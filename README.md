@@ -1,0 +1,32 @@
+# ии-Тоня Platform
+
+Production-oriented implementation of the client and expert workflows described in the
+authoritative ии-Тоня source document.
+
+## Status
+
+Pre-production. The source document is preserved, normalized, and converted into
+testable requirements before any live customer traffic is enabled.
+
+## Authoritative source
+
+- Snapshot: `docs/source/ii-tonya-expert-full-source-2026-07-28.txt`
+- SHA-256: `0439AE1C645E6FDA46F013A66512401F251AA18D35520F5C9A7A3C7C59314EAF`
+- Original Google Doc ID: `14AWYM9jbE0OPU3rKY6_PpPl3REDaqQbISdMB4D2mpUc`
+
+The source contains product intent, prompts, pseudo-JSON, and repeated drafts. It is not
+treated as executable Make configuration. `docs/spec/normalized-requirements.md` is the
+implementation contract; the source remains the traceability baseline.
+
+## System boundary
+
+Selarti serves the client channel, Telegram serves the expert channel, and Planerka
+provides scheduling integration. A transactional backend owns booking, billing, coupon,
+consent, and audit state. Make and Google Sheets are limited to non-critical automation
+and projections.
+
+## Safety boundary
+
+No real client messages, bookings, balances, payments, or crisis workflows are enabled
+until the staging contract tests and the documented go-live gates pass.
+
