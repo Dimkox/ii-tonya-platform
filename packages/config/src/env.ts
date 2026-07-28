@@ -1,13 +1,26 @@
 import { z } from "zod";
 
+const isPostgresUrl = (value: string): boolean => {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "postgres:" || protocol === "postgresql:";
+  } catch {
+    return false;
+  }
+};
+
 const schema = z.object({
-  DATABASE_URL: z.url().startsWith("postgres"),
+  DATABASE_URL: z.string().refine(isPostgresUrl, "DATABASE_URL must use postgres: or postgresql:"),
   SELARTI_ENABLED: z.literal("false").default("false"),
   PLANERKA_ENABLED: z.literal("false").default("false"),
   TELEGRAM_ENABLED: z.literal("false").default("false"),
+  LLM_ENABLED: z.literal("false").default("false"),
   MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
+  GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
   INTENT_MODEL_ENABLED: z.literal("false").default("false"),
   PAYMENTS_ENABLED: z.literal("false").default("false"),
+  PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
+  LLM_PROVIDER: z.literal("disabled").default("disabled"),
   MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
   RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
   DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),

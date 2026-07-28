@@ -17,15 +17,16 @@ describe("environment credential policy", () => {
     expect(ignored).toEqual(expect.arrayContaining([".env", ".env.*", "!.env.example"]));
 
     const example = parseEnv(readFileSync(".env.example", "utf8"));
-    const liveFlags = [
-      "SELARTI_ENABLED",
-      "PLANERKA_ENABLED",
-      "TELEGRAM_ENABLED",
-      "MAKE_PROJECTION_ENABLED",
-      "INTENT_MODEL_ENABLED",
-      "PAYMENTS_ENABLED",
-    ];
+    const liveFlags = Object.keys(example).filter((key) => key.endsWith("_ENABLED"));
+    expect(liveFlags).toEqual(expect.arrayContaining([
+      "LLM_ENABLED",
+      "GOOGLE_SHEETS_PROJECTION_ENABLED",
+      "MINOR_ONBOARDING_ENABLED",
+    ]));
     expect(liveFlags.map((key) => example[key])).toEqual(liveFlags.map(() => "false"));
+
+    expect(example.PAYMENT_PROVIDER).toBe("disabled");
+    expect(example.LLM_PROVIDER).toBe("disabled");
 
     const secretKeys = Object.keys(example).filter((key) =>
       /(PASSWORD|TOKEN|SECRET|API_KEY|HMAC_KEY)$/.test(key) || key === "DATABASE_URL");
