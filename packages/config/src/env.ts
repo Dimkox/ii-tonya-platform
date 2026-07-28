@@ -2,15 +2,19 @@ import { z } from "zod";
 
 const isPostgresUrl = (value: string): boolean => {
   try {
-    const protocol = new URL(value).protocol;
-    return protocol === "postgres:" || protocol === "postgresql:";
+    const url = new URL(value);
+    const hasPostgresProtocol = url.protocol === "postgres:" || url.protocol === "postgresql:";
+    return hasPostgresProtocol && url.hostname.length > 0 && url.pathname.length > 1;
   } catch {
     return false;
   }
 };
 
 const schema = z.object({
-  DATABASE_URL: z.string().refine(isPostgresUrl, "DATABASE_URL must use postgres: or postgresql:"),
+  DATABASE_URL: z.string().refine(
+    isPostgresUrl,
+    "DATABASE_URL must be a hierarchical postgres: or postgresql: URL with a host and database path",
+  ),
   SELARTI_ENABLED: z.literal("false").default("false"),
   PLANERKA_ENABLED: z.literal("false").default("false"),
   TELEGRAM_ENABLED: z.literal("false").default("false"),

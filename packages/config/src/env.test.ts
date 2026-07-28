@@ -39,6 +39,16 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ DATABASE_URL: "postgresx://user:password@localhost:5432/database" })).toThrow();
   });
 
+  it.each([
+    "postgres:opaque",
+    "postgresql:opaque",
+    "postgres://user:password@localhost:5432",
+    "postgres:///database",
+    "postgres://localhost/",
+  ])("rejects a non-hierarchical or pathless database URL: %s", (invalidDatabaseUrl) => {
+    expect(() => loadEnv({ DATABASE_URL: invalidDatabaseUrl })).toThrow();
+  });
+
   it("rejects every project-owned enable flag when set to true", () => {
     const ownedEnableFlags = [
       "SELARTI_ENABLED",
