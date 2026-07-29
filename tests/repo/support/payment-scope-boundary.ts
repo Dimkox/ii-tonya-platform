@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/db-gate.yml",
-    "d3fee50665d8cfb5851b054ab4fb4bb38d1269cde44c32b00444c5bef4f7066d",
+    "d3c6204bd9a11f2555d56a014b26554af29f63c7bc044dd025711dd6ec697415",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
