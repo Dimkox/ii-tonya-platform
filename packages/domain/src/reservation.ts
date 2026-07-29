@@ -25,11 +25,17 @@ export function computeReservedUntil(
   slotStartsAt: Date,
   confirmationBufferMs: number,
 ): Date {
+  const createdAtMs = createdAt.getTime();
+  const slotStartsAtMs = slotStartsAt.getTime();
+  if (!Number.isFinite(createdAtMs) || !Number.isFinite(slotStartsAtMs)
+    || !Number.isFinite(confirmationBufferMs) || confirmationBufferMs < 0) {
+    throw new Error("Invalid reservation deadline inputs");
+  }
   const deadline = new Date(Math.min(
-    createdAt.getTime() + 72 * 60 * 60 * 1_000,
-    slotStartsAt.getTime() - confirmationBufferMs,
+    createdAtMs + 72 * 60 * 60 * 1_000,
+    slotStartsAtMs - confirmationBufferMs,
   ));
-  if (deadline.getTime() <= createdAt.getTime()) throw new Error("Reservation deadline has already passed");
+  if (deadline.getTime() <= createdAtMs) throw new Error("Reservation deadline has already passed");
   return deadline;
 }
 
