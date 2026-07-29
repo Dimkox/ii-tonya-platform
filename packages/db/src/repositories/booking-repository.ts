@@ -80,6 +80,12 @@ type SlotRow = {
   serviceActive: boolean;
 };
 
+type RawSlotRow = Omit<SlotRow, "startsAt" | "endsAt" | "observedAt"> & {
+  startsAt: Date | string;
+  endsAt: Date | string;
+  observedAt: Date | string | null;
+};
+
 type ReservationRow = SlotRow & {
   reservationId: string;
   userId: string;
@@ -89,12 +95,26 @@ type ReservationRow = SlotRow & {
   version: number;
 };
 
+type RawReservationRow = Omit<
+  ReservationRow,
+  "startsAt" | "endsAt" | "observedAt" | "reservedUntil"
+> & {
+  startsAt: Date | string;
+  endsAt: Date | string;
+  observedAt: Date | string | null;
+  reservedUntil: Date | string;
+};
+
 type ReservationResultRow = {
   reservationId: string;
   userId: string;
   slotId: string | null;
   reservedUntil: Date;
   version: number;
+};
+
+type RawReservationResultRow = Omit<ReservationResultRow, "reservedUntil"> & {
+  reservedUntil: Date | string;
 };
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
@@ -115,6 +135,74 @@ export class BookingIdempotencyConflictError extends Error {
     super("Booking idempotency key belongs to another selection");
     this.name = "BookingIdempotencyConflictError";
   }
+}
+
+export class BookingDataIntegrityError extends Error {
+  readonly code = "booking_invalid_timestamp";
+
+  constructor(readonly field: string) {
+    super(`Invalid database timestamp: ${field}`);
+    this.name = "BookingDataIntegrityError";
+  }
+}
+
+export function normalizeBookingTimestamp(
+  value: Date | string,
+  field: string,
+): Date {
+  const normalized = value instanceof Date
+    ? new Date(value.getTime())
+    : new Date(value);
+  if (!Number.isFinite(normalized.getTime())) {
+    throw new BookingDataIntegrityError(field);
+  }
+  return normalized;
+}
+
+export function normalizeNullableBookingTimestamp(
+  value: Date | string | null,
+  field: string,
+): Date | null {
+  return value === null ? null : normalizeBookingTimestamp(value, field);
+}
+
+function normalizeSlotRow(row: RawSlotRow): SlotRow {
+  return {
+    ...row,
+    startsAt: normalizeBookingTimestamp(row.startsAt, "slots.starts_at"),
+    endsAt: normalizeBookingTimestamp(row.endsAt, "slots.ends_at"),
+    observedAt: normalizeNullableBookingTimestamp(
+      row.observedAt,
+      "slots.observed_at",
+    ),
+  };
+}
+
+function normalizeReservationRow(row: RawReservationRow): ReservationRow {
+  return {
+    ...normalizeSlotRow(row),
+    reservationId: row.reservationId,
+    userId: row.userId,
+    status: row.status,
+    idempotencyKey: row.idempotencyKey,
+    reservedUntil: normalizeBookingTimestamp(
+      row.reservedUntil,
+      "reservations.reserved_until",
+    ),
+    version: row.version,
+  };
+}
+
+function normalizeReservationResultRow(
+  row: RawReservationResultRow,
+): ReservationResultRow {
+  return {
+    ...row,
+    reservedUntil: normalizeBookingTimestamp(
+      row.reservedUntil,
+      "reservations.reserved_until",
+    ),
+  };
 }
 
 function hash(value: Record<string, unknown>): string {
@@ -277,7 +365,7 @@ export class PostgresBookingRepository {
       ) ordered_locks
     `);
 
-    const slot = (await tx.execute<SlotRow>(sql`
+    const rawSlot = (await tx.execute<RawSlotRow>(sql`
       select
         s.id as "slotId",
         e.id as "expertId",
@@ -295,11 +383,12 @@ export class PostgresBookingRepository {
       where s.id = ${command.slotId}::uuid
       for update of s, es, e
     `)).rows[0];
-    if (slot === undefined) {
+    if (rawSlot === undefined) {
       return { kind: "unavailable", reason: "stale_slot" };
     }
+    const slot = normalizeSlotRow(rawSlot);
 
-    const duplicate = (await tx.execute<ReservationResultRow>(sql`
+    const rawDuplicate = (await tx.execute<RawReservationResultRow>(sql`
       select
         id as "reservationId",
         user_id as "userId",
@@ -309,8 +398,11 @@ export class PostgresBookingRepository {
       from reservations
       where idempotency_key = ${command.idempotencyKey}
     `)).rows[0];
-    if (duplicate !== undefined) {
-      return this.classifyDuplicate(command, duplicate);
+    if (rawDuplicate !== undefined) {
+      return this.classifyDuplicate(
+        command,
+        normalizeReservationResultRow(rawDuplicate),
+      );
     }
 
     if (!isFresh(slot.observedAt, command.now)) {
@@ -351,7 +443,7 @@ export class PostgresBookingRepository {
       return { kind: "unavailable", reason: "expert_active_overlap" };
     }
 
-    const inserted = one((await tx.execute<ReservationResultRow>(sql`
+    const rawInserted = one((await tx.execute<RawReservationResultRow>(sql`
       insert into reservations (
         user_id, slot_id, expert_id, expert_service_id, status, idempotency_key,
         reserved_until, version, created_at, updated_at
@@ -367,6 +459,7 @@ export class PostgresBookingRepository {
         reserved_until as "reservedUntil",
         version
     `)).rows, "an inserted reservation");
+    const inserted = normalizeReservationResultRow(rawInserted);
 
     await this.auditAndOutbox(tx, {
       actorType: "client",
@@ -405,7 +498,7 @@ export class PostgresBookingRepository {
   private async resolveReservationIdempotency(
     command: ReserveSlotCommand,
   ): Promise<ReserveSlotResult> {
-    const stored = (await this.db.execute<ReservationResultRow>(sql`
+    const rawStored = (await this.db.execute<RawReservationResultRow>(sql`
       select
         id as "reservationId",
         user_id as "userId",
@@ -415,10 +508,13 @@ export class PostgresBookingRepository {
       from reservations
       where idempotency_key = ${command.idempotencyKey}
     `)).rows[0];
-    if (stored === undefined) {
+    if (rawStored === undefined) {
       throw new BookingIdempotencyConflictError(command.idempotencyKey);
     }
-    return this.classifyDuplicate(command, stored);
+    return this.classifyDuplicate(
+      command,
+      normalizeReservationResultRow(rawStored),
+    );
   }
 
   private async transitionInTransaction(
@@ -444,7 +540,7 @@ export class PostgresBookingRepository {
         order by lock_key
       ) ordered_locks
     `);
-    const reservation = (await tx.execute<ReservationRow>(sql`
+    const rawReservation = (await tx.execute<RawReservationRow>(sql`
       select
         r.id as "reservationId",
         r.user_id as "userId",
@@ -469,7 +565,8 @@ export class PostgresBookingRepository {
       where r.id = ${command.reservationId}::uuid
       for update of r, s, e, es
     `)).rows[0];
-    if (reservation === undefined) throw new Error("Reservation not found");
+    if (rawReservation === undefined) throw new Error("Reservation not found");
+    const reservation = normalizeReservationRow(rawReservation);
     if (reservation.version !== command.expectedVersion) {
       throw new Error("Stale reservation version");
     }
