@@ -54,6 +54,9 @@ jobs:
       - name: Run PostgreSQL schema integration gate
         run: pnpm exec vitest run tests/integration/schema.test.ts
 
+      - name: Repeat message-ledger concurrency gate
+        run: pnpm test:repeat -- 20 tests/integration/message-ledger-concurrency.test.ts
+
       - name: Record Docker diagnostics on failure
         if: failure()
         run: |
