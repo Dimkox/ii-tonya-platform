@@ -35,10 +35,13 @@ export interface ExpertView {
   expertNote?: string;
 }
 
-const granted = (purpose: ConsentPurpose, grants: readonly ConsentGrant[]): boolean =>
-  grants.filter((entry) => entry.purpose === purpose).toSorted(
-    (left, right) => right.recordedAt.getTime() - left.recordedAt.getTime(),
-  )[0]?.granted === true;
+const granted = (purpose: ConsentPurpose, grants: readonly ConsentGrant[]): boolean => {
+  const valid = grants.filter((entry) =>
+    entry.purpose === purpose && Number.isFinite(entry.recordedAt.getTime()));
+  const latestTimestamp = Math.max(...valid.map((entry) => entry.recordedAt.getTime()));
+  const latest = valid.filter((entry) => entry.recordedAt.getTime() === latestTimestamp);
+  return latest.length > 0 && latest.every((entry) => entry.granted);
+};
 
 export function buildProfilePatch(input: ProfileInput, grants: readonly ConsentGrant[]): ProfilePatch {
   if (!granted("client_profile", grants)) return { displayName: input.displayName };

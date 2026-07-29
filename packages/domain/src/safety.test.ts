@@ -95,6 +95,57 @@ describe("safety evaluation", () => {
     });
   });
 
+  it("fails closed when the deterministic guard throws before classifier use", async () => {
+    const classifier = { classify: vi.fn().mockResolvedValue("ordinary" as const) };
+    const guard = { detect: vi.fn().mockImplementation(() => { throw new Error("guard unavailable"); }) };
+    await expect(evaluateSafety({
+      text: "guard failure fixture",
+      countryCode: "RU",
+      regionCode: "MOW",
+      ageBand: "adult",
+      ledgerBalance: 5,
+      now,
+    }, guard, classifier, { list: () => [freshContact] })).resolves.toMatchObject({
+      kind: "human_handoff",
+      charge: 0,
+      reason: "classifier_unavailable",
+      directoryState: "fresh_fallback",
+      contacts: [expect.objectContaining({ id: "contact-1" })],
+    });
+    expect(classifier.classify).not.toHaveBeenCalled();
+  });
+
+  it("normalizes country and region codes while preserving null regions", async () => {
+    const classifier = { classify: vi.fn().mockResolvedValue("self_harm" as const) };
+    const guard = { detect: vi.fn().mockReturnValue(null) };
+    const regional = { ...freshContact, countryCode: " ru ", regionCode: " mow " };
+    const national = { ...freshContact, id: "contact-2", countryCode: " ru ", regionCode: null };
+
+    await expect(evaluateSafety({
+      text: "normalized regional fixture",
+      countryCode: " RU ",
+      regionCode: " mow ",
+      ageBand: "adult",
+      ledgerBalance: 0,
+      now,
+    }, guard, classifier, { list: () => [regional] })).resolves.toMatchObject({
+      kind: "human_handoff",
+      contacts: [expect.objectContaining({ id: "contact-1" })],
+    });
+
+    await expect(evaluateSafety({
+      text: "normalized national fixture",
+      countryCode: " ru ",
+      regionCode: null,
+      ageBand: "adult",
+      ledgerBalance: 0,
+      now,
+    }, guard, classifier, { list: () => [national] })).resolves.toMatchObject({
+      kind: "human_handoff",
+      contacts: [expect.objectContaining({ id: "contact-2" })],
+    });
+  });
+
   it("SAFE-05 assigns an opened handoff and escalates at the inclusive SLA deadline", () => {
     const assigned = transitionHandoff({
       status: "opened",

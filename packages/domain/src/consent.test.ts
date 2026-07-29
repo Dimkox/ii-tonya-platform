@@ -19,4 +19,26 @@ describe("privacy minimization", () => {
       expertNoteConsent: false,
     })).not.toHaveProperty("expertNote");
   });
+
+  it("fails closed for invalid consent timestamps and equal-time conflicts", () => {
+    const input = { displayName: "Аня", goals: "снизить тревогу" };
+    expect(buildProfilePatch(input, [
+      { purpose: "client_profile", granted: true, recordedAt: new Date("invalid") },
+      { purpose: "client_profile", granted: false, recordedAt: new Date("2026-07-28T10:00:00.000Z") },
+    ])).toEqual({ displayName: "Аня" });
+
+    const recordedAt = new Date("2026-07-28T10:00:00.000Z");
+    for (const grants of [
+      [
+        { purpose: "client_profile" as const, granted: true, recordedAt },
+        { purpose: "client_profile" as const, granted: false, recordedAt },
+      ],
+      [
+        { purpose: "client_profile" as const, granted: false, recordedAt },
+        { purpose: "client_profile" as const, granted: true, recordedAt },
+      ],
+    ]) {
+      expect(buildProfilePatch(input, grants)).toEqual({ displayName: "Аня" });
+    }
+  });
 });

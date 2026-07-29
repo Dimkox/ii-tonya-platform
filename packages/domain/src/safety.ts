@@ -46,16 +46,20 @@ export type SafetyDecision =
     contacts: SafetyContact[];
   };
 
+const normalizeCode = (code: string | null): string | null =>
+  code === null ? null : code.trim().toUpperCase();
+
 export async function evaluateSafety(
   input: SafetyInput,
   guard: DeterministicSafetyGuard,
   classifier: SafetyClassifier,
   directory: SafetyDirectory,
 ): Promise<SafetyDecision> {
-  const deterministicRisk = guard.detect(input.text);
+  const countryCode = normalizeCode(input.countryCode);
+  const regionCode = normalizeCode(input.regionCode);
   const selectContacts = (risk: SafetyRisk): SafetyContact[] => directory.list().filter((contact) =>
-    contact.countryCode === input.countryCode
-    && (contact.regionCode === null || contact.regionCode === input.regionCode)
+    normalizeCode(contact.countryCode) === countryCode
+    && (contact.regionCode === null || normalizeCode(contact.regionCode) === regionCode)
     && contact.ageBands.includes(input.ageBand)
     && contact.riskTypes.includes(risk)
     && contact.verifiedAt.getTime() <= input.now.getTime()
@@ -64,7 +68,7 @@ export async function evaluateSafety(
     && contact.owner.length > 0);
 
   try {
-    const level = deterministicRisk ?? await classifier.classify(input.text);
+    const level = guard.detect(input.text) ?? await classifier.classify(input.text);
     if (level === "ordinary") return { kind: "ordinary", charge: -1, contacts: [] };
     const contacts = selectContacts(level);
     return {
