@@ -354,8 +354,8 @@ describe("conversation message repository", () => {
 
     const handoff = await testDb.db.execute<{
       ownerId: string;
-      openedAt: Date;
-      acknowledgeBy: Date;
+      openedAt: string;
+      acknowledgeBy: string;
     }>(sql`
       select
         h.owner_id as "ownerId",
@@ -365,11 +365,14 @@ describe("conversation message repository", () => {
       join safety_incidents i on i.id = h.incident_id
       where i.reason_code = 'intent_unavailable'
     `);
-    expect(handoff.rows[0]).toMatchObject({
-      ownerId,
-      openedAt,
-      acknowledgeBy,
-    });
+    const storedHandoff = handoff.rows[0];
+    expect(storedHandoff?.ownerId).toBe(ownerId);
+    expect(new Date(storedHandoff?.openedAt ?? "").toISOString()).toBe(
+      openedAt.toISOString(),
+    );
+    expect(new Date(storedHandoff?.acknowledgeBy ?? "").toISOString()).toBe(
+      acknowledgeBy.toISOString(),
+    );
   });
 
   it.each([
