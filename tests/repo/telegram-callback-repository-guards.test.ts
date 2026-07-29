@@ -8,7 +8,7 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
   it("wraps a database outage as a typed retryable infrastructure error", async () => {
     const databaseFailure = Object.assign(
       new Error("database connection refused"),
-      { code: "08006" },
+      { code: "ECONNREFUSED", errno: -4078, syscall: "connect" },
     );
     const db = {
       $client: {
@@ -29,6 +29,11 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
   });
 
   it.each([
+    ["ECONNRESET", "CallbackInfrastructureError", true],
+    ["ETIMEDOUT", "CallbackInfrastructureError", true],
+    ["ENOTFOUND", "CallbackInfrastructureError", true],
+    ["EAI_AGAIN", "CallbackInfrastructureError", true],
+    ["EPIPE", "CallbackInfrastructureError", true],
     ["40001", "CallbackInfrastructureError", true],
     ["40P01", "CallbackInfrastructureError", true],
     ["57P03", "CallbackInfrastructureError", true],
@@ -36,6 +41,7 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
     ["22P02", "CallbackDataIntegrityError", false],
     ["23505", "CallbackConflictError", false],
     ["42P01", "CallbackDataIntegrityError", false],
+    ["UNEXPECTED", "CallbackDataIntegrityError", false],
   ] as const)(
     "classifies SQLSTATE %s without retrying deterministic failures forever",
     async (code, name, retryable) => {
@@ -113,7 +119,9 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
       );
       expect(statement).toContain("es.expert_id = r.expert_id");
     }
-    expect(statements[0]).toContain("to_timestamp($5) > now()");
+    expect(statements[0]).toContain(
+      "floor(extract(epoch from case when $7 = 'confirm' then least(to_timestamp($5), r.reserved_until) else to_timestamp($5) end)) > floor(extract(epoch from clock_timestamp()))",
+    );
     expect(statements[0]).toContain("r.reserved_until > now()");
     expect(statements[0]).toContain("s.starts_at > now()");
     expect(statements[0]).toContain(

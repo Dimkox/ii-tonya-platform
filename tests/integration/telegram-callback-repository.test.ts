@@ -454,6 +454,54 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     ).toBe(1);
   });
 
+  it("rejects a sub-second capped expiry and issues from the next epoch second", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const subSecond = await testDb.createTelegramCallbackReservation({
+      reservationVersion: 3,
+    });
+    const subSecondClock =
+      await testDb.prepareTelegramCallbackIssuanceBoundary(
+        subSecond.reservationId,
+        "same_epoch_subsecond",
+      );
+    await expect(
+      repository.put("hash-put-subsecond-expiry", {
+        reservationId: subSecond.reservationId,
+        expertId: subSecond.expertId,
+        action: "confirm",
+        version: 3,
+        expiresAtEpochSeconds: subSecondClock + 600,
+      }),
+    ).rejects.toMatchObject({
+      name: "CallbackConflictError",
+      retryable: false,
+    });
+    expect(
+      await testDb.notificationCountForToken("hash-put-subsecond-expiry"),
+    ).toBe(0);
+
+    const nextSecond = await testDb.createTelegramCallbackReservation({
+      reservationVersion: 3,
+    });
+    const nextSecondClock =
+      await testDb.prepareTelegramCallbackIssuanceBoundary(
+        nextSecond.reservationId,
+        "future_epoch",
+      );
+    await expect(
+      repository.put("hash-put-next-second-expiry", {
+        reservationId: nextSecond.reservationId,
+        expertId: nextSecond.expertId,
+        action: "confirm",
+        version: 3,
+        expiresAtEpochSeconds: nextSecondClock + 600,
+      }),
+    ).resolves.toBeUndefined();
+    expect(
+      await testDb.notificationCountForToken("hash-put-next-second-expiry"),
+    ).toBe(1);
+  });
+
   it("caps confirm callback expiry at the authoritative reservation hold", async () => {
     const repository = new PostgresTelegramCallbackRepository(testDb.db);
     const owner = await testDb.createTelegramCallbackReservation({

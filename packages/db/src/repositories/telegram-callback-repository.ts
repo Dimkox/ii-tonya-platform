@@ -26,6 +26,34 @@ interface CallbackRow extends QueryResultRow {
   callback_claims: string;
 }
 
+const retryableSystemCodes = new Set([
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTDOWN",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETRESET",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+]);
+
+const retryableSqlStates = new Set([
+  "40001",
+  "40P01",
+  "57P01",
+  "57P02",
+  "57P03",
+  "53000",
+  "53100",
+  "53200",
+  "53300",
+  "53400",
+]);
+
 const callbackStoreQuery = async <Row extends QueryResultRow>(
   db: DrizzleDb,
   statement: string,
@@ -41,19 +69,8 @@ const callbackStoreQuery = async <Row extends QueryResultRow>(
       typeof error.code === "string"
         ? error.code
         : undefined;
-    const retryableSqlStates = new Set([
-      "40001",
-      "40P01",
-      "57P01",
-      "57P02",
-      "57P03",
-      "53000",
-      "53100",
-      "53200",
-      "53300",
-      "53400",
-    ]);
     if (
+      (sqlState !== undefined && retryableSystemCodes.has(sqlState)) ||
       sqlState?.startsWith("08") === true ||
       (sqlState !== undefined && retryableSqlStates.has(sqlState))
     ) {
@@ -148,7 +165,11 @@ export class PostgresTelegramCallbackRepository {
           and e.active
           and e.verified
           and r.version = $8
-          and to_timestamp($5) > now()
+          and floor(extract(epoch from case
+            when $7 = 'confirm'
+              then least(to_timestamp($5), r.reserved_until)
+            else to_timestamp($5)
+          end)) > floor(extract(epoch from clock_timestamp()))
           and (
             (
               $7 = 'confirm'

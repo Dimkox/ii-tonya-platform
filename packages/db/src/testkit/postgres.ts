@@ -205,6 +205,10 @@ export interface TestDatabase {
     },
   ): Promise<void>;
   crossWireTelegramCallbackReservation(reservationId: string): Promise<void>;
+  prepareTelegramCallbackIssuanceBoundary(
+    reservationId: string,
+    boundary: "same_epoch_subsecond" | "future_epoch",
+  ): Promise<number>;
 }
 
 function oneId(rows: { id: string }[]): string {
@@ -1077,6 +1081,43 @@ export async function startTestPostgres(
         set expert_service_id = ${other.serviceId}::uuid, updated_at = now()
         where id = ${reservationId}::uuid
       `);
+    },
+    async prepareTelegramCallbackIssuanceBoundary(reservationId, boundary) {
+      const result = await db.execute<{ epoch_seconds: string }>(sql`
+        with authoritative_clock as (
+          select clock_timestamp() as db_now
+        ),
+        updated_reservation as (
+          update reservations r
+          set
+            reserved_until = case
+              when ${boundary} = 'same_epoch_subsecond'
+                then date_trunc('second', c.db_now) + interval '999 milliseconds'
+              else date_trunc('second', c.db_now) + interval '5 seconds'
+            end,
+            updated_at = c.db_now
+          from authoritative_clock c
+          where r.id = ${reservationId}::uuid
+          returning c.db_now
+        )
+        select floor(extract(epoch from db_now))::text as epoch_seconds
+        from updated_reservation
+      `);
+      await db.execute(sql`
+        update slots s
+        set
+          starts_at = clock_timestamp() + interval '1 hour',
+          observed_at = clock_timestamp(),
+          updated_at = clock_timestamp()
+        from reservations r
+        where r.id = ${reservationId}::uuid
+          and s.id = r.slot_id
+      `);
+      const value = result.rows[0]?.epoch_seconds;
+      if (value === undefined) {
+        throw new Error("Failed to prepare callback issuance boundary");
+      }
+      return Number(value);
     },
   };
 }
