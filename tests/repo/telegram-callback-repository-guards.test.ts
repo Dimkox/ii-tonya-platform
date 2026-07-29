@@ -149,6 +149,87 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
     });
   });
 
+  it("contains revoked and throwing proxy traps as non-retryable integrity", async () => {
+    const revoked = Proxy.revocable(new Error("revoked"), {});
+    revoked.revoke();
+    const throwingArray = new Proxy([new Error("child")], {
+      get(_target, property) {
+        if (property === "length" || property === "0") {
+          throw new Error("array inspection trap");
+        }
+        return Reflect.get(_target, property);
+      },
+    });
+    const throwingIteratorAccess = Object.defineProperty({}, Symbol.iterator, {
+      get() {
+        throw new Error("iterator access trap");
+      },
+    });
+    const throwingIteratorCall = {
+      [Symbol.iterator]() {
+        throw new Error("iterator call trap");
+      },
+    };
+
+    for (const failure of [
+      revoked.proxy,
+      Object.assign(new Error("array proxy"), { errors: throwingArray }),
+      Object.assign(new Error("iterator getter"), {
+        errors: throwingIteratorAccess,
+      }),
+      Object.assign(new Error("iterator call"), {
+        errors: throwingIteratorCall,
+      }),
+    ]) {
+      await expect(
+        repositoryThrowing(failure).peek("opaque-token-hash"),
+      ).rejects.toMatchObject({
+        name: "CallbackDataIntegrityError",
+        retryable: false,
+      });
+    }
+  });
+
+  it("classifies a nested unique/idempotency violation as conflict", async () => {
+    const failure = new Error("wrapper", {
+      cause: Object.assign(new Error("unique violation"), { code: "23505" }),
+    });
+
+    await expect(
+      repositoryThrowing(failure).peek("opaque-token-hash"),
+    ).rejects.toMatchObject({
+      name: "CallbackConflictError",
+      retryable: false,
+      cause: failure,
+    });
+  });
+
+  it("gives a nested transient code precedence over aggregate conflict codes", async () => {
+    const failure = new AggregateError(
+      [
+        new Error("conflict wrapper", {
+          cause: Object.assign(new Error("unique violation"), {
+            code: "23505",
+          }),
+        }),
+        new Error("transient wrapper", {
+          cause: Object.assign(new Error("connection reset"), {
+            code: "ECONNRESET",
+          }),
+        }),
+      ],
+      "mixed",
+    );
+
+    await expect(
+      repositoryThrowing(failure).peek("opaque-token-hash"),
+    ).rejects.toMatchObject({
+      name: "CallbackInfrastructureError",
+      retryable: true,
+      cause: failure,
+    });
+  });
+
   it("reports corrupt stored callback claims as non-retryable data integrity", async () => {
     const db = {
       $client: {

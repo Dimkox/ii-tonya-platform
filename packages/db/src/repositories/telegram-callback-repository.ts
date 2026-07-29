@@ -73,15 +73,15 @@ const readErrorProperty = (
   }
 };
 
-const isRetryableCode = (code: unknown): boolean =>
-  typeof code === "string" &&
-  (retryableSystemCodes.has(code) ||
-    code.startsWith("08") ||
-    retryableSqlStates.has(code));
+const isRetryableCode = (code: string): boolean =>
+  retryableSystemCodes.has(code) ||
+  code.startsWith("08") ||
+  retryableSqlStates.has(code);
 
-const hasRetryableErrorCode = (root: unknown): boolean => {
+const extractErrorCodes = (root: unknown): ReadonlySet<string> => {
   const queue: Array<{ value: object; depth: number }> = [];
   const seen = new WeakSet<object>();
+  const codes = new Set<string>();
   let enqueued = 0;
   const enqueue = (value: unknown, depth: number): void => {
     if (
@@ -100,9 +100,8 @@ const hasRetryableErrorCode = (root: unknown): boolean => {
   for (let cursor = 0; cursor < queue.length; cursor += 1) {
     const current = queue[cursor];
     if (current === undefined) break;
-    if (isRetryableCode(readErrorProperty(current.value, "code"))) {
-      return true;
-    }
+    const code = readErrorProperty(current.value, "code");
+    if (typeof code === "string") codes.add(code);
     if (current.depth >= MAX_ERROR_GRAPH_DEPTH) continue;
 
     enqueue(
@@ -110,20 +109,22 @@ const hasRetryableErrorCode = (root: unknown): boolean => {
       current.depth + 1,
     );
     const errors = readErrorProperty(current.value, "errors");
-    if (Array.isArray(errors)) {
-      const count = Math.min(errors.length, MAX_ERROR_CHILDREN);
-      for (let index = 0; index < count; index += 1) {
-        enqueue(readErrorProperty(errors, index), current.depth + 1);
-      }
-      continue;
-    }
-    if (!isObjectLike(errors)) continue;
-    const iteratorFactory = readErrorProperty(errors, Symbol.iterator);
-    if (typeof iteratorFactory !== "function") {
-      enqueue(errors, current.depth + 1);
-      continue;
-    }
     try {
+      if (Array.isArray(errors)) {
+        const count = Math.min(errors.length, MAX_ERROR_CHILDREN);
+        for (let index = 0; index < count; index += 1) {
+          enqueue(errors[index], current.depth + 1);
+        }
+        continue;
+      }
+      if (!isObjectLike(errors)) continue;
+      const iteratorFactory = (
+        errors as Record<PropertyKey, unknown>
+      )[Symbol.iterator];
+      if (typeof iteratorFactory !== "function") {
+        enqueue(errors, current.depth + 1);
+        continue;
+      }
       const iterator = iteratorFactory.call(errors) as Iterator<unknown>;
       for (let index = 0; index < MAX_ERROR_CHILDREN; index += 1) {
         const next = iterator.next();
@@ -135,7 +136,7 @@ const hasRetryableErrorCode = (root: unknown): boolean => {
       // Malformed iterables are deterministic data-integrity failures.
     }
   }
-  return false;
+  return codes;
 };
 
 const callbackStoreQuery = async <Row extends QueryResultRow>(
@@ -146,17 +147,14 @@ const callbackStoreQuery = async <Row extends QueryResultRow>(
   try {
     return await db.$client.query<Row>(statement, values);
   } catch (error) {
-    const directCode = isObjectLike(error)
-      ? readErrorProperty(error, "code")
-      : undefined;
-    const sqlState = typeof directCode === "string" ? directCode : undefined;
-    if (hasRetryableErrorCode(error)) {
+    const codes = extractErrorCodes(error);
+    if (Array.from(codes).some(isRetryableCode)) {
       throw new CallbackInfrastructureError(
         "callback_store_unavailable",
         error,
       );
     }
-    if (sqlState?.startsWith("23") === true) {
+    if (codes.has("23505")) {
       throw new CallbackConflictError(error);
     }
     throw new CallbackDataIntegrityError(error);
