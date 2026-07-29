@@ -36,6 +36,13 @@
       "when": 1785326820323,
       "tag": "0004_durable_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785329420182,
+      "tag": "0005_outbox_fencing_tokens",
+      "breakpoints": true
     }
   ]
 }

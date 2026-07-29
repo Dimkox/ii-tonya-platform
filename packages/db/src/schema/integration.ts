@@ -65,9 +65,11 @@ export const integrationOutbox = pgTable(
       .notNull()
       .default(0),
     dispatchOwnerId: text("dispatch_owner_id"),
+    dispatchClaimToken: text("dispatch_claim_token"),
     leaseUntil: timestamp("lease_until", { withTimezone: true }),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     reconciliationOwnerId: text("reconciliation_owner_id"),
+    reconciliationClaimToken: text("reconciliation_claim_token"),
     reconciliationLeaseUntil: timestamp("reconciliation_lease_until", {
       withTimezone: true,
     }),

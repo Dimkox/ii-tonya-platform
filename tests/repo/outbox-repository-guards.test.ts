@@ -10,18 +10,22 @@ describe("durable outbox repository guards", () => {
   it("fences dispatch and reconciliation mutations by status, owner, and lease", () => {
     expect(repository).toContain('row.status !== "processing"');
     expect(repository).toContain("row.dispatchOwnerId !== owner");
-    expect(repository).toContain("isBefore(row.leaseUntil, now)");
+    expect(repository).toContain("row.dispatchClaimToken !== claimToken");
     expect(repository).toContain("lease_until >= clock_timestamp()");
     expect(repository).toContain('row.status !== "reconciling"');
     expect(repository).toContain("row.reconciliationOwnerId !== owner");
     expect(repository).toContain(
-      "isBefore(row.reconciliationLeaseUntil, now)",
+      "row.reconciliationClaimToken !== claimToken",
     );
     expect(repository).toContain(
       "reconciliation_lease_until >= clock_timestamp()",
     );
     expect(repository).toContain("succeedAfterReconciliation");
     expect(repository).toContain("retryAfterReconciliation");
+    expect(repository).toContain("gen_random_uuid()::text");
+    expect(repository).toContain(
+      "clock_timestamp() + (${leaseDurationMs} * interval '1 millisecond')",
+    );
   });
 
   it("terminalizes exhausted rows before claim increments either budget", () => {

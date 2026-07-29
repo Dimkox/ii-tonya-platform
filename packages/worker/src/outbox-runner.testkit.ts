@@ -27,6 +27,7 @@ export interface FakeOutboxRepository extends OutboxRepository {
   makeUnknownClaimable(): void;
   makeUnknown(id: string, reconciliationAttempt?: number): void;
   failNextLocalSuccessWrite(): void;
+  advanceDatabaseClock(milliseconds: number): void;
 }
 
 function cloneMessage(row: FakeRow): OutboxMessage {
@@ -38,6 +39,8 @@ function cloneMessage(row: FakeRow): OutboxMessage {
     attempt: row.attempt,
     reconciliationKey: row.reconciliationKey,
     reconciliationAttempt: row.reconciliationAttempt,
+    dispatchClaimToken: row.dispatchClaimToken,
+    reconciliationClaimToken: row.reconciliationClaimToken,
   };
 }
 
@@ -53,11 +56,17 @@ export function fakeOutboxRepository(
         correlationId: `correlation:${item.id}`,
         reconciliationKey: `${item.topic.split(".").at(-1) ?? item.topic}:${item.id}`,
         reconciliationAttempt: 0,
+        dispatchClaimToken: null,
+        reconciliationClaimToken: null,
         status: "pending",
       },
     ]),
   );
   let failSuccessWrite = false;
+  let databaseNow = new Date("2026-07-28T10:00:00.000Z");
+  let tokenSequence = 0;
+  const newToken = (phase: string): string =>
+    `${phase}-claim-${String(++tokenSequence)}`;
   const retryCalls: { id: string; at: string; reasonCode: string }[] = [];
   const succeedCalls: string[] = [];
   const deadLetterCalls: { id: string; reasonCode: string }[] = [];
@@ -72,7 +81,7 @@ export function fakeOutboxRepository(
     retryCalls,
     succeedCalls,
     deadLetterCalls,
-    async claim(limit, owner, leaseUntil, maxAttempts) {
+    async claim(limit, owner, leaseDurationMs, maxAttempts) {
       for (const row of rows.values()) {
         if (
           (row.status === "pending" || row.status === "retry_wait") &&
@@ -93,12 +102,18 @@ export function fakeOutboxRepository(
       for (const row of claimed) {
         row.status = "processing";
         row.attempt += 1;
-        row.leaseUntil = leaseUntil;
+        row.leaseUntil = new Date(databaseNow.getTime() + leaseDurationMs);
         row.dispatchOwner = owner;
+        row.dispatchClaimToken = newToken("dispatch");
       }
       return claimed.map(cloneMessage);
     },
-    async claimUnknown(limit, owner, leaseUntil, maxReconciliationAttempts) {
+    async claimUnknown(
+      limit,
+      owner,
+      leaseDurationMs,
+      maxReconciliationAttempts,
+    ) {
       for (const row of rows.values()) {
         if (
           row.status === "unknown_outcome" &&
@@ -118,18 +133,28 @@ export function fakeOutboxRepository(
       for (const row of claimed) {
         row.status = "reconciling";
         row.reconciliationAttempt += 1;
-        row.reconciliationLeaseUntil = leaseUntil;
+        row.reconciliationLeaseUntil = new Date(
+          databaseNow.getTime() + leaseDurationMs,
+        );
         row.reconciliationOwner = owner;
+        row.reconciliationClaimToken = newToken("reconciliation");
       }
       return claimed.map(cloneMessage);
     },
-    async recordAttemptStarted(id, owner, _attemptId, reconciliationKey, now) {
+    async recordAttemptStarted(
+      id,
+      owner,
+      claimToken,
+      _attemptId,
+      reconciliationKey,
+    ) {
       const row = requireRow(id);
       if (
         row.status !== "processing" ||
         row.dispatchOwner !== owner ||
+        row.dispatchClaimToken !== claimToken ||
         row.leaseUntil === undefined ||
-        row.leaseUntil < now
+        row.leaseUntil < databaseNow
       )
         throw new Error("Row is not dispatch-leased");
       if (row.reconciliationKey !== reconciliationKey) {
@@ -139,17 +164,19 @@ export function fakeOutboxRepository(
     async markUnknownOutcome(
       id,
       owner,
+      claimToken,
       _attemptId,
       reconciliationKey,
       _reasonCode,
-      now,
     ) {
+      void _reasonCode;
       const row = requireRow(id);
       if (
         row.status !== "processing" ||
         row.dispatchOwner !== owner ||
+        row.dispatchClaimToken !== claimToken ||
         row.leaseUntil === undefined ||
-        row.leaseUntil < now
+        row.leaseUntil < databaseNow
       ) {
         throw new Error("Dispatch lease lost");
       }
@@ -159,14 +186,16 @@ export function fakeOutboxRepository(
       row.status = "unknown_outcome";
       delete row.leaseUntil;
       delete row.dispatchOwner;
+      row.dispatchClaimToken = null;
     },
-    async markStillUnknown(id, owner, now, _reasonCode, nextCheckAt) {
+    async markStillUnknown(id, owner, claimToken, _reasonCode, nextCheckAt) {
       const row = requireRow(id);
       if (
         row.status !== "reconciling" ||
         row.reconciliationOwner !== owner ||
+        row.reconciliationClaimToken !== claimToken ||
         row.reconciliationLeaseUntil === undefined ||
-        row.reconciliationLeaseUntil < now
+        row.reconciliationLeaseUntil < databaseNow
       ) {
         throw new Error("Reconciliation lease lost");
       }
@@ -174,8 +203,9 @@ export function fakeOutboxRepository(
       row.nextReconciliationAt = nextCheckAt;
       delete row.reconciliationLeaseUntil;
       delete row.reconciliationOwner;
+      row.reconciliationClaimToken = null;
     },
-    async succeed(id, owner, now) {
+    async succeed(id, owner, claimToken) {
       if (failSuccessWrite) {
         failSuccessWrite = false;
         throw new Error("simulated local acknowledgement failure");
@@ -184,58 +214,74 @@ export function fakeOutboxRepository(
       if (
         row.status !== "processing" ||
         row.dispatchOwner !== owner ||
+        row.dispatchClaimToken !== claimToken ||
         row.leaseUntil === undefined ||
-        row.leaseUntil < now
+        row.leaseUntil < databaseNow
       ) {
         throw new Error("Dispatch lease lost");
       }
       row.status = "succeeded";
+      delete row.leaseUntil;
+      delete row.dispatchOwner;
+      row.dispatchClaimToken = null;
       succeedCalls.push(id);
     },
-    async retry(id, owner, now, nextAttemptAt, reasonCode) {
+    async retry(id, owner, claimToken, nextAttemptAt, reasonCode) {
       const row = requireRow(id);
       if (
         row.status !== "processing" ||
         row.dispatchOwner !== owner ||
+        row.dispatchClaimToken !== claimToken ||
         row.leaseUntil === undefined ||
-        row.leaseUntil < now
+        row.leaseUntil < databaseNow
       ) {
         throw new Error("Dispatch lease lost");
       }
       row.status = "retry_wait";
       row.nextAttemptAt = nextAttemptAt;
+      delete row.leaseUntil;
+      delete row.dispatchOwner;
+      row.dispatchClaimToken = null;
       retryCalls.push({ id, at: nextAttemptAt.toISOString(), reasonCode });
     },
-    async deadLetterAndAlert(id, owner, now, reasonCode) {
+    async deadLetterAndAlert(id, owner, claimToken, reasonCode) {
       const row = requireRow(id);
       if (
         row.status !== "processing" ||
         row.dispatchOwner !== owner ||
+        row.dispatchClaimToken !== claimToken ||
         row.leaseUntil === undefined ||
-        row.leaseUntil < now
+        row.leaseUntil < databaseNow
       ) {
         throw new Error("Dispatch lease lost");
       }
       row.status = "dead_letter";
+      delete row.leaseUntil;
+      delete row.dispatchOwner;
+      row.dispatchClaimToken = null;
       deadLetterCalls.push({ id, reasonCode });
     },
-    async succeedAfterReconciliation(id, owner, now) {
+    async succeedAfterReconciliation(id, owner, claimToken) {
       const row = requireRow(id);
       if (
         row.status !== "reconciling" ||
         row.reconciliationOwner !== owner ||
+        row.reconciliationClaimToken !== claimToken ||
         row.reconciliationLeaseUntil === undefined ||
-        row.reconciliationLeaseUntil < now
+        row.reconciliationLeaseUntil < databaseNow
       ) {
         throw new Error("Reconciliation lease lost");
       }
       row.status = "succeeded";
+      delete row.reconciliationLeaseUntil;
+      delete row.reconciliationOwner;
+      row.reconciliationClaimToken = null;
       succeedCalls.push(id);
     },
     async retryAfterReconciliation(
       id,
       owner,
-      now,
+      claimToken,
       nextAttemptAt,
       reasonCode,
     ) {
@@ -243,55 +289,70 @@ export function fakeOutboxRepository(
       if (
         row.status !== "reconciling" ||
         row.reconciliationOwner !== owner ||
+        row.reconciliationClaimToken !== claimToken ||
         row.reconciliationLeaseUntil === undefined ||
-        row.reconciliationLeaseUntil < now
+        row.reconciliationLeaseUntil < databaseNow
       ) {
         throw new Error("Reconciliation lease lost");
       }
       row.status = "retry_wait";
       row.nextAttemptAt = nextAttemptAt;
+      delete row.reconciliationLeaseUntil;
+      delete row.reconciliationOwner;
+      row.reconciliationClaimToken = null;
       retryCalls.push({ id, at: nextAttemptAt.toISOString(), reasonCode });
     },
-    async deadLetterAfterReconciliationAndAlert(id, owner, now, reasonCode) {
+    async deadLetterAfterReconciliationAndAlert(
+      id,
+      owner,
+      claimToken,
+      reasonCode,
+    ) {
       const row = requireRow(id);
       if (
         row.status !== "reconciling" ||
         row.reconciliationOwner !== owner ||
+        row.reconciliationClaimToken !== claimToken ||
         row.reconciliationLeaseUntil === undefined ||
-        row.reconciliationLeaseUntil < now
+        row.reconciliationLeaseUntil < databaseNow
       ) {
         throw new Error("Reconciliation lease lost");
       }
       row.status = "dead_letter";
+      delete row.reconciliationLeaseUntil;
+      delete row.reconciliationOwner;
+      row.reconciliationClaimToken = null;
       deadLetterCalls.push({ id, reasonCode });
     },
-    async recoverExpiredDispatchLeases(now) {
+    async recoverExpiredDispatchLeases() {
       let count = 0;
       for (const row of rows.values()) {
         if (
           row.status === "processing" &&
           row.leaseUntil !== undefined &&
-          row.leaseUntil <= now
+          row.leaseUntil <= databaseNow
         ) {
           row.status = "unknown_outcome";
           delete row.leaseUntil;
           delete row.dispatchOwner;
+          row.dispatchClaimToken = null;
           count += 1;
         }
       }
       return count;
     },
-    async recoverExpiredReconciliationLeases(now) {
+    async recoverExpiredReconciliationLeases() {
       let count = 0;
       for (const row of rows.values()) {
         if (
           row.status === "reconciling" &&
           row.reconciliationLeaseUntil !== undefined &&
-          row.reconciliationLeaseUntil <= now
+          row.reconciliationLeaseUntil <= databaseNow
         ) {
           row.status = "unknown_outcome";
           delete row.reconciliationLeaseUntil;
           delete row.reconciliationOwner;
+          row.reconciliationClaimToken = null;
           count += 1;
         }
       }
@@ -317,6 +378,9 @@ export function fakeOutboxRepository(
     },
     failNextLocalSuccessWrite() {
       failSuccessWrite = true;
+    },
+    advanceDatabaseClock(milliseconds) {
+      databaseNow = new Date(databaseNow.getTime() + milliseconds);
     },
   };
 }

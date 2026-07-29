@@ -139,6 +139,9 @@ export interface TestDatabase {
   insertOutbox(input: InsertOutboxInput): Promise<string>;
   insertUnknownOutbox(input: InsertUnknownOutboxInput): Promise<string>;
   outboxStatus(id: string): Promise<string>;
+  expireDispatchLease(id: string): Promise<void>;
+  expireReconciliationLease(id: string): Promise<void>;
+  makeOutboxRetryDue(id: string): Promise<void>;
   ownerAlertReasons(id: string): Promise<string[]>;
   deadLetterReasons(id: string): Promise<string[]>;
   createConfirmEligibilityCase(caseName: ConfirmEligibilityCase): Promise<{
@@ -754,6 +757,28 @@ export async function startTestPostgres(
       const status = result.rows[0]?.status;
       if (status === undefined) throw new Error("Outbox row not found");
       return status;
+    },
+    async expireDispatchLease(id) {
+      await db.execute(sql`
+        update integration_outbox
+        set lease_until = clock_timestamp() - interval '1 millisecond'
+        where id = ${id}::uuid and status = 'processing'
+      `);
+    },
+    async expireReconciliationLease(id) {
+      await db.execute(sql`
+        update integration_outbox
+        set reconciliation_lease_until =
+          clock_timestamp() - interval '1 millisecond'
+        where id = ${id}::uuid and status = 'reconciling'
+      `);
+    },
+    async makeOutboxRetryDue(id) {
+      await db.execute(sql`
+        update integration_outbox
+        set next_attempt_at = clock_timestamp() - interval '1 millisecond'
+        where id = ${id}::uuid and status = 'retry_wait'
+      `);
     },
     async ownerAlertReasons(id) {
       const result = await db.execute<{ reason: string }>(sql`

@@ -118,9 +118,8 @@ describe("outbox runner", () => {
       }),
     ).rejects.toThrow("simulated local acknowledgement failure");
 
-    await repository.recoverExpiredDispatchLeases(
-      new Date("2026-07-28T10:01:00.000Z"),
-    );
+    repository.advanceDatabaseClock(60_000);
+    await repository.recoverExpiredDispatchLeases();
     repository.makeUnknownClaimable();
     await runOutboxBatch({
       ...baseDeps(),
@@ -219,5 +218,35 @@ describe("outbox runner", () => {
         reasonCode: "unknown_outcome_reconciliation_exhausted_before_claim",
       },
     ]);
+  });
+
+  it.each([
+    "1900-01-01T00:00:00.000Z",
+    "2099-01-01T00:00:00.000Z",
+  ])("does not let worker clock %s steal an active database lease", async (workerNow) => {
+    const repository = fakeOutboxRepository([
+      { id: `clock-${workerNow}`, topic: "telegram.send", attempt: 0 },
+    ]);
+    repository.failNextLocalSuccessWrite();
+    const dispatch = vi.fn().mockResolvedValue({
+      kind: "applied",
+      providerOperationId: "provider-clock",
+    });
+    const deps = {
+      ...baseDeps(),
+      repository,
+      dispatcher: { dispatch },
+      reconciler: { reconcile: vi.fn() },
+      now: () => new Date(workerNow),
+    };
+
+    await expect(runOutboxBatch(deps)).rejects.toThrow(
+      "simulated local acknowledgement failure",
+    );
+    await expect(runOutboxBatch(deps)).resolves.toEqual({
+      reconciled: 0,
+      dispatched: 0,
+    });
+    expect(dispatch).toHaveBeenCalledTimes(1);
   });
 });

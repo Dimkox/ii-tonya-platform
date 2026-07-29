@@ -143,6 +143,10 @@ describe("authoritative Drizzle schema parity", () => {
         "utf8",
       ),
       readFileSync("packages/db/migrations/0004_durable_outbox.sql", "utf8"),
+      readFileSync(
+        "packages/db/migrations/0005_outbox_fencing_tokens.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -185,7 +189,7 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0004_snapshot.json";
+    const path = "packages/db/migrations/meta/0005_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {

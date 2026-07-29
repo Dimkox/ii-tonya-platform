@@ -6,24 +6,27 @@ export interface OutboxMessage {
   attempt: number;
   reconciliationKey: string;
   reconciliationAttempt: number;
+  dispatchClaimToken: string | null;
+  reconciliationClaimToken: string | null;
 }
 
 export interface OutboxRepository {
   claim(
     limit: number,
     owner: string,
-    leaseUntil: Date,
+    leaseDurationMs: number,
     maxAttempts: number,
   ): Promise<readonly OutboxMessage[]>;
   claimUnknown(
     limit: number,
     owner: string,
-    leaseUntil: Date,
+    leaseDurationMs: number,
     maxReconciliationAttempts: number,
   ): Promise<readonly OutboxMessage[]>;
   recordAttemptStarted(
     id: string,
     owner: string,
+    claimToken: string,
     attemptId: string,
     reconciliationKey: string,
     startedAt: Date,
@@ -31,48 +34,52 @@ export interface OutboxRepository {
   markUnknownOutcome(
     id: string,
     owner: string,
+    claimToken: string,
     attemptId: string,
     reconciliationKey: string,
     reasonCode: string,
-    now: Date,
   ): Promise<void>;
   markStillUnknown(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
     nextCheckAt: Date,
   ): Promise<void>;
-  succeed(id: string, owner: string, now: Date): Promise<void>;
+  succeed(id: string, owner: string, claimToken: string): Promise<void>;
   retry(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     nextAttemptAt: Date,
     reasonCode: string,
   ): Promise<void>;
   deadLetterAndAlert(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
   ): Promise<void>;
-  succeedAfterReconciliation(id: string, owner: string, now: Date): Promise<void>;
+  succeedAfterReconciliation(
+    id: string,
+    owner: string,
+    claimToken: string,
+  ): Promise<void>;
   retryAfterReconciliation(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     nextAttemptAt: Date,
     reasonCode: string,
   ): Promise<void>;
   deadLetterAfterReconciliationAndAlert(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
   ): Promise<void>;
-  recoverExpiredDispatchLeases(now: Date): Promise<number>;
-  recoverExpiredReconciliationLeases(now: Date): Promise<number>;
+  recoverExpiredDispatchLeases(): Promise<number>;
+  recoverExpiredReconciliationLeases(): Promise<number>;
 }
 
 export type DispatchOutcome =
@@ -136,6 +143,20 @@ function retryAt(deps: OutboxRunnerDeps, now: Date, attempt: number): Date {
   return new Date(now.getTime() + deps.retryDelayMs(attempt));
 }
 
+function dispatchToken(message: OutboxMessage): string {
+  if (message.dispatchClaimToken === null) {
+    throw new Error(`Dispatch claim token missing for ${message.id}`);
+  }
+  return message.dispatchClaimToken;
+}
+
+function reconciliationToken(message: OutboxMessage): string {
+  if (message.reconciliationClaimToken === null) {
+    throw new Error(`Reconciliation claim token missing for ${message.id}`);
+  }
+  return message.reconciliationClaimToken;
+}
+
 async function reconcileUnknown(
   deps: OutboxRunnerDeps,
   message: OutboxMessage,
@@ -145,19 +166,18 @@ async function reconcileUnknown(
   try {
     resolution = await deps.reconciler.reconcile(message);
   } catch {
-    const mutationAt = deps.now();
     if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
       await deps.repository.deadLetterAfterReconciliationAndAlert(
         message.id,
         deps.workerId,
-        mutationAt,
+        reconciliationToken(message),
         "reconciliation_exception_exhausted",
       );
     } else {
       await deps.repository.markStillUnknown(
         message.id,
         deps.workerId,
-        mutationAt,
+        reconciliationToken(message),
         "reconciliation_exception",
         retryAt(deps, now, message.reconciliationAttempt),
       );
@@ -165,12 +185,11 @@ async function reconcileUnknown(
     return;
   }
 
-  const mutationAt = deps.now();
   if (resolution === "applied") {
     await deps.repository.succeedAfterReconciliation(
       message.id,
       deps.workerId,
-      mutationAt,
+      reconciliationToken(message),
     );
     return;
   }
@@ -179,14 +198,14 @@ async function reconcileUnknown(
       await deps.repository.deadLetterAfterReconciliationAndAlert(
         message.id,
         deps.workerId,
-        mutationAt,
+        reconciliationToken(message),
         "dispatch_attempts_exhausted_after_reconciliation",
       );
     } else {
       await deps.repository.retryAfterReconciliation(
         message.id,
         deps.workerId,
-        mutationAt,
+        reconciliationToken(message),
         retryAt(deps, now, message.attempt),
         "reconciled_not_applied",
       );
@@ -197,14 +216,14 @@ async function reconcileUnknown(
     await deps.repository.deadLetterAfterReconciliationAndAlert(
       message.id,
       deps.workerId,
-      mutationAt,
+      reconciliationToken(message),
       "unknown_outcome_reconciliation_exhausted",
     );
   } else {
     await deps.repository.markStillUnknown(
       message.id,
       deps.workerId,
-      mutationAt,
+      reconciliationToken(message),
       "still_unknown",
       retryAt(deps, now, message.reconciliationAttempt),
     );
@@ -220,6 +239,7 @@ async function dispatchPending(
   await deps.repository.recordAttemptStarted(
     message.id,
     deps.workerId,
+    dispatchToken(message),
     attemptId,
     message.reconciliationKey,
     now,
@@ -232,26 +252,30 @@ async function dispatchPending(
     await deps.repository.markUnknownOutcome(
       message.id,
       deps.workerId,
+      dispatchToken(message),
       attemptId,
       message.reconciliationKey,
       "dispatch_exception_unknown",
-      deps.now(),
     );
     return;
   }
 
   if (outcome.kind === "applied") {
-    await deps.repository.succeed(message.id, deps.workerId, deps.now());
+    await deps.repository.succeed(
+      message.id,
+      deps.workerId,
+      dispatchToken(message),
+    );
     return;
   }
   if (outcome.kind === "unknown_outcome") {
     await deps.repository.markUnknownOutcome(
       message.id,
       deps.workerId,
+      dispatchToken(message),
       attemptId,
       outcome.reconciliationKey,
       outcome.reasonCode,
-      deps.now(),
     );
     return;
   }
@@ -259,7 +283,7 @@ async function dispatchPending(
     await deps.repository.retry(
       message.id,
       deps.workerId,
-      deps.now(),
+      dispatchToken(message),
       retryAt(deps, now, message.attempt),
       outcome.reasonCode,
     );
@@ -267,7 +291,7 @@ async function dispatchPending(
     await deps.repository.deadLetterAndAlert(
       message.id,
       deps.workerId,
-      deps.now(),
+      dispatchToken(message),
       outcome.reasonCode,
     );
   }
@@ -277,14 +301,14 @@ export async function runOutboxBatch(
   deps: OutboxRunnerDeps,
 ): Promise<OutboxRunResult> {
   const now = deps.now();
-  await deps.repository.recoverExpiredDispatchLeases(now);
-  await deps.repository.recoverExpiredReconciliationLeases(now);
-  const leaseUntil = new Date(now.getTime() + (deps.leaseDurationMs ?? 30_000));
+  await deps.repository.recoverExpiredDispatchLeases();
+  await deps.repository.recoverExpiredReconciliationLeases();
+  const leaseDurationMs = deps.leaseDurationMs ?? 30_000;
 
   const unknown = await deps.repository.claimUnknown(
     deps.batchSize,
     deps.workerId,
-    leaseUntil,
+    leaseDurationMs,
     deps.maxReconciliationAttempts,
   );
   for (const message of unknown) {
@@ -294,7 +318,7 @@ export async function runOutboxBatch(
   const messages = await deps.repository.claim(
     deps.batchSize,
     deps.workerId,
-    leaseUntil,
+    leaseDurationMs,
     deps.maxAttempts,
   );
   for (const message of messages) {

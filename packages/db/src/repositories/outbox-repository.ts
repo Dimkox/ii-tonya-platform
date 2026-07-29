@@ -15,6 +15,8 @@ interface RawOutboxMessage extends Record<string, unknown> {
   attempt: number;
   reconciliationKey: string;
   reconciliationAttempt: number;
+  dispatchClaimToken: string | null;
+  reconciliationClaimToken: string | null;
 }
 
 export interface PersistedOutboxMessage {
@@ -25,6 +27,8 @@ export interface PersistedOutboxMessage {
   attempt: number;
   reconciliationKey: string;
   reconciliationAttempt: number;
+  dispatchClaimToken: string | null;
+  reconciliationClaimToken: string | null;
 }
 
 interface LockedOutboxRow extends Record<string, unknown> {
@@ -35,8 +39,10 @@ interface LockedOutboxRow extends Record<string, unknown> {
   reconciliationKey: string;
   attempt: number;
   dispatchOwnerId: string | null;
+  dispatchClaimToken: string | null;
   leaseUntil: Date | string | null;
   reconciliationOwnerId: string | null;
+  reconciliationClaimToken: string | null;
   reconciliationLeaseUntil: Date | string | null;
   dispatchLeaseValid: boolean;
   reconciliationLeaseValid: boolean;
@@ -78,8 +84,10 @@ async function lockedRow(
       reconciliation_key as "reconciliationKey",
       attempt,
       dispatch_owner_id as "dispatchOwnerId",
+      dispatch_claim_token as "dispatchClaimToken",
       lease_until as "leaseUntil",
       reconciliation_owner_id as "reconciliationOwnerId",
+      reconciliation_claim_token as "reconciliationClaimToken",
       reconciliation_lease_until as "reconciliationLeaseUntil",
       (
         lease_until is not null
@@ -99,20 +107,17 @@ async function lockedRow(
   return row;
 }
 
-function isBefore(value: Date | string | null, now: Date): boolean {
-  return value === null || new Date(value).getTime() < now.getTime();
-}
-
 function requireDispatchLease(
   row: LockedOutboxRow,
   owner: string,
-  now: Date,
+  claimToken: string,
 ): void {
   if (
     row.status !== "processing" ||
     row.dispatchOwnerId !== owner ||
+    row.dispatchClaimToken !== claimToken ||
     !row.dispatchLeaseValid ||
-    isBefore(row.leaseUntil, now)
+    row.leaseUntil === null
   ) {
     throw new OutboxLeaseLostError(`Dispatch lease lost for outbox row ${row.id}`);
   }
@@ -121,13 +126,14 @@ function requireDispatchLease(
 function requireReconciliationLease(
   row: LockedOutboxRow,
   owner: string,
-  now: Date,
+  claimToken: string,
 ): void {
   if (
     row.status !== "reconciling" ||
     row.reconciliationOwnerId !== owner ||
+    row.reconciliationClaimToken !== claimToken ||
     !row.reconciliationLeaseValid ||
-    isBefore(row.reconciliationLeaseUntil, now)
+    row.reconciliationLeaseUntil === null
   ) {
     throw new OutboxLeaseLostError(
       `Reconciliation lease lost for outbox row ${row.id}`,
@@ -208,8 +214,10 @@ async function writeDeadLetterAndAlert(
     set
       status = 'dead_letter',
       dispatch_owner_id = null,
+      dispatch_claim_token = null,
       lease_until = null,
       reconciliation_owner_id = null,
+      reconciliation_claim_token = null,
       reconciliation_lease_until = null,
       next_attempt_at = null,
       next_reconciliation_at = null,
@@ -235,10 +243,13 @@ export class PostgresOutboxRepository {
   async claim(
     limit: number,
     owner: string,
-    leaseUntil: Date,
+    leaseDurationMs: number,
     maxAttempts: number,
   ): Promise<readonly PersistedOutboxMessage[]> {
     if (!Number.isSafeInteger(limit) || limit < 1) return [];
+    if (!Number.isSafeInteger(leaseDurationMs) || leaseDurationMs < 1) {
+      throw new RangeError("leaseDurationMs must be a positive integer");
+    }
     return this.db.transaction(async (tx) => {
       await terminalizeDispatchExhausted(tx, maxAttempts);
       const result = await tx.execute<RawOutboxMessage>(sql`
@@ -262,7 +273,10 @@ export class PostgresOutboxRepository {
           status = 'processing',
           attempt = o.attempt + 1,
           dispatch_owner_id = ${owner},
-          lease_until = ${leaseUntil},
+          dispatch_claim_token = gen_random_uuid()::text,
+          reconciliation_claim_token = null,
+          lease_until =
+            clock_timestamp() + (${leaseDurationMs} * interval '1 millisecond'),
           next_attempt_at = null,
           updated_at = now()
         from claimable
@@ -274,7 +288,9 @@ export class PostgresOutboxRepository {
           o.correlation_id as "correlationId",
           o.attempt,
           o.reconciliation_key as "reconciliationKey",
-          o.reconciliation_attempt as "reconciliationAttempt"
+          o.reconciliation_attempt as "reconciliationAttempt",
+          o.dispatch_claim_token as "dispatchClaimToken",
+          o.reconciliation_claim_token as "reconciliationClaimToken"
       `);
       return messages(result.rows);
     });
@@ -283,10 +299,13 @@ export class PostgresOutboxRepository {
   async claimUnknown(
     limit: number,
     owner: string,
-    leaseUntil: Date,
+    leaseDurationMs: number,
     maxReconciliationAttempts: number,
   ): Promise<readonly PersistedOutboxMessage[]> {
     if (!Number.isSafeInteger(limit) || limit < 1) return [];
+    if (!Number.isSafeInteger(leaseDurationMs) || leaseDurationMs < 1) {
+      throw new RangeError("leaseDurationMs must be a positive integer");
+    }
     return this.db.transaction(async (tx) => {
       await terminalizeReconciliationExhausted(
         tx,
@@ -308,7 +327,10 @@ export class PostgresOutboxRepository {
           status = 'reconciling',
           reconciliation_attempt = o.reconciliation_attempt + 1,
           reconciliation_owner_id = ${owner},
-          reconciliation_lease_until = ${leaseUntil},
+          reconciliation_claim_token = gen_random_uuid()::text,
+          dispatch_claim_token = null,
+          reconciliation_lease_until =
+            clock_timestamp() + (${leaseDurationMs} * interval '1 millisecond'),
           next_reconciliation_at = null,
           updated_at = now()
         from claimable
@@ -320,7 +342,9 @@ export class PostgresOutboxRepository {
           o.correlation_id as "correlationId",
           o.attempt,
           o.reconciliation_key as "reconciliationKey",
-          o.reconciliation_attempt as "reconciliationAttempt"
+          o.reconciliation_attempt as "reconciliationAttempt",
+          o.dispatch_claim_token as "dispatchClaimToken",
+          o.reconciliation_claim_token as "reconciliationClaimToken"
       `);
       return messages(result.rows);
     });
@@ -329,13 +353,14 @@ export class PostgresOutboxRepository {
   async recordAttemptStarted(
     id: string,
     owner: string,
+    claimToken: string,
     attemptId: string,
     reconciliationKey: string,
     startedAt: Date,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireDispatchLease(row, owner, startedAt);
+      requireDispatchLease(row, owner, claimToken);
       if (row.reconciliationKey !== reconciliationKey) {
         throw new OutboxStateConflictError(
           "Outbox reconciliation key mismatch",
@@ -366,14 +391,14 @@ export class PostgresOutboxRepository {
   async markUnknownOutcome(
     id: string,
     owner: string,
+    claimToken: string,
     attemptId: string,
     reconciliationKey: string,
     reasonCode: string,
-    now: Date,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireDispatchLease(row, owner, now);
+      requireDispatchLease(row, owner, claimToken);
       if (row.reconciliationKey !== reconciliationKey) {
         throw new OutboxStateConflictError(
           "Outbox reconciliation key mismatch",
@@ -402,6 +427,7 @@ export class PostgresOutboxRepository {
         set
           status = 'unknown_outcome',
           dispatch_owner_id = null,
+          dispatch_claim_token = null,
           lease_until = null,
           next_reconciliation_at = now(),
           last_normalized_reason = ${reasonCode},
@@ -423,18 +449,19 @@ export class PostgresOutboxRepository {
   async markStillUnknown(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
     nextCheckAt: Date,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireReconciliationLease(row, owner, now);
+      requireReconciliationLease(row, owner, claimToken);
       await tx.execute(sql`
         update integration_outbox
         set
           status = 'unknown_outcome',
           reconciliation_owner_id = null,
+          reconciliation_claim_token = null,
           reconciliation_lease_until = null,
           next_reconciliation_at = ${nextCheckAt},
           last_normalized_reason = ${reasonCode},
@@ -444,10 +471,10 @@ export class PostgresOutboxRepository {
     });
   }
 
-  async succeed(id: string, owner: string, now: Date): Promise<void> {
+  async succeed(id: string, owner: string, claimToken: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireDispatchLease(row, owner, now);
+      requireDispatchLease(row, owner, claimToken);
       await this.transitionSucceeded(tx, id);
     });
   }
@@ -455,13 +482,13 @@ export class PostgresOutboxRepository {
   async retry(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     nextAttemptAt: Date,
     reasonCode: string,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireDispatchLease(row, owner, now);
+      requireDispatchLease(row, owner, claimToken);
       await this.transitionRetry(tx, id, nextAttemptAt, reasonCode);
     });
   }
@@ -469,12 +496,12 @@ export class PostgresOutboxRepository {
   async deadLetterAndAlert(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireDispatchLease(row, owner, now);
+      requireDispatchLease(row, owner, claimToken);
       await writeDeadLetterAndAlert(tx, row, reasonCode);
     });
   }
@@ -482,11 +509,11 @@ export class PostgresOutboxRepository {
   async succeedAfterReconciliation(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireReconciliationLease(row, owner, now);
+      requireReconciliationLease(row, owner, claimToken);
       await this.transitionSucceeded(tx, id);
     });
   }
@@ -494,13 +521,13 @@ export class PostgresOutboxRepository {
   async retryAfterReconciliation(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     nextAttemptAt: Date,
     reasonCode: string,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireReconciliationLease(row, owner, now);
+      requireReconciliationLease(row, owner, claimToken);
       await this.transitionRetry(tx, id, nextAttemptAt, reasonCode);
     });
   }
@@ -508,12 +535,12 @@ export class PostgresOutboxRepository {
   async deadLetterAfterReconciliationAndAlert(
     id: string,
     owner: string,
-    now: Date,
+    claimToken: string,
     reasonCode: string,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireReconciliationLease(row, owner, now);
+      requireReconciliationLease(row, owner, claimToken);
       await writeDeadLetterAndAlert(tx, row, reasonCode);
     });
   }
@@ -527,8 +554,10 @@ export class PostgresOutboxRepository {
       set
         status = 'succeeded',
         dispatch_owner_id = null,
+        dispatch_claim_token = null,
         lease_until = null,
         reconciliation_owner_id = null,
+        reconciliation_claim_token = null,
         reconciliation_lease_until = null,
         next_attempt_at = null,
         next_reconciliation_at = null,
@@ -549,8 +578,10 @@ export class PostgresOutboxRepository {
       set
         status = 'retry_wait',
         dispatch_owner_id = null,
+        dispatch_claim_token = null,
         lease_until = null,
         reconciliation_owner_id = null,
+        reconciliation_claim_token = null,
         reconciliation_lease_until = null,
         next_attempt_at = ${nextAttemptAt},
         next_reconciliation_at = null,
@@ -560,7 +591,7 @@ export class PostgresOutboxRepository {
     `);
   }
 
-  async recoverExpiredDispatchLeases(now: Date): Promise<number> {
+  async recoverExpiredDispatchLeases(): Promise<number> {
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
         with recovered as (
@@ -568,11 +599,13 @@ export class PostgresOutboxRepository {
           set
             status = 'unknown_outcome',
             dispatch_owner_id = null,
+            dispatch_claim_token = null,
             lease_until = null,
             next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'dispatch_lease_expired_unknown_outcome',
             updated_at = now()
-          where status = 'processing' and lease_until < ${now}
+          where status = 'processing'
+            and lease_until < clock_timestamp()
           returning id, topic, attempt, reconciliation_key
         )
         insert into delivery_attempts (
@@ -594,7 +627,7 @@ export class PostgresOutboxRepository {
     });
   }
 
-  async recoverExpiredReconciliationLeases(now: Date): Promise<number> {
+  async recoverExpiredReconciliationLeases(): Promise<number> {
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
         with recovered as (
@@ -602,11 +635,13 @@ export class PostgresOutboxRepository {
           set
             status = 'unknown_outcome',
             reconciliation_owner_id = null,
+            reconciliation_claim_token = null,
             reconciliation_lease_until = null,
             next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'reconciliation_lease_expired',
             updated_at = now()
-          where status = 'reconciling' and reconciliation_lease_until < ${now}
+          where status = 'reconciling'
+            and reconciliation_lease_until < clock_timestamp()
           returning id, topic, attempt, reconciliation_attempt, reconciliation_key
         )
         insert into delivery_attempts (

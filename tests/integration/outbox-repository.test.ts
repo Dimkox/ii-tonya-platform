@@ -55,12 +55,13 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     const [claimed] = await repository.claim(
       1,
       "dispatch-a",
-      new Date(now.getTime() + 30_000),
+      30_000,
       3,
     );
     await repository.recordAttemptStarted(
       id,
       "dispatch-a",
+      claimed!.dispatchClaimToken!,
       "attempt-1",
       claimed!.reconciliationKey,
       now,
@@ -68,15 +69,15 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     await repository.markUnknownOutcome(
       id,
       "dispatch-a",
+      claimed!.dispatchClaimToken!,
       "attempt-1",
       "reservation:provider-key-1",
       "response_timeout",
-      new Date(now.getTime() + 1_000),
     );
     const [firstReconciliation] = await repository.claimUnknown(
       1,
       "reconciler-a",
-      new Date(now.getTime() + 90_000),
+      30_000,
       3,
     );
     expect(firstReconciliation).toMatchObject({
@@ -85,15 +86,12 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       reconciliationAttempt: 1,
     });
 
-    expect(
-      await repository.recoverExpiredReconciliationLeases(
-        new Date(now.getTime() + 91_000),
-      ),
-    ).toBe(1);
+    await testDb.expireReconciliationLease(id);
+    expect(await repository.recoverExpiredReconciliationLeases()).toBe(1);
     const [recovered] = await repository.claimUnknown(
       1,
       "reconciler-b",
-      new Date(now.getTime() + 150_000),
+      30_000,
       3,
     );
     expect(recovered).toMatchObject({
@@ -104,7 +102,6 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
   });
 
   it("turns an expired dispatch lease into unknown outcome before any resend", async () => {
-    const now = new Date();
     const repository = new PostgresOutboxRepository(testDb.db);
     const id = await testDb.insertOutbox({
       topic: "selarti.send",
@@ -113,21 +110,18 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     await repository.claim(
       1,
       "dispatch-a",
-      new Date(now.getTime() + 30_000),
+      30_000,
       3,
     );
 
-    expect(
-      await repository.recoverExpiredDispatchLeases(
-        new Date(now.getTime() + 31_000),
-      ),
-    ).toBe(1);
+    await testDb.expireDispatchLease(id);
+    expect(await repository.recoverExpiredDispatchLeases()).toBe(1);
     expect(await testDb.outboxStatus(id)).toBe("unknown_outcome");
     expect(
       await repository.claim(
         1,
         "must-not-resend",
-        new Date(now.getTime() + 90_000),
+        30_000,
         3,
       ),
     ).toEqual([]);
@@ -143,12 +137,13 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     const [claimed] = await repository.claim(
       1,
       "dispatch-a",
-      new Date(now.getTime() + 30_000),
+      30_000,
       3,
     );
     await repository.recordAttemptStarted(
       id,
       "dispatch-a",
+      claimed!.dispatchClaimToken!,
       "attempt-key",
       claimed!.reconciliationKey,
       now,
@@ -158,17 +153,16 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       repository.markUnknownOutcome(
         id,
         "dispatch-a",
+        claimed!.dispatchClaimToken!,
         "attempt-key",
         "message:different-key",
         "response_timeout",
-        new Date(now.getTime() + 1_000),
       ),
     ).rejects.toThrow("reconciliation key");
     expect(await testDb.outboxStatus(id)).toBe("processing");
   });
 
   it("rejects stale dispatch and reconciliation workers with a typed lease-lost error", async () => {
-    const now = new Date();
     const repository = new PostgresOutboxRepository(testDb.db);
     const id = await testDb.insertOutbox({
       topic: "selarti.send",
@@ -177,7 +171,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     const [claimed] = await repository.claim(
       1,
       "dispatch-owner",
-      new Date(now.getTime() + 30_000),
+      30_000,
       3,
     );
 
@@ -185,27 +179,28 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       repository.recordAttemptStarted(
         id,
         "wrong-owner",
+        claimed!.dispatchClaimToken!,
         "attempt-lease",
         claimed!.reconciliationKey,
-        now,
+        new Date(),
       ),
     ).rejects.toBeInstanceOf(OutboxLeaseLostError);
 
     await repository.recordAttemptStarted(
       id,
       "dispatch-owner",
+      claimed!.dispatchClaimToken!,
       "attempt-lease",
       claimed!.reconciliationKey,
-      now,
+      new Date(),
     );
-    await repository.recoverExpiredDispatchLeases(
-      new Date(now.getTime() + 31_000),
-    );
+    await testDb.expireDispatchLease(id);
+    await repository.recoverExpiredDispatchLeases();
     await expect(
       repository.succeed(
         id,
         "dispatch-owner",
-        new Date(now.getTime() + 31_000),
+        claimed!.dispatchClaimToken!,
       ),
     ).rejects.toBeInstanceOf(OutboxLeaseLostError);
     expect(await testDb.outboxStatus(id)).toBe("unknown_outcome");
@@ -213,14 +208,14 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     const [unknown] = await repository.claimUnknown(
       1,
       "reconciliation-owner",
-      new Date(now.getTime() + 90_000),
+      30_000,
       3,
     );
     await expect(
       repository.succeedAfterReconciliation(
         unknown!.id,
         "wrong-owner",
-        new Date(now.getTime() + 60_000),
+        unknown!.reconciliationClaimToken!,
       ),
     ).rejects.toBeInstanceOf(OutboxLeaseLostError);
     expect(await testDb.outboxStatus(id)).toBe("reconciling");
@@ -253,6 +248,51 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     expect(await testDb.ownerAlertReasons(reconciliationId)).toEqual([
       "unknown_outcome_reconciliation_exhausted_before_claim",
     ]);
+  });
+
+  it("uses the PostgreSQL clock so worker clock skew cannot recover an active lease", async () => {
+    const repository = new PostgresOutboxRepository(testDb.db);
+    const id = await testDb.insertOutbox({
+      topic: "telegram.send",
+      reconciliationKey: "message:clock-authority",
+    });
+    const [claimed] = await repository.claim(1, "clock-worker", 60_000, 3);
+    expect(claimed).toMatchObject({
+      id,
+      dispatchClaimToken: expect.any(String),
+    });
+
+    expect(await repository.recoverExpiredDispatchLeases()).toBe(0);
+    expect(await testDb.outboxStatus(id)).toBe("processing");
+  });
+
+  it("rejects a stale same-owner generation after recovery and reclaim", async () => {
+    const repository = new PostgresOutboxRepository(testDb.db);
+    const id = await testDb.insertOutbox({
+      topic: "selarti.send",
+      reconciliationKey: "message:generation",
+    });
+    const [first] = await repository.claim(1, "same-worker", 60_000, 3);
+    await testDb.expireDispatchLease(id);
+    expect(await repository.recoverExpiredDispatchLeases()).toBe(1);
+    const [unknown] = await repository.claimUnknown(1, "same-worker", 60_000, 3);
+    await repository.retryAfterReconciliation(
+      id,
+      "same-worker",
+      unknown!.reconciliationClaimToken!,
+      new Date(),
+      "reconciled_not_applied",
+    );
+    await testDb.makeOutboxRetryDue(id);
+    const [second] = await repository.claim(1, "same-worker", 60_000, 3);
+    expect(second!.dispatchClaimToken).not.toBe(first!.dispatchClaimToken);
+
+    await expect(
+      repository.succeed(id, "same-worker", first!.dispatchClaimToken!),
+    ).rejects.toBeInstanceOf(OutboxLeaseLostError);
+    expect(await testDb.outboxStatus(id)).toBe("processing");
+    await repository.succeed(id, "same-worker", second!.dispatchClaimToken!);
+    expect(await testDb.outboxStatus(id)).toBe("succeeded");
   });
 
   it("never retries beyond either budget and atomically alerts the owner", async () => {
