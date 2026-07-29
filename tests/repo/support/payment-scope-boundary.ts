@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as ts from "typescript";
 
 export const PAYMENT_SCOPE_MAX_TRACKED_FILES = 5_000;
@@ -8,9 +9,242 @@ const approvedPaymentBoundaryPaths = new Set([
   "packages/integrations/src/payment/disabled-payment-adapter.ts",
   "packages/integrations/src/payment/payment-port.ts",
 ]);
+const approvedPaymentBoundaryHashes = new Map([
+  [
+    "packages/integrations/src/index.ts",
+    "fb15704134cb61cca1cbb8b12d7f760e76e0b0c2cd7c6a1a8e50fca0e8ac70f0",
+  ],
+  [
+    "packages/integrations/src/payment/disabled-payment-adapter.ts",
+    "1ae27257231b3b3060219eb400936ebc37b251a95969f047bc450e5050c7560f",
+  ],
+  [
+    "packages/integrations/src/payment/payment-port.ts",
+    "84dc621fc5cafdffb64cb42af0fa567cad6560ea41ea46ce393d8aa29cce950f",
+  ],
+]);
+const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
+  [
+    "apps/api/package.json",
+    new Set([
+      "@fastify/rate-limit",
+      "@ii-tonya/application",
+      "@ii-tonya/config",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "@ii-tonya/observability",
+      "fastify",
+    ]),
+  ],
+  [
+    "apps/worker/package.json",
+    new Set([
+      "@ii-tonya/config",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "@ii-tonya/observability",
+      "@ii-tonya/worker",
+    ]),
+  ],
+  [
+    "package.json",
+    new Set([
+      "@eslint/js",
+      "@types/node",
+      "@vitest/coverage-v8",
+      "drizzle-kit",
+      "drizzle-orm",
+      "eslint",
+      "globals",
+      "prettier",
+      "tsup",
+      "tsx",
+      "typescript",
+      "typescript-eslint",
+      "vitest",
+      "yaml",
+    ]),
+  ],
+  [
+    "packages/application/package.json",
+    new Set(["@ii-tonya/contracts", "@ii-tonya/domain"]),
+  ],
+  ["packages/config/package.json", new Set(["zod"])],
+  ["packages/contracts/package.json", new Set(["zod"])],
+  [
+    "packages/db/package.json",
+    new Set([
+      "@ii-tonya/contracts",
+      "@ii-tonya/domain",
+      "@testcontainers/postgresql",
+      "@types/pg",
+      "drizzle-kit",
+      "drizzle-orm",
+      "pg",
+    ]),
+  ],
+  ["packages/domain/package.json", new Set(["fast-check"])],
+  [
+    "packages/integrations/package.json",
+    new Set(["@ii-tonya/contracts", "zod"]),
+  ],
+  [
+    "packages/observability/package.json",
+    new Set(["@opentelemetry/api", "@opentelemetry/sdk-node", "pino"]),
+  ],
+  [
+    "packages/worker/package.json",
+    new Set([
+      "@ii-tonya/application",
+      "@ii-tonya/contracts",
+      "@ii-tonya/db",
+      "@ii-tonya/domain",
+      "@ii-tonya/integrations",
+    ]),
+  ],
+]);
+const approvedDependencySpecifiers = new Map([
+  ["@eslint/js", "^9.31.0"],
+  ["@fastify/rate-limit", "^10.3.0"],
+  ["@ii-tonya/application", "workspace:*"],
+  ["@ii-tonya/config", "workspace:*"],
+  ["@ii-tonya/contracts", "workspace:*"],
+  ["@ii-tonya/db", "workspace:*"],
+  ["@ii-tonya/domain", "workspace:*"],
+  ["@ii-tonya/integrations", "workspace:*"],
+  ["@ii-tonya/observability", "workspace:*"],
+  ["@ii-tonya/worker", "workspace:*"],
+  ["@opentelemetry/api", "^1.9.0"],
+  ["@opentelemetry/sdk-node", "^0.203.0"],
+  ["@testcontainers/postgresql", "^10.28.0"],
+  ["@types/node", "^24.0.0"],
+  ["@types/pg", "^8.15.5"],
+  ["@vitest/coverage-v8", "^3.2.4"],
+  ["drizzle-kit", "^0.31.4"],
+  ["drizzle-orm", "^0.44.3"],
+  ["eslint", "^9.31.0"],
+  ["fast-check", "^4.2.0"],
+  ["fastify", "^5.5.0"],
+  ["globals", "^14.0.0"],
+  ["pg", "^8.16.3"],
+  ["pino", "^9.7.0"],
+  ["prettier", "^3.6.2"],
+  ["tsup", "^8.5.0"],
+  ["tsx", "^4.20.3"],
+  ["typescript", "^5.8.3"],
+  ["typescript-eslint", "^8.30.1"],
+  ["vitest", "^3.2.4"],
+  ["yaml", "^2.8.0"],
+  ["zod", "^4.3.6"],
+]);
+const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0000_mvp.sql",
+    "067926dd1249fabdc59f91dedd39ebfade05a55a3de38059705092f512139216",
+  ],
+  [
+    "packages/db/migrations/0001_message-package-metadata.sql",
+    "eb09df658b46f735c4dbaedf899c8b4b87ac77649655842666cdd3ab2972c6a2",
+  ],
+  [
+    "packages/db/migrations/0002_atomic-message-accounting.sql",
+    "d29a4db9cd25d98cf9b586e2d64e8094fbd8ccbf4a41fe2b2c3752843b5ffea5",
+  ],
+  [
+    "packages/db/migrations/0003_booking-concurrency.sql",
+    "c070a7696279f3379ade453e4291626aae6e81bc21162c7bc0d628435131bbcd",
+  ],
+  [
+    "packages/db/migrations/0004_durable_outbox.sql",
+    "e2a2292c1401e0e5b19f4d7cf2adfd79a37391fe7854049cc3c4a883777794ab",
+  ],
+  [
+    "packages/db/migrations/0005_outbox_fencing_tokens.sql",
+    "d726342f962f66f975e7350ec1a3dadb78eac6d32349a0c09932bf56d5edcb4d",
+  ],
+  [
+    "packages/db/migrations/0006_telegram-callback-expert-fk.sql",
+    "551998e8ae51fe5d2267ca2dc4d13e54d8af05f084bcfd8cb92a63f0ba3d1567",
+  ],
+  [
+    "packages/db/migrations/meta/0000_snapshot.json",
+    "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
+  ],
+  [
+    "packages/db/migrations/meta/0001_snapshot.json",
+    "8e2d5febb23b7017ecf0de19acb4b7207d32e47ddd66af72586b030a4146f71b",
+  ],
+  [
+    "packages/db/migrations/meta/0002_snapshot.json",
+    "0af1d4abb7f505136cbd36239d6fcb2a44de9bd479f613f8aa2b9a663506c7e8",
+  ],
+  [
+    "packages/db/migrations/meta/0003_snapshot.json",
+    "d4682f177711765f3a54f7018657617657470efc18aa8b4e74fcf0cf0e9ddc68",
+  ],
+  [
+    "packages/db/migrations/meta/0004_snapshot.json",
+    "64f8c016d7f457ae75744666880efda6c2e30f8554d4a36844d0dd418bc22ae0",
+  ],
+  [
+    "packages/db/migrations/meta/0005_snapshot.json",
+    "c4f244df4c1ab894d37522cf0bb140cadb262124c17bfeee4b5570a29bd9dbc8",
+  ],
+  [
+    "packages/db/migrations/meta/0006_snapshot.json",
+    "3feec1d2443b1ae9e6b8e6d03fb41a7fb6d6ee0995adfd63650cfc062d487df5",
+  ],
+  [
+    "packages/db/migrations/meta/_journal.json",
+    "9c50d32d4990b62617c95340de77122f0e20cdcd79463316d612aefd226b27b0",
+  ],
+]);
+const approvedDatabaseRelations = new Set([
+  "admin_approvals",
+  "audit_events",
+  "channel_identities",
+  "client_profiles",
+  "consents",
+  "conversation_messages",
+  "conversations",
+  "dead_letters",
+  "delivery_attempts",
+  "expert_services",
+  "experts",
+  "feedback",
+  "human_escalations",
+  "integration_inbox",
+  "integration_outbox",
+  "message_events",
+  "message_ledger_entries",
+  "message_packages",
+  "notifications",
+  "outbox_operator_alerts",
+  "package_balances",
+  "privacy_deletion_jobs",
+  "privacy_processor_attempts",
+  "projection_checkpoints",
+  "prompt_versions",
+  "provider_cursors",
+  "reconciliation_mismatches",
+  "reconciliation_runs",
+  "reservations",
+  "safety_incidents",
+  "slots",
+  "users",
+]);
 
 const providerName =
   /^(?:@stripe\/|stripe(?:\/|$)|@yookassa\/|yookassa(?:\/|$)|@a2seven\/yoo-checkout(?:\/|$)|cloudpayments(?:\/|$)|paypal(?:\/|$)|@paypal\/|adyen(?:\/|$)|@adyen\/|square(?:\/|$)|@square\/)/iu;
+const commercialDependencySegments = new Set([
+  "billing",
+  "checkout",
+  "commerce",
+  "merchant",
+  "pay",
+  "payment",
+  "payments",
+]);
 const providerPath =
   /(?:^|\/)(?:commercial|commerce|stripe|yookassa|cloudpayments|paypal|adyen|square)(?:[-_.\/]|$)/iu;
 const paymentIntegrationArtifact =
@@ -18,12 +252,11 @@ const paymentIntegrationArtifact =
 const paymentApiPath =
   /(?:^|\/)(?:checkout|payments?|refunds?)(?:[-_.\/]|$)/iu;
 const paymentApplicationPath =
-  /(?:^|\/)(?:payments?(?:[-_].*)?|.*payment[-_](?:consumer|handler)|entitlement[-_]grant)(?:[-_.\/]|$)/iu;
+  /(?:^|\/)(?:payments?(?:[-_].*)?|.*payment[-_](?:consumer|handler)|entitlement[-_]grant|settlement[-_]worker|checkout[-_].*(?:access|entitlement|grant))(?:[-_.\/]|$)/iu;
 const paymentDbPath =
   /(?:^|\/)(?:payments?|refunds?|charges?)(?:[-_.\/]|$)/iu;
 const commercialRoute =
   /\/(?:checkout|payments?|refunds?|stripe|yookassa)(?:\/|$)/iu;
-const paymentTableName = /^(?:payments?|refunds?|charges?)$/iu;
 const paymentApplicationIdentifier =
   /^(?:Payment\w*Consumer|\w*PaymentConsumer|grant\w*Entitlement\w*Payment|grant\w*Payment\w*Entitlement|Payment\w*EntitlementGrant|(?:Payment|Checkout|Refund)\w*Routes?)$/iu;
 const paymentApiIdentifier =
@@ -34,9 +267,11 @@ export interface PaymentScopeProbe {
   readonly content: string;
 }
 
-const normalizePath = (path: string): string => path.replaceAll("\\", "/");
+const normalizePath = (path: string): string =>
+  path.replaceAll("\\", "/").toLowerCase();
 
 const isTestSource = (path: string): boolean =>
+  /(?:^|\/)tests?\//u.test(path) ||
   /\.(?:test|spec|testkit)\.[cm]?[jt]sx?$/u.test(path);
 
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
@@ -47,21 +282,36 @@ export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   ) {
     return true;
   }
-  return (
-    /^(?:apps|packages)\/[^/]+\/src\/.+\.[cm]?[jt]sx?$/u.test(path) &&
-    !isTestSource(path)
-  );
+  return /\.[cm]?[jt]sx?$/u.test(path) && !isTestSource(path);
 };
+
+const hasCommercialDependencySegment = (value: string): boolean =>
+  providerName.test(value) ||
+  value
+    .toLowerCase()
+    .split(/[@/_-]+/u)
+    .some((segment) => commercialDependencySegments.has(segment));
+
+const isCommercialProviderSpecifier = (value: string): boolean =>
+  !value.startsWith(".") && hasCommercialDependencySegment(value);
 
 const literalText = (node: ts.Expression | undefined): string | undefined =>
   node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
     ? node.text
     : undefined;
 
+const callMethodName = (expression: ts.LeftHandSideExpression): string | undefined => {
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  if (ts.isElementAccessExpression(expression)) {
+    return literalText(expression.argumentExpression);
+  }
+  return undefined;
+};
+
 const routeFromCall = (node: ts.CallExpression): string | undefined => {
-  if (!ts.isPropertyAccessExpression(node.expression)) return undefined;
-  const method = node.expression.name.text;
-  if (["get", "post", "put", "patch", "delete"].includes(method)) {
+  const method = callMethodName(node.expression);
+  if (!method) return undefined;
+  if (["get", "post", "put", "patch", "delete", "use"].includes(method)) {
     return literalText(node.arguments[0]);
   }
   if (method !== "route") return undefined;
@@ -104,11 +354,54 @@ const isNetworkCall = (node: ts.CallExpression): boolean => {
   );
 };
 
-const isProcessEnvAccess = (node: ts.PropertyAccessExpression): boolean =>
-  ts.isPropertyAccessExpression(node.expression) &&
-  ts.isIdentifier(node.expression.expression) &&
-  node.expression.expression.text === "process" &&
-  node.expression.name.text === "env";
+const moduleSpecifierFromCall = (
+  node: ts.CallExpression,
+): string | undefined => {
+  if (
+    node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+    (ts.isIdentifier(node.expression) && node.expression.text === "require")
+  ) {
+    return literalText(node.arguments[0]);
+  }
+  return undefined;
+};
+
+const processEnvKey = (
+  node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+): string | undefined => {
+  const expression = node.expression;
+  if (
+    !ts.isPropertyAccessExpression(expression) ||
+    !ts.isIdentifier(expression.expression) ||
+    expression.expression.text !== "process" ||
+    expression.name.text !== "env"
+  ) {
+    return undefined;
+  }
+  return ts.isPropertyAccessExpression(node)
+    ? node.name.text
+    : literalText(node.argumentExpression);
+};
+
+const isPaymentCredentialKey = (key: string): boolean =>
+  /^PAYMENTS?_(?:API_?KEY|TOKEN|SECRET|WEBHOOK_SECRET|BASE_URL|PROVIDER)$/u.test(
+    key,
+  );
+
+const isCommercialNetworkTarget = (target: string): boolean =>
+  /(?:^|[/:._-])(?:pay|payment|payments|checkout|billing|merchant|commerce)(?:[/:._-]|$)/iu.test(
+    target,
+  );
+
+const isPaymentApplicationIdentifier = (identifier: string): boolean => {
+  if (paymentApplicationIdentifier.test(identifier)) return true;
+  const normalized = identifier.toLowerCase();
+  return (
+    /^settlement\w*worker$/u.test(normalized) ||
+    (normalized.includes("checkout") &&
+      /(?:access|entitlement|grant)/u.test(normalized))
+  );
+};
 
 const inspectTypeScript = (
   path: string,
@@ -123,6 +416,67 @@ const inspectTypeScript = (
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
+  if (path === "packages/integrations/src/index.ts") {
+    for (const statement of source.statements) {
+      if (!ts.isExportDeclaration(statement)) {
+        violations.push("unapproved runtime declaration in integrations index");
+      }
+    }
+  } else if (path === "packages/integrations/src/payment/payment-port.ts") {
+    const allowedInterfaces = new Set([
+      "CreateCheckoutCommand",
+      "PaymentPort",
+      "PaymentWebhookCommand",
+      "RefundCommand",
+    ]);
+    for (const statement of source.statements) {
+      if (
+        !ts.isInterfaceDeclaration(statement) ||
+        !allowedInterfaces.has(statement.name.text)
+      ) {
+        violations.push("unapproved declaration in payment port");
+      }
+    }
+  } else if (
+    path ===
+    "packages/integrations/src/payment/disabled-payment-adapter.ts"
+  ) {
+    for (const statement of source.statements) {
+      if (ts.isImportDeclaration(statement)) {
+        const importClause = statement.importClause;
+        const bindings = importClause?.namedBindings;
+        const importedNames =
+          bindings && ts.isNamedImports(bindings)
+            ? bindings.elements.map((element) => element.name.text)
+            : [];
+        if (
+          !importClause?.isTypeOnly ||
+          !bindings ||
+          !ts.isNamedImports(bindings) ||
+          importedNames.some(
+            (name) =>
+              ![
+                "CreateCheckoutCommand",
+                "PaymentPort",
+                "PaymentWebhookCommand",
+                "RefundCommand",
+              ].includes(name),
+          )
+        ) {
+          violations.push("unapproved import in disabled payment adapter");
+        }
+      } else if (
+        !ts.isClassDeclaration(statement) ||
+        !statement.name ||
+        !["DisabledPaymentAdapter", "PaymentsDisabledError"].includes(
+          statement.name.text,
+        )
+      ) {
+        violations.push("unapproved declaration in disabled payment adapter");
+      }
+    }
+  }
+
   const visit = (node: ts.Node): void => {
     if (
       (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -130,7 +484,7 @@ const inspectTypeScript = (
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       const specifier = node.moduleSpecifier.text;
-      if (providerName.test(specifier)) {
+      if (isCommercialProviderSpecifier(specifier)) {
         violations.push(`provider SDK import: ${specifier}`);
       } else if (
         /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
@@ -140,7 +494,23 @@ const inspectTypeScript = (
       }
     }
 
-    if (path.startsWith("apps/api/src/")) {
+    if (ts.isCallExpression(node)) {
+      const specifier = moduleSpecifierFromCall(node);
+      if (specifier) {
+        if (isCommercialProviderSpecifier(specifier)) {
+          violations.push(`payment provider runtime import: ${specifier}`);
+        } else if (
+          /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
+          !isApprovedPaymentBoundaryImport(path, specifier)
+        ) {
+          violations.push(
+            `payment boundary runtime import outside allowlist: ${specifier}`,
+          );
+        }
+      }
+    }
+
+    if (path.startsWith("apps/api/")) {
       if (ts.isCallExpression(node)) {
         const route = routeFromCall(node);
         if (route && commercialRoute.test(route)) {
@@ -156,39 +526,55 @@ const inspectTypeScript = (
     }
 
     if (
-      path.startsWith("packages/application/src/") &&
+      path.startsWith("packages/application/") &&
       ts.isIdentifier(node) &&
-      paymentApplicationIdentifier.test(node.text)
+      isPaymentApplicationIdentifier(node.text)
     ) {
       violations.push(`payment application identifier: ${node.text}`);
     }
 
     if (
-      path.startsWith("packages/db/src/") &&
+      path.startsWith("packages/db/") &&
       ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      /^(?:pgTable|mysqlTable|sqliteTable)$/u.test(node.expression.text)
+      /^(?:pgTable|mysqlTable|sqliteTable|pgView|pgMaterializedView)$/u.test(
+        ts.isIdentifier(node.expression)
+          ? node.expression.text
+          : ts.isPropertyAccessExpression(node.expression)
+            ? node.expression.name.text
+            : "",
+      )
     ) {
       const tableName = literalText(node.arguments[0]);
-      if (tableName && paymentTableName.test(tableName)) {
-        violations.push(`commercial database table: ${tableName}`);
+      if (tableName && !approvedDatabaseRelations.has(tableName)) {
+        violations.push(`unapproved database relation: ${tableName}`);
       }
     }
 
     if (
-      approvedPaymentBoundaryPaths.has(path) &&
       ts.isCallExpression(node) &&
       isNetworkCall(node)
     ) {
-      violations.push("network call in payment integration boundary");
+      const target = literalText(node.arguments[0]);
+      if (
+        approvedPaymentBoundaryPaths.has(path) ||
+        (target && isCommercialNetworkTarget(target))
+      ) {
+        violations.push("payment provider network call");
+      }
     }
 
     if (
-      approvedPaymentBoundaryPaths.has(path) &&
-      ts.isPropertyAccessExpression(node) &&
-      isProcessEnvAccess(node)
+      (ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node))
     ) {
-      violations.push("credential environment access in integration boundary");
+      const key = processEnvKey(node);
+      if (
+        key &&
+        (approvedPaymentBoundaryPaths.has(path) ||
+          isPaymentCredentialKey(key))
+      ) {
+        violations.push(`payment credential environment access: ${key}`);
+      }
     }
 
     if (
@@ -216,6 +602,7 @@ const inspectTypeScript = (
 };
 
 const inspectPackageManifest = (
+  path: string,
   content: string,
   violations: string[],
 ): void => {
@@ -231,6 +618,7 @@ const inspectPackageManifest = (
     return;
   }
 
+  const approvedDependencies = approvedPackageDependencies.get(path);
   for (const sectionName of [
     "dependencies",
     "devDependencies",
@@ -242,8 +630,12 @@ const inspectPackageManifest = (
       continue;
     }
     for (const dependency of Object.keys(section)) {
-      if (providerName.test(dependency)) {
-        violations.push(`payment provider dependency: ${dependency}`);
+      const specifier = (section as Record<string, unknown>)[dependency];
+      if (
+        !approvedDependencies?.has(dependency) ||
+        specifier !== approvedDependencySpecifiers.get(dependency)
+      ) {
+        violations.push(`unapproved package dependency: ${dependency}`);
       }
     }
   }
@@ -258,10 +650,33 @@ const inspectMigration = (
     violations.push("commercial database migration path");
   }
   if (path.endsWith(".json")) {
-    if (
-      /"name"\s*:\s*"(?:payments?|refunds?|charges?)"/iu.test(content)
-    ) {
-      violations.push("commercial database snapshot table");
+    let snapshot: unknown;
+    try {
+      snapshot = JSON.parse(content);
+    } catch {
+      violations.push("database snapshot is not valid JSON");
+      return;
+    }
+    if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+      return;
+    }
+    for (const sectionName of ["tables", "views"]) {
+      const section = (snapshot as Record<string, unknown>)[sectionName];
+      if (!section || typeof section !== "object" || Array.isArray(section)) {
+        continue;
+      }
+      for (const relation of Object.values(section)) {
+        if (!relation || typeof relation !== "object" || Array.isArray(relation)) {
+          continue;
+        }
+        const name = (relation as Record<string, unknown>).name;
+        if (
+          typeof name === "string" &&
+          !approvedDatabaseRelations.has(name)
+        ) {
+          violations.push(`unapproved database snapshot relation: ${name}`);
+        }
+      }
     }
     return;
   }
@@ -269,12 +684,13 @@ const inspectMigration = (
   const withoutComments = content
     .replace(/\/\*[\s\S]*?\*\//gu, "")
     .replace(/--[^\r\n]*/gu, "");
-  if (
-    /\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?(?:"[^"]+"\.)?"?(?:payments?|refunds?|charges?)"?\b/iu.test(
-      withoutComments,
-    )
-  ) {
-    violations.push("commercial database migration table");
+  for (const match of withoutComments.matchAll(
+    /\bcreate\s+(?:materialized\s+)?(?:table|view)\s+(?:if\s+not\s+exists\s+)?(?:(?:"?[\w]+"?)\.)?"?([\w]+)"?/giu,
+  )) {
+    const relationName = match[1];
+    if (relationName && !approvedDatabaseRelations.has(relationName)) {
+      violations.push(`unapproved database migration relation: ${relationName}`);
+    }
   }
 };
 
@@ -285,29 +701,29 @@ export const classifyPaymentScopeProbe = ({
   const path = normalizePath(rawPath);
 
   const violations: string[] = [];
-  if (path.startsWith("packages/integrations/src/")) {
+  if (path.startsWith("packages/integrations/")) {
     if (
       !approvedPaymentBoundaryPaths.has(path) &&
       (providerPath.test(path) || paymentIntegrationArtifact.test(path))
     ) {
       violations.push("live or deferred payment integration path");
     }
-  } else if (path.startsWith("apps/api/src/") && paymentApiPath.test(path)) {
+  } else if (path.startsWith("apps/api/") && paymentApiPath.test(path)) {
     violations.push("commercial API route path");
   } else if (
-    path.startsWith("packages/application/src/") &&
+    path.startsWith("packages/application/") &&
     paymentApplicationPath.test(path)
   ) {
     violations.push("payment consumer or entitlement path");
   } else if (
-    path.startsWith("packages/db/src/") &&
+    path.startsWith("packages/db/") &&
     paymentDbPath.test(path)
   ) {
     violations.push("commercial database schema path");
   }
 
   if (path.endsWith("/package.json") || path === "package.json") {
-    inspectPackageManifest(content, violations);
+    inspectPackageManifest(path, content, violations);
   } else if (/^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path)) {
     inspectMigration(path, content, violations);
   } else if (/\.[cm]?[jt]sx?$/u.test(path)) {
@@ -315,4 +731,21 @@ export const classifyPaymentScopeProbe = ({
   }
 
   return [...new Set(violations)].sort();
+};
+
+export const classifyApprovedTrackedScopeContent = ({
+  path: rawPath,
+  content,
+}: PaymentScopeProbe): readonly string[] => {
+  const path = normalizePath(rawPath);
+  const isMigration = path.startsWith("packages/db/migrations/");
+  const expectedHash =
+    approvedPaymentBoundaryHashes.get(path) ?? approvedMigrationHashes.get(path);
+  if (!expectedHash) {
+    return isMigration ? ["unapproved database migration artifact path"] : [];
+  }
+  const actualHash = createHash("sha256").update(content, "utf8").digest("hex");
+  return actualHash === expectedHash
+    ? []
+    : [`approved tracked scope hash mismatch: ${actualHash}`];
 };
