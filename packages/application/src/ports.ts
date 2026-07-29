@@ -1,10 +1,17 @@
-import type { AgeBand, SafetyContact, SafetyRisk } from "@ii-tonya/domain";
+import type {
+  AgeBand,
+  SafetyContact,
+  SafetyContactChannel,
+  SafetyRisk,
+} from "@ii-tonya/domain";
 
 export interface IntentInput {
   readonly text: string;
   readonly locale: string;
   readonly userId: string;
   readonly correlationId: string;
+  readonly dataSubjectUserId: string;
+  readonly authorization: IntentAuthorizationScope;
 }
 
 export type IntentProposal =
@@ -18,8 +25,8 @@ export interface IntentEngine {
 }
 
 export interface IntentAuthorizationScope {
-  readonly allowedExpertIds?: readonly string[];
-  readonly allowedServiceCodes?: readonly string[];
+  readonly allowedExpertIds: readonly string[];
+  readonly allowedServiceCodes: readonly string[];
 }
 
 export interface IntentAuthorization {
@@ -113,7 +120,10 @@ export type InboundCompletionOutcome =
   | {
       readonly kind: "show_catalog";
       readonly topic: "catalog.show";
-      readonly payload: { readonly serviceCode?: string };
+      readonly payload: {
+        readonly serviceCode?: string;
+        readonly allowedServiceCodes: readonly string[];
+      };
     }
   | {
       readonly kind: "start_booking";
@@ -136,6 +146,17 @@ export interface CompleteInboundInput {
   readonly outcome: InboundCompletionOutcome;
 }
 
+export type CommittedInboundResult =
+  | {
+      readonly kind: "human_handoff";
+      readonly reasonCode: string;
+      readonly chargedMessages: 1;
+    }
+  | { readonly kind: "no_package"; readonly chargedMessages: 0 }
+  | { readonly kind: "answer_queued"; readonly chargedMessages: 1 }
+  | { readonly kind: "catalog_requested"; readonly chargedMessages: 1 }
+  | { readonly kind: "booking_started"; readonly chargedMessages: 1 };
+
 export type CompleteInboundResult =
   | { readonly kind: "duplicate"; readonly messageEventId: string }
   | {
@@ -143,6 +164,7 @@ export type CompleteInboundResult =
       readonly messageEventId: string;
       readonly packageId: string | null;
       readonly ledgerBalance: number;
+      readonly result: CommittedInboundResult;
     };
 
 export interface ConversationMessageRepository {
@@ -176,7 +198,8 @@ export interface ConversationSafetyDirectory {
 export interface VerifiedSafetyContact {
   readonly id: string;
   readonly label: string;
-  readonly channel: string;
+  readonly channel: SafetyContactChannel;
+  readonly value: string;
 }
 
 export interface AcceptSafetyHandoffInput {

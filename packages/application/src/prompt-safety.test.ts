@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { validateIntentProposal } from "./conversation-service.js";
 
 describe("LLM capability boundary", () => {
+  const validAuthorization = {
+    allowedExpertIds: ["b7ab91db-4988-4ec6-bf23-42d2ea3333a1"],
+    allowedServiceCodes: ["consultation"],
+  };
+
   it.each([
     ["llm-01-cross-client-disclosure", "cross_client_disclosure"],
     ["llm-02-persistent-catalog-tool-text", "persistent_tool_instruction"],
@@ -38,9 +43,89 @@ describe("LLM capability boundary", () => {
     },
     { kind: "human_handoff", reasonCode: "needs_human" },
   ])("accepts strict proposal %#", (proposal) => {
-    expect(validateIntentProposal(proposal)).toEqual({
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
       accepted: true,
       proposal,
+    });
+  });
+
+  it.each([
+    undefined,
+    {},
+    { allowedExpertIds: [] },
+    { allowedServiceCodes: [] },
+    {
+      allowedExpertIds: [
+        "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+        "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+      ],
+      allowedServiceCodes: [],
+    },
+    {
+      allowedExpertIds: [],
+      allowedServiceCodes: ["consultation", "consultation"],
+    },
+    {
+      allowedExpertIds: ["not-a-uuid"],
+      allowedServiceCodes: [],
+    },
+    {
+      allowedExpertIds: [],
+      allowedServiceCodes: ["../admin"],
+    },
+    {
+      allowedExpertIds: [],
+      allowedServiceCodes: Array.from(
+        { length: 129 },
+        (_, index) => `service-${index}`,
+      ),
+    },
+    {
+      allowedExpertIds: Array.from(
+        { length: 129 },
+        (_, index) =>
+          `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`,
+      ),
+      allowedServiceCodes: [],
+    },
+  ])("rejects malformed authorization scope %#", (authorization) => {
+    expect(
+      validateIntentProposal(
+        { kind: "show_catalog", serviceCode: "consultation" },
+        authorization,
+      ),
+    ).toEqual({
+      accepted: false,
+      reasonCode: "unauthorized_scope",
+    });
+  });
+
+  it("treats complete empty allowlists as valid deny-all scope", () => {
+    const denyAll = {
+      allowedExpertIds: [],
+      allowedServiceCodes: [],
+    };
+
+    expect(
+      validateIntentProposal(
+        { kind: "answer", text: "Короткий безопасный ответ" },
+        denyAll,
+      ),
+    ).toEqual({
+      accepted: true,
+      proposal: { kind: "answer", text: "Короткий безопасный ответ" },
+    });
+    expect(
+      validateIntentProposal(
+        {
+          kind: "start_booking",
+          expertId: "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+        },
+        denyAll,
+      ),
+    ).toEqual({
+      accepted: false,
+      reasonCode: "unauthorized_scope",
     });
   });
 
@@ -86,7 +171,7 @@ describe("LLM capability boundary", () => {
       kind: "answer",
       text: "Первая строка.\nВторая безопасная строка.",
     };
-    expect(validateIntentProposal(proposal)).toEqual({
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
       accepted: true,
       proposal,
     });

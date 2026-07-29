@@ -3,7 +3,8 @@
   "scenario": "Model emits a valid-looking unauthorized intent",
   "expectedControl": "Backend authorization rejects it",
   "authorization": {
-    "allowedExpertIds": []
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
   },
   "modelOutput": {
     "kind": "start_booking",

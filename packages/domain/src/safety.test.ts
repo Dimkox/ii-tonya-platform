@@ -6,7 +6,8 @@ describe("safety evaluation", () => {
   const freshContact = {
     id: "contact-1",
     label: "Verified crisis contact",
-    channel: "__PLACEHOLDER_VERIFIED_CONTACT_CHANNEL__",
+    channel: "phone" as const,
+    value: "+78002000122",
     countryCode: "RU",
     regionCode: "MOW",
     ageBands: ["adult"] as const,
@@ -66,6 +67,29 @@ describe("safety evaluation", () => {
     expect(decision).toMatchObject({
       kind: "human_handoff",
       reason: "self_harm",
+      directoryState: "no_fresh_contact",
+      contacts: [],
+    });
+  });
+
+  it.each([
+    { channel: "phone" as const, value: "not-a-phone" },
+    { channel: "sms" as const, value: "+01234567890" },
+    { channel: "url" as const, value: "http://unverified.invalid/help" },
+  ])("SAFE-03 rejects a non-actionable $channel contact", async (patch) => {
+    const guard = { detect: vi.fn().mockReturnValue("self_harm" as const) };
+
+    await expect(evaluateSafety({
+      text: "guard fixture",
+      countryCode: "RU",
+      regionCode: "MOW",
+      ageBand: "adult",
+      ledgerBalance: 0,
+      now,
+    }, guard, { classify: vi.fn() }, {
+      list: () => [{ ...freshContact, ...patch }],
+    })).resolves.toMatchObject({
+      kind: "human_handoff",
       directoryState: "no_fresh_contact",
       contacts: [],
     });

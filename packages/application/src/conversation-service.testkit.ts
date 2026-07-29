@@ -3,8 +3,10 @@ import { vi } from "vitest";
 
 import type {
   CanonicalOutboundDelivery,
+  CommittedInboundResult,
   ConversationDependencies,
   HandleInboundCommand,
+  InboundCompletionOutcome,
   RecordOutboundDeliveryInput,
   VerifiedSafetyContact,
 } from "./ports.js";
@@ -38,6 +40,7 @@ export interface ConversationFixture extends ConversationDependencies {
     failNextAfterPrepare(error: Error): void;
     failNextCompletionAfterCommit(error: Error): void;
     auditActions(): readonly string[];
+    pendingInboundCount(): number;
   };
   readonly outbox: {
     topics(): readonly string[];
@@ -104,6 +107,7 @@ export const conversationFixture = (input: {
       id: "contact-verified",
       label: "Verified crisis line",
       channel: "phone",
+      value: "+78002000122",
       countryCode: "RU",
       regionCode: "MOW",
       ageBands: ["adult"],
@@ -178,35 +182,60 @@ export const conversationFixture = (input: {
         };
       }
 
-      const isNoPackage = command.outcome.kind === "no_package";
-      if (isNoPackage !== !pending.packageAvailable) {
+      if (
+        command.outcome.kind === "no_package" &&
+        pending.packageAvailable
+      ) {
         throw new Error("Inbound package decision changed");
       }
-      const packageId = isNoPackage ? null : "package-1";
+      const committedOutcome: InboundCompletionOutcome =
+        command.outcome.kind === "no_package" || balance <= 0
+          ? {
+              kind: "no_package",
+              topic: "client.no_package",
+              payload: {},
+            }
+          : command.outcome;
+      const packageId =
+        committedOutcome.kind === "no_package" ? null : "package-1";
       if (packageId) {
-        if (balance <= 0) throw new Error("Package balance exhausted");
         balance -= 1;
         ledgerDeltas.push(-1);
       }
       pending.state = "completed";
       messageAuditActions.push("conversation.inbound_completed");
-      const outboxKey = `${command.messageEventId}:${command.outcome.topic}`;
+      const outboxKey =
+        `${command.messageEventId}:${committedOutcome.topic}`;
       outboxByKey.set(outboxKey, {
-        topic: command.outcome.topic,
+        topic: committedOutcome.topic,
         charge: 0,
         payload: {
           messageEventId: command.messageEventId,
-          ...command.outcome.payload,
+          ...committedOutcome.payload,
         },
       });
-      if (command.outcome.kind === "human_handoff") {
+      if (committedOutcome.kind === "human_handoff") {
         handoff = {
           status: "opened",
-          ownerId: command.outcome.ownerId,
-          acknowledgeBy: command.outcome.acknowledgeBy,
+          ownerId: committedOutcome.ownerId,
+          acknowledgeBy: committedOutcome.acknowledgeBy,
         };
         handoffAuditActions.push("conversation.handoff_opened");
       }
+      const result: CommittedInboundResult =
+        committedOutcome.kind === "no_package"
+          ? { kind: "no_package", chargedMessages: 0 }
+          : committedOutcome.kind === "answer"
+            ? { kind: "answer_queued", chargedMessages: 1 }
+            : committedOutcome.kind === "show_catalog"
+              ? { kind: "catalog_requested", chargedMessages: 1 }
+              : committedOutcome.kind === "start_booking"
+                ? { kind: "booking_started", chargedMessages: 1 }
+                : {
+                    kind: "human_handoff",
+                    reasonCode: committedOutcome.payload.reasonCode,
+                    chargedMessages: 1,
+                  };
       if (completionFailure) {
         const error = completionFailure;
         completionFailure = null;
@@ -217,6 +246,7 @@ export const conversationFixture = (input: {
         messageEventId: command.messageEventId,
         packageId,
         ledgerBalance: balance,
+        result,
       };
     },
     async recordOutboundDelivery(command: RecordOutboundDeliveryInput) {
@@ -247,6 +277,10 @@ export const conversationFixture = (input: {
     ledgerDeltas: () => [...ledgerDeltas],
     deliveryInboxCount: () => deliveryEvents.size,
     auditActions: () => [...messageAuditActions],
+    pendingInboundCount: () =>
+      [...inboundByMessageId.values()].filter(
+        (inbound) => inbound.state === "pending",
+      ).length,
     failNext(error) {
       nextFailure = error;
     },
@@ -416,7 +450,7 @@ export const conversationFixture = (input: {
     clock: {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
     },
-    handoffOwnerId: "safety-owner-1",
+    handoffOwnerId: "00000000-0000-4000-8000-000000000001",
     handoffAcknowledgeWithinMs: 300_000,
     outboundBillingMode: input.outboundBillingMode ?? "disabled",
     approvedSafetyContactIds: ["contact-verified"],

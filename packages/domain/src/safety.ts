@@ -1,10 +1,12 @@
 export type SafetyRisk = "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
 export type AgeBand = "minor" | "adult" | "unknown";
+export type SafetyContactChannel = "phone" | "sms" | "url";
 
 export interface SafetyContact {
   id: string;
   label: string;
-  channel: string;
+  channel: SafetyContactChannel;
+  value: string;
   countryCode: string;
   regionCode: string | null;
   ageBands: readonly AgeBand[];
@@ -14,6 +16,18 @@ export interface SafetyContact {
   verifiedAt: Date;
   validUntil: Date;
 }
+
+const e164Phone = /^\+[1-9][0-9]{7,14}$/u;
+const httpsUrl = /^https:\/\/[A-Za-z0-9.-]+(?:\/[^\s@]*)?$/u;
+
+export const isActionableSafetyContact = (
+  contact: Pick<SafetyContact, "channel" | "value">,
+): boolean => {
+  if (contact.channel === "phone" || contact.channel === "sms") {
+    return e164Phone.test(contact.value);
+  }
+  return contact.channel === "url" && httpsUrl.test(contact.value);
+};
 
 export interface DeterministicSafetyGuard {
   detect(text: string): SafetyRisk | null;
@@ -65,7 +79,8 @@ export async function evaluateSafety(
     && contact.verifiedAt.getTime() <= input.now.getTime()
     && contact.validUntil.getTime() >= input.now.getTime()
     && contact.sourceUrl.startsWith("https://")
-    && contact.owner.length > 0);
+    && contact.owner.length > 0
+    && isActionableSafetyContact(contact));
 
   try {
     const level = guard.detect(input.text) ?? await classifier.classify(input.text);

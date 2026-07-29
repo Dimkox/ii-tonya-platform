@@ -187,6 +187,7 @@ describe("conversation workflow", () => {
         id: "contact-verified",
         label: "Verified crisis line",
         channel: "phone",
+        value: "+78002000122",
       },
     ]);
   });
@@ -224,9 +225,38 @@ describe("conversation workflow", () => {
         id: "contact-verified",
         label: "Verified crisis line",
         channel: "phone",
+        value: "+78002000122",
       },
     ]);
   });
+
+  it.each([
+    { channel: "phone" as const, value: "not-a-phone" },
+    { channel: "url" as const, value: "http://unverified.invalid/help" },
+    {
+      channel: "email" as unknown as "phone",
+      value: "help@example.invalid",
+    },
+  ])(
+    "rejects a non-actionable or unapproved $channel safety contact",
+    async ({ channel, value }) => {
+      const deps = conversationFixture({ balance: 0, safety: "crisis" });
+      deps.safetyDirectory.setContacts([
+        {
+          ...deps.safetyDirectory.defaultContacts()[0]!,
+          channel,
+          value,
+        },
+      ]);
+
+      await createConversationService(deps).handleInbound(deps.inbound);
+
+      expect(deps.safetyHandoff.contacts()).toEqual([]);
+      expect(deps.safetyHandoff.directoryStates()).toEqual([
+        "no_fresh_contact",
+      ]);
+    },
+  );
 
   it("fails a safety directory outage closed to a durable free handoff", async () => {
     const deps = conversationFixture({ balance: 0, safety: "crisis" });
@@ -247,7 +277,7 @@ describe("conversation workflow", () => {
     expect(deps.safetyHandoff.directoryStates()).toEqual(["unavailable"]);
     expect(deps.handoffs.current()).toMatchObject({
       status: "opened",
-      ownerId: "safety-owner-1",
+      ownerId: "00000000-0000-4000-8000-000000000001",
     });
     expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
   });
@@ -285,6 +315,61 @@ describe("conversation workflow", () => {
       "prepare-inbound",
     ]);
   });
+
+  it("binds validated client authorization into the intent request before model execution", async () => {
+    const deps = conversationFixture({ balance: 1, safety: "ordinary" });
+
+    await createConversationService(deps).handleInbound(deps.inbound);
+
+    expect(deps.intentEngine.propose).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        dataSubjectUserId: "user-1",
+        authorization: {
+          allowedExpertIds: ["b7ab91db-4988-4ec6-bf23-42d2ea3333a1"],
+          allowedServiceCodes: ["consultation"],
+        },
+      }),
+    );
+    expect(
+      vi.mocked(deps.intentAuthorization.scopeFor).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(deps.intentEngine.propose).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it.each([
+    {},
+    { allowedExpertIds: [] },
+    { allowedServiceCodes: [] },
+    {
+      allowedExpertIds: [
+        "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+        "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+      ],
+      allowedServiceCodes: [],
+    },
+  ])(
+    "fails malformed runtime authorization closed before model execution %#",
+    async (authorization) => {
+      const deps = conversationFixture({ balance: 1, safety: "ordinary" });
+      deps.intentAuthorization.scopeFor = vi
+        .fn()
+        .mockResolvedValue(authorization);
+
+      const result = await createConversationService(deps).handleInbound(
+        deps.inbound,
+      );
+
+      expect(result).toEqual({
+        kind: "human_handoff",
+        reasonCode: "unauthorized_scope",
+        chargedMessages: 1,
+      });
+      expect(deps.intentEngine.propose).not.toHaveBeenCalled();
+      expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
+    },
+  );
 
   it.each(["deterministic", "typed"] as const)(
     "fails a runtime-invalid %s safety result closed",
@@ -401,6 +486,59 @@ describe("conversation workflow", () => {
       "conversation.inbound_completed",
     ]);
     expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+  });
+
+  it("atomically falls back to no-package when distinct events race for the last credit", async () => {
+    const deps = conversationFixture({ balance: 1, safety: "ordinary" });
+    let proposalCount = 0;
+    let releaseProposals!: () => void;
+    const bothPrepared = new Promise<void>((resolve) => {
+      releaseProposals = resolve;
+    });
+    deps.intentEngine.propose = vi.fn(async () => {
+      proposalCount += 1;
+      if (proposalCount === 2) releaseProposals();
+      await bothPrepared;
+      return { kind: "answer" as const, text: "Короткий ответ" };
+    });
+    const service = createConversationService(deps);
+    const secondInbound = {
+      ...deps.inbound,
+      providerEventId: "provider-event-2",
+      providerMessageId: "provider-message-2",
+      correlationId: "correlation-2",
+    };
+
+    const results = await Promise.all([
+      service.handleInbound(deps.inbound),
+      service.handleInbound(secondInbound),
+    ]);
+
+    expect(results).toContainEqual({
+      kind: "answer_queued",
+      chargedMessages: 1,
+    });
+    expect(results).toContainEqual({
+      kind: "no_package",
+      chargedMessages: 0,
+    });
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.messageRepository.auditActions()).toEqual([
+      "conversation.inbound_completed",
+      "conversation.inbound_completed",
+    ]);
+    expect([...deps.outbox.topics()].sort()).toEqual([
+      "client.no_package",
+      "selarti.send",
+    ]);
+    expect(deps.messageRepository.pendingInboundCount()).toBe(0);
+
+    await expect(service.handleInbound(secondInbound)).resolves.toEqual({
+      kind: "duplicate",
+      chargedMessages: 0,
+    });
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.outbox.topics()).toHaveLength(2);
   });
 
   it("atomically persists one free no-package result across an unknown completion outcome", async () => {
@@ -524,7 +662,7 @@ describe("conversation workflow", () => {
     expect(retry).toEqual({ kind: "duplicate", chargedMessages: 0 });
     expect(deps.handoffs.current()).toMatchObject({
       status: "opened",
-      ownerId: "safety-owner-1",
+      ownerId: "00000000-0000-4000-8000-000000000001",
       acknowledgeBy: expect.any(Date),
     });
     expect(deps.audit.actions()).toEqual(["conversation.handoff_opened"]);
@@ -557,7 +695,7 @@ describe("conversation workflow", () => {
     );
     expect(deps.handoffs.current()).toMatchObject({
       status: "opened",
-      ownerId: "safety-owner-1",
+      ownerId: "00000000-0000-4000-8000-000000000001",
     });
   });
 
@@ -579,7 +717,7 @@ describe("conversation workflow", () => {
     });
     expect(deps.handoffs.current()).toMatchObject({
       status: "opened",
-      ownerId: "safety-owner-1",
+      ownerId: "00000000-0000-4000-8000-000000000001",
     });
     expect(deps.audit.actions()).toEqual(["conversation.handoff_opened"]);
     expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
@@ -597,6 +735,9 @@ describe("conversation workflow", () => {
 
     expect(result).toEqual({ kind: "catalog_requested", chargedMessages: 1 });
     expect(deps.outbox.payloads()[0]).not.toHaveProperty("serviceCode");
+    expect(deps.outbox.payloads()[0]).toMatchObject({
+      allowedServiceCodes: ["consultation"],
+    });
   });
 
   it("classifies port failures without exposing credentials", async () => {

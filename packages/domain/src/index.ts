@@ -31,6 +31,7 @@ export type {
 } from "./consent.js";
 export {
   evaluateSafety,
+  isActionableSafetyContact,
   transitionHandoff,
 } from "./safety.js";
 export type {
@@ -40,6 +41,7 @@ export type {
   HandoffState,
   SafetyClassifier,
   SafetyContact,
+  SafetyContactChannel,
   SafetyDecision,
   SafetyDirectory,
   SafetyInput,

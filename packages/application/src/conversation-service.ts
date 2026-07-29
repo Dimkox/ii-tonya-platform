@@ -1,4 +1,8 @@
-import type { SafetyContact, SafetyRisk } from "@ii-tonya/domain";
+import {
+  isActionableSafetyContact,
+  type SafetyContact,
+  type SafetyRisk,
+} from "@ii-tonya/domain";
 
 import type {
   CanonicalOutboundDelivery,
@@ -15,6 +19,7 @@ import type {
 
 const MAX_INBOUND_TEXT_LENGTH = 4_096;
 const MAX_ANSWER_TEXT_LENGTH = 2_000;
+const MAX_AUTHORIZATION_SCOPE_VALUES = 128;
 const stableKey = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const locale = /^[a-z]{2}(?:-[A-Z]{2})?$/u;
 const countryCode = /^[A-Z]{2}$/u;
@@ -92,6 +97,35 @@ const hasExactKeys = (
   );
 };
 
+const validateAuthorizationScope = (
+  value: unknown,
+): IntentAuthorizationScope | null => {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["allowedExpertIds", "allowedServiceCodes"]) ||
+    !Array.isArray(value.allowedExpertIds) ||
+    !Array.isArray(value.allowedServiceCodes) ||
+    value.allowedExpertIds.length > MAX_AUTHORIZATION_SCOPE_VALUES ||
+    value.allowedServiceCodes.length > MAX_AUTHORIZATION_SCOPE_VALUES ||
+    !value.allowedExpertIds.every(
+      (id): id is string => typeof id === "string" && uuid.test(id),
+    ) ||
+    !value.allowedServiceCodes.every(
+      (code): code is string =>
+        typeof code === "string" && boundedCode.test(code),
+    ) ||
+    new Set(value.allowedExpertIds).size !== value.allowedExpertIds.length ||
+    new Set(value.allowedServiceCodes).size !==
+      value.allowedServiceCodes.length
+  ) {
+    return null;
+  }
+  return {
+    allowedExpertIds: [...value.allowedExpertIds],
+    allowedServiceCodes: [...value.allowedServiceCodes],
+  };
+};
+
 const capabilityRejection = (
   values: readonly string[],
 ): IntentRejectionReason | null => {
@@ -111,7 +145,7 @@ const capabilityRejection = (
 
 const validateIntentProposalUnsafe = (
   value: unknown,
-  authorization?: IntentAuthorizationScope,
+  authorization?: unknown,
 ): IntentProposalValidation => {
   if (!isRecord(value) || typeof value.kind !== "string") {
     return { accepted: false, reasonCode: "invalid_shape" };
@@ -180,18 +214,20 @@ const validateIntentProposalUnsafe = (
     ),
   );
   if (rejection) return { accepted: false, reasonCode: rejection };
+  const authorized = validateAuthorizationScope(authorization);
+  if (authorized === null) {
+    return { accepted: false, reasonCode: "unauthorized_scope" };
+  }
   if (
     proposal.kind === "start_booking" &&
-    authorization?.allowedExpertIds !== undefined &&
-    !authorization.allowedExpertIds.includes(proposal.expertId)
+    !authorized.allowedExpertIds.includes(proposal.expertId)
   ) {
     return { accepted: false, reasonCode: "unauthorized_scope" };
   }
   if (
     proposal.kind === "show_catalog" &&
     proposal.serviceCode !== undefined &&
-    authorization?.allowedServiceCodes !== undefined &&
-    !authorization.allowedServiceCodes.includes(proposal.serviceCode)
+    !authorized.allowedServiceCodes.includes(proposal.serviceCode)
   ) {
     return { accepted: false, reasonCode: "unauthorized_scope" };
   }
@@ -200,7 +236,7 @@ const validateIntentProposalUnsafe = (
 
 export const validateIntentProposal = (
   value: unknown,
-  authorization?: IntentAuthorizationScope,
+  authorization?: unknown,
 ): IntentProposalValidation => {
   try {
     return validateIntentProposalUnsafe(value, authorization);
@@ -310,7 +346,7 @@ const readRuntimeConfig = (
 ): RuntimeConfig => {
   if (
     typeof deps.handoffOwnerId !== "string" ||
-    !stableKey.test(deps.handoffOwnerId) ||
+    !uuid.test(deps.handoffOwnerId) ||
     !Number.isSafeInteger(deps.handoffAcknowledgeWithinMs) ||
     deps.handoffAcknowledgeWithinMs <= 0 ||
     deps.handoffAcknowledgeWithinMs > 86_400_000 ||
@@ -367,6 +403,7 @@ const isVerifiedSafetyContact = (
       !arbitraryUrl.test(value.label) &&
       !/[\u0000-\u001F\u007F-\u009F]/u.test(value.label) &&
       boundedCode.test(value.channel) &&
+      isActionableSafetyContact(value) &&
       value.countryCode.trim().toUpperCase() === command.countryCode &&
       (value.regionCode === null ||
         value.regionCode.trim().toUpperCase() === command.regionCode) &&
@@ -413,7 +450,12 @@ const selectSafetyContacts = async (
       .filter((candidate) =>
         isVerifiedSafetyContact(candidate, command, risk, runtime)
       )
-      .map(({ id, label, channel }) => ({ id, label, channel }));
+      .map(({ id, label, channel, value }) => ({
+        id,
+        label,
+        channel,
+        value,
+      }));
     return {
       contacts,
       directoryState: contacts.length > 0 ? "fresh" : "no_fresh_contact",
@@ -464,7 +506,6 @@ const completeInbound = async (
   command: HandleInboundCommand,
   messageEventId: string,
   outcome: InboundCompletionOutcome,
-  result: ConversationResult,
 ): Promise<ConversationResult> => {
   try {
     const completed = await deps.messageRepository.completeInbound({
@@ -475,7 +516,7 @@ const completeInbound = async (
     });
     return completed.kind === "duplicate"
       ? { kind: "duplicate", chargedMessages: 0 }
-      : result;
+      : completed.result;
   } catch {
     throw dependencyFailure();
   }
@@ -538,7 +579,45 @@ export const createConversationService = (
           topic: "client.no_package",
           payload: {},
         },
-        { kind: "no_package", chargedMessages: 0 },
+      );
+    }
+
+    let authorization: IntentAuthorizationScope;
+    try {
+      const candidate: unknown = await deps.intentAuthorization.scopeFor({
+        userId: command.userId,
+        correlationId: command.correlationId,
+      });
+      const validated = validateAuthorizationScope(candidate);
+      if (validated === null) {
+        return completeInbound(
+          deps,
+          command,
+          prepared.messageEventId,
+          {
+            kind: "human_handoff",
+            topic: "human_handoff.opened",
+            payload: { reasonCode: "unauthorized_scope" },
+            ownerId: runtime.handoffOwnerId,
+            openedAt: runtime.now,
+            acknowledgeBy: runtime.acknowledgeBy,
+          },
+        );
+      }
+      authorization = validated;
+    } catch {
+      return completeInbound(
+        deps,
+        command,
+        prepared.messageEventId,
+        {
+          kind: "human_handoff",
+          topic: "human_handoff.opened",
+          payload: { reasonCode: "intent_unavailable" },
+          ownerId: runtime.handoffOwnerId,
+          openedAt: runtime.now,
+          acknowledgeBy: runtime.acknowledgeBy,
+        },
       );
     }
 
@@ -549,10 +628,8 @@ export const createConversationService = (
         locale: command.locale,
         userId: command.userId,
         correlationId: command.correlationId,
-      });
-      const authorization = await deps.intentAuthorization.scopeFor({
-        userId: command.userId,
-        correlationId: command.correlationId,
+        dataSubjectUserId: command.userId,
+        authorization,
       });
       validation = validateIntentProposal(
         proposal,
@@ -571,11 +648,6 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
-        {
-          kind: "human_handoff",
-          reasonCode: "intent_unavailable",
-          chargedMessages: 1,
-        },
       );
     }
     if (!validation.accepted) {
@@ -590,11 +662,6 @@ export const createConversationService = (
           ownerId: runtime.handoffOwnerId,
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
-        },
-        {
-          kind: "human_handoff",
-          reasonCode: validation.reasonCode,
-          chargedMessages: 1,
         },
       );
     }
@@ -613,59 +680,37 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
-        {
-          kind: "human_handoff",
-          reasonCode: proposal.reasonCode,
-          chargedMessages: 1,
-        },
       );
     }
 
-    const output =
+    const outcome: InboundCompletionOutcome =
       proposal.kind === "answer"
         ? {
-            outcome: {
-              kind: "answer" as const,
-              topic: "selarti.send" as const,
-              payload: { text: proposal.text },
-            },
-            result: {
-              kind: "answer_queued" as const,
-              chargedMessages: 1 as const,
-            },
+            kind: "answer",
+            topic: "selarti.send",
+            payload: { text: proposal.text },
           }
         : proposal.kind === "show_catalog"
           ? {
-              outcome: {
-                kind: "show_catalog" as const,
-                topic: "catalog.show" as const,
-                payload:
-                  proposal.serviceCode === undefined
-                    ? {}
-                    : { serviceCode: proposal.serviceCode },
-              },
-              result: {
-                kind: "catalog_requested" as const,
-                chargedMessages: 1 as const,
+              kind: "show_catalog",
+              topic: "catalog.show",
+              payload: {
+                allowedServiceCodes: authorization.allowedServiceCodes,
+                ...(proposal.serviceCode === undefined
+                  ? {}
+                  : { serviceCode: proposal.serviceCode }),
               },
             }
           : {
-              outcome: {
-                kind: "start_booking" as const,
-                topic: "booking.start" as const,
-                payload: { expertId: proposal.expertId },
-              },
-              result: {
-                kind: "booking_started" as const,
-                chargedMessages: 1 as const,
-              },
+              kind: "start_booking",
+              topic: "booking.start",
+              payload: { expertId: proposal.expertId },
             };
     return completeInbound(
       deps,
       command,
       prepared.messageEventId,
-      output.outcome,
-      output.result,
+      outcome,
     );
   },
 
