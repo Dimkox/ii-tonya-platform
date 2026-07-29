@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
-import { PostgresInboxRepository } from "./inbox-repository.js";
+import {
+  InboxPayloadMismatchError,
+  PostgresInboxRepository,
+} from "./inbox-repository.js";
 
 export interface AcceptInboundCommand {
   provider: string;
@@ -38,27 +41,44 @@ export interface MessageRepository {
   compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }>;
 }
 
+type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (transaction: infer T) => unknown ? T : never;
 type MessageEvent = { id: string };
 type PackageBalance = { id: string; balance: number };
 type Debit = { id: string; packageId: string };
 type Balance = { balance: number };
 
-function payloadHash(payload: Record<string, string>): string {
-  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+export class CompensationConflictError extends Error {}
+
+function hash(parts: Record<string, string>): string {
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
-function isSerializationFailure(error: unknown): boolean {
+function hasCode(error: unknown, code: string): boolean {
   const seen = new Set<unknown>();
   let current = error;
   while (typeof current === "object" && current !== null && !seen.has(current)) {
     seen.add(current);
-    if ((current as { code?: unknown }).code === "40001") return true;
+    if ((current as { code?: unknown }).code === code) return true;
     current = (current as { cause?: unknown }).cause;
   }
   return false;
 }
 
-function singleRow<T>(rows: T[], description: string): T {
+export async function withSerializableRetry<T>(
+  operation: () => Promise<T>,
+  attempts = 3,
+): Promise<T> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt === attempts - 1 || !hasCode(error, "40001")) throw error;
+    }
+  }
+  throw new Error("Unreachable serialization retry state");
+}
+
+function one<T>(rows: T[], description: string): T {
   const row = rows[0];
   if (row === undefined) throw new Error(`Expected ${description}`);
   return row;
@@ -69,230 +89,190 @@ export class PostgresMessageRepository implements MessageRepository {
 
   constructor(private readonly db: DrizzleDb) {}
 
-  async acceptInbound(command: AcceptInboundCommand): Promise<AcceptInboundResult> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await this.db.transaction(async (tx) => {
-          await tx.execute(sql`set transaction isolation level serializable`);
-          const claimed = await this.inbox.claim(tx, {
-            provider: command.provider,
-            externalEventId: command.externalEventId,
-            payloadHash: payloadHash({
-              provider: command.provider,
-              externalEventId: command.externalEventId,
-              externalMessageId: command.externalMessageId,
-              userId: command.userId,
-              messageClass: command.messageClass,
-              occurredAt: command.occurredAt.toISOString(),
-              correlationId: command.correlationId,
-            }),
-            normalizedIdentifier: command.externalMessageId,
-          });
-          if (!claimed) return this.duplicateInbound(tx, command);
-
-          const event = singleRow((await tx.execute<MessageEvent>(sql`
-            insert into message_events (
-              user_id,
-              provider,
-              external_message_id,
-              direction,
-              created_at
-            ) values (
-              ${command.userId}::uuid,
-              ${command.provider},
-              ${command.externalMessageId},
-              'inbound',
-              ${command.occurredAt}
-            ) returning id
-          `)).rows, "an inserted message event");
-
-          if (command.messageClass !== "ordinary_inbound") {
-            return this.recordFreeFact(tx, command.userId, event.id);
-          }
-
-          await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`);
-          const packageRow = (await tx.execute<PackageBalance>(sql`
-            select p.id, balances.balance
-            from message_packages p
-            cross join lateral (
-              select coalesce(sum(l.delta), 0)::integer as balance
-              from message_ledger_entries l
-              where l.package_id = p.id
-            ) balances
-            where p.user_id = ${command.userId}::uuid
-              and balances.balance > 0
-              and (p.expires_at is null or p.expires_at > ${command.occurredAt})
-            order by (p.kind = 'intro') asc, p.expires_at asc nulls last, p.granted_at asc, p.id asc
-            for update of p
-            limit 1
-          `)).rows[0];
-
-          if (packageRow === undefined) {
-            return { kind: "accepted", messageEventId: event.id, packageId: null, ledgerBalance: 0 };
-          }
-          await tx.execute(sql`
-            insert into message_ledger_entries (
-              package_id,
-              entry_kind,
-              delta,
-              direction,
-              message_event_id,
-              idempotency_key
-            ) values (
-              ${packageRow.id}::uuid,
-              'debit',
-              -1,
-              'inbound',
-              ${event.id}::uuid,
-              ${`inbound:${command.externalMessageId}`}
-            )
-          `);
-          return {
-            kind: "accepted",
-            messageEventId: event.id,
-            packageId: packageRow.id,
-            ledgerBalance: Number(packageRow.balance) - 1,
-          };
-        });
-      } catch (error) {
-        if (attempt === 2 || !isSerializationFailure(error)) throw error;
-      }
-    }
-    throw new Error("Unreachable serialization retry state");
-  }
-
-  async recordOutboundDelivery(command: RecordOutboundDeliveryCommand): Promise<AcceptInboundResult> {
-    return this.db.transaction(async (tx) => {
-      const claimed = await this.inbox.claim(tx, {
-        provider: command.provider,
-        externalEventId: command.externalDeliveryEventId,
-        payloadHash: payloadHash({
-          provider: command.provider,
-          externalDeliveryEventId: command.externalDeliveryEventId,
-          providerMessageId: command.providerMessageId,
-          userId: command.userId,
-          deliveryStatus: command.deliveryStatus,
-          occurredAt: command.occurredAt.toISOString(),
-          correlationId: command.correlationId,
-        }),
-        normalizedIdentifier: command.providerMessageId,
-      });
-      if (!claimed) {
-        const event = singleRow((await tx.execute<MessageEvent>(sql`
-          select id from message_events
-          where provider = ${command.provider}
-            and external_message_id = ${command.providerMessageId}
-        `)).rows, "the duplicate delivery event");
-        return { kind: "duplicate", messageEventId: event.id };
-      }
-      const event = singleRow((await tx.execute<MessageEvent>(sql`
-        insert into message_events (user_id, provider, external_message_id, direction, created_at)
-        values (
-          ${command.userId}::uuid,
-          ${command.provider},
-          ${command.providerMessageId},
-          'outbound',
-          ${command.occurredAt}
-        ) returning id
-      `)).rows, "an inserted delivery event");
-      return { kind: "accepted", messageEventId: event.id, packageId: null, ledgerBalance: 0 };
+  acceptInbound(command: AcceptInboundCommand): Promise<AcceptInboundResult> {
+    const payloadHash = hash({
+      provider: command.provider,
+      externalEventId: command.externalEventId,
+      externalMessageId: command.externalMessageId,
+      userId: command.userId,
+      messageClass: command.messageClass,
+      occurredAt: command.occurredAt.toISOString(),
+      correlationId: command.correlationId,
+    });
+    return this.acceptMessage({
+      provider: command.provider,
+      externalEventId: command.externalEventId,
+      externalMessageId: command.externalMessageId,
+      userId: command.userId,
+      direction: "inbound",
+      messageClass: command.messageClass,
+      occurredAt: command.occurredAt,
+      correlationId: command.correlationId,
+      payloadHash,
     });
   }
 
-  async compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }> {
-    return this.db.transaction(async (tx) => {
+  recordOutboundDelivery(command: RecordOutboundDeliveryCommand): Promise<AcceptInboundResult> {
+    return this.acceptMessage({
+      provider: command.provider,
+      externalEventId: command.externalDeliveryEventId,
+      externalMessageId: command.providerMessageId,
+      userId: command.userId,
+      direction: "outbound",
+      messageClass: "ordinary_inbound",
+      occurredAt: command.occurredAt,
+      correlationId: command.correlationId,
+      payloadHash: hash({
+        provider: command.provider,
+        externalDeliveryEventId: command.externalDeliveryEventId,
+        providerMessageId: command.providerMessageId,
+        userId: command.userId,
+        deliveryStatus: command.deliveryStatus,
+        occurredAt: command.occurredAt.toISOString(),
+        correlationId: command.correlationId,
+      }),
+    });
+  }
+
+  compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }> {
+    return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
-      const debit = singleRow((await tx.execute<Debit>(sql`
+      const debit = one((await tx.execute<Debit>(sql`
         select l.id, l.package_id as "packageId"
         from message_ledger_entries l
         join message_packages p on p.id = l.package_id
-        where l.entry_kind = 'debit'
-          and l.idempotency_key = ${command.originalDebitKey}
+        where l.entry_kind = 'debit' and l.idempotency_key = ${command.originalDebitKey}
         for update of p, l
       `)).rows, "the original debit");
-      await tx.execute(sql`
-        insert into message_ledger_entries (
-          package_id,
-          entry_kind,
-          delta,
-          original_entry_id,
-          idempotency_key
-        ) values (
-          ${debit.packageId}::uuid,
-          'compensation',
-          1,
-          ${debit.id}::uuid,
-          ${command.idempotencyKey}
-        )
-        on conflict do nothing
-      `);
-      return this.packageBalance(tx, debit.packageId);
-    });
+      const existing = (await tx.execute<{ idempotencyKey: string }>(sql`
+        select idempotency_key as "idempotencyKey"
+        from message_ledger_entries
+        where entry_kind = 'compensation' and original_entry_id = ${debit.id}::uuid
+      `)).rows[0];
+      if (existing !== undefined) {
+        if (existing.idempotencyKey !== command.idempotencyKey) {
+          throw new CompensationConflictError("Original debit already compensated with another key");
+        }
+      } else {
+        await tx.execute(sql`
+          insert into message_ledger_entries (
+            package_id, entry_kind, delta, original_entry_id, idempotency_key
+          ) values (
+            ${debit.packageId}::uuid, 'compensation', 1, ${debit.id}::uuid, ${command.idempotencyKey}
+          )
+        `);
+      }
+      return this.balance(tx, debit.packageId);
+    }));
   }
 
-  private async duplicateInbound(
-    tx: Parameters<DrizzleDb["transaction"]>[0] extends (transaction: infer T) => unknown ? T : never,
-    command: AcceptInboundCommand,
-  ): Promise<AcceptInboundResult> {
-    const event = singleRow((await tx.execute<MessageEvent>(sql`
-      select id from message_events
-      where provider = ${command.provider}
-        and external_message_id = ${command.externalMessageId}
-    `)).rows, "the duplicate inbound event");
-    return { kind: "duplicate", messageEventId: event.id };
+  private acceptMessage(command: {
+    provider: string;
+    externalEventId: string;
+    externalMessageId: string;
+    userId: string;
+    direction: "inbound" | "outbound";
+    messageClass: AcceptInboundCommand["messageClass"];
+    occurredAt: Date;
+    correlationId: string;
+    payloadHash: string;
+  }): Promise<AcceptInboundResult> {
+    return withSerializableRetry(() => this.db.transaction(async (tx) => {
+      await tx.execute(sql`set transaction isolation level serializable`);
+      const inbox = await this.inbox.claim(tx, {
+        provider: command.provider,
+        externalEventId: command.externalEventId,
+        payloadHash: command.payloadHash,
+        normalizedIdentifier: command.externalMessageId,
+      });
+      if (inbox.kind === "duplicate") {
+        if (!inbox.payloadMatches) throw new InboxPayloadMismatchError();
+        return { kind: "duplicate", messageEventId: inbox.messageEventId };
+      }
+      const event = one((await tx.execute<MessageEvent>(sql`
+        insert into message_events (user_id, provider, external_message_id, direction, created_at)
+        values (${command.userId}::uuid, ${command.provider}, ${command.externalMessageId}, ${command.direction}, ${command.occurredAt})
+        returning id
+      `)).rows, "an inserted message event");
+      await this.inbox.associate(tx, inbox.inboxId, event.id);
+      const charged = command.messageClass === "ordinary_inbound"
+        ? await this.debit(tx, command.userId, command.occurredAt, event.id, command.direction, `${command.direction}:${command.externalMessageId}`)
+        : await this.free(tx, event.id, command.direction);
+      await this.auditAndOutbox(tx, command, event.id);
+      return { kind: "accepted", messageEventId: event.id, ...charged };
+    }));
   }
 
-  private async recordFreeFact(
-    tx: Parameters<DrizzleDb["transaction"]>[0] extends (transaction: infer T) => unknown ? T : never,
+  private async debit(
+    tx: Transaction,
     userId: string,
-    messageEventId: string,
-  ): Promise<AcceptInboundResult> {
+    occurredAt: Date,
+    eventId: string,
+    direction: "inbound" | "outbound",
+    idempotencyKey: string,
+  ): Promise<{ packageId: string | null; ledgerBalance: number }> {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
     const packageRow = (await tx.execute<PackageBalance>(sql`
-      select p.id, coalesce(sum(l.delta), 0)::integer as balance
+      select p.id, balances.balance
       from message_packages p
-      left join message_ledger_entries l on l.package_id = p.id
-      where p.user_id = ${userId}::uuid
-      group by p.id
-      order by p.granted_at asc, p.id asc
-      limit 1
+      cross join lateral (
+        select coalesce(sum(l.delta), 0)::integer as balance from message_ledger_entries l where l.package_id = p.id
+      ) balances
+      where p.user_id = ${userId}::uuid and balances.balance > 0
+        and (p.expires_at is null or p.expires_at > ${occurredAt})
+      order by (p.kind = 'intro') asc, p.expires_at asc nulls last, p.granted_at asc, p.id asc
+      for update of p limit 1
     `)).rows[0];
-    if (packageRow === undefined) {
-      return { kind: "accepted", messageEventId, packageId: null, ledgerBalance: 0 };
-    }
+    if (packageRow === undefined) return { packageId: null, ledgerBalance: 0 };
     await tx.execute(sql`
-      insert into message_ledger_entries (
-        package_id,
-        entry_kind,
-        delta,
-        direction,
-        message_event_id,
-        idempotency_key
+      insert into message_ledger_entries (package_id, entry_kind, delta, direction, message_event_id, idempotency_key)
+      values (${packageRow.id}::uuid, 'debit', -1, ${direction}, ${eventId}::uuid, ${idempotencyKey})
+    `);
+    return { packageId: packageRow.id, ledgerBalance: Number(packageRow.balance) - 1 };
+  }
+
+  private async free(
+    tx: Transaction,
+    eventId: string,
+    direction: "inbound" | "outbound",
+  ): Promise<{ packageId: null; ledgerBalance: number }> {
+    await tx.execute(sql`
+      insert into message_ledger_entries (entry_kind, delta, direction, message_event_id, idempotency_key)
+      values ('free', 0, ${direction}, ${eventId}::uuid, ${`free:${eventId}`})
+    `);
+    return { packageId: null, ledgerBalance: 0 };
+  }
+
+  private async auditAndOutbox(
+    tx: Transaction,
+    command: {
+      provider: string; externalEventId: string; userId: string; direction: string;
+      messageClass: string; occurredAt: Date; correlationId: string; payloadHash: string;
+    },
+    eventId: string,
+  ): Promise<void> {
+    const sessionHash = hash({ provider: command.provider, userId: command.userId });
+    await tx.execute(sql`
+      insert into audit_events (
+        actor_type, actor_id, authenticated_session_id_hash, action, object_type, object_id,
+        decision, reason_code, correlation_id, occurred_at, metadata_hash
       ) values (
-        ${packageRow.id}::uuid,
-        'free',
-        0,
-        'inbound',
-        ${messageEventId}::uuid,
-        ${`free:${messageEventId}`}
+        'provider', ${command.userId}::uuid, ${sessionHash}, 'message.accepted', 'message_event',
+        ${eventId}::uuid, 'accepted', ${command.messageClass}, ${command.correlationId},
+        ${command.occurredAt}, ${command.payloadHash}
       )
     `);
-    return {
-      kind: "accepted",
-      messageEventId,
-      packageId: packageRow.id,
-      ledgerBalance: Number(packageRow.balance),
-    };
+    const outboxKey = hash({ provider: command.provider, externalEventId: command.externalEventId, direction: command.direction });
+    await tx.execute(sql`
+      insert into integration_outbox (idempotency_key, reconciliation_key, payload_hash)
+      values (${`message:${outboxKey}`}, ${`message:${outboxKey}`}, ${command.payloadHash})
+    `);
   }
 
-  private async packageBalance(
-    tx: Parameters<DrizzleDb["transaction"]>[0] extends (transaction: infer T) => unknown ? T : never,
-    packageId: string,
-  ): Promise<{ ledgerBalance: number }> {
-    const balance = singleRow((await tx.execute<Balance>(sql`
-      select coalesce(sum(delta), 0)::integer as balance
-      from message_ledger_entries
-      where package_id = ${packageId}::uuid
+  private async balance(tx: Transaction, packageId: string): Promise<{ ledgerBalance: number }> {
+    const result = one((await tx.execute<Balance>(sql`
+      select coalesce(sum(delta), 0)::integer as balance from message_ledger_entries where package_id = ${packageId}::uuid
     `)).rows, "a package balance");
-    return { ledgerBalance: Number(balance.balance) };
+    return { ledgerBalance: Number(result.balance) };
   }
 }

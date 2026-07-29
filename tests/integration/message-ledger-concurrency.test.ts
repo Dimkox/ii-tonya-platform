@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
 import { PostgresMessageRepository } from "../../packages/db/src/index.js";
 import {
   startTestPostgres,
@@ -68,5 +69,128 @@ describe("message ledger transaction", () => {
     expect(await testDb.packageBalance(userId)).toBe(2);
     expect(await testDb.rebuildPackageBalance(userId)).toBe(2);
     expect(await testDb.mutableBalanceColumnCount()).toBe(0);
+  });
+
+  it("returns the stored event for an exact duplicate and rejects a mismatched replay", async () => {
+    const userId = await testDb.createUserWithPackage(1);
+    const repo = new PostgresMessageRepository(testDb.db);
+    const first = await repo.acceptInbound({
+      provider: "selarti", externalEventId: "evt-stored", externalMessageId: "msg-stored", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-stored",
+    });
+    const duplicate = await repo.acceptInbound({
+      provider: "selarti", externalEventId: "evt-stored", externalMessageId: "msg-stored", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-stored",
+    });
+    if (first.kind !== "accepted") throw new Error("Expected first claim to be accepted");
+    expect(duplicate).toEqual({ kind: "duplicate", messageEventId: first.messageEventId });
+    await expect(repo.acceptInbound({
+      provider: "selarti", externalEventId: "evt-stored", externalMessageId: "msg-replayed", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-stored",
+    })).rejects.toThrow("payload does not match");
+  });
+
+  it("debits only a newly delivered outbound message and writes audit plus outbox atomically", async () => {
+    const userId = await testDb.createUserWithPackage(1);
+    const repo = new PostgresMessageRepository(testDb.db);
+    const command = {
+      provider: "selarti" as const, externalDeliveryEventId: "delivery-1", providerMessageId: "outbound-1",
+      userId, deliveryStatus: "delivered" as const, occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-outbound",
+    };
+    const first = await repo.recordOutboundDelivery(command);
+    const duplicate = await repo.recordOutboundDelivery(command);
+    if (first.kind !== "accepted") throw new Error("Expected first delivery to be accepted");
+    expect(first.kind).toBe("accepted");
+    expect(duplicate).toEqual({ kind: "duplicate", messageEventId: first.messageEventId });
+    expect(await testDb.packageBalance(userId)).toBe(0);
+    const facts = await testDb.db.execute<{ audit: string; outbox: string }>(sql`
+      select
+        (select count(*)::text from audit_events where correlation_id = 'corr-outbound') as audit,
+        (select count(*)::text from integration_outbox) as outbox
+    `);
+    expect(facts.rows[0]).toEqual({ audit: "1", outbox: "1" });
+  });
+
+  it.each(["system", "safety", "error"] as const)("records one package-less free fact for %s", async (messageClass) => {
+    const userId = await testDb.createUser();
+    const repo = new PostgresMessageRepository(testDb.db);
+    const result = await repo.acceptInbound({
+      provider: "selarti", externalEventId: `evt-${messageClass}`, externalMessageId: `msg-${messageClass}`,
+      userId, messageClass, occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: `corr-${messageClass}`,
+    });
+    expect(result).toMatchObject({ kind: "accepted", packageId: null, ledgerBalance: 0 });
+    const freeFacts = await testDb.db.execute<{ count: string }>(sql`
+      select count(*)::text as count from message_ledger_entries where entry_kind = 'free' and package_id is null
+    `);
+    expect(Number(freeFacts.rows[0]?.count)).toBeGreaterThan(0);
+  });
+
+  it("accepts ordinary content without a package but records audit and outbox", async () => {
+    const userId = await testDb.createUser();
+    const result = await new PostgresMessageRepository(testDb.db).acceptInbound({
+      provider: "selarti", externalEventId: "evt-no-package", externalMessageId: "msg-no-package", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-no-package",
+    });
+    expect(result).toMatchObject({ kind: "accepted", packageId: null, ledgerBalance: 0 });
+    const counts = await testDb.db.execute<{ audit: string; outbox: string }>(sql`
+      select (select count(*)::text from audit_events where correlation_id = 'corr-no-package') as audit,
+        (select count(*)::text from integration_outbox) as outbox
+    `);
+    expect(counts.rows[0]?.audit).toBe("1");
+    expect(Number(counts.rows[0]?.outbox)).toBeGreaterThan(0);
+  });
+
+  it("uses paid, earliest expiry, grant time, then id as the package order", async () => {
+    const userId = await testDb.createUser();
+    const makePackage = async (key: string, kind: string, expiresAt: Date | null, grantedAt: Date) => {
+      const packageRow = await testDb.db.execute<{ id: string }>(sql`
+        insert into message_packages (user_id, granted_messages, grant_idempotency_key, kind, expires_at, granted_at)
+        values (${userId}::uuid, 1, ${key}, ${kind}, ${expiresAt}, ${grantedAt}) returning id
+      `);
+      const id = packageRow.rows[0]?.id;
+      if (id === undefined) throw new Error("Expected package");
+      await testDb.db.execute(sql`
+        insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
+        values (${id}::uuid, 'grant', 1, ${`grant-${key}`})
+      `);
+      return id;
+    };
+    await makePackage("intro", "intro", new Date("2026-07-29T00:00:00.000Z"), new Date("2026-07-01T00:00:00.000Z"));
+    const expected = await makePackage("paid-early", "paid", new Date("2026-07-30T00:00:00.000Z"), new Date("2026-07-02T00:00:00.000Z"));
+    await makePackage("paid-null", "paid", null, new Date("2026-07-01T00:00:00.000Z"));
+    const result = await new PostgresMessageRepository(testDb.db).acceptInbound({
+      provider: "selarti", externalEventId: "evt-order", externalMessageId: "msg-order", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-order",
+    });
+    expect(result).toMatchObject({ kind: "accepted", packageId: expected });
+  });
+
+  it("rolls back inbox, audit, and outbox when message-event uniqueness rejects a new provider event", async () => {
+    const userId = await testDb.createUserWithPackage(2);
+    const repo = new PostgresMessageRepository(testDb.db);
+    await repo.acceptInbound({
+      provider: "selarti", externalEventId: "evt-atomic-a", externalMessageId: "msg-atomic", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-atomic-a",
+    });
+    await expect(repo.acceptInbound({
+      provider: "selarti", externalEventId: "evt-atomic-b", externalMessageId: "msg-atomic", userId,
+      messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-atomic-b",
+    })).rejects.toThrow();
+    const rows = await testDb.db.execute<{ inbox: string; audit: string; outbox: string }>(sql`
+      select (select count(*)::text from integration_inbox where external_event_id = 'evt-atomic-b') as inbox,
+        (select count(*)::text from audit_events where correlation_id = 'corr-atomic-b') as audit,
+        (select count(*)::text from integration_outbox where payload_hash = 'unused') as outbox
+    `);
+    expect(rows.rows[0]).toMatchObject({ inbox: "0", audit: "0", outbox: "0" });
+  });
+
+  it("distinguishes compensation replay from original and idempotency-key conflicts", async () => {
+    const userId = await testDb.createUserWithPackage(2);
+    const repo = new PostgresMessageRepository(testDb.db);
+    await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-comp-a", externalMessageId: "msg-comp-a", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-comp-a" });
+    await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-comp-b", externalMessageId: "msg-comp-b", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-comp-b" });
+    await repo.compensate({ originalDebitKey: "inbound:msg-comp-a", idempotencyKey: "comp-key" });
+    await expect(repo.compensate({ originalDebitKey: "inbound:msg-comp-a", idempotencyKey: "other-key" })).rejects.toThrow("already compensated");
+    await expect(repo.compensate({ originalDebitKey: "inbound:msg-comp-b", idempotencyKey: "comp-key" })).rejects.toThrow();
   });
 });

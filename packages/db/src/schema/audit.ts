@@ -12,7 +12,7 @@ export const auditEvents = pgTable("audit_events", {
   objectId: uuid("object_id").notNull(),
   decision: text("decision").notNull(),
   reasonCode: text("reason_code").notNull(),
-  correlationId: uuid("correlation_id").notNull(),
+  correlationId: text("correlation_id").notNull(),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   metadataHash: text("metadata_hash").notNull(),
   createdAt,

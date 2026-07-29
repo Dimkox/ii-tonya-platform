@@ -10,6 +10,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { messageEvents } from "./billing.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const mutableTimestamps = {
@@ -26,6 +27,7 @@ export const integrationInbox = pgTable(
     externalEventId: text("external_event_id").notNull(),
     payloadHash: text("payload_hash").notNull(),
     normalizedIdentifier: text("normalized_identifier").notNull(),
+    messageEventId: uuid("message_event_id").references(() => messageEvents.id),
     ...mutableTimestamps,
   },
   (table) => [

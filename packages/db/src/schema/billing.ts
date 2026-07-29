@@ -64,7 +64,7 @@ export const messageLedgerEntries = pgTable(
   "message_ledger_entries",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    packageId: uuid("package_id").notNull().references(() => messagePackages.id),
+    packageId: uuid("package_id").references(() => messagePackages.id),
     entryKind: ledgerEntryKind("entry_kind").notNull(),
     delta: integer("delta").notNull(),
     direction: text("direction").notNull().default("outbound"),
@@ -81,11 +81,11 @@ export const messageLedgerEntries = pgTable(
       name: "message_ledger_original_entry_fk",
     }),
     check("message_ledger_delta_matches_kind", sql`
-      (${table.entryKind} = 'grant' and ${table.delta} > 0 and ${table.messageEventId} is null and ${table.originalEntryId} is null)
-      or (${table.entryKind} = 'debit' and ${table.delta} = -1 and ${table.messageEventId} is not null and ${table.originalEntryId} is null)
+      (${table.entryKind} = 'grant' and ${table.packageId} is not null and ${table.delta} > 0 and ${table.messageEventId} is null and ${table.originalEntryId} is null)
+      or (${table.entryKind} = 'debit' and ${table.packageId} is not null and ${table.delta} = -1 and ${table.messageEventId} is not null and ${table.originalEntryId} is null)
       or (${table.entryKind} = 'free' and ${table.delta} = 0 and ${table.messageEventId} is not null and ${table.originalEntryId} is null)
-      or (${table.entryKind} = 'compensation' and ${table.delta} = 1 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
-      or (${table.entryKind} = 'revocation' and ${table.delta} <= 0 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
+      or (${table.entryKind} = 'compensation' and ${table.packageId} is not null and ${table.delta} = 1 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
+      or (${table.entryKind} = 'revocation' and ${table.packageId} is not null and ${table.delta} <= 0 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
     `),
     uniqueIndex("message_ledger_message_fact_once")
       .on(table.messageEventId, table.direction)

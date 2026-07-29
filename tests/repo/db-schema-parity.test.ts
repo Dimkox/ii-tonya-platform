@@ -116,6 +116,7 @@ describe("authoritative Drizzle schema parity", () => {
     const migration = [
       readFileSync("packages/db/migrations/0000_mvp.sql", "utf8"),
       readFileSync("packages/db/migrations/0001_message-package-metadata.sql", "utf8"),
+      readFileSync("packages/db/migrations/0002_atomic-message-accounting.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -150,12 +151,13 @@ describe("authoritative Drizzle schema parity", () => {
       "privacy_processor_attempts_job_processor_unique",
       "provider_cursors_provider_unique",
       "projection_checkpoints_projection_unique",
+      "integration_inbox_message_event_id_message_events_id_fk",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
   });
 
   it("has a coherent Drizzle baseline snapshot", () => {
-    const path = "packages/db/migrations/meta/0001_snapshot.json";
+    const path = "packages/db/migrations/meta/0002_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
