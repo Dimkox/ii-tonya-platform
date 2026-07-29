@@ -1,7 +1,10 @@
+import { EventEmitter } from "node:events";
+import type { Pool, PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "../client.js";
 import {
   startTestPostgres,
+  trackPoolClientClosures,
   type TestPostgresDependencies,
 } from "./postgres.js";
 
@@ -11,14 +14,15 @@ const container = () => ({
 });
 
 describe("PostgreSQL testkit lifecycle", () => {
-  it("does not stop the container until pool shutdown settles", async () => {
+  it("does not stop the container until tracked client shutdown settles", async () => {
     const startedContainer = container();
-    let settlePool: (() => void) | undefined;
+    let settleClient: (() => void) | undefined;
     const pool = {
-      end: vi.fn(
+      end: vi.fn(async () => undefined),
+      waitForClosedClients: vi.fn(
         async () =>
           new Promise<void>((resolve) => {
-            settlePool = resolve;
+            settleClient = resolve;
           }),
       ),
     };
@@ -31,9 +35,109 @@ describe("PostgreSQL testkit lifecycle", () => {
 
     const stopping = testDb.stop();
     await vi.waitFor(() => expect(pool.end).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(pool.waitForClosedClients).toHaveBeenCalledOnce(),
+    );
     expect(startedContainer.stop).not.toHaveBeenCalled();
-    settlePool?.();
+    settleClient?.();
     await stopping;
+    expect(startedContainer.stop).toHaveBeenCalledOnce();
+  });
+
+  it("tracks clients connected before shutdown until their terminal end", async () => {
+    const rawPool = new EventEmitter() as Pool;
+    rawPool.end = vi.fn(async () => undefined);
+    const pool = trackPoolClientClosures(rawPool);
+    const client = new EventEmitter() as PoolClient;
+
+    rawPool.emit("connect", client);
+    await pool.end();
+    let clientsClosed = false;
+    const waiting = pool.waitForClosedClients?.().then(() => {
+      clientsClosed = true;
+    });
+
+    await Promise.resolve();
+    expect(clientsClosed).toBe(false);
+    client.emit("end");
+    await waiting;
+    expect(clientsClosed).toBe(true);
+    expect(rawPool.listenerCount("connect")).toBe(0);
+    expect(client.listenerCount("error")).toBe(0);
+  });
+
+  it("tracks a client that connects while shutdown is in progress", async () => {
+    const rawPool = new EventEmitter() as Pool;
+    let settlePool: (() => void) | undefined;
+    rawPool.end = vi.fn(
+      async () =>
+        new Promise<void>((resolve) => {
+          settlePool = resolve;
+        }),
+    );
+    const pool = trackPoolClientClosures(rawPool);
+    const client = new EventEmitter() as PoolClient;
+
+    const ending = pool.end();
+    rawPool.emit("connect", client);
+    settlePool?.();
+    await ending;
+    const waiting = pool.waitForClosedClients?.();
+
+    client.emit("end");
+    await waiting;
+    expect(rawPool.listenerCount("connect")).toBe(0);
+  });
+
+  it("records client errors but waits for the terminal end event", async () => {
+    const rawPool = new EventEmitter() as Pool;
+    rawPool.end = vi.fn(async () => undefined);
+    const pool = trackPoolClientClosures(rawPool);
+    const client = new EventEmitter() as PoolClient;
+    const closureFailure = new Error("client close failed");
+    let outcome: "pending" | "resolved" | Error = "pending";
+
+    rawPool.emit("connect", client);
+    const waiting = pool.waitForClosedClients?.().then(
+      () => {
+        outcome = "resolved";
+      },
+      (error: Error) => {
+        outcome = error;
+      },
+    );
+    client.emit("error", closureFailure);
+    const beforeEnd = await Promise.race([
+      waiting?.then(() => "settled"),
+      new Promise<"pending">((resolve) => {
+        setImmediate(() => resolve("pending"));
+      }),
+    ]);
+
+    expect(beforeEnd).toBe("pending");
+    expect(outcome).toBe("pending");
+    client.emit("end");
+    await waiting;
+    expect(outcome).toBe(closureFailure);
+    expect(client.listenerCount("end")).toBe(0);
+    expect(client.listenerCount("error")).toBe(0);
+  });
+
+  it("surfaces tracked client errors after still stopping the container", async () => {
+    const startedContainer = container();
+    const closureFailure = new Error("client close failed");
+    const pool = {
+      end: vi.fn(async () => undefined),
+      waitForClosedClients: vi.fn(async () => Promise.reject(closureFailure)),
+    };
+    const dependencies: TestPostgresDependencies = {
+      startContainer: vi.fn(async () => startedContainer),
+      createPool: vi.fn(() => pool),
+      createDb: vi.fn(() => ({}) as DrizzleDb),
+    };
+    const testDb = await startTestPostgres(dependencies);
+
+    await expect(testDb.stop()).rejects.toBe(closureFailure);
     expect(startedContainer.stop).toHaveBeenCalledOnce();
   });
 
@@ -92,6 +196,38 @@ describe("PostgreSQL testkit lifecycle", () => {
 
     await expect(testDb.stop()).rejects.toThrow("pool close failed");
     expect(startedContainer.stop).toHaveBeenCalledOnce();
+  });
+
+  it("waits for tracked clients and cleans listeners when pool shutdown rejects", async () => {
+    const startedContainer = container();
+    const poolFailure = new Error("pool close failed");
+    let rejectPool: ((error: Error) => void) | undefined;
+    const rawPool = new EventEmitter() as Pool;
+    rawPool.end = vi.fn(
+      async () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectPool = reject;
+        }),
+    );
+    const pool = trackPoolClientClosures(rawPool);
+    const client = new EventEmitter() as PoolClient;
+    const dependencies: TestPostgresDependencies = {
+      startContainer: vi.fn(async () => startedContainer),
+      createPool: vi.fn(() => pool),
+      createDb: vi.fn(() => ({}) as DrizzleDb),
+    };
+    const testDb = await startTestPostgres(dependencies);
+
+    const stopping = testDb.stop();
+    await vi.waitFor(() => expect(rawPool.end).toHaveBeenCalledOnce());
+    rawPool.emit("connect", client);
+    rejectPool?.(poolFailure);
+    await Promise.resolve();
+    expect(startedContainer.stop).not.toHaveBeenCalled();
+    client.emit("end");
+    await expect(stopping).rejects.toBe(poolFailure);
+    expect(startedContainer.stop).toHaveBeenCalledOnce();
+    expect(rawPool.listenerCount("connect")).toBe(0);
   });
 
   it("aggregates ordered pool and container shutdown failures", async () => {

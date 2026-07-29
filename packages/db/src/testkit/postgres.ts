@@ -3,7 +3,7 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import * as schema from "../schema/index.js";
 import type { DrizzleDb } from "../client.js";
 import {
@@ -44,6 +44,7 @@ interface TestContainerHandle {
 
 interface TestPoolHandle {
   end(): Promise<void>;
+  waitForClosedClients?(): Promise<void>;
 }
 
 interface InsertOutboxInput {
@@ -220,10 +221,59 @@ function oneId(rows: { id: string }[]): string {
   return id;
 }
 
+type ClientClosureTrackedPool = Pool & {
+  waitForClosedClients(): Promise<void>;
+};
+
+export function trackPoolClientClosures(pool: Pool): ClientClosureTrackedPool {
+  const pendingClosures = new Set<Promise<void>>();
+  const closureErrors: unknown[] = [];
+
+  const onConnect = (client: PoolClient): void => {
+    const terminal = new Promise<void>((resolve) => {
+      const cleanup = (): void => {
+        client.removeListener("end", onEnd);
+        client.removeListener("error", onError);
+      };
+      const onEnd = (): void => {
+        cleanup();
+        resolve();
+      };
+      const onError = (error: unknown): void => {
+        closureErrors.push(error);
+      };
+
+      client.once("end", onEnd);
+      client.once("error", onError);
+    });
+    pendingClosures.add(terminal);
+    void terminal.then(() => pendingClosures.delete(terminal));
+  };
+
+  pool.on("connect", onConnect);
+
+  return Object.assign(pool, {
+    async waitForClosedClients(): Promise<void> {
+      while (pendingClosures.size > 0) {
+        await Promise.all([...pendingClosures]);
+      }
+      pool.removeListener("connect", onConnect);
+      if (closureErrors.length === 1) throw closureErrors[0];
+      if (closureErrors.length > 1) {
+        throw new AggregateError(
+          closureErrors,
+          "PostgreSQL clients failed while closing",
+        );
+      }
+    },
+  });
+}
+
 const defaultDependencies: TestPostgresDependencies = {
   startContainer: async () =>
     new PostgreSqlContainer("postgres:16-alpine").start(),
-  createPool: (connectionString) => new Pool({ connectionString }),
+  createPool: (connectionString) =>
+    trackPoolClientClosures(new Pool({ connectionString })),
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
 };
 
@@ -234,6 +284,11 @@ async function stopResources(
   const errors: unknown[] = [];
   try {
     await pool.end();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await pool.waitForClosedClients?.();
   } catch (error) {
     errors.push(error);
   }
