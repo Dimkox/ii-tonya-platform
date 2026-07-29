@@ -1,0 +1,15 @@
+{
+  "sanitized": true,
+  "update": {
+    "update_id": "not-an-integer"
+  },
+  "transport": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "result": {
+        "message_id": "not-an-integer"
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import {
   isValidWebhookBodyLimit,
   type WebhookVerification,
 } from "../http/webhook-auth.js";
+import { TransportFailure } from "../http/transport-failure.js";
 import type {
   CanonicalSelartiEvent,
   SelartiPort,
@@ -61,13 +62,6 @@ export interface SelartiContractAdapterDeps {
   ): WebhookVerification;
   maxBodyBytes: number;
   rateLimitResponsePolicy?: "confirmed_not_applied";
-}
-
-export class TransportFailure extends Error {
-  constructor(readonly phase: "before_write" | "after_write") {
-    super(`Selarti transport failed ${phase}`);
-    this.name = "TransportFailure";
-  }
 }
 
 const retryAfterMilliseconds = (

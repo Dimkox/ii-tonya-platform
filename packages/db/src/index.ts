@@ -33,4 +33,9 @@ export {
   OutboxStateConflictError,
   PostgresOutboxRepository,
 } from "./repositories/outbox-repository.js";
+export {
+  PostgresTelegramCallbackRepository,
+  type ConsumeTelegramCallbackCommand,
+  type StoredExpertCallbackClaims,
+} from "./repositories/telegram-callback-repository.js";
 export * from "./schema/index.js";

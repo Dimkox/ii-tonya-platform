@@ -55,6 +55,26 @@ interface InsertUnknownOutboxInput {
   reconciliationKey: string;
 }
 
+interface TelegramCallbackFixtureInput {
+  tokenHash: string;
+  expertId: string;
+  action: "confirm" | "cancel";
+  version: number;
+  expiresAt: string;
+}
+
+interface TelegramCallbackFixture {
+  notificationId: string;
+  tokenHash: string;
+  claims: {
+    reservationId: string;
+    expertId: string;
+    action: "confirm" | "cancel";
+    version: number;
+    expiresAtEpochSeconds: number;
+  };
+}
+
 export interface TestPostgresDependencies {
   startContainer(): Promise<TestContainerHandle>;
   createPool(connectionString: string): TestPoolHandle;
@@ -150,6 +170,10 @@ export interface TestDatabase {
     now: Date;
   }>;
   reservationStatus(reservationId: string): Promise<string>;
+  seedTelegramCallback(
+    input: TelegramCallbackFixtureInput,
+  ): Promise<TelegramCallbackFixture>;
+  callbackConsumedAt(notificationId: string): Promise<Date | null>;
 }
 
 function oneId(rows: { id: string }[]): string {
@@ -857,6 +881,92 @@ export async function startTestPostgres(
       const status = result.rows[0]?.status;
       if (status === undefined) throw new Error("Reservation not found");
       return status;
+    },
+    async seedTelegramCallback(input) {
+      const clientId = await createUser();
+      const expert = await createExpert();
+      const startsAt = new Date("2026-08-02T10:00:00.000Z");
+      const slotId = await createSlotForService({
+        serviceId: expert.serviceId,
+        capacity: 1,
+        startsAt,
+      });
+      const reservationId = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
+            insert into reservations (
+              user_id,
+              slot_id,
+              expert_id,
+              expert_service_id,
+              status,
+              idempotency_key,
+              reserved_until,
+              version,
+              created_at,
+              updated_at
+            ) values (
+              ${clientId}::uuid,
+              ${slotId}::uuid,
+              ${expert.expertId}::uuid,
+              ${expert.serviceId}::uuid,
+              'reserved',
+              ${`callback-reservation-${randomUUID()}`},
+              ${new Date("2026-07-31T10:00:00.000Z")},
+              1,
+              ${new Date("2026-07-27T10:00:00.000Z")},
+              ${new Date("2026-07-27T10:00:00.000Z")}
+            )
+            returning id
+          `)
+        ).rows,
+      );
+      const claims = {
+        reservationId,
+        expertId: input.expertId,
+        action: input.action,
+        version: input.version,
+        expiresAtEpochSeconds: Math.floor(
+          new Date(input.expiresAt).getTime() / 1_000,
+        ),
+      };
+      const notificationId = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
+            insert into notifications (
+              reservation_id,
+              idempotency_key,
+              callback_token_hash,
+              callback_claims,
+              callback_expires_at,
+              callback_expert_id,
+              callback_action,
+              callback_version
+            ) values (
+              ${reservationId}::uuid,
+              ${`callback-notification-${randomUUID()}`},
+              ${input.tokenHash},
+              ${JSON.stringify(claims)},
+              ${new Date(input.expiresAt)},
+              ${input.expertId}::uuid,
+              ${input.action},
+              ${input.version}
+            )
+            returning id
+          `)
+        ).rows,
+      );
+      return { notificationId, tokenHash: input.tokenHash, claims };
+    },
+    async callbackConsumedAt(notificationId) {
+      const result = await db.execute<{ consumedAt: Date | null }>(sql`
+        select callback_consumed_at as "consumedAt"
+        from notifications
+        where id = ${notificationId}::uuid
+      `);
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("Notification not found");
+      return row.consumedAt;
     },
   };
 }

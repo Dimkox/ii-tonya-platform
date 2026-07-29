@@ -8,14 +8,14 @@
 
 ## Сводка
 
-| Интеграция | Статус | Что подтверждено | Что блокирует live |
-|---|---|---|---|
-| GitHub | READY для работы с репозиторием | `gh` авторизован как `Dimkox`; приватный `Dimkox/ii-tonya-platform` доступен | Авторизация широкая; для CI/CD нужен отдельный минимально привилегированный контур |
-| Telegram | BLOCKED | Найден валидный бот, проверенный только через `getMe` | Это `@ExtndBstBot` / `Extended boost`, а не выделенный бот ii-tonya; нет project-owned token/webhook/secret/chat mapping |
-| Selarti | BLOCKED | Публичный официальный REST-контракт и webhook payload подтверждены | Нет API key, company/task/AI/channel IDs, webhook receiver и runtime mappings |
-| Planerka | BLOCKED | Подтверждены получение API-токена в аккаунте и webhook events/payload | Нет токена/tenant context; точные REST endpoints и auth header доступны только после авторизации и сейчас не подтверждены |
-| Make | BLOCKED | В исходном snapshot есть только placeholder webhook URL | Нет project-owned webhook/scenario/API credentials, IDs и развёрнутых сценариев |
-| Google Sheets | BLOCKED | В исходном snapshot есть только placeholder spreadsheet ID | Нет spreadsheet ID, deployable auth identity, scopes и ACL |
+| Интеграция    | Статус                          | Что подтверждено                                                             | Что блокирует live                                                                                                        |
+| ------------- | ------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| GitHub        | READY для работы с репозиторием | `gh` авторизован как `Dimkox`; приватный `Dimkox/ii-tonya-platform` доступен | Авторизация широкая; для CI/CD нужен отдельный минимально привилегированный контур                                        |
+| Telegram      | BLOCKED                         | Найден валидный бот, проверенный только через `getMe`                        | Это `@ExtndBstBot` / `Extended boost`, а не выделенный бот ii-tonya; нет project-owned token/webhook/secret/chat mapping  |
+| Selarti       | BLOCKED                         | Публичный официальный REST-контракт и webhook payload подтверждены           | Нет API key, company/task/AI/channel IDs, webhook receiver и runtime mappings                                             |
+| Planerka      | BLOCKED                         | Подтверждены получение API-токена в аккаунте и webhook events/payload        | Нет токена/tenant context; точные REST endpoints и auth header доступны только после авторизации и сейчас не подтверждены |
+| Make          | BLOCKED                         | В исходном snapshot есть только placeholder webhook URL                      | Нет project-owned webhook/scenario/API credentials, IDs и развёрнутых сценариев                                           |
+| Google Sheets | BLOCKED                         | В исходном snapshot есть только placeholder spreadsheet ID                   | Нет spreadsheet ID, deployable auth identity, scopes и ACL                                                                |
 
 ## Локальная инвентаризация
 
@@ -219,3 +219,16 @@ Live остаётся закрыт, пока не выполнены все пу
 7. Выполнен staging smoke test полного цикла без реальных клиентов и платежей.
 
 До прохождения gates допустимы только локальная разработка, mocked/contract tests и staging/shadow-проверки без live-трафика.
+
+## Telegram code boundary
+
+Локальный адаптер и callback-контракт реализованы без сетевой активации:
+
+- `TELEGRAM_ENABLED=false` остаётся обязательным;
+- bot token, webhook secret и `TELEGRAM_CALLBACK_HMAC_KEY` представлены только placeholder-значениями;
+- callback data содержит только версию, случайный nonce и HMAC, не содержит reservation/expert IDs, PII, заметок, meeting URL или provider credentials;
+- отправка выполняется только через инъецируемый transport с отключённым request logging;
+- token-bearing URL перед логированием заменяется на `/bot[REDACTED]/sendMessage`;
+- `/schedule` получает уже авторизованное представление через порт и не читает PostgreSQL из адаптера.
+
+Live bot/client/session и HTTPS transport в текущем composition root не создаются.

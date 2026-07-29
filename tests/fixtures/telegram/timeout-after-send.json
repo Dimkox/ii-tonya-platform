@@ -1,0 +1,6 @@
+{
+  "sanitized": true,
+  "transport": {
+    "phase": "after_write"
+  }
+}

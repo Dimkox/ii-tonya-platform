@@ -1,0 +1,14 @@
+{
+  "sanitized": true,
+  "transport": {
+    "status": 429,
+    "body": {
+      "ok": false,
+      "error_code": 429,
+      "description": "Too Many Requests",
+      "parameters": {
+        "retry_after": 3
+      }
+    }
+  }
+}

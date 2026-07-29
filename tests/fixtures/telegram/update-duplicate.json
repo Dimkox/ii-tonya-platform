@@ -1,0 +1,13 @@
+{
+  "sanitized": true,
+  "update": {
+    "update_id": 1001,
+    "callback_query": {
+      "id": "sanitized-callback-query",
+      "from": {
+        "id": 123456789
+      },
+      "data": "ct1.sanitized"
+    }
+  }
+}

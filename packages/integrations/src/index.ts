@@ -10,12 +10,12 @@ export {
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export {
   SelartiContractAdapter,
-  TransportFailure,
   type SelartiContractAdapterDeps,
   type SelartiTransport,
   type SelartiTransportRequest,
   type SelartiTransportResponse,
 } from "./selarti/selarti-contract-adapter.js";
+export { TransportFailure } from "./http/transport-failure.js";
 export type {
   CanonicalInboundMessage,
   CanonicalOutboundDelivery,
@@ -23,3 +23,24 @@ export type {
   SelartiPort,
   SelartiSendOutcome,
 } from "./selarti/selarti-port.js";
+export {
+  issueCallback,
+  verifyCallback,
+  type CallbackClaimsStore,
+  type ExpertBinding,
+  type ExpertCallbackClaims,
+} from "./telegram/callback-token.js";
+export {
+  buildTelegramMethodUrl,
+  redactTelegramUrl,
+  TelegramAdapter,
+  type ExpertReservationView,
+  type ExpertScheduleView,
+  type TelegramAdapterDeps,
+  type TelegramPort,
+  type TelegramSendOutcome,
+  type TelegramTransport,
+  type TelegramTransportRequest,
+  type TelegramTransportResponse,
+  type TelegramUpdate,
+} from "./telegram/telegram-adapter.js";
