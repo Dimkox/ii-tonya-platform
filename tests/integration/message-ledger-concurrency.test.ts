@@ -101,6 +101,9 @@ describe("message ledger transaction", () => {
   it("debits only a newly delivered outbound message and writes audit plus outbox atomically", async () => {
     const userId = await testDb.createUserWithPackage(1);
     const repo = new PostgresMessageRepository(testDb.db);
+    const outboxBefore = await testDb.db.execute<{ count: string }>(sql`
+      select count(*)::text as count from integration_outbox
+    `);
     const command = {
       provider: "selarti" as const, externalDeliveryEventId: "delivery-1", providerMessageId: "outbound-1",
       userId, deliveryStatus: "delivered" as const, occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-outbound",
@@ -116,7 +119,10 @@ describe("message ledger transaction", () => {
         (select count(*)::text from audit_events where correlation_id = 'corr-outbound') as audit,
         (select count(*)::text from integration_outbox) as outbox
     `);
-    expect(facts.rows[0]).toEqual({ audit: "1", outbox: "1" });
+    expect(facts.rows[0]).toEqual({
+      audit: "1",
+      outbox: String(Number(outboxBefore.rows[0]?.count ?? "0") + 1),
+    });
   });
 
   it.each(["system", "safety", "error"] as const)("records one package-less free fact for %s", async (messageClass) => {
