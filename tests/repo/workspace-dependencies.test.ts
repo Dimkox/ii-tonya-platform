@@ -98,7 +98,7 @@ describe("workspace dependency ownership remediation", () => {
     expect(root.dependencies ?? {}).toEqual({});
     expect(root.devDependencies).not.toHaveProperty("zod");
     expect(root.packageManager).toBe("pnpm@11.9.0");
-    expect(root.scripts?.build).toBe("pnpm -r --sort run build");
+    expect(root.scripts?.build).toBe("pnpm --workspace-concurrency=1 -r --sort run build");
     expect(root.scripts?.typecheck).toBe("pnpm -r --sort run typecheck");
     expect(root.scripts?.["test:repeat"]).toBe("node scripts/repeat-vitest.mjs");
     expect(root.scripts?.["verify:clean-workspace"]).toBe(
@@ -106,6 +106,12 @@ describe("workspace dependency ownership remediation", () => {
     );
     expect(root.scripts?.["test:pnpm-launcher"]).toBe(
       "node scripts/pnpm-launcher-self-test.mjs",
+    );
+  });
+
+  it("serializes the topological root build to avoid concurrent DTS cleans", () => {
+    expect(manifestAt(".").scripts?.build).toBe(
+      "pnpm --workspace-concurrency=1 -r --sort run build",
     );
   });
 

@@ -19,6 +19,7 @@
   "dependencies": {
     "@ii-tonya/contracts": "workspace:*",
     "@ii-tonya/domain": "workspace:*",
+    "@testcontainers/postgresql": "^10.28.0",
     "drizzle-orm": "^0.44.3",
     "pg": "^8.16.3"
   },
