@@ -27,6 +27,7 @@ describe("booking workflows", () => {
     const first = await service.confirmByExpert({
       reservationId: deps.reservationId,
       expertId: deps.expertId,
+      callbackTokenHash: deps.callbackTokenHash,
       expectedVersion: 1,
       correlationId: "confirm-1",
     });
@@ -36,6 +37,7 @@ describe("booking workflows", () => {
       service.confirmByExpert({
         reservationId: deps.reservationId,
         expertId: deps.expertId,
+        callbackTokenHash: deps.callbackTokenHash,
         expectedVersion: 1,
         correlationId: "confirm-2",
       }),

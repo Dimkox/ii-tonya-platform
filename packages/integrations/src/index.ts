@@ -43,9 +43,11 @@ export type {
 } from "./selarti/selarti-port.js";
 export {
   CallbackVerificationError,
+  authenticateCallback,
   issueCallback,
   verifyCallback,
   type CallbackClaimsStore,
+  type AuthenticatedExpertCallback,
   type ExpertBinding,
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";

@@ -17,6 +17,7 @@ export {
   type ReserveSlotResult,
   type TransitionReservationCommand,
   type TransitionReservationResult,
+  type TransitionTelegramCallbackCommand,
 } from "./repositories/booking-repository.js";
 export {
   PostgresCatalogRepository,

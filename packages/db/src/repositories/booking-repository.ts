@@ -58,10 +58,21 @@ export interface TransitionReservationResult {
   version: number;
 }
 
+export interface TransitionTelegramCallbackCommand {
+  tokenHash: string;
+  reservationId: string;
+  expertId: string;
+  action: "confirm" | "cancel";
+  version: number;
+  now: Date;
+  correlationId: string;
+}
+
 export interface BookingRepositoryOptions {
   maxSerializationAttempts?: number;
   retryDelayMs?: (attempt: number) => number;
   onSerializationExhausted?: (code: "booking_serialization_exhausted") => void;
+  beforeCallbackTransition?: () => Promise<void>;
 }
 
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends
@@ -117,7 +128,43 @@ type RawReservationResultRow = Omit<ReservationResultRow, "reservedUntil"> & {
   reservedUntil: Date | string;
 };
 
+type BookingAuditAction =
+  | "reservation.reserve"
+  | "reservation.expert_confirm"
+  | "reservation.client_cancel"
+  | "reservation.expert_cancel"
+  | "reservation.expire"
+  | "reservation.complete"
+  | "reservation.mark_no_show";
+
+const outboxTopicsFor = (
+  action: BookingAuditAction,
+): readonly string[] => {
+  switch (action) {
+    case "reservation.reserve":
+      return ["planerka.reserve", "telegram.reservation_request"];
+    case "reservation.expert_confirm":
+      return ["planerka.confirm", "client.booking_confirmed"];
+    case "reservation.client_cancel":
+      return ["planerka.cancel", "telegram.booking_cancelled"];
+    case "reservation.expert_cancel":
+      return ["planerka.cancel", "client.booking_cancelled"];
+    case "reservation.expire":
+      return [
+        "planerka.cancel",
+        "client.reservation_expired",
+        "expert.reservation_expired",
+      ];
+    case "reservation.complete":
+      return ["client.booking_completed"];
+    case "reservation.mark_no_show":
+      return ["client.booking_no_show"];
+  }
+};
+
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class BookingSerializationExhaustedError extends Error {
   readonly code = "booking_serialization_exhausted";
@@ -270,6 +317,7 @@ export class PostgresBookingRepository {
   private readonly onSerializationExhausted: (
     code: "booking_serialization_exhausted",
   ) => void;
+  private readonly beforeCallbackTransition: () => Promise<void>;
 
   constructor(
     private readonly db: DrizzleDb,
@@ -282,6 +330,8 @@ export class PostgresBookingRepository {
     this.retryDelayMs = options.retryDelayMs
       ?? ((attempt) => Math.floor(Math.random() * Math.min(250, 25 * 2 ** attempt)));
     this.onSerializationExhausted = options.onSerializationExhausted ?? (() => undefined);
+    this.beforeCallbackTransition =
+      options.beforeCallbackTransition ?? (() => Promise.resolve());
   }
 
   async reserve(command: ReserveSlotCommand): Promise<ReserveSlotResult> {
@@ -312,6 +362,85 @@ export class PostgresBookingRepository {
       return Promise.reject(new Error("Invalid reservation transition input"));
     }
     return this.runSerializable((tx) => this.transitionInTransaction(tx, command));
+  }
+
+  transitionFromTelegramCallback(
+    command: TransitionTelegramCallbackCommand,
+  ): Promise<TransitionReservationResult | null> {
+    if (
+      !finiteDate(command.now) ||
+      !/^[a-f0-9]{64}$/.test(command.tokenHash) ||
+      !UUID_PATTERN.test(command.reservationId) ||
+      !UUID_PATTERN.test(command.expertId) ||
+      !Number.isInteger(command.version) ||
+      command.version <= 0
+    ) {
+      return Promise.resolve(null);
+    }
+    return this.runSerializable(async (tx) => {
+      const consumed = (
+        await tx.execute<{ reservationId: string }>(sql`
+          update notifications n
+          set callback_consumed_at = ${command.now},
+              updated_at = ${command.now}
+          from reservations r
+          join experts e on e.id = r.expert_id
+          join slots s
+            on s.id = r.slot_id
+            and s.expert_service_id = r.expert_service_id
+          join expert_services es
+            on es.id = r.expert_service_id
+            and es.expert_id = r.expert_id
+          where n.callback_token_hash = ${command.tokenHash}
+            and n.reservation_id = r.id
+            and r.id = ${command.reservationId}::uuid
+            and n.callback_consumed_at is null
+            and n.callback_expires_at > ${command.now}
+            and r.expert_id = ${command.expertId}::uuid
+            and n.callback_expert_id = r.expert_id
+            and e.active
+            and e.verified
+            and n.callback_action = ${command.action}
+            and n.callback_version = ${command.version}
+            and r.version = ${command.version}
+            and (
+              (
+                ${command.action} = 'confirm'
+                and r.status = 'reserved'
+                and r.reserved_until > ${command.now}
+                and s.starts_at > ${command.now}
+                and s.observed_at >= ${new Date(
+                  command.now.getTime() - SLOT_FRESHNESS_MS,
+                )}
+                and s.observed_at <= ${command.now}
+                and es.active
+              )
+              or (
+                ${command.action} = 'cancel'
+                and r.status in ('reserved', 'booked')
+              )
+            )
+            and n.callback_claims::jsonb @> jsonb_build_object(
+              'reservationId', r.id::text,
+              'expertId', r.expert_id::text,
+              'action', ${command.action}::text,
+              'version', ${command.version}::integer
+            )
+          returning r.id as "reservationId"
+        `)
+      ).rows[0];
+      if (consumed === undefined) return null;
+      await this.beforeCallbackTransition();
+      return this.transitionInTransaction(tx, {
+        reservationId: consumed.reservationId,
+        expectedVersion: command.version,
+        action:
+          command.action === "confirm" ? "expert_confirm" : "expert_cancel",
+        actor: { type: "expert", id: command.expertId },
+        now: command.now,
+        correlationId: command.correlationId,
+      });
+    });
   }
 
   private async runSerializable<T>(
@@ -726,7 +855,7 @@ export class PostgresBookingRepository {
     event: {
       actorType: string;
       actorId: string;
-      action: string;
+      action: BookingAuditAction;
       reservationId: string;
       decision: string;
       reasonCode: string;
@@ -753,24 +882,28 @@ export class PostgresBookingRepository {
         ${event.occurredAt}, ${metadataHash}
       )
     `);
-    await tx.execute(sql`
-      insert into integration_outbox (
-        idempotency_key, topic, payload, correlation_id,
-        reconciliation_key, payload_hash
-      ) values (
-        ${`booking:${event.action}:${event.reservationId}:v${event.version}`},
-        'booking.reservation_changed',
-        ${JSON.stringify({
-          reservationId: event.reservationId,
-          action: event.action.replace(/^reservation\./, ""),
-          decision: event.decision,
-          version: event.version,
-        })}::jsonb,
-        ${event.correlationId},
-        ${`booking:${event.correlationId}`},
-        ${metadataHash}
-      )
-    `);
+    for (const topic of outboxTopicsFor(event.action)) {
+      const payload = {
+        reservationId: event.reservationId,
+        action: event.action.replace(/^reservation\./, ""),
+        decision: event.decision,
+        version: event.version,
+        charge: 0,
+      };
+      await tx.execute(sql`
+        insert into integration_outbox (
+          idempotency_key, topic, payload, correlation_id,
+          reconciliation_key, payload_hash
+        ) values (
+          ${`${event.reservationId}:${event.version}:${topic}`},
+          ${topic},
+          ${JSON.stringify(payload)}::jsonb,
+          ${event.correlationId},
+          ${`booking:${event.correlationId}`},
+          ${hash(payload)}
+        )
+      `);
+    }
   }
 }
 

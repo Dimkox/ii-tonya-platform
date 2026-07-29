@@ -42,6 +42,7 @@ export type ReserveResult =
 export interface ExpertDecisionCommand {
   readonly reservationId: string;
   readonly expertId: string;
+  readonly callbackTokenHash: string;
   readonly expectedVersion: number;
   readonly correlationId: string;
 }
@@ -108,6 +109,15 @@ export interface BookingWorkflowRepository {
     readonly now: Date;
     readonly correlationId: string;
   }): Promise<BookingResult>;
+  transitionFromTelegramCallback(command: {
+    readonly tokenHash: string;
+    readonly reservationId: string;
+    readonly expertId: string;
+    readonly action: "confirm" | "cancel";
+    readonly version: number;
+    readonly now: Date;
+    readonly correlationId: string;
+  }): Promise<BookingResult | null>;
   expertForTelegramIdentity(telegramUserId: string): Promise<string | null>;
   listExpertSchedule(command: {
     readonly expertId: string;
@@ -155,19 +165,39 @@ const validTimezone = (timezone: string): boolean => {
 export const createBookingService = (
   deps: BookingDependencies,
 ): BookingService => {
-  const transition = (
-    command: ExpertDecisionCommand | ClientCancelCommand,
-    action: "expert_confirm" | "expert_cancel" | "client_cancel",
-    actor: { readonly type: "expert" | "client"; readonly id: string },
+  const clientTransition = (
+    command: ClientCancelCommand,
   ): Promise<BookingResult> =>
     deps.repository.transitionAndPublish({
       reservationId: command.reservationId,
       expectedVersion: command.expectedVersion,
-      action,
-      actor,
+      action: "client_cancel",
+      actor: { type: "client", id: command.userId },
       now: deps.clock.now(),
       correlationId: command.correlationId,
     });
+
+  const expertTransition = async (
+    command: ExpertDecisionCommand,
+    action: "confirm" | "cancel",
+  ): Promise<BookingResult> => {
+    if (!/^[a-f0-9]{64}$/.test(command.callbackTokenHash)) {
+      throw new Error("Invalid callback token hash");
+    }
+    const result = await deps.repository.transitionFromTelegramCallback({
+      tokenHash: command.callbackTokenHash,
+      reservationId: command.reservationId,
+      expertId: command.expertId,
+      action,
+      version: command.expectedVersion,
+      now: deps.clock.now(),
+      correlationId: command.correlationId,
+    });
+    if (result === null || result.reservationId !== command.reservationId) {
+      throw new Error("Invalid, stale, or consumed expert callback");
+    }
+    return result;
+  };
 
   return {
     searchSlots: (command) =>
@@ -183,21 +213,9 @@ export const createBookingService = (
         minimumLeadMs: MINIMUM_LEAD_MS,
         confirmationBufferMs: CONFIRMATION_BUFFER_MS,
       }),
-    confirmByExpert: (command) =>
-      transition(command, "expert_confirm", {
-        type: "expert",
-        id: command.expertId,
-      }),
-    cancelByExpert: (command) =>
-      transition(command, "expert_cancel", {
-        type: "expert",
-        id: command.expertId,
-      }),
-    cancelByClient: (command) =>
-      transition(command, "client_cancel", {
-        type: "client",
-        id: command.userId,
-      }),
+    confirmByExpert: (command) => expertTransition(command, "confirm"),
+    cancelByExpert: (command) => expertTransition(command, "cancel"),
+    cancelByClient: clientTransition,
     async getExpertSchedule(command) {
       if (!/^[1-9]\d{0,19}$/.test(command.telegramUserId)) {
         throw new Error("Invalid Telegram identity");

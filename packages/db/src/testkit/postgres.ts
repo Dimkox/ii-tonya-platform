@@ -160,6 +160,15 @@ export interface TestDatabase {
     correlationId: string;
     reconciliationKey: string;
   }>;
+  outboxDeliveriesForCorrelation(correlationId: string): Promise<
+    readonly {
+      idempotencyKey: string;
+      topic: string;
+      payload: unknown;
+      correlationId: string;
+      reconciliationKey: string;
+    }[]
+  >;
   auditCountForCorrelation(correlationId: string): Promise<number>;
   insertOutbox(input: InsertOutboxInput): Promise<string>;
   insertUnknownOutbox(input: InsertUnknownOutboxInput): Promise<string>;
@@ -910,12 +919,14 @@ export async function startTestPostgres(
     },
     async outboxDeliveryForCorrelation(correlationId) {
       const result = await db.execute<{
+        idempotencyKey: string;
         topic: string;
         payload: unknown;
         correlationId: string;
         reconciliationKey: string;
       }>(sql`
         select
+          idempotency_key as "idempotencyKey",
           topic,
           payload,
           correlation_id as "correlationId",
@@ -926,6 +937,26 @@ export async function startTestPostgres(
       const row = result.rows[0];
       if (row === undefined) throw new Error("Outbox delivery not found");
       return row;
+    },
+    async outboxDeliveriesForCorrelation(correlationId) {
+      const result = await db.execute<{
+        idempotencyKey: string;
+        topic: string;
+        payload: unknown;
+        correlationId: string;
+        reconciliationKey: string;
+      }>(sql`
+        select
+          idempotency_key as "idempotencyKey",
+          topic,
+          payload,
+          correlation_id as "correlationId",
+          reconciliation_key as "reconciliationKey"
+        from integration_outbox
+        where correlation_id = ${correlationId}
+        order by topic
+      `);
+      return result.rows;
     },
     async auditCountForCorrelation(correlationId) {
       const result = await db.execute<{ count: string }>(sql`

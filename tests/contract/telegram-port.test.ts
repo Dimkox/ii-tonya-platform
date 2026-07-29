@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildTelegramMethodUrl,
   CallbackInfrastructureError,
+  authenticateCallback,
   issueCallback,
   redactTelegramUrl,
   TelegramAdapter,
@@ -124,6 +125,42 @@ describe("Telegram expert callback", () => {
         new Date("2026-07-28T10:00:00.000Z"),
       ),
     ).rejects.toThrow("Callback verification failed");
+  });
+
+  it("authenticates without consuming so booking can transition atomically", async () => {
+    const store = memoryCallbackStore();
+    const token = await issueCallback(claims, secret, store);
+    const binding = {
+      telegramUserId: "123456789",
+      expertId: "expert-1",
+      active: true,
+      verified: true,
+    };
+
+    const authenticated = await authenticateCallback(
+      token,
+      binding.telegramUserId,
+      binding,
+      secret,
+      store,
+      new Date("2026-07-28T10:00:00.000Z"),
+    );
+
+    expect(authenticated).toEqual({
+      tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      claims,
+    });
+    await expect(store.peek(authenticated.tokenHash)).resolves.toEqual(claims);
+    await expect(
+      verifyCallback(
+        token,
+        binding.telegramUserId,
+        binding,
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).resolves.toEqual(claims);
   });
 
   it("validates binding before consume so a wrong expert cannot burn the token", async () => {

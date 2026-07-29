@@ -34,6 +34,11 @@ export interface ExpertBinding {
   verified: boolean;
 }
 
+export interface AuthenticatedExpertCallback {
+  tokenHash: string;
+  claims: ExpertCallbackClaims;
+}
+
 export interface CallbackClaimsStore {
   put(tokenHash: string, claims: ExpertCallbackClaims): Promise<void>;
   peek(tokenHash: string): Promise<ExpertCallbackClaims | null>;
@@ -143,7 +148,44 @@ export async function verifyCallback(
   now: Date,
 ): Promise<ExpertCallbackClaims> {
   try {
-    return await verifyCallbackInternal(
+    const authenticated = await authenticateCallbackInternal(
+      token,
+      expectedTelegramUserId,
+      binding,
+      secret,
+      store,
+      now,
+    );
+    const consumed = await store.consumeIfValid({
+      tokenHash: authenticated.tokenHash,
+      expertId: authenticated.claims.expertId,
+      action: authenticated.claims.action,
+      version: authenticated.claims.version,
+      now,
+    });
+    if (consumed === null) {
+      throw new CallbackAuthStateError(
+        "Callback token is unknown or already used",
+      );
+    }
+    return consumed;
+  } catch (error) {
+    if (error instanceof CallbackInfrastructureError) throw error;
+    if (!(error instanceof CallbackAuthStateError)) throw error;
+    throw new CallbackVerificationError();
+  }
+}
+
+export async function authenticateCallback(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  secret: Uint8Array,
+  store: CallbackClaimsStore,
+  now: Date,
+): Promise<AuthenticatedExpertCallback> {
+  try {
+    return await authenticateCallbackInternal(
       token,
       expectedTelegramUserId,
       binding,
@@ -158,14 +200,14 @@ export async function verifyCallback(
   }
 }
 
-async function verifyCallbackInternal(
+async function authenticateCallbackInternal(
   token: string,
   expectedTelegramUserId: string,
   binding: ExpertBinding,
   secret: Uint8Array,
   store: CallbackClaimsStore,
   now: Date,
-): Promise<ExpertCallbackClaims> {
+): Promise<AuthenticatedExpertCallback> {
   requireStrongSecret(secret);
   const { nonce, authenticatedTag } = parseToken(token);
   const expectedTag = callbackTag(nonce, secret);
@@ -198,17 +240,5 @@ async function verifyCallbackInternal(
     throw new CallbackAuthStateError("Callback token has expired");
   }
 
-  const consumed = await store.consumeIfValid({
-    tokenHash: hash,
-    expertId: claims.expertId,
-    action: claims.action,
-    version: claims.version,
-    now,
-  });
-  if (consumed === null) {
-    throw new CallbackAuthStateError(
-      "Callback token is unknown or already used",
-    );
-  }
-  return consumed;
+  return { tokenHash: hash, claims };
 }

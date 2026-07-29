@@ -105,7 +105,12 @@ describe("booking transaction", () => {
     await expect(repo.reserve(retried.command)).resolves.toMatchObject({ kind: "reserved" });
     expect(await testDb.serializationAttemptCount(retried.command.idempotencyKey)).toBe(2);
     expect(await testDb.reservationCountForKey(retried.command.idempotencyKey)).toBe(1);
-    expect(await testDb.outboxCountForCorrelation(retried.command.correlationId)).toBe(1);
+    expect(await testDb.outboxCountForCorrelation(retried.command.correlationId)).toBe(2);
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        retried.command.correlationId,
+      )).map((delivery) => delivery.topic),
+    ).toEqual(["planerka.reserve", "telegram.reservation_request"]);
 
     const exhausted = await testDb.createReservableFixture();
     await testDb.installSerializationFailureTrigger(exhausted.command.idempotencyKey, 3);
@@ -149,18 +154,33 @@ describe("booking transaction", () => {
       correlationId: "confirm-retry",
     })).rejects.toThrow("Stale reservation version");
     expect(await testDb.auditCountForCorrelation("confirm-1")).toBe(1);
-    expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(1);
-    expect(await testDb.outboxDeliveryForCorrelation("confirm-1")).toMatchObject({
-      topic: "booking.reservation_changed",
-      correlationId: "confirm-1",
-      reconciliationKey: "booking:confirm-1",
-      payload: {
-        reservationId: first.reservationId,
-        action: "expert_confirm",
-        decision: "booked",
-        version: 2,
-      },
-    });
+    expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(2);
+    expect(
+      await testDb.outboxDeliveriesForCorrelation("confirm-1"),
+    ).toEqual([
+      expect.objectContaining({
+        idempotencyKey: `${first.reservationId}:2:client.booking_confirmed`,
+        topic: "client.booking_confirmed",
+        correlationId: "confirm-1",
+        reconciliationKey: "booking:confirm-1",
+        payload: expect.objectContaining({
+          reservationId: first.reservationId,
+          version: 2,
+          charge: 0,
+        }),
+      }),
+      expect.objectContaining({
+        idempotencyKey: `${first.reservationId}:2:planerka.confirm`,
+        topic: "planerka.confirm",
+        correlationId: "confirm-1",
+        reconciliationKey: "booking:confirm-1",
+        payload: expect.objectContaining({
+          reservationId: first.reservationId,
+          version: 2,
+          charge: 0,
+        }),
+      }),
+    ]);
   });
 
   it("rejects sequential and concurrent reuse of an idempotency key for another selection", async () => {
@@ -235,6 +255,46 @@ describe("booking transaction", () => {
       now: fixture.command.now,
       correlationId: "early-expiry",
     })).rejects.toThrow("Reservation hold has not expired");
+
+    await expect(repo.transition({
+      reservationId: reserved.reservationId,
+      expectedVersion: reserved.version,
+      action: "client_cancel",
+      actor: { type: "client", id: fixture.command.userId },
+      now: fixture.command.now,
+      correlationId: "client-cancelled",
+    })).resolves.toMatchObject({
+      status: "cancelled_by_client",
+      version: 2,
+    });
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        "client-cancelled",
+      )).map((delivery) => delivery.topic),
+    ).toEqual(["planerka.cancel", "telegram.booking_cancelled"]);
+
+    const expiryFixture = await testDb.createReservableFixture();
+    const expiring = await repo.reserve(expiryFixture.command);
+    if (expiring.kind !== "reserved") {
+      throw new Error("Expected expiring reservation");
+    }
+    await expect(repo.transition({
+      reservationId: expiring.reservationId,
+      expectedVersion: expiring.version,
+      action: "expire",
+      actor: { type: "system", id: expiryFixture.expertId },
+      now: new Date("2026-08-01T10:00:00.000Z"),
+      correlationId: "system-expired",
+    })).resolves.toMatchObject({ status: "expired", version: 2 });
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        "system-expired",
+      )).map((delivery) => delivery.topic),
+    ).toEqual([
+      "client.reservation_expired",
+      "expert.reservation_expired",
+      "planerka.cancel",
+    ]);
   });
 
   it("fails closed for completion and no-show actors and audits authorized actions", async () => {
@@ -297,7 +357,121 @@ describe("booking transaction", () => {
 
     expect(await testDb.auditCountForCorrelation("authorized-complete")).toBe(1);
     expect(await testDb.outboxCountForCorrelation("authorized-complete")).toBe(1);
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        "authorized-complete",
+      )).map((delivery) => delivery.topic),
+    ).toEqual(["client.booking_completed"]);
     expect(await testDb.auditCountForCorrelation("authorized-no-show")).toBe(1);
     expect(await testDb.outboxCountForCorrelation("authorized-no-show")).toBe(1);
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        "authorized-no-show",
+      )).map((delivery) => delivery.topic),
+    ).toEqual(["client.booking_no_show"]);
+  });
+
+  it("consumes an expert callback and transitions the reservation in one transaction", async () => {
+    const fixture = await testDb.seedTelegramCallback({
+      tokenHash: "a".repeat(64),
+      action: "confirm",
+      version: 3,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    const repository = new PostgresBookingRepository(testDb.db);
+    const command = {
+      tokenHash: fixture.tokenHash,
+      reservationId: fixture.claims.reservationId,
+      expertId: fixture.claims.expertId,
+      action: "confirm" as const,
+      version: 3,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+      correlationId: "callback-confirm-atomic",
+    };
+
+    await expect(
+      repository.transitionFromTelegramCallback({
+        ...command,
+        reservationId: "00000000-0000-4000-8000-000000000999",
+      }),
+    ).resolves.toBeNull();
+    expect(await testDb.callbackConsumedAt(fixture.notificationId)).toBeNull();
+    expect(
+      await testDb.reservationStatus(fixture.claims.reservationId),
+    ).toBe("reserved");
+
+    await expect(
+      repository.transitionFromTelegramCallback(command),
+    ).resolves.toMatchObject({
+      reservationId: fixture.claims.reservationId,
+      status: "booked",
+      version: 4,
+    });
+    await expect(
+      repository.transitionFromTelegramCallback(command),
+    ).resolves.toBeNull();
+    expect(await testDb.callbackConsumedAt(fixture.notificationId)).toEqual(
+      command.now,
+    );
+    expect(
+      (await testDb.outboxDeliveriesForCorrelation(
+        command.correlationId,
+      )).map((delivery) => delivery.topic),
+    ).toEqual(["client.booking_confirmed", "planerka.confirm"]);
+  });
+
+  it("rolls callback consumption back when the reservation transition fails", async () => {
+    const fixture = await testDb.seedTelegramCallback({
+      tokenHash: "b".repeat(64),
+      action: "cancel",
+      version: 4,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    const command = {
+      tokenHash: fixture.tokenHash,
+      reservationId: fixture.claims.reservationId,
+      expertId: fixture.claims.expertId,
+      action: "cancel" as const,
+      version: 4,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+      correlationId: "callback-cancel-rollback",
+    };
+    const failing = new PostgresBookingRepository(testDb.db, {
+      beforeCallbackTransition: () =>
+        Promise.reject(new Error("transition interrupted")),
+    });
+
+    await expect(
+      failing.transitionFromTelegramCallback(command),
+    ).rejects.toThrow("transition interrupted");
+    expect(await testDb.callbackConsumedAt(fixture.notificationId)).toBeNull();
+    expect(
+      await testDb.reservationStatus(fixture.claims.reservationId),
+    ).toBe("reserved");
+
+    await expect(
+      new PostgresBookingRepository(
+        testDb.db,
+      ).transitionFromTelegramCallback(command),
+    ).resolves.toMatchObject({
+      status: "cancelled_by_expert",
+      version: 5,
+    });
+    expect(
+      await testDb.outboxDeliveriesForCorrelation(command.correlationId),
+    ).toEqual([
+      expect.objectContaining({
+        idempotencyKey:
+          `${fixture.claims.reservationId}:5:client.booking_cancelled`,
+        topic: "client.booking_cancelled",
+        payload: expect.objectContaining({ charge: 0, version: 5 }),
+      }),
+      expect.objectContaining({
+        idempotencyKey:
+          `${fixture.claims.reservationId}:5:planerka.cancel`,
+        topic: "planerka.cancel",
+        payload: expect.objectContaining({ charge: 0, version: 5 }),
+      }),
+    ]);
   });
 });

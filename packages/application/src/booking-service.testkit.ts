@@ -11,6 +11,7 @@ export interface BookingFixture extends BookingDependencies {
   readonly reservationId: string;
   readonly expertId: string;
   readonly telegramUserId: string;
+  readonly callbackTokenHash: string;
   readonly outbox: {
     topics(): readonly string[];
     allFree(): boolean;
@@ -27,6 +28,7 @@ export const bookingFixture = (
   const expertId = "00000000-0000-4000-8000-000000000102";
   const userId = "00000000-0000-4000-8000-000000000103";
   const telegramUserId = "123456789";
+  const callbackTokenHash = "a".repeat(64);
   const topics: string[] = [];
   const charges: number[] = [];
   const actions: string[] = [];
@@ -43,6 +45,7 @@ export const bookingFixture = (
     reservationId,
     expertId,
     telegramUserId,
+    callbackTokenHash,
     reserveCommand: {
       idempotencyKey: "reserve-1",
       userId,
@@ -108,6 +111,23 @@ export const bookingFixture = (
           publish("client.booking_confirmed");
         }
         return { reservationId, ...reservation };
+      },
+      async transitionFromTelegramCallback(command): Promise<BookingResult | null> {
+        if (
+          command.tokenHash !== callbackTokenHash ||
+          command.reservationId !== reservationId
+        ) return null;
+        return this.transitionAndPublish({
+          reservationId,
+          expectedVersion: command.version,
+          action:
+            command.action === "confirm"
+              ? "expert_confirm"
+              : "expert_cancel",
+          actor: { type: "expert", id: command.expertId },
+          now: command.now,
+          correlationId: command.correlationId,
+        });
       },
       async expertForTelegramIdentity(identity) {
         return identity === telegramUserId ? expertId : null;
