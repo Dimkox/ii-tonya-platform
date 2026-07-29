@@ -10,6 +10,7 @@ export {
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
 export {
+  MAX_PROVIDER_SLOT_CANDIDATES,
   normalizeProviderSlots,
   type PlanerkaMutationOutcome,
   type PlanerkaPort,

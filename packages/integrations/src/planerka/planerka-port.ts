@@ -1,6 +1,19 @@
+import { isProxy } from "node:util/types";
 import { z } from "zod";
 
 const MINIMUM_LEAD_TIME_MS = 24 * 60 * 60 * 1_000;
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+/** Hard fail-closed bound for one provider availability snapshot. */
+export const MAX_PROVIDER_SLOT_CANDIDATES = 10_000;
+const PROVIDER_SLOT_FIELDS = [
+  "externalSlotId",
+  "expertExternalId",
+  "startsAt",
+  "endsAt",
+  "capacity",
+  "observedAt",
+] as const;
+const controlCharacter = /[\u0000-\u001f\u007f-\u009f]/u;
 const canonicalUtcTimestamp = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u)
@@ -11,18 +24,20 @@ const canonicalUtcTimestamp = z
       timestamp.toISOString() === value
     );
   });
-const externalIdentifier = z
-  .string()
-  .min(1)
-  .max(256)
-  .refine((value) => value.trim() === value);
+const isSafeExternalIdentifier = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.length >= 1 &&
+  value.length <= 256 &&
+  value.trim() === value &&
+  !controlCharacter.test(value);
+const externalIdentifier = z.string().refine(isSafeExternalIdentifier);
 const providerSlotSchema = z
   .object({
     externalSlotId: externalIdentifier,
     expertExternalId: externalIdentifier,
     startsAt: canonicalUtcTimestamp,
     endsAt: canonicalUtcTimestamp,
-    capacity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    capacity: z.number().int().positive().max(POSTGRES_INTEGER_MAX),
     observedAt: canonicalUtcTimestamp,
   })
   .strict();
@@ -68,6 +83,43 @@ export interface PlanerkaPort {
   ): Promise<"reserved" | "booked" | "cancelled" | "missing">;
 }
 
+interface InspectedCandidate {
+  candidate: unknown;
+  externalSlotId?: string;
+  schemaEligible: boolean;
+}
+
+const inspectCandidate = (
+  candidate: unknown,
+): InspectedCandidate | undefined => {
+  if (candidate === null || typeof candidate !== "object") {
+    return { candidate, schemaEligible: false };
+  }
+  if (isProxy(candidate)) return undefined;
+
+  const descriptors = new Map<
+    (typeof PROVIDER_SLOT_FIELDS)[number],
+    PropertyDescriptor | undefined
+  >();
+  for (const field of PROVIDER_SLOT_FIELDS) {
+    const descriptor = Object.getOwnPropertyDescriptor(candidate, field);
+    if (descriptor && !("value" in descriptor)) return undefined;
+    descriptors.set(field, descriptor);
+  }
+
+  const externalSlotId = descriptors.get("externalSlotId")?.value as unknown;
+  return {
+    candidate,
+    ...(isSafeExternalIdentifier(externalSlotId) ? { externalSlotId } : {}),
+    schemaEligible: PROVIDER_SLOT_FIELDS.every((field) =>
+      descriptors.get(field),
+    ),
+  };
+};
+
+const compareCodeUnits = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
 export function normalizeProviderSlots(
   slots: readonly ProviderSlot[],
   now: Date,
@@ -88,6 +140,23 @@ export function normalizeProviderSlots(
   }
 
   try {
+    if (
+      !Array.isArray(slots) ||
+      isProxy(slots) ||
+      slots.length > MAX_PROVIDER_SLOT_CANDIDATES
+    ) {
+      return [];
+    }
+
+    const inspected: InspectedCandidate[] = [];
+    for (let index = 0; index < slots.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(slots, String(index));
+      if (!descriptor || !("value" in descriptor)) return [];
+      const inspection = inspectCandidate(descriptor.value);
+      if (!inspection) return [];
+      inspected.push(inspection);
+    }
+
     const parsed: Array<{
       slot: ProviderSlot;
       startsAtMs: number;
@@ -95,14 +164,18 @@ export function normalizeProviderSlots(
       observedAtMs: number;
     }> = [];
     const identifierCounts = new Map<string, number>();
-    for (const candidate of slots) {
+    for (const { externalSlotId } of inspected) {
+      if (!externalSlotId) continue;
+      identifierCounts.set(
+        externalSlotId,
+        (identifierCounts.get(externalSlotId) ?? 0) + 1,
+      );
+    }
+    for (const { candidate, schemaEligible } of inspected) {
+      if (!schemaEligible) continue;
       const result = providerSlotSchema.safeParse(candidate);
       if (!result.success) continue;
       const slot = result.data;
-      identifierCounts.set(
-        slot.externalSlotId,
-        (identifierCounts.get(slot.externalSlotId) ?? 0) + 1,
-      );
       parsed.push({
         slot,
         startsAtMs: Date.parse(slot.startsAt),
@@ -124,8 +197,8 @@ export function normalizeProviderSlots(
       .map(({ slot }) => slot)
       .sort(
         (left, right) =>
-          left.startsAt.localeCompare(right.startsAt) ||
-          left.externalSlotId.localeCompare(right.externalSlotId),
+          compareCodeUnits(left.startsAt, right.startsAt) ||
+          compareCodeUnits(left.externalSlotId, right.externalSlotId),
       );
   } catch {
     return [];
