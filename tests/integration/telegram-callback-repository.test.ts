@@ -268,9 +268,12 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       expiresAtEpochSeconds: times.expiresAtEpochSeconds,
     };
 
-    await expect(repository.put("hash-cross-owner", claims)).rejects.toThrow(
-      "Callback persistence rejected",
-    );
+    await expect(
+      repository.put("hash-cross-owner", claims),
+    ).rejects.toMatchObject({
+      name: "CallbackConflictError",
+      retryable: false,
+    });
     expect(await testDb.notificationCountForToken("hash-cross-owner")).toBe(0);
   });
 
@@ -359,7 +362,10 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
           reservationId: ineligible.reservationId,
           expertId: ineligible.expertId,
         }),
-      ).rejects.toThrow("Callback persistence rejected");
+      ).rejects.toMatchObject({
+        name: "CallbackConflictError",
+        retryable: false,
+      });
       expect(await testDb.notificationCountForToken(tokenHash)).toBe(0);
     }
   });
