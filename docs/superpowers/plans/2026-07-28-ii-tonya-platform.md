@@ -146,6 +146,8 @@ packages/
     src/worker-jobs.testkit.ts
 scripts/repeat-vitest.mjs
 scripts/smoke.mjs
+scripts/lib/run-pnpm.mjs
+scripts/pnpm-launcher-self-test.mjs
 scripts/verify-clean-workspace.mjs
 tests/
   container/image-smoke.test.mjs
@@ -257,11 +259,11 @@ describe("workspace layout", () => {
 });
 ```
 
-Create the root harness with `"packageManager": "pnpm@10.13.1"`, `"engines": {"node": ">=24 <25"}`, and script targets for unit, integration, contract, E2E, lint, typecheck, and build. Set `.nvmrc` to `24`; make `vitest.config.ts` include `packages/**/*.test.ts`, `apps/**/*.test.ts`, and `tests/**/*.test.ts`. Task 3 owns the complete dependency and command remediation because Tasks 1 and 2 are already committed.
+Create the root harness with `"packageManager": "pnpm@11.9.0"`, `"engines": {"node": ">=24 <25"}`, and script targets for unit, integration, contract, E2E, lint, typecheck, and build. Use the installed direct pnpm runtime; do not invoke Corepack. Set `.nvmrc` to `24`; make `vitest.config.ts` include `packages/**/*.test.ts`, `apps/**/*.test.ts`, and `tests/**/*.test.ts`. Task 3 owns the complete dependency and command remediation because Tasks 1 and 2 are already committed.
 
 - [ ] **Step 2: Run the test and confirm the expected failure**
 
-Run: `corepack pnpm install && pnpm exec vitest run tests/repo/workspace-layout.test.ts`
+Run: `pnpm install && pnpm exec vitest run tests/repo/workspace-layout.test.ts`
 
 Expected: FAIL with the ten missing workspace roots listed by the assertion.
 
@@ -609,6 +611,7 @@ git commit -m "feat: add canonical contracts and safe configuration"
 
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
+- Modify: `pnpm-workspace.yaml`
 - Modify: `apps/api/package.json`
 - Modify: `apps/worker/package.json`
 - Modify: `packages/application/package.json`
@@ -619,6 +622,8 @@ git commit -m "feat: add canonical contracts and safe configuration"
 - Modify: `packages/integrations/package.json`
 - Modify: `packages/observability/package.json`
 - Modify: `packages/worker/package.json`
+- Create: `scripts/lib/run-pnpm.mjs`
+- Create: `scripts/pnpm-launcher-self-test.mjs`
 - Create: `scripts/repeat-vitest.mjs`
 - Create: `scripts/verify-clean-workspace.mjs`
 - Create: `tests/repo/workspace-dependencies.test.ts`
@@ -648,14 +653,17 @@ export function computeReservedUntil(createdAt: Date, slotStartsAt: Date, confir
 export function transitionReservation(status: ReservationStatus, action: ReservationAction): ReservationStatus;
 ```
 
-Every external import owner is declared in its consuming workspace, internal dependencies use `workspace:*`, and root owns tooling only. `pnpm test:repeat -- <count> <test-path...>` invokes `scripts/repeat-vitest.mjs`. This task does not claim deployability: `apps/worker/src/main.ts` and `apps/api/src/server.ts` are created with their real compositions in Tasks 19 and 20.
+Every external import owner is declared in its consuming workspace, internal dependencies use `workspace:*`, and root owns tooling only. Runtime source imports are parsed and compared with the owning manifest on every run. Every `packages/*` runtime workspace emits `dist/index.js` plus `dist/index.d.ts`, exports only those artifacts, and lists `dist` in `files`; no production package exports TypeScript source. `pnpm-workspace.yaml` sets `injectWorkspacePackages: true` so the Task 21 deploy output contains built internal dependencies. `pnpm test:repeat -- <count> <test-path...>` invokes `scripts/repeat-vitest.mjs` through the shared host launcher. This task does not claim app deployability: `apps/worker/src/main.ts` and `apps/api/src/server.ts` are created with their real compositions in Tasks 19 and 20.
 
 - [ ] **Step 1: Write the failing dependency-ownership and state-machine tests**
 
 ```ts
 // tests/repo/workspace-dependencies.test.ts
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { describe, expect, it } from "vitest";
+import { preProcessFile } from "typescript";
+import { parse } from "yaml";
 
 const required = {
   ".": {
@@ -668,7 +676,7 @@ const required = {
   "apps/api": {
     dependencies: [
       "@fastify/rate-limit", "@ii-tonya/application", "@ii-tonya/config",
-      "@ii-tonya/integrations", "@ii-tonya/observability", "fastify",
+      "@ii-tonya/db", "@ii-tonya/integrations", "@ii-tonya/observability", "fastify",
     ],
     devDependencies: [],
   },
@@ -713,7 +721,26 @@ const manifestAt = (root: string) => JSON.parse(
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   scripts?: Record<string, string>;
+  exports?: { "."?: { import?: string; types?: string } };
+  files?: string[];
+  main?: string;
+  types?: string;
+  packageManager?: string;
 };
+
+const runtimePackageRoots = [
+  "packages/application", "packages/config", "packages/contracts", "packages/db",
+  "packages/domain", "packages/integrations", "packages/observability", "packages/worker",
+] as const;
+
+const importOwner = (specifier: string): string =>
+  specifier.startsWith("@")
+    ? specifier.split("/").slice(0, 2).join("/")
+    : specifier.split("/")[0]!;
+const nodeBuiltins = new Set([
+  ...builtinModules,
+  ...builtinModules.map((name) => `node:${name}`),
+]);
 
 describe("workspace dependency ownership remediation", () => {
   it.each(Object.entries(required))("%s owns every current and planned import", (root, expected) => {
@@ -731,10 +758,66 @@ describe("workspace dependency ownership remediation", () => {
     const root = manifestAt(".");
     expect(root.dependencies ?? {}).toEqual({});
     expect(root.devDependencies).not.toHaveProperty("zod");
+    expect(root.packageManager).toBe("pnpm@11.9.0");
+    expect(root.scripts?.build).toBe("pnpm -r --sort run build");
+    expect(root.scripts?.typecheck).toBe("pnpm -r --sort run typecheck");
     expect(root.scripts?.["test:repeat"]).toBe("node scripts/repeat-vitest.mjs");
     expect(root.scripts?.["verify:clean-workspace"]).toBe(
       "node scripts/verify-clean-workspace.mjs",
     );
+    expect(root.scripts?.["test:pnpm-launcher"]).toBe(
+      "node scripts/pnpm-launcher-self-test.mjs",
+    );
+  });
+
+  it("derives manifest ownership from every non-test runtime source import", () => {
+    const missing: string[] = [];
+    const files = [
+      ...globSync("apps/*/src/**/*.ts"),
+      ...globSync("packages/*/src/**/*.ts"),
+    ]
+      .filter((file) => !/(\.test|\.testkit)\.ts$/.test(file));
+    for (const file of files) {
+      const [top, workspace] = file.replaceAll("\\", "/").split("/");
+      const root = `${top}/${workspace}`;
+      const dependencies = manifestAt(root).dependencies ?? {};
+      const imported = preProcessFile(readFileSync(file, "utf8"), true, true).importedFiles;
+      for (const { fileName } of imported) {
+        if (fileName.startsWith(".") || nodeBuiltins.has(fileName)) continue;
+        const owner = importOwner(fileName);
+        if (dependencies[owner] === undefined) missing.push(`${file} -> ${owner}`);
+        if (owner.startsWith("@ii-tonya/") && dependencies[owner] !== "workspace:*") {
+          missing.push(`${file} -> ${owner} must use workspace:*`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("emits JavaScript and declarations for every runtime library", () => {
+    for (const root of runtimePackageRoots) {
+      const manifest = manifestAt(root);
+      expect(manifest.scripts?.build).toBe(
+        "tsup src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
+      );
+      expect(manifest.scripts?.typecheck).toBe(
+        "tsc --noEmit -p ../../tsconfig.base.json",
+      );
+      expect(manifest.exports?.["."]).toEqual({
+        types: "./dist/index.d.ts",
+        import: "./dist/index.js",
+      });
+      expect(manifest.main).toBe("./dist/index.js");
+      expect(manifest.types).toBe("./dist/index.d.ts");
+      expect(manifest.files).toContain("dist");
+    }
+    expect(manifestAt("apps/api").dependencies?.["@ii-tonya/db"]).toBe("workspace:*");
+    const workspace = parse(readFileSync("pnpm-workspace.yaml", "utf8")) as {
+      injectWorkspacePackages?: boolean;
+      syncInjectedDepsAfterScripts?: string[];
+    };
+    expect(workspace.injectWorkspacePackages).toBe(true);
+    expect(workspace.syncInjectedDepsAfterScripts).toContain("build");
   });
 });
 ```
@@ -784,7 +867,7 @@ Apply this ownership table in the listed `package.json` files before adding more
 | Workspace | Runtime dependencies | Development dependencies |
 |---|---|---|
 | root | none | `@eslint/js`, `@types/node`, `@vitest/coverage-v8`, `eslint`, `globals`, `prettier`, `tsup`, `tsx`, `typescript`, `typescript-eslint`, `vitest`, `yaml` |
-| `apps/api` | `@fastify/rate-limit`, `@ii-tonya/application`, `@ii-tonya/config`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `fastify` | none |
+| `apps/api` | `@fastify/rate-limit`, `@ii-tonya/application`, `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `fastify` | none |
 | `apps/worker` | `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `@ii-tonya/worker` | none |
 | `packages/application` | `@ii-tonya/contracts`, `@ii-tonya/domain` | none |
 | `packages/config` | `zod` | none |
@@ -795,24 +878,97 @@ Apply this ownership table in the listed `package.json` files before adding more
 | `packages/observability` | `@opentelemetry/api`, `@opentelemetry/sdk-node`, `pino` | none |
 | `packages/worker` | `@ii-tonya/application`, `@ii-tonya/contracts`, `@ii-tonya/db`, `@ii-tonya/domain`, `@ii-tonya/integrations` | none |
 
-Remove `zod` from root `devDependencies`; add it to the runtime `dependencies` of `packages/config`, `packages/contracts`, and `packages/integrations`. Use `workspace:*` for every `@ii-tonya/*` dependency. Root script `test:repeat` must be `node scripts/repeat-vitest.mjs`. Regenerate `pnpm-lock.yaml` only after all manifest edits.
+Remove `zod` from root `devDependencies`; add it to the runtime `dependencies` of `packages/config`, `packages/contracts`, and `packages/integrations`. Add `@ii-tonya/db: "workspace:*"` to `apps/api`. Use `workspace:*` for every `@ii-tonya/*` dependency. For all eight `packages/*` workspaces set:
+
+```json
+{
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
+    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+  }
+}
+```
+
+Set root `packageManager` to the installed and host-verified `pnpm@11.9.0`. Set `injectWorkspacePackages: true` and `syncInjectedDepsAfterScripts: [build]` in `pnpm-workspace.yaml`; the latter synchronizes newly emitted `dist` files into injected workspace dependencies after build. Root scripts include `build` → `pnpm -r --sort run build`, `typecheck` → `pnpm -r --sort run typecheck`, `test:repeat` → `node scripts/repeat-vitest.mjs`, `test:pnpm-launcher` → `node scripts/pnpm-launcher-self-test.mjs`, and `verify:clean-workspace` → `node scripts/verify-clean-workspace.mjs`. Regenerate `pnpm-lock.yaml` only after all manifest and workspace-config edits.
+
+```js
+// scripts/lib/run-pnpm.mjs
+import { spawnSync } from "node:child_process";
+
+const safeCmdToken = /^[-A-Za-z0-9_@./:=,*]+$/;
+
+export function runPnpm(args, options = {}) {
+  if (!Array.isArray(args) || args.some((arg) => !safeCmdToken.test(arg))) {
+    throw new Error("pnpm launcher accepts only fixed, shell-safe argument tokens");
+  }
+  const child = process.platform === "win32"
+    ? {
+        file: process.env.ComSpec ?? "cmd.exe",
+        args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+      }
+    : { file: "pnpm", args };
+  const result = spawnSync(child.file, child.args, {
+    cwd: options.cwd,
+    env: options.env ?? process.env,
+    encoding: options.encoding,
+    stdio: options.stdio ?? "inherit",
+    shell: false,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`pnpm ${args.join(" ")} exited with ${String(result.status)}`);
+  }
+  return result;
+}
+```
+
+On Windows this always launches the already-installed `pnpm` command through `%ComSpec% /d /s /c`; it never calls a `.cmd` shim directly and never enables `shell: true`. The restricted token grammar rejects metacharacters, whitespace, quotes, substitutions, and newlines before constructing the command. Every planned argument is a repository-controlled relative path or fixed option that matches this grammar.
+
+```js
+// scripts/pnpm-launcher-self-test.mjs
+import { readFileSync } from "node:fs";
+import { runPnpm } from "./lib/run-pnpm.mjs";
+
+const expectedVersion = JSON.parse(readFileSync("package.json", "utf8"))
+  .packageManager.replace(/^pnpm@/, "");
+const outputs = [];
+for (let childExecution = 1; childExecution <= 2; childExecution += 1) {
+  const result = runPnpm(["--version"], { encoding: "utf8", stdio: "pipe" });
+  const version = result.stdout.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`invalid pnpm version: ${version}`);
+  if (version !== expectedVersion) {
+    throw new Error(`pnpm version mismatch: expected ${expectedVersion}, received ${version}`);
+  }
+  outputs.push({ childExecution, version });
+}
+if (outputs.length !== 2 || outputs.some((item) => item.childExecution < 1)) {
+  throw new Error("launcher did not complete exactly two child executions");
+}
+process.stdout.write(`${JSON.stringify({ childExecutions: outputs.length, outputs })}\n`);
+```
 
 ```js
 // scripts/repeat-vitest.mjs
-import { spawnSync } from "node:child_process";
+import { runPnpm } from "./lib/run-pnpm.mjs";
 
 const [countText, ...testPaths] = process.argv.slice(2);
 const count = Number.parseInt(countText ?? "", 10);
 if (!Number.isInteger(count) || count < 1 || testPaths.length === 0) {
   throw new Error("Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]");
 }
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 for (let index = 1; index <= count; index += 1) {
-  const result = spawnSync(pnpm, ["exec", "vitest", "run", ...testPaths], {
-    stdio: "inherit",
+  runPnpm(["exec", "vitest", "run", ...testPaths], {
     env: { ...process.env, TEST_RUN_INDEX: String(index) },
   });
-  if (result.status !== 0) process.exit(result.status ?? 1);
 }
 ```
 
@@ -822,17 +978,16 @@ import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { runPnpm } from "./lib/run-pnpm.mjs";
 
 const sourceRoot = process.cwd();
 const scratch = mkdtempSync(join(tmpdir(), "ii-tonya-clean-"));
 const copyRoot = join(scratch, "repo");
 const excluded = new Set([".git", "node_modules", "dist", "coverage", ".turbo"]);
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 const run = (args) => {
-  const result = spawnSync(pnpm, args, { cwd: copyRoot, stdio: "inherit" });
-  if (result.status !== 0) process.exitCode = result.status ?? 1;
-  return result.status === 0;
+  runPnpm(args, { cwd: copyRoot });
+  return true;
 };
 
 try {
@@ -848,6 +1003,18 @@ try {
   if (!run(["install", "--frozen-lockfile"])) throw new Error("clean install failed");
   if (!run(["typecheck"])) throw new Error("clean typecheck failed");
   if (!run(["build"])) throw new Error("clean build failed");
+  for (const packageRoot of [
+    "application", "config", "contracts", "db",
+    "domain", "integrations", "observability", "worker",
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      ["--input-type=module", "--eval", "await import('./dist/index.js')"],
+      { cwd: join(copyRoot, "packages", packageRoot), stdio: "inherit", shell: false },
+    );
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`clean runtime import failed: ${packageRoot}`);
+  }
 } finally {
   const relativeScratch = relative(tmpdir(), scratch);
   if (!relativeScratch.startsWith("ii-tonya-clean-") || relativeScratch.includes(sep)) {
@@ -906,19 +1073,20 @@ export function transitionReservation(status: ReservationStatus, action: Reserva
 Run:
 
 ```bash
-corepack pnpm install --lockfile-only
-corepack pnpm install --frozen-lockfile
+pnpm install --lockfile-only
+pnpm install --frozen-lockfile
+pnpm test:pnpm-launcher
 pnpm exec vitest run tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.test.ts
 pnpm test:repeat -- 2 tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.test.ts
 pnpm verify:clean-workspace
 ```
 
-Expected: PASS; a frozen dependency graph resolves package-owned runtime imports, the portable repeat runner executes twice, strict type checking succeeds, and every currently buildable workspace builds. Tasks 4–21 must stop if this gate fails.
+Expected: PASS; the host launcher reports exactly two direct-pnpm child executions, a frozen dependency graph resolves source-derived owners, the repeat runner executes twice, every runtime library emits importable JS and declarations under `dist`, and the isolated copy passes typecheck/build/import without inherited `node_modules`. Tasks 4–21 must stop if this gate fails.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add package.json pnpm-lock.yaml apps/api/package.json apps/worker/package.json packages/*/package.json scripts/repeat-vitest.mjs scripts/verify-clean-workspace.mjs tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.ts packages/domain/src/reservation.test.ts packages/domain/src/index.ts
+git add package.json pnpm-lock.yaml pnpm-workspace.yaml apps/api/package.json apps/worker/package.json packages/*/package.json scripts/lib/run-pnpm.mjs scripts/pnpm-launcher-self-test.mjs scripts/repeat-vitest.mjs scripts/verify-clean-workspace.mjs tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.ts packages/domain/src/reservation.test.ts packages/domain/src/index.ts
 git commit -m "fix: own workspace dependencies and define reservation policy"
 ```
 
@@ -1290,16 +1458,26 @@ describe("safety evaluation", () => {
     });
   });
 
-  it("SAFE-05 escalates an unacknowledged durable handoff after its SLA", () => {
-    expect(transitionHandoff({
-      status: "assigned",
-      ownerId: "operator-1",
+  it("SAFE-05 assigns an opened handoff and escalates at the inclusive SLA deadline", () => {
+    const assigned = transitionHandoff({
+      status: "opened",
+      ownerId: null,
       openedAt: new Date("2026-07-28T09:00:00.000Z"),
-      acknowledgeBy: new Date("2026-07-28T09:05:00.000Z"),
+      acknowledgeBy: new Date("2026-07-28T10:00:00.000Z"),
       acknowledgedAt: null,
       resolvedAt: null,
+      version: 1,
+    }, { kind: "assign", ownerId: "operator-1" }, new Date("2026-07-28T09:01:00.000Z"));
+    expect(assigned).toMatchObject({
+      status: "assigned",
+      ownerId: "operator-1",
       version: 2,
-    }, "check_ack_sla", now)).toMatchObject({ status: "escalated", version: 3 });
+    });
+    expect(transitionHandoff(
+      assigned,
+      { kind: "check_ack_sla" },
+      new Date("2026-07-28T10:00:00.000Z"),
+    )).toMatchObject({ status: "escalated", version: 3 });
   });
 });
 ```
@@ -1434,24 +1612,34 @@ export type HandoffState = {
   version: number;
 };
 export type HandoffAction =
-  | "assign"
-  | "acknowledge"
-  | "check_ack_sla"
-  | "resolve";
+  | { kind: "assign"; ownerId: string }
+  | { kind: "acknowledge" }
+  | { kind: "check_ack_sla" }
+  | { kind: "resolve" };
 
 export function transitionHandoff(state: HandoffState, action: HandoffAction, now: Date): HandoffState {
-  if (action === "check_ack_sla" && state.acknowledgedAt === null && now > state.acknowledgeBy) {
+  if (action.kind === "assign" && state.status === "opened" && action.ownerId.length > 0) {
+    return { ...state, status: "assigned", ownerId: action.ownerId, version: state.version + 1 };
+  }
+  if (
+    action.kind === "check_ack_sla"
+    && state.status === "assigned"
+    && state.acknowledgedAt === null
+    && now.getTime() >= state.acknowledgeBy.getTime()
+  ) {
     return { ...state, status: "escalated", version: state.version + 1 };
   }
-  if (action === "acknowledge" && state.status === "assigned") {
+  if (action.kind === "acknowledge" && state.status === "assigned") {
     return { ...state, status: "acknowledged", acknowledgedAt: now, version: state.version + 1 };
   }
-  if (action === "resolve" && (state.status === "acknowledged" || state.status === "escalated")) {
+  if (action.kind === "resolve" && (state.status === "acknowledged" || state.status === "escalated")) {
     return { ...state, status: "resolved", resolvedAt: now, version: state.version + 1 };
   }
   throw new Error("Invalid handoff transition");
 }
 ```
+
+The acknowledgement SLA rule is explicitly inclusive: an unacknowledged assigned handoff is overdue when `now >= acknowledgeBy`. Checking just before the deadline leaves it assigned; checking at the exact deadline escalates it.
 
 - [ ] **Step 4: Run focused tests and type checking**
 
@@ -1494,7 +1682,7 @@ The migration must create exactly these MVP tables:
 |---|---|---|
 | Identity | `users`, `channel_identities`, `client_profiles`, `consents` | unique `(provider, external_id)`; append-only consent decisions; profile references a user |
 | Catalog | `experts`, `expert_services`, `slots` | active and verified expert flags; active service flag; unique provider slot identity; `capacity > 0`; UTC timestamps |
-| Billing | `message_packages`, `message_events`, `message_ledger_entries`, derived view `package_balances` | immutable positive grant; append-only debit/free/compensation/revocation facts; unique idempotency keys; no stored authoritative remainder |
+| Billing | `message_packages`, `message_events`, `message_ledger_entries`, derived view `package_balances` | immutable positive grant; append-only debit/free/compensation/revocation facts; partial message-event uniqueness; package-scoped grant/revocation and original-fact-scoped compensation uniqueness; no stored authoritative remainder |
 | Booking | `reservations`, `notifications`, `feedback` | normative status check; positive version; unique reservation idempotency key; unique notification idempotency key |
 | Conversation and safety | `conversations`, `conversation_messages`, `prompt_versions`, `safety_incidents`, `human_escalations` | content is referenced separately; prompt version is immutable; safety and handoff facts are append-only |
 | Audit and approval | `audit_events`, `admin_approvals` | append-only actor/action/object/correlation facts; one-time authenticated approvals bound to action, object, requester, approver, expiry, and nonce |
@@ -1551,6 +1739,34 @@ describe("MVP schema", () => {
     await expect(testDb.updateLedgerFact("debit-1", 0)).rejects.toThrow("append-only");
     await expect(testDb.deleteLedgerFact("debit-1")).rejects.toThrow("append-only");
   });
+
+  it("allows grants across clients/packages while rejecting only same-scope corrections", async () => {
+    const clientA = await testDb.createUser();
+    const clientB = await testDb.createUser();
+    const packageA1 = await testDb.createLedgerPackage(clientA, "grant-a1");
+    const packageA2 = await testDb.createLedgerPackage(clientA, "grant-a2");
+    const packageB1 = await testDb.createLedgerPackage(clientB, "grant-b1");
+
+    const grantA1 = await testDb.appendGrantFact(packageA1, 500, "ledger-grant-a1");
+    const grantA2 = await testDb.appendGrantFact(packageA2, 1000, "ledger-grant-a2");
+    const grantB1 = await testDb.appendGrantFact(packageB1, 500, "ledger-grant-b1");
+    expect([grantA1, grantA2, grantB1]).toHaveLength(3);
+    await expect(testDb.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"))
+      .rejects.toThrow("message_ledger_grant_once_per_package");
+
+    const debitA = await testDb.appendMessageDebit(packageA1, "message-a", "debit-a");
+    const debitB = await testDb.appendMessageDebit(packageB1, "message-b", "debit-b");
+    await testDb.appendCompensation(packageA1, debitA, "comp-a");
+    await testDb.appendCompensation(packageB1, debitB, "comp-b");
+    await expect(testDb.appendCompensation(packageA1, debitA, "comp-a-again"))
+      .rejects.toThrow("message_ledger_compensation_once_per_original");
+
+    await testDb.appendRevocation(packageA1, grantA1, "revoke-a1");
+    await testDb.appendRevocation(packageB1, grantB1, "revoke-b1");
+    await expect(testDb.appendRevocation(packageA1, grantA1, "revoke-a1-again"))
+      .rejects.toThrow("message_ledger_revocation_once_per_package_grant");
+    expect(await testDb.ledgerFactCount([packageA1, packageA2, packageB1])).toBe(9);
+  });
 });
 ```
 
@@ -1589,15 +1805,27 @@ alter table message_events
   add constraint message_events_provider_external_unique unique (provider, external_message_id);
 alter table message_ledger_entries
   add constraint message_ledger_idempotency_unique unique (idempotency_key),
-  add constraint message_ledger_entry_once unique nulls not distinct
-    (message_event_id, direction, message_class, entry_kind),
+  add constraint message_ledger_original_entry_fk
+    foreign key (original_entry_id) references message_ledger_entries(id),
   add constraint message_ledger_delta_matches_kind check (
-    (entry_kind = 'grant' and delta > 0)
-    or (entry_kind = 'debit' and delta = -1)
-    or (entry_kind = 'free' and delta = 0)
-    or (entry_kind = 'compensation' and delta = 1)
-    or (entry_kind = 'revocation' and delta <= 0)
+    (entry_kind = 'grant' and delta > 0 and message_event_id is null and original_entry_id is null)
+    or (entry_kind = 'debit' and delta = -1 and message_event_id is not null and original_entry_id is null)
+    or (entry_kind = 'free' and delta = 0 and message_event_id is not null and original_entry_id is null)
+    or (entry_kind = 'compensation' and delta = 1 and message_event_id is null and original_entry_id is not null)
+    or (entry_kind = 'revocation' and delta <= 0 and message_event_id is null and original_entry_id is not null)
   );
+create unique index message_ledger_message_fact_once
+  on message_ledger_entries(message_event_id, direction)
+  where message_event_id is not null and entry_kind in ('debit', 'free');
+create unique index message_ledger_grant_once_per_package
+  on message_ledger_entries(package_id)
+  where entry_kind = 'grant';
+create unique index message_ledger_compensation_once_per_original
+  on message_ledger_entries(original_entry_id)
+  where entry_kind = 'compensation';
+create unique index message_ledger_revocation_once_per_package_grant
+  on message_ledger_entries(package_id, original_entry_id)
+  where entry_kind = 'revocation';
 alter table reservations
   add constraint reservations_idempotency_unique unique (idempotency_key),
   add constraint reservations_version_positive check (version > 0),
@@ -1607,7 +1835,19 @@ alter table notifications
 alter table integration_inbox
   add constraint integration_inbox_provider_event_unique unique (provider, external_event_id);
 alter table integration_outbox
-  add constraint integration_outbox_idempotency_unique unique (idempotency_key);
+  add constraint integration_outbox_idempotency_unique unique (idempotency_key),
+  add constraint integration_outbox_reconciliation_key_present check (
+    length(reconciliation_key) > 0
+  ),
+  add constraint integration_outbox_attempts_nonnegative check (
+    attempt >= 0 and reconciliation_attempt >= 0
+  );
+create index integration_outbox_dispatch_lease
+  on integration_outbox(status, lease_until)
+  where status = 'processing';
+create index integration_outbox_reconciliation_lease
+  on integration_outbox(status, reconciliation_lease_until)
+  where status = 'reconciling';
 
 create view package_balances as
 select p.id as package_id, p.user_id, coalesce(sum(l.delta), 0)::integer as balance
@@ -1616,9 +1856,11 @@ left join message_ledger_entries l on l.package_id = p.id
 group by p.id, p.user_id;
 ```
 
+`message_ledger_entries.original_entry_id` is a nullable self-reference: compensation points to its debit and revocation points to the package grant. Repositories additionally lock and verify the referenced kind and same `package_id`; the partial indexes scope uniqueness without making unrelated null-valued grants conflict.
+
 Install `reject_append_only_change()` triggers on `message_packages`, `message_ledger_entries`, `consents`, `audit_events`, `safety_incidents`, `delivery_attempts`, and `reconciliation_mismatches`; the trigger raises SQLSTATE `55000` on update or delete. The only package correction is a new compensation or revocation fact. `package_balances` is a rebuildable view and never an input column.
 
-Every mutable table has `created_at` and `updated_at`; append-only tables have only `created_at`. `conversation_messages` stores a nullable encrypted `content_ref`, never raw text; retention can remove the referenced content without rewriting financial or audit facts. `human_escalations` stores incident ID, status, owner ID, opened time, acknowledgement deadline/time, resolution time, version, and escalation reason. Notifications support nullable `callback_token_hash`, `callback_claims`, `callback_expires_at`, `callback_expert_id`, `callback_action`, `callback_version`, and `callback_consumed_at`; the token hash is unique when present, and the expert/action/version columns are validated in the same conditional consume statement. `audit_events` requires actor type/ID, authenticated session ID hash, action, object type/ID, decision, reason code, correlation ID, occurred time, and metadata hash. Delivery attempts, dead letters, provider cursors, reconciliation runs/mismatches, and projection checkpoints provide the evidence required by the design specification. Store provider payload hashes and normalized identifiers, not raw provider bodies. Implement the testkit with `@testcontainers/postgresql`, run migrations per suite, expose only the named seed/assertion helpers used by tests, and terminate the container in `stop`.
+Every mutable table has `created_at` and `updated_at`; append-only tables have only `created_at`. `conversation_messages` stores a nullable encrypted `content_ref`, never raw text; retention can remove the referenced content without rewriting financial or audit facts. `human_escalations` stores incident ID, status, owner ID, opened time, acknowledgement deadline/time, resolution time, version, and escalation reason. Notifications support nullable `callback_token_hash`, `callback_claims`, `callback_expires_at`, `callback_expert_id`, `callback_action`, `callback_version`, and `callback_consumed_at`; the token hash is unique when present, and the expert/action/version columns are validated in the same conditional consume statement. `integration_outbox` stores non-null `reconciliation_key`, dispatch `attempt`, `reconciliation_attempt`, separate dispatch/reconciliation owner and lease-expiry columns, and last normalized reason; a lease transition never clears the key. `audit_events` requires actor type/ID, authenticated session ID hash, action, object type/ID, decision, reason code, correlation ID, occurred time, and metadata hash. Delivery attempts, dead letters, provider cursors, reconciliation runs/mismatches, and projection checkpoints provide the evidence required by the design specification. Store provider payload hashes and normalized identifiers, not raw provider bodies. Implement the testkit with `@testcontainers/postgresql`, run migrations per suite, expose only the named seed/assertion helpers used by tests, and terminate the container in `stop`.
 
 - [ ] **Step 4: Run migration, schema test, and type checking**
 
@@ -1784,7 +2026,7 @@ for update of p
 limit 1;
 ```
 
-Map PostgreSQL unique violations for the inbox key to the `duplicate` result; propagate every other database error. Compensation locks the original debit’s package, verifies that the debit exists and has not already been compensated, and inserts `+1` with a unique original-debit relation. Revocation in Task 17 locks the same row, derives the current balance, and appends one `revocation` fact with `delta = -balance`.
+Map PostgreSQL unique violations for the inbox key to the `duplicate` result; propagate every other database error. Compensation locks the original debit’s package, verifies that the debit exists, belongs to that package, and has not already been compensated, then inserts `+1` with `original_entry_id = debit.id`. Revocation in Task 17 locks the package and its grant fact, derives the current balance, and appends one `revocation` fact with `delta = -balance` and `original_entry_id = grant.id`.
 
 - [ ] **Step 4: Run concurrency tests repeatedly**
 
@@ -1874,24 +2116,57 @@ describe("booking transaction", () => {
     expect(results.filter((result) => result.kind === "unavailable")).toHaveLength(1);
   });
 
-  it("BOOK-02 rejects a second active overlapping reservation for the same client", async () => {
+  it("BOOK-02 allows only one of two concurrent overlapping reservations for the same client", async () => {
     const fixture = await testDb.createOverlappingClientSlots();
     const repo = new PostgresBookingRepository(testDb.db);
-    expect((await repo.reserve(fixture.first)).kind).toBe("reserved");
-    await expect(repo.reserve(fixture.second)).resolves.toMatchObject({
-      kind: "unavailable",
-      reason: "client_active_overlap",
-    });
+    const results = await Promise.all([
+      repo.reserve(fixture.first),
+      repo.reserve(fixture.second),
+    ]);
+    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(1);
+    expect(results.filter((result) =>
+      result.kind === "unavailable" && result.reason === "client_active_overlap"
+    )).toHaveLength(1);
+    expect(await testDb.activeReservationCountForClient(fixture.clientId)).toBe(1);
   });
 
-  it("BOOK-03 rejects overlapping active slots for the same expert", async () => {
+  it("BOOK-03 allows only one of two concurrent overlapping reservations for the same expert", async () => {
     const fixture = await testDb.createOverlappingExpertSlots();
     const repo = new PostgresBookingRepository(testDb.db);
-    expect((await repo.reserve(fixture.first)).kind).toBe("reserved");
-    await expect(repo.reserve(fixture.second)).resolves.toMatchObject({
-      kind: "unavailable",
-      reason: "expert_active_overlap",
+    const results = await Promise.all([
+      repo.reserve(fixture.first),
+      repo.reserve(fixture.second),
+    ]);
+    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(1);
+    expect(results.filter((result) =>
+      result.kind === "unavailable" && result.reason === "expert_active_overlap"
+    )).toHaveLength(1);
+    expect(await testDb.activeReservationCountForExpert(fixture.expertId)).toBe(1);
+  });
+
+  it("restarts the whole SERIALIZABLE transaction on 40001 and stops after three attempts", async () => {
+    const retried = await testDb.createReservableFixture();
+    await testDb.installSerializationFailureTrigger(retried.command.idempotencyKey, 1);
+    const alerts: string[] = [];
+    const repo = new PostgresBookingRepository(testDb.db, {
+      maxSerializationAttempts: 3,
+      retryDelayMs: () => 0,
+      onSerializationExhausted: (code) => alerts.push(code),
     });
+    await expect(repo.reserve(retried.command)).resolves.toMatchObject({ kind: "reserved" });
+    expect(await testDb.serializationAttemptCount(retried.command.idempotencyKey)).toBe(2);
+    expect(await testDb.reservationCountForKey(retried.command.idempotencyKey)).toBe(1);
+    expect(await testDb.outboxCountForCorrelation(retried.command.correlationId)).toBe(1);
+
+    const exhausted = await testDb.createReservableFixture();
+    await testDb.installSerializationFailureTrigger(exhausted.command.idempotencyKey, 3);
+    await expect(repo.reserve(exhausted.command)).rejects.toMatchObject({
+      code: "booking_serialization_exhausted",
+      cause: expect.objectContaining({ code: "40001" }),
+    });
+    expect(await testDb.serializationAttemptCount(exhausted.command.idempotencyKey)).toBe(3);
+    expect(await testDb.reservationCountForKey(exhausted.command.idempotencyKey)).toBe(0);
+    expect(alerts).toEqual(["booking_serialization_exhausted"]);
   });
 
   it("returns the same reservation for a repeated selection and rejects stale callback versions", async () => {
@@ -1948,14 +2223,16 @@ Expected: FAIL because `PostgresBookingRepository` does not exist.
 
 - [ ] **Step 3: Implement row-locked capacity and optimistic callbacks**
 
-Run `reserve` and `transition` at `SERIALIZABLE` isolation. Before predicate reads, take transaction-scoped advisory locks for the slot ID, client ID, and expert ID in lexicographic order; then lock the slot, expert, and expert-service rows with `FOR UPDATE`. `reserve` rejects stale provider data, inactive/unverified experts, inactive services, `starts_at < now + 24h`, invalid deadlines, exhausted capacity, any active client reservation whose `[starts_at, ends_at)` overlaps the candidate, and any active reservation for the same expert whose interval overlaps the candidate. Active means `reserved` or `booked`. Return the existing reservation only on the same idempotency key; a different command for the same client is evaluated against overlap predicates.
+Run `reserve` and `transition` at `SERIALIZABLE` isolation through one bounded wrapper. On SQLSTATE `40001`, roll back the entire transaction, wait bounded full jitter, start a new transaction with a fresh snapshot, reacquire every advisory/row lock, and re-evaluate all predicates. Never retry a statement or reuse data from the aborted attempt. Allow at most three whole-transaction attempts; exhaustion emits `booking_serialization_exhausted` to the owner alert port and throws that typed error with the final `40001` cause. Unique/idempotency/domain failures are never retried.
+
+Before predicate reads, take transaction-scoped advisory locks for the slot ID, client ID, and expert ID in lexicographic order; then lock the slot, expert, and expert-service rows with `FOR UPDATE`. `reserve` rejects stale provider data, inactive/unverified experts, inactive services, `starts_at < now + 24h`, invalid deadlines, exhausted capacity, any active client reservation whose `[starts_at, ends_at)` overlaps the candidate, and any active reservation for the same expert whose interval overlaps the candidate. Active means `reserved` or `booked`. Return the existing reservation only on the same idempotency key; a different command for the same client is evaluated against overlap predicates.
 
 Within `transition`, treat `now` as an injected server clock value, never provider or client input. Lock and join reservation, slot, expert, and service. Expert confirm additionally requires: actor type `expert`; actor ID equals reservation expert ID; expert active and verified; service active; `reserved_until > now`; slot `starts_at > now`; slot observation fresh; no conflicting active client reservation; and no conflicting active expert interval. Client cancel requires actor ownership. System expiry requires `reserved_until <= now`. Only after all predicates pass may the update increment version, append audit, and enqueue the next provider notification in the same transaction. If no row is updated, return a specific missing, stale-version, ownership, expiry, eligibility, or overlap error without changing state.
 
 Use this mutation guard:
 
 ```sql
-update reservations
+update reservations as r
 set status = $1, version = r.version + 1, updated_at = $5
 from slots s, experts e, expert_services es
 where r.id = $2
@@ -1972,11 +2249,13 @@ where r.id = $2
 returning r.id, r.status, r.version;
 ```
 
+`installSerializationFailureTrigger` is a PostgreSQL-only test helper: a sequence-backed trigger raises real SQLSTATE `40001` for the configured first N attempts. Sequence increments survive transaction rollback, so the test proves a fresh second transaction succeeds and a three-attempt case terminates; it does not mock a JavaScript exception.
+
 - [ ] **Step 4: Run the concurrency test repeatedly**
 
 Run: `pnpm test:repeat -- 20 tests/integration/booking-concurrency.test.ts && pnpm typecheck`
 
-Expected: PASS in all repetitions; capacity, idempotency, and version invariants hold.
+Expected: PASS in all repetitions; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold.
 
 - [ ] **Step 5: Commit**
 
@@ -1997,6 +2276,7 @@ git commit -m "feat: make booking concurrency safe"
 - Create: `packages/worker/src/outbox-runner.testkit.ts`
 - Modify: `packages/worker/src/index.ts`
 - Test: `tests/integration/outbox-runner.test.ts`
+- Test: `tests/integration/outbox-repository.test.ts`
 
 **Interfaces:**
 
@@ -2007,16 +2287,20 @@ export interface OutboxMessage {
   payload: unknown;
   correlationId: string;
   attempt: number;
+  reconciliationKey: string;
+  reconciliationAttempt: number;
 }
 export interface OutboxRepository {
-  claim(limit: number, leaseUntil: Date): Promise<readonly OutboxMessage[]>;
-  claimUnknown(limit: number): Promise<readonly OutboxMessage[]>;
-  recordAttemptStarted(id: string, attemptId: string, startedAt: Date): Promise<void>;
-  markUnknownOutcome(id: string, attemptId: string, reasonCode: string): Promise<void>;
+  claim(limit: number, owner: string, leaseUntil: Date): Promise<readonly OutboxMessage[]>;
+  claimUnknown(limit: number, owner: string, leaseUntil: Date): Promise<readonly OutboxMessage[]>;
+  recordAttemptStarted(id: string, attemptId: string, reconciliationKey: string, startedAt: Date): Promise<void>;
+  markUnknownOutcome(id: string, attemptId: string, reconciliationKey: string, reasonCode: string): Promise<void>;
+  markStillUnknown(id: string, owner: string, reasonCode: string, nextCheckAt: Date): Promise<void>;
   succeed(id: string): Promise<void>;
   retry(id: string, nextAttemptAt: Date, reasonCode: string): Promise<void>;
-  deadLetter(id: string, reasonCode: string): Promise<void>;
-  recoverExpiredLeases(now: Date): Promise<number>;
+  deadLetterAndAlert(id: string, reasonCode: string): Promise<void>;
+  recoverExpiredDispatchLeases(now: Date): Promise<number>;
+  recoverExpiredReconciliationLeases(now: Date): Promise<number>;
 }
 export type DispatchOutcome =
   | { kind: "applied"; providerOperationId: string }
@@ -2051,7 +2335,9 @@ describe("outbox runner", () => {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
+      maxReconciliationAttempts: 3,
       batchSize: 10,
+      workerId: "worker-test",
       newAttemptId: () => "attempt-1",
     };
     await runOutboxBatch(deps);
@@ -2079,7 +2365,9 @@ describe("outbox runner", () => {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
+      maxReconciliationAttempts: 3,
       batchSize: 10,
+      workerId: "worker-test",
       newAttemptId: () => "attempt-unknown",
     });
     repository.makeUnknownClaimable();
@@ -2090,7 +2378,9 @@ describe("outbox runner", () => {
       now: () => new Date("2026-07-28T10:01:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
+      maxReconciliationAttempts: 3,
       batchSize: 10,
+      workerId: "worker-test",
       newAttemptId: () => "must-not-dispatch",
     });
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -2110,11 +2400,13 @@ describe("outbox runner", () => {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
+      maxReconciliationAttempts: 3,
       batchSize: 10,
+      workerId: "worker-test",
       newAttemptId: () => "attempt-crash",
     };
     await expect(runOutboxBatch(deps)).rejects.toThrow("simulated local acknowledgement failure");
-    await repository.recoverExpiredLeases(new Date("2026-07-28T10:01:00.000Z"));
+    await repository.recoverExpiredDispatchLeases(new Date("2026-07-28T10:01:00.000Z"));
     repository.makeUnknownClaimable();
     await runOutboxBatch(deps);
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -2135,7 +2427,9 @@ describe("outbox runner", () => {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
+      maxReconciliationAttempts: 3,
       batchSize: 10,
+      workerId: "worker-test",
       newAttemptId: () => "attempt-permanent",
     });
     expect(repository.deadLetterCalls).toEqual([
@@ -2147,70 +2441,220 @@ describe("outbox runner", () => {
 });
 ```
 
+```ts
+// tests/integration/outbox-repository.test.ts
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  PostgresOutboxRepository,
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/index.js";
+import { runOutboxBatch } from "../../packages/worker/src/outbox-runner.js";
+
+let testDb: TestDatabase;
+beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeEach(async () => testDb.reset());
+afterAll(async () => testDb.stop());
+
+describe("PostgreSQL unknown-outcome lifecycle", () => {
+  it("round-trips the reconciliation key and recovers a crashed reconciliation lease", async () => {
+    const repository = new PostgresOutboxRepository(testDb.db);
+    const id = await testDb.insertOutbox({
+      topic: "planerka.reserve",
+      reconciliationKey: "reservation:provider-key-1",
+    });
+    const [claimed] = await repository.claim(
+      1, "dispatch-a", new Date("2026-07-28T10:00:30.000Z"),
+    );
+    await repository.recordAttemptStarted(
+      id, "attempt-1", claimed!.reconciliationKey, new Date("2026-07-28T10:00:00.000Z"),
+    );
+    await repository.markUnknownOutcome(
+      id, "attempt-1", "reservation:provider-key-1", "response_timeout",
+    );
+    const [firstReconciliation] = await repository.claimUnknown(
+      1, "reconciler-a", new Date("2026-07-28T10:01:30.000Z"),
+    );
+    expect(firstReconciliation).toMatchObject({
+      id,
+      reconciliationKey: "reservation:provider-key-1",
+      reconciliationAttempt: 1,
+    });
+
+    expect(await repository.recoverExpiredReconciliationLeases(
+      new Date("2026-07-28T10:01:31.000Z"),
+    )).toBe(1);
+    const [recovered] = await repository.claimUnknown(
+      1, "reconciler-b", new Date("2026-07-28T10:02:30.000Z"),
+    );
+    expect(recovered).toMatchObject({
+      id,
+      reconciliationKey: "reservation:provider-key-1",
+      reconciliationAttempt: 2,
+    });
+  });
+
+  it("never retries beyond either budget and atomically alerts the owner", async () => {
+    const repository = new PostgresOutboxRepository(testDb.db);
+    const dispatch = vi.fn();
+    const reconcile = vi.fn().mockResolvedValue("still_unknown");
+    const unknownId = await testDb.insertUnknownOutbox({
+      attempt: 3,
+      reconciliationAttempt: 1,
+      reconciliationKey: "telegram:message-2",
+    });
+    await runOutboxBatch({
+      repository,
+      dispatcher: { dispatch },
+      reconciler: { reconcile },
+      now: () => new Date("2026-07-28T11:00:00.000Z"),
+      retryDelayMs: () => 1_000,
+      maxAttempts: 3,
+      maxReconciliationAttempts: 2,
+      batchSize: 10,
+      workerId: "worker-budget",
+      newAttemptId: () => "unused",
+    });
+    expect(await testDb.outboxStatus(unknownId)).toBe("dead_letter");
+    expect(await testDb.ownerAlertReasons(unknownId)).toEqual([
+      "unknown_outcome_reconciliation_exhausted",
+    ]);
+    expect(dispatch).not.toHaveBeenCalled();
+
+    const notAppliedId = await testDb.insertUnknownOutbox({
+      attempt: 3,
+      reconciliationAttempt: 0,
+      reconciliationKey: "planerka:reservation-3",
+    });
+    reconcile.mockResolvedValueOnce("not_applied");
+    await runOutboxBatch({
+      repository,
+      dispatcher: { dispatch },
+      reconciler: { reconcile },
+      now: () => new Date("2026-07-28T11:01:00.000Z"),
+      retryDelayMs: () => 1_000,
+      maxAttempts: 3,
+      maxReconciliationAttempts: 2,
+      batchSize: 10,
+      workerId: "worker-budget",
+      newAttemptId: () => "unused",
+    });
+    expect(await testDb.outboxStatus(notAppliedId)).toBe("dead_letter");
+    expect(await testDb.ownerAlertReasons(notAppliedId)).toEqual([
+      "dispatch_attempts_exhausted_after_reconciliation",
+    ]);
+  });
+});
+```
+
 - [ ] **Step 2: Run the test and confirm the expected failure**
 
-Run: `pnpm exec vitest run tests/integration/outbox-runner.test.ts`
+Run: `pnpm exec vitest run tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts`
 
 Expected: FAIL because the outbox runner and repository do not exist.
 
 - [ ] **Step 3: Implement leased claims and one finite decision per message**
 
-Claim pending/retry rows with `FOR UPDATE SKIP LOCKED`, set `processing`, increment attempt, and set a finite lease. Before network I/O, append `delivery_attempts(state = 'started')`. An expired `processing` lease always becomes `unknown_outcome`, never `retry_wait`, because the process may have crashed after provider commit. Unknown rows are claimed separately as `reconciling`; only reconciliation may move them to `succeeded`, `retry_wait`, or leave them unknown.
+Every provider-bound outbox row is created with a stable `reconciliation_key` derived from its command/idempotency identity before dispatch. Claim pending/retry rows with `FOR UPDATE SKIP LOCKED`, set `processing`, increment `attempt`, set `lease_owner/lease_until`, and return the key. Before network I/O, append `delivery_attempts(state = 'started', reconciliation_key)`. An expired `processing` lease always becomes `unknown_outcome`, never `retry_wait`, because the process may have crashed after provider commit.
+
+Unknown rows are claimed separately with `FOR UPDATE SKIP LOCKED`: set `reconciling`, increment `reconciliation_attempt`, and set a distinct reconciliation owner/lease. `claimUnknown` returns the persisted key. Expired reconciliation leases return to `unknown_outcome` with the same key and an append-only crash reason; they never enter the dispatch claim. Only reconciliation may move them to `succeeded`, confirmed `retry_wait`, or terminal `dead_letter` plus owner alert.
 
 ```ts
 export async function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunResult> {
   const now = deps.now();
-  await deps.repository.recoverExpiredLeases(now);
-  const unknown = await deps.repository.claimUnknown(deps.batchSize);
+  await deps.repository.recoverExpiredDispatchLeases(now);
+  await deps.repository.recoverExpiredReconciliationLeases(now);
+  const leaseUntil = new Date(now.getTime() + 30_000);
+  const unknown = await deps.repository.claimUnknown(deps.batchSize, deps.workerId, leaseUntil);
   for (const message of unknown) {
-    const resolution = await deps.reconciler.reconcile(message);
-    if (resolution === "applied") await deps.repository.succeed(message.id);
-    if (resolution === "not_applied") {
-      await deps.repository.retry(message.id, new Date(now.getTime() + deps.retryDelayMs(message.attempt)), "reconciled_not_applied");
-    }
-    if (resolution === "still_unknown") {
-      await deps.repository.markUnknownOutcome(message.id, `reconcile-${message.attempt}`, "still_unknown");
+    try {
+      const resolution = await deps.reconciler.reconcile(message);
+      if (resolution === "applied") await deps.repository.succeed(message.id);
+      if (resolution === "not_applied") {
+        if (message.attempt >= deps.maxAttempts) {
+          await deps.repository.deadLetterAndAlert(
+            message.id, "dispatch_attempts_exhausted_after_reconciliation",
+          );
+        } else {
+          await deps.repository.retry(
+            message.id,
+            new Date(now.getTime() + deps.retryDelayMs(message.attempt)),
+            "reconciled_not_applied",
+          );
+        }
+      }
+      if (resolution === "still_unknown") {
+        if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
+          await deps.repository.deadLetterAndAlert(
+            message.id, "unknown_outcome_reconciliation_exhausted",
+          );
+        } else {
+          await deps.repository.markStillUnknown(
+            message.id,
+            deps.workerId,
+            "still_unknown",
+            new Date(now.getTime() + deps.retryDelayMs(message.reconciliationAttempt)),
+          );
+        }
+      }
+    } catch {
+      if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
+        await deps.repository.deadLetterAndAlert(
+          message.id, "reconciliation_exception_exhausted",
+        );
+      } else {
+        await deps.repository.markStillUnknown(
+          message.id,
+          deps.workerId,
+          "reconciliation_exception",
+          new Date(now.getTime() + deps.retryDelayMs(message.reconciliationAttempt)),
+        );
+      }
     }
   }
-  const messages = await deps.repository.claim(deps.batchSize, new Date(now.getTime() + 30_000));
+  const messages = await deps.repository.claim(deps.batchSize, deps.workerId, leaseUntil);
   for (const message of messages) {
     const attemptId = deps.newAttemptId();
-    await deps.repository.recordAttemptStarted(message.id, attemptId, now);
+    await deps.repository.recordAttemptStarted(
+      message.id, attemptId, message.reconciliationKey, now,
+    );
     const outcome = await deps.dispatcher.dispatch(message);
     if (outcome.kind === "applied") {
       await deps.repository.succeed(message.id);
       continue;
     }
     if (outcome.kind === "unknown_outcome") {
-      await deps.repository.markUnknownOutcome(message.id, attemptId, outcome.reasonCode);
+      await deps.repository.markUnknownOutcome(
+        message.id, attemptId, outcome.reconciliationKey, outcome.reasonCode,
+      );
       continue;
     }
-    if (outcome.retryable && message.attempt + 1 < deps.maxAttempts) {
+    if (outcome.retryable && message.attempt < deps.maxAttempts) {
       await deps.repository.retry(
         message.id,
         new Date(now.getTime() + deps.retryDelayMs(message.attempt + 1)),
         outcome.reasonCode,
       );
     } else {
-      await deps.repository.deadLetter(message.id, outcome.reasonCode);
+      await deps.repository.deadLetterAndAlert(message.id, outcome.reasonCode);
     }
   }
   return { reconciled: unknown.length, dispatched: messages.length };
 }
 ```
 
-Transport adapters must distinguish `not_applied` only when failure happened before bytes were sent or the provider explicitly rejected the command. Timeouts, connection resets after write, malformed success responses, and local acknowledgement-write failures are `unknown_outcome`. Use exponential backoff with bounded full jitter for confirmed-not-applied rows and a separate reconciliation schedule for ambiguous rows. `outbox-runner.testkit.ts` implements every repository transition plus lease recovery, second-attempt activation, unknown claims, and fault injection used by the tests. Store normalized reason codes and payload hashes, not secrets or raw provider bodies.
+Transport adapters must distinguish `not_applied` only when failure happened before bytes were sent or the provider explicitly rejected the command. Timeouts, connection resets after write, malformed success responses, and local acknowledgement-write failures are `unknown_outcome`. The outcome key must equal the row’s stable reconciliation identity or the repository rejects it. Use exponential backoff with bounded full jitter for confirmed-not-applied rows and a separate bounded reconciliation schedule for ambiguous rows. `deadLetterAndAlert` is one database transaction that appends the dead letter and an operator alert; exhaustion never authorizes a resend. `outbox-runner.testkit.ts` implements both leases, key round-trip, second-attempt activation, and fault injection. The PostgreSQL test, not the fake, is authoritative for lease recovery and terminal budgets. Store normalized reason codes and payload hashes, not secrets or raw provider bodies.
 
 - [ ] **Step 4: Run focused and integration tests**
 
-Run: `pnpm exec vitest run tests/integration/outbox-runner.test.ts && pnpm test:integration && pnpm typecheck`
+Run: `pnpm exec vitest run tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts && pnpm test:integration && pnpm typecheck`
 
-Expected: PASS; confirmed-not-applied failures retry, ambiguous results reconcile before retry, acknowledgement crashes do not resend, leases recover, and terminal failures reach dead letter.
+Expected: PASS; keys survive dispatch/reconciliation claims, both leases recover, confirmed-not-applied failures retry only within budget, acknowledgement/reconciliation crashes do not resend, and both exhausted paths dead-letter with an owner alert.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/db/src/repositories/outbox-repository.ts packages/db/src/index.ts packages/worker tests/integration/outbox-runner.test.ts
+git add packages/db/src/repositories/outbox-repository.ts packages/db/src/index.ts packages/worker tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts
 git commit -m "feat: add durable outbox runner"
 ```
 
@@ -2221,6 +2665,7 @@ git commit -m "feat: add durable outbox runner"
 **Files:**
 
 - Create: `packages/integrations/src/selarti/selarti-port.ts`
+- Create: `packages/integrations/src/selarti/selarti-contract-adapter.ts`
 - Create: `packages/integrations/src/selarti/disabled-selarti-adapter.ts`
 - Create: `packages/integrations/src/http/webhook-auth.ts`
 - Modify: `packages/integrations/src/index.ts`
@@ -2231,6 +2676,7 @@ git commit -m "feat: add durable outbox runner"
 - Create: `tests/fixtures/selarti/rate-limit.json`
 - Create: `tests/fixtures/selarti/timeout-before-send.json`
 - Create: `tests/fixtures/selarti/timeout-after-send.json`
+- Create: `tests/fixtures/selarti/oversized-body.json`
 - Create: `tests/fixtures/selarti/delivery-contract-unconfirmed.json`
 - Create: `docs/contracts/provider-activation.md`
 
@@ -2256,13 +2702,16 @@ export interface CanonicalOutboundDelivery {
 export type CanonicalSelartiEvent = CanonicalInboundMessage | CanonicalOutboundDelivery;
 export type SelartiSendOutcome =
   | { kind: "applied"; providerOperationId: string }
-  | { kind: "not_applied"; retryable: boolean; reasonCode: string }
+  | { kind: "not_applied"; retryable: boolean; reasonCode: string; retryAfterMs?: number }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
 export interface SelartiPort {
   decodeVerifiedWebhook(rawBody: Uint8Array, headers: Readonly<Record<string, string>>): Promise<CanonicalSelartiEvent>;
   sendMessage(command: { idempotencyKey: string; channelUserId: string; text: string }): Promise<SelartiSendOutcome>;
 }
 export function verifySignedWebhook(input: SignedWebhookInput): WebhookVerification;
+export class SelartiContractAdapter implements SelartiPort {
+  constructor(deps: SelartiContractAdapterDeps);
+}
 ```
 
 - [ ] **Step 1: Write failing disabled-adapter and generic webhook-firewall tests**
@@ -2271,15 +2720,41 @@ export function verifySignedWebhook(input: SignedWebhookInput): WebhookVerificat
 // tests/contract/selarti-port.test.ts
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { DisabledSelartiAdapter, verifySignedWebhook } from "../../packages/integrations/src/index.js";
+import { describe, expect, it, vi } from "vitest";
+import {
+  DisabledSelartiAdapter,
+  SelartiContractAdapter,
+  TransportFailure,
+  verifySignedWebhook,
+} from "../../packages/integrations/src/index.js";
 
-const fixture = (name: string): Record<string, unknown> =>
-  JSON.parse(readFileSync(`tests/fixtures/selarti/${name}.json`, "utf8")) as Record<string, unknown>;
-const loadSelartiFixtures = () => ({
-  success: fixture("inbound-success"),
-  duplicate: fixture("inbound-duplicate"),
-  deliveryContractUnconfirmed: fixture("delivery-contract-unconfirmed"),
+type SelartiFixture = {
+  sanitized: true;
+  body?: Record<string, unknown>;
+  expandedBodyBytes?: number;
+  transport?: {
+    phase?: "before_write" | "after_write";
+    status?: number;
+    headers?: Record<string, string>;
+    body?: unknown;
+  };
+  expected: Record<string, unknown>;
+};
+const fixture = (name: string): SelartiFixture =>
+  JSON.parse(readFileSync(`tests/fixtures/selarti/${name}.json`, "utf8")) as SelartiFixture;
+const rawBody = (value: SelartiFixture): Uint8Array =>
+  value.expandedBodyBytes === undefined
+    ? Buffer.from(JSON.stringify(value.body))
+    : Buffer.alloc(value.expandedBodyBytes, "x");
+const fixtureTransport = (value: SelartiFixture) => ({
+  request: vi.fn(async () => {
+    if (value.transport?.phase) throw new TransportFailure(value.transport.phase);
+    return {
+      status: value.transport?.status ?? 200,
+      headers: value.transport?.headers ?? {},
+      body: value.transport?.body ?? {},
+    };
+  }),
 });
 const signedWebhookFixture = () => {
   const body = Buffer.from('{"event":"message"}');
@@ -2333,19 +2808,62 @@ describe("Selarti boundary", () => {
       .rejects.toThrow("Selarti integration is disabled");
   });
 
-  it("treats send acceptance as unbilled and requires a separate stable delivery event", () => {
-    const fixtures = loadSelartiFixtures();
-    expect(fixtures.success).toMatchObject({
-      channel_id: expect.any(String),
-      external_chat_id: expect.any(String),
-      message_id: expect.any(String),
-      message_text: expect.any(String),
-      wh_type: "all_messages",
+  it("executes success/duplicate/invalid/oversized/delivery fixtures through the codec and inbox", async () => {
+    const mutations = vi.fn();
+    const seen = new Set<string>();
+    const adapter = new SelartiContractAdapter({
+      transport: fixtureTransport(fixture("inbound-success")),
+      authenticate: () => ({ accepted: true }),
+      maxBodyBytes: 64_000,
     });
-    expect(fixtures.duplicate.message_id).toBe(fixtures.success.message_id);
-    expect(fixtures.deliveryContractUnconfirmed).toEqual({
-      outboundBillingMode: "disabled",
-      reason: "stable Selarti delivery event is not confirmed by approved contract evidence",
+    const ingest = async (value: SelartiFixture) => {
+      const event = await adapter.decodeVerifiedWebhook(rawBody(value), {
+        "content-type": "application/json",
+      });
+      if (seen.has(event.providerEventId)) return "duplicate";
+      seen.add(event.providerEventId);
+      mutations(event);
+      return "applied";
+    };
+
+    await expect(ingest(fixture("inbound-success"))).resolves.toBe("applied");
+    await expect(ingest(fixture("inbound-duplicate"))).resolves.toBe("duplicate");
+    await expect(ingest(fixture("invalid-schema"))).rejects.toThrow("invalid_schema");
+    await expect(ingest(fixture("oversized-body"))).rejects.toThrow("body_size");
+    await expect(ingest(fixture("delivery-contract-unconfirmed")))
+      .rejects.toThrow("outbound_delivery_contract_unconfirmed");
+    expect(mutations).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["rate-limit", {
+      kind: "not_applied", retryable: true, reasonCode: "rate_limited", retryAfterMs: 3_000,
+    }],
+    ["timeout-before-send", {
+      kind: "not_applied", retryable: true, reasonCode: "timeout_before_write",
+    }],
+    ["timeout-after-send", {
+      kind: "unknown_outcome",
+      reconciliationKey: "selarti-send-fixture-1",
+      reasonCode: "timeout_after_write",
+    }],
+  ] as const)("executes the sanitized Selarti transport fixture %s", async (name, expected) => {
+    const value = fixture(name);
+    const transport = fixtureTransport(value);
+    const adapter = new SelartiContractAdapter({
+      transport,
+      authenticate: () => ({ accepted: true }),
+      maxBodyBytes: 64_000,
+    });
+    const command = {
+      idempotencyKey: "selarti-send-fixture-1",
+      channelUserId: "channel-1",
+      text: "fixture",
+    };
+    await expect(adapter.sendMessage(command)).resolves.toEqual(expected);
+    expect(transport.request).toHaveBeenCalledTimes(1);
+    expect(transport.request.mock.calls[0]![0]).toMatchObject({
+      idempotencyKey: "selarti-send-fixture-1",
     });
   });
 
@@ -2392,15 +2910,17 @@ export class DisabledSelartiAdapter implements SelartiPort {
 }
 ```
 
-Capture sanitized fixtures for the documented all-messages payload, duplicate identity, invalid schema, rate limit, pre-send timeout, post-send timeout, and the unconfirmed delivery contract. Each fixture includes `source_document`, `captured_at`, `sanitized: true`, and `contract_status`. Timeout fixtures map to `not_applied` before write and `unknown_outcome` after write. The delivery fixture contains only the explicit disabled-billing decision; it must not invent a provider status field.
+`SelartiContractAdapter` is an unbound contract harness with injected authenticator and HTTP transport. It enforces the 64 KiB raw-body limit before JSON parsing, applies a strict all-messages codec, carries the platform idempotency key in transport context, parses a numeric `Retry-After` into bounded milliseconds, and distinguishes failure before versus after write. It is exported for contract tests but is never selected by runtime composition while `SELARTI_ENABLED=false`.
 
-In `docs/contracts/provider-activation.md`, define the activation evidence fields and set Selarti status to `NO-GO`: official contract version, document checksum, authentication method, webhook replay window, payload fixtures, sandbox tenant, rate limits, timeout semantics, idempotency support, stable outbound-delivery event identity, security reviewer, product approver, and evidence date. Runtime `SELARTI_OUTBOUND_BILLING_MODE=disabled`; send acceptance never calls `recordOutboundDelivery`. If a future approved contract provides stable delivery events, they enter through `integration_inbox` as `CanonicalOutboundDelivery` and Task 7 meters them idempotently in a separate transaction. A live codec or HTTP adapter is not added by this task.
+Capture sanitized fixtures for the documented all-messages payload, duplicate identity, invalid schema, oversized raw body, rate limit with an exact three-second retry, pre-send timeout, post-send timeout, and the unconfirmed delivery contract. Each fixture includes `source_document`, `captured_at`, `sanitized: true`, and `contract_status`. Every fixture is executed through the codec/adapter and injected transport; a metadata-only assertion is insufficient. Invalid, oversized, duplicate, and unconfirmed-delivery cases assert zero application mutations. Timeout fixtures map to `not_applied` before write and `unknown_outcome` after write with the command idempotency key as reconciliation key. The delivery fixture contains only the explicit disabled-billing decision; it must not invent a provider status field.
+
+In `docs/contracts/provider-activation.md`, define the activation evidence fields and set Selarti status to `NO-GO`: official contract version, document checksum, authentication method, webhook replay window, payload fixtures, sandbox tenant, rate limits, timeout semantics, idempotency support, stable outbound-delivery event identity, security reviewer, product approver, and evidence date. Runtime `SELARTI_OUTBOUND_BILLING_MODE=disabled`; send acceptance never calls `recordOutboundDelivery`. If a future approved contract provides stable delivery events, they enter through `integration_inbox` as `CanonicalOutboundDelivery` and Task 7 meters them idempotently in a separate transaction. The contract adapter is not a live binding and cannot be constructed by the API composition root.
 
 - [ ] **Step 4: Run contract tests and type checking**
 
 Run: `pnpm exec vitest run tests/contract/selarti-port.test.ts && pnpm typecheck`
 
-Expected: PASS; the security firewall works independently and Selarti network activity is impossible.
+Expected: PASS; every sanitized fixture executes through the codec/transport, invalid input causes no mutation, typed retry/unknown outcomes are exact, the security firewall works independently, and runtime Selarti network activity remains impossible.
 
 - [ ] **Step 5: Commit**
 
@@ -2421,13 +2941,16 @@ git commit -m "feat: define disabled selarti boundary"
 - Create: `packages/db/src/repositories/telegram-callback-repository.ts`
 - Modify: `packages/db/src/index.ts`
 - Test: `tests/contract/telegram-port.test.ts`
+- Test: `tests/integration/telegram-callback-repository.test.ts`
 - Create: `tests/fixtures/telegram/send-success.json`
 - Create: `tests/fixtures/telegram/update-duplicate.json`
 - Create: `tests/fixtures/telegram/callback-expired.json`
 - Create: `tests/fixtures/telegram/expert-deactivated.json`
 - Create: `tests/fixtures/telegram/rate-limit-429.json`
+- Create: `tests/fixtures/telegram/timeout-before-send.json`
 - Create: `tests/fixtures/telegram/timeout-after-send.json`
 - Create: `tests/fixtures/telegram/invalid-schema.json`
+- Create: `tests/fixtures/telegram/oversized-body.json`
 
 **Interfaces:**
 
@@ -2462,6 +2985,7 @@ export type TelegramSendOutcome =
   | { kind: "not_applied"; retryable: boolean; reasonCode: string; retryAfterMs?: number }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
 export interface TelegramPort {
+  decodeUpdate(rawBody: Uint8Array): Promise<TelegramUpdate>;
   sendReservationRequest(view: ExpertReservationView): Promise<TelegramSendOutcome>;
   sendSchedule(view: ExpertScheduleView): Promise<TelegramSendOutcome>;
 }
@@ -2474,14 +2998,40 @@ export function redactTelegramUrl(url: URL): string;
 ```ts
 // tests/contract/telegram-port.test.ts
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildTelegramMethodUrl,
   issueCallback,
   redactTelegramUrl,
+  TelegramAdapter,
+  TransportFailure,
   verifyCallback,
   type ExpertCallbackClaims,
 } from "../../packages/integrations/src/index.js";
+
+type TelegramFixture = {
+  sanitized: true;
+  update?: Record<string, unknown>;
+  expandedBodyBytes?: number;
+  now?: string;
+  expertActive?: boolean;
+  transport?: {
+    phase?: "before_write" | "after_write";
+    status?: number;
+    body?: unknown;
+  };
+};
+const telegramFixture = (name: string): TelegramFixture =>
+  JSON.parse(readFileSync(`tests/fixtures/telegram/${name}.json`, "utf8")) as TelegramFixture;
+const telegramTransport = (value: TelegramFixture) => ({
+  request: vi.fn(async () => {
+    if (value.transport?.phase) throw new TransportFailure(value.transport.phase);
+    return {
+      status: value.transport?.status ?? 200,
+      body: value.transport?.body ?? {},
+    };
+  }),
+});
 
 const memoryCallbackStore = () => {
   const values = new Map<string, {
@@ -2574,6 +3124,8 @@ describe("Telegram expert callback", () => {
   });
 
   it("rejects tampering, expiry, and a deactivated expert without consuming a valid token", async () => {
+    const expiredFixture = telegramFixture("callback-expired");
+    const deactivatedFixture = telegramFixture("expert-deactivated");
     const store = memoryCallbackStore();
     const token = await issueCallback(claims, secret, store);
     await expect(verifyCallback(
@@ -2587,7 +3139,11 @@ describe("Telegram expert callback", () => {
     await expect(verifyCallback(
       token,
       "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: false },
+      {
+        telegramUserId: "123456789",
+        expertId: "expert-1",
+        active: deactivatedFixture.expertActive!,
+      },
       secret,
       store,
       new Date("2026-07-28T10:00:00.000Z"),
@@ -2598,7 +3154,7 @@ describe("Telegram expert callback", () => {
       { telegramUserId: "123456789", expertId: "expert-1", active: true },
       secret,
       store,
-      new Date("2026-07-28T10:06:00.000Z"),
+      new Date(expiredFixture.now!),
     )).rejects.toThrow("Callback token has expired");
   });
 
@@ -2611,28 +3167,156 @@ describe("Telegram expert callback", () => {
   });
 
   it.each([
-    "send-success",
-    "update-duplicate",
-    "callback-expired",
-    "expert-deactivated",
-    "rate-limit-429",
-    "timeout-after-send",
-    "invalid-schema",
-  ])("parses the sanitized Telegram fixture %s", (name) => {
-    const value = JSON.parse(
-      readFileSync(`tests/fixtures/telegram/${name}.json`, "utf8"),
-    ) as { sanitized: boolean; expectedOutcome: string };
-    expect(value.sanitized).toBe(true);
-    expect(value.expectedOutcome).toMatch(
-      /^(applied|duplicate|expired|unauthorized|retryable|unknown_outcome|invalid_schema)$/,
-    );
+    ["send-success", { kind: "applied", providerOperationId: "42" }],
+    ["rate-limit-429", {
+      kind: "not_applied", retryable: true, reasonCode: "rate_limited", retryAfterMs: 3_000,
+    }],
+    ["timeout-before-send", {
+      kind: "not_applied", retryable: true, reasonCode: "timeout_before_write",
+    }],
+    ["timeout-after-send", {
+      kind: "unknown_outcome",
+      reconciliationKey: "telegram-notification-1",
+      reasonCode: "timeout_after_write",
+    }],
+    ["invalid-schema", {
+      kind: "unknown_outcome",
+      reconciliationKey: "telegram-notification-1",
+      reasonCode: "invalid_success_schema",
+    }],
+  ] as const)("executes TelegramAdapter transport fixture %s", async (name, expected) => {
+    const value = telegramFixture(name);
+    const transport = telegramTransport(value);
+    const logged: unknown[] = [];
+    const adapter = new TelegramAdapter({
+      baseUrl: new URL("https://api.telegram.org"),
+      botToken: "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
+      transport,
+      logger: { error: (entry: unknown) => logged.push(entry) },
+      maxBodyBytes: 64_000,
+    });
+    await expect(adapter.sendReservationRequest({
+      idempotencyKey: "telegram-notification-1",
+      telegramUserId: "123456789",
+      text: "fixture",
+    })).resolves.toEqual(expected);
+    expect(transport.request).toHaveBeenCalledTimes(1);
+    expect(transport.request.mock.calls[0]![0]).toMatchObject({
+      context: { idempotencyKey: "telegram-notification-1" },
+    });
+    const serializedLogs = JSON.stringify(logged);
+    expect(serializedLogs).not.toContain("__PLACEHOLDER_TELEGRAM_BOT_TOKEN__");
+    if (name.includes("timeout") || name === "invalid-schema") {
+      expect(serializedLogs).toContain("/bot[REDACTED]/sendMessage");
+    }
+  });
+
+  it("executes duplicate and oversized update fixtures through the Telegram codec", async () => {
+    const duplicate = telegramFixture("update-duplicate");
+    const oversized = telegramFixture("oversized-body");
+    const adapter = new TelegramAdapter({
+      baseUrl: new URL("https://api.telegram.org"),
+      botToken: "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
+      transport: telegramTransport(telegramFixture("send-success")),
+      logger: { error: vi.fn() },
+      maxBodyBytes: 64_000,
+    });
+    const seen = new Set<number>();
+    const mutate = vi.fn();
+    const ingest = async (raw: Uint8Array) => {
+      const update = await adapter.decodeUpdate(raw);
+      if (seen.has(update.updateId)) return "duplicate";
+      seen.add(update.updateId);
+      mutate(update);
+      return "applied";
+    };
+    const rawDuplicate = Buffer.from(JSON.stringify(duplicate.update));
+    await expect(ingest(rawDuplicate)).resolves.toBe("applied");
+    await expect(ingest(rawDuplicate)).resolves.toBe("duplicate");
+    await expect(ingest(Buffer.alloc(oversized.expandedBodyBytes!, "x")))
+      .rejects.toThrow("body_size");
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+```ts
+// tests/integration/telegram-callback-repository.test.ts
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  PostgresTelegramCallbackRepository,
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/index.js";
+
+let testDb: TestDatabase;
+beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeEach(async () => testDb.reset());
+afterAll(async () => testDb.stop());
+
+describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
+  it("does not consume for the wrong expert or an expired callback", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const active = await testDb.seedTelegramCallback({
+      tokenHash: "hash-active",
+      expertId: "expert-1",
+      action: "confirm",
+      version: 3,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    await expect(repository.consumeIfValid({
+      tokenHash: active.tokenHash,
+      expertId: "expert-2",
+      action: "confirm",
+      version: 3,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+    })).resolves.toBeNull();
+    expect(await testDb.callbackConsumedAt(active.notificationId)).toBeNull();
+
+    const expired = await testDb.seedTelegramCallback({
+      tokenHash: "hash-expired",
+      expertId: "expert-1",
+      action: "confirm",
+      version: 3,
+      expiresAt: "2026-07-28T09:59:59.000Z",
+    });
+    await expect(repository.consumeIfValid({
+      tokenHash: expired.tokenHash,
+      expertId: "expert-1",
+      action: "confirm",
+      version: 3,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+    })).resolves.toBeNull();
+    expect(await testDb.callbackConsumedAt(expired.notificationId)).toBeNull();
+  });
+
+  it("returns claims once for valid contiguous bindings and rejects replay", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const fixture = await testDb.seedTelegramCallback({
+      tokenHash: "hash-valid",
+      expertId: "expert-1",
+      action: "confirm",
+      version: 3,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    const command = {
+      tokenHash: fixture.tokenHash,
+      expertId: "expert-1",
+      action: "confirm" as const,
+      version: 3,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+    };
+    await expect(repository.consumeIfValid(command)).resolves.toEqual(fixture.claims);
+    await expect(repository.consumeIfValid(command)).resolves.toBeNull();
+    expect(await testDb.callbackConsumedAt(fixture.notificationId))
+      .toEqual(new Date("2026-07-28T10:00:00.000Z"));
   });
 });
 ```
 
 - [ ] **Step 2: Run the contract test and confirm the expected failure**
 
-Run: `pnpm exec vitest run tests/contract/telegram-port.test.ts`
+Run: `pnpm exec vitest run tests/contract/telegram-port.test.ts tests/integration/telegram-callback-repository.test.ts`
 
 Expected: FAIL because callback signing and the Telegram adapter do not exist.
 
@@ -2644,10 +3328,10 @@ Generate a 16-byte random nonce, persist `SHA-256(nonce)` with the claims throug
 
 ```sql
 update notifications
-set callback_consumed_at = $6
+set callback_consumed_at = $5
 where callback_token_hash = $1
   and callback_consumed_at is null
-  and callback_expires_at > $6
+  and callback_expires_at > $5
   and callback_expert_id = $2
   and callback_action = $3
   and callback_version = $4
@@ -2655,22 +3339,26 @@ where callback_token_hash = $1
 returning callback_claims;
 ```
 
+The binding is contiguous and exact: `$1 tokenHash`, `$2 expertId`, `$3 action`, `$4 version`, `$5 now`. The repository passes exactly those five values in that order; no adapter or SQL builder may insert a hidden parameter.
+
 Never put client PII, reservation ID, expert ID, appointment notes, meeting URLs, or provider tokens in callback data.
 
-`TelegramAdapter` follows the official Bot API request contract: `POST https://api.telegram.org/bot{token}/sendMessage` with JSON body. It accepts an injected HTTPS transport, implements only `sendReservationRequest` and `sendSchedule`, and maps 429 plus `retry_after`, invalid schema, pre-send failure, post-send timeout, and permanent recipient failure to typed outcomes. Because the token is in the URL path, request logging is disabled at the transport and every error/trace passes only `redactTelegramUrl`; raw URLs are never attached. `/schedule` obtains its view from the application service after expert authorization; the adapter cannot query PostgreSQL itself.
+`TelegramAdapter` follows the official Bot API request contract: `POST https://api.telegram.org/bot{token}/sendMessage` with JSON body. It accepts an injected HTTPS transport, implements `decodeUpdate`, `sendReservationRequest`, and `sendSchedule`, rejects raw updates over 64 KiB before JSON parsing, and maps 429 plus `parameters.retry_after`, invalid success schema, pre-send failure, post-send timeout, and permanent recipient failure to typed outcomes. A malformed success after bytes were written is `unknown_outcome`, never safe retry. The platform notification idempotency key is transport context only; it is not represented as provider-supported idempotency. The outbox prevents duplicate dispatch and reconciles ambiguous outcomes.
 
-Capture sanitized fixtures for send success, duplicate `update_id`, expired callback, deactivated expert, 429, post-send timeout, and invalid schema. Tests assert duplicate updates enter the inbox once, deactivated/expired callbacks do not mutate or consume, 429 is retryable with bounded delay, and post-send timeout is `unknown_outcome`. Contract tests use placeholder tokens and an injected fake transport; runtime keeps `TELEGRAM_ENABLED=false` and does not construct the HTTPS adapter while no project-owned bot session exists.
+Because the token is in the official URL path, request logging is disabled at the transport and every error/trace passes only `redactTelegramUrl`; raw URLs are never attached. Contract tests assert captured timeout/schema logs contain `/bot[REDACTED]/sendMessage` and never contain the placeholder token. `/schedule` obtains its view from the application service after expert authorization; the adapter cannot query PostgreSQL itself.
+
+Capture sanitized fixtures for send success, duplicate `update_id`, expired callback, deactivated expert, 429 with `retry_after = 3`, pre-send timeout, post-send timeout, invalid success schema, and oversized update. Every fixture is executed through `TelegramAdapter`, its codec, injected transport, or callback verifier with exact typed outcomes; metadata-only parsing is insufficient. Tests assert duplicate/invalid/oversized/deactivated/expired cases cause no application mutation or premature consume. Contract tests use placeholder tokens and an injected fake transport; runtime keeps `TELEGRAM_ENABLED=false` and does not construct the HTTPS adapter while no project-owned bot session exists.
 
 - [ ] **Step 4: Run the contract and security-focused tests**
 
-Run: `pnpm exec vitest run tests/contract/telegram-port.test.ts && pnpm typecheck`
+Run: `pnpm exec vitest run tests/contract/telegram-port.test.ts tests/integration/telegram-callback-repository.test.ts && pnpm typecheck`
 
-Expected: PASS; unauthorized, stale, expired, and tampered callbacks fail closed.
+Expected: PASS; every fixture executes through behavior, retry-after and ambiguous outcomes are exact, token-bearing URLs are redacted, duplicate/invalid input causes no mutation, and callbacks fail closed in memory/PostgreSQL while one valid callback returns its claims exactly once.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/integrations/src/telegram packages/integrations/src/index.ts packages/db/src/repositories/telegram-callback-repository.ts packages/db/src/index.ts tests/contract/telegram-port.test.ts tests/fixtures/telegram
+git add packages/integrations/src/telegram packages/integrations/src/index.ts packages/db/src/repositories/telegram-callback-repository.ts packages/db/src/index.ts tests/contract/telegram-port.test.ts tests/integration/telegram-callback-repository.test.ts tests/fixtures/telegram
 git commit -m "feat: secure telegram expert callbacks"
 ```
 
@@ -3746,7 +4434,7 @@ Admin routes resolve principals from platform sessions, require MFA within 15 mi
 | Read safety case | `security_admin` | explicit case assignment |
 | Read negative feedback | `support` | assigned queue |
 
-`AdminService` implements every MVP-FR-015 operation with exact repository methods: create/deactivate client, verify/suspend expert, activate/deactivate service, grant/revoke package, resolve integration error, and acknowledge/resolve feedback or safety alert. Package grant accepts only `500 | 1000 | 1500 | 2000`, creates immutable package metadata expiring at `now + 60 days`, and appends the positive grant fact in one transaction. Intro grant is a separately authorized `100`-unit, no-expiry command. Revoke locks the package, derives its ledger balance, and appends a non-positive revocation fact; it never updates or deletes prior facts.
+`AdminService` implements every MVP-FR-015 operation with exact repository methods: create/deactivate client, verify/suspend expert, activate/deactivate service, grant/revoke package, resolve integration error, and acknowledge/resolve feedback or safety alert. Package grant accepts only `500 | 1000 | 1500 | 2000`, creates immutable package metadata expiring at `now + 60 days`, and appends the positive grant fact in one transaction. Intro grant is a separately authorized `100`-unit, no-expiry command. Revoke locks the package and its grant fact, derives its ledger balance, and appends a non-positive revocation fact referencing that grant through `original_entry_id`; it never updates or deletes prior facts.
 
 `AdminApprovalRepository.consumeIfValid` resolves requester and approver from stored authenticated session hashes and checks distinct identities, both recent MFA records, role, action, object, payload hash, nonce, unused state, and expiry in one `UPDATE ... RETURNING`. Every allow and deny appends the complete `AuditPort` fact. Secrets, raw authorization headers, raw conversation text, and full optional profile data never enter audit payloads. `tests/integration/admin-ledger.test.ts` runs valid/replayed/concurrent grants and revocations in PostgreSQL and asserts one approval consumption, one grant/revocation fact, derived conservation, and complete immutable audit fields.
 
@@ -4021,11 +4709,11 @@ Reconciliation reads local and provider states, emits a report with counts and e
 
 `WorkerRuntime.runOnce` executes safety handoff SLA work first, then expired-lease recovery and unknown-outcome reconciliation, due reservation expiry, confirmed-safe outbox delivery, processor erasure/retention, and bounded provider drift reconciliation. Safety uses a dedicated dispatcher and circuit independent of LLM and booking providers. `apps/worker/src/main.ts` loads validated config, constructs `WorkerRuntime`, runs the polling loop, and handles `SIGTERM`/`SIGINT` by stopping claims, finishing the current bounded batch, closing database/telemetry, and exiting nonzero on startup failure. `worker-jobs.testkit.ts` provides typed repositories plus topic, transition, alert, circuit, and audit recorders.
 
-Replace the bootstrap-only worker scripts with `main: "dist/main.js"`, `build: "tsup src/main.ts src/index.ts --format esm --dts --clean"`, `start: "node dist/main.js"`, and the existing strict `typecheck`. The built entrypoint must call `main()` at process startup; importing it in a test must not start a loop.
+Replace the bootstrap-only worker manifest with `files: ["dist"]`, `main: "dist/main.js"`, `types: "dist/index.d.ts"`, dist-only `"."` exports (`types: "./dist/index.d.ts"`, `import: "./dist/index.js"`), `build: "tsup src/main.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json"`, `start: "node dist/main.js"`, and `typecheck: "tsc --noEmit -p ../../tsconfig.base.json"`. The built entrypoint must call `main()` at process startup; importing it in a test must not start a loop. Re-run `tests/repo/workspace-dependencies.test.ts` so every new runtime import is owned.
 
 - [ ] **Step 4: Run all worker and integration tests**
 
-Run: `pnpm exec vitest run packages/worker/src tests/integration/outbox-runner.test.ts tests/integration/booking-concurrency.test.ts && pnpm typecheck && pnpm --filter @ii-tonya/app-worker build`
+Run: `pnpm exec vitest run packages/worker/src tests/integration/outbox-runner.test.ts tests/integration/booking-concurrency.test.ts tests/repo/workspace-dependencies.test.ts && pnpm typecheck && pnpm --filter @ii-tonya/app-worker build`
 
 Expected: PASS; jobs are repeatable and bounded, the real `dist/main.js` worker artifact is emitted, and no job invents provider outcomes.
 
@@ -4198,13 +4886,13 @@ Authentication and raw-body/schema checks execute before the protected rate-limi
 
 Use dependency injection to bind disabled Selarti, Planerka, Telegram, Make projection, intent-model, and payment adapters. The current configuration schema accepts only literal `false` for all six live flags, so startup rejects every attempted activation before secret lookup or network construction. `server.ts` starts the built Fastify app on configured host/port, emits readiness only after migrations, handles termination signals, and closes telemetry/database. Enabling any provider requires a separate reviewed plan after real sandbox sessions and approved contract evidence exist.
 
-Replace the bootstrap-only API scripts with `main: "dist/server.js"`, `build: "tsup src/server.ts src/index.ts --format esm --dts --clean"`, `start: "node dist/server.js"`, and the existing strict `typecheck`. The built entrypoint must call `main()` only when executed as the process module; test imports remain side-effect free.
+Replace the bootstrap-only API manifest with `files: ["dist"]`, `main: "dist/server.js"`, `types: "dist/index.d.ts"`, dist-only `"."` exports (`types: "./dist/index.d.ts"`, `import: "./dist/index.js"`), `build: "tsup src/server.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json"`, `start: "node dist/server.js"`, and `typecheck: "tsc --noEmit -p ../../tsconfig.base.json"`. The built entrypoint imports `@ii-tonya/db` for migrations/repository composition and must call `main()` only when executed as the process module; test imports remain side-effect free. Re-run the source-derived ownership test so an undeclared runtime import fails Task 20.
 
 Create Pino redaction paths for authorization, cookies, tokens, secrets, raw bodies, conversation fields, optional profiles, contact channels, meeting URLs, provider payloads, request URLs, `req.url`, and `err.request.url`. A serializer detects `/bot{token}/{method}` and emits `/bot[REDACTED]/{method}` before any log or trace export. Emit correlation ID, hashed event ID, module, operation, normalized outcome, duration, retry count, and error code. Add OpenTelemetry spans and low-cardinality metrics for inbox duplicates, debit outcomes, reservation transitions, outbox unknown outcomes/lag/dead letter, provider circuit state, safety handoffs, and reconciliation drift.
 
 - [ ] **Step 4: Run API, observability, contract, and type checks**
 
-Run: `pnpm exec vitest run apps/api/src packages/observability/src tests/contract tests/e2e/api-boundary.test.ts && pnpm typecheck && pnpm --filter @ii-tonya/api build`
+Run: `pnpm exec vitest run apps/api/src packages/observability/src tests/contract tests/e2e/api-boundary.test.ts tests/repo/workspace-dependencies.test.ts && pnpm typecheck && pnpm --filter @ii-tonya/api build`
 
 Expected: PASS; unauthenticated ingress cannot reach application services, sensitive values are redacted, and the real `dist/server.js` API artifact is emitted.
 
@@ -4424,6 +5112,59 @@ describe("release assets", () => {
 });
 ```
 
+```js
+// tests/container/image-smoke.test.mjs
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import test from "node:test";
+
+const run = (file, args) => execFileSync(file, args, {
+  cwd: process.cwd(),
+  encoding: "utf8",
+  stdio: ["ignore", "pipe", "pipe"],
+});
+const compose = (args) => run("docker", ["compose", ...args]);
+
+test("boots portable final images and imports emitted internal packages", async () => {
+  try {
+    compose(["up", "--build", "--wait"]);
+    run(process.execPath, ["scripts/smoke.mjs", "--base-url=http://localhost:3000"]);
+    for (const [service, command, packages] of [
+      ["api", "dist/server.js", [
+        "@ii-tonya/application", "@ii-tonya/config", "@ii-tonya/db",
+        "@ii-tonya/integrations", "@ii-tonya/observability",
+      ]],
+      ["worker", "dist/main.js", [
+        "@ii-tonya/config", "@ii-tonya/db", "@ii-tonya/integrations",
+        "@ii-tonya/observability", "@ii-tonya/worker",
+      ]],
+    ]) {
+      const id = compose(["ps", "-q", service]).trim();
+      assert.notEqual(id, "");
+      const inspected = JSON.parse(run("docker", ["inspect", id]))[0];
+      assert.equal(inspected.Config.User, "10001:10001");
+      assert.equal(inspected.HostConfig.ReadonlyRootfs, true);
+      assert.equal(inspected.State.Health.Status, "healthy");
+      assert.deepEqual(inspected.Config.Cmd, ["node", command]);
+      for (const packageName of packages) {
+        const probe = [
+          `const resolved=import.meta.resolve('${packageName}');`,
+          "if(!resolved.includes('/app/node_modules/@ii-tonya/')",
+          "||!resolved.endsWith('/dist/index.js'))process.exit(41);",
+          `await import('${packageName}');`,
+        ].join("");
+        run("docker", [
+          "compose", "exec", "-T", service, "node",
+          "--input-type=module", "--eval", probe,
+        ]);
+      }
+    }
+  } finally {
+    compose(["down", "--volumes", "--remove-orphans"]);
+  }
+});
+```
+
 - [ ] **Step 2: Run the tests and confirm the expected failure**
 
 Run: `pnpm exec vitest run tests/e2e/mvp-smoke.test.ts tests/repo/workflow-semantics.test.ts tests/repo/release-assets.test.ts`
@@ -4449,11 +5190,19 @@ complete allow audit
 two reconciliation runs with zero mismatch and zero duplicate facts/inbox/outbox rows
 ```
 
-Build non-root multi-stage `api` and `worker` targets from the Task 1 entrypoints. Final commands are `node apps/api/dist/server.js` and `node apps/worker/dist/main.js`; both final stages contain only production dependencies and built output, use numeric UID/GID `10001:10001`, receive no build-time secrets, and write only to `/tmp`. `.dockerignore` excludes `.env`, `.env.*`, `.env.example`, VCS metadata, coverage, caches, and dependency directories. `compose.yaml` starts PostgreSQL 17, runs one migration service, then starts both built targets with `read_only: true`, `tmpfs: /tmp`, health checks, placeholder-only local keys, and all six live flags literal `false`.
+Build non-root multi-stage `api` and `worker` targets from the Tasks 19/20 entrypoints. The builder executes these commands after the frozen install:
+
+```dockerfile
+RUN pnpm build
+RUN pnpm --filter @ii-tonya/api --prod deploy /out/api
+RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
+```
+
+`injectWorkspacePackages: true`, `syncInjectedDepsAfterScripts: [build]`, and each workspace’s `files: ["dist"]` make both deploy directories portable: internal `@ii-tonya/*` dependencies are production-installed with emitted JS/types rather than links to `src/*.ts`. The API final target copies `/out/api` to `WORKDIR /app` and uses `CMD ["node", "dist/server.js"]`; the worker copies `/out/worker` and uses `CMD ["node", "dist/main.js"]`. Both final stages contain only production dependencies and built output, use numeric UID/GID `10001:10001`, receive no build-time secrets, and write only to `/tmp`. `.dockerignore` excludes `.env`, `.env.*`, `.env.example`, VCS metadata, coverage, caches, and dependency directories. `compose.yaml` starts PostgreSQL 17, runs one migration service, then starts both built targets with `read_only: true`, `tmpfs: /tmp`, health checks, placeholder-only local keys, and all six live flags literal `false`.
 
 `tests/provider-stubs/server.mjs` serves only the sanitized Selarti, Planerka, and Telegram fixture shapes from Tasks 10 through 12. It binds to the Compose-internal network, accepts no credential, and records idempotency keys for assertions. It is local fixture infrastructure, not provider staging evidence.
 
-`tests/container/image-smoke.test.mjs` uses `node:test` and `node:child_process` to execute `docker compose up --build --wait`, run `scripts/smoke.mjs`, resolve API and worker container IDs through `docker compose ps -q`, and inspect each container. It fails unless the API health endpoint answers from the built `server.js`, the worker heartbeat comes from built `main.js`, both users equal `10001:10001`, both root filesystems are read-only, health is `healthy`, and every live flag equals `false`. A `finally` block always executes `docker compose down --volumes --remove-orphans`. This is executable image evidence; static Dockerfile string checks are not sufficient.
+`tests/container/image-smoke.test.mjs` uses `node:test` and `node:child_process` to execute `docker compose up --build --wait`, run `scripts/smoke.mjs`, resolve API and worker container IDs through `docker compose ps -q`, and inspect each container. It then executes Node inside each final container to import every internal package used by that app and asserts the resolved URL is under `/app/node_modules/@ii-tonya/` and ends in `/dist/index.js`; any missing JS artifact or leaked `src/index.ts` fails. It also fails unless the API health endpoint answers from built `dist/server.js`, the worker heartbeat comes from built `dist/main.js`, both users equal `10001:10001`, both root filesystems are read-only, health is `healthy`, and every live flag equals `false`. A `finally` block always executes `docker compose down --volumes --remove-orphans`. This is executable image evidence; static Dockerfile string checks are not sufficient.
 
 Define root commands in this order:
 
@@ -4475,7 +5224,7 @@ pnpm test:container:
   node --test tests/container/image-smoke.test.mjs
 ```
 
-`ci.yml` has one dependency boundary: checkout and Node/Corepack/pnpm setup, then `pnpm install --frozen-lockfile`, then all repository commands. Immediately after the frozen install, run `pnpm exec vitest run tests/repo/env-policy.test.ts`; no Vitest, pnpm script, or repository binary runs before install. Then run `pnpm verify`, upload JUnit and coverage, run Gitleaks with redaction, execute `pnpm test:container`, and scan both resulting image digests with Trivy using `--severity HIGH,CRITICAL --exit-code 1`. Cache only the pnpm store.
+`ci.yml` has one dependency boundary: checkout, Node setup, and direct pinned pnpm setup, then `pnpm install --frozen-lockfile`, then all repository commands. It never invokes Corepack. Immediately after the frozen install, run `pnpm exec vitest run tests/repo/env-policy.test.ts`; no Vitest, pnpm script, or repository binary runs before install. Then run `pnpm verify`, upload JUnit and coverage, run Gitleaks with redaction, execute `pnpm test:container`, and scan both resulting image digests with Trivy using `--severity HIGH,CRITICAL --exit-code 1`. Cache only the pnpm store.
 
 `release.yml` consumes the exact tested image digests, deploys staging, runs migration preflight, smoke, and reconciliation, and creates a signed evidence artifact. Its production job depends on `verify_digest`, `staging`, and `evidence_gate`, requires manual environment approval, reads `Release status: GO` and `Provider staging status: PASS`, deploys by digest, repeats smoke and reconciliation, and follows `rollback.md` on failure. With the committed evidence statuses, the production job cannot run.
 
@@ -4505,7 +5254,7 @@ Create operating documents with explicit owners and executable checks:
 Run:
 
 ```bash
-corepack pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 pnpm verify
 pnpm test:container
 gitleaks detect --source . --no-banner --redact
