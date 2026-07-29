@@ -14,7 +14,8 @@ type ConfirmEligibilityCase =
   | "wrong_expert"
   | "inactive_expert"
   | "past_slot"
-  | "stale_slot";
+  | "stale_slot"
+  | "future_slot";
 
 interface ReservableFixture {
   command: ReserveSlotCommand;
@@ -553,7 +554,9 @@ export async function startTestPostgres(
         : new Date("2026-08-02T10:00:00.000Z");
       const observedAt = caseName === "stale_slot"
         ? new Date("2026-07-28T09:00:00.000Z")
-        : now;
+        : caseName === "future_slot"
+          ? new Date("2026-07-28T10:00:00.001Z")
+          : now;
       const slotId = await createSlotForService({
         serviceId: expert.serviceId,
         capacity: 1,

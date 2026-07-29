@@ -492,6 +492,7 @@ export class PostgresBookingRepository {
             and r.reserved_until > ${command.now}
             and s.starts_at > ${command.now}
             and s.observed_at >= ${new Date(command.now.getTime() - SLOT_FRESHNESS_MS)}
+            and s.observed_at <= ${command.now}
             and e.active = true
             and e.verified = true
             and es.active = true

@@ -185,6 +185,7 @@ describe("booking transaction", () => {
     ["inactive_expert", "Expert is not eligible"],
     ["past_slot", "Slot is no longer confirmable"],
     ["stale_slot", "Slot observation is stale"],
+    ["future_slot", "Slot observation is stale"],
   ] as const)("rejects ineligible confirm: %s", async (caseName, expected) => {
     const fixture = await testDb.createConfirmEligibilityCase(caseName);
     const repo = new PostgresBookingRepository(testDb.db);
