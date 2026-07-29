@@ -54,6 +54,14 @@ describe("reservation policy", () => {
     );
   });
 
+  it("rejects finite buffers that produce an out-of-range deadline", () => {
+    expect(() => computeReservedUntil(
+      new Date("2026-07-28T10:00:00.000Z"),
+      new Date("2026-07-29T12:00:00.000Z"),
+      Number.MAX_VALUE,
+    )).toThrow("Invalid reservation deadline inputs");
+  });
+
   it("allows only normative transitions", () => {
     expect(transitionReservation("reserved", "expert_confirm")).toBe("booked");
     expect(transitionReservation("reserved", "expire")).toBe("expired");
