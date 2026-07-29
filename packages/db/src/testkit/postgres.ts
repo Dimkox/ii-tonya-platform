@@ -221,9 +221,14 @@ export async function startTestPostgres(
       `);
     },
     async ledgerFactCount(packageIds) {
+      if (packageIds.length === 0) return 0;
+      const packageIdList = sql.join(
+        packageIds.map((packageId) => sql`${packageId}::uuid`),
+        sql`, `,
+      );
       const result = await db.execute<{ count: string }>(sql`
         select count(*)::text as count from message_ledger_entries
-        where package_id = any(${packageIds}::uuid[])
+        where package_id in (${packageIdList})
       `);
       return Number(result.rows[0]?.count ?? 0);
     },
