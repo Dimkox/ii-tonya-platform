@@ -42,6 +42,26 @@ describe("booking transaction", () => {
     )).toHaveLength(1);
   });
 
+  it("rejects a provider observation from the future", async () => {
+    const slotId = await testDb.createSlot({
+      capacity: 1,
+      startsAt: "2026-08-02T10:00:00.000Z",
+      observedAt: "2026-07-28T10:00:00.001Z",
+    });
+    const userId = await testDb.createUser();
+    const repo = new PostgresBookingRepository(testDb.db);
+
+    await expect(repo.reserve({
+      idempotencyKey: `future-observation-${slotId}`,
+      userId,
+      slotId,
+      now: new Date("2026-07-28T10:00:00.000Z"),
+      minimumLeadMs: 24 * 60 * 60 * 1_000,
+      confirmationBufferMs: 60 * 60 * 1_000,
+      correlationId: `future-observation-${slotId}`,
+    })).resolves.toEqual({ kind: "unavailable", reason: "stale_slot" });
+  });
+
   it("BOOK-02 allows only one of two concurrent overlapping reservations for the same client", async () => {
     const fixture = await testDb.createOverlappingClientSlots();
     const repo = new PostgresBookingRepository(testDb.db);

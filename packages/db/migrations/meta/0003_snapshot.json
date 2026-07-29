@@ -715,7 +715,7 @@
           "name": "slot_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "expert_id": {
           "name": "expert_id",

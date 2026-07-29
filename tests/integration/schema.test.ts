@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -26,6 +27,94 @@ function databaseErrorChain(error: unknown): DatabaseErrorEvidence[] {
     current = evidence.cause;
   }
   return chain;
+}
+
+async function applySqlMigration(
+  db: TestDatabase["db"],
+  path: string,
+): Promise<void> {
+  const statements = readFileSync(path, "utf8")
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+  for (const statement of statements) {
+    await db.execute(sql.raw(statement));
+  }
+}
+
+async function applyLegacyBaseline(db: TestDatabase["db"]): Promise<void> {
+  for (const path of [
+    "packages/db/migrations/0000_mvp.sql",
+    "packages/db/migrations/0001_message-package-metadata.sql",
+    "packages/db/migrations/0002_atomic-message-accounting.sql",
+  ]) {
+    await applySqlMigration(db, path);
+  }
+}
+
+async function seedLegacyReservation(
+  db: TestDatabase["db"],
+  slotCount: number,
+): Promise<void> {
+  await db.execute(sql.raw(`
+    insert into users (id) values
+      ('00000000-0000-4000-8000-000000000001'),
+      ('00000000-0000-4000-8000-000000000002');
+    insert into experts (id, user_id, active, verified) values (
+      '00000000-0000-4000-8000-000000000003',
+      '00000000-0000-4000-8000-000000000002',
+      true,
+      true
+    );
+    insert into expert_services (
+      id, expert_id, name, active, duration_minutes
+    ) values (
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000003',
+      'Legacy service',
+      true,
+      60
+    );
+    insert into slots (
+      id, expert_service_id, provider, external_slot_id,
+      starts_at, ends_at, capacity
+    ) values (
+      '00000000-0000-4000-8000-000000000005',
+      '00000000-0000-4000-8000-000000000004',
+      'legacy',
+      'legacy-slot-1',
+      '2026-08-02T10:00:00.000Z',
+      '2026-08-02T11:00:00.000Z',
+      1
+    );
+    ${slotCount === 2 ? `
+    insert into slots (
+      id, expert_service_id, provider, external_slot_id,
+      starts_at, ends_at, capacity
+    ) values (
+      '00000000-0000-4000-8000-000000000006',
+      '00000000-0000-4000-8000-000000000004',
+      'legacy',
+      'legacy-slot-2',
+      '2026-08-03T10:00:00.000Z',
+      '2026-08-03T11:00:00.000Z',
+      1
+    );` : ""}
+    insert into reservations (
+      id, user_id, expert_service_id, status, idempotency_key,
+      reserved_until, version, created_at, updated_at
+    ) values (
+      '00000000-0000-4000-8000-000000000007',
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000004',
+      'reserved',
+      'legacy-reservation',
+      '2026-08-01T10:00:00.000Z',
+      1,
+      '2026-07-28T10:00:00.000Z',
+      '2026-07-28T10:00:00.000Z'
+    );
+  `));
 }
 
 async function expectDatabaseError(
@@ -126,4 +215,92 @@ describe("MVP schema", () => {
     );
     expect(await testDb!.ledgerFactCount([packageA1, packageA2, packageB1])).toBe(9);
   });
+
+  it("upgrades an unambiguous legacy reservation through migration 0003", async () => {
+    const legacyDb = await startTestPostgres();
+    try {
+      await applyLegacyBaseline(legacyDb.db);
+      await seedLegacyReservation(legacyDb.db, 1);
+      await applySqlMigration(
+        legacyDb.db,
+        "packages/db/migrations/0003_booking-concurrency.sql",
+      );
+
+      const result = await legacyDb.db.execute<{
+        slotId: string | null;
+        expertId: string | null;
+        observedAt: Date | null;
+      }>(sql`
+        select
+          r.slot_id as "slotId",
+          r.expert_id as "expertId",
+          s.observed_at as "observedAt"
+        from reservations r
+        join slots s on s.id = r.slot_id
+        where r.id = '00000000-0000-4000-8000-000000000007'::uuid
+      `);
+      expect(result.rows[0]).toEqual({
+        slotId: "00000000-0000-4000-8000-000000000005",
+        expertId: "00000000-0000-4000-8000-000000000003",
+        observedAt: null,
+      });
+      const columns = await legacyDb.db.execute<{
+        columnName: string;
+        isNullable: string;
+      }>(sql`
+        select column_name as "columnName", is_nullable as "isNullable"
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'reservations'
+          and column_name in ('slot_id', 'expert_id')
+        order by column_name
+      `);
+      expect(columns.rows).toEqual([
+        { columnName: "expert_id", isNullable: "NO" },
+        { columnName: "slot_id", isNullable: "NO" },
+      ]);
+      const constraints = await legacyDb.db.execute<{ constraintName: string }>(sql`
+        select constraint_name as "constraintName"
+        from information_schema.table_constraints
+        where table_schema = 'public'
+          and table_name = 'reservations'
+          and constraint_name in (
+            'reservations_slot_id_slots_id_fk',
+            'reservations_expert_id_experts_id_fk'
+          )
+        order by constraint_name
+      `);
+      expect(constraints.rows.map((row) => row.constraintName)).toEqual([
+        "reservations_expert_id_experts_id_fk",
+        "reservations_slot_id_slots_id_fk",
+      ]);
+    } finally {
+      await legacyDb.stop();
+    }
+  }, 120_000);
+
+  it("fails an ambiguous legacy slot mapping with an actionable migration error", async () => {
+    const legacyDb = await startTestPostgres();
+    try {
+      await applyLegacyBaseline(legacyDb.db);
+      await seedLegacyReservation(legacyDb.db, 2);
+
+      let caught: unknown;
+      try {
+        await applySqlMigration(
+          legacyDb.db,
+          "packages/db/migrations/0003_booking-concurrency.sql",
+        );
+      } catch (error) {
+        caught = error;
+      }
+      const chain = databaseErrorChain(caught);
+      expect(chain.some((error) =>
+        error.code === "P0001"
+        && String(error.message).includes("booking_slot_backfill_ambiguous")
+      )).toBe(true);
+    } finally {
+      await legacyDb.stop();
+    }
+  }, 120_000);
 });

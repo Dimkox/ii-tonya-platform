@@ -185,8 +185,9 @@ describe("authoritative Drizzle schema parity", () => {
     expect(migration).toContain('add column "slot_id" uuid;');
     expect(migration).toContain('add column "expert_id" uuid;');
     expect(migration).toContain("update \"reservations\"");
+    expect(migration).toContain("booking_slot_backfill_ambiguous");
+    expect(migration).toContain('alter column "slot_id" set not null');
     expect(migration).toContain('alter column "expert_id" set not null');
-    expect(migration).not.toContain('alter column "slot_id" set not null');
 
     const snapshot = JSON.parse(readFileSync(
       "packages/db/migrations/meta/0003_snapshot.json",
@@ -200,7 +201,7 @@ describe("authoritative Drizzle schema parity", () => {
     const reservationColumns = snapshot.tables?.["public.reservations"]?.columns;
     expect(slotColumns?.observed_at).toMatchObject({ notNull: false });
     expect(slotColumns?.observed_at?.default).toBeUndefined();
-    expect(reservationColumns?.slot_id).toMatchObject({ notNull: false });
+    expect(reservationColumns?.slot_id).toMatchObject({ notNull: true });
     expect(reservationColumns?.expert_id).toMatchObject({ notNull: true });
   });
 

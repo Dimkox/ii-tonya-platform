@@ -25,7 +25,7 @@ export const reservations = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id").notNull().references(() => users.id),
-    slotId: uuid("slot_id").references(() => slots.id),
+    slotId: uuid("slot_id").notNull().references(() => slots.id),
     expertId: uuid("expert_id").notNull().references(() => experts.id),
     expertServiceId: uuid("expert_service_id").notNull().references(() => expertServices.id),
     status: reservationStatus("status").notNull().default("reserved"),

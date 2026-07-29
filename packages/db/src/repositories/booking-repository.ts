@@ -155,6 +155,7 @@ function finiteDate(date: Date): boolean {
 
 function isFresh(observedAt: Date | null, now: Date): boolean {
   return observedAt !== null
+    && observedAt.getTime() <= now.getTime()
     && observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS;
 }
 

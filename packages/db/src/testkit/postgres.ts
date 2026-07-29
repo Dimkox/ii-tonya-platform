@@ -76,7 +76,11 @@ export interface TestDatabase {
   appendCompensation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
   appendRevocation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
   ledgerFactCount(packageIds: string[]): Promise<number>;
-  createSlot(input: { capacity: number; startsAt: string }): Promise<string>;
+  createSlot(input: {
+    capacity: number;
+    startsAt: string;
+    observedAt?: string;
+  }): Promise<string>;
   createOverlappingClientSlots(): Promise<OverlappingClientFixture>;
   createOverlappingExpertSlots(): Promise<OverlappingExpertFixture>;
   createReservableFixture(): Promise<ReservableFixture>;
@@ -379,12 +383,13 @@ export async function startTestPostgres(
       `);
       return Number(result.rows[0]?.count ?? 0);
     },
-    async createSlot({ capacity, startsAt }) {
+    async createSlot({ capacity, startsAt, observedAt }) {
       const { serviceId } = await createExpert();
       return createSlotForService({
         serviceId,
         capacity,
         startsAt: new Date(startsAt),
+        ...(observedAt === undefined ? {} : { observedAt: new Date(observedAt) }),
       });
     },
     async createOverlappingClientSlots() {
