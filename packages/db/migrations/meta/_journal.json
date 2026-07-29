@@ -50,6 +50,13 @@
       "when": 1785335586654,
       "tag": "0006_telegram-callback-expert-fk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785362360664,
+      "tag": "0007_catalog-eligibility-fields",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,11 @@ export {
   type TransitionReservationResult,
 } from "./repositories/booking-repository.js";
 export {
+  PostgresCatalogRepository,
+  type CatalogEligibilityQuery,
+  type CatalogExpertRecord,
+} from "./repositories/catalog-repository.js";
+export {
   CompensationConflictError,
   ConversationCompletionDataError,
   PostgresMessageRepository,

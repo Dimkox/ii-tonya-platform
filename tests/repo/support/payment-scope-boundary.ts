@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/db-gate.yml",
-    "d3c6204bd9a11f2555d56a014b26554af29f63c7bc044dd025711dd6ec697415",
+    "cf03fe5ad90b3538f0a0762476c6179660f8ee12081e4152c7e3afa31fbee690",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
@@ -219,6 +219,10 @@ const approvedMigrationHashes = new Map([
     "551998e8ae51fe5d2267ca2dc4d13e54d8af05f084bcfd8cb92a63f0ba3d1567",
   ],
   [
+    "packages/db/migrations/0007_catalog-eligibility-fields.sql",
+    "cd056b56578fd09915da44e99bb63f025757c2561bfb0391a327107680748303",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -247,8 +251,12 @@ const approvedMigrationHashes = new Map([
     "3feec1d2443b1ae9e6b8e6d03fb41a7fb6d6ee0995adfd63650cfc062d487df5",
   ],
   [
+    "packages/db/migrations/meta/0007_snapshot.json",
+    "4c589a340cdd27dde006965ebe4abcb35e3ef5d81f2e564ad34385d99e1b115e",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "9c50d32d4990b62617c95340de77122f0e20cdcd79463316d612aefd226b27b0",
+    "90360b155e098c1f55b94a60553bb1e8844da3cb65b3836ddfa6ec1ab2ff5955",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
