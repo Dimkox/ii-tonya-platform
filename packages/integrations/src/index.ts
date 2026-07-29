@@ -24,6 +24,7 @@ export type {
   SelartiSendOutcome,
 } from "./selarti/selarti-port.js";
 export {
+  CallbackVerificationError,
   issueCallback,
   verifyCallback,
   type CallbackClaimsStore,

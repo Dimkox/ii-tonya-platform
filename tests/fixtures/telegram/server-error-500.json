@@ -1,0 +1,11 @@
+{
+  "sanitized": true,
+  "transport": {
+    "status": 500,
+    "body": {
+      "ok": false,
+      "error_code": 500,
+      "description": "Internal Server Error"
+    }
+  }
+}

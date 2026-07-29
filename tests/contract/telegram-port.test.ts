@@ -1,3 +1,4 @@
+import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -99,6 +100,7 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
@@ -113,12 +115,13 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
         new Date("2026-07-28T10:00:00.000Z"),
       ),
-    ).rejects.toThrow("Callback token is unknown or already used");
+    ).rejects.toThrow("Callback verification failed");
   });
 
   it("validates binding before consume so a wrong expert cannot burn the token", async () => {
@@ -132,12 +135,13 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
         new Date("2026-07-28T10:00:00.000Z"),
       ),
-    ).rejects.toThrow("Telegram identity is not authorized");
+    ).rejects.toThrow("Callback verification failed");
     await expect(
       verifyCallback(
         token,
@@ -146,6 +150,7 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
@@ -167,12 +172,13 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
         new Date("2026-07-28T10:00:00.000Z"),
       ),
-    ).rejects.toThrow("Invalid callback token");
+    ).rejects.toThrow("Callback verification failed");
     await expect(
       verifyCallback(
         token,
@@ -181,12 +187,13 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: deactivatedFixture.expertActive!,
+          verified: true,
         },
         secret,
         store,
         new Date("2026-07-28T10:00:00.000Z"),
       ),
-    ).rejects.toThrow("Expert binding is inactive");
+    ).rejects.toThrow("Callback verification failed");
     await expect(
       verifyCallback(
         token,
@@ -195,6 +202,7 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
@@ -211,12 +219,13 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
         new Date(expiredFixture.now!),
       ),
-    ).rejects.toThrow("Callback token has expired");
+    ).rejects.toThrow("Callback verification failed");
     await expect(
       verifyCallback(
         expiredToken,
@@ -225,12 +234,142 @@ describe("Telegram expert callback", () => {
           telegramUserId: "123456789",
           expertId: "expert-1",
           active: true,
+          verified: true,
         },
         secret,
         store,
         new Date("2026-07-28T10:00:00.000Z"),
       ),
     ).resolves.toEqual(claims);
+  });
+
+  it("rejects weak callback secrets before issuing or accepting a token", async () => {
+    const store = memoryCallbackStore();
+    const weakSecret = new TextEncoder().encode("too-short");
+    await expect(issueCallback(claims, weakSecret, store)).rejects.toThrow(
+      "Callback secret must be at least 32 bytes",
+    );
+
+    const token = await issueCallback(claims, secret, store);
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        weakSecret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Callback verification failed");
+  });
+
+  it("domain-separates the MAC over exact callback prefix, version, and nonce", async () => {
+    const store = memoryCallbackStore();
+    const nonce = Buffer.alloc(16, 7);
+    const legacyTag = createHmac("sha256", secret)
+      .update(nonce)
+      .digest()
+      .subarray(0, 16);
+    const token = `ct1.${Buffer.concat([
+      Buffer.from([1]),
+      nonce,
+      legacyTag,
+    ]).toString("base64url")}`;
+    await store.put(createHash("sha256").update(nonce).digest("hex"), claims);
+
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Callback verification failed");
+  });
+
+  it("returns one non-enumerable error for all external callback failures", async () => {
+    const cases = [
+      {
+        expectedTelegramUserId: "123456789",
+        binding: {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: false,
+          verified: true,
+        },
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      },
+      {
+        expectedTelegramUserId: "123456789",
+        binding: {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: false,
+        },
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      },
+      {
+        expectedTelegramUserId: "123456789",
+        binding: {
+          telegramUserId: "987654321",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      },
+      {
+        expectedTelegramUserId: "123456789",
+        binding: {
+          telegramUserId: "123456789",
+          expertId: "expert-2",
+          active: true,
+          verified: true,
+        },
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      },
+      {
+        expectedTelegramUserId: "123456789",
+        binding: {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        now: new Date("2026-07-28T10:05:00.000Z"),
+      },
+    ] as const;
+
+    for (const value of cases) {
+      const store = memoryCallbackStore();
+      const token = await issueCallback(claims, secret, store);
+      await expect(
+        verifyCallback(
+          token,
+          value.expectedTelegramUserId,
+          value.binding,
+          secret,
+          store,
+          value.now,
+        ),
+      ).rejects.toMatchObject({
+        name: "CallbackVerificationError",
+        message: "Callback verification failed",
+      });
+    }
   });
 
   it("uses the official token-bearing method path but redacts it from logs and errors", () => {
@@ -245,6 +384,26 @@ describe("Telegram expert callback", () => {
       "https://api.telegram.org/bot[REDACTED]/sendMessage",
     );
     expect(redactTelegramUrl(url)).not.toContain(token);
+  });
+
+  it("fails closed while redacting unexpected Telegram URL shapes", () => {
+    const token = "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__";
+    const urls = [
+      new URL(
+        `https://api.telegram.org/bot${token}/sendMessage/extra?token=${token}`,
+      ),
+      new URL(
+        `https://api.telegram.org/bot${encodeURIComponent(`${token}/sendMessage`)}`,
+      ),
+      new URL(`https://api.telegram.org/unexpected/${token}`),
+    ];
+    for (const url of urls) {
+      const redacted = redactTelegramUrl(url);
+      expect(redacted).not.toContain(token);
+      expect(redacted).not.toContain(encodeURIComponent(token));
+      expect(redacted).not.toContain("token=");
+      expect(redacted).toContain("[REDACTED]");
+    }
   });
 
   it.each([
@@ -288,6 +447,14 @@ describe("Telegram expert callback", () => {
         kind: "not_applied",
         retryable: false,
         reasonCode: "recipient_rejected",
+      },
+    ],
+    [
+      "server-error-500",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "telegram-notification-1",
+        reasonCode: "http_500_after_write",
       },
     ],
   ] as const)(

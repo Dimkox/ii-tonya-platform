@@ -145,10 +145,9 @@ export function redactTelegramUrl(url: URL): string {
   redacted.password = "";
   redacted.search = "";
   redacted.hash = "";
-  redacted.pathname = redacted.pathname.replace(
-    /^\/bot[^/]+\/(?=[^/]+$)/u,
-    "/bot[REDACTED]/",
-  );
+  redacted.pathname = /^\/bot[^/]+\/sendMessage$/u.test(redacted.pathname)
+    ? "/bot[REDACTED]/sendMessage"
+    : "/[REDACTED]";
   return redacted.toString();
 }
 
@@ -301,10 +300,12 @@ export class TelegramAdapter implements TelegramPort {
       };
     }
     if (response.status >= 500 && response.status <= 599) {
+      const reasonCode = `http_${response.status}_after_write`;
+      logFailure(this.deps, url, reasonCode);
       return {
-        kind: "not_applied",
-        retryable: true,
-        reasonCode: "telegram_unavailable",
+        kind: "unknown_outcome",
+        reconciliationKey: view.idempotencyKey,
+        reasonCode,
       };
     }
     return {

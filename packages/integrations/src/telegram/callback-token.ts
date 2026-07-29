@@ -11,7 +11,12 @@ const NONCE_BYTES = 16;
 const TAG_BYTES = 16;
 const PAYLOAD_BYTES = 1 + NONCE_BYTES + TAG_BYTES;
 const MAX_CALLBACK_BYTES = 64;
-const numericTelegramIdentity = /^\d+$/u;
+const MINIMUM_SECRET_BYTES = 32;
+const MAC_DOMAIN = Buffer.from(
+  `ii-tonya:telegram-callback\u0000${TOKEN_PREFIX}`,
+  "utf8",
+);
+const numericTelegramIdentity = /^[1-9]\d*$/u;
 
 export interface ExpertCallbackClaims {
   reservationId: string;
@@ -25,6 +30,7 @@ export interface ExpertBinding {
   telegramUserId: string;
   expertId: string;
   active: boolean;
+  verified: boolean;
 }
 
 export interface CallbackClaimsStore {
@@ -57,7 +63,25 @@ const tokenHash = (nonce: Uint8Array): string =>
   createHash("sha256").update(nonce).digest("hex");
 
 const callbackTag = (nonce: Uint8Array, secret: Uint8Array): Buffer =>
-  createHmac("sha256", secret).update(nonce).digest().subarray(0, TAG_BYTES);
+  createHmac("sha256", secret)
+    .update(MAC_DOMAIN)
+    .update(Buffer.from([TOKEN_VERSION]))
+    .update(nonce)
+    .digest()
+    .subarray(0, TAG_BYTES);
+
+const requireStrongSecret = (secret: Uint8Array): void => {
+  if (secret.byteLength < MINIMUM_SECRET_BYTES) {
+    throw new Error("Callback secret must be at least 32 bytes");
+  }
+};
+
+export class CallbackVerificationError extends Error {
+  constructor() {
+    super("Callback verification failed");
+    this.name = "CallbackVerificationError";
+  }
+}
 
 const parseToken = (
   token: string,
@@ -89,7 +113,7 @@ export async function issueCallback(
   store: CallbackClaimsStore,
 ): Promise<string> {
   validateClaims(claims);
-  if (secret.byteLength === 0) throw new Error("Invalid callback secret");
+  requireStrongSecret(secret);
 
   const nonce = randomBytes(NONCE_BYTES);
   const payload = Buffer.concat([
@@ -113,7 +137,29 @@ export async function verifyCallback(
   store: CallbackClaimsStore,
   now: Date,
 ): Promise<ExpertCallbackClaims> {
-  if (secret.byteLength === 0) throw new Error("Invalid callback secret");
+  try {
+    return await verifyCallbackInternal(
+      token,
+      expectedTelegramUserId,
+      binding,
+      secret,
+      store,
+      now,
+    );
+  } catch {
+    throw new CallbackVerificationError();
+  }
+}
+
+async function verifyCallbackInternal(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  secret: Uint8Array,
+  store: CallbackClaimsStore,
+  now: Date,
+): Promise<ExpertCallbackClaims> {
+  requireStrongSecret(secret);
   const { nonce, authenticatedTag } = parseToken(token);
   const expectedTag = callbackTag(nonce, secret);
   if (!timingSafeEqual(authenticatedTag, expectedTag)) {
@@ -133,7 +179,9 @@ export async function verifyCallback(
   ) {
     throw new Error("Telegram identity is not authorized");
   }
-  if (!binding.active) throw new Error("Expert binding is inactive");
+  if (!binding.active || !binding.verified) {
+    throw new Error("Expert binding is not eligible");
+  }
   if (claims.expertId !== binding.expertId) {
     throw new Error("Expert binding does not match callback");
   }

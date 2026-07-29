@@ -57,10 +57,11 @@ interface InsertUnknownOutboxInput {
 
 interface TelegramCallbackFixtureInput {
   tokenHash: string;
-  expertId: string;
   action: "confirm" | "cancel";
   version: number;
   expiresAt: string;
+  expertActive?: boolean;
+  expertVerified?: boolean;
 }
 
 interface TelegramCallbackFixture {
@@ -174,6 +175,26 @@ export interface TestDatabase {
     input: TelegramCallbackFixtureInput,
   ): Promise<TelegramCallbackFixture>;
   callbackConsumedAt(notificationId: string): Promise<Date | null>;
+  createTelegramCallbackReservation(input?: {
+    expertActive?: boolean;
+    expertVerified?: boolean;
+    reservationVersion?: number;
+  }): Promise<{ reservationId: string; expertId: string }>;
+  notificationCountForToken(tokenHash: string): Promise<number>;
+  setTelegramCallbackReservationState(
+    reservationId: string,
+    input: {
+      status?:
+        | "reserved"
+        | "booked"
+        | "cancelled_by_client"
+        | "cancelled_by_expert"
+        | "expired"
+        | "completed"
+        | "no_show";
+      version?: number;
+    },
+  ): Promise<void>;
 }
 
 function oneId(rows: { id: string }[]): string {
@@ -321,6 +342,57 @@ export async function startTestPostgres(
     confirmationBufferMs: 60 * 60 * 1_000,
     correlationId: `booking-${suffix}`,
   });
+
+  const createTelegramCallbackReservation = async (
+    input: {
+      expertActive?: boolean;
+      expertVerified?: boolean;
+      reservationVersion?: number;
+    } = {},
+  ): Promise<{ reservationId: string; expertId: string }> => {
+    const clientId = await createUser();
+    const expert = await createExpert({
+      active: input.expertActive ?? true,
+      verified: input.expertVerified ?? true,
+    });
+    const startsAt = new Date("2026-08-02T10:00:00.000Z");
+    const slotId = await createSlotForService({
+      serviceId: expert.serviceId,
+      capacity: 1,
+      startsAt,
+    });
+    const reservationId = oneId(
+      (
+        await db.execute<{ id: string }>(sql`
+          insert into reservations (
+            user_id,
+            slot_id,
+            expert_id,
+            expert_service_id,
+            status,
+            idempotency_key,
+            reserved_until,
+            version,
+            created_at,
+            updated_at
+          ) values (
+            ${clientId}::uuid,
+            ${slotId}::uuid,
+            ${expert.expertId}::uuid,
+            ${expert.serviceId}::uuid,
+            'reserved',
+            ${`callback-reservation-${randomUUID()}`},
+            ${new Date("2026-07-31T10:00:00.000Z")},
+            ${input.reservationVersion ?? 1},
+            ${new Date("2026-07-27T10:00:00.000Z")},
+            ${new Date("2026-07-27T10:00:00.000Z")}
+          )
+          returning id
+        `)
+      ).rows,
+    );
+    return { reservationId, expertId: expert.expertId };
+  };
 
   return {
     db,
@@ -883,47 +955,14 @@ export async function startTestPostgres(
       return status;
     },
     async seedTelegramCallback(input) {
-      const clientId = await createUser();
-      const expert = await createExpert();
-      const startsAt = new Date("2026-08-02T10:00:00.000Z");
-      const slotId = await createSlotForService({
-        serviceId: expert.serviceId,
-        capacity: 1,
-        startsAt,
+      const reservation = await createTelegramCallbackReservation({
+        expertActive: input.expertActive ?? true,
+        expertVerified: input.expertVerified ?? true,
+        reservationVersion: input.version,
       });
-      const reservationId = oneId(
-        (
-          await db.execute<{ id: string }>(sql`
-            insert into reservations (
-              user_id,
-              slot_id,
-              expert_id,
-              expert_service_id,
-              status,
-              idempotency_key,
-              reserved_until,
-              version,
-              created_at,
-              updated_at
-            ) values (
-              ${clientId}::uuid,
-              ${slotId}::uuid,
-              ${expert.expertId}::uuid,
-              ${expert.serviceId}::uuid,
-              'reserved',
-              ${`callback-reservation-${randomUUID()}`},
-              ${new Date("2026-07-31T10:00:00.000Z")},
-              1,
-              ${new Date("2026-07-27T10:00:00.000Z")},
-              ${new Date("2026-07-27T10:00:00.000Z")}
-            )
-            returning id
-          `)
-        ).rows,
-      );
       const claims = {
-        reservationId,
-        expertId: input.expertId,
+        reservationId: reservation.reservationId,
+        expertId: reservation.expertId,
         action: input.action,
         version: input.version,
         expiresAtEpochSeconds: Math.floor(
@@ -943,12 +982,12 @@ export async function startTestPostgres(
               callback_action,
               callback_version
             ) values (
-              ${reservationId}::uuid,
+              ${reservation.reservationId}::uuid,
               ${`callback-notification-${randomUUID()}`},
               ${input.tokenHash},
               ${JSON.stringify(claims)},
               ${new Date(input.expiresAt)},
-              ${input.expertId}::uuid,
+              ${reservation.expertId}::uuid,
               ${input.action},
               ${input.version}
             )
@@ -967,6 +1006,28 @@ export async function startTestPostgres(
       const row = result.rows[0];
       if (row === undefined) throw new Error("Notification not found");
       return row.consumedAt;
+    },
+    createTelegramCallbackReservation,
+    async notificationCountForToken(tokenHash) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from notifications
+        where callback_token_hash = ${tokenHash}
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async setTelegramCallbackReservationState(reservationId, input) {
+      await db.execute(sql`
+        update reservations
+        set
+          status = coalesce(
+            ${input.status ?? null}::reservation_status,
+            status
+          ),
+          version = coalesce(${input.version ?? null}::integer, version),
+          updated_at = now()
+        where id = ${reservationId}::uuid
+      `);
     },
   };
 }
