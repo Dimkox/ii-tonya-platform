@@ -160,6 +160,11 @@ export type CommittedInboundResult =
 export type CompleteInboundResult =
   | { readonly kind: "duplicate"; readonly messageEventId: string }
   | {
+      readonly kind: "retry";
+      readonly messageEventId: string;
+      readonly packageAvailable: true;
+    }
+  | {
       readonly kind: "completed";
       readonly messageEventId: string;
       readonly packageId: string | null;

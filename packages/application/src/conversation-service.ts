@@ -514,6 +514,36 @@ const completeInbound = async (
       correlationId: command.correlationId,
       outcome,
     });
+    if (completed.kind === "retry") {
+      throw new Error("Unexpected retry for a chargeable outcome");
+    }
+    return completed.kind === "duplicate"
+      ? { kind: "duplicate", chargedMessages: 0 }
+      : completed.result;
+  } catch {
+    throw dependencyFailure();
+  }
+};
+
+const completeNoPackage = async (
+  deps: ConversationDependencies,
+  command: HandleInboundCommand,
+  messageEventId: string,
+): Promise<ConversationResult | { readonly kind: "retry" }> => {
+  try {
+    const completed = await deps.messageRepository.completeInbound({
+      messageEventId,
+      userId: command.userId,
+      correlationId: command.correlationId,
+      outcome: {
+        kind: "no_package",
+        topic: "client.no_package",
+        payload: {},
+      },
+    });
+    if (completed.kind === "retry") {
+      return { kind: "retry" };
+    }
     return completed.kind === "duplicate"
       ? { kind: "duplicate", chargedMessages: 0 }
       : completed.result;
@@ -570,16 +600,14 @@ export const createConversationService = (
       return { kind: "duplicate", chargedMessages: 0 };
     }
     if (!prepared.packageAvailable) {
-      return completeInbound(
+      const completion = await completeNoPackage(
         deps,
         command,
         prepared.messageEventId,
-        {
-          kind: "no_package",
-          topic: "client.no_package",
-          payload: {},
-        },
       );
+      if (completion.kind !== "retry") {
+        return completion;
+      }
     }
 
     let authorization: IntentAuthorizationScope;

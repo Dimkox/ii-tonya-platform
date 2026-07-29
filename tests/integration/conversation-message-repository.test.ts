@@ -238,6 +238,56 @@ describe("conversation message repository", () => {
     ).toMatchObject({ topic: "client.no_package" });
   });
 
+  it("keeps a no-package proposal pending when a package is granted after prepare", async () => {
+    const userId = await testDb.createUser();
+    const repository = new PostgresMessageRepository(testDb.db);
+    const command = inbound(userId, "concurrent-grant");
+    const prepared = await repository.prepareInbound(command);
+    if (prepared.kind !== "pending")
+      throw new Error("Expected pending inbound");
+    expect(prepared.packageAvailable).toBe(false);
+
+    const packageId = await testDb.createLedgerPackage(
+      userId,
+      "post-prepare-package",
+      1,
+    );
+    await testDb.appendGrantFact(packageId, 1, "post-prepare-grant");
+    const retry = await repository.completeInbound({
+      messageEventId: prepared.messageEventId,
+      userId,
+      correlationId: command.correlationId,
+      outcome: {
+        kind: "no_package",
+        topic: "client.no_package",
+        payload: {},
+      },
+    });
+
+    expect(retry).toEqual({
+      kind: "retry",
+      messageEventId: prepared.messageEventId,
+      packageAvailable: true,
+    });
+    expect(await testDb.ledgerEntryCount(command.externalMessageId)).toBe(0);
+    expect(await testDb.outboxCountForCorrelation(command.correlationId)).toBe(
+      0,
+    );
+
+    const completed = await repository.completeInbound({
+      messageEventId: prepared.messageEventId,
+      userId,
+      correlationId: command.correlationId,
+      outcome: answer("now paid"),
+    });
+    expect(completed).toMatchObject({
+      kind: "completed",
+      packageId: expect.any(String),
+      ledgerBalance: 0,
+      result: { kind: "answer_queued", chargedMessages: 1 },
+    });
+  });
+
   it("replays a committed completion after an unknown commit outcome", async () => {
     const userId = await testDb.createUserWithPackage(1);
     let failAcknowledgement = true;

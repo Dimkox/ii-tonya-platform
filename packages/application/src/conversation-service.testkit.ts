@@ -41,6 +41,7 @@ export interface ConversationFixture extends ConversationDependencies {
     failNextCompletionAfterCommit(error: Error): void;
     auditActions(): readonly string[];
     pendingInboundCount(): number;
+    grantMessages(count: number): void;
   };
   readonly outbox: {
     topics(): readonly string[];
@@ -184,9 +185,13 @@ export const conversationFixture = (input: {
 
       if (
         command.outcome.kind === "no_package" &&
-        pending.packageAvailable
+        balance > 0
       ) {
-        throw new Error("Inbound package decision changed");
+        return {
+          kind: "retry" as const,
+          messageEventId: command.messageEventId,
+          packageAvailable: true as const,
+        };
       }
       const committedOutcome: InboundCompletionOutcome =
         command.outcome.kind === "no_package" || balance <= 0
@@ -281,6 +286,12 @@ export const conversationFixture = (input: {
       [...inboundByMessageId.values()].filter(
         (inbound) => inbound.state === "pending",
       ).length,
+    grantMessages(count) {
+      if (!Number.isSafeInteger(count) || count <= 0) {
+        throw new Error("Granted message count must be a positive safe integer");
+      }
+      balance += count;
+    },
     failNext(error) {
       nextFailure = error;
     },

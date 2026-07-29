@@ -95,6 +95,11 @@ interface StoredCompletion {
 export type CompleteInboundResult =
   | { kind: "duplicate"; messageEventId: string }
   | {
+      kind: "retry";
+      messageEventId: string;
+      packageAvailable: true;
+    }
+  | {
       kind: "completed";
       messageEventId: string;
       packageId: string | null;
@@ -490,6 +495,19 @@ export class PostgresMessageRepository implements MessageRepository {
           { packageId: string | null; ledgerBalance: number } | undefined;
         let outcome = command.outcome;
         if (outcome.kind === "no_package") {
+          if (
+            await this.packageAvailable(
+              tx,
+              command.userId,
+              event.occurredAt,
+            )
+          ) {
+            return {
+              kind: "retry" as const,
+              messageEventId: command.messageEventId,
+              packageAvailable: true as const,
+            };
+          }
           charged = await this.free(tx, command.messageEventId, "inbound");
         } else {
           charged = await this.debit(

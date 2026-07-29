@@ -541,6 +541,34 @@ describe("conversation workflow", () => {
     expect(deps.outbox.topics()).toHaveLength(2);
   });
 
+  it("rechecks a package grant made after prepare before committing no-package", async () => {
+    const deps = conversationFixture({ balance: 0, safety: "ordinary" });
+    const occurredAt = new Date(deps.inbound.occurredAt);
+    await deps.messageRepository.prepareInbound({
+      provider: deps.inbound.provider,
+      externalEventId: deps.inbound.providerEventId,
+      externalMessageId: deps.inbound.providerMessageId,
+      userId: deps.inbound.userId,
+      messageClass: "ordinary_inbound",
+      occurredAt,
+      correlationId: deps.inbound.correlationId,
+    });
+    deps.messageRepository.grantMessages(1);
+
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+
+    expect(result).toEqual({
+      kind: "answer_queued",
+      chargedMessages: 1,
+    });
+    expect(deps.intentEngine.propose).toHaveBeenCalledOnce();
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+    expect(deps.messageRepository.pendingInboundCount()).toBe(0);
+  });
+
   it("atomically persists one free no-package result across an unknown completion outcome", async () => {
     const deps = conversationFixture({ balance: 0, safety: "ordinary" });
     deps.messageRepository.failNextCompletionAfterCommit(
