@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -12,12 +13,24 @@ import {
 } from "drizzle-orm/pg-core";
 import { messageEvents } from "./billing.js";
 
-const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+const createdAt = timestamp("created_at", { withTimezone: true })
+  .notNull()
+  .defaultNow();
 const mutableTimestamps = {
   createdAt,
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 };
-export const outboxStatus = pgEnum("outbox_status", ["pending", "processing", "unknown_outcome", "reconciling", "succeeded", "retry_wait", "dead_letter"]);
+export const outboxStatus = pgEnum("outbox_status", [
+  "pending",
+  "processing",
+  "unknown_outcome",
+  "reconciling",
+  "succeeded",
+  "retry_wait",
+  "dead_letter",
+]);
 
 export const integrationInbox = pgTable(
   "integration_inbox",
@@ -31,8 +44,10 @@ export const integrationInbox = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
-    unique("integration_inbox_provider_event_unique")
-      .on(table.provider, table.externalEventId),
+    unique("integration_inbox_provider_event_unique").on(
+      table.provider,
+      table.externalEventId,
+    ),
   ],
 );
 export const integrationOutbox = pgTable(
@@ -40,14 +55,25 @@ export const integrationOutbox = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     idempotencyKey: text("idempotency_key").notNull(),
+    topic: text("topic").notNull().default("legacy.unknown"),
+    payload: jsonb("payload").notNull().default({}),
+    correlationId: text("correlation_id").notNull().default("legacy"),
     status: outboxStatus("status").notNull().default("pending"),
     reconciliationKey: text("reconciliation_key").notNull(),
     attempt: integer("attempt").notNull().default(0),
-    reconciliationAttempt: integer("reconciliation_attempt").notNull().default(0),
+    reconciliationAttempt: integer("reconciliation_attempt")
+      .notNull()
+      .default(0),
     dispatchOwnerId: text("dispatch_owner_id"),
     leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     reconciliationOwnerId: text("reconciliation_owner_id"),
-    reconciliationLeaseUntil: timestamp("reconciliation_lease_until", { withTimezone: true }),
+    reconciliationLeaseUntil: timestamp("reconciliation_lease_until", {
+      withTimezone: true,
+    }),
+    nextReconciliationAt: timestamp("next_reconciliation_at", {
+      withTimezone: true,
+    }),
     lastNormalizedReason: text("last_normalized_reason"),
     payloadHash: text("payload_hash").notNull(),
     ...mutableTimestamps,
@@ -72,20 +98,47 @@ export const integrationOutbox = pgTable(
 );
 export const deliveryAttempts = pgTable("delivery_attempts", {
   id: uuid("id").defaultRandom().primaryKey(),
-  outboxId: uuid("outbox_id").notNull().references(() => integrationOutbox.id),
+  outboxId: uuid("outbox_id")
+    .notNull()
+    .references(() => integrationOutbox.id),
+  attemptId: text("attempt_id").notNull().default("legacy"),
   attempt: integer("attempt").notNull(),
   provider: text("provider").notNull(),
   outcome: text("outcome").notNull(),
+  reconciliationKey: text("reconciliation_key").notNull().default("legacy"),
   normalizedReason: text("normalized_reason"),
   createdAt,
 });
-export const deadLetters = pgTable("dead_letters", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  outboxId: uuid("outbox_id").notNull().references(() => integrationOutbox.id),
-  reason: text("reason").notNull(),
-  payloadHash: text("payload_hash").notNull(),
-  ...mutableTimestamps,
-});
+export const deadLetters = pgTable(
+  "dead_letters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    outboxId: uuid("outbox_id")
+      .notNull()
+      .references(() => integrationOutbox.id),
+    reason: text("reason").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    ...mutableTimestamps,
+  },
+  (table) => [unique("dead_letters_outbox_unique").on(table.outboxId)],
+);
+export const outboxOperatorAlerts = pgTable(
+  "outbox_operator_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    outboxId: uuid("outbox_id")
+      .notNull()
+      .references(() => integrationOutbox.id),
+    reasonCode: text("reason_code").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("outbox_operator_alerts_outbox_reason_unique").on(
+      table.outboxId,
+      table.reasonCode,
+    ),
+  ],
+);
 export const providerCursors = pgTable(
   "provider_cursors",
   {
@@ -94,9 +147,7 @@ export const providerCursors = pgTable(
     cursor: text("cursor").notNull(),
     ...mutableTimestamps,
   },
-  (table) => [
-    unique("provider_cursors_provider_unique").on(table.provider),
-  ],
+  (table) => [unique("provider_cursors_provider_unique").on(table.provider)],
 );
 export const reconciliationRuns = pgTable("reconciliation_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -107,7 +158,9 @@ export const reconciliationRuns = pgTable("reconciliation_runs", {
 });
 export const reconciliationMismatches = pgTable("reconciliation_mismatches", {
   id: uuid("id").defaultRandom().primaryKey(),
-  reconciliationRunId: uuid("reconciliation_run_id").notNull().references(() => reconciliationRuns.id),
+  reconciliationRunId: uuid("reconciliation_run_id")
+    .notNull()
+    .references(() => reconciliationRuns.id),
   outboxId: uuid("outbox_id").references(() => integrationOutbox.id),
   reason: text("reason").notNull(),
   createdAt,

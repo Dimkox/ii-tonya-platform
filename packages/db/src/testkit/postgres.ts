@@ -43,6 +43,17 @@ interface TestPoolHandle {
   end(): Promise<void>;
 }
 
+interface InsertOutboxInput {
+  topic: string;
+  reconciliationKey: string;
+}
+
+interface InsertUnknownOutboxInput {
+  attempt: number;
+  reconciliationAttempt: number;
+  reconciliationKey: string;
+}
+
 export interface TestPostgresDependencies {
   startContainer(): Promise<TestContainerHandle>;
   createPool(connectionString: string): TestPoolHandle;
@@ -60,7 +71,10 @@ export interface TestDatabase {
     grantIdempotencyKey: string,
     grantedMessages?: number,
   ): Promise<string>;
-  seedUserAndPackage(input: { externalMessageId: string; grantedMessages: number }): Promise<void>;
+  seedUserAndPackage(input: {
+    externalMessageId: string;
+    grantedMessages: number;
+  }): Promise<void>;
   insertDuplicateExternalMessage(externalMessageId: string): Promise<void>;
   columnExists(table: string, column: string): Promise<boolean>;
   packageGrantedMessages(): Promise<number>;
@@ -69,13 +83,33 @@ export interface TestDatabase {
   ledgerEntryCount(externalMessageId: string): Promise<number>;
   rebuildPackageBalance(userId: string): Promise<number>;
   mutableBalanceColumnCount(): Promise<number>;
-  appendLedgerFact(input: { kind: LedgerKind; delta: number; idempotencyKey: string }): Promise<void>;
+  appendLedgerFact(input: {
+    kind: LedgerKind;
+    delta: number;
+    idempotencyKey: string;
+  }): Promise<void>;
   updateLedgerFact(idempotencyKey: string, delta: number): Promise<void>;
   deleteLedgerFact(idempotencyKey: string): Promise<void>;
-  appendGrantFact(packageId: string, delta: number, idempotencyKey: string): Promise<string>;
-  appendMessageDebit(packageId: string, externalMessageId: string, idempotencyKey: string): Promise<string>;
-  appendCompensation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
-  appendRevocation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
+  appendGrantFact(
+    packageId: string,
+    delta: number,
+    idempotencyKey: string,
+  ): Promise<string>;
+  appendMessageDebit(
+    packageId: string,
+    externalMessageId: string,
+    idempotencyKey: string,
+  ): Promise<string>;
+  appendCompensation(
+    packageId: string,
+    originalEntryId: string,
+    idempotencyKey: string,
+  ): Promise<void>;
+  appendRevocation(
+    packageId: string,
+    originalEntryId: string,
+    idempotencyKey: string,
+  ): Promise<void>;
   ledgerFactCount(packageIds: string[]): Promise<number>;
   createSlot(input: {
     capacity: number;
@@ -85,13 +119,21 @@ export interface TestDatabase {
   createOverlappingClientSlots(): Promise<OverlappingClientFixture>;
   createOverlappingExpertSlots(): Promise<OverlappingExpertFixture>;
   createReservableFixture(): Promise<ReservableFixture>;
-  installSerializationFailureTrigger(idempotencyKey: string, failures: number): Promise<void>;
+  installSerializationFailureTrigger(
+    idempotencyKey: string,
+    failures: number,
+  ): Promise<void>;
   serializationAttemptCount(idempotencyKey: string): Promise<number>;
   reservationCountForKey(idempotencyKey: string): Promise<number>;
   activeReservationCountForClient(clientId: string): Promise<number>;
   activeReservationCountForExpert(expertId: string): Promise<number>;
   outboxCountForCorrelation(correlationId: string): Promise<number>;
   auditCountForCorrelation(correlationId: string): Promise<number>;
+  insertOutbox(input: InsertOutboxInput): Promise<string>;
+  insertUnknownOutbox(input: InsertUnknownOutboxInput): Promise<string>;
+  outboxStatus(id: string): Promise<string>;
+  ownerAlertReasons(id: string): Promise<string[]>;
+  deadLetterReasons(id: string): Promise<string[]>;
   createConfirmEligibilityCase(caseName: ConfirmEligibilityCase): Promise<{
     reservationId: string;
     actorExpertId: string;
@@ -107,7 +149,8 @@ function oneId(rows: { id: string }[]): string {
 }
 
 const defaultDependencies: TestPostgresDependencies = {
-  startContainer: async () => new PostgreSqlContainer("postgres:16-alpine").start(),
+  startContainer: async () =>
+    new PostgreSqlContainer("postgres:16-alpine").start(),
   createPool: (connectionString) => new Pool({ connectionString }),
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
 };
@@ -121,10 +164,13 @@ async function stopResources(
     Promise.resolve().then(() => container.stop()),
   ]);
   const errors = results
-    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    )
     .map(({ reason }) => reason);
   if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) throw new AggregateError(errors, "Failed to stop test database resources");
+  if (errors.length > 1)
+    throw new AggregateError(errors, "Failed to stop test database resources");
 }
 
 export async function startTestPostgres(
@@ -148,24 +194,36 @@ export async function startTestPostgres(
   let primaryPackageId: string | undefined;
   let primaryUserId: string | undefined;
 
-  const createUser = async (): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
+  const createUser = async (): Promise<string> =>
+    oneId(
+      (
+        await db.execute<{ id: string }>(sql`
     insert into users default values returning id
-  `)).rows);
+  `)
+      ).rows,
+    );
 
   const createLedgerPackage = async (
     userId: string,
     grantIdempotencyKey: string,
     grantedMessages = 1,
-  ): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
+  ): Promise<string> =>
+    oneId(
+      (
+        await db.execute<{ id: string }>(sql`
     insert into message_packages (user_id, granted_messages, grant_idempotency_key)
     values (${userId}::uuid, ${grantedMessages}, ${grantIdempotencyKey}) returning id
-  `)).rows);
+  `)
+      ).rows,
+    );
 
   const createExpert = async (
     input: { active?: boolean; verified?: boolean } = {},
   ): Promise<{ expertId: string; serviceId: string }> => {
     const expertUserId = await createUser();
-    const expertId = oneId((await db.execute<{ id: string }>(sql`
+    const expertId = oneId(
+      (
+        await db.execute<{ id: string }>(sql`
       insert into experts (user_id, active, verified)
       values (
         ${expertUserId}::uuid,
@@ -173,12 +231,18 @@ export async function startTestPostgres(
         ${input.verified ?? true}
       )
       returning id
-    `)).rows);
-    const serviceId = oneId((await db.execute<{ id: string }>(sql`
+    `)
+      ).rows,
+    );
+    const serviceId = oneId(
+      (
+        await db.execute<{ id: string }>(sql`
       insert into expert_services (expert_id, name, active, duration_minutes)
       values (${expertId}::uuid, 'Test consultation', true, 60)
       returning id
-    `)).rows);
+    `)
+      ).rows,
+    );
     return { expertId, serviceId };
   };
 
@@ -188,7 +252,10 @@ export async function startTestPostgres(
     startsAt: Date;
     endsAt?: Date;
     observedAt?: Date;
-  }): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
+  }): Promise<string> =>
+    oneId(
+      (
+        await db.execute<{ id: string }>(sql`
     insert into slots (
       expert_service_id, provider, external_slot_id, starts_at, ends_at,
       observed_at, capacity
@@ -203,7 +270,9 @@ export async function startTestPostgres(
       ${input.capacity}
     )
     returning id
-  `)).rows);
+  `)
+      ).rows,
+    );
 
   const commandFor = (
     userId: string,
@@ -226,7 +295,8 @@ export async function startTestPostgres(
     },
     async reset() {
       await db.execute(sql`
-        truncate table reconciliation_mismatches, delivery_attempts, dead_letters, integration_outbox,
+        truncate table reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
+          dead_letters, integration_outbox,
           integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,
           privacy_processor_attempts, privacy_deletion_jobs, admin_approvals, audit_events,
           human_escalations, safety_incidents, prompt_versions, conversation_messages, conversations,
@@ -244,7 +314,11 @@ export async function startTestPostgres(
     createLedgerPackage,
     async createUserWithPackage(grantedMessages) {
       const userId = await createUser();
-      const packageId = await createLedgerPackage(userId, `package-${userId}`, grantedMessages);
+      const packageId = await createLedgerPackage(
+        userId,
+        `package-${userId}`,
+        grantedMessages,
+      );
       await db.execute(sql`
         insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
         values (${packageId}::uuid, 'grant', ${grantedMessages}, ${`grant-${userId}`})
@@ -253,7 +327,11 @@ export async function startTestPostgres(
     },
     async seedUserAndPackage({ externalMessageId, grantedMessages }) {
       primaryUserId = await createUser();
-      primaryPackageId = await createLedgerPackage(primaryUserId, `package-${externalMessageId}`, grantedMessages);
+      primaryPackageId = await createLedgerPackage(
+        primaryUserId,
+        `package-${externalMessageId}`,
+        grantedMessages,
+      );
       await db.execute(sql`
         insert into message_events (user_id, provider, external_message_id, direction)
         values (${primaryUserId}::uuid, 'test', ${externalMessageId}, 'outbound')
@@ -264,7 +342,8 @@ export async function startTestPostgres(
       `);
     },
     async insertDuplicateExternalMessage(externalMessageId) {
-      if (primaryUserId === undefined) throw new Error("Call seedUserAndPackage first");
+      if (primaryUserId === undefined)
+        throw new Error("Call seedUserAndPackage first");
       await db.execute(sql`
         insert into message_events (user_id, provider, external_message_id, direction)
         values (${primaryUserId}::uuid, 'test', ${externalMessageId}, 'outbound')
@@ -280,7 +359,8 @@ export async function startTestPostgres(
       return result.rows[0]?.exists ?? false;
     },
     async packageGrantedMessages() {
-      if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");
+      if (primaryPackageId === undefined)
+        throw new Error("Call seedUserAndPackage first");
       const result = await db.execute<{ granted_messages: number }>(sql`
         select granted_messages
         from message_packages
@@ -289,7 +369,8 @@ export async function startTestPostgres(
       return Number(result.rows[0]?.granted_messages ?? 0);
     },
     async packageBalance(userId = primaryUserId) {
-      if (userId === undefined) throw new Error("Call seedUserAndPackage first");
+      if (userId === undefined)
+        throw new Error("Call seedUserAndPackage first");
       const result = await db.execute<{ balance: number }>(sql`
         select coalesce(sum(balance), 0)::integer as balance
         from package_balances where user_id = ${userId}::uuid
@@ -325,40 +406,65 @@ export async function startTestPostgres(
       return Number(result.rows[0]?.count ?? 0);
     },
     async appendLedgerFact({ kind, delta, idempotencyKey }) {
-      if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");
-      const event = oneId((await db.execute<{ id: string }>(sql`
+      if (primaryPackageId === undefined)
+        throw new Error("Call seedUserAndPackage first");
+      const event = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         insert into message_events (user_id, provider, external_message_id, direction)
         values (${primaryUserId!}::uuid, 'test', ${idempotencyKey}, 'outbound') returning id
-      `)).rows);
+      `)
+        ).rows,
+      );
       await db.execute(sql`
         insert into message_ledger_entries (package_id, entry_kind, delta, message_event_id, idempotency_key)
         values (${primaryPackageId}::uuid, ${kind}, ${delta}, ${event}::uuid, ${idempotencyKey})
       `);
     },
     async updateLedgerFact(idempotencyKey, delta) {
-      await db.execute(sql`update message_ledger_entries set delta = ${delta} where idempotency_key = ${idempotencyKey}`);
+      await db.execute(
+        sql`update message_ledger_entries set delta = ${delta} where idempotency_key = ${idempotencyKey}`,
+      );
     },
     async deleteLedgerFact(idempotencyKey) {
-      await db.execute(sql`delete from message_ledger_entries where idempotency_key = ${idempotencyKey}`);
+      await db.execute(
+        sql`delete from message_ledger_entries where idempotency_key = ${idempotencyKey}`,
+      );
     },
     async appendGrantFact(packageId, delta, idempotencyKey) {
-      return oneId((await db.execute<{ id: string }>(sql`
+      return oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
         values (${packageId}::uuid, 'grant', ${delta}, ${idempotencyKey}) returning id
-      `)).rows);
+      `)
+        ).rows,
+      );
     },
     async appendMessageDebit(packageId, externalMessageId, idempotencyKey) {
-      const user = oneId((await db.execute<{ id: string }>(sql`
+      const user = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         select user_id as id from message_packages where id = ${packageId}::uuid
-      `)).rows);
-      const event = oneId((await db.execute<{ id: string }>(sql`
+      `)
+        ).rows,
+      );
+      const event = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         insert into message_events (user_id, provider, external_message_id, direction)
         values (${user}::uuid, 'test', ${externalMessageId}, 'outbound') returning id
-      `)).rows);
-      return oneId((await db.execute<{ id: string }>(sql`
+      `)
+        ).rows,
+      );
+      return oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         insert into message_ledger_entries (package_id, entry_kind, delta, message_event_id, idempotency_key)
         values (${packageId}::uuid, 'debit', -1, ${event}::uuid, ${idempotencyKey}) returning id
-      `)).rows);
+      `)
+        ).rows,
+      );
     },
     async appendCompensation(packageId, originalEntryId, idempotencyKey) {
       await db.execute(sql`
@@ -390,7 +496,9 @@ export async function startTestPostgres(
         serviceId,
         capacity,
         startsAt: new Date(startsAt),
-        ...(observedAt === undefined ? {} : { observedAt: new Date(observedAt) }),
+        ...(observedAt === undefined
+          ? {}
+          : { observedAt: new Date(observedAt) }),
       });
     },
     async createOverlappingClientSlots() {
@@ -463,7 +571,8 @@ export async function startTestPostgres(
         on conflict (idempotency_key) do update
         set sequence_name = excluded.sequence_name, failures = excluded.failures
       `);
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         create or replace function booking_force_serialization_failure()
         returns trigger language plpgsql as $$
         declare
@@ -489,16 +598,21 @@ export async function startTestPostgres(
         create trigger booking_force_serialization_failure
         before insert on reservations
         for each row execute function booking_force_serialization_failure();
-      `));
+      `),
+      );
     },
     async serializationAttemptCount(idempotencyKey) {
-      const config = (await db.execute<{ sequenceName: string }>(sql`
+      const config = (
+        await db.execute<{ sequenceName: string }>(sql`
         select sequence_name as "sequenceName"
         from booking_serialization_failure_config
         where idempotency_key = ${idempotencyKey}
-      `)).rows[0];
+      `)
+      ).rows[0];
       if (config === undefined) return 0;
-      const result = await db.execute<{ lastValue: string | number | null }>(sql`
+      const result = await db.execute<{
+        lastValue: string | number | null;
+      }>(sql`
         select last_value as "lastValue"
         from pg_sequences
         where schemaname = current_schema() and sequencename = ${config.sequenceName}
@@ -545,18 +659,106 @@ export async function startTestPostgres(
       `);
       return Number(result.rows[0]?.count ?? 0);
     },
+    async insertOutbox({ topic, reconciliationKey }) {
+      return oneId(
+        (
+          await db.execute<{ id: string }>(sql`
+        insert into integration_outbox (
+          idempotency_key,
+          topic,
+          payload,
+          correlation_id,
+          reconciliation_key,
+          payload_hash
+        ) values (
+          ${`test:${randomUUID()}`},
+          ${topic},
+          ${JSON.stringify({ test: true })}::jsonb,
+          ${`correlation:${randomUUID()}`},
+          ${reconciliationKey},
+          ${`sha256:${randomUUID()}`}
+        )
+        returning id
+      `)
+        ).rows,
+      );
+    },
+    async insertUnknownOutbox({
+      attempt,
+      reconciliationAttempt,
+      reconciliationKey,
+    }) {
+      return oneId(
+        (
+          await db.execute<{ id: string }>(sql`
+        insert into integration_outbox (
+          idempotency_key,
+          topic,
+          payload,
+          correlation_id,
+          status,
+          reconciliation_key,
+          attempt,
+          reconciliation_attempt,
+          next_reconciliation_at,
+          payload_hash
+        ) values (
+          ${`test:${randomUUID()}`},
+          'test.dispatch',
+          '{}'::jsonb,
+          ${`correlation:${randomUUID()}`},
+          'unknown_outcome',
+          ${reconciliationKey},
+          ${attempt},
+          ${reconciliationAttempt},
+          now(),
+          ${`sha256:${randomUUID()}`}
+        )
+        returning id
+      `)
+        ).rows,
+      );
+    },
+    async outboxStatus(id) {
+      const result = await db.execute<{ status: string }>(sql`
+        select status from integration_outbox where id = ${id}::uuid
+      `);
+      const status = result.rows[0]?.status;
+      if (status === undefined) throw new Error("Outbox row not found");
+      return status;
+    },
+    async ownerAlertReasons(id) {
+      const result = await db.execute<{ reason: string }>(sql`
+        select reason_code as reason
+        from outbox_operator_alerts
+        where outbox_id = ${id}::uuid
+        order by created_at, id
+      `);
+      return result.rows.map(({ reason }) => reason);
+    },
+    async deadLetterReasons(id) {
+      const result = await db.execute<{ reason: string }>(sql`
+        select reason
+        from dead_letters
+        where outbox_id = ${id}::uuid
+        order by created_at, id
+      `);
+      return result.rows.map(({ reason }) => reason);
+    },
     async createConfirmEligibilityCase(caseName) {
       const now = new Date("2026-07-28T10:00:00.000Z");
       const clientId = await createUser();
       const expert = await createExpert();
-      const startsAt = caseName === "past_slot"
-        ? new Date("2026-07-28T09:00:00.000Z")
-        : new Date("2026-08-02T10:00:00.000Z");
-      const observedAt = caseName === "stale_slot"
-        ? new Date("2026-07-28T09:00:00.000Z")
-        : caseName === "future_slot"
-          ? new Date("2026-07-28T10:00:00.001Z")
-          : now;
+      const startsAt =
+        caseName === "past_slot"
+          ? new Date("2026-07-28T09:00:00.000Z")
+          : new Date("2026-08-02T10:00:00.000Z");
+      const observedAt =
+        caseName === "stale_slot"
+          ? new Date("2026-07-28T09:00:00.000Z")
+          : caseName === "future_slot"
+            ? new Date("2026-07-28T10:00:00.001Z")
+            : now;
       const slotId = await createSlotForService({
         serviceId: expert.serviceId,
         capacity: 1,
@@ -570,10 +772,13 @@ export async function startTestPostgres(
         `);
       }
       const createdAt = new Date("2026-07-27T10:00:00.000Z");
-      const reservedUntil = caseName === "expired_hold"
-        ? new Date("2026-07-28T09:59:00.000Z")
-        : new Date("2026-07-31T10:00:00.000Z");
-      const reservationId = oneId((await db.execute<{ id: string }>(sql`
+      const reservedUntil =
+        caseName === "expired_hold"
+          ? new Date("2026-07-28T09:59:00.000Z")
+          : new Date("2026-07-31T10:00:00.000Z");
+      const reservationId = oneId(
+        (
+          await db.execute<{ id: string }>(sql`
         insert into reservations (
           user_id, slot_id, expert_id, expert_service_id, status, idempotency_key,
           reserved_until, version, created_at, updated_at
@@ -583,7 +788,9 @@ export async function startTestPostgres(
           ${reservedUntil}, 1, ${createdAt}, ${createdAt}
         )
         returning id
-      `)).rows);
+      `)
+        ).rows,
+      );
       let actorExpertId = expert.expertId;
       if (caseName === "wrong_expert") {
         actorExpertId = (await createExpert()).expertId;

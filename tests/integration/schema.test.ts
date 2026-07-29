@@ -20,7 +20,11 @@ function databaseErrorChain(error: unknown): DatabaseErrorEvidence[] {
   const chain: DatabaseErrorEvidence[] = [];
   const seen = new Set<unknown>();
   let current = error;
-  while (typeof current === "object" && current !== null && !seen.has(current)) {
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
     seen.add(current);
     const evidence = current as DatabaseErrorEvidence;
     chain.push(evidence);
@@ -56,7 +60,8 @@ async function seedLegacyReservation(
   db: TestDatabase["db"],
   slotCount: number,
 ): Promise<void> {
-  await db.execute(sql.raw(`
+  await db.execute(
+    sql.raw(`
     insert into users (id) values
       ('00000000-0000-4000-8000-000000000001'),
       ('00000000-0000-4000-8000-000000000002');
@@ -87,7 +92,9 @@ async function seedLegacyReservation(
       '2026-08-02T11:00:00.000Z',
       1
     );
-    ${slotCount === 2 ? `
+    ${
+      slotCount === 2
+        ? `
     insert into slots (
       id, expert_service_id, provider, external_slot_id,
       starts_at, ends_at, capacity
@@ -99,7 +106,9 @@ async function seedLegacyReservation(
       '2026-08-03T10:00:00.000Z',
       '2026-08-03T11:00:00.000Z',
       1
-    );` : ""}
+    );`
+        : ""
+    }
     insert into reservations (
       id, user_id, expert_service_id, status, idempotency_key,
       reserved_until, version, created_at, updated_at
@@ -114,7 +123,8 @@ async function seedLegacyReservation(
       '2026-07-28T10:00:00.000Z',
       '2026-07-28T10:00:00.000Z'
     );
-  `));
+  `),
+  );
 }
 
 async function expectDatabaseError(
@@ -130,9 +140,12 @@ async function expectDatabaseError(
   expect(caught, "database operation should fail").toBeDefined();
   const chain = databaseErrorChain(caught);
   expect(
-    chain.some((error) =>
-      error.code === expected.code
-      && (expected.constraint === undefined || error.constraint === expected.constraint)),
+    chain.some(
+      (error) =>
+        error.code === expected.code &&
+        (expected.constraint === undefined ||
+          error.constraint === expected.constraint),
+    ),
     `expected SQLSTATE ${expected.code}${expected.constraint ? ` / ${expected.constraint}` : ""}`,
   ).toBe(true);
 }
@@ -152,34 +165,66 @@ describe("MVP schema", () => {
     `);
     const names = rows.rows.map((row) => row.table_name);
     expect(names).toEqual([
-      "admin_approvals", "audit_events", "channel_identities", "client_profiles",
-      "consents", "conversation_messages", "conversations", "dead_letters",
-      "delivery_attempts", "expert_services", "experts", "feedback",
-      "human_escalations", "integration_inbox", "integration_outbox",
-      "message_events", "message_ledger_entries", "message_packages",
-      "notifications", "package_balances", "privacy_deletion_jobs",
-      "privacy_processor_attempts", "projection_checkpoints", "prompt_versions",
-      "provider_cursors", "reconciliation_mismatches", "reconciliation_runs",
-      "reservations", "safety_incidents", "slots", "users",
+      "admin_approvals",
+      "audit_events",
+      "channel_identities",
+      "client_profiles",
+      "consents",
+      "conversation_messages",
+      "conversations",
+      "dead_letters",
+      "delivery_attempts",
+      "expert_services",
+      "experts",
+      "feedback",
+      "human_escalations",
+      "integration_inbox",
+      "integration_outbox",
+      "message_events",
+      "message_ledger_entries",
+      "message_packages",
+      "notifications",
+      "outbox_operator_alerts",
+      "package_balances",
+      "privacy_deletion_jobs",
+      "privacy_processor_attempts",
+      "projection_checkpoints",
+      "prompt_versions",
+      "provider_cursors",
+      "reconciliation_mismatches",
+      "reconciliation_runs",
+      "reservations",
+      "safety_incidents",
+      "slots",
+      "users",
     ]);
   });
 
   it("uses an append-only ledger-derived balance with no mutable remainder column", async () => {
-    await testDb!.seedUserAndPackage({ externalMessageId: "m-1", grantedMessages: 2 });
+    await testDb!.seedUserAndPackage({
+      externalMessageId: "m-1",
+      grantedMessages: 2,
+    });
     expect(await testDb!.packageGrantedMessages()).toBe(2);
-    await expect(testDb!.insertDuplicateExternalMessage("m-1")).rejects.toThrow();
-    expect(await testDb!.columnExists("message_packages", "remaining_messages")).toBe(false);
+    await expect(
+      testDb!.insertDuplicateExternalMessage("m-1"),
+    ).rejects.toThrow();
+    expect(
+      await testDb!.columnExists("message_packages", "remaining_messages"),
+    ).toBe(false);
     expect(await testDb!.packageBalance()).toBe(2);
-    await testDb!.appendLedgerFact({ kind: "debit", delta: -1, idempotencyKey: "debit-1" });
+    await testDb!.appendLedgerFact({
+      kind: "debit",
+      delta: -1,
+      idempotencyKey: "debit-1",
+    });
     expect(await testDb!.packageBalance()).toBe(1);
-    await expectDatabaseError(
-      () => testDb!.updateLedgerFact("debit-1", 0),
-      { code: "55000" },
-    );
-    await expectDatabaseError(
-      () => testDb!.deleteLedgerFact("debit-1"),
-      { code: "55000" },
-    );
+    await expectDatabaseError(() => testDb!.updateLedgerFact("debit-1", 0), {
+      code: "55000",
+    });
+    await expectDatabaseError(() => testDb!.deleteLedgerFact("debit-1"), {
+      code: "55000",
+    });
   });
 
   it("allows grants across clients/packages while rejecting only same-scope corrections", async () => {
@@ -189,31 +234,59 @@ describe("MVP schema", () => {
     const packageA2 = await testDb!.createLedgerPackage(clientA, "grant-a2");
     const packageB1 = await testDb!.createLedgerPackage(clientB, "grant-b1");
 
-    const grantA1 = await testDb!.appendGrantFact(packageA1, 500, "ledger-grant-a1");
-    const grantA2 = await testDb!.appendGrantFact(packageA2, 1000, "ledger-grant-a2");
-    const grantB1 = await testDb!.appendGrantFact(packageB1, 500, "ledger-grant-b1");
+    const grantA1 = await testDb!.appendGrantFact(
+      packageA1,
+      500,
+      "ledger-grant-a1",
+    );
+    const grantA2 = await testDb!.appendGrantFact(
+      packageA2,
+      1000,
+      "ledger-grant-a2",
+    );
+    const grantB1 = await testDb!.appendGrantFact(
+      packageB1,
+      500,
+      "ledger-grant-b1",
+    );
     expect([grantA1, grantA2, grantB1]).toHaveLength(3);
     await expectDatabaseError(
       () => testDb!.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"),
       { code: "23505", constraint: "message_ledger_grant_once_per_package" },
     );
 
-    const debitA = await testDb!.appendMessageDebit(packageA1, "message-a", "debit-a");
-    const debitB = await testDb!.appendMessageDebit(packageB1, "message-b", "debit-b");
+    const debitA = await testDb!.appendMessageDebit(
+      packageA1,
+      "message-a",
+      "debit-a",
+    );
+    const debitB = await testDb!.appendMessageDebit(
+      packageB1,
+      "message-b",
+      "debit-b",
+    );
     await testDb!.appendCompensation(packageA1, debitA, "comp-a");
     await testDb!.appendCompensation(packageB1, debitB, "comp-b");
     await expectDatabaseError(
       () => testDb!.appendCompensation(packageA1, debitA, "comp-a-again"),
-      { code: "23505", constraint: "message_ledger_compensation_once_per_original" },
+      {
+        code: "23505",
+        constraint: "message_ledger_compensation_once_per_original",
+      },
     );
 
     await testDb!.appendRevocation(packageA1, grantA1, "revoke-a1");
     await testDb!.appendRevocation(packageB1, grantB1, "revoke-b1");
     await expectDatabaseError(
       () => testDb!.appendRevocation(packageA1, grantA1, "revoke-a1-again"),
-      { code: "23505", constraint: "message_ledger_revocation_once_per_package_grant" },
+      {
+        code: "23505",
+        constraint: "message_ledger_revocation_once_per_package_grant",
+      },
     );
-    expect(await testDb!.ledgerFactCount([packageA1, packageA2, packageB1])).toBe(9);
+    expect(
+      await testDb!.ledgerFactCount([packageA1, packageA2, packageB1]),
+    ).toBe(9);
   });
 
   it("upgrades an unambiguous legacy reservation through migration 0003", async () => {
@@ -259,7 +332,9 @@ describe("MVP schema", () => {
         { columnName: "expert_id", isNullable: "NO" },
         { columnName: "slot_id", isNullable: "NO" },
       ]);
-      const constraints = await legacyDb.db.execute<{ constraintName: string }>(sql`
+      const constraints = await legacyDb.db.execute<{
+        constraintName: string;
+      }>(sql`
         select constraint_name as "constraintName"
         from information_schema.table_constraints
         where table_schema = 'public'
@@ -295,10 +370,13 @@ describe("MVP schema", () => {
         caught = error;
       }
       const chain = databaseErrorChain(caught);
-      expect(chain.some((error) =>
-        error.code === "P0001"
-        && String(error.message).includes("booking_slot_backfill_ambiguous")
-      )).toBe(true);
+      expect(
+        chain.some(
+          (error) =>
+            error.code === "P0001" &&
+            String(error.message).includes("booking_slot_backfill_ambiguous"),
+        ),
+      ).toBe(true);
     } finally {
       await legacyDb.stop();
     }

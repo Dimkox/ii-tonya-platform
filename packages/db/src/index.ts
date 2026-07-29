@@ -28,4 +28,8 @@ export {
   type RecordOutboundDeliveryCommand,
   withSerializableRetry,
 } from "./repositories/message-repository.js";
+export {
+  OutboxStateConflictError,
+  PostgresOutboxRepository,
+} from "./repositories/outbox-repository.js";
 export * from "./schema/index.js";

@@ -29,6 +29,13 @@
       "when": 1785323709933,
       "tag": "0003_booking-concurrency",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785326820323,
+      "tag": "0004_durable_outbox",
+      "breakpoints": true
     }
   ]
 }

@@ -29,7 +29,9 @@ const names = (table: AnyPgTable) => {
   const config = getTableConfig(table);
   return {
     checks: config.checks.map(({ name }) => name).sort(),
-    foreignKeys: config.foreignKeys.map((foreignKey) => foreignKey.getName()).sort(),
+    foreignKeys: config.foreignKeys
+      .map((foreignKey) => foreignKey.getName())
+      .sort(),
     indexes: config.indexes.map(({ config: index }) => index.name).sort(),
     uniques: config.uniqueConstraints.map(({ name }) => name).sort(),
   };
@@ -45,7 +47,10 @@ describe("authoritative Drizzle schema parity", () => {
       uniques: ["slots_provider_external_unique"],
     });
     expect(names(messagePackages)).toMatchObject({
-      checks: ["message_packages_grant_positive", "message_packages_kind_allowed"],
+      checks: [
+        "message_packages_grant_positive",
+        "message_packages_kind_allowed",
+      ],
       indexes: ["message_packages_eligible_order"],
       uniques: ["message_packages_grant_idempotency_unique"],
     });
@@ -94,15 +99,21 @@ describe("authoritative Drizzle schema parity", () => {
       ],
       uniques: ["integration_outbox_idempotency_unique"],
     });
-    expect(names(promptVersions).uniques).toEqual(["prompt_versions_name_version_unique"]);
-    expect(names(adminApprovals).uniques).toEqual(["admin_approvals_scope_nonce_unique"]);
+    expect(names(promptVersions).uniques).toEqual([
+      "prompt_versions_name_version_unique",
+    ]);
+    expect(names(adminApprovals).uniques).toEqual([
+      "admin_approvals_scope_nonce_unique",
+    ]);
     expect(names(privacyDeletionJobs).uniques).toEqual([
       "privacy_deletion_jobs_subject_idempotency_unique",
     ]);
     expect(names(privacyProcessorAttempts).uniques).toEqual([
       "privacy_processor_attempts_job_processor_unique",
     ]);
-    expect(names(providerCursors).uniques).toEqual(["provider_cursors_provider_unique"]);
+    expect(names(providerCursors).uniques).toEqual([
+      "provider_cursors_provider_unique",
+    ]);
     expect(names(projectionCheckpoints).uniques).toEqual([
       "projection_checkpoints_projection_unique",
     ]);
@@ -119,9 +130,19 @@ describe("authoritative Drizzle schema parity", () => {
   it("keeps the migration SQL and Drizzle metadata names synchronized", () => {
     const migration = [
       readFileSync("packages/db/migrations/0000_mvp.sql", "utf8"),
-      readFileSync("packages/db/migrations/0001_message-package-metadata.sql", "utf8"),
-      readFileSync("packages/db/migrations/0002_atomic-message-accounting.sql", "utf8"),
-      readFileSync("packages/db/migrations/0003_booking-concurrency.sql", "utf8"),
+      readFileSync(
+        "packages/db/migrations/0001_message-package-metadata.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0002_atomic-message-accounting.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0003_booking-concurrency.sql",
+        "utf8",
+      ),
+      readFileSync("packages/db/migrations/0004_durable_outbox.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -164,14 +185,14 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0003_snapshot.json";
+    const path = "packages/db/migrations/meta/0004_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
       tables?: Record<string, unknown>;
       views?: Record<string, unknown>;
     };
-    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(30);
+    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(31);
     expect(snapshot.views).toHaveProperty("public.package_balances");
   });
 
@@ -180,25 +201,32 @@ describe("authoritative Drizzle schema parity", () => {
       "packages/db/migrations/0003_booking-concurrency.sql",
       "utf8",
     ).toLowerCase();
-    expect(migration).toContain('add column "observed_at" timestamp with time zone;');
-    expect(migration).not.toContain('"observed_at" timestamp with time zone default now()');
+    expect(migration).toContain(
+      'add column "observed_at" timestamp with time zone;',
+    );
+    expect(migration).not.toContain(
+      '"observed_at" timestamp with time zone default now()',
+    );
     expect(migration).toContain('add column "slot_id" uuid;');
     expect(migration).toContain('add column "expert_id" uuid;');
-    expect(migration).toContain("update \"reservations\"");
+    expect(migration).toContain('update "reservations"');
     expect(migration).toContain("booking_slot_backfill_ambiguous");
     expect(migration).toContain('alter column "slot_id" set not null');
     expect(migration).toContain('alter column "expert_id" set not null');
 
-    const snapshot = JSON.parse(readFileSync(
-      "packages/db/migrations/meta/0003_snapshot.json",
-      "utf8",
-    )) as {
-      tables?: Record<string, {
-        columns?: Record<string, { notNull?: boolean; default?: unknown }>;
-      }>;
+    const snapshot = JSON.parse(
+      readFileSync("packages/db/migrations/meta/0003_snapshot.json", "utf8"),
+    ) as {
+      tables?: Record<
+        string,
+        {
+          columns?: Record<string, { notNull?: boolean; default?: unknown }>;
+        }
+      >;
     };
     const slotColumns = snapshot.tables?.["public.slots"]?.columns;
-    const reservationColumns = snapshot.tables?.["public.reservations"]?.columns;
+    const reservationColumns =
+      snapshot.tables?.["public.reservations"]?.columns;
     expect(slotColumns?.observed_at).toMatchObject({ notNull: false });
     expect(slotColumns?.observed_at?.default).toBeUndefined();
     expect(reservationColumns?.slot_id).toMatchObject({ notNull: true });
@@ -207,8 +235,8 @@ describe("authoritative Drizzle schema parity", () => {
 
   it("passes the granted message count into package metadata", () => {
     const testkit = readFileSync("packages/db/src/testkit/postgres.ts", "utf8");
-    expect(testkit).toContain(
-      "createLedgerPackage(primaryUserId, `package-${externalMessageId}`, grantedMessages)",
+    expect(testkit).toMatch(
+      /createLedgerPackage\(\s*primaryUserId,\s*`package-\$\{externalMessageId\}`,\s*grantedMessages,\s*\)/,
     );
     expect(testkit).toContain(
       "values (${userId}::uuid, ${grantedMessages}, ${grantIdempotencyKey})",
