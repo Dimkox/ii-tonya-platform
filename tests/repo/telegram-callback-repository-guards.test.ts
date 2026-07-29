@@ -287,6 +287,10 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
     expect(statements[0]).toContain(
       "floor(extract(epoch from case when $7 = 'confirm' then least(to_timestamp($5), r.reserved_until) else to_timestamp($5) end)) > floor(extract(epoch from clock_timestamp()))",
     );
+    expect(statements[0]).toContain(
+      "case when $7 = 'confirm' then jsonb_set( $4::jsonb",
+    );
+    expect(statements[0]).toContain("else $4::jsonb end)::text");
     expect(statements[0]).toContain("r.reserved_until > now()");
     expect(statements[0]).toContain("s.starts_at > now()");
     expect(statements[0]).toContain(

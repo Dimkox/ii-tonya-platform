@@ -206,7 +206,7 @@ export class PostgresTelegramCallbackRepository {
           r.id,
           $2,
           $3,
-          case
+          (case
             when $7 = 'confirm' then jsonb_set(
               $4::jsonb,
               '{expiresAtEpochSeconds}',
@@ -216,9 +216,9 @@ export class PostgresTelegramCallbackRepository {
                   r.reserved_until
                 )))::bigint
               )
-            )::text
-            else $4
-          end,
+            )
+            else $4::jsonb
+          end)::text,
           case
             when $7 = 'confirm'
               then least(to_timestamp($5), r.reserved_until)

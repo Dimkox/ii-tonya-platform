@@ -6,7 +6,10 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "../schema/index.js";
 import type { DrizzleDb } from "../client.js";
-import type { ReserveSlotCommand } from "../repositories/booking-repository.js";
+import {
+  normalizeNullableBookingTimestamp,
+  type ReserveSlotCommand,
+} from "../repositories/booking-repository.js";
 
 type LedgerKind = "debit" | "free";
 type ConfirmEligibilityCase =
@@ -1012,14 +1015,19 @@ export async function startTestPostgres(
       return { notificationId, tokenHash: input.tokenHash, claims };
     },
     async callbackConsumedAt(notificationId) {
-      const result = await db.execute<{ consumedAt: Date | null }>(sql`
+      const result = await db.execute<{
+        consumedAt: Date | string | null;
+      }>(sql`
         select callback_consumed_at as "consumedAt"
         from notifications
         where id = ${notificationId}::uuid
       `);
       const row = result.rows[0];
       if (row === undefined) throw new Error("Notification not found");
-      return row.consumedAt;
+      return normalizeNullableBookingTimestamp(
+        row.consumedAt,
+        "notifications.callback_consumed_at",
+      );
     },
     createTelegramCallbackReservation,
     async notificationCountForToken(tokenHash) {

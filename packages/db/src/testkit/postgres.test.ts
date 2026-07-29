@@ -40,4 +40,23 @@ describe("PostgreSQL testkit lifecycle", () => {
     await expect(testDb.stop()).rejects.toThrow("pool close failed");
     expect(startedContainer.stop).toHaveBeenCalledOnce();
   });
+
+  it("normalizes raw PostgreSQL callback timestamps at the testkit boundary", async () => {
+    const startedContainer = container();
+    const pool = { end: vi.fn(async () => undefined) };
+    const execute = vi.fn(async () => ({
+      rows: [{ consumedAt: "2026-07-28 10:00:00+00" }],
+    }));
+    const dependencies: TestPostgresDependencies = {
+      startContainer: vi.fn(async () => startedContainer),
+      createPool: vi.fn(() => pool),
+      createDb: vi.fn(() => ({ execute }) as unknown as DrizzleDb),
+    };
+    const testDb = await startTestPostgres(dependencies);
+
+    await expect(
+      testDb.callbackConsumedAt("00000000-0000-0000-0000-000000000001"),
+    ).resolves.toEqual(new Date("2026-07-28T10:00:00.000Z"));
+    await testDb.stop();
+  });
 });
