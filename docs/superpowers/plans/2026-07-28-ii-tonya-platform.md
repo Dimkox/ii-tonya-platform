@@ -1001,8 +1001,8 @@ try {
     },
   });
   if (!run(["install", "--frozen-lockfile"])) throw new Error("clean install failed");
-  if (!run(["typecheck"])) throw new Error("clean typecheck failed");
   if (!run(["build"])) throw new Error("clean build failed");
+  if (!run(["typecheck"])) throw new Error("clean typecheck failed");
   for (const packageRoot of [
     "application", "config", "contracts", "db",
     "domain", "integrations", "observability", "worker",
@@ -1075,13 +1075,14 @@ Run:
 ```bash
 pnpm install --lockfile-only
 pnpm install --frozen-lockfile
+pnpm build
 pnpm test:pnpm-launcher
 pnpm exec vitest run tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.test.ts
 pnpm test:repeat -- 2 tests/repo/workspace-dependencies.test.ts packages/domain/src/reservation.test.ts
 pnpm verify:clean-workspace
 ```
 
-Expected: PASS; the host launcher reports exactly two direct-pnpm child executions, a frozen dependency graph resolves source-derived owners, the repeat runner executes twice, every runtime library emits importable JS and declarations under `dist`, and the isolated copy passes typecheck/build/import without inherited `node_modules`. Tasks 4–21 must stop if this gate fails.
+Expected: PASS; the host launcher reports exactly two direct-pnpm child executions, a frozen dependency graph resolves source-derived owners, the repeat runner executes twice, every runtime library emits importable JS and declarations under `dist`, and the isolated copy passes build/typecheck/import without inherited `node_modules`. The first source command after a clean install is the topologically sorted build, because internal workspace exports are deliberately dist-only and no `dist` artifact is committed. Tasks 4–21 must stop if this gate fails.
 
 - [ ] **Step 5: Commit**
 
@@ -2673,6 +2674,8 @@ git commit -m "feat: add durable outbox runner"
 - Create: `tests/fixtures/selarti/inbound-success.json`
 - Create: `tests/fixtures/selarti/inbound-duplicate.json`
 - Create: `tests/fixtures/selarti/invalid-schema.json`
+- Create: `tests/fixtures/selarti/outbound-send-success.json`
+- Create: `tests/fixtures/selarti/malformed-success-response.json`
 - Create: `tests/fixtures/selarti/rate-limit.json`
 - Create: `tests/fixtures/selarti/timeout-before-send.json`
 - Create: `tests/fixtures/selarti/timeout-after-send.json`
@@ -2836,6 +2839,14 @@ describe("Selarti boundary", () => {
   });
 
   it.each([
+    ["outbound-send-success", {
+      kind: "applied", providerOperationId: "selarti-operation-fixture-1",
+    }],
+    ["malformed-success-response", {
+      kind: "unknown_outcome",
+      reconciliationKey: "selarti-send-fixture-1",
+      reasonCode: "malformed_success_response",
+    }],
     ["rate-limit", {
       kind: "not_applied", retryable: true, reasonCode: "rate_limited", retryAfterMs: 3_000,
     }],
@@ -2912,7 +2923,7 @@ export class DisabledSelartiAdapter implements SelartiPort {
 
 `SelartiContractAdapter` is an unbound contract harness with injected authenticator and HTTP transport. It enforces the 64 KiB raw-body limit before JSON parsing, applies a strict all-messages codec, carries the platform idempotency key in transport context, parses a numeric `Retry-After` into bounded milliseconds, and distinguishes failure before versus after write. It is exported for contract tests but is never selected by runtime composition while `SELARTI_ENABLED=false`.
 
-Capture sanitized fixtures for the documented all-messages payload, duplicate identity, invalid schema, oversized raw body, rate limit with an exact three-second retry, pre-send timeout, post-send timeout, and the unconfirmed delivery contract. Each fixture includes `source_document`, `captured_at`, `sanitized: true`, and `contract_status`. Every fixture is executed through the codec/adapter and injected transport; a metadata-only assertion is insufficient. Invalid, oversized, duplicate, and unconfirmed-delivery cases assert zero application mutations. Timeout fixtures map to `not_applied` before write and `unknown_outcome` after write with the command idempotency key as reconciliation key. The delivery fixture contains only the explicit disabled-billing decision; it must not invent a provider status field.
+Capture sanitized fixtures for the documented all-messages payload, duplicate identity, invalid schema, oversized raw body, successful outbound send, malformed `200 OK` send response, rate limit with an exact three-second retry, pre-send timeout, post-send timeout, and the unconfirmed delivery contract. Each fixture includes `source_document`, `captured_at`, `sanitized: true`, and `contract_status`. Every fixture is executed through the codec/adapter and injected transport; a metadata-only assertion is insufficient. Invalid, oversized, duplicate, and unconfirmed-delivery cases assert zero application mutations. A valid successful response maps to `applied` only after its strict response codec extracts the stable provider operation ID. A malformed successful response maps to `unknown_outcome` with the command idempotency key as reconciliation key because the remote application state cannot be proven. Timeout fixtures map to `not_applied` before write and `unknown_outcome` after write with the same reconciliation key. The delivery fixture contains only the explicit disabled-billing decision; it must not invent a provider status field.
 
 In `docs/contracts/provider-activation.md`, define the activation evidence fields and set Selarti status to `NO-GO`: official contract version, document checksum, authentication method, webhook replay window, payload fixtures, sandbox tenant, rate limits, timeout semantics, idempotency support, stable outbound-delivery event identity, security reviewer, product approver, and evidence date. Runtime `SELARTI_OUTBOUND_BILLING_MODE=disabled`; send acceptance never calls `recordOutboundDelivery`. If a future approved contract provides stable delivery events, they enter through `integration_inbox` as `CanonicalOutboundDelivery` and Task 7 meters them idempotently in a separate transaction. The contract adapter is not a live binding and cannot be constructed by the API composition root.
 
@@ -5051,11 +5062,13 @@ describe("CI and release workflow semantics", () => {
     const install = steps.findIndex((step) =>
       step.run?.includes("pnpm install --frozen-lockfile")
     );
+    const build = steps.findIndex((step) => step.run?.trim() === "pnpm build");
     const executable = steps
       .map((step, index) => ({ index, run: step.run ?? "" }))
-      .filter(({ run }) => /\bpnpm (exec|verify|test|lint|typecheck|build)\b/.test(run));
+      .filter(({ run }) => /\bpnpm (exec|verify|test|lint|typecheck)\b/.test(run));
     expect(install).toBeGreaterThanOrEqual(0);
-    expect(executable.every(({ index }) => index > install)).toBe(true);
+    expect(build).toBeGreaterThan(install);
+    expect(executable.every(({ index }) => index > build)).toBe(true);
     expect(steps.some((step) => step.run?.includes("pnpm verify"))).toBe(true);
   });
 
@@ -5146,6 +5159,24 @@ test("boots portable final images and imports emitted internal packages", async 
       assert.equal(inspected.HostConfig.ReadonlyRootfs, true);
       assert.equal(inspected.State.Health.Status, "healthy");
       assert.deepEqual(inspected.Config.Cmd, ["node", command]);
+      const env = new Set(inspected.Config.Env ?? []);
+      for (const liveFlag of [
+        "MINOR_ONBOARDING_ENABLED",
+        "SELARTI_ENABLED",
+        "PLANERKA_ENABLED",
+        "TELEGRAM_ENABLED",
+        "PAYMENTS_ENABLED",
+        "LLM_ENABLED",
+        "INTENT_MODEL_ENABLED",
+        "MAKE_PROJECTION_ENABLED",
+        "GOOGLE_SHEETS_PROJECTION_ENABLED",
+      ]) {
+        assert.equal(
+          env.has(`${liveFlag}=false`),
+          true,
+          `${service} must keep ${liveFlag}=false`,
+        );
+      }
       for (const packageName of packages) {
         const probe = [
           `const resolved=import.meta.resolve('${packageName}');`,
@@ -5208,6 +5239,7 @@ Define root commands in this order:
 
 ```text
 pnpm verify:
+  pnpm build
   pnpm format:check
   pnpm lint
   pnpm typecheck
@@ -5217,14 +5249,13 @@ pnpm verify:
   pnpm test:contract
   pnpm test:security
   pnpm test:e2e
-  pnpm build
   pnpm audit --prod --audit-level high
 
 pnpm test:container:
   node --test tests/container/image-smoke.test.mjs
 ```
 
-`ci.yml` has one dependency boundary: checkout, Node setup, and direct pinned pnpm setup, then `pnpm install --frozen-lockfile`, then all repository commands. It never invokes Corepack. Immediately after the frozen install, run `pnpm exec vitest run tests/repo/env-policy.test.ts`; no Vitest, pnpm script, or repository binary runs before install. Then run `pnpm verify`, upload JUnit and coverage, run Gitleaks with redaction, execute `pnpm test:container`, and scan both resulting image digests with Trivy using `--severity HIGH,CRITICAL --exit-code 1`. Cache only the pnpm store.
+`ci.yml` has one dependency boundary: checkout, Node setup, and direct pinned pnpm setup, then `pnpm install --frozen-lockfile`, then all repository commands. It never invokes Corepack. Immediately after the frozen install, run `pnpm build` so every dist-only internal workspace export exists, then run `pnpm exec vitest run tests/repo/env-policy.test.ts`. No Vitest, typecheck, lint, test, or application import runs before that build. Then run `pnpm verify`, upload JUnit and coverage, run Gitleaks with redaction, execute `pnpm test:container`, and scan both resulting image digests with Trivy using `--severity HIGH,CRITICAL --exit-code 1`. Cache only the pnpm store.
 
 `release.yml` consumes the exact tested image digests, deploys staging, runs migration preflight, smoke, and reconciliation, and creates a signed evidence artifact. Its production job depends on `verify_digest`, `staging`, and `evidence_gate`, requires manual environment approval, reads `Release status: GO` and `Provider staging status: PASS`, deploys by digest, repeats smoke and reconciliation, and follows `rollback.md` on failure. With the committed evidence statuses, the production job cannot run.
 
