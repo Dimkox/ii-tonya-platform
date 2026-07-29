@@ -200,6 +200,7 @@ describe("message ledger transaction", () => {
     await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-comp-b", externalMessageId: "msg-comp-b", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-comp-b" });
     await repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-a", idempotencyKey: "comp-key" });
     await expect(repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-a", idempotencyKey: "other-key" })).rejects.toThrow("already compensated");
+    await expect(repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-b", idempotencyKey: "comp-key" })).rejects.toThrow("Compensation key belongs to another debit");
     const raced = await Promise.allSettled([
       repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-b", idempotencyKey: "comp-key" }),
       repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-b", idempotencyKey: "other-key-b" }),

@@ -287,6 +287,13 @@ export class PostgresMessageRepository implements MessageRepository {
         select id, package_id as "packageId" from message_ledger_entries
         where entry_kind = 'debit' and idempotency_key = ${command.originalDebitKey}
       `)).rows, "the original debit after a compensation conflict");
+      const byKey = (await tx.execute<{ originalEntryId: string }>(sql`
+        select original_entry_id as "originalEntryId" from message_ledger_entries
+        where idempotency_key = ${command.idempotencyKey}
+      `)).rows[0];
+      if (byKey?.originalEntryId !== debit.id) {
+        throw new CompensationConflictError("Compensation key belongs to another debit");
+      }
       const byOriginal = (await tx.execute<{ idempotencyKey: string }>(sql`
         select idempotency_key as "idempotencyKey" from message_ledger_entries
         where entry_kind = 'compensation' and original_entry_id = ${debit.id}::uuid
@@ -294,13 +301,6 @@ export class PostgresMessageRepository implements MessageRepository {
       if (byOriginal === undefined) throw new Error("Compensation conflict could not be resolved");
       if (byOriginal.idempotencyKey !== command.idempotencyKey) {
         throw new CompensationConflictError("Original debit already compensated with another key");
-      }
-      const byKey = (await tx.execute<{ originalEntryId: string }>(sql`
-        select original_entry_id as "originalEntryId" from message_ledger_entries
-        where idempotency_key = ${command.idempotencyKey}
-      `)).rows[0];
-      if (byKey?.originalEntryId !== debit.id) {
-        throw new CompensationConflictError("Compensation key belongs to another debit");
       }
       return this.balance(tx, debit.packageId);
     });
