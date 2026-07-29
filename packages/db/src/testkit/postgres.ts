@@ -452,8 +452,12 @@ export async function startTestPostgres(
     const serviceId = oneId(
       (
         await db.execute<{ id: string }>(sql`
-      insert into expert_services (expert_id, name, active, duration_minutes)
-      values (${expertId}::uuid, 'Test consultation', true, 60)
+      insert into expert_services (
+        expert_id, name, code, language, active, duration_minutes
+      )
+      values (
+        ${expertId}::uuid, 'Test consultation', 'consultation', 'ru', true, 60
+      )
       returning id
     `)
       ).rows,

@@ -12,6 +12,8 @@ export {
   BookingSerializationExhaustedError,
   PostgresBookingRepository,
   type BookingRepositoryOptions,
+  type BookingExpertScheduleRecord,
+  type BookingSlotView,
   type ReservationAction,
   type ReserveSlotCommand,
   type ReserveSlotResult,

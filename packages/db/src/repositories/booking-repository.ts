@@ -68,6 +68,22 @@ export interface TransitionTelegramCallbackCommand {
   correlationId: string;
 }
 
+export interface BookingSlotView {
+  slotId: string;
+  expertId: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface BookingExpertScheduleRecord {
+  reservationId: string;
+  expertId: string;
+  status: ReservationStatus;
+  startsAt: Date;
+  clientDisplayName: string;
+  expertNoteConsent: boolean;
+}
+
 export interface BookingRepositoryOptions {
   maxSerializationAttempts?: number;
   retryDelayMs?: (attempt: number) => number;
@@ -355,6 +371,10 @@ export class PostgresBookingRepository {
     }
   }
 
+  reserveAndPublish(command: ReserveSlotCommand): Promise<ReserveSlotResult> {
+    return this.reserve(command);
+  }
+
   transition(
     command: TransitionReservationCommand,
   ): Promise<TransitionReservationResult> {
@@ -362,6 +382,178 @@ export class PostgresBookingRepository {
       return Promise.reject(new Error("Invalid reservation transition input"));
     }
     return this.runSerializable((tx) => this.transitionInTransaction(tx, command));
+  }
+
+  transitionAndPublish(
+    command: TransitionReservationCommand,
+  ): Promise<TransitionReservationResult> {
+    return this.transition(command);
+  }
+
+  async searchSlots(command: {
+    serviceCode?: string;
+    language?: string;
+    from: Date;
+    to: Date;
+    now: Date;
+    minimumLeadMs: number;
+  }): Promise<readonly BookingSlotView[]> {
+    if (
+      !finiteDate(command.from) ||
+      !finiteDate(command.to) ||
+      !finiteDate(command.now) ||
+      command.from.getTime() >= command.to.getTime() ||
+      !Number.isFinite(command.minimumLeadMs) ||
+      command.minimumLeadMs < 0
+    ) {
+      throw new Error("Invalid slot search query");
+    }
+    const earliest = new Date(
+      Math.max(
+        command.from.getTime(),
+        command.now.getTime() + command.minimumLeadMs,
+      ),
+    );
+    const serviceCode = command.serviceCode ?? null;
+    const language = command.language ?? null;
+    const rows = await this.db.execute<{
+      slotId: string;
+      expertId: string;
+      startsAt: Date | string;
+      endsAt: Date | string;
+    }>(sql`
+      select
+        s.id as "slotId",
+        e.id as "expertId",
+        s.starts_at as "startsAt",
+        s.ends_at as "endsAt"
+      from slots s
+      join expert_services es on es.id = s.expert_service_id
+      join experts e on e.id = es.expert_id
+      where e.active
+        and e.verified
+        and es.active
+        and es.code is not null
+        and es.language is not null
+        and (${serviceCode}::text is null or es.code = ${serviceCode})
+        and (${language}::text is null or es.language = ${language})
+        and s.observed_at >= ${new Date(
+          command.now.getTime() - SLOT_FRESHNESS_MS,
+        )}
+        and s.observed_at <= ${command.now}
+        and s.starts_at >= ${earliest}
+        and s.starts_at < ${command.to}
+        and (
+          select count(*)
+          from reservations r
+          where r.slot_id = s.id
+            and (
+              r.status = 'booked'
+              or (
+                r.status = 'reserved'
+                and r.reserved_until > ${command.now}
+              )
+            )
+        ) < s.capacity
+      order by s.starts_at, s.id
+      limit 500
+    `);
+    return rows.rows.map((row) => {
+      const startsAt =
+        row.startsAt instanceof Date ? row.startsAt : new Date(row.startsAt);
+      const endsAt =
+        row.endsAt instanceof Date ? row.endsAt : new Date(row.endsAt);
+      if (!finiteDate(startsAt) || !finiteDate(endsAt)) {
+        throw new BookingDataIntegrityError(
+          "Slot search returned an invalid timestamp",
+        );
+      }
+      return {
+        slotId: row.slotId,
+        expertId: row.expertId,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+      };
+    });
+  }
+
+  async listAuthorizedExpertSchedule(command: {
+    expertId: string;
+    telegramUserId: string;
+    from: Date;
+    to: Date;
+  }): Promise<readonly BookingExpertScheduleRecord[] | null> {
+    if (
+      !UUID_PATTERN.test(command.expertId) ||
+      !/^[1-9]\d{0,19}$/.test(command.telegramUserId) ||
+      !finiteDate(command.from) ||
+      !finiteDate(command.to) ||
+      command.from.getTime() >= command.to.getTime()
+    ) {
+      return null;
+    }
+    const result = await this.db.execute<{
+      reservationId: string;
+      expertId: string;
+      status: ReservationStatus;
+      startsAt: Date | string;
+      clientDisplayName: string;
+    }>(sql`
+      select
+        r.id as "reservationId",
+        r.expert_id as "expertId",
+        r.status,
+        s.starts_at as "startsAt",
+        coalesce(nullif(cp.display_name, ''), 'Клиент') as "clientDisplayName"
+      from experts e
+      join channel_identities ci
+        on ci.user_id = e.user_id
+        and ci.provider = 'telegram'
+        and ci.external_id = ${command.telegramUserId}
+      join reservations r on r.expert_id = e.id
+      join slots s on s.id = r.slot_id
+      left join client_profiles cp on cp.user_id = r.user_id
+      where e.id = ${command.expertId}::uuid
+        and e.active
+        and e.verified
+        and r.status in ('reserved', 'booked')
+        and s.starts_at >= ${command.from}
+        and s.starts_at < ${command.to}
+      order by s.starts_at, r.id
+      limit 500
+    `);
+    if (result.rows.length === 0) {
+      const authorized = await this.db.execute<{ authorized: boolean }>(sql`
+        select exists (
+          select 1
+          from experts e
+          join channel_identities ci on ci.user_id = e.user_id
+          where e.id = ${command.expertId}::uuid
+            and e.active
+            and e.verified
+            and ci.provider = 'telegram'
+            and ci.external_id = ${command.telegramUserId}
+        ) as authorized
+      `);
+      if (authorized.rows[0]?.authorized !== true) return null;
+    }
+    return result.rows.map((row) => {
+      const startsAt =
+        row.startsAt instanceof Date ? row.startsAt : new Date(row.startsAt);
+      if (!finiteDate(startsAt)) {
+        throw new BookingDataIntegrityError(
+          "Expert schedule returned an invalid timestamp",
+        );
+      }
+      return {
+        reservationId: row.reservationId,
+        expertId: row.expertId,
+        status: row.status,
+        startsAt,
+        clientDisplayName: row.clientDisplayName,
+        expertNoteConsent: false,
+      };
+    });
   }
 
   transitionFromTelegramCallback(

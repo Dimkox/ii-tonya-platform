@@ -129,10 +129,11 @@ export const bookingFixture = (
           correlationId: command.correlationId,
         });
       },
-      async expertForTelegramIdentity(identity) {
-        return identity === telegramUserId ? expertId : null;
-      },
-      async listExpertSchedule() {
+      async listAuthorizedExpertSchedule(command) {
+        if (
+          command.telegramUserId !== telegramUserId ||
+          command.expertId !== expertId
+        ) return null;
         return [
           {
             reservationId,

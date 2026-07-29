@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BookingIdempotencyConflictError,
@@ -418,6 +419,153 @@ describe("booking transaction", () => {
         command.correlationId,
       )).map((delivery) => delivery.topic),
     ).toEqual(["client.booking_confirmed", "planerka.confirm"]);
+  });
+
+  it("composes eligible slot search, Telegram ownership, and an owner-scoped schedule", async () => {
+    const fixture = await testDb.createReservableFixture();
+    const repository = new PostgresBookingRepository(testDb.db);
+    await testDb.db.execute(sql`
+      insert into channel_identities (user_id, provider, external_id)
+      select user_id, 'telegram', '123456789'
+      from experts
+      where id = ${fixture.expertId}::uuid
+    `);
+
+    const search = () => repository.searchSlots({
+      serviceCode: "consultation",
+      language: "ru",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2026-08-06T00:00:00.000Z"),
+      now: fixture.command.now,
+      minimumLeadMs: 86_400_000,
+    });
+    const containsFixture = (slots: readonly { slotId: string }[]) =>
+      slots.some((slot) => slot.slotId === fixture.command.slotId);
+
+    await expect(search().then(containsFixture)).resolves.toBe(true);
+    await testDb.db.execute(sql`
+      update experts set active = false where id = ${fixture.expertId}::uuid
+    `);
+    await expect(search().then(containsFixture)).resolves.toBe(false);
+    await testDb.db.execute(sql`
+      update experts set active = true, verified = false
+      where id = ${fixture.expertId}::uuid
+    `);
+    await expect(search().then(containsFixture)).resolves.toBe(false);
+    await testDb.db.execute(sql`
+      update experts set verified = true where id = ${fixture.expertId}::uuid
+    `);
+    await testDb.db.execute(sql`
+      update expert_services set active = false
+      where id = (
+        select expert_service_id from slots
+        where id = ${fixture.command.slotId}::uuid
+      )
+    `);
+    await expect(search().then(containsFixture)).resolves.toBe(false);
+    await testDb.db.execute(sql`
+      update expert_services set active = true
+      where id = (
+        select expert_service_id from slots
+        where id = ${fixture.command.slotId}::uuid
+      )
+    `);
+    await testDb.db.execute(sql`
+      update slots set observed_at = ${
+        new Date(fixture.command.now.getTime() - 15 * 60 * 1_000 - 1)
+      }
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    await expect(search().then(containsFixture)).resolves.toBe(false);
+    await testDb.db.execute(sql`
+      update slots set observed_at = ${
+        new Date(fixture.command.now.getTime() + 1)
+      }
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    await expect(search().then(containsFixture)).resolves.toBe(false);
+    await testDb.db.execute(sql`
+      update slots set observed_at = ${fixture.command.now}
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    await expect(
+      repository.searchSlots({
+        serviceCode: "unknown-service",
+        language: "ru",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+        now: fixture.command.now,
+        minimumLeadMs: 86_400_000,
+      }).then(containsFixture),
+    ).resolves.toBe(false);
+    await expect(
+      repository.searchSlots({
+        serviceCode: "consultation",
+        language: "en",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+        now: fixture.command.now,
+        minimumLeadMs: 86_400_000,
+      }).then(containsFixture),
+    ).resolves.toBe(false);
+
+    const reserved = await repository.reserve(fixture.command);
+    if (reserved.kind !== "reserved") throw new Error("Expected reservation");
+    const slots = await search();
+    expect(slots.every((slot) => slot.slotId !== fixture.command.slotId)).toBe(
+      true,
+    );
+    const schedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    if (schedule === null) throw new Error("Expected authorized schedule");
+    expect(schedule).toEqual([
+      expect.objectContaining({
+        reservationId: reserved.reservationId,
+        expertId: fixture.expertId,
+        status: "reserved",
+        expertNoteConsent: false,
+      }),
+    ]);
+    expect(schedule[0]).not.toHaveProperty("expertNote");
+    expect(schedule[0]).not.toHaveProperty("meetingUrl");
+    await testDb.db.execute(sql`
+      update experts set active = false where id = ${fixture.expertId}::uuid
+    `);
+    await expect(
+      repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
+    await testDb.db.execute(sql`
+      update experts set active = true where id = ${fixture.expertId}::uuid
+    `);
+    await expect(
+      repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "987654321",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
+    await testDb.db.execute(sql`
+      delete from channel_identities
+      where provider = 'telegram' and external_id = '123456789'
+    `);
+    await expect(
+      repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
   });
 
   it("rolls callback consumption back when the reservation transition fails", async () => {

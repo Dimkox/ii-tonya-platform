@@ -118,12 +118,12 @@ export interface BookingWorkflowRepository {
     readonly now: Date;
     readonly correlationId: string;
   }): Promise<BookingResult | null>;
-  expertForTelegramIdentity(telegramUserId: string): Promise<string | null>;
-  listExpertSchedule(command: {
+  listAuthorizedExpertSchedule(command: {
     readonly expertId: string;
+    readonly telegramUserId: string;
     readonly from: Date;
     readonly to: Date;
-  }): Promise<readonly ExpertScheduleRecord[]>;
+  }): Promise<readonly ExpertScheduleRecord[] | null>;
 }
 
 export interface BookingDependencies {
@@ -228,23 +228,17 @@ export const createBookingService = (
       if (from.getTime() >= to.getTime()) {
         throw new Error("Invalid expert schedule range");
       }
-      const authoritativeExpertId =
-        await deps.repository.expertForTelegramIdentity(
-          command.telegramUserId,
-        );
-      if (
-        authoritativeExpertId === null ||
-        authoritativeExpertId !== command.expertId
-      ) {
-        throw new Error("Expert schedule access denied");
-      }
-      const records = await deps.repository.listExpertSchedule({
-        expertId: authoritativeExpertId,
+      const records = await deps.repository.listAuthorizedExpertSchedule({
+        expertId: command.expertId,
+        telegramUserId: command.telegramUserId,
         from,
         to,
       });
+      if (records === null) {
+        throw new Error("Expert schedule access denied");
+      }
       const appointments = records.map((record) => {
-        if (record.expertId !== authoritativeExpertId) {
+        if (record.expertId !== command.expertId) {
           throw new Error("Expert schedule ownership mismatch");
         }
         const view = buildExpertView({
@@ -267,7 +261,7 @@ export const createBookingService = (
         };
       });
       return {
-        expertId: authoritativeExpertId,
+        expertId: command.expertId,
         timezone: command.timezone,
         appointments,
       };

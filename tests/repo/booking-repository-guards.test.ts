@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PostgresBookingRepository } from "../../packages/db/src/index.js";
+import type { BookingWorkflowRepository } from "../../packages/application/src/booking-service.js";
 
 describe("booking SQL mutation guards", () => {
   it("bounds slot observation freshness on both sides of the server clock", () => {
@@ -31,5 +32,24 @@ describe("booking SQL mutation guards", () => {
         correlationId: "invalid-callback-input",
       }),
     ).resolves.toBeNull();
+  });
+
+  it("implements the production booking workflow port structurally", () => {
+    const repository: BookingWorkflowRepository =
+      new PostgresBookingRepository(
+        {} as ConstructorParameters<typeof PostgresBookingRepository>[0],
+      );
+
+    expect(repository).toBeInstanceOf(PostgresBookingRepository);
+  });
+
+  it("does not expose split Telegram authorization and schedule reads", () => {
+    const source = readFileSync(
+      "packages/db/src/repositories/booking-repository.ts",
+      "utf8",
+    );
+
+    expect(source).not.toContain("expertForTelegramIdentity(");
+    expect(source).not.toContain("listExpertSchedule(");
   });
 });
