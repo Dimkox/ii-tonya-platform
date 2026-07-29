@@ -7,6 +7,7 @@ export {
   type InboxClaimResult,
 } from "./repositories/inbox-repository.js";
 export {
+  BookingIdempotencyConflictError,
   BookingSerializationExhaustedError,
   PostgresBookingRepository,
   type BookingRepositoryOptions,

@@ -73,7 +73,7 @@ type SlotRow = {
   expertServiceId: string;
   startsAt: Date;
   endsAt: Date;
-  observedAt: Date;
+  observedAt: Date | null;
   capacity: number;
   expertActive: boolean;
   expertVerified: boolean;
@@ -91,6 +91,8 @@ type ReservationRow = SlotRow & {
 
 type ReservationResultRow = {
   reservationId: string;
+  userId: string;
+  slotId: string | null;
   reservedUntil: Date;
   version: number;
 };
@@ -103,6 +105,15 @@ export class BookingSerializationExhaustedError extends Error {
   constructor(override readonly cause: unknown) {
     super("Booking serialization retry limit exhausted", { cause });
     this.name = "BookingSerializationExhaustedError";
+  }
+}
+
+export class BookingIdempotencyConflictError extends Error {
+  readonly code = "booking_idempotency_conflict";
+
+  constructor(readonly idempotencyKey: string) {
+    super("Booking idempotency key belongs to another selection");
+    this.name = "BookingIdempotencyConflictError";
   }
 }
 
@@ -142,8 +153,20 @@ function finiteDate(date: Date): boolean {
   return Number.isFinite(date.getTime());
 }
 
-function isFresh(observedAt: Date, now: Date): boolean {
-  return observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS;
+function isFresh(observedAt: Date | null, now: Date): boolean {
+  return observedAt !== null
+    && observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS;
+}
+
+function hasConstraint(error: unknown, constraint: string): boolean {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (typeof current === "object" && current !== null && !seen.has(current)) {
+    seen.add(current);
+    if ((current as { constraint?: unknown }).constraint === constraint) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -172,7 +195,7 @@ export class PostgresBookingRepository {
     this.onSerializationExhausted = options.onSerializationExhausted ?? (() => undefined);
   }
 
-  reserve(command: ReserveSlotCommand): Promise<ReserveSlotResult> {
+  async reserve(command: ReserveSlotCommand): Promise<ReserveSlotResult> {
     if (
       !finiteDate(command.now)
       || !Number.isFinite(command.minimumLeadMs)
@@ -180,9 +203,17 @@ export class PostgresBookingRepository {
       || !Number.isFinite(command.confirmationBufferMs)
       || command.confirmationBufferMs < 0
     ) {
-      return Promise.resolve({ kind: "unavailable", reason: "deadline" });
+      return { kind: "unavailable", reason: "deadline" };
     }
-    return this.runSerializable((tx) => this.reserveInTransaction(tx, command));
+    try {
+      return await this.runSerializable((tx) => this.reserveInTransaction(tx, command));
+    } catch (error) {
+      if (!hasSqlState(error, "23505")
+        || !hasConstraint(error, "reservations_idempotency_unique")) {
+        throw error;
+      }
+      return this.resolveReservationIdempotency(command);
+    }
   }
 
   transition(
@@ -268,12 +299,17 @@ export class PostgresBookingRepository {
     }
 
     const duplicate = (await tx.execute<ReservationResultRow>(sql`
-      select id as "reservationId", reserved_until as "reservedUntil", version
+      select
+        id as "reservationId",
+        user_id as "userId",
+        slot_id as "slotId",
+        reserved_until as "reservedUntil",
+        version
       from reservations
       where idempotency_key = ${command.idempotencyKey}
     `)).rows[0];
     if (duplicate !== undefined) {
-      return { kind: "duplicate", ...duplicate };
+      return this.classifyDuplicate(command, duplicate);
     }
 
     if (!isFresh(slot.observedAt, command.now)) {
@@ -323,7 +359,12 @@ export class PostgresBookingRepository {
         ${slot.expertServiceId}::uuid, 'reserved', ${command.idempotencyKey},
         ${reservedUntil}, 1, ${command.now}, ${command.now}
       )
-      returning id as "reservationId", reserved_until as "reservedUntil", version
+      returning
+        id as "reservationId",
+        user_id as "userId",
+        slot_id as "slotId",
+        reserved_until as "reservedUntil",
+        version
     `)).rows, "an inserted reservation");
 
     await this.auditAndOutbox(tx, {
@@ -337,7 +378,46 @@ export class PostgresBookingRepository {
       occurredAt: command.now,
       version: inserted.version,
     });
-    return { kind: "reserved", ...inserted };
+    return {
+      kind: "reserved",
+      reservationId: inserted.reservationId,
+      reservedUntil: inserted.reservedUntil,
+      version: inserted.version,
+    };
+  }
+
+  private classifyDuplicate(
+    command: ReserveSlotCommand,
+    stored: ReservationResultRow,
+  ): ReserveSlotResult {
+    if (stored.userId !== command.userId || stored.slotId !== command.slotId) {
+      throw new BookingIdempotencyConflictError(command.idempotencyKey);
+    }
+    return {
+      kind: "duplicate",
+      reservationId: stored.reservationId,
+      reservedUntil: stored.reservedUntil,
+      version: stored.version,
+    };
+  }
+
+  private async resolveReservationIdempotency(
+    command: ReserveSlotCommand,
+  ): Promise<ReserveSlotResult> {
+    const stored = (await this.db.execute<ReservationResultRow>(sql`
+      select
+        id as "reservationId",
+        user_id as "userId",
+        slot_id as "slotId",
+        reserved_until as "reservedUntil",
+        version
+      from reservations
+      where idempotency_key = ${command.idempotencyKey}
+    `)).rows[0];
+    if (stored === undefined) {
+      throw new BookingIdempotencyConflictError(command.idempotencyKey);
+    }
+    return this.classifyDuplicate(command, stored);
   }
 
   private async transitionInTransaction(
@@ -447,48 +527,69 @@ export class PostgresBookingRepository {
     reservation: ReservationRow,
     command: TransitionReservationCommand,
   ): Promise<void> {
-    if (command.action === "expert_confirm") {
-      if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
-        throw new Error("Expert does not own reservation");
-      }
-      if (!reservation.expertActive || !reservation.expertVerified || !reservation.serviceActive) {
-        throw new Error("Expert is not eligible");
-      }
-      if (reservation.reservedUntil.getTime() <= command.now.getTime()) {
-        throw new Error("Reservation hold has expired");
-      }
-      if (reservation.startsAt.getTime() <= command.now.getTime()) {
-        throw new Error("Slot is no longer confirmable");
-      }
-      if (!isFresh(reservation.observedAt, command.now)) {
-        throw new Error("Slot observation is stale");
-      }
-      if (await this.hasOverlap(tx, "client", reservation.userId, reservation, reservation.reservationId)) {
-        throw new Error("Client has an active overlapping reservation");
-      }
-      if (await this.hasOverlap(tx, "expert", reservation.expertId, reservation, reservation.reservationId)) {
-        throw new Error("Expert has an active overlapping reservation");
-      }
-      return;
-    }
-    if (command.action === "client_cancel") {
-      if (command.actor.type !== "client" || command.actor.id !== reservation.userId) {
-        throw new Error("Client does not own reservation");
-      }
-      return;
-    }
-    if (command.action === "expert_cancel") {
-      if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
-        throw new Error("Expert does not own reservation");
-      }
-      return;
-    }
-    if (command.action === "expire") {
-      if (command.actor.type !== "system") {
-        throw new Error("System actor is required");
-      }
-      if (reservation.reservedUntil.getTime() > command.now.getTime()) {
-        throw new Error("Reservation hold has not expired");
+    switch (command.action) {
+      case "expert_confirm":
+        if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
+          throw new Error("Expert does not own reservation");
+        }
+        if (!reservation.expertActive || !reservation.expertVerified || !reservation.serviceActive) {
+          throw new Error("Expert is not eligible");
+        }
+        if (reservation.reservedUntil.getTime() <= command.now.getTime()) {
+          throw new Error("Reservation hold has expired");
+        }
+        if (reservation.startsAt.getTime() <= command.now.getTime()) {
+          throw new Error("Slot is no longer confirmable");
+        }
+        if (!isFresh(reservation.observedAt, command.now)) {
+          throw new Error("Slot observation is stale");
+        }
+        if (await this.hasOverlap(
+          tx,
+          "client",
+          reservation.userId,
+          reservation,
+          reservation.reservationId,
+        )) {
+          throw new Error("Client has an active overlapping reservation");
+        }
+        if (await this.hasOverlap(
+          tx,
+          "expert",
+          reservation.expertId,
+          reservation,
+          reservation.reservationId,
+        )) {
+          throw new Error("Expert has an active overlapping reservation");
+        }
+        return;
+      case "client_cancel":
+        if (command.actor.type !== "client" || command.actor.id !== reservation.userId) {
+          throw new Error("Client does not own reservation");
+        }
+        return;
+      case "expert_cancel":
+      case "mark_no_show":
+        if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
+          throw new Error("Expert does not own reservation");
+        }
+        return;
+      case "expire":
+        if (command.actor.type !== "system") {
+          throw new Error("System actor is required");
+        }
+        if (reservation.reservedUntil.getTime() > command.now.getTime()) {
+          throw new Error("Reservation hold has not expired");
+        }
+        return;
+      case "complete":
+        if (command.actor.type !== "system") {
+          throw new Error("System actor is required");
+        }
+        return;
+      default: {
+        const unsupportedAction: never = command.action;
+        throw new Error(`Unsupported reservation action: ${String(unsupportedAction)}`);
       }
     }
   }

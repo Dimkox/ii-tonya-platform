@@ -1,5 +1,5 @@
 {
-  "id": "a7b54ffe-7a77-4fbf-9e01-3a2452236760",
+  "id": "1462b6fe-f2d8-4027-b993-df3763ce1b7b",
   "prevId": "1f11f2ba-902e-4690-9808-db2b5987d7c6",
   "version": "7",
   "dialect": "postgresql",
@@ -423,8 +423,7 @@
           "name": "observed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
         },
         "capacity": {
           "name": "capacity",
@@ -716,7 +715,7 @@
           "name": "slot_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "expert_id": {
           "name": "expert_id",

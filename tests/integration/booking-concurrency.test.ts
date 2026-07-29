@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  BookingIdempotencyConflictError,
   BookingSerializationExhaustedError,
   PostgresBookingRepository,
 } from "../../packages/db/src/index.js";
@@ -131,6 +132,33 @@ describe("booking transaction", () => {
     expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(1);
   });
 
+  it("rejects sequential and concurrent reuse of an idempotency key for another selection", async () => {
+    const first = await testDb.createReservableFixture();
+    const second = await testDb.createReservableFixture();
+    const repo = new PostgresBookingRepository(testDb.db);
+    await expect(repo.reserve(first.command)).resolves.toMatchObject({ kind: "reserved" });
+
+    await expect(repo.reserve({
+      ...second.command,
+      idempotencyKey: first.command.idempotencyKey,
+    })).rejects.toBeInstanceOf(BookingIdempotencyConflictError);
+
+    const third = await testDb.createReservableFixture();
+    const fourth = await testDb.createReservableFixture();
+    const sharedKey = `shared-${third.command.idempotencyKey}`;
+    const settled = await Promise.allSettled([
+      repo.reserve({ ...third.command, idempotencyKey: sharedKey }),
+      repo.reserve({ ...fourth.command, idempotencyKey: sharedKey }),
+    ]);
+    expect(settled.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejection = settled.find((result) => result.status === "rejected");
+    expect(rejection).toMatchObject({
+      status: "rejected",
+      reason: expect.any(BookingIdempotencyConflictError),
+    });
+    expect(await testDb.reservationCountForKey(sharedKey)).toBe(1);
+  });
+
   it.each([
     ["expired_hold", "Reservation hold has expired"],
     ["wrong_expert", "Expert does not own reservation"],
@@ -175,5 +203,69 @@ describe("booking transaction", () => {
       now: fixture.command.now,
       correlationId: "early-expiry",
     })).rejects.toThrow("Reservation hold has not expired");
+  });
+
+  it("fails closed for completion and no-show actors and audits authorized actions", async () => {
+    const completeFixture = await testDb.createReservableFixture();
+    const noShowFixture = await testDb.createReservableFixture();
+    const repo = new PostgresBookingRepository(testDb.db);
+
+    const book = async (
+      fixture: Awaited<ReturnType<TestDatabase["createReservableFixture"]>>,
+      correlationId: string,
+    ) => {
+      const reserved = await repo.reserve(fixture.command);
+      if (reserved.kind !== "reserved") throw new Error("Expected reservation");
+      await repo.transition({
+        reservationId: reserved.reservationId,
+        expectedVersion: 1,
+        action: "expert_confirm",
+        actor: { type: "expert", id: fixture.expertId },
+        now: new Date("2026-07-28T10:01:00.000Z"),
+        correlationId,
+      });
+      return reserved.reservationId;
+    };
+
+    const completeReservationId = await book(completeFixture, "book-for-complete");
+    await expect(repo.transition({
+      reservationId: completeReservationId,
+      expectedVersion: 2,
+      action: "complete",
+      actor: { type: "client", id: completeFixture.command.userId },
+      now: new Date("2026-08-02T11:00:00.000Z"),
+      correlationId: "unauthorized-complete",
+    })).rejects.toThrow("System actor is required");
+    await expect(repo.transition({
+      reservationId: completeReservationId,
+      expectedVersion: 2,
+      action: "complete",
+      actor: { type: "system", id: completeFixture.expertId },
+      now: new Date("2026-08-02T11:00:00.000Z"),
+      correlationId: "authorized-complete",
+    })).resolves.toMatchObject({ status: "completed", version: 3 });
+
+    const noShowReservationId = await book(noShowFixture, "book-for-no-show");
+    await expect(repo.transition({
+      reservationId: noShowReservationId,
+      expectedVersion: 2,
+      action: "mark_no_show",
+      actor: { type: "client", id: noShowFixture.command.userId },
+      now: new Date("2026-08-02T11:00:00.000Z"),
+      correlationId: "unauthorized-no-show",
+    })).rejects.toThrow("Expert does not own reservation");
+    await expect(repo.transition({
+      reservationId: noShowReservationId,
+      expectedVersion: 2,
+      action: "mark_no_show",
+      actor: { type: "expert", id: noShowFixture.expertId },
+      now: new Date("2026-08-02T11:00:00.000Z"),
+      correlationId: "authorized-no-show",
+    })).resolves.toMatchObject({ status: "no_show", version: 3 });
+
+    expect(await testDb.auditCountForCorrelation("authorized-complete")).toBe(1);
+    expect(await testDb.outboxCountForCorrelation("authorized-complete")).toBe(1);
+    expect(await testDb.auditCountForCorrelation("authorized-no-show")).toBe(1);
+    expect(await testDb.outboxCountForCorrelation("authorized-no-show")).toBe(1);
   });
 });

@@ -163,8 +163,8 @@ describe("authoritative Drizzle schema parity", () => {
     for (const name of requiredNames) expect(migration).toContain(name);
   });
 
-  it("has a coherent Drizzle baseline snapshot", () => {
-    const path = "packages/db/migrations/meta/0002_snapshot.json";
+  it("has a coherent latest Drizzle snapshot", () => {
+    const path = "packages/db/migrations/meta/0003_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
@@ -173,6 +173,35 @@ describe("authoritative Drizzle schema parity", () => {
     };
     expect(Object.keys(snapshot.tables ?? {})).toHaveLength(30);
     expect(snapshot.views).toHaveProperty("public.package_balances");
+  });
+
+  it("keeps booking migration upgrade-safe and historical slots stale", () => {
+    const migration = readFileSync(
+      "packages/db/migrations/0003_booking-concurrency.sql",
+      "utf8",
+    ).toLowerCase();
+    expect(migration).toContain('add column "observed_at" timestamp with time zone;');
+    expect(migration).not.toContain('"observed_at" timestamp with time zone default now()');
+    expect(migration).toContain('add column "slot_id" uuid;');
+    expect(migration).toContain('add column "expert_id" uuid;');
+    expect(migration).toContain("update \"reservations\"");
+    expect(migration).toContain('alter column "expert_id" set not null');
+    expect(migration).not.toContain('alter column "slot_id" set not null');
+
+    const snapshot = JSON.parse(readFileSync(
+      "packages/db/migrations/meta/0003_snapshot.json",
+      "utf8",
+    )) as {
+      tables?: Record<string, {
+        columns?: Record<string, { notNull?: boolean; default?: unknown }>;
+      }>;
+    };
+    const slotColumns = snapshot.tables?.["public.slots"]?.columns;
+    const reservationColumns = snapshot.tables?.["public.reservations"]?.columns;
+    expect(slotColumns?.observed_at).toMatchObject({ notNull: false });
+    expect(slotColumns?.observed_at?.default).toBeUndefined();
+    expect(reservationColumns?.slot_id).toMatchObject({ notNull: false });
+    expect(reservationColumns?.expert_id).toMatchObject({ notNull: true });
   });
 
   it("passes the granted message count into package metadata", () => {
