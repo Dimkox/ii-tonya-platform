@@ -36,10 +36,10 @@ export interface ExpertView {
 }
 
 const granted = (purpose: ConsentPurpose, grants: readonly ConsentGrant[]): boolean => {
-  const valid = grants.filter((entry) =>
-    entry.purpose === purpose && Number.isFinite(entry.recordedAt.getTime()));
-  const latestTimestamp = Math.max(...valid.map((entry) => entry.recordedAt.getTime()));
-  const latest = valid.filter((entry) => entry.recordedAt.getTime() === latestTimestamp);
+  const entries = grants.filter((entry) => entry.purpose === purpose);
+  if (entries.some((entry) => !Number.isFinite(entry.recordedAt.getTime()))) return false;
+  const latestTimestamp = Math.max(...entries.map((entry) => entry.recordedAt.getTime()));
+  const latest = entries.filter((entry) => entry.recordedAt.getTime() === latestTimestamp);
   return latest.length > 0 && latest.every((entry) => entry.granted);
 };
 

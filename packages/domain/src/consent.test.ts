@@ -27,6 +27,25 @@ describe("privacy minimization", () => {
       { purpose: "client_profile", granted: false, recordedAt: new Date("2026-07-28T10:00:00.000Z") },
     ])).toEqual({ displayName: "Аня" });
 
+    const validGrantedAt = new Date("2026-07-28T10:00:00.000Z");
+    const invalidDeniedAt = new Date("invalid");
+    for (const grants of [
+      [
+        { purpose: "client_profile" as const, granted: true, recordedAt: validGrantedAt },
+        { purpose: "client_profile" as const, granted: false, recordedAt: invalidDeniedAt },
+      ],
+      [
+        { purpose: "client_profile" as const, granted: false, recordedAt: invalidDeniedAt },
+        { purpose: "client_profile" as const, granted: true, recordedAt: validGrantedAt },
+      ],
+      [
+        { purpose: "client_profile" as const, granted: true, recordedAt: validGrantedAt },
+        { purpose: "client_profile" as const, granted: true, recordedAt: invalidDeniedAt },
+      ],
+    ]) {
+      expect(buildProfilePatch(input, grants)).toEqual({ displayName: "Аня" });
+    }
+
     const recordedAt = new Date("2026-07-28T10:00:00.000Z");
     for (const grants of [
       [
