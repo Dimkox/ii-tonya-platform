@@ -23,6 +23,58 @@ const approvedPaymentBoundaryHashes = new Map([
     "84dc621fc5cafdffb64cb42af0fa567cad6560ea41ea46ce393d8aa29cce950f",
   ],
 ]);
+const approvedPackageManifestHashes = new Map([
+  [
+    "apps/api/package.json",
+    "eb1144b1f7b877efe8f6114ee9b627a8d065bfb64fbed3617e8463a8b3f83936",
+  ],
+  [
+    "apps/worker/package.json",
+    "64c1c21fe5fd48e62fecc815ddce23a0564c69fc081fc0ede85418763762fb91",
+  ],
+  [
+    "package.json",
+    "ef4322d6abff5c0efa15392c3f3152a24b95ec665300bad64c35155c7a8800ca",
+  ],
+  [
+    "packages/application/package.json",
+    "507dfff15d9c8b52a4fa3a30f97219c839921cee18ff2661ac15fb6bdbfcfe89",
+  ],
+  [
+    "packages/config/package.json",
+    "9aa5f2e8fa0c82f1f5ea18020537a8fa76c9416e01eb91fe9819948c65a65467",
+  ],
+  [
+    "packages/contracts/package.json",
+    "3d58ef391e2b36da2a0ea5a5e19f9fb576fb555c12e97cfc4c84daa6948b62cf",
+  ],
+  [
+    "packages/db/package.json",
+    "5f5e78ae5b15576ce6efc4db9f6bd9c43519d2eb9c5cdf553ad216a81c06cece",
+  ],
+  [
+    "packages/domain/package.json",
+    "79fc6070f4c1c2936b79c20e4635dc980c78742d66ca270340054d1e9e6265f8",
+  ],
+  [
+    "packages/integrations/package.json",
+    "24ff853ea1e3e9f6d810cccf2ed57bb6ab8a599fe9a0495ac5143f961996494c",
+  ],
+  [
+    "packages/observability/package.json",
+    "f63fa081290353e171acddd22318f51dde50f2fb349f1e97fb0da0be07afc9f6",
+  ],
+  [
+    "packages/worker/package.json",
+    "da18d8b8bbfa95815d8d9bfae9a2de15125c8bd91e2c84be1e4de73706fa8cd7",
+  ],
+]);
+const approvedAutomationArtifactHashes = new Map([
+  [
+    ".github/workflows/db-gate.yml",
+    "d3fee50665d8cfb5851b054ab4fb4bb38d1269cde44c32b00444c5bef4f7066d",
+  ],
+]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   [
     "apps/api/package.json",
@@ -274,6 +326,12 @@ const isTestSource = (path: string): boolean =>
   /(?:^|\/)tests?\//u.test(path) ||
   /\.(?:test|spec|testkit)\.[cm]?[jt]sx?$/u.test(path);
 
+const isExecutableAutomationPath = (path: string): boolean =>
+  /\.(?:ps1|sh|bash|py|cmd|bat)$/u.test(path) ||
+  /^\.github\/workflows\/.+\.(?:yml|yaml)$/u.test(path) ||
+  /(?:^|\/)dockerfile(?:[._-].*)?$/u.test(path) ||
+  /(?:^|\/)(?:docker-)?compose(?:\.[^/]+)?\.(?:yml|yaml)$/u.test(path);
+
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
   if (path.endsWith("/package.json") || path === "package.json") return true;
@@ -282,6 +340,7 @@ export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   ) {
     return true;
   }
+  if (isExecutableAutomationPath(path)) return true;
   return /\.[cm]?[jt]sx?$/u.test(path) && !isTestSource(path);
 };
 
@@ -738,13 +797,26 @@ export const classifyApprovedTrackedScopeContent = ({
   content,
 }: PaymentScopeProbe): readonly string[] => {
   const path = normalizePath(rawPath);
+  const isPackageManifest =
+    path.endsWith("/package.json") || path === "package.json";
   const isMigration = path.startsWith("packages/db/migrations/");
   const expectedHash =
-    approvedPaymentBoundaryHashes.get(path) ?? approvedMigrationHashes.get(path);
+    approvedPaymentBoundaryHashes.get(path) ??
+    approvedMigrationHashes.get(path) ??
+    approvedPackageManifestHashes.get(path) ??
+    approvedAutomationArtifactHashes.get(path);
   if (!expectedHash) {
-    return isMigration ? ["unapproved database migration artifact path"] : [];
+    if (isPackageManifest) return ["unapproved package manifest artifact path"];
+    if (isMigration) return ["unapproved database migration artifact path"];
+    if (isExecutableAutomationPath(path)) {
+      return ["unapproved executable or automation artifact path"];
+    }
+    return [];
   }
-  const actualHash = createHash("sha256").update(content, "utf8").digest("hex");
+  const normalizedContent = content.replace(/\r\n?/gu, "\n");
+  const actualHash = createHash("sha256")
+    .update(normalizedContent, "utf8")
+    .digest("hex");
   return actualHash === expectedHash
     ? []
     : [`approved tracked scope hash mismatch: ${actualHash}`];

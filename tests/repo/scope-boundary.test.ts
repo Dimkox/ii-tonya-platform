@@ -204,6 +204,15 @@ describe("MVP scope boundary", () => {
     "Apps/API/src/routes/payments.ts",
     "packages/integrations/lib/provider.ts",
     "scripts/runtime-payment-check.mjs",
+    "scripts/pay.ps1",
+    "scripts/maintenance.sh",
+    "scripts/worker.py",
+    "scripts/check.cmd",
+    "scripts/check.bat",
+    "scripts/check.bash",
+    ".github/workflows/pay.yml",
+    "Dockerfile.payment",
+    "compose.yml",
   ])("inspects tracked executable source location %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(true);
   });
@@ -244,6 +253,48 @@ describe("MVP scope boundary", () => {
       classifyApprovedTrackedScopeContent({
         path: "packages/db/migrations/9999_cashier.sql",
         content: "ALTER TABLE users ADD cashier_id text;",
+      }),
+    ).not.toEqual([]);
+  });
+
+  it.each([
+    ["scripts/pay.ps1", 'Invoke-WebRequest "https://pay.invalid"'],
+    ["scripts/maintenance.sh", "curl https://pay.invalid"],
+    ["scripts/worker.py", 'requests.get("https://pay.invalid")'],
+    [".github/workflows/pay.yml", "jobs: {}"],
+    ["Dockerfile.payment", "FROM node:24"],
+    ["compose.yml", "services: {}"],
+  ])("rejects unapproved executable automation artifact %s", (path, content) => {
+    expect(classifyApprovedTrackedScopeContent({ path, content })).not.toEqual(
+      [],
+    );
+  });
+
+  it("pins full package manifest content including scripts", () => {
+    const path = "packages/integrations/package.json";
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+
+    const manifest = JSON.parse(content) as Record<string, unknown>;
+    manifest.scripts = {
+      pay: 'node -e "fetch(\'https://pay.invalid\')"',
+    };
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${JSON.stringify(manifest, null, 2)}\n`,
+      }),
+    ).not.toEqual([]);
+  });
+
+  it("pins the current approved workflow content", () => {
+    const path = ".github/workflows/db-gate.yml";
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${content}\n# changed\n`,
       }),
     ).not.toEqual([]);
   });
