@@ -1,6 +1,7 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "../schema/index.js";
 import type { DrizzleDb } from "../client.js";
@@ -24,6 +25,7 @@ export interface TestPostgresDependencies {
 
 export interface TestDatabase {
   db: DrizzleDb;
+  migrate(): Promise<void>;
   reset(): Promise<void>;
   stop(): Promise<void>;
   createUser(): Promise<string>;
@@ -36,7 +38,11 @@ export interface TestDatabase {
   insertDuplicateExternalMessage(externalMessageId: string): Promise<void>;
   columnExists(table: string, column: string): Promise<boolean>;
   packageGrantedMessages(): Promise<number>;
-  packageBalance(): Promise<number>;
+  createUserWithPackage(grantedMessages: number): Promise<string>;
+  packageBalance(userId?: string): Promise<number>;
+  ledgerEntryCount(externalMessageId: string): Promise<number>;
+  rebuildPackageBalance(userId: string): Promise<number>;
+  mutableBalanceColumnCount(): Promise<number>;
   appendLedgerFact(input: { kind: LedgerKind; delta: number; idempotencyKey: string }): Promise<void>;
   updateLedgerFact(idempotencyKey: string, delta: number): Promise<void>;
   deleteLedgerFact(idempotencyKey: string): Promise<void>;
@@ -110,6 +116,9 @@ export async function startTestPostgres(
 
   return {
     db,
+    async migrate() {
+      await migrate(db, { migrationsFolder: "packages/db/migrations" });
+    },
     async reset() {
       await db.execute(sql`
         truncate table reconciliation_mismatches, delivery_attempts, dead_letters, integration_outbox,
@@ -128,6 +137,15 @@ export async function startTestPostgres(
     },
     createUser,
     createLedgerPackage,
+    async createUserWithPackage(grantedMessages) {
+      const userId = await createUser();
+      const packageId = await createLedgerPackage(userId, `package-${userId}`, grantedMessages);
+      await db.execute(sql`
+        insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
+        values (${packageId}::uuid, 'grant', ${grantedMessages}, ${`grant-${userId}`})
+      `);
+      return userId;
+    },
     async seedUserAndPackage({ externalMessageId, grantedMessages }) {
       primaryUserId = await createUser();
       primaryPackageId = await createLedgerPackage(primaryUserId, `package-${externalMessageId}`, grantedMessages);
@@ -165,12 +183,41 @@ export async function startTestPostgres(
       `);
       return Number(result.rows[0]?.granted_messages ?? 0);
     },
-    async packageBalance() {
-      if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");
+    async packageBalance(userId = primaryUserId) {
+      if (userId === undefined) throw new Error("Call seedUserAndPackage first");
       const result = await db.execute<{ balance: number }>(sql`
-        select balance from package_balances where package_id = ${primaryPackageId}::uuid
+        select coalesce(sum(balance), 0)::integer as balance
+        from package_balances where user_id = ${userId}::uuid
       `);
       return Number(result.rows[0]?.balance ?? 0);
+    },
+    async ledgerEntryCount(externalMessageId) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from message_ledger_entries l
+        join message_events e on e.id = l.message_event_id
+        where e.external_message_id = ${externalMessageId}
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async rebuildPackageBalance(userId) {
+      const result = await db.execute<{ balance: number }>(sql`
+        select coalesce(sum(l.delta), 0)::integer as balance
+        from message_packages p
+        left join message_ledger_entries l on l.package_id = p.id
+        where p.user_id = ${userId}::uuid
+      `);
+      return Number(result.rows[0]?.balance ?? 0);
+    },
+    async mutableBalanceColumnCount() {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'message_packages'
+          and column_name in ('balance', 'remaining_messages')
+      `);
+      return Number(result.rows[0]?.count ?? 0);
     },
     async appendLedgerFact({ kind, delta, idempotencyKey }) {
       if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");

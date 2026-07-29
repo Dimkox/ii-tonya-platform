@@ -45,7 +45,8 @@ describe("authoritative Drizzle schema parity", () => {
       uniques: ["slots_provider_external_unique"],
     });
     expect(names(messagePackages)).toMatchObject({
-      checks: ["message_packages_grant_positive"],
+      checks: ["message_packages_grant_positive", "message_packages_kind_allowed"],
+      indexes: ["message_packages_eligible_order"],
       uniques: ["message_packages_grant_idempotency_unique"],
     });
     expect(names(messageEvents).uniques).toEqual([
@@ -112,13 +113,18 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("keeps the migration SQL and Drizzle metadata names synchronized", () => {
-    const migration = readFileSync("packages/db/migrations/0000_mvp.sql", "utf8");
+    const migration = [
+      readFileSync("packages/db/migrations/0000_mvp.sql", "utf8"),
+      readFileSync("packages/db/migrations/0001_message-package-metadata.sql", "utf8"),
+    ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
       "slots_provider_external_unique",
       "slots_capacity_positive",
       "message_packages_grant_positive",
       "message_packages_grant_idempotency_unique",
+      "message_packages_kind_allowed",
+      "message_packages_eligible_order",
       "message_events_provider_external_unique",
       "message_ledger_idempotency_unique",
       "message_ledger_original_entry_fk",
@@ -149,7 +155,7 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("has a coherent Drizzle baseline snapshot", () => {
-    const path = "packages/db/migrations/meta/0000_snapshot.json";
+    const path = "packages/db/migrations/meta/0001_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {

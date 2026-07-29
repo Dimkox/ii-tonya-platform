@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   foreignKey,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -24,11 +25,22 @@ export const messagePackages = pgTable(
     userId: uuid("user_id").notNull().references(() => users.id),
     grantedMessages: integer("granted_messages").notNull(),
     grantIdempotencyKey: text("grant_idempotency_key").notNull(),
+    kind: text("kind").notNull().default("paid"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt,
   },
   (table) => [
     check("message_packages_grant_positive", sql`${table.grantedMessages} > 0`),
+    check("message_packages_kind_allowed", sql`${table.kind} in ('admin', 'paid', 'intro')`),
     unique("message_packages_grant_idempotency_unique").on(table.grantIdempotencyKey),
+    index("message_packages_eligible_order").on(
+      table.userId,
+      table.kind,
+      table.expiresAt,
+      table.grantedAt,
+      table.id,
+    ),
   ],
 );
 
