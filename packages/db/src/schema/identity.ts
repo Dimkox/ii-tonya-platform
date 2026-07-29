@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const mutableTimestamps = {
@@ -11,13 +11,20 @@ export const users = pgTable("users", {
   ...mutableTimestamps,
 });
 
-export const channelIdentities = pgTable("channel_identities", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  provider: text("provider").notNull(),
-  externalId: text("external_id").notNull(),
-  ...mutableTimestamps,
-});
+export const channelIdentities = pgTable(
+  "channel_identities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("channel_identities_provider_external_unique")
+      .on(table.provider, table.externalId),
+  ],
+);
 
 export const clientProfiles = pgTable("client_profiles", {
   userId: uuid("user_id").primaryKey().references(() => users.id),

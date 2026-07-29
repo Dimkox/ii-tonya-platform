@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
 
 const mutableTimestamps = {
@@ -19,13 +19,19 @@ export const conversationMessages = pgTable("conversation_messages", {
   contentRef: text("content_ref"),
   createdAt,
 });
-export const promptVersions = pgTable("prompt_versions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  version: integer("version").notNull(),
-  contentRef: text("content_ref").notNull(),
-  createdAt,
-});
+export const promptVersions = pgTable(
+  "prompt_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    version: integer("version").notNull(),
+    contentRef: text("content_ref").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("prompt_versions_name_version_unique").on(table.name, table.version),
+  ],
+);
 export const safetyIncidents = pgTable("safety_incidents", {
   id: uuid("id").defaultRandom().primaryKey(),
   conversationId: uuid("conversation_id").references(() => conversations.id),

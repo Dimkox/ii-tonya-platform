@@ -7,15 +7,35 @@ import type { DrizzleDb } from "../client.js";
 
 type LedgerKind = "debit" | "free";
 
+interface TestContainerHandle {
+  getConnectionUri(): string;
+  stop(): Promise<unknown>;
+}
+
+interface TestPoolHandle {
+  end(): Promise<void>;
+}
+
+export interface TestPostgresDependencies {
+  startContainer(): Promise<TestContainerHandle>;
+  createPool(connectionString: string): TestPoolHandle;
+  createDb(pool: TestPoolHandle): DrizzleDb;
+}
+
 export interface TestDatabase {
   db: DrizzleDb;
   reset(): Promise<void>;
   stop(): Promise<void>;
   createUser(): Promise<string>;
-  createLedgerPackage(userId: string, grantIdempotencyKey: string): Promise<string>;
+  createLedgerPackage(
+    userId: string,
+    grantIdempotencyKey: string,
+    grantedMessages?: number,
+  ): Promise<string>;
   seedUserAndPackage(input: { externalMessageId: string; grantedMessages: number }): Promise<void>;
   insertDuplicateExternalMessage(externalMessageId: string): Promise<void>;
   columnExists(table: string, column: string): Promise<boolean>;
+  packageGrantedMessages(): Promise<number>;
   packageBalance(): Promise<number>;
   appendLedgerFact(input: { kind: LedgerKind; delta: number; idempotencyKey: string }): Promise<void>;
   updateLedgerFact(idempotencyKey: string, delta: number): Promise<void>;
@@ -33,10 +53,45 @@ function oneId(rows: { id: string }[]): string {
   return id;
 }
 
-export async function startTestPostgres(): Promise<TestDatabase> {
-  const container = await new PostgreSqlContainer("postgres:16-alpine").start();
-  const pool = new Pool({ connectionString: container.getConnectionUri() });
-  const db = drizzle(pool, { schema });
+const defaultDependencies: TestPostgresDependencies = {
+  startContainer: async () => new PostgreSqlContainer("postgres:16-alpine").start(),
+  createPool: (connectionString) => new Pool({ connectionString }),
+  createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
+};
+
+async function stopResources(
+  pool: TestPoolHandle,
+  container: TestContainerHandle,
+): Promise<void> {
+  const results = await Promise.allSettled([
+    Promise.resolve().then(() => pool.end()),
+    Promise.resolve().then(() => container.stop()),
+  ]);
+  const errors = results
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map(({ reason }) => reason);
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, "Failed to stop test database resources");
+}
+
+export async function startTestPostgres(
+  dependencies: TestPostgresDependencies = defaultDependencies,
+): Promise<TestDatabase> {
+  const container = await dependencies.startContainer();
+  let pool: TestPoolHandle | undefined;
+  let db: DrizzleDb;
+  try {
+    pool = dependencies.createPool(container.getConnectionUri());
+    db = dependencies.createDb(pool);
+  } catch (error) {
+    const cleanups = [Promise.resolve().then(() => container.stop())];
+    const initializedPool = pool;
+    if (initializedPool !== undefined) {
+      cleanups.push(Promise.resolve().then(() => initializedPool.end()));
+    }
+    await Promise.allSettled(cleanups);
+    throw error;
+  }
   let primaryPackageId: string | undefined;
   let primaryUserId: string | undefined;
 
@@ -44,13 +99,17 @@ export async function startTestPostgres(): Promise<TestDatabase> {
     insert into users default values returning id
   `)).rows);
 
-  const createLedgerPackage = async (userId: string, grantIdempotencyKey: string): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
+  const createLedgerPackage = async (
+    userId: string,
+    grantIdempotencyKey: string,
+    grantedMessages = 1,
+  ): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
     insert into message_packages (user_id, granted_messages, grant_idempotency_key)
-    values (${userId}::uuid, 1, ${grantIdempotencyKey}) returning id
+    values (${userId}::uuid, ${grantedMessages}, ${grantIdempotencyKey}) returning id
   `)).rows);
 
   return {
-    db: db as DrizzleDb,
+    db,
     async reset() {
       await db.execute(sql`
         truncate table reconciliation_mismatches, delivery_attempts, dead_letters, integration_outbox,
@@ -65,14 +124,13 @@ export async function startTestPostgres(): Promise<TestDatabase> {
       primaryUserId = undefined;
     },
     async stop() {
-      await pool.end();
-      await container.stop();
+      await stopResources(pool, container);
     },
     createUser,
     createLedgerPackage,
     async seedUserAndPackage({ externalMessageId, grantedMessages }) {
       primaryUserId = await createUser();
-      primaryPackageId = await createLedgerPackage(primaryUserId, `package-${externalMessageId}`);
+      primaryPackageId = await createLedgerPackage(primaryUserId, `package-${externalMessageId}`, grantedMessages);
       await db.execute(sql`
         insert into message_events (user_id, provider, external_message_id, direction)
         values (${primaryUserId}::uuid, 'test', ${externalMessageId}, 'outbound')
@@ -97,6 +155,15 @@ export async function startTestPostgres(): Promise<TestDatabase> {
         ) as exists
       `);
       return result.rows[0]?.exists ?? false;
+    },
+    async packageGrantedMessages() {
+      if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");
+      const result = await db.execute<{ granted_messages: number }>(sql`
+        select granted_messages
+        from message_packages
+        where id = ${primaryPackageId}::uuid
+      `);
+      return Number(result.rows[0]?.granted_messages ?? 0);
     },
     async packageBalance() {
       if (primaryPackageId === undefined) throw new Error("Call seedUserAndPackage first");

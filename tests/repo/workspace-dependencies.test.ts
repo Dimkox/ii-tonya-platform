@@ -121,7 +121,8 @@ describe("workspace dependency ownership remediation", () => {
       ...globSync("apps/*/src/**/*.ts"),
       ...globSync("packages/*/src/**/*.ts"),
     ]
-      .filter((file) => !/(\.test|\.testkit)\.ts$/.test(file));
+      .filter((file) => !/(\.test|\.testkit)\.ts$/.test(file))
+      .filter((file) => !file.replaceAll("\\", "/").includes("/src/testkit/"));
     for (const file of files) {
       const [top, workspace] = file.replaceAll("\\", "/").split("/");
       const root = `${top}/${workspace}`;
@@ -137,6 +138,12 @@ describe("workspace dependency ownership remediation", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it("owns database testkit dependencies only as development dependencies", () => {
+    const manifest = manifestAt("packages/db");
+    expect(manifest.dependencies).not.toHaveProperty("@testcontainers/postgresql");
+    expect(manifest.devDependencies).toHaveProperty("@testcontainers/postgresql");
   });
 
   it("emits JavaScript and declarations for every runtime library", () => {

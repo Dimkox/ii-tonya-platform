@@ -1,4 +1,14 @@
-import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
 
 const mutableTimestamps = {
@@ -23,13 +33,20 @@ export const expertServices = pgTable("expert_services", {
   ...mutableTimestamps,
 });
 
-export const slots = pgTable("slots", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  expertServiceId: uuid("expert_service_id").notNull().references(() => expertServices.id),
-  provider: text("provider").notNull(),
-  externalSlotId: text("external_slot_id").notNull(),
-  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
-  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
-  capacity: integer("capacity").notNull(),
-  ...mutableTimestamps,
-});
+export const slots = pgTable(
+  "slots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    expertServiceId: uuid("expert_service_id").notNull().references(() => expertServices.id),
+    provider: text("provider").notNull(),
+    externalSlotId: text("external_slot_id").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    capacity: integer("capacity").notNull(),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("slots_provider_external_unique").on(table.provider, table.externalSlotId),
+    check("slots_capacity_positive", sql`${table.capacity} > 0`),
+  ],
+);

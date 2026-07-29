@@ -22,24 +22,22 @@ describe("MVP schema", () => {
       where table_schema = 'public' order by table_name
     `);
     const names = rows.rows.map((row) => row.table_name);
-    expect(names).toEqual(expect.arrayContaining([
-      "audit_events", "channel_identities", "client_profiles", "consents",
-      "experts", "expert_services", "feedback", "integration_inbox",
-      "integration_outbox", "message_events", "message_ledger_entries",
-      "message_packages", "notifications", "reservations", "slots", "users",
-      "conversations", "conversation_messages", "prompt_versions",
-      "safety_incidents", "human_escalations", "delivery_attempts",
-      "dead_letters", "provider_cursors", "reconciliation_runs",
-      "reconciliation_mismatches", "projection_checkpoints",
-      "admin_approvals", "privacy_deletion_jobs", "privacy_processor_attempts",
-    ]));
-    expect(names).not.toEqual(expect.arrayContaining([
-      "coupons", "payments", "referrals", "reminders", "reschedules", "waitlist",
-    ]));
+    expect(names).toEqual([
+      "admin_approvals", "audit_events", "channel_identities", "client_profiles",
+      "consents", "conversation_messages", "conversations", "dead_letters",
+      "delivery_attempts", "expert_services", "experts", "feedback",
+      "human_escalations", "integration_inbox", "integration_outbox",
+      "message_events", "message_ledger_entries", "message_packages",
+      "notifications", "package_balances", "privacy_deletion_jobs",
+      "privacy_processor_attempts", "projection_checkpoints", "prompt_versions",
+      "provider_cursors", "reconciliation_mismatches", "reconciliation_runs",
+      "reservations", "safety_incidents", "slots", "users",
+    ]);
   });
 
   it("uses an append-only ledger-derived balance with no mutable remainder column", async () => {
     await testDb!.seedUserAndPackage({ externalMessageId: "m-1", grantedMessages: 2 });
+    expect(await testDb!.packageGrantedMessages()).toBe(2);
     await expect(testDb!.insertDuplicateExternalMessage("m-1")).rejects.toThrow();
     expect(await testDb!.columnExists("message_packages", "remaining_messages")).toBe(false);
     expect(await testDb!.packageBalance()).toBe(2);

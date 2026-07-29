@@ -94,7 +94,8 @@ create table conversation_messages (
 );
 create table prompt_versions (
   id uuid primary key default gen_random_uuid(), name text not null, version integer not null,
-  content_ref text not null, created_at timestamptz not null default now(), unique(name, version)
+  content_ref text not null, created_at timestamptz not null default now(),
+  constraint prompt_versions_name_version_unique unique(name, version)
 );
 create table safety_incidents (
   id uuid primary key default gen_random_uuid(), conversation_id uuid references conversations(id),
@@ -120,19 +121,20 @@ create table admin_approvals (
   object_id uuid not null, requester_id uuid not null references users(id),
   approver_id uuid not null references users(id), expires_at timestamptz not null,
   nonce text not null, consumed_at timestamptz, created_at timestamptz not null default now(),
-  unique(action, object_type, object_id, requester_id, approver_id, nonce)
+  constraint admin_approvals_scope_nonce_unique
+    unique(action, object_type, object_id, requester_id, approver_id, nonce)
 );
 create table privacy_deletion_jobs (
   id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id),
   idempotency_key text not null, status text not null, backup_expires_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
-  unique(user_id, idempotency_key)
+  constraint privacy_deletion_jobs_subject_idempotency_unique unique(user_id, idempotency_key)
 );
 create table privacy_processor_attempts (
   id uuid primary key default gen_random_uuid(), deletion_job_id uuid not null references privacy_deletion_jobs(id),
   processor text not null, status text not null, receipt_ref text,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
-  unique(deletion_job_id, processor)
+  constraint privacy_processor_attempts_job_processor_unique unique(deletion_job_id, processor)
 );
 
 create table integration_inbox (
@@ -160,7 +162,8 @@ create table dead_letters (
 );
 create table provider_cursors (
   id uuid primary key default gen_random_uuid(), provider text not null, cursor text not null,
-  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(provider)
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  constraint provider_cursors_provider_unique unique(provider)
 );
 create table reconciliation_runs (
   id uuid primary key default gen_random_uuid(), provider text not null, started_at timestamptz not null,
@@ -172,7 +175,8 @@ create table reconciliation_mismatches (
 );
 create table projection_checkpoints (
   id uuid primary key default gen_random_uuid(), projection text not null, position text not null,
-  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(projection)
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  constraint projection_checkpoints_projection_unique unique(projection)
 );
 
 alter table channel_identities
