@@ -193,6 +193,15 @@ export interface TestDatabase {
         | "completed"
         | "no_show";
       version?: number;
+      reservedUntil?: Date;
+    },
+  ): Promise<void>;
+  setTelegramCallbackSlotState(
+    reservationId: string,
+    input: {
+      startsAt?: Date;
+      observedAt?: Date;
+      serviceActive?: boolean;
     },
   ): Promise<void>;
 }
@@ -1025,9 +1034,40 @@ export async function startTestPostgres(
             status
           ),
           version = coalesce(${input.version ?? null}::integer, version),
+          reserved_until = coalesce(
+            ${input.reservedUntil ?? null}::timestamptz,
+            reserved_until
+          ),
           updated_at = now()
         where id = ${reservationId}::uuid
       `);
+    },
+    async setTelegramCallbackSlotState(reservationId, input) {
+      await db.execute(sql`
+        update slots s
+        set
+          starts_at = coalesce(
+            ${input.startsAt ?? null}::timestamptz,
+            s.starts_at
+          ),
+          observed_at = coalesce(
+            ${input.observedAt ?? null}::timestamptz,
+            s.observed_at
+          ),
+          updated_at = now()
+        from reservations r
+        where r.id = ${reservationId}::uuid
+          and s.id = r.slot_id
+      `);
+      if (input.serviceActive !== undefined) {
+        await db.execute(sql`
+          update expert_services es
+          set active = ${input.serviceActive}, updated_at = now()
+          from reservations r
+          where r.id = ${reservationId}::uuid
+            and es.id = r.expert_service_id
+        `);
+      }
     },
   };
 }

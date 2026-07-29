@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildTelegramMethodUrl,
+  CallbackInfrastructureError,
   issueCallback,
   redactTelegramUrl,
   TelegramAdapter,
@@ -88,6 +89,7 @@ describe("Telegram expert callback", () => {
   it("binds a compact opaque callback to numeric Telegram identity, expert, version, and expiry", async () => {
     const store = memoryCallbackStore();
     const token = await issueCallback(claims, secret, store);
+    expect(token).toMatch(/^ct2\./u);
     expect(Buffer.byteLength(token, "utf8")).toBeLessThanOrEqual(64);
     expect(token).not.toContain(claims.reservationId);
     expect(token).not.toContain(claims.expertId);
@@ -297,6 +299,70 @@ describe("Telegram expert callback", () => {
         new Date("2026-07-28T10:00:00.000Z"),
       ),
     ).rejects.toThrow("Callback verification failed");
+  });
+
+  it("rejects every pre-hardening ct1 token with the generic external error", async () => {
+    const store = memoryCallbackStore();
+    const nonce = Buffer.alloc(16, 9);
+    const token = `ct1.${Buffer.concat([
+      Buffer.from([1]),
+      nonce,
+      Buffer.alloc(16, 3),
+    ]).toString("base64url")}`;
+    await store.put(createHash("sha256").update(nonce).digest("hex"), claims);
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toMatchObject({
+      name: "CallbackVerificationError",
+      message: "Callback verification failed",
+    });
+  });
+
+  it("propagates a typed retryable callback store outage", async () => {
+    const backing = memoryCallbackStore();
+    const token = await issueCallback(claims, secret, backing);
+    const outage = new CallbackInfrastructureError(
+      "callback_store_unavailable",
+    );
+    const store = {
+      ...backing,
+      async peek() {
+        throw outage;
+      },
+    };
+
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: true,
+          verified: true,
+        },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toBe(outage);
+    expect(outage).toMatchObject({
+      name: "CallbackInfrastructureError",
+      retryable: true,
+      code: "callback_store_unavailable",
+    });
   });
 
   it("returns one non-enumerable error for all external callback failures", async () => {

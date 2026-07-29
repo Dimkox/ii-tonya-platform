@@ -226,10 +226,13 @@ Live остаётся закрыт, пока не выполнены все пу
 
 - `TELEGRAM_ENABLED=false` остаётся обязательным;
 - bot token, webhook secret и `TELEGRAM_CALLBACK_HMAC_KEY` представлены только placeholder-значениями;
+- callback wire protocol — только `ct2`/version 2; все `ct1` и pre-hardening callback rows инвалидируются при migration `0006`;
 - callback data содержит только версию, случайный nonce и HMAC, не содержит reservation/expert IDs, PII, заметок, meeting URL или provider credentials;
-- staging/production callback secret должен состоять минимум из 32 криптографически случайных байт; HMAC domain-separated и связывает точный prefix, wire-version и nonce;
+- staging/production callback secret должен состоять минимум из 32 криптографически случайных байт; HMAC domain-separated и связывает точный `ct2.` prefix, wire-version и nonce;
 - внешние ошибки callback verification не раскрывают, существует ли token, binding, reservation или expert;
+- retryable PostgreSQL/store outages пробрасываются типизированно и не маскируются под auth rejection;
 - consume сверяет reservation ownership, текущие status/version и active+verified expert через авторитетные PostgreSQL joins, а не доверяет дублированному `callback_expert_id`;
+- confirm дополнительно требует живой hold, будущий и свежий slot, active service; его callback expiry ограничен `reserved_until`; booked cancel не наследует confirm-only hold predicate;
 - отправка выполняется только через инъецируемый transport с отключённым request logging;
 - token-bearing URL перед логированием заменяется на `/bot[REDACTED]/sendMessage`, а неожиданные path/query/encoded URL shapes полностью скрываются;
 - Telegram HTTP 5xx после записи запроса считается `unknown_outcome`, пока provider не даёт проверяемой idempotency;

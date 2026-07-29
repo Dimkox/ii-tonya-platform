@@ -4,9 +4,10 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
+import { CallbackInfrastructureError } from "@ii-tonya/contracts";
 
-const TOKEN_PREFIX = "ct1.";
-const TOKEN_VERSION = 1;
+const TOKEN_PREFIX = "ct2.";
+const TOKEN_VERSION = 2;
 const NONCE_BYTES = 16;
 const TAG_BYTES = 16;
 const PAYLOAD_BYTES = 1 + NONCE_BYTES + TAG_BYTES;
@@ -45,6 +46,8 @@ export interface CallbackClaimsStore {
   }): Promise<ExpertCallbackClaims | null>;
 }
 
+class CallbackAuthStateError extends Error {}
+
 const validateClaims = (claims: ExpertCallbackClaims): void => {
   if (
     claims.reservationId.length === 0 ||
@@ -55,7 +58,7 @@ const validateClaims = (claims: ExpertCallbackClaims): void => {
     !Number.isSafeInteger(claims.expiresAtEpochSeconds) ||
     claims.expiresAtEpochSeconds <= 0
   ) {
-    throw new Error("Invalid callback claims");
+    throw new CallbackAuthStateError("Invalid callback claims");
   }
 };
 
@@ -72,7 +75,9 @@ const callbackTag = (nonce: Uint8Array, secret: Uint8Array): Buffer =>
 
 const requireStrongSecret = (secret: Uint8Array): void => {
   if (secret.byteLength < MINIMUM_SECRET_BYTES) {
-    throw new Error("Callback secret must be at least 32 bytes");
+    throw new CallbackAuthStateError(
+      "Callback secret must be at least 32 bytes",
+    );
   }
 };
 
@@ -87,11 +92,11 @@ const parseToken = (
   token: string,
 ): { nonce: Buffer; authenticatedTag: Buffer } => {
   if (!token.startsWith(TOKEN_PREFIX)) {
-    throw new Error("Invalid callback token");
+    throw new CallbackAuthStateError("Invalid callback token");
   }
   const encoded = token.slice(TOKEN_PREFIX.length);
   if (!/^[A-Za-z0-9_-]+$/u.test(encoded)) {
-    throw new Error("Invalid callback token");
+    throw new CallbackAuthStateError("Invalid callback token");
   }
   const payload = Buffer.from(encoded, "base64url");
   if (
@@ -99,7 +104,7 @@ const parseToken = (
     payload[0] !== TOKEN_VERSION ||
     payload.toString("base64url") !== encoded
   ) {
-    throw new Error("Invalid callback token");
+    throw new CallbackAuthStateError("Invalid callback token");
   }
   return {
     nonce: payload.subarray(1, 1 + NONCE_BYTES),
@@ -123,7 +128,7 @@ export async function issueCallback(
   ]);
   const token = `${TOKEN_PREFIX}${payload.toString("base64url")}`;
   if (Buffer.byteLength(token, "utf8") > MAX_CALLBACK_BYTES) {
-    throw new Error("Callback token exceeds Telegram limit");
+    throw new CallbackAuthStateError("Callback token exceeds Telegram limit");
   }
   await store.put(tokenHash(nonce), claims);
   return token;
@@ -146,7 +151,9 @@ export async function verifyCallback(
       store,
       now,
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof CallbackInfrastructureError) throw error;
+    if (!(error instanceof CallbackAuthStateError)) throw error;
     throw new CallbackVerificationError();
   }
 }
@@ -163,13 +170,15 @@ async function verifyCallbackInternal(
   const { nonce, authenticatedTag } = parseToken(token);
   const expectedTag = callbackTag(nonce, secret);
   if (!timingSafeEqual(authenticatedTag, expectedTag)) {
-    throw new Error("Invalid callback token");
+    throw new CallbackAuthStateError("Invalid callback token");
   }
 
   const hash = tokenHash(nonce);
   const claims = await store.peek(hash);
   if (claims === null) {
-    throw new Error("Callback token is unknown or already used");
+    throw new CallbackAuthStateError(
+      "Callback token is unknown or already used",
+    );
   }
   validateClaims(claims);
 
@@ -177,16 +186,16 @@ async function verifyCallbackInternal(
     !numericTelegramIdentity.test(expectedTelegramUserId) ||
     binding.telegramUserId !== expectedTelegramUserId
   ) {
-    throw new Error("Telegram identity is not authorized");
+    throw new CallbackAuthStateError("Telegram identity is not authorized");
   }
   if (!binding.active || !binding.verified) {
-    throw new Error("Expert binding is not eligible");
+    throw new CallbackAuthStateError("Expert binding is not eligible");
   }
   if (claims.expertId !== binding.expertId) {
-    throw new Error("Expert binding does not match callback");
+    throw new CallbackAuthStateError("Expert binding does not match callback");
   }
   if (claims.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)) {
-    throw new Error("Callback token has expired");
+    throw new CallbackAuthStateError("Callback token has expired");
   }
 
   const consumed = await store.consumeIfValid({
@@ -197,7 +206,9 @@ async function verifyCallbackInternal(
     now,
   });
   if (consumed === null) {
-    throw new Error("Callback token is unknown or already used");
+    throw new CallbackAuthStateError(
+      "Callback token is unknown or already used",
+    );
   }
   return consumed;
 }

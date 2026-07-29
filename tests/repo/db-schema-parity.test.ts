@@ -147,6 +147,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0005_outbox_fencing_tokens.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0006_telegram-callback-expert-fk.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -184,12 +188,13 @@ describe("authoritative Drizzle schema parity", () => {
       "provider_cursors_provider_unique",
       "projection_checkpoints_projection_unique",
       "integration_inbox_message_event_id_message_events_id_fk",
+      "notifications_callback_expert_id_experts_id_fk",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0005_snapshot.json";
+    const path = "packages/db/migrations/meta/0006_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
@@ -198,6 +203,14 @@ describe("authoritative Drizzle schema parity", () => {
     };
     expect(Object.keys(snapshot.tables ?? {})).toHaveLength(31);
     expect(snapshot.views).toHaveProperty("public.package_balances");
+    const notificationsTable = snapshot.tables?.["public.notifications"] as
+      | {
+          foreignKeys?: Record<string, unknown>;
+        }
+      | undefined;
+    expect(notificationsTable?.foreignKeys).toHaveProperty(
+      "notifications_callback_expert_id_experts_id_fk",
+    );
   });
 
   it("keeps booking migration upgrade-safe and historical slots stale", () => {

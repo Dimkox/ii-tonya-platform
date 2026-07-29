@@ -1,4 +1,5 @@
-import type { QueryResultRow } from "pg";
+import { CallbackInfrastructureError } from "@ii-tonya/contracts";
+import type { QueryResult, QueryResultRow } from "pg";
 import type { DrizzleDb } from "../client.js";
 
 export interface StoredExpertCallbackClaims {
@@ -20,6 +21,18 @@ export interface ConsumeTelegramCallbackCommand {
 interface CallbackRow extends QueryResultRow {
   callback_claims: string;
 }
+
+const callbackStoreQuery = async <Row extends QueryResultRow>(
+  db: DrizzleDb,
+  statement: string,
+  values: unknown[],
+): Promise<QueryResult<Row>> => {
+  try {
+    return await db.$client.query<Row>(statement, values);
+  } catch (error) {
+    throw new CallbackInfrastructureError("callback_store_unavailable", error);
+  }
+};
 
 const parseClaims = (value: string): StoredExpertCallbackClaims => {
   const parsed = JSON.parse(value) as Partial<StoredExpertCallbackClaims>;
@@ -44,7 +57,8 @@ export class PostgresTelegramCallbackRepository {
     tokenHash: string,
     claims: StoredExpertCallbackClaims,
   ): Promise<void> {
-    const result = await this.db.$client.query(
+    const result = await callbackStoreQuery(
+      this.db,
       `
         insert into notifications (
           reservation_id,
@@ -60,8 +74,24 @@ export class PostgresTelegramCallbackRepository {
           r.id,
           $2,
           $3,
-          $4,
-          to_timestamp($5),
+          case
+            when $7 = 'confirm' then jsonb_set(
+              $4::jsonb,
+              '{expiresAtEpochSeconds}',
+              to_jsonb(
+                floor(extract(epoch from least(
+                  to_timestamp($5),
+                  r.reserved_until
+                )))::bigint
+              )
+            )::text
+            else $4
+          end,
+          case
+            when $7 = 'confirm'
+              then least(to_timestamp($5), r.reserved_until)
+            else to_timestamp($5)
+          end,
           r.expert_id,
           $7,
           $8
@@ -95,7 +125,8 @@ export class PostgresTelegramCallbackRepository {
   }
 
   async peek(tokenHash: string): Promise<StoredExpertCallbackClaims | null> {
-    const result = await this.db.$client.query<CallbackRow>(
+    const result = await callbackStoreQuery<CallbackRow>(
+      this.db,
       `
         select callback_claims
         from notifications
@@ -105,7 +136,15 @@ export class PostgresTelegramCallbackRepository {
       [tokenHash],
     );
     const value = result.rows[0]?.callback_claims;
-    return value === undefined ? null : parseClaims(value);
+    if (value === undefined) return null;
+    try {
+      return parseClaims(value);
+    } catch (error) {
+      throw new CallbackInfrastructureError(
+        "callback_store_unavailable",
+        error,
+      );
+    }
   }
 
   async consumeIfValid(
@@ -118,12 +157,15 @@ export class PostgresTelegramCallbackRepository {
     ) {
       return null;
     }
-    const result = await this.db.$client.query<CallbackRow>(
+    const result = await callbackStoreQuery<CallbackRow>(
+      this.db,
       `
         update notifications n
         set callback_consumed_at = $5, updated_at = $5
         from reservations r
         join experts e on e.id = r.expert_id
+        join slots s on s.id = r.slot_id
+        join expert_services es on es.id = r.expert_service_id
         where n.callback_token_hash = $1
           and n.reservation_id = r.id
           and n.callback_consumed_at is null
@@ -137,7 +179,15 @@ export class PostgresTelegramCallbackRepository {
           and n.callback_version > 0
           and r.version = $4
           and (
-            ($3 = 'confirm' and r.status = 'reserved')
+            (
+              $3 = 'confirm'
+              and r.status = 'reserved'
+              and r.reserved_until > $5
+              and s.starts_at > $5
+              and s.observed_at >= $5 - interval '15 minutes'
+              and s.observed_at <= $5
+              and es.active
+            )
             or ($3 = 'cancel' and r.status in ('reserved', 'booked'))
           )
           and n.callback_claims::jsonb @> jsonb_build_object(
@@ -151,6 +201,14 @@ export class PostgresTelegramCallbackRepository {
       [input.tokenHash, input.expertId, input.action, input.version, input.now],
     );
     const value = result.rows[0]?.callback_claims;
-    return value === undefined ? null : parseClaims(value);
+    if (value === undefined) return null;
+    try {
+      return parseClaims(value);
+    } catch (error) {
+      throw new CallbackInfrastructureError(
+        "callback_store_unavailable",
+        error,
+      );
+    }
   }
 }

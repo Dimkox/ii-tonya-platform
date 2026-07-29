@@ -142,6 +142,10 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
         "hash-cancelled-reservation",
         { status: "cancelled_by_client" as const },
       ],
+      [
+        "hash-expired-hold",
+        { reservedUntil: new Date("2026-07-28T09:59:59.000Z") },
+      ],
     ] as const) {
       const fixture = await testDb.seedTelegramCallback({
         tokenHash,
@@ -166,6 +170,64 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
         await testDb.callbackConsumedAt(fixture.notificationId),
       ).toBeNull();
     }
+  });
+
+  it("requires a future, fresh, eligible slot for confirm callbacks", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    for (const [tokenHash, state] of [
+      ["hash-past-slot", { startsAt: new Date("2026-07-28T09:59:59.000Z") }],
+      ["hash-stale-slot", { observedAt: new Date("2026-07-28T09:44:59.000Z") }],
+      ["hash-inactive-service", { serviceActive: false }],
+    ] as const) {
+      const fixture = await testDb.seedTelegramCallback({
+        tokenHash,
+        action: "confirm",
+        version: 3,
+        expiresAt: "2026-07-28T10:05:00.000Z",
+      });
+      await testDb.setTelegramCallbackSlotState(
+        fixture.claims.reservationId,
+        state,
+      );
+      await expect(
+        repository.consumeIfValid({
+          tokenHash,
+          expertId: fixture.claims.expertId,
+          action: "confirm",
+          version: 3,
+          now: new Date("2026-07-28T10:00:00.000Z"),
+        }),
+      ).resolves.toBeNull();
+      expect(
+        await testDb.callbackConsumedAt(fixture.notificationId),
+      ).toBeNull();
+    }
+  });
+
+  it("does not apply confirm-only hold predicates to a booked cancellation", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const fixture = await testDb.seedTelegramCallback({
+      tokenHash: "hash-booked-cancel",
+      action: "cancel",
+      version: 3,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    await testDb.setTelegramCallbackReservationState(
+      fixture.claims.reservationId,
+      {
+        status: "booked",
+        reservedUntil: new Date("2026-07-28T09:00:00.000Z"),
+      },
+    );
+    await expect(
+      repository.consumeIfValid({
+        tokenHash: fixture.tokenHash,
+        expertId: fixture.claims.expertId,
+        action: "cancel",
+        version: 3,
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      }),
+    ).resolves.toEqual(fixture.claims);
   });
 
   it("derives callback ownership from the reservation and rejects a claimed cross-expert binding", async () => {
@@ -222,5 +284,24 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       ).rejects.toThrow("Callback persistence rejected");
       expect(await testDb.notificationCountForToken(tokenHash)).toBe(0);
     }
+  });
+
+  it("caps confirm callback expiry at the authoritative reservation hold", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const owner = await testDb.createTelegramCallbackReservation({
+      reservationVersion: 3,
+    });
+    const requestedClaims = {
+      reservationId: owner.reservationId,
+      expertId: owner.expertId,
+      action: "confirm" as const,
+      version: 3,
+      expiresAtEpochSeconds: 1785585600,
+    };
+    await repository.put("hash-expiry-cap", requestedClaims);
+    await expect(repository.peek("hash-expiry-cap")).resolves.toEqual({
+      ...requestedClaims,
+      expiresAtEpochSeconds: 1785492000,
+    });
   });
 });
