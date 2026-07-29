@@ -1,4 +1,4 @@
-import type { AgeBand, SafetyRisk } from "@ii-tonya/domain";
+import type { AgeBand, SafetyContact, SafetyRisk } from "@ii-tonya/domain";
 
 export interface IntentInput {
   readonly text: string;
@@ -15,6 +15,18 @@ export type IntentProposal =
 
 export interface IntentEngine {
   propose(input: IntentInput): Promise<IntentProposal>;
+}
+
+export interface IntentAuthorizationScope {
+  readonly allowedExpertIds?: readonly string[];
+  readonly allowedServiceCodes?: readonly string[];
+}
+
+export interface IntentAuthorization {
+  scopeFor(input: {
+    readonly userId: string;
+    readonly correlationId: string;
+  }): Promise<IntentAuthorizationScope>;
 }
 
 export interface DeterministicSafetyPort {
@@ -39,13 +51,12 @@ export interface HandleInboundCommand {
   readonly correlationId: string;
 }
 
-export type InboundAcceptance =
+export type PreparedInbound =
   | { readonly kind: "duplicate"; readonly messageEventId: string }
   | {
-      readonly kind: "accepted";
+      readonly kind: "pending";
       readonly messageEventId: string;
-      readonly packageId: string | null;
-      readonly ledgerBalance: number;
+      readonly packageAvailable: boolean;
     };
 
 export interface AcceptInboundInput {
@@ -88,11 +99,84 @@ export interface RecordOutboundDeliveryInput {
   readonly charge: boolean;
 }
 
+export type InboundCompletionOutcome =
+  | {
+      readonly kind: "answer";
+      readonly topic: "selarti.send";
+      readonly payload: { readonly text: string };
+    }
+  | {
+      readonly kind: "no_package";
+      readonly topic: "client.no_package";
+      readonly payload: Readonly<Record<string, never>>;
+    }
+  | {
+      readonly kind: "show_catalog";
+      readonly topic: "catalog.show";
+      readonly payload: { readonly serviceCode?: string };
+    }
+  | {
+      readonly kind: "start_booking";
+      readonly topic: "booking.start";
+      readonly payload: { readonly expertId: string };
+    }
+  | {
+      readonly kind: "human_handoff";
+      readonly topic: "human_handoff.opened";
+      readonly payload: { readonly reasonCode: string };
+      readonly ownerId: string;
+      readonly openedAt: Date;
+      readonly acknowledgeBy: Date;
+    };
+
+export interface CompleteInboundInput {
+  readonly messageEventId: string;
+  readonly userId: string;
+  readonly correlationId: string;
+  readonly outcome: InboundCompletionOutcome;
+}
+
+export type CompleteInboundResult =
+  | { readonly kind: "duplicate"; readonly messageEventId: string }
+  | {
+      readonly kind: "completed";
+      readonly messageEventId: string;
+      readonly packageId: string | null;
+      readonly ledgerBalance: number;
+    };
+
 export interface ConversationMessageRepository {
-  acceptInbound(input: AcceptInboundInput): Promise<InboundAcceptance>;
+  prepareInbound(input: AcceptInboundInput): Promise<PreparedInbound>;
+  completeInbound(input: CompleteInboundInput): Promise<CompleteInboundResult>;
   recordOutboundDelivery(
     input: RecordOutboundDeliveryInput,
-  ): Promise<InboundAcceptance>;
+  ): Promise<
+    | { readonly kind: "duplicate"; readonly messageEventId: string }
+    | {
+        readonly kind: "accepted";
+        readonly messageEventId: string;
+        readonly packageId: string | null;
+        readonly ledgerBalance: number;
+      }
+  >;
+}
+
+export interface SafetyDirectoryQuery {
+  readonly countryCode: string;
+  readonly regionCode: string | null;
+  readonly ageBand: AgeBand;
+  readonly risk: SafetyRisk;
+  readonly at: Date;
+}
+
+export interface ConversationSafetyDirectory {
+  list(query: SafetyDirectoryQuery): Promise<readonly SafetyContact[]>;
+}
+
+export interface VerifiedSafetyContact {
+  readonly id: string;
+  readonly label: string;
+  readonly channel: string;
 }
 
 export interface AcceptSafetyHandoffInput {
@@ -106,6 +190,11 @@ export interface AcceptSafetyHandoffInput {
   readonly reasonCode: SafetyRisk | "classifier_unavailable";
   readonly ownerId: string;
   readonly acknowledgeBy: Date;
+  readonly directoryState:
+    | "fresh"
+    | "no_fresh_contact"
+    | "unavailable";
+  readonly contacts: readonly VerifiedSafetyContact[];
 }
 
 export interface SafetyHandoffTransaction {
@@ -115,32 +204,6 @@ export interface SafetyHandoffTransaction {
     | { readonly kind: "duplicate"; readonly messageEventId: string }
     | { readonly kind: "accepted"; readonly messageEventId: string }
   >;
-  openForAcceptedInbound(input: {
-    readonly messageEventId: string;
-    readonly userId: string;
-    readonly correlationId: string;
-    readonly reasonCode: string;
-    readonly ownerId: string;
-    readonly openedAt: Date;
-    readonly acknowledgeBy: Date;
-  }): Promise<
-    | { readonly kind: "duplicate"; readonly messageEventId: string }
-    | { readonly kind: "opened"; readonly messageEventId: string }
-  >;
-}
-
-export interface ConversationOutbox {
-  enqueue(input: {
-    readonly idempotencyKey: string;
-    readonly topic:
-      | "selarti.send"
-      | "client.no_package"
-      | "catalog.show"
-      | "booking.start"
-      | "human_handoff.opened";
-    readonly charge: 0;
-    readonly payload: Readonly<Record<string, unknown>>;
-  }): Promise<void>;
 }
 
 export interface Clock {
@@ -151,15 +214,17 @@ export interface ConversationDependencies {
   readonly deterministicSafety: DeterministicSafetyPort;
   readonly typedSafety: TypedSafetyPort;
   readonly intentEngine: IntentEngine;
+  readonly intentAuthorization: IntentAuthorization;
   readonly messageRepository: ConversationMessageRepository;
+  readonly safetyDirectory: ConversationSafetyDirectory;
   readonly safetyHandoff: SafetyHandoffTransaction;
-  readonly outbox: ConversationOutbox;
   readonly clock: Clock;
   readonly handoffOwnerId: string;
   readonly handoffAcknowledgeWithinMs: number;
   readonly outboundBillingMode:
     | "disabled"
     | "provider_delivery_event";
+  readonly approvedSafetyContactIds: readonly string[];
 }
 
 export type ConversationResult =

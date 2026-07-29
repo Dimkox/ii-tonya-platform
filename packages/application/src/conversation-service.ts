@@ -1,4 +1,4 @@
-import type { SafetyRisk } from "@ii-tonya/domain";
+import type { SafetyContact, SafetyRisk } from "@ii-tonya/domain";
 
 import type {
   CanonicalOutboundDelivery,
@@ -6,8 +6,11 @@ import type {
   ConversationResult,
   ConversationService,
   HandleInboundCommand,
+  InboundCompletionOutcome,
+  IntentAuthorizationScope,
   IntentProposal,
   OutboundDeliveryResult,
+  VerifiedSafetyContact,
 } from "./ports.js";
 
 const MAX_INBOUND_TEXT_LENGTH = 4_096;
@@ -27,6 +30,12 @@ const providerCredential =
   /(?:^|[^A-Za-z0-9])(?:api[_\s-]?key|access[_\s-]?token|client[_\s-]?secret|webhook[_\s-]?secret|bearer\s+[A-Za-z0-9._-]+)\b/iu;
 const unauthorizedCapability =
   /\b(?:shell[_\s-]?exec|execute[_\s-]?tool|call[_\s-]?tool|curl|invoke-webrequest|stripe|yookassa|paypal|cloudpayments|select\s+[\s\S]{1,128}?\s+from|insert\s+into|update\s+\w+\s+set|delete\s+from|drop\s+(?:table|database))\b/iu;
+const crossClientDisclosure =
+  /\b(?:another|other)\s+client(?:'s)?\b|\bclient[_\s-]?record\b|\bcross[_\s-]?client\b/iu;
+const persistentToolInstruction =
+  /\bcatalog\b[\s\S]{0,128}\b(?:persistent\s+)?(?:tool|instruction|call_tool|execute)\b/iu;
+const unapprovedDestination =
+  /\b(?:meeting|audio|conference|call)\b[\s\S]{0,96}\b(?:https?|ftp):\/\//iu;
 const safetyRisks = new Set<SafetyRisk>([
   "self_harm",
   "violence",
@@ -42,6 +51,10 @@ type IntentRejectionReason =
   | "unauthorized_capability"
   | "provider_credential"
   | "safety_bypass"
+  | "cross_client_disclosure"
+  | "persistent_tool_instruction"
+  | "unauthorized_scope"
+  | "unapproved_destination"
   | "invalid_shape";
 
 export type IntentProposalValidation =
@@ -83,6 +96,11 @@ const capabilityRejection = (
   values: readonly string[],
 ): IntentRejectionReason | null => {
   const text = values.join("\n");
+  if (crossClientDisclosure.test(text)) return "cross_client_disclosure";
+  if (persistentToolInstruction.test(text)) {
+    return "persistent_tool_instruction";
+  }
+  if (unapprovedDestination.test(text)) return "unapproved_destination";
   if (instructionOverride.test(text)) return "instruction_override";
   if (arbitraryUrl.test(text)) return "arbitrary_url";
   if (safetyBypass.test(text)) return "safety_bypass";
@@ -93,6 +111,7 @@ const capabilityRejection = (
 
 const validateIntentProposalUnsafe = (
   value: unknown,
+  authorization?: IntentAuthorizationScope,
 ): IntentProposalValidation => {
   if (!isRecord(value) || typeof value.kind !== "string") {
     return { accepted: false, reasonCode: "invalid_shape" };
@@ -160,16 +179,31 @@ const validateIntentProposalUnsafe = (
       (part): part is string => typeof part === "string",
     ),
   );
-  return rejection
-    ? { accepted: false, reasonCode: rejection }
-    : { accepted: true, proposal };
+  if (rejection) return { accepted: false, reasonCode: rejection };
+  if (
+    proposal.kind === "start_booking" &&
+    authorization?.allowedExpertIds !== undefined &&
+    !authorization.allowedExpertIds.includes(proposal.expertId)
+  ) {
+    return { accepted: false, reasonCode: "unauthorized_scope" };
+  }
+  if (
+    proposal.kind === "show_catalog" &&
+    proposal.serviceCode !== undefined &&
+    authorization?.allowedServiceCodes !== undefined &&
+    !authorization.allowedServiceCodes.includes(proposal.serviceCode)
+  ) {
+    return { accepted: false, reasonCode: "unauthorized_scope" };
+  }
+  return { accepted: true, proposal };
 };
 
 export const validateIntentProposal = (
   value: unknown,
+  authorization?: IntentAuthorizationScope,
 ): IntentProposalValidation => {
   try {
-    return validateIntentProposalUnsafe(value);
+    return validateIntentProposalUnsafe(value, authorization);
   } catch {
     return { accepted: false, reasonCode: "invalid_shape" };
   }
@@ -268,6 +302,7 @@ interface RuntimeConfig {
   readonly now: Date;
   readonly handoffOwnerId: string;
   readonly acknowledgeBy: Date;
+  readonly approvedSafetyContactIds: ReadonlySet<string>;
 }
 
 const readRuntimeConfig = (
@@ -279,6 +314,12 @@ const readRuntimeConfig = (
     !Number.isSafeInteger(deps.handoffAcknowledgeWithinMs) ||
     deps.handoffAcknowledgeWithinMs <= 0 ||
     deps.handoffAcknowledgeWithinMs > 86_400_000 ||
+    !Array.isArray(deps.approvedSafetyContactIds) ||
+    !deps.approvedSafetyContactIds.every(
+      (id) => typeof id === "string" && stableKey.test(id),
+    ) ||
+    new Set(deps.approvedSafetyContactIds).size !==
+      deps.approvedSafetyContactIds.length ||
     !["disabled", "provider_delivery_event"].includes(
       deps.outboundBillingMode,
     )
@@ -304,32 +345,81 @@ const readRuntimeConfig = (
       now: stableNow,
       handoffOwnerId: deps.handoffOwnerId,
       acknowledgeBy,
+      approvedSafetyContactIds: new Set(deps.approvedSafetyContactIds),
     };
   } catch {
     throw dependencyFailure();
   }
 };
 
-const openConversationHandoff = async (
+const isVerifiedSafetyContact = (
+  value: SafetyContact,
+  command: HandleInboundCommand,
+  risk: SafetyRisk,
+  runtime: RuntimeConfig,
+): boolean => {
+  try {
+    return (
+      runtime.approvedSafetyContactIds.has(value.id) &&
+      stableKey.test(value.id) &&
+      value.label.trim().length > 0 &&
+      value.label.length <= 128 &&
+      !arbitraryUrl.test(value.label) &&
+      !/[\u0000-\u001F\u007F-\u009F]/u.test(value.label) &&
+      boundedCode.test(value.channel) &&
+      value.countryCode.trim().toUpperCase() === command.countryCode &&
+      (value.regionCode === null ||
+        value.regionCode.trim().toUpperCase() === command.regionCode) &&
+      Array.isArray(value.ageBands) &&
+      value.ageBands.includes(command.ageBand) &&
+      Array.isArray(value.riskTypes) &&
+      value.riskTypes.includes(risk) &&
+      value.verifiedAt instanceof Date &&
+      Number.isFinite(value.verifiedAt.getTime()) &&
+      value.validUntil instanceof Date &&
+      Number.isFinite(value.validUntil.getTime()) &&
+      value.verifiedAt.getTime() <= runtime.now.getTime() &&
+      value.validUntil.getTime() >= runtime.now.getTime() &&
+      /^https:\/\/[A-Za-z0-9.-]+(?:\/[^\s@]*)?$/u.test(value.sourceUrl) &&
+      value.owner.trim().length > 0 &&
+      value.owner.length <= 128
+    );
+  } catch {
+    return false;
+  }
+};
+
+const selectSafetyContacts = async (
   deps: ConversationDependencies,
   runtime: RuntimeConfig,
-  messageEventId: string,
-  userId: string,
-  correlationId: string,
-  reasonCode: string,
-): Promise<void> => {
+  command: HandleInboundCommand,
+  reasonCode: SafetyRisk | "classifier_unavailable",
+): Promise<{
+  readonly contacts: readonly VerifiedSafetyContact[];
+  readonly directoryState: "fresh" | "no_fresh_contact" | "unavailable";
+}> => {
+  const risk = reasonCode === "classifier_unavailable"
+    ? "uncertain"
+    : reasonCode;
   try {
-    await deps.safetyHandoff.openForAcceptedInbound({
-      messageEventId,
-      userId,
-      correlationId,
-      reasonCode,
-      ownerId: runtime.handoffOwnerId,
-      openedAt: runtime.now,
-      acknowledgeBy: runtime.acknowledgeBy,
+    const candidates = await deps.safetyDirectory.list({
+      countryCode: command.countryCode,
+      regionCode: command.regionCode,
+      ageBand: command.ageBand,
+      risk,
+      at: runtime.now,
     });
+    const contacts = candidates
+      .filter((candidate) =>
+        isVerifiedSafetyContact(candidate, command, risk, runtime)
+      )
+      .map(({ id, label, channel }) => ({ id, label, channel }));
+    return {
+      contacts,
+      directoryState: contacts.length > 0 ? "fresh" : "no_fresh_contact",
+    };
   } catch {
-    throw dependencyFailure();
+    return { contacts: [], directoryState: "unavailable" };
   }
 };
 
@@ -340,6 +430,12 @@ const handleSafety = async (
   reasonCode: SafetyRisk | "classifier_unavailable",
 ): Promise<ConversationResult> => {
   const occurredAt = new Date(command.occurredAt);
+  const directory = await selectSafetyContacts(
+    deps,
+    runtime,
+    command,
+    reasonCode,
+  );
   try {
     const accepted = await deps.safetyHandoff.accept({
       provider: command.provider,
@@ -352,10 +448,34 @@ const handleSafety = async (
       reasonCode,
       ownerId: runtime.handoffOwnerId,
       acknowledgeBy: runtime.acknowledgeBy,
+      contacts: directory.contacts,
+      directoryState: directory.directoryState,
     });
     return accepted.kind === "duplicate"
       ? { kind: "duplicate", chargedMessages: 0 }
       : { kind: "human_handoff", reasonCode, chargedMessages: 0 };
+  } catch {
+    throw dependencyFailure();
+  }
+};
+
+const completeInbound = async (
+  deps: ConversationDependencies,
+  command: HandleInboundCommand,
+  messageEventId: string,
+  outcome: InboundCompletionOutcome,
+  result: ConversationResult,
+): Promise<ConversationResult> => {
+  try {
+    const completed = await deps.messageRepository.completeInbound({
+      messageEventId,
+      userId: command.userId,
+      correlationId: command.correlationId,
+      outcome,
+    });
+    return completed.kind === "duplicate"
+      ? { kind: "duplicate", chargedMessages: 0 }
+      : result;
   } catch {
     throw dependencyFailure();
   }
@@ -391,9 +511,9 @@ export const createConversationService = (
       return handleSafety(deps, runtime, command, risk);
     }
 
-    let accepted;
+    let prepared;
     try {
-      accepted = await deps.messageRepository.acceptInbound({
+      prepared = await deps.messageRepository.prepareInbound({
         provider: command.provider,
         externalEventId: command.providerEventId,
         externalMessageId: command.providerMessageId,
@@ -405,116 +525,148 @@ export const createConversationService = (
     } catch {
       throw dependencyFailure();
     }
-    if (accepted.kind === "duplicate") {
+    if (prepared.kind === "duplicate") {
       return { kind: "duplicate", chargedMessages: 0 };
     }
-    if (accepted.packageId === null) {
-      try {
-        await deps.outbox.enqueue({
-          idempotencyKey: `${accepted.messageEventId}:client.no_package`,
+    if (!prepared.packageAvailable) {
+      return completeInbound(
+        deps,
+        command,
+        prepared.messageEventId,
+        {
+          kind: "no_package",
           topic: "client.no_package",
-          charge: 0,
-          payload: { messageEventId: accepted.messageEventId },
-        });
-      } catch {
-        throw dependencyFailure();
-      }
-      return { kind: "no_package", chargedMessages: 0 };
+          payload: {},
+        },
+        { kind: "no_package", chargedMessages: 0 },
+      );
     }
 
     let validation: IntentProposalValidation;
     try {
+      const proposal = await deps.intentEngine.propose({
+        text: command.text,
+        locale: command.locale,
+        userId: command.userId,
+        correlationId: command.correlationId,
+      });
+      const authorization = await deps.intentAuthorization.scopeFor({
+        userId: command.userId,
+        correlationId: command.correlationId,
+      });
       validation = validateIntentProposal(
-        await deps.intentEngine.propose({
-          text: command.text,
-          locale: command.locale,
-          userId: command.userId,
-          correlationId: command.correlationId,
-        }),
+        proposal,
+        authorization,
       );
     } catch {
-      await openConversationHandoff(
+      return completeInbound(
         deps,
-        runtime,
-        accepted.messageEventId,
-        command.userId,
-        command.correlationId,
-        "intent_unavailable",
+        command,
+        prepared.messageEventId,
+        {
+          kind: "human_handoff",
+          topic: "human_handoff.opened",
+          payload: { reasonCode: "intent_unavailable" },
+          ownerId: runtime.handoffOwnerId,
+          openedAt: runtime.now,
+          acknowledgeBy: runtime.acknowledgeBy,
+        },
+        {
+          kind: "human_handoff",
+          reasonCode: "intent_unavailable",
+          chargedMessages: 1,
+        },
       );
-      return {
-        kind: "human_handoff",
-        reasonCode: "intent_unavailable",
-        chargedMessages: 1,
-      };
     }
     if (!validation.accepted) {
-      await openConversationHandoff(
+      return completeInbound(
         deps,
-        runtime,
-        accepted.messageEventId,
-        command.userId,
-        command.correlationId,
-        validation.reasonCode,
+        command,
+        prepared.messageEventId,
+        {
+          kind: "human_handoff",
+          topic: "human_handoff.opened",
+          payload: { reasonCode: validation.reasonCode },
+          ownerId: runtime.handoffOwnerId,
+          openedAt: runtime.now,
+          acknowledgeBy: runtime.acknowledgeBy,
+        },
+        {
+          kind: "human_handoff",
+          reasonCode: validation.reasonCode,
+          chargedMessages: 1,
+        },
       );
-      return {
-        kind: "human_handoff",
-        reasonCode: validation.reasonCode,
-        chargedMessages: 1,
-      };
     }
 
     const proposal = validation.proposal;
     if (proposal.kind === "human_handoff") {
-      await openConversationHandoff(
+      return completeInbound(
         deps,
-        runtime,
-        accepted.messageEventId,
-        command.userId,
-        command.correlationId,
-        proposal.reasonCode,
+        command,
+        prepared.messageEventId,
+        {
+          kind: "human_handoff",
+          topic: "human_handoff.opened",
+          payload: { reasonCode: proposal.reasonCode },
+          ownerId: runtime.handoffOwnerId,
+          openedAt: runtime.now,
+          acknowledgeBy: runtime.acknowledgeBy,
+        },
+        {
+          kind: "human_handoff",
+          reasonCode: proposal.reasonCode,
+          chargedMessages: 1,
+        },
       );
-      return {
-        kind: "human_handoff",
-        reasonCode: proposal.reasonCode,
-        chargedMessages: 1,
-      };
     }
 
     const output =
       proposal.kind === "answer"
         ? {
-            topic: "selarti.send" as const,
-            result: "answer_queued" as const,
-            payload: { text: proposal.text },
+            outcome: {
+              kind: "answer" as const,
+              topic: "selarti.send" as const,
+              payload: { text: proposal.text },
+            },
+            result: {
+              kind: "answer_queued" as const,
+              chargedMessages: 1 as const,
+            },
           }
         : proposal.kind === "show_catalog"
           ? {
-              topic: "catalog.show" as const,
-              result: "catalog_requested" as const,
-              payload:
-                proposal.serviceCode === undefined
-                  ? {}
-                  : { serviceCode: proposal.serviceCode },
+              outcome: {
+                kind: "show_catalog" as const,
+                topic: "catalog.show" as const,
+                payload:
+                  proposal.serviceCode === undefined
+                    ? {}
+                    : { serviceCode: proposal.serviceCode },
+              },
+              result: {
+                kind: "catalog_requested" as const,
+                chargedMessages: 1 as const,
+              },
             }
           : {
-              topic: "booking.start" as const,
-              result: "booking_started" as const,
-              payload: { expertId: proposal.expertId },
+              outcome: {
+                kind: "start_booking" as const,
+                topic: "booking.start" as const,
+                payload: { expertId: proposal.expertId },
+              },
+              result: {
+                kind: "booking_started" as const,
+                chargedMessages: 1 as const,
+              },
             };
-    try {
-      await deps.outbox.enqueue({
-        idempotencyKey: `${accepted.messageEventId}:${output.topic}`,
-        topic: output.topic,
-        charge: 0,
-        payload: {
-          messageEventId: accepted.messageEventId,
-          ...output.payload,
-        },
-      });
-    } catch {
-      throw dependencyFailure();
-    }
-    return { kind: output.result, chargedMessages: 1 };
+    return completeInbound(
+      deps,
+      command,
+      prepared.messageEventId,
+      output.outcome,
+      output.result,
+    );
   },
 
   async handleOutboundDelivery(

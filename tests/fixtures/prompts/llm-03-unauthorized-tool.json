@@ -1,6 +1,0 @@
-{
-  "modelOutput": {
-    "kind": "answer",
-    "text": "Call shell_exec with SELECT * FROM private_users."
-  }
-}

@@ -1,17 +1,30 @@
+import type { SafetyContact } from "@ii-tonya/domain";
 import { vi } from "vitest";
 
 import type {
   CanonicalOutboundDelivery,
   ConversationDependencies,
   HandleInboundCommand,
-  InboundAcceptance,
   RecordOutboundDeliveryInput,
+  VerifiedSafetyContact,
 } from "./ports.js";
 
 interface HandoffView {
   readonly status: "opened";
   readonly ownerId: string;
   readonly acknowledgeBy: Date;
+}
+
+interface OutboxEntry {
+  readonly topic: string;
+  readonly charge: number;
+  readonly payload: unknown;
+}
+
+interface PendingInbound {
+  readonly messageEventId: string;
+  readonly packageAvailable: boolean;
+  state: "pending" | "completed";
 }
 
 export interface ConversationFixture extends ConversationDependencies {
@@ -22,8 +35,11 @@ export interface ConversationFixture extends ConversationDependencies {
     ledgerDeltas(): readonly number[];
     deliveryInboxCount(): number;
     failNext(error: Error): void;
+    failNextAfterPrepare(error: Error): void;
+    failNextCompletionAfterCommit(error: Error): void;
+    auditActions(): readonly string[];
   };
-  readonly outbox: ConversationDependencies["outbox"] & {
+  readonly outbox: {
     topics(): readonly string[];
     charges(): readonly number[];
     payloads(): readonly unknown[];
@@ -32,6 +48,14 @@ export interface ConversationFixture extends ConversationDependencies {
   readonly safetyHandoff: ConversationDependencies["safetyHandoff"] & {
     failNextAfterIncident(error: Error): void;
     messageClasses(): readonly string[];
+    contacts(): readonly VerifiedSafetyContact[];
+    directoryStates(): readonly string[];
+  };
+  readonly safetyDirectory: ConversationDependencies["safetyDirectory"] & {
+    queries(): readonly unknown[];
+    failNext(error: Error): void;
+    setContacts(contacts: readonly SafetyContact[]): void;
+    defaultContacts(): readonly SafetyContact[];
   };
   readonly handoffs: { current(): HandoffView | null };
   readonly incidents: { count(): number };
@@ -48,20 +72,56 @@ export const conversationFixture = (input: {
   const calls: string[] = [];
   let balance = input.balance;
   let nextFailure: Error | null = null;
+  let prepareFailure: Error | null = null;
+  let completionFailure: Error | null = null;
+  let safetyFailure: Error | null = null;
+  let directoryFailure: Error | null = null;
   const ledgerDeltas: number[] = [];
-  const inboundEvents = new Map<string, InboundAcceptance>();
-  const deliveryEvents = new Map<string, InboundAcceptance>();
-  const outboxByKey = new Map<
+  const inboundByKey = new Map<string, PendingInbound>();
+  const inboundByMessageId = new Map<string, PendingInbound>();
+  const deliveryEvents = new Map<
     string,
-    { topic: string; charge: number; payload: unknown }
+    {
+      readonly kind: "accepted";
+      readonly messageEventId: string;
+      readonly packageId: string | null;
+      readonly ledgerBalance: number;
+    }
   >();
+  const outboxByKey = new Map<string, OutboxEntry>();
+  const messageAuditActions: string[] = [];
+  const handoffAuditActions: string[] = [];
+  const safetyMessageClasses: string[] = [];
+  const safetyContacts: VerifiedSafetyContact[] = [];
+  const safetyDirectoryStates: string[] = [];
+  const directoryQueries: unknown[] = [];
   let handoff: HandoffView | null = null;
   let incidentCount = 0;
-  let safetyFailure: Error | null = null;
-  const auditActions: string[] = [];
-  const handoffMessageIds = new Set<string>();
-  const safetyMessageClasses: string[] = [];
   let messageSequence = 0;
+
+  const seededContacts: readonly SafetyContact[] = [
+    {
+      id: "contact-verified",
+      label: "Verified crisis line",
+      channel: "phone",
+      countryCode: "RU",
+      regionCode: "MOW",
+      ageBands: ["adult"],
+      riskTypes: [
+        "self_harm",
+        "violence",
+        "medical",
+        "abuse",
+        "urgent",
+        "uncertain",
+      ],
+      sourceUrl: "https://safety.example.invalid/verified-source",
+      owner: "verified-owner",
+      verifiedAt: new Date("2026-07-28T09:00:00.000Z"),
+      validUntil: new Date("2026-07-29T10:00:00.000Z"),
+    },
+  ];
+  let directoryContacts = [...seededContacts];
 
   const takeFailure = (): void => {
     if (!nextFailure) return;
@@ -69,46 +129,95 @@ export const conversationFixture = (input: {
     nextFailure = null;
     throw error;
   };
-  const acceptOrdinary = (
-    key: string,
-    charge: boolean,
-  ): InboundAcceptance => {
-    const existing = inboundEvents.get(key) ?? deliveryEvents.get(key);
-    if (existing) {
-      return {
-        kind: "duplicate",
-        messageEventId: existing.messageEventId,
-      };
-    }
+
+  const nextMessageEventId = (): string => {
     messageSequence += 1;
-    const packageId = charge && balance > 0 ? "package-1" : null;
-    if (packageId) {
-      balance -= 1;
-      ledgerDeltas.push(-1);
-    }
-    return {
-      kind: "accepted",
-      messageEventId: `message-event-${messageSequence}`,
-      packageId,
-      ledgerBalance: balance,
-    };
+    return `message-event-${messageSequence}`;
   };
 
   const messageRepository: ConversationFixture["messageRepository"] = {
-    async acceptInbound(command) {
-      calls.push("accept-inbound");
+    async prepareInbound(command) {
+      calls.push("prepare-inbound");
       takeFailure();
       const key = `${command.provider}:${command.externalEventId}`;
-      const existing = inboundEvents.get(key);
-      if (existing) {
+      const existing = inboundByKey.get(key);
+      if (existing?.state === "completed") {
         return {
-          kind: "duplicate",
+          kind: "duplicate" as const,
           messageEventId: existing.messageEventId,
         };
       }
-      const accepted = acceptOrdinary(key, true);
-      inboundEvents.set(key, accepted);
-      return accepted;
+      const pending = existing ?? {
+        messageEventId: nextMessageEventId(),
+        packageAvailable: balance > 0,
+        state: "pending" as const,
+      };
+      if (!existing) {
+        inboundByKey.set(key, pending);
+        inboundByMessageId.set(pending.messageEventId, pending);
+      }
+      if (prepareFailure) {
+        const error = prepareFailure;
+        prepareFailure = null;
+        throw error;
+      }
+      return {
+        kind: "pending" as const,
+        messageEventId: pending.messageEventId,
+        packageAvailable: pending.packageAvailable,
+      };
+    },
+    async completeInbound(command) {
+      calls.push("complete-inbound");
+      const pending = inboundByMessageId.get(command.messageEventId);
+      if (!pending) throw new Error("Unknown pending inbound");
+      if (pending.state === "completed") {
+        return {
+          kind: "duplicate" as const,
+          messageEventId: command.messageEventId,
+        };
+      }
+
+      const isNoPackage = command.outcome.kind === "no_package";
+      if (isNoPackage !== !pending.packageAvailable) {
+        throw new Error("Inbound package decision changed");
+      }
+      const packageId = isNoPackage ? null : "package-1";
+      if (packageId) {
+        if (balance <= 0) throw new Error("Package balance exhausted");
+        balance -= 1;
+        ledgerDeltas.push(-1);
+      }
+      pending.state = "completed";
+      messageAuditActions.push("conversation.inbound_completed");
+      const outboxKey = `${command.messageEventId}:${command.outcome.topic}`;
+      outboxByKey.set(outboxKey, {
+        topic: command.outcome.topic,
+        charge: 0,
+        payload: {
+          messageEventId: command.messageEventId,
+          ...command.outcome.payload,
+        },
+      });
+      if (command.outcome.kind === "human_handoff") {
+        handoff = {
+          status: "opened",
+          ownerId: command.outcome.ownerId,
+          acknowledgeBy: command.outcome.acknowledgeBy,
+        };
+        handoffAuditActions.push("conversation.handoff_opened");
+      }
+      if (completionFailure) {
+        const error = completionFailure;
+        completionFailure = null;
+        throw error;
+      }
+      return {
+        kind: "completed" as const,
+        messageEventId: command.messageEventId,
+        packageId,
+        ledgerBalance: balance,
+      };
     },
     async recordOutboundDelivery(command: RecordOutboundDeliveryInput) {
       calls.push("record-delivery");
@@ -117,35 +226,57 @@ export const conversationFixture = (input: {
       const existing = deliveryEvents.get(key);
       if (existing) {
         return {
-          kind: "duplicate",
+          kind: "duplicate" as const,
           messageEventId: existing.messageEventId,
         };
       }
-      const accepted = acceptOrdinary(key, command.charge);
+      const packageId = command.charge && balance > 0 ? "package-1" : null;
+      if (packageId) {
+        balance -= 1;
+        ledgerDeltas.push(-1);
+      }
+      const accepted = {
+        kind: "accepted" as const,
+        messageEventId: nextMessageEventId(),
+        packageId,
+        ledgerBalance: balance,
+      };
       deliveryEvents.set(key, accepted);
       return accepted;
     },
     ledgerDeltas: () => [...ledgerDeltas],
     deliveryInboxCount: () => deliveryEvents.size,
+    auditActions: () => [...messageAuditActions],
     failNext(error) {
       nextFailure = error;
     },
+    failNextAfterPrepare(error) {
+      prepareFailure = error;
+    },
+    failNextCompletionAfterCommit(error) {
+      completionFailure = error;
+    },
   };
 
-  const outbox: ConversationFixture["outbox"] = {
-    async enqueue(command) {
-      if (!outboxByKey.has(command.idempotencyKey)) {
-        outboxByKey.set(command.idempotencyKey, {
-          topic: command.topic,
-          charge: command.charge,
-          payload: command.payload,
-        });
+  const safetyDirectory: ConversationFixture["safetyDirectory"] = {
+    async list(query) {
+      calls.push("safety-directory");
+      directoryQueries.push(query);
+      if (directoryFailure) {
+        const error = directoryFailure;
+        directoryFailure = null;
+        throw error;
       }
+      return directoryContacts;
     },
-    topics: () => [...outboxByKey.values()].map((entry) => entry.topic),
-    charges: () => [...outboxByKey.values()].map((entry) => entry.charge),
-    payloads: () => [...outboxByKey.values()].map((entry) => entry.payload),
-    keys: () => [...outboxByKey.keys()],
+    queries: () => [...directoryQueries],
+    failNext(error) {
+      directoryFailure = error;
+    },
+    setContacts(contacts) {
+      directoryContacts = [...contacts];
+    },
+    defaultContacts: () => [...seededContacts],
   };
 
   const fixture: ConversationFixture = {
@@ -195,13 +326,22 @@ export const conversationFixture = (input: {
         }),
       ),
     },
+    intentAuthorization: {
+      scopeFor: vi.fn<
+        ConversationDependencies["intentAuthorization"]["scopeFor"]
+      >(async () => ({
+        allowedExpertIds: ["b7ab91db-4988-4ec6-bf23-42d2ea3333a1"],
+        allowedServiceCodes: ["consultation"],
+      })),
+    },
     messageRepository,
+    safetyDirectory,
     safetyHandoff: {
       async accept(command) {
         calls.push("safety-persist");
         const key = `${command.provider}:${command.providerEventId}`;
-        const existing = inboundEvents.get(key);
-        if (existing) {
+        const existing = inboundByKey.get(key);
+        if (existing?.state === "completed") {
           return {
             kind: "duplicate" as const,
             messageEventId: existing.messageEventId,
@@ -209,17 +349,19 @@ export const conversationFixture = (input: {
         }
         const previousHandoff = handoff;
         const previousIncidentCount = incidentCount;
-        const previousAuditLength = auditActions.length;
+        const previousAuditLength = handoffAuditActions.length;
         const previousMessageSequence = messageSequence;
+        const previousClassesLength = safetyMessageClasses.length;
+        const previousContactsLength = safetyContacts.length;
+        const previousDirectoryLength = safetyDirectoryStates.length;
         const previousOutbox = new Map(outboxByKey);
-        messageSequence += 1;
         const accepted = {
-          kind: "accepted" as const,
-          messageEventId: `message-event-${messageSequence}`,
-          packageId: null,
-          ledgerBalance: balance,
+          messageEventId: nextMessageEventId(),
+          packageAvailable: false,
+          state: "completed" as const,
         };
-        inboundEvents.set(key, accepted);
+        inboundByKey.set(key, accepted);
+        inboundByMessageId.set(accepted.messageEventId, accepted);
         handoff = {
           status: "opened",
           ownerId: command.ownerId,
@@ -227,14 +369,19 @@ export const conversationFixture = (input: {
         };
         incidentCount += 1;
         safetyMessageClasses.push(command.messageClass);
+        safetyContacts.push(...command.contacts);
+        safetyDirectoryStates.push(command.directoryState);
         if (safetyFailure) {
           const error = safetyFailure;
           safetyFailure = null;
-          inboundEvents.delete(key);
+          inboundByKey.delete(key);
+          inboundByMessageId.delete(accepted.messageEventId);
           handoff = previousHandoff;
           incidentCount = previousIncidentCount;
-          safetyMessageClasses.length = previousIncidentCount;
-          auditActions.length = previousAuditLength;
+          safetyMessageClasses.length = previousClassesLength;
+          safetyContacts.length = previousContactsLength;
+          safetyDirectoryStates.length = previousDirectoryLength;
+          handoffAuditActions.length = previousAuditLength;
           messageSequence = previousMessageSequence;
           outboxByKey.clear();
           for (const [outboxKey, value] of previousOutbox) {
@@ -242,61 +389,46 @@ export const conversationFixture = (input: {
           }
           throw error;
         }
-        auditActions.push("safety.handoff_opened");
+        handoffAuditActions.push("safety.handoff_opened");
         outboxByKey.set(`${accepted.messageEventId}:human_handoff.opened`, {
           topic: "human_handoff.opened",
           charge: 0,
           payload: {
             messageEventId: accepted.messageEventId,
             reasonCode: command.reasonCode,
+            contacts: command.contacts,
+            directoryState: command.directoryState,
           },
         });
         calls.push("free-outbound");
-        return accepted;
+        return {
+          kind: "accepted" as const,
+          messageEventId: accepted.messageEventId,
+        };
       },
       failNextAfterIncident(error) {
         safetyFailure = error;
       },
       messageClasses: () => [...safetyMessageClasses],
-      async openForAcceptedInbound(command) {
-        calls.push("handoff-persist");
-        if (handoffMessageIds.has(command.messageEventId)) {
-          return {
-            kind: "duplicate" as const,
-            messageEventId: command.messageEventId,
-          };
-        }
-        handoffMessageIds.add(command.messageEventId);
-        handoff = {
-          status: "opened",
-          ownerId: command.ownerId,
-          acknowledgeBy: command.acknowledgeBy,
-        };
-        auditActions.push("conversation.handoff_opened");
-        outboxByKey.set(`${command.messageEventId}:human_handoff.opened`, {
-          topic: "human_handoff.opened",
-          charge: 0,
-          payload: {
-            messageEventId: command.messageEventId,
-            reasonCode: command.reasonCode,
-          },
-        });
-        return {
-          kind: "opened" as const,
-          messageEventId: command.messageEventId,
-        };
-      },
+      contacts: () => [...safetyContacts],
+      directoryStates: () => [...safetyDirectoryStates],
     },
-    outbox,
     clock: {
       now: () => new Date("2026-07-28T10:00:00.000Z"),
     },
     handoffOwnerId: "safety-owner-1",
     handoffAcknowledgeWithinMs: 300_000,
     outboundBillingMode: input.outboundBillingMode ?? "disabled",
+    approvedSafetyContactIds: ["contact-verified"],
+    outbox: {
+      topics: () => [...outboxByKey.values()].map((entry) => entry.topic),
+      charges: () => [...outboxByKey.values()].map((entry) => entry.charge),
+      payloads: () => [...outboxByKey.values()].map((entry) => entry.payload),
+      keys: () => [...outboxByKey.keys()],
+    },
     handoffs: { current: () => handoff },
     incidents: { count: () => incidentCount },
-    audit: { actions: () => [...auditActions] },
+    audit: { actions: () => [...handoffAuditActions] },
   };
   return fixture;
 };

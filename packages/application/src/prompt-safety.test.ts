@@ -6,15 +6,23 @@ import { validateIntentProposal } from "./conversation-service.js";
 
 describe("LLM capability boundary", () => {
   it.each([
-    ["llm-01-instruction-override", "instruction_override"],
-    ["llm-02-arbitrary-url", "arbitrary_url"],
-    ["llm-03-unauthorized-tool", "unauthorized_capability"],
-    ["llm-04-safety-bypass", "safety_bypass"],
+    ["llm-01-cross-client-disclosure", "cross_client_disclosure"],
+    ["llm-02-persistent-catalog-tool-text", "persistent_tool_instruction"],
+    ["llm-03-unauthorized-typed-intent", "unauthorized_scope"],
+    ["llm-04-unapproved-meeting-audio-link", "unapproved_destination"],
   ])("%s is rejected with %s", (fixtureName, reasonCode) => {
     const fixture = JSON.parse(
       readFileSync(`tests/fixtures/prompts/${fixtureName}.json`, "utf8"),
-    ) as { modelOutput: unknown };
-    expect(validateIntentProposal(fixture.modelOutput)).toEqual({
+    ) as {
+      modelOutput: unknown;
+      authorization?: {
+        allowedExpertIds?: string[];
+        allowedServiceCodes?: string[];
+      };
+    };
+    expect(
+      validateIntentProposal(fixture.modelOutput, fixture.authorization),
+    ).toEqual({
       accepted: false,
       reasonCode,
     });

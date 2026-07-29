@@ -142,9 +142,11 @@ describe("conversation workflow", () => {
 
     expect(deps.calls).toEqual([
       "deterministic-safety",
+      "safety-directory",
       "safety-persist",
       "free-outbound",
       "deterministic-safety",
+      "safety-directory",
       "safety-persist",
     ]);
     expect(first).toMatchObject({
@@ -165,6 +167,89 @@ describe("conversation workflow", () => {
     expect(deps.outbox.charges()).toEqual([0]);
     expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
     expect(deps.safetyHandoff.messageClasses()).toEqual(["safety"]);
+    expect(deps.safetyDirectory.queries()).toHaveLength(2);
+    expect(deps.safetyDirectory.queries()).toEqual([
+      expect.objectContaining({
+        countryCode: "RU",
+        regionCode: "MOW",
+        ageBand: "adult",
+        risk: "self_harm",
+      }),
+      expect.objectContaining({
+        countryCode: "RU",
+        regionCode: "MOW",
+        ageBand: "adult",
+        risk: "self_harm",
+      }),
+    ]);
+    expect(deps.safetyHandoff.contacts()).toEqual([
+      {
+        id: "contact-verified",
+        label: "Verified crisis line",
+        channel: "phone",
+      },
+    ]);
+  });
+
+  it("filters unverified, expired, mismatched, and arbitrary safety contacts", async () => {
+    const deps = conversationFixture({ balance: 0, safety: "crisis" });
+    deps.safetyDirectory.setContacts([
+      ...deps.safetyDirectory.defaultContacts(),
+      {
+        ...deps.safetyDirectory.defaultContacts()[0]!,
+        id: "contact-unverified",
+        verifiedAt: new Date("2026-07-28T10:01:00.000Z"),
+      },
+      {
+        ...deps.safetyDirectory.defaultContacts()[0]!,
+        id: "contact-expired",
+        validUntil: new Date("2026-07-28T09:59:59.000Z"),
+      },
+      {
+        ...deps.safetyDirectory.defaultContacts()[0]!,
+        id: "contact-wrong-region",
+        regionCode: "SPE",
+      },
+      {
+        ...deps.safetyDirectory.defaultContacts()[0]!,
+        id: "contact-arbitrary-url",
+        sourceUrl: "http://unverified.invalid/source",
+      },
+    ]);
+
+    await createConversationService(deps).handleInbound(deps.inbound);
+
+    expect(deps.safetyHandoff.contacts()).toEqual([
+      {
+        id: "contact-verified",
+        label: "Verified crisis line",
+        channel: "phone",
+      },
+    ]);
+  });
+
+  it("fails a safety directory outage closed to a durable free handoff", async () => {
+    const deps = conversationFixture({ balance: 0, safety: "crisis" });
+    deps.safetyDirectory.failNext(
+      new Error("directory dependency credential material"),
+    );
+
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+
+    expect(result).toMatchObject({
+      kind: "human_handoff",
+      chargedMessages: 0,
+      reasonCode: "self_harm",
+    });
+    expect(deps.safetyHandoff.contacts()).toEqual([]);
+    expect(deps.safetyHandoff.directoryStates()).toEqual(["unavailable"]);
+    expect(deps.handoffs.current()).toMatchObject({
+      status: "opened",
+      ownerId: "safety-owner-1",
+    });
+    expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
   });
 
   it("rolls back every crisis fact when the atomic safety transaction fails", async () => {
@@ -197,7 +282,7 @@ describe("conversation workflow", () => {
     expect(deps.calls.slice(0, 3)).toEqual([
       "deterministic-safety",
       "typed-safety",
-      "accept-inbound",
+      "prepare-inbound",
     ]);
   });
 
@@ -249,6 +334,94 @@ describe("conversation workflow", () => {
     expect(deps.intentEngine.propose).toHaveBeenCalledTimes(1);
     expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
     expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+    expect(deps.outbox.charges()).toEqual([0]);
+  });
+
+  it("atomically commits debit, audit, and answer outbox across an unknown completion outcome", async () => {
+    const deps = conversationFixture({ balance: 3, safety: "ordinary" });
+    deps.intentEngine.propose = vi
+      .fn()
+      .mockResolvedValue({ kind: "answer", text: "Короткий ответ" });
+    deps.messageRepository.failNextCompletionAfterCommit(
+      new Error("completion outcome unknown"),
+    );
+    const service = createConversationService(deps);
+
+    await expect(service.handleInbound(deps.inbound)).rejects.toMatchObject({
+      code: "dependency_unavailable",
+    });
+    const retry = await service.handleInbound(deps.inbound);
+
+    expect(retry).toEqual({ kind: "duplicate", chargedMessages: 0 });
+    expect(deps.intentEngine.propose).toHaveBeenCalledTimes(1);
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.messageRepository.auditActions()).toEqual([
+      "conversation.inbound_completed",
+    ]);
+    expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+    expect(deps.outbox.keys()).toEqual(["message-event-1:selarti.send"]);
+  });
+
+  it("resumes a persisted pending inbound after a prepare crash", async () => {
+    const deps = conversationFixture({ balance: 3, safety: "ordinary" });
+    deps.messageRepository.failNextAfterPrepare(
+      new Error("process stopped after prepare"),
+    );
+    const service = createConversationService(deps);
+
+    await expect(service.handleInbound(deps.inbound)).rejects.toMatchObject({
+      code: "dependency_unavailable",
+    });
+    const retry = await service.handleInbound(deps.inbound);
+
+    expect(retry).toEqual({ kind: "answer_queued", chargedMessages: 1 });
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.messageRepository.auditActions()).toEqual([
+      "conversation.inbound_completed",
+    ]);
+    expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+  });
+
+  it("lets concurrent pending retries race to one atomic completion", async () => {
+    const deps = conversationFixture({ balance: 3, safety: "ordinary" });
+    const service = createConversationService(deps);
+
+    const results = await Promise.all([
+      service.handleInbound(deps.inbound),
+      service.handleInbound(deps.inbound),
+    ]);
+
+    expect(results).toContainEqual({
+      kind: "answer_queued",
+      chargedMessages: 1,
+    });
+    expect(results).toContainEqual({ kind: "duplicate", chargedMessages: 0 });
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
+    expect(deps.messageRepository.auditActions()).toEqual([
+      "conversation.inbound_completed",
+    ]);
+    expect(deps.outbox.topics()).toEqual(["selarti.send"]);
+  });
+
+  it("atomically persists one free no-package result across an unknown completion outcome", async () => {
+    const deps = conversationFixture({ balance: 0, safety: "ordinary" });
+    deps.messageRepository.failNextCompletionAfterCommit(
+      new Error("completion outcome unknown"),
+    );
+    const service = createConversationService(deps);
+
+    await expect(service.handleInbound(deps.inbound)).rejects.toMatchObject({
+      code: "dependency_unavailable",
+    });
+    const retry = await service.handleInbound(deps.inbound);
+
+    expect(retry).toEqual({ kind: "duplicate", chargedMessages: 0 });
+    expect(deps.intentEngine.propose).not.toHaveBeenCalled();
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
+    expect(deps.messageRepository.auditActions()).toEqual([
+      "conversation.inbound_completed",
+    ]);
+    expect(deps.outbox.topics()).toEqual(["client.no_package"]);
     expect(deps.outbox.charges()).toEqual([0]);
   });
 
