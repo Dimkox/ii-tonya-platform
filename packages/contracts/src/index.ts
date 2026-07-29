@@ -4,4 +4,8 @@ export { eventEnvelopeSchema } from "./events.js";
 export type { EventEnvelope } from "./events.js";
 export { toUtcIso } from "./time.js";
 export type { Clock } from "./time.js";
-export { CallbackInfrastructureError } from "./errors.js";
+export {
+  CallbackConflictError,
+  CallbackDataIntegrityError,
+  CallbackInfrastructureError,
+} from "./errors.js";

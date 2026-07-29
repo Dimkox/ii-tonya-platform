@@ -31,7 +31,11 @@ export {
   type ExpertBinding,
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
-export { CallbackInfrastructureError } from "@ii-tonya/contracts";
+export {
+  CallbackConflictError,
+  CallbackDataIntegrityError,
+  CallbackInfrastructureError,
+} from "@ii-tonya/contracts";
 export {
   buildTelegramMethodUrl,
   redactTelegramUrl,

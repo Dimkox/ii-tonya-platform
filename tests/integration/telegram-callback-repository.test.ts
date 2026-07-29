@@ -13,6 +13,31 @@ beforeAll(async () => {
 beforeEach(async () => testDb.reset());
 afterAll(async () => testDb?.stop(), 60_000);
 
+const eligibleIssuanceTimes = () => {
+  const now = Date.now();
+  return {
+    observedAt: new Date(now - 1_000),
+    startsAt: new Date(now + 60 * 60_000),
+    reservedUntil: new Date(now + 30 * 60_000),
+    expiresAtEpochSeconds: Math.floor(now / 1_000) + 10 * 60,
+  };
+};
+
+const makeConfirmIssuanceEligible = async (
+  reservationId: string,
+  times = eligibleIssuanceTimes(),
+) => {
+  await testDb.setTelegramCallbackReservationState(reservationId, {
+    reservedUntil: times.reservedUntil,
+  });
+  await testDb.setTelegramCallbackSlotState(reservationId, {
+    observedAt: times.observedAt,
+    startsAt: times.startsAt,
+    serviceActive: true,
+  });
+  return times;
+};
+
 describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
   it("does not consume for the wrong expert or an expired callback", async () => {
     const repository = new PostgresTelegramCallbackRepository(testDb.db);
@@ -234,12 +259,13 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     const repository = new PostgresTelegramCallbackRepository(testDb.db);
     const owner = await testDb.createTelegramCallbackReservation();
     const attacker = await testDb.createTelegramCallbackReservation();
+    const times = await makeConfirmIssuanceEligible(owner.reservationId);
     const claims = {
       reservationId: owner.reservationId,
       expertId: attacker.expertId,
       action: "confirm" as const,
       version: 1,
-      expiresAtEpochSeconds: 1785233100,
+      expiresAtEpochSeconds: times.expiresAtEpochSeconds,
     };
 
     await expect(repository.put("hash-cross-owner", claims)).rejects.toThrow(
@@ -248,17 +274,68 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     expect(await testDb.notificationCountForToken("hash-cross-owner")).toBe(0);
   });
 
+  it("rejects cross-wired reservation slot and service ownership on put and consume", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const putFixture = await testDb.createTelegramCallbackReservation({
+      reservationVersion: 3,
+    });
+    const putTimes = await makeConfirmIssuanceEligible(
+      putFixture.reservationId,
+    );
+    await testDb.crossWireTelegramCallbackReservation(
+      putFixture.reservationId,
+    );
+    await expect(
+      repository.put("hash-cross-wired-put", {
+        reservationId: putFixture.reservationId,
+        expertId: putFixture.expertId,
+        action: "confirm",
+        version: 3,
+        expiresAtEpochSeconds: putTimes.expiresAtEpochSeconds,
+      }),
+    ).rejects.toMatchObject({
+      name: "CallbackConflictError",
+      retryable: false,
+    });
+    expect(
+      await testDb.notificationCountForToken("hash-cross-wired-put"),
+    ).toBe(0);
+
+    const consumeFixture = await testDb.seedTelegramCallback({
+      tokenHash: "hash-cross-wired-consume",
+      action: "confirm",
+      version: 3,
+      expiresAt: "2026-07-28T10:05:00.000Z",
+    });
+    await testDb.crossWireTelegramCallbackReservation(
+      consumeFixture.claims.reservationId,
+    );
+    await expect(
+      repository.consumeIfValid({
+        tokenHash: consumeFixture.tokenHash,
+        expertId: consumeFixture.claims.expertId,
+        action: "confirm",
+        version: 3,
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
+    expect(
+      await testDb.callbackConsumedAt(consumeFixture.notificationId),
+    ).toBeNull();
+  });
+
   it("persists only an eligible authoritative reservation expert", async () => {
     const repository = new PostgresTelegramCallbackRepository(testDb.db);
     const owner = await testDb.createTelegramCallbackReservation({
       reservationVersion: 3,
     });
+    const ownerTimes = await makeConfirmIssuanceEligible(owner.reservationId);
     const claims = {
       reservationId: owner.reservationId,
       expertId: owner.expertId,
       action: "confirm" as const,
       version: 3,
-      expiresAtEpochSeconds: 1785233100,
+      expiresAtEpochSeconds: ownerTimes.expiresAtEpochSeconds,
     };
     await expect(
       repository.put("hash-authoritative", claims),
@@ -275,6 +352,7 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
         ...flags,
         reservationVersion: 3,
       });
+      await makeConfirmIssuanceEligible(ineligible.reservationId);
       await expect(
         repository.put(tokenHash, {
           ...claims,
@@ -286,22 +364,115 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     }
   });
 
+  it("does not issue confirm callbacks for expired or stale authoritative state", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    for (const [tokenHash, mutate, expiresAtEpochSeconds] of [
+      [
+        "hash-put-expired-token",
+        async () => undefined,
+        Math.floor(Date.now() / 1_000) - 1,
+      ],
+      [
+        "hash-put-expired-hold",
+        async (reservationId: string) =>
+          testDb.setTelegramCallbackReservationState(reservationId, {
+            reservedUntil: new Date(Date.now() - 60_000),
+          }),
+        Math.floor(Date.now() / 1_000) + 600,
+      ],
+      [
+        "hash-put-past-slot",
+        async (reservationId: string) =>
+          testDb.setTelegramCallbackSlotState(reservationId, {
+            startsAt: new Date(Date.now() - 60_000),
+          }),
+        Math.floor(Date.now() / 1_000) + 600,
+      ],
+      [
+        "hash-put-stale-slot",
+        async (reservationId: string) =>
+          testDb.setTelegramCallbackSlotState(reservationId, {
+            observedAt: new Date(Date.now() - 16 * 60_000),
+          }),
+        Math.floor(Date.now() / 1_000) + 600,
+      ],
+      [
+        "hash-put-inactive-service-state",
+        async (reservationId: string) =>
+          testDb.setTelegramCallbackSlotState(reservationId, {
+            serviceActive: false,
+          }),
+        Math.floor(Date.now() / 1_000) + 600,
+      ],
+    ] as const) {
+      const fixture = await testDb.createTelegramCallbackReservation({
+        reservationVersion: 3,
+      });
+      await makeConfirmIssuanceEligible(fixture.reservationId);
+      await mutate(fixture.reservationId);
+      await expect(
+        repository.put(tokenHash, {
+          reservationId: fixture.reservationId,
+          expertId: fixture.expertId,
+          action: "confirm",
+          version: 3,
+          expiresAtEpochSeconds,
+        }),
+      ).rejects.toMatchObject({
+        name: "CallbackConflictError",
+        retryable: false,
+      });
+      expect(await testDb.notificationCountForToken(tokenHash)).toBe(0);
+    }
+  });
+
+  it("issues booked cancellation without confirm-only hold and slot predicates", async () => {
+    const repository = new PostgresTelegramCallbackRepository(testDb.db);
+    const fixture = await testDb.createTelegramCallbackReservation({
+      reservationVersion: 3,
+    });
+    await testDb.setTelegramCallbackReservationState(fixture.reservationId, {
+      status: "booked",
+      reservedUntil: new Date(Date.now() - 60_000),
+    });
+    await testDb.setTelegramCallbackSlotState(fixture.reservationId, {
+      startsAt: new Date(Date.now() - 60_000),
+      observedAt: new Date(Date.now() - 60 * 60_000),
+      serviceActive: false,
+    });
+    await expect(
+      repository.put("hash-put-booked-cancel", {
+        reservationId: fixture.reservationId,
+        expertId: fixture.expertId,
+        action: "cancel",
+        version: 3,
+        expiresAtEpochSeconds: Math.floor(Date.now() / 1_000) + 600,
+      }),
+    ).resolves.toBeUndefined();
+    expect(
+      await testDb.notificationCountForToken("hash-put-booked-cancel"),
+    ).toBe(1);
+  });
+
   it("caps confirm callback expiry at the authoritative reservation hold", async () => {
     const repository = new PostgresTelegramCallbackRepository(testDb.db);
     const owner = await testDb.createTelegramCallbackReservation({
       reservationVersion: 3,
     });
+    const times = eligibleIssuanceTimes();
+    times.reservedUntil.setMilliseconds(0);
+    await makeConfirmIssuanceEligible(owner.reservationId, times);
     const requestedClaims = {
       reservationId: owner.reservationId,
       expertId: owner.expertId,
       action: "confirm" as const,
       version: 3,
-      expiresAtEpochSeconds: 1785585600,
+      expiresAtEpochSeconds: times.expiresAtEpochSeconds + 60 * 60,
     };
     await repository.put("hash-expiry-cap", requestedClaims);
     await expect(repository.peek("hash-expiry-cap")).resolves.toEqual({
       ...requestedClaims,
-      expiresAtEpochSeconds: 1785492000,
+      expiresAtEpochSeconds: Math.floor(times.reservedUntil.getTime() / 1_000),
     });
   });
 });

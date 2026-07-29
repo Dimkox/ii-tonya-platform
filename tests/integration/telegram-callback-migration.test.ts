@@ -110,12 +110,23 @@ describe("Telegram callback 0005 to 0006 migration", () => {
     const fresh = await testDb.createTelegramCallbackReservation({
       reservationVersion: 3,
     });
+    const now = new Date();
+    const verifyAt = new Date(now.getTime() + 1_000);
+    const expiresAtEpochSeconds = Math.floor(now.getTime() / 1_000) + 600;
+    await testDb.setTelegramCallbackReservationState(fresh.reservationId, {
+      reservedUntil: new Date(now.getTime() + 30 * 60_000),
+    });
+    await testDb.setTelegramCallbackSlotState(fresh.reservationId, {
+      startsAt: new Date(now.getTime() + 60 * 60_000),
+      observedAt: now,
+      serviceActive: true,
+    });
     const claims = {
       reservationId: fresh.reservationId,
       expertId: fresh.expertId,
       action: "confirm" as const,
       version: 3,
-      expiresAtEpochSeconds: 1785233100,
+      expiresAtEpochSeconds,
     };
     const secret = new TextEncoder().encode(
       "__PLACEHOLDER_TELEGRAM_CALLBACK_HMAC_KEY__",
@@ -134,7 +145,7 @@ describe("Telegram callback 0005 to 0006 migration", () => {
         },
         secret,
         repository,
-        new Date("2026-07-28T10:00:00.000Z"),
+        verifyAt,
       ),
     ).resolves.toEqual(claims);
   });

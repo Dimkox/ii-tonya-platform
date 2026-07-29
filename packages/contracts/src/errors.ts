@@ -11,3 +11,23 @@ export class CallbackInfrastructureError extends Error {
     this.code = code;
   }
 }
+
+export class CallbackDataIntegrityError extends Error {
+  readonly code = "callback_data_integrity";
+  readonly retryable = false;
+
+  constructor(cause?: unknown) {
+    super("Callback data integrity failure", { cause });
+    this.name = "CallbackDataIntegrityError";
+  }
+}
+
+export class CallbackConflictError extends Error {
+  readonly code = "callback_conflict";
+  readonly retryable = false;
+
+  constructor(cause?: unknown) {
+    super("Callback operation conflict", { cause });
+    this.name = "CallbackConflictError";
+  }
+}

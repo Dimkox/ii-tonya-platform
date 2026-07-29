@@ -1,4 +1,8 @@
-import { CallbackInfrastructureError } from "@ii-tonya/contracts";
+import {
+  CallbackConflictError,
+  CallbackDataIntegrityError,
+  CallbackInfrastructureError,
+} from "@ii-tonya/contracts";
 import type { QueryResult, QueryResultRow } from "pg";
 import type { DrizzleDb } from "../client.js";
 
@@ -30,12 +34,48 @@ const callbackStoreQuery = async <Row extends QueryResultRow>(
   try {
     return await db.$client.query<Row>(statement, values);
   } catch (error) {
-    throw new CallbackInfrastructureError("callback_store_unavailable", error);
+    const sqlState =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : undefined;
+    const retryableSqlStates = new Set([
+      "40001",
+      "40P01",
+      "57P01",
+      "57P02",
+      "57P03",
+      "53000",
+      "53100",
+      "53200",
+      "53300",
+      "53400",
+    ]);
+    if (
+      sqlState?.startsWith("08") === true ||
+      (sqlState !== undefined && retryableSqlStates.has(sqlState))
+    ) {
+      throw new CallbackInfrastructureError(
+        "callback_store_unavailable",
+        error,
+      );
+    }
+    if (sqlState?.startsWith("23") === true) {
+      throw new CallbackConflictError(error);
+    }
+    throw new CallbackDataIntegrityError(error);
   }
 };
 
 const parseClaims = (value: string): StoredExpertCallbackClaims => {
-  const parsed = JSON.parse(value) as Partial<StoredExpertCallbackClaims>;
+  let parsed: Partial<StoredExpertCallbackClaims>;
+  try {
+    parsed = JSON.parse(value) as Partial<StoredExpertCallbackClaims>;
+  } catch (error) {
+    throw new CallbackDataIntegrityError(error);
+  }
   if (
     typeof parsed.reservationId !== "string" ||
     typeof parsed.expertId !== "string" ||
@@ -45,7 +85,7 @@ const parseClaims = (value: string): StoredExpertCallbackClaims => {
     !Number.isSafeInteger(parsed.expiresAtEpochSeconds) ||
     (parsed.expiresAtEpochSeconds ?? 0) <= 0
   ) {
-    throw new Error("Stored callback claims are invalid");
+    throw new CallbackDataIntegrityError();
   }
   return parsed as StoredExpertCallbackClaims;
 };
@@ -97,13 +137,28 @@ export class PostgresTelegramCallbackRepository {
           $8
         from reservations r
         join experts e on e.id = r.expert_id
+        join slots s
+          on s.id = r.slot_id
+          and s.expert_service_id = r.expert_service_id
+        join expert_services es
+          on es.id = r.expert_service_id
+          and es.expert_id = r.expert_id
         where r.id = $1::uuid
           and r.expert_id = $6::uuid
           and e.active
           and e.verified
           and r.version = $8
+          and to_timestamp($5) > now()
           and (
-            ($7 = 'confirm' and r.status = 'reserved')
+            (
+              $7 = 'confirm'
+              and r.status = 'reserved'
+              and r.reserved_until > now()
+              and s.starts_at > now()
+              and s.observed_at >= now() - interval '15 minutes'
+              and s.observed_at <= now()
+              and es.active
+            )
             or ($7 = 'cancel' and r.status in ('reserved', 'booked'))
           )
         returning id
@@ -120,7 +175,7 @@ export class PostgresTelegramCallbackRepository {
       ],
     );
     if (result.rowCount !== 1) {
-      throw new Error("Callback persistence rejected");
+      throw new CallbackConflictError();
     }
   }
 
@@ -137,14 +192,7 @@ export class PostgresTelegramCallbackRepository {
     );
     const value = result.rows[0]?.callback_claims;
     if (value === undefined) return null;
-    try {
-      return parseClaims(value);
-    } catch (error) {
-      throw new CallbackInfrastructureError(
-        "callback_store_unavailable",
-        error,
-      );
-    }
+    return parseClaims(value);
   }
 
   async consumeIfValid(
@@ -164,8 +212,12 @@ export class PostgresTelegramCallbackRepository {
         set callback_consumed_at = $5, updated_at = $5
         from reservations r
         join experts e on e.id = r.expert_id
-        join slots s on s.id = r.slot_id
-        join expert_services es on es.id = r.expert_service_id
+        join slots s
+          on s.id = r.slot_id
+          and s.expert_service_id = r.expert_service_id
+        join expert_services es
+          on es.id = r.expert_service_id
+          and es.expert_id = r.expert_id
         where n.callback_token_hash = $1
           and n.reservation_id = r.id
           and n.callback_consumed_at is null
@@ -202,13 +254,6 @@ export class PostgresTelegramCallbackRepository {
     );
     const value = result.rows[0]?.callback_claims;
     if (value === undefined) return null;
-    try {
-      return parseClaims(value);
-    } catch (error) {
-      throw new CallbackInfrastructureError(
-        "callback_store_unavailable",
-        error,
-      );
-    }
+    return parseClaims(value);
   }
 }

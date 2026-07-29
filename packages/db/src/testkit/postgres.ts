@@ -204,6 +204,7 @@ export interface TestDatabase {
       serviceActive?: boolean;
     },
   ): Promise<void>;
+  crossWireTelegramCallbackReservation(reservationId: string): Promise<void>;
 }
 
 function oneId(rows: { id: string }[]): string {
@@ -1068,6 +1069,14 @@ export async function startTestPostgres(
             and es.id = r.expert_service_id
         `);
       }
+    },
+    async crossWireTelegramCallbackReservation(reservationId) {
+      const other = await createExpert();
+      await db.execute(sql`
+        update reservations
+        set expert_service_id = ${other.serviceId}::uuid, updated_at = now()
+        where id = ${reservationId}::uuid
+      `);
     },
   };
 }
