@@ -16,6 +16,7 @@ const schema = z.object({
     "DATABASE_URL must be a hierarchical postgres: or postgresql: URL with a host and database path",
   ),
   SELARTI_ENABLED: z.literal("false").default("false"),
+  SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
   PLANERKA_ENABLED: z.literal("false").default("false"),
   TELEGRAM_ENABLED: z.literal("false").default("false"),
   LLM_ENABLED: z.literal("false").default("false"),
@@ -42,6 +43,7 @@ export type RuntimeConfig = {
   };
   minorOnboarding: false;
   rawConversationLogging: false;
+  selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
 };
 
@@ -64,6 +66,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     },
     minorOnboarding: false,
     rawConversationLogging: false,
+    selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
   };
 }

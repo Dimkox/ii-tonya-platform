@@ -17,6 +17,7 @@ describe("loadEnv", () => {
     });
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
+    expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(() => loadEnv({ DATABASE_URL: databaseUrl, RAW_CONVERSATION_LOGGING: "true" })).toThrow(
       "Raw conversation logging is prohibited",
     );
@@ -75,5 +76,11 @@ describe("loadEnv", () => {
     }).databaseUrl).toBe(databaseUrl);
     expect(() => loadEnv({ DATABASE_URL: databaseUrl, PAYMENT_PROVIDER: "stripe" })).toThrow();
     expect(() => loadEnv({ DATABASE_URL: databaseUrl, LLM_PROVIDER: "openai" })).toThrow();
+    expect(() =>
+      loadEnv({
+        DATABASE_URL: databaseUrl,
+        SELARTI_OUTBOUND_BILLING_MODE: "delivery",
+      }),
+    ).toThrow();
   });
 });

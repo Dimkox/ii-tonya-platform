@@ -1,0 +1,14 @@
+{
+  "source_document": "https://docs.selarti.com/",
+  "captured_at": "2026-07-29T00:00:00.000Z",
+  "sanitized": true,
+  "contract_status": "failure_semantics_contract_harness_only",
+  "transport": {
+    "phase": "before_write"
+  },
+  "expected": {
+    "kind": "not_applied",
+    "retryable": true,
+    "reasonCode": "timeout_before_write"
+  }
+}
