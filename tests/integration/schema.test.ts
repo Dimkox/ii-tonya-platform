@@ -11,9 +11,9 @@ let testDb: TestDatabase | undefined;
 beforeAll(async () => {
   testDb = await startTestPostgres();
   await migrate(testDb.db, { migrationsFolder: "packages/db/migrations" });
-});
+}, 120_000);
 
-afterAll(async () => testDb?.stop());
+afterAll(async () => testDb?.stop(), 60_000);
 
 describe("MVP schema", () => {
   it("creates the authoritative MVP and operational-support tables", async () => {
