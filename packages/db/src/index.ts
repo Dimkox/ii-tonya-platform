@@ -20,11 +20,18 @@ export {
 } from "./repositories/booking-repository.js";
 export {
   CompensationConflictError,
+  ConversationCompletionDataError,
   PostgresMessageRepository,
   type AcceptInboundCommand,
   type AcceptInboundResult,
+  type CommittedInboundResult,
+  type CompleteInboundCommand,
+  type CompleteInboundResult,
   type CompensateDebitCommand,
+  type InboundCompletionOutcome,
   type MessageRepository,
+  type MessageRepositoryOptions,
+  type PreparedInbound,
   type RecordOutboundDeliveryCommand,
   withSerializableRetry,
 } from "./repositories/message-repository.js";
