@@ -116,3 +116,48 @@ PLANERKA_WEBHOOK_SECRET=__PLACEHOLDER_PLANERKA_WEBHOOK_SECRET__
 Every disabled adapter method throws `Planerka integration is disabled`. Provider
 activation requires a separate reviewed change after every missing evidence field
 above is supplied and approved.
+
+## Payments
+
+| Evidence or commercial decision                 | Status                              |
+| ----------------------------------------------- | ----------------------------------- |
+| Payment provider and immutable contract version | Not selected or approved            |
+| Prices                                          | Not approved                        |
+| Package composition                             | Not approved                        |
+| Refund policy                                   | Not approved                        |
+| Chargeback policy                               | Not approved                        |
+| No-show policy                                  | Not approved                        |
+| Receipt and fiscal requirements                 | Not approved                        |
+| Legal basis and data-processing terms           | Not approved                        |
+| Authenticated webhook contract and replay rules | Not available                       |
+| Idempotency and authoritative reconciliation    | Not available                       |
+| Sandbox tenant and test identities              | Not available                       |
+| Credential owner                                | Not assigned                        |
+| Security and legal reviewers                    | Not assigned                        |
+| Product approver                                | Not assigned                        |
+| Dual-control activation approval                | Not defined or granted              |
+| Evidence date                                   | 2026-07-29                          |
+| Expiry/review date                              | Not assigned                        |
+
+**Activation status: `NO-GO`.**
+
+`CreateCheckoutCommand`, `PaymentWebhookCommand`, and `RefundCommand` are internal
+type boundaries only. They do not establish prices, currencies, package contents,
+refund eligibility, provider payloads, fiscal treatment, or entitlement rules.
+`DisabledPaymentAdapter` is the only payment binding. Every operation throws a
+`PaymentsDisabledError` whose code is `PAYMENTS_DISABLED`, without inspecting the
+command.
+
+No payment route, provider client, codec, webhook mutation handler, database table,
+payment event consumer, entitlement grant, credential lookup, or authenticated
+session is supplied. Runtime configuration remains:
+
+```text
+PAYMENTS_ENABLED=false
+PAYMENT_PROVIDER=disabled
+PAYMENT_API_KEY=__PLACEHOLDER_PAYMENT_API_KEY__
+PAYMENT_WEBHOOK_SECRET=__PLACEHOLDER_PAYMENT_WEBHOOK_SECRET__
+```
+
+Activation requires a separate dual-controlled change after every missing evidence
+and policy item above is supplied, reviewed, and approved.

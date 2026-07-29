@@ -17,6 +17,16 @@ export {
   type ProviderSlot,
 } from "./planerka/planerka-port.js";
 export {
+  DisabledPaymentAdapter,
+  PaymentsDisabledError,
+} from "./payment/disabled-payment-adapter.js";
+export type {
+  CreateCheckoutCommand,
+  PaymentPort,
+  PaymentWebhookCommand,
+  RefundCommand,
+} from "./payment/payment-port.js";
+export {
   SelartiContractAdapter,
   type SelartiContractAdapterDeps,
   type SelartiTransport,
