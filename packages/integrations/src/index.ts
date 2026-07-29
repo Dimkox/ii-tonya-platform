@@ -1,6 +1,9 @@
 export {
+  createSignedWebhookVerifier,
   verifySignedWebhook,
   type SignedWebhookInput,
+  type SignedWebhookRequest,
+  type SignedWebhookVerifierConfig,
   type WebhookRejectionReason,
   type WebhookVerification,
 } from "./http/webhook-auth.js";

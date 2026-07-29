@@ -17,6 +17,6 @@
   },
   "expected": {
     "kind": "duplicate",
-    "providerEventId": "company-fixture-1:message-fixture-1"
+    "providerEventId": "selarti:03dbd50f9a40db6f59c0edf18cdb96d4be9bfc96dae8c25c34d302ae69cf5ba8"
   }
 }

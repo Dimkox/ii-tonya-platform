@@ -6,7 +6,7 @@
   "transport": {
     "status": 429,
     "headers": {
-      "retry-after": "3"
+      "Retry-After": "3"
     },
     "body": {}
   },

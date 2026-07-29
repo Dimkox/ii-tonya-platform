@@ -18,6 +18,7 @@ export interface SignedWebhookInput {
 }
 
 const integerTimestamp = /^\d+$/u;
+const sha256HexSignature = /^[0-9a-f]{64}$/u;
 
 export function verifySignedWebhook(
   input: SignedWebhookInput,
@@ -33,6 +34,12 @@ export function verifySignedWebhook(
   }
   if (!integerTimestamp.test(input.timestamp)) {
     return { accepted: false, reason: "timestamp" };
+  }
+  if (
+    input.secret.trim().length === 0 ||
+    !sha256HexSignature.test(input.signature)
+  ) {
+    return { accepted: false, reason: "signature" };
   }
 
   const timestamp = Number(input.timestamp);
@@ -51,11 +58,38 @@ export function verifySignedWebhook(
     .update(input.body)
     .digest("hex");
   const actualBytes = Buffer.from(input.signature, "utf8");
-  const fixedActual = Buffer.alloc(expected.length);
-  actualBytes.copy(fixedActual, 0, 0, expected.length);
-  const matches = timingSafeEqual(Buffer.from(expected, "utf8"), fixedActual);
+  const matches = timingSafeEqual(Buffer.from(expected, "utf8"), actualBytes);
 
-  return actualBytes.length === expected.length && matches
+  return matches
     ? { accepted: true }
     : { accepted: false, reason: "signature" };
+}
+
+export type SignedWebhookRequest = Pick<
+  SignedWebhookInput,
+  "body" | "contentType" | "signature" | "timestamp"
+>;
+
+export interface SignedWebhookVerifierConfig {
+  secret: string;
+  nowEpochSeconds(): number;
+  maxAgeSeconds: number;
+  maxBodyBytes: number;
+}
+
+export function createSignedWebhookVerifier(
+  config: SignedWebhookVerifierConfig,
+): (request: SignedWebhookRequest) => WebhookVerification {
+  if (config.secret.trim().length === 0) {
+    throw new Error("invalid_webhook_secret_configuration");
+  }
+
+  return (request) =>
+    verifySignedWebhook({
+      ...request,
+      secret: config.secret,
+      nowEpochSeconds: config.nowEpochSeconds(),
+      maxAgeSeconds: config.maxAgeSeconds,
+      maxBodyBytes: config.maxBodyBytes,
+    });
 }

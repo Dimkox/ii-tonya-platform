@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  createSignedWebhookVerifier,
   DisabledSelartiAdapter,
   SelartiContractAdapter,
   TransportFailure,
@@ -33,7 +34,20 @@ const fixtureNames = [
   "rate-limit",
   "timeout-before-send",
   "timeout-after-send",
+  "outbound-accepted-ambiguous",
+  "outbound-service-unavailable",
+  "outbound-send-wrong-content-type",
+  "outbound-send-extra-field",
   "oversized-body",
+  "invalid-utf8",
+  "identity-collision-a",
+  "identity-collision-b",
+  "message-type-agent",
+  "message-type-system",
+  "message-type-outbound",
+  "message-type-status",
+  "message-type-delivery",
+  "message-type-unknown",
   "delivery-contract-unconfirmed",
 ] as const;
 
@@ -111,6 +125,7 @@ describe("Selarti boundary", () => {
       [{ timestamp: "1785232800.5" }, "timestamp"],
       [{ timestamp: "1785232000" }, "timestamp"],
       [{ signature: "forged" }, "signature"],
+      [{ signature: "a".repeat(1_000_000) }, "signature"],
     ] as const;
 
     for (const [override, reason] of cases) {
@@ -122,6 +137,20 @@ describe("Selarti boundary", () => {
       });
     }
   });
+
+  it.each(["", " ", "\t\r\n"])(
+    "rejects an empty webhook HMAC secret when constructing the verifier",
+    (secret) => {
+      expect(() =>
+        createSignedWebhookVerifier({
+          secret,
+          nowEpochSeconds: () => 1785232800,
+          maxAgeSeconds: 300,
+          maxBodyBytes: 64_000,
+        }),
+      ).toThrow("invalid_webhook_secret_configuration");
+    },
+  );
 
   it("cannot decode or send while the official provider contract is unapproved", async () => {
     const adapter = new DisabledSelartiAdapter();
@@ -172,24 +201,112 @@ describe("Selarti boundary", () => {
     expect(mutations).toHaveBeenCalledWith(fixture("inbound-success").expected);
   });
 
-  it("authenticates before parsing a webhook payload", async () => {
-    const authenticate = vi.fn(() => ({
-      accepted: false,
-      reason: "signature" as const,
-    }));
+  it.each([
+    "missing_header",
+    "content_type",
+    "body_size",
+    "timestamp",
+    "signature",
+  ] as const)(
+    "exposes one generic boundary error for internal webhook auth rejection %s",
+    async (reason) => {
+      const authenticate = vi.fn(() => ({
+        accepted: false as const,
+        reason,
+      }));
+      const adapter = new SelartiContractAdapter({
+        transport: fixtureTransport(fixture("inbound-success")),
+        authenticate,
+        maxBodyBytes: 64_000,
+      });
+
+      await expect(
+        adapter.decodeVerifiedWebhook(Buffer.from("{not-json"), {
+          "content-type": "application/json",
+        }),
+      ).rejects.toThrow("webhook_auth_rejected");
+      expect(authenticate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 0, 1.5, 64_001])(
+    "rejects an unsafe maxBodyBytes configuration: %s",
+    (maxBodyBytes) => {
+      expect(
+        () =>
+          new SelartiContractAdapter({
+            transport: fixtureTransport(fixture("inbound-success")),
+            authenticate: () => ({ accepted: true }),
+            maxBodyBytes,
+          }),
+      ).toThrow("invalid_max_body_bytes");
+    },
+  );
+
+  it("rejects malformed UTF-8 before JSON/schema normalization", async () => {
+    const value = fixture("invalid-utf8");
+    const body = Buffer.from(JSON.stringify(value.body));
+    const textOffset = body.indexOf("sanitized fixture message");
+    expect(textOffset).toBeGreaterThanOrEqual(0);
+    body[textOffset] = 0xff;
     const adapter = new SelartiContractAdapter({
-      transport: fixtureTransport(fixture("inbound-success")),
-      authenticate,
+      transport: fixtureTransport(value),
+      authenticate: () => ({ accepted: true }),
       maxBodyBytes: 64_000,
     });
 
     await expect(
-      adapter.decodeVerifiedWebhook(Buffer.from("{not-json"), {
+      adapter.decodeVerifiedWebhook(body, {
         "content-type": "application/json",
       }),
-    ).rejects.toThrow("webhook_auth_signature");
-    expect(authenticate).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow("invalid_schema");
   });
+
+  it("uses collision-resistant structured identity for provider events", async () => {
+    const adapter = new SelartiContractAdapter({
+      transport: fixtureTransport(fixture("inbound-success")),
+      authenticate: () => ({ accepted: true }),
+      maxBodyBytes: 64_000,
+    });
+    const first = await adapter.decodeVerifiedWebhook(
+      rawBody(fixture("identity-collision-a")),
+      { "content-type": "application/json" },
+    );
+    const second = await adapter.decodeVerifiedWebhook(
+      rawBody(fixture("identity-collision-b")),
+      { "content-type": "application/json" },
+    );
+
+    expect(first.providerEventId).not.toBe(second.providerEventId);
+    expect(first.providerEventId).toMatch(/^selarti:[a-f0-9]{64}$/);
+    expect(second.providerEventId).toMatch(/^selarti:[a-f0-9]{64}$/);
+  });
+
+  it.each([
+    "message-type-agent",
+    "message-type-system",
+    "message-type-outbound",
+    "message-type-status",
+    "message-type-delivery",
+    "message-type-unknown",
+  ] as const)(
+    "rejects unsupported message direction fixture %s without mutation",
+    async (name) => {
+      const mutations = vi.fn();
+      const adapter = new SelartiContractAdapter({
+        transport: fixtureTransport(fixture(name)),
+        authenticate: () => ({ accepted: true }),
+        maxBodyBytes: 64_000,
+      });
+
+      await expect(
+        adapter.decodeVerifiedWebhook(rawBody(fixture(name)), {
+          "content-type": "application/json",
+        }),
+      ).rejects.toThrow("invalid_schema");
+      expect(mutations).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     [
@@ -229,6 +346,38 @@ describe("Selarti boundary", () => {
         reasonCode: "timeout_after_write",
       },
     ],
+    [
+      "outbound-accepted-ambiguous",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "http_202",
+      },
+    ],
+    [
+      "outbound-service-unavailable",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "http_503",
+      },
+    ],
+    [
+      "outbound-send-wrong-content-type",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "malformed_success_response",
+      },
+    ],
+    [
+      "outbound-send-extra-field",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "malformed_success_response",
+      },
+    ],
   ] as const)(
     "normalizes the sanitized Selarti transport fixture %s",
     async (name, expected) => {
@@ -238,6 +387,7 @@ describe("Selarti boundary", () => {
         transport,
         authenticate: () => ({ accepted: true }),
         maxBodyBytes: 64_000,
+        rateLimitResponsePolicy: "confirmed_not_applied",
       });
       const command = {
         idempotencyKey: "selarti-send-fixture-1",
@@ -260,7 +410,7 @@ describe("Selarti boundary", () => {
           .fn()
           .mockResolvedValueOnce({
             status: 429,
-            headers: { "retry-after": "999" },
+            headers: { "Retry-After": "999" },
             body: {},
           })
           .mockResolvedValueOnce({
@@ -271,6 +421,7 @@ describe("Selarti boundary", () => {
       },
       authenticate: () => ({ accepted: true }),
       maxBodyBytes: 64_000,
+      rateLimitResponsePolicy: "confirmed_not_applied",
     });
     const command = {
       idempotencyKey: "retry-boundary",
@@ -285,6 +436,56 @@ describe("Selarti boundary", () => {
       kind: "not_applied",
       retryable: true,
       reasonCode: "rate_limited",
+    });
+  });
+
+  it("does not treat rate limiting as not-applied without an explicit policy", async () => {
+    const adapter = new SelartiContractAdapter({
+      transport: {
+        request: vi.fn(async () => ({
+          status: 429,
+          headers: { "Retry-After": "3" },
+          body: {},
+        })),
+      },
+      authenticate: () => ({ accepted: true }),
+      maxBodyBytes: 64_000,
+    });
+
+    await expect(
+      adapter.sendMessage({
+        idempotencyKey: "rate-limit-unconfirmed",
+        channelUserId: "channel-1",
+        text: "fixture",
+      }),
+    ).resolves.toEqual({
+      kind: "unknown_outcome",
+      reconciliationKey: "rate-limit-unconfirmed",
+      reasonCode: "http_429",
+    });
+  });
+
+  it("normalizes an unclassified transport exception to unknown outcome", async () => {
+    const adapter = new SelartiContractAdapter({
+      transport: {
+        request: vi.fn(async () => {
+          throw new Error("socket failure details must not escape");
+        }),
+      },
+      authenticate: () => ({ accepted: true }),
+      maxBodyBytes: 64_000,
+    });
+
+    await expect(
+      adapter.sendMessage({
+        idempotencyKey: "unclassified-transport",
+        channelUserId: "channel-1",
+        text: "fixture",
+      }),
+    ).resolves.toEqual({
+      kind: "unknown_outcome",
+      reconciliationKey: "unclassified-transport",
+      reasonCode: "transport_failure_unknown_phase",
     });
   });
 });

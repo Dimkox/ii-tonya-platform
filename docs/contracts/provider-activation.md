@@ -42,6 +42,16 @@ Missing or ambiguous evidence is a `NO-GO`.
 
 The inbound fixture's `occurred_at` field is an explicit contract hypothesis needed
 for canonical event time; it is not treated as provider-confirmed evidence.
+Only the explicit `message_type = client` harness literal maps to
+`CanonicalInboundMessage`; every other direction or unknown type is rejected. The
+canonical event identity hashes a serialized `[company_id, message_id]` tuple so
+provider identifiers containing delimiters cannot collide.
+
+Outbound `applied` requires an exact JSON content type and a strict response body
+with one stable operation ID. Any ambiguous post-write HTTP response, unclassified
+transport exception, or unconfirmed rate-limit response becomes `unknown_outcome`
+with the original reconciliation key. A `429` is retryable as `not_applied` only
+when an explicit reviewed policy proves that response means no provider mutation.
 
 `SelartiContractAdapter` is an unbound codec and transport harness. The API
 composition root does not construct it, and the repository contains no live Selarti
