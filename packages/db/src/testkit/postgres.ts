@@ -225,43 +225,116 @@ type ClientClosureTrackedPool = Pool & {
   waitForClosedClients(): Promise<void>;
 };
 
-export function trackPoolClientClosures(pool: Pool): ClientClosureTrackedPool {
-  const pendingClosures = new Set<Promise<void>>();
+interface ClientClosureTrackingOptions {
+  shutdownTimeoutMs?: number;
+}
+
+interface PendingClientClosure {
+  terminal: Promise<void>;
+  cleanup(): void;
+}
+
+const DEFAULT_CLIENT_CLOSURE_TIMEOUT_MS = 5_000;
+
+export class PostgresClientClosureTimeoutError extends Error {
+  readonly code = "POSTGRES_CLIENT_CLOSURE_TIMEOUT";
+
+  constructor(
+    readonly timeoutMs: number,
+    readonly openClientCount: number,
+  ) {
+    super(
+      `Timed out after ${timeoutMs}ms waiting for ${openClientCount} PostgreSQL client(s) to close`,
+    );
+    this.name = "PostgresClientClosureTimeoutError";
+  }
+}
+
+export function trackPoolClientClosures(
+  pool: Pool,
+  options: ClientClosureTrackingOptions = {},
+): ClientClosureTrackedPool {
+  const shutdownTimeoutMs =
+    options.shutdownTimeoutMs ?? DEFAULT_CLIENT_CLOSURE_TIMEOUT_MS;
+  if (!Number.isFinite(shutdownTimeoutMs) || shutdownTimeoutMs <= 0) {
+    throw new RangeError("PostgreSQL client closure timeout must be positive");
+  }
+
+  const pendingClosures = new Map<PoolClient, PendingClientClosure>();
   const closureErrors: unknown[] = [];
 
   const onConnect = (client: PoolClient): void => {
+    if (pendingClosures.has(client)) return;
+    let resolveTerminal: (() => void) | undefined;
     const terminal = new Promise<void>((resolve) => {
-      const cleanup = (): void => {
-        client.removeListener("end", onEnd);
-        client.removeListener("error", onError);
-      };
-      const onEnd = (): void => {
-        cleanup();
-        resolve();
-      };
-      const onError = (error: unknown): void => {
-        closureErrors.push(error);
-      };
-
-      client.once("end", onEnd);
-      client.once("error", onError);
+      resolveTerminal = resolve;
     });
-    pendingClosures.add(terminal);
-    void terminal.then(() => pendingClosures.delete(terminal));
+    const onEnd = (): void => {
+      cleanup();
+      resolveTerminal?.();
+    };
+    const onError = (error: unknown): void => {
+      closureErrors.push(error);
+    };
+    const cleanup = (): void => {
+      client.removeListener("end", onEnd);
+      client.removeListener("error", onError);
+    };
+    const pending = { terminal, cleanup };
+    pendingClosures.set(client, pending);
+    void terminal.then(() => {
+      if (pendingClosures.get(client) === pending) {
+        pendingClosures.delete(client);
+      }
+    });
+    client.once("end", onEnd);
+    client.once("error", onError);
   };
 
   pool.on("connect", onConnect);
 
   return Object.assign(pool, {
     async waitForClosedClients(): Promise<void> {
-      while (pendingClosures.size > 0) {
-        await Promise.all([...pendingClosures]);
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      let waitError: unknown;
+      try {
+        if (pendingClosures.size > 0) {
+          const timeout = new Promise<void>((_resolve, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(
+                new PostgresClientClosureTimeoutError(
+                  shutdownTimeoutMs,
+                  pendingClosures.size,
+                ),
+              );
+            }, shutdownTimeoutMs);
+          });
+          while (pendingClosures.size > 0) {
+            await Promise.race([
+              Promise.all(
+                [...pendingClosures.values()].map(({ terminal }) => terminal),
+              ).then(() => undefined),
+              timeout,
+            ]);
+          }
+        }
+      } catch (error) {
+        waitError = error;
+      } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+        pool.removeListener("connect", onConnect);
+        for (const { cleanup } of pendingClosures.values()) cleanup();
+        pendingClosures.clear();
       }
-      pool.removeListener("connect", onConnect);
-      if (closureErrors.length === 1) throw closureErrors[0];
-      if (closureErrors.length > 1) {
+
+      const errors =
+        waitError === undefined
+          ? closureErrors
+          : [...closureErrors, waitError];
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) {
         throw new AggregateError(
-          closureErrors,
+          errors,
           "PostgreSQL clients failed while closing",
         );
       }

@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "../client.js";
 import {
+  PostgresClientClosureTimeoutError,
   startTestPostgres,
   trackPoolClientClosures,
   type TestPostgresDependencies,
@@ -228,6 +229,79 @@ describe("PostgreSQL testkit lifecycle", () => {
     await expect(stopping).rejects.toBe(poolFailure);
     expect(startedContainer.stop).toHaveBeenCalledOnce();
     expect(rawPool.listenerCount("connect")).toBe(0);
+  });
+
+  it("times out a missing terminal event, cleans listeners, and stops the container", async () => {
+    vi.useFakeTimers();
+    try {
+      const startedContainer = container();
+      const rawPool = new EventEmitter() as Pool;
+      rawPool.end = vi.fn(async () => undefined);
+      const pool = trackPoolClientClosures(rawPool, {
+        shutdownTimeoutMs: 25,
+      });
+      const client = new EventEmitter() as PoolClient;
+      const dependencies: TestPostgresDependencies = {
+        startContainer: vi.fn(async () => startedContainer),
+        createPool: vi.fn(() => pool),
+        createDb: vi.fn(() => ({}) as DrizzleDb),
+      };
+      const testDb = await startTestPostgres(dependencies);
+
+      rawPool.emit("connect", client);
+      const stopping = testDb.stop();
+      const rejected = expect(stopping).rejects.toBeInstanceOf(
+        PostgresClientClosureTimeoutError,
+      );
+      await vi.advanceTimersByTimeAsync(25);
+
+      await rejected;
+      expect(startedContainer.stop).toHaveBeenCalledOnce();
+      expect(rawPool.listenerCount("connect")).toBe(0);
+      expect(client.listenerCount("end")).toBe(0);
+      expect(client.listenerCount("error")).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aggregates pool rejection before a bounded client closure timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const startedContainer = container();
+      const poolFailure = new Error("pool close failed");
+      const rawPool = new EventEmitter() as Pool;
+      rawPool.end = vi.fn(async () => Promise.reject(poolFailure));
+      const pool = trackPoolClientClosures(rawPool, {
+        shutdownTimeoutMs: 25,
+      });
+      const client = new EventEmitter() as PoolClient;
+      const dependencies: TestPostgresDependencies = {
+        startContainer: vi.fn(async () => startedContainer),
+        createPool: vi.fn(() => pool),
+        createDb: vi.fn(() => ({}) as DrizzleDb),
+      };
+      const testDb = await startTestPostgres(dependencies);
+
+      rawPool.emit("connect", client);
+      const stopping = testDb.stop();
+      const rejected = expect(stopping).rejects.toMatchObject({
+        message: "Failed to stop test database resources",
+        errors: [
+          poolFailure,
+          expect.any(PostgresClientClosureTimeoutError),
+        ],
+      });
+      await vi.advanceTimersByTimeAsync(25);
+
+      await rejected;
+      expect(startedContainer.stop).toHaveBeenCalledOnce();
+      expect(rawPool.listenerCount("connect")).toBe(0);
+      expect(client.listenerCount("end")).toBe(0);
+      expect(client.listenerCount("error")).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("aggregates ordered pool and container shutdown failures", async () => {
