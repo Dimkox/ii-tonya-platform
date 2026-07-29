@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
@@ -5,8 +6,32 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "../schema/index.js";
 import type { DrizzleDb } from "../client.js";
+import type { ReserveSlotCommand } from "../repositories/booking-repository.js";
 
 type LedgerKind = "debit" | "free";
+type ConfirmEligibilityCase =
+  | "expired_hold"
+  | "wrong_expert"
+  | "inactive_expert"
+  | "past_slot"
+  | "stale_slot";
+
+interface ReservableFixture {
+  command: ReserveSlotCommand;
+  expertId: string;
+}
+
+interface OverlappingClientFixture {
+  clientId: string;
+  first: ReserveSlotCommand;
+  second: ReserveSlotCommand;
+}
+
+interface OverlappingExpertFixture {
+  expertId: string;
+  first: ReserveSlotCommand;
+  second: ReserveSlotCommand;
+}
 
 interface TestContainerHandle {
   getConnectionUri(): string;
@@ -51,6 +76,23 @@ export interface TestDatabase {
   appendCompensation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
   appendRevocation(packageId: string, originalEntryId: string, idempotencyKey: string): Promise<void>;
   ledgerFactCount(packageIds: string[]): Promise<number>;
+  createSlot(input: { capacity: number; startsAt: string }): Promise<string>;
+  createOverlappingClientSlots(): Promise<OverlappingClientFixture>;
+  createOverlappingExpertSlots(): Promise<OverlappingExpertFixture>;
+  createReservableFixture(): Promise<ReservableFixture>;
+  installSerializationFailureTrigger(idempotencyKey: string, failures: number): Promise<void>;
+  serializationAttemptCount(idempotencyKey: string): Promise<number>;
+  reservationCountForKey(idempotencyKey: string): Promise<number>;
+  activeReservationCountForClient(clientId: string): Promise<number>;
+  activeReservationCountForExpert(expertId: string): Promise<number>;
+  outboxCountForCorrelation(correlationId: string): Promise<number>;
+  auditCountForCorrelation(correlationId: string): Promise<number>;
+  createConfirmEligibilityCase(caseName: ConfirmEligibilityCase): Promise<{
+    reservationId: string;
+    actorExpertId: string;
+    now: Date;
+  }>;
+  reservationStatus(reservationId: string): Promise<string>;
 }
 
 function oneId(rows: { id: string }[]): string {
@@ -113,6 +155,64 @@ export async function startTestPostgres(
     insert into message_packages (user_id, granted_messages, grant_idempotency_key)
     values (${userId}::uuid, ${grantedMessages}, ${grantIdempotencyKey}) returning id
   `)).rows);
+
+  const createExpert = async (
+    input: { active?: boolean; verified?: boolean } = {},
+  ): Promise<{ expertId: string; serviceId: string }> => {
+    const expertUserId = await createUser();
+    const expertId = oneId((await db.execute<{ id: string }>(sql`
+      insert into experts (user_id, active, verified)
+      values (
+        ${expertUserId}::uuid,
+        ${input.active ?? true},
+        ${input.verified ?? true}
+      )
+      returning id
+    `)).rows);
+    const serviceId = oneId((await db.execute<{ id: string }>(sql`
+      insert into expert_services (expert_id, name, active, duration_minutes)
+      values (${expertId}::uuid, 'Test consultation', true, 60)
+      returning id
+    `)).rows);
+    return { expertId, serviceId };
+  };
+
+  const createSlotForService = async (input: {
+    serviceId: string;
+    capacity: number;
+    startsAt: Date;
+    endsAt?: Date;
+    observedAt?: Date;
+  }): Promise<string> => oneId((await db.execute<{ id: string }>(sql`
+    insert into slots (
+      expert_service_id, provider, external_slot_id, starts_at, ends_at,
+      observed_at, capacity
+    )
+    values (
+      ${input.serviceId}::uuid,
+      'test',
+      ${`slot-${randomUUID()}`},
+      ${input.startsAt},
+      ${input.endsAt ?? new Date(input.startsAt.getTime() + 60 * 60 * 1_000)},
+      ${input.observedAt ?? new Date("2026-07-28T10:00:00.000Z")},
+      ${input.capacity}
+    )
+    returning id
+  `)).rows);
+
+  const commandFor = (
+    userId: string,
+    slotId: string,
+    suffix = randomUUID(),
+  ): ReserveSlotCommand => ({
+    idempotencyKey: `reserve-${suffix}`,
+    userId,
+    slotId,
+    now: new Date("2026-07-28T10:00:00.000Z"),
+    minimumLeadMs: 24 * 60 * 60 * 1_000,
+    confirmationBufferMs: 60 * 60 * 1_000,
+    correlationId: `booking-${suffix}`,
+  });
 
   return {
     db,
@@ -278,6 +378,217 @@ export async function startTestPostgres(
         where package_id in (${packageIdList})
       `);
       return Number(result.rows[0]?.count ?? 0);
+    },
+    async createSlot({ capacity, startsAt }) {
+      const { serviceId } = await createExpert();
+      return createSlotForService({
+        serviceId,
+        capacity,
+        startsAt: new Date(startsAt),
+      });
+    },
+    async createOverlappingClientSlots() {
+      const clientId = await createUser();
+      const firstExpert = await createExpert();
+      const secondExpert = await createExpert();
+      const firstSlot = await createSlotForService({
+        serviceId: firstExpert.serviceId,
+        capacity: 1,
+        startsAt: new Date("2026-08-02T10:00:00.000Z"),
+      });
+      const secondSlot = await createSlotForService({
+        serviceId: secondExpert.serviceId,
+        capacity: 1,
+        startsAt: new Date("2026-08-02T10:30:00.000Z"),
+      });
+      return {
+        clientId,
+        first: commandFor(clientId, firstSlot),
+        second: commandFor(clientId, secondSlot),
+      };
+    },
+    async createOverlappingExpertSlots() {
+      const firstClient = await createUser();
+      const secondClient = await createUser();
+      const { expertId, serviceId } = await createExpert();
+      const firstSlot = await createSlotForService({
+        serviceId,
+        capacity: 1,
+        startsAt: new Date("2026-08-02T10:00:00.000Z"),
+      });
+      const secondSlot = await createSlotForService({
+        serviceId,
+        capacity: 1,
+        startsAt: new Date("2026-08-02T10:30:00.000Z"),
+      });
+      return {
+        expertId,
+        first: commandFor(firstClient, firstSlot),
+        second: commandFor(secondClient, secondSlot),
+      };
+    },
+    async createReservableFixture() {
+      const userId = await createUser();
+      const { expertId, serviceId } = await createExpert();
+      const slotId = await createSlotForService({
+        serviceId,
+        capacity: 1,
+        startsAt: new Date("2026-08-02T10:00:00.000Z"),
+      });
+      return { command: commandFor(userId, slotId), expertId };
+    },
+    async installSerializationFailureTrigger(idempotencyKey, failures) {
+      if (!Number.isInteger(failures) || failures < 0) {
+        throw new Error("failures must be a non-negative integer");
+      }
+      const sequenceName = `booking_retry_${randomUUID().replaceAll("-", "")}`;
+      await db.execute(sql.raw(`create sequence "${sequenceName}"`));
+      await db.execute(sql`
+        create table if not exists booking_serialization_failure_config (
+          idempotency_key text primary key,
+          sequence_name text not null,
+          failures integer not null check (failures >= 0)
+        )
+      `);
+      await db.execute(sql`
+        insert into booking_serialization_failure_config (
+          idempotency_key, sequence_name, failures
+        ) values (${idempotencyKey}, ${sequenceName}, ${failures})
+        on conflict (idempotency_key) do update
+        set sequence_name = excluded.sequence_name, failures = excluded.failures
+      `);
+      await db.execute(sql.raw(`
+        create or replace function booking_force_serialization_failure()
+        returns trigger language plpgsql as $$
+        declare
+          config booking_serialization_failure_config%rowtype;
+          attempt bigint;
+        begin
+          select * into config
+          from booking_serialization_failure_config
+          where idempotency_key = new.idempotency_key;
+          if found then
+            execute format('select nextval(%L::regclass)', config.sequence_name)
+              into attempt;
+            if attempt <= config.failures then
+              raise exception using
+                errcode = '40001',
+                message = 'test serialization failure';
+            end if;
+          end if;
+          return new;
+        end
+        $$;
+        drop trigger if exists booking_force_serialization_failure on reservations;
+        create trigger booking_force_serialization_failure
+        before insert on reservations
+        for each row execute function booking_force_serialization_failure();
+      `));
+    },
+    async serializationAttemptCount(idempotencyKey) {
+      const config = (await db.execute<{ sequenceName: string }>(sql`
+        select sequence_name as "sequenceName"
+        from booking_serialization_failure_config
+        where idempotency_key = ${idempotencyKey}
+      `)).rows[0];
+      if (config === undefined) return 0;
+      const result = await db.execute<{ lastValue: string | number | null }>(sql`
+        select last_value as "lastValue"
+        from pg_sequences
+        where schemaname = current_schema() and sequencename = ${config.sequenceName}
+      `);
+      return Number(result.rows[0]?.lastValue ?? 0);
+    },
+    async reservationCountForKey(idempotencyKey) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from reservations
+        where idempotency_key = ${idempotencyKey}
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async activeReservationCountForClient(clientId) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from reservations
+        where user_id = ${clientId}::uuid and status in ('reserved', 'booked')
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async activeReservationCountForExpert(expertId) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from reservations
+        where expert_id = ${expertId}::uuid and status in ('reserved', 'booked')
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async outboxCountForCorrelation(correlationId) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from integration_outbox
+        where reconciliation_key = ${`booking:${correlationId}`}
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async auditCountForCorrelation(correlationId) {
+      const result = await db.execute<{ count: string }>(sql`
+        select count(*)::text as count
+        from audit_events
+        where correlation_id = ${correlationId}
+      `);
+      return Number(result.rows[0]?.count ?? 0);
+    },
+    async createConfirmEligibilityCase(caseName) {
+      const now = new Date("2026-07-28T10:00:00.000Z");
+      const clientId = await createUser();
+      const expert = await createExpert();
+      const startsAt = caseName === "past_slot"
+        ? new Date("2026-07-28T09:00:00.000Z")
+        : new Date("2026-08-02T10:00:00.000Z");
+      const observedAt = caseName === "stale_slot"
+        ? new Date("2026-07-28T09:00:00.000Z")
+        : now;
+      const slotId = await createSlotForService({
+        serviceId: expert.serviceId,
+        capacity: 1,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 60 * 60 * 1_000),
+        observedAt,
+      });
+      if (caseName === "inactive_expert") {
+        await db.execute(sql`
+          update experts set active = false where id = ${expert.expertId}::uuid
+        `);
+      }
+      const createdAt = new Date("2026-07-27T10:00:00.000Z");
+      const reservedUntil = caseName === "expired_hold"
+        ? new Date("2026-07-28T09:59:00.000Z")
+        : new Date("2026-07-31T10:00:00.000Z");
+      const reservationId = oneId((await db.execute<{ id: string }>(sql`
+        insert into reservations (
+          user_id, slot_id, expert_id, expert_service_id, status, idempotency_key,
+          reserved_until, version, created_at, updated_at
+        ) values (
+          ${clientId}::uuid, ${slotId}::uuid, ${expert.expertId}::uuid,
+          ${expert.serviceId}::uuid, 'reserved', ${`confirm-${randomUUID()}`},
+          ${reservedUntil}, 1, ${createdAt}, ${createdAt}
+        )
+        returning id
+      `)).rows);
+      let actorExpertId = expert.expertId;
+      if (caseName === "wrong_expert") {
+        actorExpertId = (await createExpert()).expertId;
+      }
+      return { reservationId, actorExpertId, now };
+    },
+    async reservationStatus(reservationId) {
+      const result = await db.execute<{ status: string }>(sql`
+        select status from reservations where id = ${reservationId}::uuid
+      `);
+      const status = result.rows[0]?.status;
+      if (status === undefined) throw new Error("Reservation not found");
+      return status;
     },
   };
 }

@@ -70,6 +70,10 @@ describe("authoritative Drizzle schema parity", () => {
         "reservations_deadline_after_creation",
         "reservations_version_positive",
       ],
+      indexes: [
+        "reservations_client_active_overlap",
+        "reservations_expert_active_overlap",
+      ],
       uniques: ["reservations_idempotency_unique"],
     });
     expect(names(notifications)).toMatchObject({
@@ -117,6 +121,7 @@ describe("authoritative Drizzle schema parity", () => {
       readFileSync("packages/db/migrations/0000_mvp.sql", "utf8"),
       readFileSync("packages/db/migrations/0001_message-package-metadata.sql", "utf8"),
       readFileSync("packages/db/migrations/0002_atomic-message-accounting.sql", "utf8"),
+      readFileSync("packages/db/migrations/0003_booking-concurrency.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -137,6 +142,8 @@ describe("authoritative Drizzle schema parity", () => {
       "reservations_idempotency_unique",
       "reservations_version_positive",
       "reservations_deadline_after_creation",
+      "reservations_client_active_overlap",
+      "reservations_expert_active_overlap",
       "notifications_idempotency_unique",
       "notifications_callback_token_hash_unique",
       "integration_inbox_provider_event_unique",

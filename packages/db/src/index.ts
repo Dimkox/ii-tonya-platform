@@ -7,6 +7,16 @@ export {
   type InboxClaimResult,
 } from "./repositories/inbox-repository.js";
 export {
+  BookingSerializationExhaustedError,
+  PostgresBookingRepository,
+  type BookingRepositoryOptions,
+  type ReservationAction,
+  type ReserveSlotCommand,
+  type ReserveSlotResult,
+  type TransitionReservationCommand,
+  type TransitionReservationResult,
+} from "./repositories/booking-repository.js";
+export {
   CompensationConflictError,
   PostgresMessageRepository,
   type AcceptInboundCommand,

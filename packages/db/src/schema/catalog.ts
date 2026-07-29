@@ -42,6 +42,7 @@ export const slots = pgTable(
     externalSlotId: text("external_slot_id").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
     capacity: integer("capacity").notNull(),
     ...mutableTimestamps,
   },

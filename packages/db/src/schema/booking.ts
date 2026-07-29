@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -10,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { expertServices } from "./catalog.js";
+import { experts, expertServices, slots } from "./catalog.js";
 import { users } from "./identity.js";
 
 const mutableTimestamps = {
@@ -24,6 +25,8 @@ export const reservations = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id").notNull().references(() => users.id),
+    slotId: uuid("slot_id").notNull().references(() => slots.id),
+    expertId: uuid("expert_id").notNull().references(() => experts.id),
     expertServiceId: uuid("expert_service_id").notNull().references(() => expertServices.id),
     status: reservationStatus("status").notNull().default("reserved"),
     idempotencyKey: text("idempotency_key").notNull(),
@@ -33,6 +36,8 @@ export const reservations = pgTable(
   },
   (table) => [
     unique("reservations_idempotency_unique").on(table.idempotencyKey),
+    index("reservations_client_active_overlap").on(table.userId, table.status),
+    index("reservations_expert_active_overlap").on(table.expertId, table.status),
     check("reservations_version_positive", sql`${table.version} > 0`),
     check(
       "reservations_deadline_after_creation",
