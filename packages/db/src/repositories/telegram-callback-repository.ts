@@ -54,6 +54,90 @@ const retryableSqlStates = new Set([
   "53400",
 ]);
 
+const MAX_ERROR_GRAPH_NODES = 32;
+const MAX_ERROR_GRAPH_DEPTH = 8;
+const MAX_ERROR_CHILDREN = 16;
+
+const isObjectLike = (value: unknown): value is object =>
+  (typeof value === "object" && value !== null) ||
+  typeof value === "function";
+
+const readErrorProperty = (
+  value: object,
+  property: PropertyKey,
+): unknown => {
+  try {
+    return (value as Record<PropertyKey, unknown>)[property];
+  } catch {
+    return undefined;
+  }
+};
+
+const isRetryableCode = (code: unknown): boolean =>
+  typeof code === "string" &&
+  (retryableSystemCodes.has(code) ||
+    code.startsWith("08") ||
+    retryableSqlStates.has(code));
+
+const hasRetryableErrorCode = (root: unknown): boolean => {
+  const queue: Array<{ value: object; depth: number }> = [];
+  const seen = new WeakSet<object>();
+  let enqueued = 0;
+  const enqueue = (value: unknown, depth: number): void => {
+    if (
+      !isObjectLike(value) ||
+      seen.has(value) ||
+      enqueued >= MAX_ERROR_GRAPH_NODES
+    ) {
+      return;
+    }
+    seen.add(value);
+    queue.push({ value, depth });
+    enqueued += 1;
+  };
+  enqueue(root, 0);
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const current = queue[cursor];
+    if (current === undefined) break;
+    if (isRetryableCode(readErrorProperty(current.value, "code"))) {
+      return true;
+    }
+    if (current.depth >= MAX_ERROR_GRAPH_DEPTH) continue;
+
+    enqueue(
+      readErrorProperty(current.value, "cause"),
+      current.depth + 1,
+    );
+    const errors = readErrorProperty(current.value, "errors");
+    if (Array.isArray(errors)) {
+      const count = Math.min(errors.length, MAX_ERROR_CHILDREN);
+      for (let index = 0; index < count; index += 1) {
+        enqueue(readErrorProperty(errors, index), current.depth + 1);
+      }
+      continue;
+    }
+    if (!isObjectLike(errors)) continue;
+    const iteratorFactory = readErrorProperty(errors, Symbol.iterator);
+    if (typeof iteratorFactory !== "function") {
+      enqueue(errors, current.depth + 1);
+      continue;
+    }
+    try {
+      const iterator = iteratorFactory.call(errors) as Iterator<unknown>;
+      for (let index = 0; index < MAX_ERROR_CHILDREN; index += 1) {
+        const next = iterator.next();
+        if (next.done === true) break;
+        enqueue(next.value, current.depth + 1);
+        if (enqueued >= MAX_ERROR_GRAPH_NODES) break;
+      }
+    } catch {
+      // Malformed iterables are deterministic data-integrity failures.
+    }
+  }
+  return false;
+};
+
 const callbackStoreQuery = async <Row extends QueryResultRow>(
   db: DrizzleDb,
   statement: string,
@@ -62,18 +146,11 @@ const callbackStoreQuery = async <Row extends QueryResultRow>(
   try {
     return await db.$client.query<Row>(statement, values);
   } catch (error) {
-    const sqlState =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof error.code === "string"
-        ? error.code
-        : undefined;
-    if (
-      (sqlState !== undefined && retryableSystemCodes.has(sqlState)) ||
-      sqlState?.startsWith("08") === true ||
-      (sqlState !== undefined && retryableSqlStates.has(sqlState))
-    ) {
+    const directCode = isObjectLike(error)
+      ? readErrorProperty(error, "code")
+      : undefined;
+    const sqlState = typeof directCode === "string" ? directCode : undefined;
+    if (hasRetryableErrorCode(error)) {
       throw new CallbackInfrastructureError(
         "callback_store_unavailable",
         error,

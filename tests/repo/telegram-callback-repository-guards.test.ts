@@ -5,6 +5,15 @@ import {
 } from "../../packages/db/src/index.js";
 
 describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
+  const repositoryThrowing = (failure: unknown) =>
+    new PostgresTelegramCallbackRepository({
+      $client: {
+        query: vi.fn(async () => {
+          throw failure;
+        }),
+      },
+    } as unknown as DrizzleDb);
+
   it("wraps a database outage as a typed retryable infrastructure error", async () => {
     const databaseFailure = Object.assign(
       new Error("database connection refused"),
@@ -64,6 +73,81 @@ describe("PostgresTelegramCallbackRepository infrastructure failures", () => {
       });
     },
   );
+
+  it.each([
+    [
+      "direct cause",
+      new Error("wrapper", {
+        cause: Object.assign(new Error("reset"), { code: "ECONNRESET" }),
+      }),
+    ],
+    [
+      "nested cause",
+      new Error("outer", {
+        cause: new Error("middle", {
+          cause: Object.assign(new Error("timeout"), { code: "ETIMEDOUT" }),
+        }),
+      }),
+    ],
+    [
+      "aggregate mixed children",
+      new AggregateError(
+        [
+          Object.assign(new Error("deterministic"), { code: "22P02" }),
+          Object.assign(new Error("retryable"), { code: "40001" }),
+        ],
+        "aggregate",
+      ),
+    ],
+    [
+      "errors iterable",
+      Object.assign(new Error("iterable wrapper"), {
+        errors: new Set([
+          Object.assign(new Error("dns retry"), { code: "EAI_AGAIN" }),
+        ]),
+      }),
+    ],
+  ])("finds a transient code through %s", async (_label, failure) => {
+    await expect(
+      repositoryThrowing(failure).peek("opaque-token-hash"),
+    ).rejects.toMatchObject({
+      name: "CallbackInfrastructureError",
+      retryable: true,
+      cause: failure,
+    });
+  });
+
+  it("terminates on a cyclic cause graph without a transient code", async () => {
+    const cyclic = Object.assign(new Error("cyclic deterministic"), {
+      code: "UNEXPECTED",
+    }) as Error & { cause?: unknown };
+    cyclic.cause = cyclic;
+
+    await expect(
+      repositoryThrowing(cyclic).peek("opaque-token-hash"),
+    ).rejects.toMatchObject({
+      name: "CallbackDataIntegrityError",
+      retryable: false,
+      cause: cyclic,
+    });
+  });
+
+  it("bounds oversized error collections and ignores transient codes beyond the cap", async () => {
+    const errors = Array.from({ length: 256 }, (_, index) =>
+      Object.assign(new Error(`deterministic-${index}`), {
+        code: index === 255 ? "ECONNRESET" : "UNEXPECTED",
+      }),
+    );
+    const oversized = Object.assign(new Error("oversized"), { errors });
+
+    await expect(
+      repositoryThrowing(oversized).peek("opaque-token-hash"),
+    ).rejects.toMatchObject({
+      name: "CallbackDataIntegrityError",
+      retryable: false,
+      cause: oversized,
+    });
+  });
 
   it("reports corrupt stored callback claims as non-retryable data integrity", async () => {
     const db = {
