@@ -50,6 +50,14 @@ describe("message ledger transaction", () => {
     expect(await testDb.packageBalance(userId)).toBe(0);
   });
 
+  it("charges same external message IDs independently across providers", async () => {
+    const userId = await testDb.createUserWithPackage(2);
+    const repo = new PostgresMessageRepository(testDb.db);
+    await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-provider-a", externalMessageId: "same-id", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-provider-a" });
+    await repo.acceptInbound({ provider: "other", externalEventId: "evt-provider-b", externalMessageId: "same-id", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-provider-b" });
+    expect(await testDb.packageBalance(userId)).toBe(0);
+  });
+
   it("rebuilds balance from facts and applies a compensation exactly once", async () => {
     const userId = await testDb.createUserWithPackage(2);
     const repo = new PostgresMessageRepository(testDb.db);
@@ -63,8 +71,8 @@ describe("message ledger transaction", () => {
       correlationId: "corr-rebuild",
     });
     await Promise.all([
-      repo.compensate({ originalDebitKey: "inbound:msg-rebuild", idempotencyKey: "comp-1" }),
-      repo.compensate({ originalDebitKey: "inbound:msg-rebuild", idempotencyKey: "comp-1" }),
+      repo.compensate({ originalDebitKey: "inbound:selarti:msg-rebuild", idempotencyKey: "comp-1" }),
+      repo.compensate({ originalDebitKey: "inbound:selarti:msg-rebuild", idempotencyKey: "comp-1" }),
     ]);
     expect(await testDb.packageBalance(userId)).toBe(2);
     expect(await testDb.rebuildPackageBalance(userId)).toBe(2);
@@ -172,6 +180,7 @@ describe("message ledger transaction", () => {
       provider: "selarti", externalEventId: "evt-atomic-a", externalMessageId: "msg-atomic", userId,
       messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-atomic-a",
     });
+    const before = await testDb.db.execute<{ outbox: string }>(sql`select count(*)::text as outbox from integration_outbox`);
     await expect(repo.acceptInbound({
       provider: "selarti", externalEventId: "evt-atomic-b", externalMessageId: "msg-atomic", userId,
       messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-atomic-b",
@@ -179,9 +188,9 @@ describe("message ledger transaction", () => {
     const rows = await testDb.db.execute<{ inbox: string; audit: string; outbox: string }>(sql`
       select (select count(*)::text from integration_inbox where external_event_id = 'evt-atomic-b') as inbox,
         (select count(*)::text from audit_events where correlation_id = 'corr-atomic-b') as audit,
-        (select count(*)::text from integration_outbox where payload_hash = 'unused') as outbox
+        (select count(*)::text from integration_outbox) as outbox
     `);
-    expect(rows.rows[0]).toMatchObject({ inbox: "0", audit: "0", outbox: "0" });
+    expect(rows.rows[0]).toMatchObject({ inbox: "0", audit: "0", outbox: before.rows[0]?.outbox });
   });
 
   it("distinguishes compensation replay from original and idempotency-key conflicts", async () => {
@@ -189,8 +198,13 @@ describe("message ledger transaction", () => {
     const repo = new PostgresMessageRepository(testDb.db);
     await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-comp-a", externalMessageId: "msg-comp-a", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-comp-a" });
     await repo.acceptInbound({ provider: "selarti", externalEventId: "evt-comp-b", externalMessageId: "msg-comp-b", userId, messageClass: "ordinary_inbound", occurredAt: new Date(), correlationId: "corr-comp-b" });
-    await repo.compensate({ originalDebitKey: "inbound:msg-comp-a", idempotencyKey: "comp-key" });
-    await expect(repo.compensate({ originalDebitKey: "inbound:msg-comp-a", idempotencyKey: "other-key" })).rejects.toThrow("already compensated");
-    await expect(repo.compensate({ originalDebitKey: "inbound:msg-comp-b", idempotencyKey: "comp-key" })).rejects.toThrow();
+    await repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-a", idempotencyKey: "comp-key" });
+    await expect(repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-a", idempotencyKey: "other-key" })).rejects.toThrow("already compensated");
+    const raced = await Promise.allSettled([
+      repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-b", idempotencyKey: "comp-key" }),
+      repo.compensate({ originalDebitKey: "inbound:selarti:msg-comp-b", idempotencyKey: "other-key-b" }),
+    ]);
+    expect(raced.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(raced.filter((result) => result.status === "rejected")).toHaveLength(1);
   });
 });

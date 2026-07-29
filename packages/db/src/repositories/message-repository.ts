@@ -134,8 +134,9 @@ export class PostgresMessageRepository implements MessageRepository {
     });
   }
 
-  compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }> {
-    return withSerializableRetry(() => this.db.transaction(async (tx) => {
+  async compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }> {
+    try {
+      return await withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       const debit = one((await tx.execute<Debit>(sql`
         select l.id, l.package_id as "packageId"
@@ -163,7 +164,11 @@ export class PostgresMessageRepository implements MessageRepository {
         `);
       }
       return this.balance(tx, debit.packageId);
-    }));
+      }));
+    } catch (error) {
+      if (!hasCode(error, "23505")) throw error;
+      return this.resolveCompensationConflict(command);
+    }
   }
 
   private acceptMessage(command: {
@@ -196,7 +201,7 @@ export class PostgresMessageRepository implements MessageRepository {
       `)).rows, "an inserted message event");
       await this.inbox.associate(tx, inbox.inboxId, event.id);
       const charged = command.messageClass === "ordinary_inbound"
-        ? await this.debit(tx, command.userId, command.occurredAt, event.id, command.direction, `${command.direction}:${command.externalMessageId}`)
+        ? await this.debit(tx, command.userId, command.occurredAt, event.id, command.direction, `${command.direction}:${command.provider}:${command.externalMessageId}`)
         : await this.free(tx, event.id, command.direction);
       await this.auditAndOutbox(tx, command, event.id);
       return { kind: "accepted", messageEventId: event.id, ...charged };
@@ -274,5 +279,30 @@ export class PostgresMessageRepository implements MessageRepository {
       select coalesce(sum(delta), 0)::integer as balance from message_ledger_entries where package_id = ${packageId}::uuid
     `)).rows, "a package balance");
     return { ledgerBalance: Number(result.balance) };
+  }
+
+  private async resolveCompensationConflict(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }> {
+    return this.db.transaction(async (tx) => {
+      const debit = one((await tx.execute<Debit>(sql`
+        select id, package_id as "packageId" from message_ledger_entries
+        where entry_kind = 'debit' and idempotency_key = ${command.originalDebitKey}
+      `)).rows, "the original debit after a compensation conflict");
+      const byOriginal = (await tx.execute<{ idempotencyKey: string }>(sql`
+        select idempotency_key as "idempotencyKey" from message_ledger_entries
+        where entry_kind = 'compensation' and original_entry_id = ${debit.id}::uuid
+      `)).rows[0];
+      if (byOriginal === undefined) throw new Error("Compensation conflict could not be resolved");
+      if (byOriginal.idempotencyKey !== command.idempotencyKey) {
+        throw new CompensationConflictError("Original debit already compensated with another key");
+      }
+      const byKey = (await tx.execute<{ originalEntryId: string }>(sql`
+        select original_entry_id as "originalEntryId" from message_ledger_entries
+        where idempotency_key = ${command.idempotencyKey}
+      `)).rows[0];
+      if (byKey?.originalEntryId !== debit.id) {
+        throw new CompensationConflictError("Compensation key belongs to another debit");
+      }
+      return this.balance(tx, debit.packageId);
+    });
   }
 }

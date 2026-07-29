@@ -1,6 +1,7 @@
 export { createDb, type DrizzleDb } from "./client.js";
 export {
   InboxPayloadMismatchError,
+  LegacyInboxAssociationError,
   PostgresInboxRepository,
   type InboxClaimCommand,
   type InboxClaimResult,

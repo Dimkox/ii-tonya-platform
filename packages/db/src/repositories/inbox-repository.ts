@@ -20,6 +20,12 @@ export class InboxPayloadMismatchError extends Error {
   }
 }
 
+export class LegacyInboxAssociationError extends Error {
+  constructor() {
+    super("Legacy inbox claim cannot be associated with a stored message event");
+  }
+}
+
 export class PostgresInboxRepository {
   async claim(executor: DbExecutor, command: InboxClaimCommand): Promise<InboxClaimResult> {
     const result = await executor.execute<{ id: string }>(sql`
@@ -40,16 +46,27 @@ export class PostgresInboxRepository {
     const claimed = result.rows[0];
     if (claimed !== undefined) return { kind: "claimed", inboxId: claimed.id };
     const stored = (await executor.execute<{
+      id: string;
       messageEventId: string | null;
       payloadHash: string;
+      normalizedIdentifier: string;
     }>(sql`
-      select message_event_id as "messageEventId", payload_hash as "payloadHash"
+      select id, message_event_id as "messageEventId", payload_hash as "payloadHash",
+        normalized_identifier as "normalizedIdentifier"
       from integration_inbox
       where provider = ${command.provider}
         and external_event_id = ${command.externalEventId}
     `)).rows[0];
-    if (stored?.messageEventId === null || stored === undefined) {
-      throw new Error("Expected the stored inbox event association");
+    if (stored === undefined) throw new LegacyInboxAssociationError();
+    if (stored.messageEventId === null) {
+      const event = (await executor.execute<{ id: string }>(sql`
+        select id from message_events
+        where provider = ${command.provider}
+          and external_message_id = ${stored.normalizedIdentifier}
+      `)).rows[0];
+      if (event === undefined) throw new LegacyInboxAssociationError();
+      await this.associate(executor, stored.id, event.id);
+      return { kind: "duplicate", messageEventId: event.id, payloadMatches: stored.payloadHash === command.payloadHash };
     }
     return {
       kind: "duplicate",
