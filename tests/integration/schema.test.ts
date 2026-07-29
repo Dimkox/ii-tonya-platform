@@ -8,6 +8,46 @@ import {
 
 let testDb: TestDatabase | undefined;
 
+type DatabaseErrorEvidence = {
+  code?: unknown;
+  constraint?: unknown;
+  message?: unknown;
+  cause?: unknown;
+};
+
+function databaseErrorChain(error: unknown): DatabaseErrorEvidence[] {
+  const chain: DatabaseErrorEvidence[] = [];
+  const seen = new Set<unknown>();
+  let current = error;
+  while (typeof current === "object" && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const evidence = current as DatabaseErrorEvidence;
+    chain.push(evidence);
+    current = evidence.cause;
+  }
+  return chain;
+}
+
+async function expectDatabaseError(
+  operation: () => Promise<unknown>,
+  expected: { code: string; constraint?: string },
+): Promise<void> {
+  let caught: unknown;
+  try {
+    await operation();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught, "database operation should fail").toBeDefined();
+  const chain = databaseErrorChain(caught);
+  expect(
+    chain.some((error) =>
+      error.code === expected.code
+      && (expected.constraint === undefined || error.constraint === expected.constraint)),
+    `expected SQLSTATE ${expected.code}${expected.constraint ? ` / ${expected.constraint}` : ""}`,
+  ).toBe(true);
+}
+
 beforeAll(async () => {
   testDb = await startTestPostgres();
   await migrate(testDb.db, { migrationsFolder: "packages/db/migrations" });
@@ -43,8 +83,14 @@ describe("MVP schema", () => {
     expect(await testDb!.packageBalance()).toBe(2);
     await testDb!.appendLedgerFact({ kind: "debit", delta: -1, idempotencyKey: "debit-1" });
     expect(await testDb!.packageBalance()).toBe(1);
-    await expect(testDb!.updateLedgerFact("debit-1", 0)).rejects.toThrow("append-only");
-    await expect(testDb!.deleteLedgerFact("debit-1")).rejects.toThrow("append-only");
+    await expectDatabaseError(
+      () => testDb!.updateLedgerFact("debit-1", 0),
+      { code: "55000" },
+    );
+    await expectDatabaseError(
+      () => testDb!.deleteLedgerFact("debit-1"),
+      { code: "55000" },
+    );
   });
 
   it("allows grants across clients/packages while rejecting only same-scope corrections", async () => {
@@ -58,20 +104,26 @@ describe("MVP schema", () => {
     const grantA2 = await testDb!.appendGrantFact(packageA2, 1000, "ledger-grant-a2");
     const grantB1 = await testDb!.appendGrantFact(packageB1, 500, "ledger-grant-b1");
     expect([grantA1, grantA2, grantB1]).toHaveLength(3);
-    await expect(testDb!.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"))
-      .rejects.toThrow("message_ledger_grant_once_per_package");
+    await expectDatabaseError(
+      () => testDb!.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"),
+      { code: "23505", constraint: "message_ledger_grant_once_per_package" },
+    );
 
     const debitA = await testDb!.appendMessageDebit(packageA1, "message-a", "debit-a");
     const debitB = await testDb!.appendMessageDebit(packageB1, "message-b", "debit-b");
     await testDb!.appendCompensation(packageA1, debitA, "comp-a");
     await testDb!.appendCompensation(packageB1, debitB, "comp-b");
-    await expect(testDb!.appendCompensation(packageA1, debitA, "comp-a-again"))
-      .rejects.toThrow("message_ledger_compensation_once_per_original");
+    await expectDatabaseError(
+      () => testDb!.appendCompensation(packageA1, debitA, "comp-a-again"),
+      { code: "23505", constraint: "message_ledger_compensation_once_per_original" },
+    );
 
     await testDb!.appendRevocation(packageA1, grantA1, "revoke-a1");
     await testDb!.appendRevocation(packageB1, grantB1, "revoke-b1");
-    await expect(testDb!.appendRevocation(packageA1, grantA1, "revoke-a1-again"))
-      .rejects.toThrow("message_ledger_revocation_once_per_package_grant");
+    await expectDatabaseError(
+      () => testDb!.appendRevocation(packageA1, grantA1, "revoke-a1-again"),
+      { code: "23505", constraint: "message_ledger_revocation_once_per_package_grant" },
+    );
     expect(await testDb!.ledgerFactCount([packageA1, packageA2, packageB1])).toBe(9);
   });
 });
