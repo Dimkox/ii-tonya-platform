@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { WebhookVerification } from "../http/webhook-auth.js";
+import {
+  isValidWebhookBodyLimit,
+  type WebhookVerification,
+} from "../http/webhook-auth.js";
 import type {
   CanonicalSelartiEvent,
   SelartiPort,
@@ -100,11 +103,7 @@ export class SelartiContractAdapter implements SelartiPort {
   private readonly deps: SelartiContractAdapterDeps;
 
   constructor(deps: SelartiContractAdapterDeps) {
-    if (
-      !Number.isSafeInteger(deps.maxBodyBytes) ||
-      deps.maxBodyBytes <= 0 ||
-      deps.maxBodyBytes > 64_000
-    ) {
+    if (!isValidWebhookBodyLimit(deps.maxBodyBytes)) {
       throw new Error("invalid_max_body_bytes");
     }
     this.deps = deps;

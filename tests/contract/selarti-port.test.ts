@@ -100,6 +100,24 @@ const signedWebhookFixture = () => {
   };
 };
 
+const signedWebhookWithBody = (body: Uint8Array, maxBodyBytes: number) => {
+  const timestamp = "1785232800";
+  const secret = "__PLACEHOLDER_CONTRACT_TEST_SECRET__";
+  return {
+    body,
+    contentType: "application/json",
+    signature: createHmac("sha256", secret)
+      .update(`${timestamp}.`)
+      .update(body)
+      .digest("hex"),
+    timestamp,
+    secret,
+    nowEpochSeconds: 1785232800,
+    maxAgeSeconds: 300,
+    maxBodyBytes,
+  };
+};
+
 describe("Selarti boundary", () => {
   it("keeps every fixture sanitized and traceable to a contract status", () => {
     for (const name of fixtureNames) {
@@ -151,6 +169,51 @@ describe("Selarti boundary", () => {
       ).toThrow("invalid_webhook_secret_configuration");
     },
   );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -1, 1.5, 64_001])(
+    "fails closed for standalone verifier maxBodyBytes configuration %s",
+    (maxBodyBytes) => {
+      expect(
+        verifySignedWebhook(
+          signedWebhookWithBody(Buffer.alloc(100_000, "x"), maxBodyBytes),
+        ),
+      ).toEqual({ accepted: false, reason: "body_size" });
+    },
+  );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -1, 1.5, 64_001])(
+    "rejects unsafe maxBodyBytes when constructing the standalone verifier: %s",
+    (maxBodyBytes) => {
+      expect(() =>
+        createSignedWebhookVerifier({
+          secret: "__PLACEHOLDER_CONTRACT_TEST_SECRET__",
+          nowEpochSeconds: () => 1785232800,
+          maxAgeSeconds: 300,
+          maxBodyBytes,
+        }),
+      ).toThrow("invalid_max_body_bytes");
+    },
+  );
+
+  it("accepts the exact 64,000-byte boundary in direct and constructed verification", () => {
+    const input = signedWebhookWithBody(Buffer.alloc(64_000, "x"), 64_000);
+    expect(verifySignedWebhook(input)).toEqual({ accepted: true });
+
+    const verifier = createSignedWebhookVerifier({
+      secret: input.secret,
+      nowEpochSeconds: () => input.nowEpochSeconds,
+      maxAgeSeconds: input.maxAgeSeconds,
+      maxBodyBytes: input.maxBodyBytes,
+    });
+    expect(
+      verifier({
+        body: input.body,
+        contentType: input.contentType,
+        signature: input.signature,
+        timestamp: input.timestamp,
+      }),
+    ).toEqual({ accepted: true });
+  });
 
   it("cannot decode or send while the official provider contract is unapproved", async () => {
     const adapter = new DisabledSelartiAdapter();

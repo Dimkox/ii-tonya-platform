@@ -20,6 +20,9 @@ export interface SignedWebhookInput {
 const integerTimestamp = /^\d+$/u;
 const sha256HexSignature = /^[0-9a-f]{64}$/u;
 
+export const isValidWebhookBodyLimit = (value: number): boolean =>
+  Number.isSafeInteger(value) && value > 0 && value <= 64_000;
+
 export function verifySignedWebhook(
   input: SignedWebhookInput,
 ): WebhookVerification {
@@ -29,7 +32,10 @@ export function verifySignedWebhook(
   if (input.contentType !== "application/json") {
     return { accepted: false, reason: "content_type" };
   }
-  if (input.body.byteLength > input.maxBodyBytes) {
+  if (
+    !isValidWebhookBodyLimit(input.maxBodyBytes) ||
+    input.body.byteLength > input.maxBodyBytes
+  ) {
     return { accepted: false, reason: "body_size" };
   }
   if (!integerTimestamp.test(input.timestamp)) {
@@ -82,6 +88,9 @@ export function createSignedWebhookVerifier(
 ): (request: SignedWebhookRequest) => WebhookVerification {
   if (config.secret.trim().length === 0) {
     throw new Error("invalid_webhook_secret_configuration");
+  }
+  if (!isValidWebhookBodyLimit(config.maxBodyBytes)) {
+    throw new Error("invalid_max_body_bytes");
   }
 
   return (request) =>
