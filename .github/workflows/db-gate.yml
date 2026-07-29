@@ -60,6 +60,9 @@ jobs:
       - name: Repeat booking concurrency gate
         run: pnpm test:repeat -- 20 tests/integration/booking-concurrency.test.ts
 
+      - name: Repeat durable outbox gate
+        run: pnpm test:repeat -- 20 tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts
+
       - name: Record Docker diagnostics on failure
         if: failure()
         run: |
