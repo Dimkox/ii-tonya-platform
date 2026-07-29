@@ -269,8 +269,22 @@ export class PostgresMessageRepository implements MessageRepository {
     `);
     const outboxKey = hash({ provider: command.provider, externalEventId: command.externalEventId, direction: command.direction });
     await tx.execute(sql`
-      insert into integration_outbox (idempotency_key, reconciliation_key, payload_hash)
-      values (${`message:${outboxKey}`}, ${`message:${outboxKey}`}, ${command.payloadHash})
+      insert into integration_outbox (
+        idempotency_key, topic, payload, correlation_id,
+        reconciliation_key, payload_hash
+      )
+      values (
+        ${`message:${outboxKey}`},
+        'message.accounted',
+        ${JSON.stringify({
+          messageEventId: eventId,
+          provider: command.provider,
+          direction: command.direction,
+        })}::jsonb,
+        ${command.correlationId},
+        ${`message:${outboxKey}`},
+        ${command.payloadHash}
+      )
     `);
   }
 

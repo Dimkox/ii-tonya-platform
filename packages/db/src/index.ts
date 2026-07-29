@@ -29,6 +29,7 @@ export {
   withSerializableRetry,
 } from "./repositories/message-repository.js";
 export {
+  OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
 } from "./repositories/outbox-repository.js";

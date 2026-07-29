@@ -178,4 +178,46 @@ describe("outbox runner", () => {
     ]);
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  it("terminalizes an already exhausted dispatch budget without another dispatch", async () => {
+    const repository = fakeOutboxRepository([
+      { id: "o-6", topic: "telegram.send", attempt: 3 },
+    ]);
+    const dispatch = vi.fn();
+
+    await runOutboxBatch({
+      ...baseDeps(),
+      repository,
+      dispatcher: { dispatch },
+      reconciler: { reconcile: vi.fn() },
+    });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(repository.deadLetterCalls).toEqual([
+      { id: "o-6", reasonCode: "dispatch_attempts_exhausted_before_claim" },
+    ]);
+  });
+
+  it("terminalizes an already exhausted reconciliation budget without reconciling", async () => {
+    const repository = fakeOutboxRepository([
+      { id: "o-7", topic: "telegram.send", attempt: 2 },
+    ]);
+    repository.makeUnknown("o-7", 3);
+    const reconcile = vi.fn();
+
+    await runOutboxBatch({
+      ...baseDeps(),
+      repository,
+      dispatcher: { dispatch: vi.fn() },
+      reconciler: { reconcile },
+    });
+
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(repository.deadLetterCalls).toEqual([
+      {
+        id: "o-7",
+        reasonCode: "unknown_outcome_reconciliation_exhausted_before_claim",
+      },
+    ]);
+  });
 });

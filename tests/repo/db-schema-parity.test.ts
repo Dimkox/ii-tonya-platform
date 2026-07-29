@@ -233,6 +233,20 @@ describe("authoritative Drizzle schema parity", () => {
     expect(reservationColumns?.expert_id).toMatchObject({ notNull: true });
   });
 
+  it("deduplicates legacy dead letters deterministically before enforcing uniqueness", () => {
+    const migration = readFileSync(
+      "packages/db/migrations/0004_durable_outbox.sql",
+      "utf8",
+    );
+    const dedupe = migration.indexOf("ranked_dead_letters");
+    const unique = migration.indexOf("dead_letters_outbox_unique");
+    expect(dedupe).toBeGreaterThan(-1);
+    expect(migration).toContain('PARTITION BY "outbox_id"');
+    expect(migration).toContain('ORDER BY "created_at", "id"');
+    expect(migration).toContain("duplicate_rank > 1");
+    expect(unique).toBeGreaterThan(dedupe);
+  });
+
   it("passes the granted message count into package metadata", () => {
     const testkit = readFileSync("packages/db/src/testkit/postgres.ts", "utf8");
     expect(testkit).toMatch(

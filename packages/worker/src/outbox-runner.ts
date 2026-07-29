@@ -13,33 +13,64 @@ export interface OutboxRepository {
     limit: number,
     owner: string,
     leaseUntil: Date,
+    maxAttempts: number,
   ): Promise<readonly OutboxMessage[]>;
   claimUnknown(
     limit: number,
     owner: string,
     leaseUntil: Date,
+    maxReconciliationAttempts: number,
   ): Promise<readonly OutboxMessage[]>;
   recordAttemptStarted(
     id: string,
+    owner: string,
     attemptId: string,
     reconciliationKey: string,
     startedAt: Date,
   ): Promise<void>;
   markUnknownOutcome(
     id: string,
+    owner: string,
     attemptId: string,
     reconciliationKey: string,
     reasonCode: string,
+    now: Date,
   ): Promise<void>;
   markStillUnknown(
     id: string,
     owner: string,
+    now: Date,
     reasonCode: string,
     nextCheckAt: Date,
   ): Promise<void>;
-  succeed(id: string): Promise<void>;
-  retry(id: string, nextAttemptAt: Date, reasonCode: string): Promise<void>;
-  deadLetterAndAlert(id: string, reasonCode: string): Promise<void>;
+  succeed(id: string, owner: string, now: Date): Promise<void>;
+  retry(
+    id: string,
+    owner: string,
+    now: Date,
+    nextAttemptAt: Date,
+    reasonCode: string,
+  ): Promise<void>;
+  deadLetterAndAlert(
+    id: string,
+    owner: string,
+    now: Date,
+    reasonCode: string,
+  ): Promise<void>;
+  succeedAfterReconciliation(id: string, owner: string, now: Date): Promise<void>;
+  retryAfterReconciliation(
+    id: string,
+    owner: string,
+    now: Date,
+    nextAttemptAt: Date,
+    reasonCode: string,
+  ): Promise<void>;
+  deadLetterAfterReconciliationAndAlert(
+    id: string,
+    owner: string,
+    now: Date,
+    reasonCode: string,
+  ): Promise<void>;
   recoverExpiredDispatchLeases(now: Date): Promise<number>;
   recoverExpiredReconciliationLeases(now: Date): Promise<number>;
 }
@@ -110,54 +141,73 @@ async function reconcileUnknown(
   message: OutboxMessage,
   now: Date,
 ): Promise<void> {
+  let resolution: "applied" | "not_applied" | "still_unknown";
   try {
-    const resolution = await deps.reconciler.reconcile(message);
-    if (resolution === "applied") {
-      await deps.repository.succeed(message.id);
-      return;
-    }
-    if (resolution === "not_applied") {
-      if (message.attempt >= deps.maxAttempts) {
-        await deps.repository.deadLetterAndAlert(
-          message.id,
-          "dispatch_attempts_exhausted_after_reconciliation",
-        );
-      } else {
-        await deps.repository.retry(
-          message.id,
-          retryAt(deps, now, message.attempt),
-          "reconciled_not_applied",
-        );
-      }
-      return;
-    }
+    resolution = await deps.reconciler.reconcile(message);
+  } catch {
+    const mutationAt = deps.now();
     if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
-      await deps.repository.deadLetterAndAlert(
-        message.id,
-        "unknown_outcome_reconciliation_exhausted",
-      );
-    } else {
-      await deps.repository.markStillUnknown(
+      await deps.repository.deadLetterAfterReconciliationAndAlert(
         message.id,
         deps.workerId,
-        "still_unknown",
-        retryAt(deps, now, message.reconciliationAttempt),
-      );
-    }
-  } catch {
-    if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
-      await deps.repository.deadLetterAndAlert(
-        message.id,
+        mutationAt,
         "reconciliation_exception_exhausted",
       );
     } else {
       await deps.repository.markStillUnknown(
         message.id,
         deps.workerId,
+        mutationAt,
         "reconciliation_exception",
         retryAt(deps, now, message.reconciliationAttempt),
       );
     }
+    return;
+  }
+
+  const mutationAt = deps.now();
+  if (resolution === "applied") {
+    await deps.repository.succeedAfterReconciliation(
+      message.id,
+      deps.workerId,
+      mutationAt,
+    );
+    return;
+  }
+  if (resolution === "not_applied") {
+    if (message.attempt >= deps.maxAttempts) {
+      await deps.repository.deadLetterAfterReconciliationAndAlert(
+        message.id,
+        deps.workerId,
+        mutationAt,
+        "dispatch_attempts_exhausted_after_reconciliation",
+      );
+    } else {
+      await deps.repository.retryAfterReconciliation(
+        message.id,
+        deps.workerId,
+        mutationAt,
+        retryAt(deps, now, message.attempt),
+        "reconciled_not_applied",
+      );
+    }
+    return;
+  }
+  if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
+    await deps.repository.deadLetterAfterReconciliationAndAlert(
+      message.id,
+      deps.workerId,
+      mutationAt,
+      "unknown_outcome_reconciliation_exhausted",
+    );
+  } else {
+    await deps.repository.markStillUnknown(
+      message.id,
+      deps.workerId,
+      mutationAt,
+      "still_unknown",
+      retryAt(deps, now, message.reconciliationAttempt),
+    );
   }
 }
 
@@ -169,6 +219,7 @@ async function dispatchPending(
   const attemptId = deps.newAttemptId();
   await deps.repository.recordAttemptStarted(
     message.id,
+    deps.workerId,
     attemptId,
     message.reconciliationKey,
     now,
@@ -180,34 +231,45 @@ async function dispatchPending(
   } catch {
     await deps.repository.markUnknownOutcome(
       message.id,
+      deps.workerId,
       attemptId,
       message.reconciliationKey,
       "dispatch_exception_unknown",
+      deps.now(),
     );
     return;
   }
 
   if (outcome.kind === "applied") {
-    await deps.repository.succeed(message.id);
+    await deps.repository.succeed(message.id, deps.workerId, deps.now());
     return;
   }
   if (outcome.kind === "unknown_outcome") {
     await deps.repository.markUnknownOutcome(
       message.id,
+      deps.workerId,
       attemptId,
       outcome.reconciliationKey,
       outcome.reasonCode,
+      deps.now(),
     );
     return;
   }
   if (outcome.retryable && message.attempt < deps.maxAttempts) {
     await deps.repository.retry(
       message.id,
+      deps.workerId,
+      deps.now(),
       retryAt(deps, now, message.attempt),
       outcome.reasonCode,
     );
   } else {
-    await deps.repository.deadLetterAndAlert(message.id, outcome.reasonCode);
+    await deps.repository.deadLetterAndAlert(
+      message.id,
+      deps.workerId,
+      deps.now(),
+      outcome.reasonCode,
+    );
   }
 }
 
@@ -223,6 +285,7 @@ export async function runOutboxBatch(
     deps.batchSize,
     deps.workerId,
     leaseUntil,
+    deps.maxReconciliationAttempts,
   );
   for (const message of unknown) {
     await reconcileUnknown(deps, message, now);
@@ -232,6 +295,7 @@ export async function runOutboxBatch(
     deps.batchSize,
     deps.workerId,
     leaseUntil,
+    deps.maxAttempts,
   );
   for (const message of messages) {
     await dispatchPending(deps, message, now);

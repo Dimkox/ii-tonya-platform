@@ -46,6 +46,7 @@ interface TestPoolHandle {
 interface InsertOutboxInput {
   topic: string;
   reconciliationKey: string;
+  attempt?: number;
 }
 
 interface InsertUnknownOutboxInput {
@@ -128,6 +129,12 @@ export interface TestDatabase {
   activeReservationCountForClient(clientId: string): Promise<number>;
   activeReservationCountForExpert(expertId: string): Promise<number>;
   outboxCountForCorrelation(correlationId: string): Promise<number>;
+  outboxDeliveryForCorrelation(correlationId: string): Promise<{
+    topic: string;
+    payload: unknown;
+    correlationId: string;
+    reconciliationKey: string;
+  }>;
   auditCountForCorrelation(correlationId: string): Promise<number>;
   insertOutbox(input: InsertOutboxInput): Promise<string>;
   insertUnknownOutbox(input: InsertUnknownOutboxInput): Promise<string>;
@@ -651,6 +658,25 @@ export async function startTestPostgres(
       `);
       return Number(result.rows[0]?.count ?? 0);
     },
+    async outboxDeliveryForCorrelation(correlationId) {
+      const result = await db.execute<{
+        topic: string;
+        payload: unknown;
+        correlationId: string;
+        reconciliationKey: string;
+      }>(sql`
+        select
+          topic,
+          payload,
+          correlation_id as "correlationId",
+          reconciliation_key as "reconciliationKey"
+        from integration_outbox
+        where correlation_id = ${correlationId}
+      `);
+      const row = result.rows[0];
+      if (row === undefined) throw new Error("Outbox delivery not found");
+      return row;
+    },
     async auditCountForCorrelation(correlationId) {
       const result = await db.execute<{ count: string }>(sql`
         select count(*)::text as count
@@ -659,7 +685,7 @@ export async function startTestPostgres(
       `);
       return Number(result.rows[0]?.count ?? 0);
     },
-    async insertOutbox({ topic, reconciliationKey }) {
+    async insertOutbox({ topic, reconciliationKey, attempt = 0 }) {
       return oneId(
         (
           await db.execute<{ id: string }>(sql`
@@ -668,15 +694,17 @@ export async function startTestPostgres(
           topic,
           payload,
           correlation_id,
-          reconciliation_key,
-          payload_hash
+           reconciliation_key,
+           attempt,
+           payload_hash
         ) values (
           ${`test:${randomUUID()}`},
           ${topic},
           ${JSON.stringify({ test: true })}::jsonb,
           ${`correlation:${randomUUID()}`},
-          ${reconciliationKey},
-          ${`sha256:${randomUUID()}`}
+           ${reconciliationKey},
+           ${attempt},
+           ${`sha256:${randomUUID()}`}
         )
         returning id
       `)

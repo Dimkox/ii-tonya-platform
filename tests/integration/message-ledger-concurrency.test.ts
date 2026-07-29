@@ -123,6 +123,16 @@ describe("message ledger transaction", () => {
       audit: "1",
       outbox: String(Number(outboxBefore.rows[0]?.count ?? "0") + 1),
     });
+    expect(await testDb.outboxDeliveryForCorrelation("corr-outbound")).toMatchObject({
+      topic: "message.accounted",
+      correlationId: "corr-outbound",
+      reconciliationKey: expect.stringMatching(/^message:/),
+      payload: {
+        messageEventId: first.messageEventId,
+        provider: "selarti",
+        direction: "outbound",
+      },
+    });
   });
 
   it.each(["system", "safety", "error"] as const)("records one package-less free fact for %s", async (messageClass) => {

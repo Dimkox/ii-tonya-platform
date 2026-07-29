@@ -25,4 +25,19 @@ SET
 FROM "integration_outbox" AS outbox
 WHERE attempts."outbox_id" = outbox."id";--> statement-breakpoint
 ALTER TABLE "outbox_operator_alerts" ADD CONSTRAINT "outbox_operator_alerts_outbox_id_integration_outbox_id_fk" FOREIGN KEY ("outbox_id") REFERENCES "public"."integration_outbox"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+WITH ranked_dead_letters AS (
+	SELECT
+		"id",
+		row_number() OVER (
+			PARTITION BY "outbox_id"
+			ORDER BY "created_at", "id"
+		) AS duplicate_rank
+	FROM "dead_letters"
+)
+DELETE FROM "dead_letters"
+WHERE "id" IN (
+	SELECT "id"
+	FROM ranked_dead_letters
+	WHERE duplicate_rank > 1
+);--> statement-breakpoint
 ALTER TABLE "dead_letters" ADD CONSTRAINT "dead_letters_outbox_unique" UNIQUE("outbox_id");

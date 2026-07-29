@@ -755,9 +755,18 @@ export class PostgresBookingRepository {
     `);
     await tx.execute(sql`
       insert into integration_outbox (
-        idempotency_key, reconciliation_key, payload_hash
+        idempotency_key, topic, payload, correlation_id,
+        reconciliation_key, payload_hash
       ) values (
         ${`booking:${event.action}:${event.reservationId}:v${event.version}`},
+        'booking.reservation_changed',
+        ${JSON.stringify({
+          reservationId: event.reservationId,
+          action: event.action.replace(/^reservation\./, ""),
+          decision: event.decision,
+          version: event.version,
+        })}::jsonb,
+        ${event.correlationId},
         ${`booking:${event.correlationId}`},
         ${metadataHash}
       )

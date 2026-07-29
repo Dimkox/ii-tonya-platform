@@ -316,7 +316,8 @@ describe("MVP schema", () => {
         slotId: "00000000-0000-4000-8000-000000000005",
         expertId: "00000000-0000-4000-8000-000000000003",
         observedAt: null,
-      });
+  });
+
       const columns = await legacyDb.db.execute<{
         columnName: string;
         isNullable: string;
@@ -349,6 +350,74 @@ describe("MVP schema", () => {
         "reservations_expert_id_experts_id_fk",
         "reservations_slot_id_slots_id_fk",
       ]);
+    } finally {
+      await legacyDb.stop();
+    }
+  }, 120_000);
+
+  it("deduplicates legacy dead letters before migration 0004 adds uniqueness", async () => {
+    const legacyDb = await startTestPostgres();
+    try {
+      await applyLegacyBaseline(legacyDb.db);
+      await applySqlMigration(
+        legacyDb.db,
+        "packages/db/migrations/0003_booking-concurrency.sql",
+      );
+      await legacyDb.db.execute(sql`
+        insert into integration_outbox (
+          id, idempotency_key, reconciliation_key, payload_hash
+        ) values (
+          '00000000-0000-4000-8000-000000000020'::uuid,
+          'legacy:outbox',
+          'legacy:reconciliation',
+          'sha256:legacy'
+        )
+      `);
+      await legacyDb.db.execute(sql`
+        insert into dead_letters (
+          id, outbox_id, reason, payload_hash, created_at, updated_at
+        ) values
+          (
+            '00000000-0000-4000-8000-000000000021'::uuid,
+            '00000000-0000-4000-8000-000000000020'::uuid,
+            'canonical',
+            'sha256:legacy',
+            '2026-07-28T10:00:00.000Z',
+            '2026-07-28T10:00:00.000Z'
+          ),
+          (
+            '00000000-0000-4000-8000-000000000022'::uuid,
+            '00000000-0000-4000-8000-000000000020'::uuid,
+            'duplicate',
+            'sha256:legacy',
+            '2026-07-28T10:01:00.000Z',
+            '2026-07-28T10:01:00.000Z'
+          )
+      `);
+
+      await applySqlMigration(
+        legacyDb.db,
+        "packages/db/migrations/0004_durable_outbox.sql",
+      );
+
+      const rows = await legacyDb.db.execute<{ reason: string }>(sql`
+        select reason
+        from dead_letters
+        where outbox_id = '00000000-0000-4000-8000-000000000020'::uuid
+      `);
+      expect(rows.rows).toEqual([{ reason: "canonical" }]);
+      await expectDatabaseError(
+        () =>
+          legacyDb.db.execute(sql`
+            insert into dead_letters (outbox_id, reason, payload_hash)
+            values (
+              '00000000-0000-4000-8000-000000000020'::uuid,
+              'new-duplicate',
+              'sha256:legacy'
+            )
+          `),
+        { code: "23505", constraint: "dead_letters_outbox_unique" },
+      );
     } finally {
       await legacyDb.stop();
     }

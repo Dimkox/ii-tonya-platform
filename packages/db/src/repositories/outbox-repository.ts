@@ -34,12 +34,25 @@ interface LockedOutboxRow extends Record<string, unknown> {
   payloadHash: string;
   reconciliationKey: string;
   attempt: number;
+  dispatchOwnerId: string | null;
+  leaseUntil: Date | string | null;
+  reconciliationOwnerId: string | null;
+  reconciliationLeaseUntil: Date | string | null;
+  dispatchLeaseValid: boolean;
+  reconciliationLeaseValid: boolean;
 }
 
 export class OutboxStateConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "OutboxStateConflictError";
+  }
+}
+
+export class OutboxLeaseLostError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OutboxLeaseLostError";
   }
 }
 
@@ -63,7 +76,19 @@ async function lockedRow(
       topic,
       payload_hash as "payloadHash",
       reconciliation_key as "reconciliationKey",
-      attempt
+      attempt,
+      dispatch_owner_id as "dispatchOwnerId",
+      lease_until as "leaseUntil",
+      reconciliation_owner_id as "reconciliationOwnerId",
+      reconciliation_lease_until as "reconciliationLeaseUntil",
+      (
+        lease_until is not null
+        and lease_until >= clock_timestamp()
+      ) as "dispatchLeaseValid",
+      (
+        reconciliation_lease_until is not null
+        and reconciliation_lease_until >= clock_timestamp()
+      ) as "reconciliationLeaseValid"
     from integration_outbox
     where id = ${id}::uuid
     for update
@@ -74,12 +99,134 @@ async function lockedRow(
   return row;
 }
 
-function requireStatus(row: LockedOutboxRow, expected: string): void {
-  if (row.status !== expected) {
-    throw new OutboxStateConflictError(
-      `Outbox row ${row.id} must be ${expected}, received ${row.status}`,
+function isBefore(value: Date | string | null, now: Date): boolean {
+  return value === null || new Date(value).getTime() < now.getTime();
+}
+
+function requireDispatchLease(
+  row: LockedOutboxRow,
+  owner: string,
+  now: Date,
+): void {
+  if (
+    row.status !== "processing" ||
+    row.dispatchOwnerId !== owner ||
+    !row.dispatchLeaseValid ||
+    isBefore(row.leaseUntil, now)
+  ) {
+    throw new OutboxLeaseLostError(`Dispatch lease lost for outbox row ${row.id}`);
+  }
+}
+
+function requireReconciliationLease(
+  row: LockedOutboxRow,
+  owner: string,
+  now: Date,
+): void {
+  if (
+    row.status !== "reconciling" ||
+    row.reconciliationOwnerId !== owner ||
+    !row.reconciliationLeaseValid ||
+    isBefore(row.reconciliationLeaseUntil, now)
+  ) {
+    throw new OutboxLeaseLostError(
+      `Reconciliation lease lost for outbox row ${row.id}`,
     );
   }
+}
+
+async function terminalizeDispatchExhausted(
+  tx: Transaction,
+  maxAttempts: number,
+): Promise<void> {
+  await tx.execute(sql`
+    with exhausted as (
+      update integration_outbox
+      set
+        status = 'dead_letter',
+        next_attempt_at = null,
+        last_normalized_reason = 'dispatch_attempts_exhausted_before_claim',
+        updated_at = now()
+      where status in ('pending', 'retry_wait') and attempt >= ${maxAttempts}
+      returning id, payload_hash
+    ),
+    dead as (
+      insert into dead_letters (outbox_id, reason, payload_hash)
+      select id, 'dispatch_attempts_exhausted_before_claim', payload_hash
+      from exhausted
+      on conflict (outbox_id) do nothing
+    )
+    insert into outbox_operator_alerts (outbox_id, reason_code)
+    select id, 'dispatch_attempts_exhausted_before_claim'
+    from exhausted
+    on conflict (outbox_id, reason_code) do nothing
+  `);
+}
+
+async function terminalizeReconciliationExhausted(
+  tx: Transaction,
+  maxAttempts: number,
+): Promise<void> {
+  await tx.execute(sql`
+    with exhausted as (
+      update integration_outbox
+      set
+        status = 'dead_letter',
+        next_reconciliation_at = null,
+        last_normalized_reason =
+          'unknown_outcome_reconciliation_exhausted_before_claim',
+        updated_at = now()
+      where status = 'unknown_outcome'
+        and reconciliation_attempt >= ${maxAttempts}
+      returning id, payload_hash
+    ),
+    dead as (
+      insert into dead_letters (outbox_id, reason, payload_hash)
+      select
+        id,
+        'unknown_outcome_reconciliation_exhausted_before_claim',
+        payload_hash
+      from exhausted
+      on conflict (outbox_id) do nothing
+    )
+    insert into outbox_operator_alerts (outbox_id, reason_code)
+    select
+      id,
+      'unknown_outcome_reconciliation_exhausted_before_claim'
+    from exhausted
+    on conflict (outbox_id, reason_code) do nothing
+  `);
+}
+
+async function writeDeadLetterAndAlert(
+  tx: Transaction,
+  row: LockedOutboxRow,
+  reasonCode: string,
+): Promise<void> {
+  await tx.execute(sql`
+    update integration_outbox
+    set
+      status = 'dead_letter',
+      dispatch_owner_id = null,
+      lease_until = null,
+      reconciliation_owner_id = null,
+      reconciliation_lease_until = null,
+      next_attempt_at = null,
+      next_reconciliation_at = null,
+      last_normalized_reason = ${reasonCode},
+      updated_at = now()
+    where id = ${row.id}::uuid
+  `);
+  await tx.execute(sql`
+    insert into dead_letters (outbox_id, reason, payload_hash)
+    values (${row.id}::uuid, ${reasonCode}, ${row.payloadHash})
+    on conflict (outbox_id) do nothing
+  `);
+  await tx.execute(sql`
+    insert into outbox_operator_alerts (outbox_id, reason_code)
+    values (${row.id}::uuid, ${reasonCode})
+    on conflict (outbox_id, reason_code) do nothing
+  `);
 }
 
 export class PostgresOutboxRepository {
@@ -89,9 +236,11 @@ export class PostgresOutboxRepository {
     limit: number,
     owner: string,
     leaseUntil: Date,
+    maxAttempts: number,
   ): Promise<readonly PersistedOutboxMessage[]> {
     if (!Number.isSafeInteger(limit) || limit < 1) return [];
     return this.db.transaction(async (tx) => {
+      await terminalizeDispatchExhausted(tx, maxAttempts);
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
           select id
@@ -103,6 +252,7 @@ export class PostgresOutboxRepository {
               and (next_attempt_at is null or next_attempt_at <= now())
             )
           )
+            and attempt < ${maxAttempts}
           order by created_at, id
           for update skip locked
           limit ${limit}
@@ -134,14 +284,20 @@ export class PostgresOutboxRepository {
     limit: number,
     owner: string,
     leaseUntil: Date,
+    maxReconciliationAttempts: number,
   ): Promise<readonly PersistedOutboxMessage[]> {
     if (!Number.isSafeInteger(limit) || limit < 1) return [];
     return this.db.transaction(async (tx) => {
+      await terminalizeReconciliationExhausted(
+        tx,
+        maxReconciliationAttempts,
+      );
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
           select id
           from integration_outbox
           where status = 'unknown_outcome'
+            and reconciliation_attempt < ${maxReconciliationAttempts}
             and (next_reconciliation_at is null or next_reconciliation_at <= now())
           order by updated_at, id
           for update skip locked
@@ -172,13 +328,14 @@ export class PostgresOutboxRepository {
 
   async recordAttemptStarted(
     id: string,
+    owner: string,
     attemptId: string,
     reconciliationKey: string,
     startedAt: Date,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireStatus(row, "processing");
+      requireDispatchLease(row, owner, startedAt);
       if (row.reconciliationKey !== reconciliationKey) {
         throw new OutboxStateConflictError(
           "Outbox reconciliation key mismatch",
@@ -208,13 +365,15 @@ export class PostgresOutboxRepository {
 
   async markUnknownOutcome(
     id: string,
+    owner: string,
     attemptId: string,
     reconciliationKey: string,
     reasonCode: string,
+    now: Date,
   ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
-      requireStatus(row, "processing");
+      requireDispatchLease(row, owner, now);
       if (row.reconciliationKey !== reconciliationKey) {
         throw new OutboxStateConflictError(
           "Outbox reconciliation key mismatch",
@@ -264,32 +423,106 @@ export class PostgresOutboxRepository {
   async markStillUnknown(
     id: string,
     owner: string,
+    now: Date,
     reasonCode: string,
     nextCheckAt: Date,
   ): Promise<void> {
-    const result = await this.db.execute<{ id: string }>(sql`
-      update integration_outbox
-      set
-        status = 'unknown_outcome',
-        reconciliation_owner_id = null,
-        reconciliation_lease_until = null,
-        next_reconciliation_at = ${nextCheckAt},
-        last_normalized_reason = ${reasonCode},
-        updated_at = now()
-      where id = ${id}::uuid
-        and status = 'reconciling'
-        and reconciliation_owner_id = ${owner}
-      returning id
-    `);
-    if (result.rows.length !== 1) {
-      throw new OutboxStateConflictError(
-        "Outbox reconciliation lease ownership mismatch",
-      );
-    }
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireReconciliationLease(row, owner, now);
+      await tx.execute(sql`
+        update integration_outbox
+        set
+          status = 'unknown_outcome',
+          reconciliation_owner_id = null,
+          reconciliation_lease_until = null,
+          next_reconciliation_at = ${nextCheckAt},
+          last_normalized_reason = ${reasonCode},
+          updated_at = now()
+        where id = ${id}::uuid
+      `);
+    });
   }
 
-  async succeed(id: string): Promise<void> {
-    const result = await this.db.execute<{ id: string }>(sql`
+  async succeed(id: string, owner: string, now: Date): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireDispatchLease(row, owner, now);
+      await this.transitionSucceeded(tx, id);
+    });
+  }
+
+  async retry(
+    id: string,
+    owner: string,
+    now: Date,
+    nextAttemptAt: Date,
+    reasonCode: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireDispatchLease(row, owner, now);
+      await this.transitionRetry(tx, id, nextAttemptAt, reasonCode);
+    });
+  }
+
+  async deadLetterAndAlert(
+    id: string,
+    owner: string,
+    now: Date,
+    reasonCode: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireDispatchLease(row, owner, now);
+      await writeDeadLetterAndAlert(tx, row, reasonCode);
+    });
+  }
+
+  async succeedAfterReconciliation(
+    id: string,
+    owner: string,
+    now: Date,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireReconciliationLease(row, owner, now);
+      await this.transitionSucceeded(tx, id);
+    });
+  }
+
+  async retryAfterReconciliation(
+    id: string,
+    owner: string,
+    now: Date,
+    nextAttemptAt: Date,
+    reasonCode: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireReconciliationLease(row, owner, now);
+      await this.transitionRetry(tx, id, nextAttemptAt, reasonCode);
+    });
+  }
+
+  async deadLetterAfterReconciliationAndAlert(
+    id: string,
+    owner: string,
+    now: Date,
+    reasonCode: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const row = await lockedRow(tx, id);
+      requireReconciliationLease(row, owner, now);
+      await writeDeadLetterAndAlert(tx, row, reasonCode);
+    });
+  }
+
+  private async transitionSucceeded(
+    tx: Transaction,
+    id: string,
+  ): Promise<void> {
+    await tx.execute(sql`
       update integration_outbox
       set
         status = 'succeeded',
@@ -301,22 +534,17 @@ export class PostgresOutboxRepository {
         next_reconciliation_at = null,
         last_normalized_reason = null,
         updated_at = now()
-      where id = ${id}::uuid and status in ('processing', 'reconciling')
-      returning id
+      where id = ${id}::uuid
     `);
-    if (result.rows.length !== 1) {
-      throw new OutboxStateConflictError(
-        "Outbox row cannot transition to succeeded",
-      );
-    }
   }
 
-  async retry(
+  private async transitionRetry(
+    tx: Transaction,
     id: string,
     nextAttemptAt: Date,
     reasonCode: string,
   ): Promise<void> {
-    const result = await this.db.execute<{ id: string }>(sql`
+    await tx.execute(sql`
       update integration_outbox
       set
         status = 'retry_wait',
@@ -328,51 +556,8 @@ export class PostgresOutboxRepository {
         next_reconciliation_at = null,
         last_normalized_reason = ${reasonCode},
         updated_at = now()
-      where id = ${id}::uuid and status in ('processing', 'reconciling')
-      returning id
+      where id = ${id}::uuid
     `);
-    if (result.rows.length !== 1) {
-      throw new OutboxStateConflictError(
-        "Outbox row cannot transition to retry_wait",
-      );
-    }
-  }
-
-  async deadLetterAndAlert(id: string, reasonCode: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      const row = await lockedRow(tx, id);
-      if (row.status === "succeeded") {
-        throw new OutboxStateConflictError(
-          "Succeeded outbox row cannot be dead-lettered",
-        );
-      }
-      if (row.status !== "dead_letter") {
-        await tx.execute(sql`
-          update integration_outbox
-          set
-            status = 'dead_letter',
-            dispatch_owner_id = null,
-            lease_until = null,
-            reconciliation_owner_id = null,
-            reconciliation_lease_until = null,
-            next_attempt_at = null,
-            next_reconciliation_at = null,
-            last_normalized_reason = ${reasonCode},
-            updated_at = now()
-          where id = ${id}::uuid
-        `);
-      }
-      await tx.execute(sql`
-        insert into dead_letters (outbox_id, reason, payload_hash)
-        values (${id}::uuid, ${reasonCode}, ${row.payloadHash})
-        on conflict (outbox_id) do nothing
-      `);
-      await tx.execute(sql`
-        insert into outbox_operator_alerts (outbox_id, reason_code)
-        values (${id}::uuid, ${reasonCode})
-        on conflict (outbox_id, reason_code) do nothing
-      `);
-    });
   }
 
   async recoverExpiredDispatchLeases(now: Date): Promise<number> {
@@ -384,7 +569,7 @@ export class PostgresOutboxRepository {
             status = 'unknown_outcome',
             dispatch_owner_id = null,
             lease_until = null,
-            next_reconciliation_at = ${now},
+            next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'dispatch_lease_expired_unknown_outcome',
             updated_at = now()
           where status = 'processing' and lease_until < ${now}
@@ -418,7 +603,7 @@ export class PostgresOutboxRepository {
             status = 'unknown_outcome',
             reconciliation_owner_id = null,
             reconciliation_lease_until = null,
-            next_reconciliation_at = ${now},
+            next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'reconciliation_lease_expired',
             updated_at = now()
           where status = 'reconciling' and reconciliation_lease_until < ${now}

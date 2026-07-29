@@ -12,7 +12,9 @@ type FakeStatus =
 interface FakeRow extends OutboxMessage {
   status: FakeStatus;
   leaseUntil?: Date;
+  dispatchOwner?: string;
   reconciliationLeaseUntil?: Date;
+  reconciliationOwner?: string;
   nextAttemptAt?: Date;
   nextReconciliationAt?: Date;
 }
@@ -70,7 +72,19 @@ export function fakeOutboxRepository(
     retryCalls,
     succeedCalls,
     deadLetterCalls,
-    async claim(limit, _owner, leaseUntil) {
+    async claim(limit, owner, leaseUntil, maxAttempts) {
+      for (const row of rows.values()) {
+        if (
+          (row.status === "pending" || row.status === "retry_wait") &&
+          row.attempt >= maxAttempts
+        ) {
+          row.status = "dead_letter";
+          deadLetterCalls.push({
+            id: row.id,
+            reasonCode: "dispatch_attempts_exhausted_before_claim",
+          });
+        }
+      }
       const claimed = [...rows.values()]
         .filter(
           (row) => row.status === "pending" || row.status === "retry_wait",
@@ -80,10 +94,24 @@ export function fakeOutboxRepository(
         row.status = "processing";
         row.attempt += 1;
         row.leaseUntil = leaseUntil;
+        row.dispatchOwner = owner;
       }
       return claimed.map(cloneMessage);
     },
-    async claimUnknown(limit, _owner, leaseUntil) {
+    async claimUnknown(limit, owner, leaseUntil, maxReconciliationAttempts) {
+      for (const row of rows.values()) {
+        if (
+          row.status === "unknown_outcome" &&
+          row.reconciliationAttempt >= maxReconciliationAttempts
+        ) {
+          row.status = "dead_letter";
+          deadLetterCalls.push({
+            id: row.id,
+            reasonCode:
+              "unknown_outcome_reconciliation_exhausted_before_claim",
+          });
+        }
+      }
       const claimed = [...rows.values()]
         .filter((row) => row.status === "unknown_outcome")
         .slice(0, limit);
@@ -91,48 +119,150 @@ export function fakeOutboxRepository(
         row.status = "reconciling";
         row.reconciliationAttempt += 1;
         row.reconciliationLeaseUntil = leaseUntil;
+        row.reconciliationOwner = owner;
       }
       return claimed.map(cloneMessage);
     },
-    async recordAttemptStarted(id, _attemptId, reconciliationKey) {
+    async recordAttemptStarted(id, owner, _attemptId, reconciliationKey, now) {
       const row = requireRow(id);
-      if (row.status !== "processing")
+      if (
+        row.status !== "processing" ||
+        row.dispatchOwner !== owner ||
+        row.leaseUntil === undefined ||
+        row.leaseUntil < now
+      )
         throw new Error("Row is not dispatch-leased");
       if (row.reconciliationKey !== reconciliationKey) {
         throw new Error("Reconciliation key mismatch");
       }
     },
-    async markUnknownOutcome(id, _attemptId, reconciliationKey) {
+    async markUnknownOutcome(
+      id,
+      owner,
+      _attemptId,
+      reconciliationKey,
+      _reasonCode,
+      now,
+    ) {
       const row = requireRow(id);
+      if (
+        row.status !== "processing" ||
+        row.dispatchOwner !== owner ||
+        row.leaseUntil === undefined ||
+        row.leaseUntil < now
+      ) {
+        throw new Error("Dispatch lease lost");
+      }
       if (row.reconciliationKey !== reconciliationKey) {
         throw new Error("Reconciliation key mismatch");
       }
       row.status = "unknown_outcome";
       delete row.leaseUntil;
+      delete row.dispatchOwner;
     },
-    async markStillUnknown(id, _owner, _reasonCode, nextCheckAt) {
+    async markStillUnknown(id, owner, now, _reasonCode, nextCheckAt) {
       const row = requireRow(id);
+      if (
+        row.status !== "reconciling" ||
+        row.reconciliationOwner !== owner ||
+        row.reconciliationLeaseUntil === undefined ||
+        row.reconciliationLeaseUntil < now
+      ) {
+        throw new Error("Reconciliation lease lost");
+      }
       row.status = "unknown_outcome";
       row.nextReconciliationAt = nextCheckAt;
       delete row.reconciliationLeaseUntil;
+      delete row.reconciliationOwner;
     },
-    async succeed(id) {
+    async succeed(id, owner, now) {
       if (failSuccessWrite) {
         failSuccessWrite = false;
         throw new Error("simulated local acknowledgement failure");
       }
       const row = requireRow(id);
+      if (
+        row.status !== "processing" ||
+        row.dispatchOwner !== owner ||
+        row.leaseUntil === undefined ||
+        row.leaseUntil < now
+      ) {
+        throw new Error("Dispatch lease lost");
+      }
       row.status = "succeeded";
       succeedCalls.push(id);
     },
-    async retry(id, nextAttemptAt, reasonCode) {
+    async retry(id, owner, now, nextAttemptAt, reasonCode) {
       const row = requireRow(id);
+      if (
+        row.status !== "processing" ||
+        row.dispatchOwner !== owner ||
+        row.leaseUntil === undefined ||
+        row.leaseUntil < now
+      ) {
+        throw new Error("Dispatch lease lost");
+      }
       row.status = "retry_wait";
       row.nextAttemptAt = nextAttemptAt;
       retryCalls.push({ id, at: nextAttemptAt.toISOString(), reasonCode });
     },
-    async deadLetterAndAlert(id, reasonCode) {
-      requireRow(id).status = "dead_letter";
+    async deadLetterAndAlert(id, owner, now, reasonCode) {
+      const row = requireRow(id);
+      if (
+        row.status !== "processing" ||
+        row.dispatchOwner !== owner ||
+        row.leaseUntil === undefined ||
+        row.leaseUntil < now
+      ) {
+        throw new Error("Dispatch lease lost");
+      }
+      row.status = "dead_letter";
+      deadLetterCalls.push({ id, reasonCode });
+    },
+    async succeedAfterReconciliation(id, owner, now) {
+      const row = requireRow(id);
+      if (
+        row.status !== "reconciling" ||
+        row.reconciliationOwner !== owner ||
+        row.reconciliationLeaseUntil === undefined ||
+        row.reconciliationLeaseUntil < now
+      ) {
+        throw new Error("Reconciliation lease lost");
+      }
+      row.status = "succeeded";
+      succeedCalls.push(id);
+    },
+    async retryAfterReconciliation(
+      id,
+      owner,
+      now,
+      nextAttemptAt,
+      reasonCode,
+    ) {
+      const row = requireRow(id);
+      if (
+        row.status !== "reconciling" ||
+        row.reconciliationOwner !== owner ||
+        row.reconciliationLeaseUntil === undefined ||
+        row.reconciliationLeaseUntil < now
+      ) {
+        throw new Error("Reconciliation lease lost");
+      }
+      row.status = "retry_wait";
+      row.nextAttemptAt = nextAttemptAt;
+      retryCalls.push({ id, at: nextAttemptAt.toISOString(), reasonCode });
+    },
+    async deadLetterAfterReconciliationAndAlert(id, owner, now, reasonCode) {
+      const row = requireRow(id);
+      if (
+        row.status !== "reconciling" ||
+        row.reconciliationOwner !== owner ||
+        row.reconciliationLeaseUntil === undefined ||
+        row.reconciliationLeaseUntil < now
+      ) {
+        throw new Error("Reconciliation lease lost");
+      }
+      row.status = "dead_letter";
       deadLetterCalls.push({ id, reasonCode });
     },
     async recoverExpiredDispatchLeases(now) {
@@ -145,6 +275,7 @@ export function fakeOutboxRepository(
         ) {
           row.status = "unknown_outcome";
           delete row.leaseUntil;
+          delete row.dispatchOwner;
           count += 1;
         }
       }
@@ -160,6 +291,7 @@ export function fakeOutboxRepository(
         ) {
           row.status = "unknown_outcome";
           delete row.reconciliationLeaseUntil;
+          delete row.reconciliationOwner;
           count += 1;
         }
       }

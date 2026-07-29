@@ -150,6 +150,17 @@ describe("booking transaction", () => {
     })).rejects.toThrow("Stale reservation version");
     expect(await testDb.auditCountForCorrelation("confirm-1")).toBe(1);
     expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(1);
+    expect(await testDb.outboxDeliveryForCorrelation("confirm-1")).toMatchObject({
+      topic: "booking.reservation_changed",
+      correlationId: "confirm-1",
+      reconciliationKey: "booking:confirm-1",
+      payload: {
+        reservationId: first.reservationId,
+        action: "expert_confirm",
+        decision: "booked",
+        version: 2,
+      },
+    });
   });
 
   it("rejects sequential and concurrent reuse of an idempotency key for another selection", async () => {
