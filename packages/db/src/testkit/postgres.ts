@@ -231,15 +231,17 @@ async function stopResources(
   pool: TestPoolHandle,
   container: TestContainerHandle,
 ): Promise<void> {
-  const results = await Promise.allSettled([
-    Promise.resolve().then(() => pool.end()),
-    Promise.resolve().then(() => container.stop()),
-  ]);
-  const errors = results
-    .filter(
-      (result): result is PromiseRejectedResult => result.status === "rejected",
-    )
-    .map(({ reason }) => reason);
+  const errors: unknown[] = [];
+  try {
+    await pool.end();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await container.stop();
+  } catch (error) {
+    errors.push(error);
+  }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1)
     throw new AggregateError(errors, "Failed to stop test database resources");
@@ -255,12 +257,16 @@ export async function startTestPostgres(
     pool = dependencies.createPool(container.getConnectionUri());
     db = dependencies.createDb(pool);
   } catch (error) {
-    const cleanups = [Promise.resolve().then(() => container.stop())];
     const initializedPool = pool;
-    if (initializedPool !== undefined) {
-      cleanups.push(Promise.resolve().then(() => initializedPool.end()));
+    try {
+      if (initializedPool === undefined) {
+        await container.stop();
+      } else {
+        await stopResources(initializedPool, container);
+      }
+    } catch {
+      // Initialization remains the primary error after best-effort cleanup.
     }
-    await Promise.allSettled(cleanups);
     throw error;
   }
   let primaryPackageId: string | undefined;
