@@ -425,6 +425,14 @@ describe("booking transaction", () => {
     const fixture = await testDb.createReservableFixture();
     const repository = new PostgresBookingRepository(testDb.db);
     await testDb.db.execute(sql`
+      update expert_services
+      set code = 'consultation', language = 'ru'
+      where id = (
+        select expert_service_id from slots
+        where id = ${fixture.command.slotId}::uuid
+      )
+    `);
+    await testDb.db.execute(sql`
       insert into channel_identities (user_id, provider, external_id)
       select user_id, 'telegram', '123456789'
       from experts
