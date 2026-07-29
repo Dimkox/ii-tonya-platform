@@ -1,0 +1,40 @@
+export type ReservationStatus =
+  | "reserved" | "booked" | "cancelled_by_client" | "cancelled_by_expert"
+  | "expired" | "completed" | "no_show";
+export type ReservationAction =
+  | "expert_confirm" | "client_cancel" | "expert_cancel" | "expire"
+  | "complete" | "mark_no_show";
+
+const transitions: Partial<Record<ReservationStatus, Partial<Record<ReservationAction, ReservationStatus>>>> = {
+  reserved: {
+    expert_confirm: "booked",
+    client_cancel: "cancelled_by_client",
+    expert_cancel: "cancelled_by_expert",
+    expire: "expired",
+  },
+  booked: {
+    client_cancel: "cancelled_by_client",
+    expert_cancel: "cancelled_by_expert",
+    complete: "completed",
+    mark_no_show: "no_show",
+  },
+};
+
+export function computeReservedUntil(
+  createdAt: Date,
+  slotStartsAt: Date,
+  confirmationBufferMs: number,
+): Date {
+  const deadline = new Date(Math.min(
+    createdAt.getTime() + 72 * 60 * 60 * 1_000,
+    slotStartsAt.getTime() - confirmationBufferMs,
+  ));
+  if (deadline.getTime() <= createdAt.getTime()) throw new Error("Reservation deadline has already passed");
+  return deadline;
+}
+
+export function transitionReservation(status: ReservationStatus, action: ReservationAction): ReservationStatus {
+  const next = transitions[status]?.[action];
+  if (!next) throw new Error("Invalid reservation transition");
+  return next;
+}

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@11.9.0",
   "engines": {
     "node": ">=24 <25"
   },
@@ -13,17 +13,25 @@
     "test:integration": "vitest run",
     "test:contract": "vitest run",
     "test:e2e": "vitest run",
+    "test:repeat": "node scripts/repeat-vitest.mjs",
+    "test:pnpm-launcher": "node scripts/pnpm-launcher-self-test.mjs",
+    "verify:clean-workspace": "node scripts/verify-clean-workspace.mjs",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.base.json",
-    "build": "tsc --noEmit -p tsconfig.base.json"
+    "typecheck": "pnpm -r --sort run typecheck",
+    "build": "pnpm -r --sort run build"
   },
   "devDependencies": {
+    "@eslint/js": "^9.31.0",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.31.0",
-    "typescript-eslint": "^8.30.1",
+    "globals": "^14.0.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "zod": "^4.3.6"
+    "yaml": "^2.8.0"
   }
 }

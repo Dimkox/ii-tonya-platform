@@ -5,7 +5,16 @@
   "type": "module",
   "exports": "./src/index.ts",
   "scripts": {
-    "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc --noEmit -p ../../tsconfig.base.json",
+    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.3.0",
+    "@ii-tonya/application": "workspace:*",
+    "@ii-tonya/config": "workspace:*",
+    "@ii-tonya/db": "workspace:*",
+    "@ii-tonya/integrations": "workspace:*",
+    "@ii-tonya/observability": "workspace:*",
+    "fastify": "^5.5.0"
   }
 }
