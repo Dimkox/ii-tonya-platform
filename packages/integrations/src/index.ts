@@ -8,6 +8,13 @@ export {
   type WebhookVerification,
 } from "./http/webhook-auth.js";
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
+export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
+export {
+  normalizeProviderSlots,
+  type PlanerkaMutationOutcome,
+  type PlanerkaPort,
+  type ProviderSlot,
+} from "./planerka/planerka-port.js";
 export {
   SelartiContractAdapter,
   type SelartiContractAdapterDeps,

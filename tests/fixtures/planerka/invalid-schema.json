@@ -1,0 +1,12 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "invalid_schema",
+  "payload": {
+    "reasonCode": "strict_schema_rejection",
+    "example": {
+      "externalSlotId": ""
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "disabled",
+  "payload": {
+    "reasonCode": "webhook_auth_unconfirmed"
+  }
+}

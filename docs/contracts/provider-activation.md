@@ -70,3 +70,49 @@ Send acceptance is not delivery evidence and never invokes
 events, each event must first enter `integration_inbox` as a
 `CanonicalOutboundDelivery`; Task 7 then meters it idempotently in a separate
 transaction.
+
+## Planerka
+
+| Evidence                                         | Status                                       |
+| ------------------------------------------------ | -------------------------------------------- |
+| Official contract version and checksum           | Missing immutable approved snapshot          |
+| Authenticated REST paths and authentication      | Not confirmed                                |
+| Authentication credential owner                  | Not assigned                                 |
+| Webhook authentication and freshness window      | Not confirmed                                |
+| Payload fixtures                                 | Sanitized contract-hypothesis fixtures only  |
+| Sandbox tenant and test identities               | Not available                                |
+| Published and measured rate limits               | Not confirmed                                |
+| `429` no-mutation and retry semantics             | Not confirmed                                |
+| Before-write versus after-write timeout semantics | Not provider-confirmed                       |
+| Reserve idempotency semantics                     | Not confirmed                                |
+| Confirm idempotency semantics                     | Not confirmed                                |
+| Cancel idempotency semantics                      | Not confirmed                                |
+| Authoritative reconciliation endpoint             | Not confirmed                                |
+| Stable booking/event identity                     | Not confirmed                                |
+| Security reviewer                                 | Not assigned                                 |
+| Product approver                                  | Not assigned                                 |
+| Evidence date                                     | 2026-07-29                                   |
+| Expiry/review date                                | Not assigned                                 |
+
+**Activation status: `NO-GO`.**
+
+`ProviderSlot` and `PlanerkaMutationOutcome` are internal boundary contracts, not
+claims about a live provider schema. The seven Planerka fixtures are sanitized
+contract hypotheses and have not passed through an authenticated provider codec.
+An after-write timeout is treated as `unknown_outcome`; an approved future binding
+must reconcile through an authoritative reservation lookup before any retry.
+
+`DisabledPlanerkaAdapter` is the only Planerka adapter supplied by this task. The
+repository contains no Planerka HTTP codec, client, endpoint binding, credential
+lookup, authenticated session, or webhook handler. Runtime configuration remains:
+
+```text
+PLANERKA_ENABLED=false
+PLANERKA_API_TOKEN=__PLACEHOLDER_PLANERKA_API_TOKEN__
+PLANERKA_BASE_URL=__PLACEHOLDER_CONFIRM_FROM_AUTHENTICATED_API_DOCS__
+PLANERKA_WEBHOOK_SECRET=__PLACEHOLDER_PLANERKA_WEBHOOK_SECRET__
+```
+
+Every disabled adapter method throws `Planerka integration is disabled`. Provider
+activation requires a separate reviewed change after every missing evidence field
+above is supplied and approved.

@@ -1,0 +1,10 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "not_applied",
+  "payload": {
+    "phase": "before_write",
+    "reasonCode": "transport_unavailable"
+  }
+}
