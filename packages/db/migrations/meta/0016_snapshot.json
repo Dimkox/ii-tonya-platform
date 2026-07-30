@@ -1,5 +1,5 @@
 {
-  "id": "70d538b5-d8e7-4749-a328-41aa7c7441a3",
+  "id": "28730294-f82e-471c-b790-b00a04448363",
   "prevId": "a42cffa2-f20e-49ab-b315-fb3f549b64fe",
   "version": "7",
   "dialect": "postgresql",
@@ -1193,6 +1193,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "legacy_admin_fact": {
+          "name": "legacy_admin_fact",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "idempotency_key": {
           "name": "idempotency_key",
           "type": "text",
@@ -1312,6 +1319,32 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "message_ledger_entries_admin_approval_id_admin_approvals_id_fk": {
+          "name": "message_ledger_entries_admin_approval_id_admin_approvals_id_fk",
+          "tableFrom": "message_ledger_entries",
+          "tableTo": "admin_approvals",
+          "columnsFrom": [
+            "admin_approval_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "message_ledger_entries_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk": {
+          "name": "message_ledger_entries_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk",
+          "tableFrom": "message_ledger_entries",
+          "tableTo": "admin_sessions",
+          "columnsFrom": [
+            "admin_requester_session_id_hash"
+          ],
+          "columnsTo": [
+            "session_id_hash"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "message_ledger_original_entry_fk": {
           "name": "message_ledger_original_entry_fk",
           "tableFrom": "message_ledger_entries",
@@ -1397,6 +1430,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "legacy_admin_grant": {
+          "name": "legacy_admin_grant",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -1472,6 +1512,32 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "message_packages_admin_approval_id_admin_approvals_id_fk": {
+          "name": "message_packages_admin_approval_id_admin_approvals_id_fk",
+          "tableFrom": "message_packages",
+          "tableTo": "admin_approvals",
+          "columnsFrom": [
+            "admin_approval_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "message_packages_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk": {
+          "name": "message_packages_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk",
+          "tableFrom": "message_packages",
+          "tableTo": "admin_sessions",
+          "columnsFrom": [
+            "admin_requester_session_id_hash"
+          ],
+          "columnsTo": [
+            "session_id_hash"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1500,7 +1566,7 @@
         },
         "message_packages_admin_contract": {
           "name": "message_packages_admin_contract",
-          "value": "\n      (\"message_packages\".\"kind\" = 'admin' and \"message_packages\".\"granted_messages\" in (500, 1000, 1500, 2000) and \"message_packages\".\"expires_at\" is not null)\n      or (\"message_packages\".\"kind\" = 'intro' and \"message_packages\".\"granted_messages\" = 100 and \"message_packages\".\"expires_at\" is null)\n      or (\"message_packages\".\"kind\" = 'paid')\n    "
+          "value": "\n      (\"message_packages\".\"kind\" = 'paid' and \"message_packages\".\"legacy_admin_grant\" = false and \"message_packages\".\"admin_approval_id\" is null and \"message_packages\".\"admin_requester_session_id_hash\" is null)\n      or (\"message_packages\".\"kind\" in ('admin', 'intro') and \"message_packages\".\"legacy_admin_grant\" = true and \"message_packages\".\"admin_approval_id\" is null and \"message_packages\".\"admin_requester_session_id_hash\" is null)\n      or (\"message_packages\".\"kind\" = 'admin' and \"message_packages\".\"legacy_admin_grant\" = false and \"message_packages\".\"admin_approval_id\" is not null and \"message_packages\".\"admin_requester_session_id_hash\" is not null and \"message_packages\".\"granted_messages\" in (500, 1000, 1500, 2000) and \"message_packages\".\"expires_at\" is not null)\n      or (\"message_packages\".\"kind\" = 'intro' and \"message_packages\".\"legacy_admin_grant\" = false and \"message_packages\".\"admin_approval_id\" is not null and \"message_packages\".\"admin_requester_session_id_hash\" is not null and \"message_packages\".\"granted_messages\" = 100 and \"message_packages\".\"expires_at\" is null)\n    "
         }
       },
       "isRLSEnabled": false

@@ -40,6 +40,30 @@ async function approved(input: {
   return { approvalId: request!.approvalId, nonce, sessionIdHash: input.requester.sessionIdHash, correlationId: `corr:${randomUUID()}` };
 }
 
+async function seedSafetyAlert(
+  status: "opened" | "assigned" | "acknowledged" | "escalated",
+  assignedAdminId: string,
+) {
+  const incidentId = randomUUID();
+  const alertId = randomUUID();
+  await testDb!.db.execute(sql`
+    insert into safety_incidents (id, reason_code, metadata_hash)
+    values (${incidentId}::uuid, 'safety_test', 'sha256:redacted');
+    insert into human_escalations (
+      id, incident_id, status, opened_at, acknowledgement_deadline,
+      acknowledged_at, escalation_reason
+    ) values (
+      ${alertId}::uuid, ${incidentId}::uuid, ${status}, clock_timestamp(),
+      clock_timestamp() + interval '5 minutes',
+      case when ${status} = 'acknowledged' then clock_timestamp() else null end,
+      'safety_test'
+    );
+    insert into admin_object_assignments (admin_id, object_type, object_id)
+    values (${assignedAdminId}::uuid, 'safety_case', ${alertId}::uuid)
+  `);
+  return alertId;
+}
+
 beforeAll(async () => {
   testDb = await startTestPostgres();
   await testDb.migrate();
@@ -61,6 +85,29 @@ describe("atomic approved admin workflows", () => {
     expect(raced.every((result) => result.allowed)).toBe(true);
     expect(raced.filter((result) => result.allowed && !result.replayed)).toHaveLength(1);
     await expect(repository.grantPackage(command)).resolves.toMatchObject({ allowed: true, replayed: true });
+    for (const changed of [
+      { nonce: `${auth.nonce}:changed`, correlationId: `corr:${randomUUID()}` },
+      { units: 1000 as const, correlationId: `corr:${randomUUID()}` },
+      { userId: await testDb!.createUser(), correlationId: `corr:${randomUUID()}` },
+    ]) {
+      await expect(repository.grantPackage({ ...command, ...changed }))
+        .resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+    }
+    await expect(repository.grantIntroPackage({
+      ...command,
+      units: 100,
+      correlationId: `corr:${randomUUID()}`,
+    })).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+    await testDb!.db.execute(sql`
+      insert into admin_role_assignments (admin_id, role)
+      values (${requester.adminId}::uuid, 'support');
+      delete from admin_role_assignments
+      where admin_id = ${requester.adminId}::uuid and role = 'entitlement_admin'
+    `);
+    await expect(repository.grantPackage({
+      ...command,
+      correlationId: `corr:${randomUUID()}`,
+    })).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
 
     const facts = await testDb!.db.execute<{
       packages: string; grants: string; audits: string; consumed: string; seconds: string;
@@ -103,10 +150,19 @@ describe("atomic approved admin workflows", () => {
     const approver = await seedAdmin("entitlement_admin");
     const ownerId = await testDb!.createUser();
     const otherUserId = await testDb!.createUser();
-    const packageId = await testDb!.createLedgerPackage(ownerId, `seed:${randomUUID()}`, 500);
+    const grantKey = `grant-for-revoke:${randomUUID()}`;
+    const grantAuth = await approved({
+      requester, approver, action: "package.grant", objectType: "user", objectId: ownerId,
+      payload: { userId: ownerId, units: 500, idempotencyKey: grantKey },
+    });
+    const granted = await new PostgresAdminRepository(testDb!.db).grantPackage({
+      ...grantAuth, userId: ownerId, units: 500, idempotencyKey: grantKey,
+    });
+    expect(granted.allowed).toBe(true);
+    const packageId = granted.allowed ? granted.packageId : "";
     const grant = await testDb!.db.execute<{ id: string }>(sql`
-      insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
-      values (${packageId}::uuid, 'grant', 500, ${`seed-ledger:${randomUUID()}`}) returning id
+      select id from message_ledger_entries
+      where package_id = ${packageId}::uuid and entry_kind = 'grant'
     `);
     const idempotencyKey = `revoke:${randomUUID()}`;
     const auth = await approved({
@@ -135,6 +191,46 @@ describe("atomic approved admin workflows", () => {
         (select count(*)::text from audit_events where correlation_id = ${crossAuth.correlationId} and decision = 'denied') as denied
     `);
     expect(cross.rows[0]).toEqual({ ledger: "0", consumed: "0", denied: "1" });
+  });
+
+  it("rejects paid and intro package revocation with full rollback and denied audit", async () => {
+    const requester = await seedAdmin("entitlement_admin");
+    const approver = await seedAdmin("entitlement_admin");
+    const userId = await testDb!.createUser();
+    const paidId = await testDb!.createLedgerPackage(userId, `paid:${randomUUID()}`, 500);
+    await testDb!.db.execute(sql`
+      insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key)
+      values (${paidId}::uuid, 'grant', 500, ${`paid-ledger:${randomUUID()}`})
+    `);
+    const introKey = `intro-revoke:${randomUUID()}`;
+    const introAuth = await approved({
+      requester, approver, action: "package.intro_grant", objectType: "user", objectId: userId,
+      payload: { userId, units: 100, idempotencyKey: introKey },
+    });
+    const intro = await new PostgresAdminRepository(testDb!.db).grantIntroPackage({
+      ...introAuth, userId, units: 100, idempotencyKey: introKey,
+    });
+    expect(intro.allowed).toBe(true);
+    const introId = intro.allowed ? intro.packageId : "";
+    const repository = new PostgresAdminRepository(testDb!.db);
+
+    for (const [kind, packageId] of [["paid", paidId], ["intro", introId]] as const) {
+      const idempotencyKey = `reject-${kind}:${randomUUID()}`;
+      const auth = await approved({
+        requester, approver, action: "package.revoke", objectType: "user", objectId: userId,
+        payload: { userId, packageId, idempotencyKey },
+      });
+      await expect(repository.revokePackage({ ...auth, userId, packageId, idempotencyKey }))
+        .rejects.toThrow("Admin workflow target was not found");
+      const effects = await testDb!.db.execute<{ ledger: string; consumed: string; denied: string; allowed: string }>(sql`
+        select
+          (select count(*)::text from message_ledger_entries where idempotency_key = ${idempotencyKey}) as ledger,
+          (select count(*)::text from admin_approvals where id = ${auth.approvalId}::uuid and consumed_at is not null) as consumed,
+          (select count(*)::text from audit_events where correlation_id = ${auth.correlationId} and decision = 'denied') as denied,
+          (select count(*)::text from audit_events where correlation_id = ${auth.correlationId} and decision = 'allowed') as allowed
+      `);
+      expect(effects.rows[0]).toEqual({ ledger: "0", consumed: "0", denied: "1", allowed: "0" });
+    }
   });
 
   it("executes exact client, expert, service, and integration-error mutations", async () => {
@@ -248,6 +344,79 @@ describe("atomic approved admin workflows", () => {
     expect(denied.rows[0]).toEqual({ packages: "0", ledger: "0", audit: "1" });
   });
 
+  it("enforces safety transition order, serializes concurrent transitions, and rolls state back with audit failure", async () => {
+    const requester = await seedAdmin("security_admin");
+    const approver = await seedAdmin("security_admin");
+    const repository = new PostgresAdminRepository(testDb!.db);
+
+    const openedId = await seedSafetyAlert("opened", requester.adminId);
+    const openedAuth = await approved({
+      requester, approver, action: "safety.resolve", objectType: "safety_case",
+      objectId: openedId, payload: { alertId: openedId, resolution: "acknowledge" },
+    });
+    await expect(repository.acknowledgeSafetyAlert({ ...openedAuth, alertId: openedId }))
+      .rejects.toThrow("Admin workflow state transition is not allowed");
+    const opened = await testDb!.db.execute<{ status: string; version: number; consumed: string; denied: string }>(sql`
+      select status, version,
+        (select count(*)::text from admin_approvals where id = ${openedAuth.approvalId}::uuid and consumed_at is not null) as consumed,
+        (select count(*)::text from audit_events where correlation_id = ${openedAuth.correlationId} and decision = 'denied') as denied
+      from human_escalations where id = ${openedId}::uuid
+    `);
+    expect(opened.rows[0]).toEqual({ status: "opened", version: 1, consumed: "0", denied: "1" });
+
+    const concurrentId = await seedSafetyAlert("assigned", requester.adminId);
+    const first = await approved({
+      requester, approver, action: "safety.resolve", objectType: "safety_case",
+      objectId: concurrentId, payload: { alertId: concurrentId, resolution: "acknowledge" },
+    });
+    const second = await approved({
+      requester, approver, action: "safety.resolve", objectType: "safety_case",
+      objectId: concurrentId, payload: { alertId: concurrentId, resolution: "acknowledge" },
+    });
+    const concurrent = await Promise.allSettled([
+      repository.acknowledgeSafetyAlert({ ...first, alertId: concurrentId }),
+      repository.acknowledgeSafetyAlert({ ...second, alertId: concurrentId }),
+    ]);
+    expect(concurrent.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(concurrent.filter(({ status }) => status === "rejected")).toHaveLength(1);
+    const concurrentState = await testDb!.db.execute<{ status: string; version: number; actions: string; consumed: string }>(sql`
+      select status, version,
+        (select count(*)::text from admin_case_actions where object_id = ${concurrentId}::uuid and action = 'acknowledge') as actions,
+        (select count(*)::text from admin_approvals where id in (${first.approvalId}::uuid, ${second.approvalId}::uuid) and consumed_at is not null) as consumed
+      from human_escalations where id = ${concurrentId}::uuid
+    `);
+    expect(concurrentState.rows[0]).toEqual({ status: "acknowledged", version: 2, actions: "1", consumed: "1" });
+
+    const rollbackId = await seedSafetyAlert("assigned", requester.adminId);
+    const rollbackAuth = await approved({
+      requester, approver, action: "safety.resolve", objectType: "safety_case",
+      objectId: rollbackId, payload: { alertId: rollbackId, resolution: "acknowledge" },
+    });
+    await testDb!.db.execute(sql`
+      create function fail_safety_allowed_audit() returns trigger language plpgsql as $$
+      begin raise exception 'forced safety audit failure'; end; $$
+    `);
+    await testDb!.db.execute(sql`
+      create trigger fail_safety_allowed_audit before insert on audit_events
+      for each row when (new.action = 'safety.resolve.allowed')
+      execute function fail_safety_allowed_audit()
+    `);
+    try {
+      await expect(repository.acknowledgeSafetyAlert({ ...rollbackAuth, alertId: rollbackId })).rejects.toThrow();
+    } finally {
+      await testDb!.db.execute(sql`drop trigger if exists fail_safety_allowed_audit on audit_events`);
+      await testDb!.db.execute(sql`drop function if exists fail_safety_allowed_audit()`);
+    }
+    const rollback = await testDb!.db.execute<{ status: string; version: number; actions: string; consumed: string; denied: string }>(sql`
+      select status, version,
+        (select count(*)::text from admin_case_actions where object_id = ${rollbackId}::uuid) as actions,
+        (select count(*)::text from admin_approvals where id = ${rollbackAuth.approvalId}::uuid and consumed_at is not null) as consumed,
+        (select count(*)::text from audit_events where correlation_id = ${rollbackAuth.correlationId} and decision = 'denied') as denied
+      from human_escalations where id = ${rollbackId}::uuid
+    `);
+    expect(rollback.rows[0]).toEqual({ status: "assigned", version: 1, actions: "0", consumed: "0", denied: "1" });
+  });
+
   it("records assigned safety and negative-feedback acknowledgement/resolution as immutable actions", async () => {
     const securityA = await seedAdmin("security_admin");
     const securityB = await seedAdmin("security_admin");
@@ -262,7 +431,7 @@ describe("atomic approved admin workflows", () => {
       insert into human_escalations (
         id, incident_id, status, opened_at, acknowledgement_deadline, escalation_reason
       ) values (
-        ${safetyId}::uuid, ${incidentId}::uuid, 'open', clock_timestamp(),
+        ${safetyId}::uuid, ${incidentId}::uuid, 'assigned', clock_timestamp(),
         clock_timestamp() + interval '5 minutes', 'safety_test'
       );
       insert into admin_object_assignments (admin_id, object_type, object_id)
@@ -300,11 +469,31 @@ describe("atomic approved admin workflows", () => {
       if (resolution === "acknowledge") await repository.acknowledgeNegativeFeedback(command);
       else await repository.resolveNegativeFeedback(command);
     }
-    const actions = await testDb!.db.execute<{ count: string }>(sql`
-      select count(*)::text as count from admin_case_actions
-      where object_id in (${safetyId}::uuid, ${feedbackId}::uuid)
+    const actions = await testDb!.db.execute<{
+      count: string;
+      safetyStatus: string;
+      safetyVersion: number;
+      acknowledgedAt: Date | null;
+      resolvedAt: Date | null;
+      feedbackStatus: string;
+    }>(sql`
+      select
+        (select count(*)::text from admin_case_actions
+          where object_id in (${safetyId}::uuid, ${feedbackId}::uuid)) as count,
+        (select status from human_escalations where id = ${safetyId}::uuid) as "safetyStatus",
+        (select version from human_escalations where id = ${safetyId}::uuid) as "safetyVersion",
+        (select acknowledged_at from human_escalations where id = ${safetyId}::uuid) as "acknowledgedAt",
+        (select resolved_at from human_escalations where id = ${safetyId}::uuid) as "resolvedAt",
+        (select escalation_status from feedback where id = ${feedbackId}::uuid) as "feedbackStatus"
     `);
-    expect(actions.rows).toEqual([{ count: "4" }]);
+    expect(actions.rows[0]).toMatchObject({
+      count: "4",
+      safetyStatus: "resolved",
+      safetyVersion: 3,
+      acknowledgedAt: expect.any(Date),
+      resolvedAt: expect.any(Date),
+      feedbackStatus: "resolved",
+    });
     await expect(testDb!.db.execute(sql`delete from admin_case_actions where object_id = ${safetyId}::uuid`)).rejects.toThrow();
   });
 });

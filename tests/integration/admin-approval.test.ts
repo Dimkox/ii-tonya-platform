@@ -330,6 +330,32 @@ describe("populated 0012 upgrade", () => {
           clock_timestamp() + interval '2 hours', 'legacy-nonce'
         )
       `);
+      await legacy.db.execute(sql`
+        insert into message_packages (
+          id, user_id, granted_messages, grant_idempotency_key, kind,
+          expires_at, granted_at
+        ) values (
+          '00000000-0000-4000-8000-000000000086'::uuid,
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          333, 'legacy-admin-package', 'admin', null, clock_timestamp()
+        ), (
+          '00000000-0000-4000-8000-000000000087'::uuid,
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          77, 'legacy-intro-package', 'intro',
+          clock_timestamp() + interval '9 days', clock_timestamp()
+        );
+        insert into message_ledger_entries (
+          id, package_id, entry_kind, delta, idempotency_key
+        ) values (
+          '00000000-0000-4000-8000-000000000088'::uuid,
+          '00000000-0000-4000-8000-000000000086'::uuid,
+          'grant', 333, 'legacy-admin-ledger'
+        ), (
+          '00000000-0000-4000-8000-000000000089'::uuid,
+          '00000000-0000-4000-8000-000000000087'::uuid,
+          'grant', 77, 'legacy-intro-ledger'
+        )
+      `);
       for (const index of [13, 14, 15, 16]) {
         const prefix = index.toString().padStart(4, "0");
         const file = GetMigrationFile(prefix);
@@ -363,6 +389,87 @@ describe("populated 0012 upgrade", () => {
         caseActions: "0",
         integrationErrors: "0",
       }]);
+      const legacyEntitlements = await legacy.db.execute<{
+        id: string;
+        units: number;
+        kind: string;
+        expiresAt: Date | null;
+        legacyGrant: boolean;
+        approvalId: string | null;
+        sessionIdHash: string | null;
+        legacyFact: boolean;
+        delta: number;
+      }>(sql`
+        select p.id, p.granted_messages as units, p.kind,
+          p.expires_at as "expiresAt",
+          p.legacy_admin_grant as "legacyGrant",
+          p.admin_approval_id as "approvalId",
+          p.admin_requester_session_id_hash as "sessionIdHash",
+          l.legacy_admin_fact as "legacyFact", l.delta
+        from message_packages p
+        join message_ledger_entries l on l.package_id = p.id and l.entry_kind = 'grant'
+        where p.id in (
+          '00000000-0000-4000-8000-000000000086'::uuid,
+          '00000000-0000-4000-8000-000000000087'::uuid
+        )
+        order by p.id
+      `);
+      expect(legacyEntitlements.rows).toEqual([
+        {
+          id: "00000000-0000-4000-8000-000000000086",
+          units: 333,
+          kind: "admin",
+          expiresAt: null,
+          legacyGrant: true,
+          approvalId: null,
+          sessionIdHash: null,
+          legacyFact: true,
+          delta: 333,
+        },
+        {
+          id: "00000000-0000-4000-8000-000000000087",
+          units: 77,
+          kind: "intro",
+          expiresAt: expect.any(Date),
+          legacyGrant: true,
+          approvalId: null,
+          sessionIdHash: null,
+          legacyFact: true,
+          delta: 77,
+        },
+      ]);
+      await expect(legacy.db.execute(sql`
+        insert into message_packages (
+          user_id, granted_messages, grant_idempotency_key, kind,
+          legacy_admin_grant
+        ) values (
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          444, 'forged-legacy-admin', 'admin', true
+        )
+      `)).rejects.toThrow();
+      await expect(legacy.db.execute(sql`
+        insert into message_packages (
+          user_id, granted_messages, grant_idempotency_key, kind,
+          admin_approval_id, admin_requester_session_id_hash
+        ) values (
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          500, 'missing-session-paid', 'paid',
+          '00000000-0000-4000-8000-000000000083'::uuid,
+          'bound-session'
+        )
+      `)).rejects.toThrow();
+      await expect(legacy.db.execute(sql`
+        insert into message_packages (
+          user_id, granted_messages, grant_idempotency_key, kind,
+          expires_at, admin_approval_id, admin_requester_session_id_hash
+        ) values (
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          500, 'bad-session-admin', 'admin',
+          clock_timestamp() + interval '60 days',
+          '00000000-0000-4000-8000-000000000083'::uuid,
+          'missing-session'
+        )
+      `)).rejects.toThrow();
       const legacyRows = await legacy.db.execute<{
         id: string;
         nonce: string;
@@ -404,6 +511,17 @@ describe("populated 0012 upgrade", () => {
           'entitlement_admin'
         )
       `);
+      await expect(legacy.db.execute(sql`
+        insert into message_packages (
+          user_id, granted_messages, grant_idempotency_key, kind,
+          admin_approval_id, admin_requester_session_id_hash
+        ) values (
+          '00000000-0000-4000-8000-000000000081'::uuid,
+          500, 'approval-bound-paid', 'paid',
+          '00000000-0000-4000-8000-000000000083'::uuid,
+          'bound-session'
+        )
+      `)).rejects.toThrow();
       const boundRepository = new PostgresAdminApprovalRepository(legacy.db);
       const first = await boundRepository.requestApproval({
         sessionIdHash: "bound-session",

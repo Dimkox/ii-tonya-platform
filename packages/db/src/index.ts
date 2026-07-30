@@ -65,6 +65,7 @@ export {
   type WithdrawalReceipt,
 } from "./repositories/privacy-repository.js";
 export {
+  AdminInvalidStateTransitionError,
   AdminTargetNotFoundError,
   AdminWorkflowConflictError,
   PostgresAdminRepository,

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -14,6 +15,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
+import { adminApprovals, adminSessions } from "./audit.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 export const ledgerEntryKind = pgEnum("ledger_entry_kind", ["grant", "debit", "free", "compensation", "revocation"]);
@@ -26,8 +28,10 @@ export const messagePackages = pgTable(
     grantedMessages: integer("granted_messages").notNull(),
     grantIdempotencyKey: text("grant_idempotency_key").notNull(),
     kind: text("kind").notNull().default("paid"),
-    adminApprovalId: uuid("admin_approval_id"),
-    adminRequesterSessionIdHash: text("admin_requester_session_id_hash"),
+    adminApprovalId: uuid("admin_approval_id").references(() => adminApprovals.id),
+    adminRequesterSessionIdHash: text("admin_requester_session_id_hash")
+      .references(() => adminSessions.sessionIdHash),
+    legacyAdminGrant: boolean("legacy_admin_grant").notNull().default(false),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt,
@@ -40,9 +44,10 @@ export const messagePackages = pgTable(
       or (${table.adminApprovalId} is not null and ${table.adminRequesterSessionIdHash} is not null)
     `),
     check("message_packages_admin_contract", sql`
-      (${table.kind} = 'admin' and ${table.grantedMessages} in (500, 1000, 1500, 2000) and ${table.expiresAt} is not null)
-      or (${table.kind} = 'intro' and ${table.grantedMessages} = 100 and ${table.expiresAt} is null)
-      or (${table.kind} = 'paid')
+      (${table.kind} = 'paid' and ${table.legacyAdminGrant} = false and ${table.adminApprovalId} is null and ${table.adminRequesterSessionIdHash} is null)
+      or (${table.kind} in ('admin', 'intro') and ${table.legacyAdminGrant} = true and ${table.adminApprovalId} is null and ${table.adminRequesterSessionIdHash} is null)
+      or (${table.kind} = 'admin' and ${table.legacyAdminGrant} = false and ${table.adminApprovalId} is not null and ${table.adminRequesterSessionIdHash} is not null and ${table.grantedMessages} in (500, 1000, 1500, 2000) and ${table.expiresAt} is not null)
+      or (${table.kind} = 'intro' and ${table.legacyAdminGrant} = false and ${table.adminApprovalId} is not null and ${table.adminRequesterSessionIdHash} is not null and ${table.grantedMessages} = 100 and ${table.expiresAt} is null)
     `),
     unique("message_packages_grant_idempotency_unique").on(table.grantIdempotencyKey),
     index("message_packages_eligible_order").on(
@@ -81,8 +86,10 @@ export const messageLedgerEntries = pgTable(
     direction: text("direction").notNull().default("outbound"),
     messageEventId: uuid("message_event_id").references(() => messageEvents.id),
     originalEntryId: uuid("original_entry_id"),
-    adminApprovalId: uuid("admin_approval_id"),
-    adminRequesterSessionIdHash: text("admin_requester_session_id_hash"),
+    adminApprovalId: uuid("admin_approval_id").references(() => adminApprovals.id),
+    adminRequesterSessionIdHash: text("admin_requester_session_id_hash")
+      .references(() => adminSessions.sessionIdHash),
+    legacyAdminFact: boolean("legacy_admin_fact").notNull().default(false),
     idempotencyKey: text("idempotency_key").notNull(),
     createdAt,
   },

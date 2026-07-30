@@ -100,3 +100,72 @@
   feedback/conversation text, or profile payloads were added.
 - PostgreSQL behavior is still pending the GitHub Database Gate because the
   local machine has no working Testcontainers runtime.
+
+## Independent-review P1 remediation
+
+### RED
+
+- Added four structural tests for the missing replay validator, normal-admin
+  revoke provenance, authoritative alert state transitions, and safe legacy
+  upgrade classification/FKs.
+- Command:
+  `pnpm exec vitest run tests/repo/admin-workflow-guards.test.ts`
+- Result: 4 of 7 tests failed on the four missing contracts.
+
+### GREEN
+
+- Added `PostgresAdminApprovalRepository.validateConsumedApprovalReplay`.
+  Grant and revoke replay now share this one validator, which rechecks current
+  DB-clock requester and approver sessions/MFA, exact current required role,
+  requester identity/session binding, consumed approval ID, action, mapped
+  object type/ID, canonical payload hash, nonce, and object assignment.
+- Revoke now locks and accepts only a nonlegacy `kind='admin'` package created
+  by the workflow and its original positive grant with matching immutable
+  package provenance. Paid, intro, legacy, unbound, and mismatched-provenance
+  packages roll the consume back and receive only a denied audit.
+- Safety acknowledgement is `assigned -> acknowledged`; resolution is
+  `acknowledged|escalated -> resolved`. Feedback acknowledgement is
+  `escalated -> acknowledged`; resolution is `acknowledged -> resolved`.
+  Each transition locks the row, updates authoritative status/timestamps/
+  version in the approval transaction, and appends one immutable case action.
+- Regenerated one coherent unpublished 0016 snapshot. The migration explicitly
+  backfills only existing admin/intro packages and original grant facts as
+  legacy while temporarily disabling their append-only update triggers. New
+  legacy markers are rejected. New admin/intro packages require approval and
+  session FKs plus exact consumed approval provenance; paid rows must remain
+  unbound. A ledger trigger enforces package/original-grant provenance and
+  exact consumed revoke approval provenance.
+- Focused GREEN command:
+  `pnpm exec vitest run tests/repo/admin-workflow-guards.test.ts
+  packages/db/src/repositories/admin-approval-repository.test.ts
+  tests/repo/db-schema-parity.test.ts packages/application/src/admin-service.test.ts
+  apps/api/src/routes/admin.test.ts`
+- Result: 5 files, 27 tests passed.
+
+### Expanded PostgreSQL authority
+
+- The admin workflow suite now has 9 cases. It adds replay denial after
+  entitlement-role revocation while another role remains, changed
+  nonce/action/object/payload denial, paid/intro revoke rollback, safety state
+  order, concurrent transition serialization, transition rollback under audit
+  failure, and authoritative state/timestamp/version assertions.
+- The populated upgrade case now seeds arbitrary pre-0016 admin and intro
+  sizes/expiry plus ledger rows, proves exact preservation and explicit legacy
+  classification, and tests migration-only marker rejection, approval-bound
+  paid rejection, and session FK rejection.
+- Local combined command:
+  `pnpm exec vitest run tests/integration/admin-ledger.test.ts
+  tests/integration/admin-approval.test.ts`
+- Result: both files failed in `beforeAll`; all 15 test bodies were skipped
+  because Testcontainers reported
+  `Could not find a working container runtime strategy`.
+
+### Final remediation gates
+
+- Focused tests: passed, 5 files and 27 tests.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- `pnpm build`: passed for all 10 built workspace projects.
+- Drizzle metadata check: passed.
+- Drizzle final generation: `No schema changes, nothing to migrate`.
+- `git diff --check`: passed.

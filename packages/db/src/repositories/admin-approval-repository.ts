@@ -371,6 +371,83 @@ export class PostgresAdminApprovalRepository {
     return result.rows[0] ?? null;
   }
 
+  async validateConsumedApprovalReplay(
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
+    const requiredRole = actionRoles[input.action];
+    const requiredObjectType = requiredApprovalObjectType(input.action);
+    const payloadHash = canonicalAdminPayloadHash(input.payload);
+    const assignmentGate = requiredObjectType === null
+      ? sql`true`
+      : sql`
+          ${input.objectType} = ${requiredObjectType}
+          and exists (
+            select 1 from admin_object_assignments oa
+            where oa.admin_id = requester.admin_id
+              and oa.object_type = ${requiredObjectType}
+              and oa.object_id = ${input.objectId}::uuid
+          )
+        `;
+    const result = await this.db.execute<ApprovalRow>(sql`
+      with db_clock as (
+        select clock_timestamp() as db_now
+      ),
+      requester as (
+        select s.admin_id, s.session_id_hash, s.mfa_verified_at, c.db_now
+        from admin_sessions s
+        join admin_role_assignments r
+          on r.admin_id = s.admin_id and r.role = ${requiredRole}
+        cross join db_clock c
+        where s.session_id_hash = ${input.sessionIdHash}
+          and s.revoked_at is null
+          and s.expires_at > c.db_now
+          and s.mfa_verified_at <= c.db_now
+          and s.mfa_verified_at >= c.db_now - interval '15 minutes'
+      )
+      select
+        a.id as "approvalId", a.requester_id as "requesterId",
+        a.approver_id as "approverId", a.action,
+        a.object_type as "objectType", a.object_id as "objectId",
+        a.payload_hash as "payloadHash", a.nonce,
+        a.consumed_at as "consumedAt"
+      from admin_approvals a
+      join requester
+        on requester.admin_id = a.requester_id
+        and requester.session_id_hash = a.requester_session_id_hash
+        and requester.mfa_verified_at = a.requester_mfa_verified_at
+      where a.id = ${input.approvalId}::uuid
+        and a.action = ${input.action}
+        and a.object_type = ${input.objectType}
+        and a.object_id = ${input.objectId}::uuid
+        and a.payload_hash = ${payloadHash}
+        and a.required_role = ${requiredRole}
+        and a.nonce = ${input.nonce}
+        and a.consumed_at is not null
+        and a.approver_id is not null
+        and a.approver_id <> a.requester_id
+        and a.approver_session_id_hash is not null
+        and a.approver_mfa_verified_at is not null
+        and a.approver_mfa_verified_at <= requester.db_now
+        and a.approver_mfa_verified_at >= requester.db_now - interval '15 minutes'
+        and exists (
+          select 1
+          from admin_sessions approver_session
+          join admin_role_assignments approver_role
+            on approver_role.admin_id = approver_session.admin_id
+            and approver_role.role = a.required_role
+          where approver_session.session_id_hash = a.approver_session_id_hash
+            and approver_session.admin_id = a.approver_id
+            and approver_session.mfa_verified_at = a.approver_mfa_verified_at
+            and approver_session.revoked_at is null
+            and approver_session.expires_at > requester.db_now
+            and approver_session.mfa_verified_at <= requester.db_now
+            and approver_session.mfa_verified_at >= requester.db_now - interval '15 minutes'
+        )
+        and ${assignmentGate}
+    `);
+    return result.rows[0] ?? null;
+  }
+
   async hasObjectAssignment(input: {
     readonly sessionIdHash: string;
     readonly objectType: "safety_case" | "feedback_queue";

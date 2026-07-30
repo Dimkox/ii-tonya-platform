@@ -57,4 +57,33 @@ describe("Task 17C structural guards", () => {
     expect(migration).toContain("message_packages_admin_contract");
     expect(migration).toContain("admin_requester_session_id_hash");
   });
+
+  it("uses one full approval replay validator for both grant and revoke", () => {
+    expect(repository).toContain("validateConsumedApprovalReplay");
+    expect(repository.match(/validateConsumedApprovalReplay/g)).toHaveLength(2);
+    expect(repository).not.toContain(".resolvePrincipal(input.sessionIdHash)");
+  });
+
+  it("limits revocation to provenance-bound normal admin grants", () => {
+    expect(repository).toContain("p.kind = 'admin'");
+    expect(repository).toContain("g.admin_approval_id = p.admin_approval_id");
+    expect(repository).toContain("g.admin_requester_session_id_hash = p.admin_requester_session_id_hash");
+  });
+
+  it("applies authoritative safety and feedback state transitions under row lock", () => {
+    expect(repository).toContain("status = 'acknowledged'");
+    expect(repository).toContain("status = 'resolved'");
+    expect(repository).toContain("version = version + 1");
+    expect(repository).toContain("for update");
+    expect(repository).toContain("escalation_status = 'acknowledged'");
+    expect(repository).toContain("escalation_status = 'resolved'");
+  });
+
+  it("grandfathers only populated pre-0016 admin facts and protects new provenance with FKs", () => {
+    expect(migration).toContain("legacy_admin_grant");
+    expect(migration).toContain("legacy_admin_fact");
+    expect(migration).toContain("REFERENCES \"public\".\"admin_approvals\"");
+    expect(migration).toContain("REFERENCES \"public\".\"admin_sessions\"");
+    expect(migration).toContain("enforce_admin_ledger_provenance");
+  });
 });

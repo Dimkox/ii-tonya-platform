@@ -53,6 +53,13 @@ export class AdminTargetNotFoundError extends Error {
     this.name = "AdminTargetNotFoundError";
   }
 }
+export class AdminInvalidStateTransitionError extends Error {
+  readonly code = "ADMIN_INVALID_STATE_TRANSITION";
+  constructor() {
+    super("Admin workflow state transition is not allowed");
+    this.name = "AdminInvalidStateTransitionError";
+  }
+}
 
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 type MutationResult = Record<string, unknown>;
@@ -221,6 +228,9 @@ export class PostgresAdminRepository {
     idempotencyKey: string;
     approvalId: string;
     sessionIdHash: string;
+    nonce: string;
+    action: "package.grant" | "package.intro_grant";
+    payload: AdminPayload;
   }): Promise<{ packageId: string } | null> {
     const stored = await this.db.execute<{
       packageId: string;
@@ -246,9 +256,17 @@ export class PostgresAdminRepository {
     `);
     const row = stored.rows[0];
     if (row === undefined) return null;
-    const principal = await new PostgresAdminApprovalRepository(this.db)
-      .resolvePrincipal(input.sessionIdHash);
-    if (principal === null || row.requesterId !== principal.id) return null;
+    const approval = await new PostgresAdminApprovalRepository(this.db)
+      .validateConsumedApprovalReplay({
+        approvalId: input.approvalId,
+        sessionIdHash: input.sessionIdHash,
+        action: input.action,
+        objectType: "user",
+        objectId: input.userId,
+        payload: input.payload,
+        nonce: input.nonce,
+      });
+    if (approval === null || row.requesterId !== approval.requesterId) return null;
     if (
       row.userId !== input.userId ||
       Number(row.units) !== input.units ||
@@ -310,6 +328,9 @@ export class PostgresAdminRepository {
       kind,
       approvalId: command.approvalId,
       sessionIdHash: command.sessionIdHash,
+      nonce: command.nonce,
+      action,
+      payload,
     }));
   }
 
@@ -338,15 +359,35 @@ export class PostgresAdminRepository {
         a.requester_id as "requesterId"
       from message_ledger_entries l
       join message_packages p on p.id = l.package_id
+      join message_ledger_entries g
+        on g.id = l.original_entry_id and g.entry_kind = 'grant'
       left join admin_approvals a on a.id = l.admin_approval_id
       where l.idempotency_key = ${command.idempotencyKey}
         and l.entry_kind = 'revocation'
+        and p.kind = 'admin'
+        and p.legacy_admin_grant = false
+        and p.admin_approval_id is not null
+        and p.admin_requester_session_id_hash is not null
+        and g.admin_approval_id = p.admin_approval_id
+        and g.admin_requester_session_id_hash = p.admin_requester_session_id_hash
     `);
     const row = stored.rows[0];
     if (row === undefined) return null;
-    const principal = await new PostgresAdminApprovalRepository(this.db)
-      .resolvePrincipal(command.sessionIdHash);
-    if (principal === null || row.requesterId !== principal.id) return null;
+    const approval = await new PostgresAdminApprovalRepository(this.db)
+      .validateConsumedApprovalReplay({
+        approvalId: command.approvalId,
+        sessionIdHash: command.sessionIdHash,
+        action: "package.revoke",
+        objectType: "user",
+        objectId: command.userId,
+        payload: {
+          userId: command.userId,
+          packageId: command.packageId,
+          idempotencyKey: command.idempotencyKey,
+        },
+        nonce: command.nonce,
+      });
+    if (approval === null || row.requesterId !== approval.requesterId) return null;
     if (
       row.packageId !== command.packageId ||
       row.userId !== command.userId ||
@@ -377,6 +418,13 @@ export class PostgresAdminRepository {
           on g.package_id = p.id and g.entry_kind = 'grant'
         where p.id = ${command.packageId}::uuid
           and p.user_id = ${command.userId}::uuid
+          and p.kind = 'admin'
+          and p.legacy_admin_grant = false
+          and p.admin_approval_id is not null
+          and p.admin_requester_session_id_hash is not null
+          and g.admin_approval_id = p.admin_approval_id
+          and g.admin_requester_session_id_hash = p.admin_requester_session_id_hash
+          and g.legacy_admin_fact = false
         for update of p, g
       `);
       const row = locked.rows[0];
@@ -482,10 +530,65 @@ export class PostgresAdminRepository {
       objectId: command.alertId,
       payload: { alertId: command.alertId, resolution: input.action },
     }, async (tx, approval) => {
-      const target = input.objectType === "safety_alert"
-        ? await tx.execute(sql`select 1 from human_escalations where id = ${command.alertId}::uuid`)
-        : await tx.execute(sql`select 1 from feedback where id = ${command.alertId}::uuid and escalation_status = 'escalated'`);
-      if (target.rows.length !== 1) throw new AdminTargetNotFoundError();
+      if (input.objectType === "safety_alert") {
+        const target = await tx.execute<{ status: string }>(sql`
+          select status
+          from human_escalations
+          where id = ${command.alertId}::uuid
+          for update
+        `);
+        const status = target.rows[0]?.status;
+        if (status === undefined) throw new AdminTargetNotFoundError();
+        const valid = input.action === "acknowledge"
+          ? status === "assigned"
+          : status === "acknowledged" || status === "escalated";
+        if (!valid) throw new AdminInvalidStateTransitionError();
+        if (input.action === "acknowledge") {
+          await tx.execute(sql`
+            update human_escalations
+            set status = 'acknowledged',
+              acknowledged_at = clock_timestamp(),
+              version = version + 1,
+              updated_at = clock_timestamp()
+            where id = ${command.alertId}::uuid
+          `);
+        } else {
+          await tx.execute(sql`
+            update human_escalations
+            set status = 'resolved',
+              resolved_at = clock_timestamp(),
+              version = version + 1,
+              updated_at = clock_timestamp()
+            where id = ${command.alertId}::uuid
+          `);
+        }
+      } else {
+        const target = await tx.execute<{ status: string }>(sql`
+          select escalation_status as status
+          from feedback
+          where id = ${command.alertId}::uuid
+          for update
+        `);
+        const status = target.rows[0]?.status;
+        if (status === undefined) throw new AdminTargetNotFoundError();
+        const expected = input.action === "acknowledge"
+          ? "escalated"
+          : "acknowledged";
+        if (status !== expected) throw new AdminInvalidStateTransitionError();
+        if (input.action === "acknowledge") {
+          await tx.execute(sql`
+            update feedback
+            set escalation_status = 'acknowledged'
+            where id = ${command.alertId}::uuid
+          `);
+        } else {
+          await tx.execute(sql`
+            update feedback
+            set escalation_status = 'resolved'
+            where id = ${command.alertId}::uuid
+          `);
+        }
+      }
       const inserted = await tx.execute<{ alertId: string }>(sql`
         insert into admin_case_actions (
           object_type, object_id, action, actor_id, approval_id
