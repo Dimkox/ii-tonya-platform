@@ -116,3 +116,14 @@
 - Result: blocked before all six test bodies by
   `Could not find a working container runtime strategy`; the expanded suite
   remains wired into GitHub DB Gate.
+
+## CI 30535974419 fixture repair
+
+- The IAM gate failed before production behavior because `seedAdmin` rendered
+  `clock_timestamp() - 1 minute`, causing PostgreSQL SQLSTATE `42601`.
+- RED: `tests/repo/admin-approval-test-guards.test.ts` failed because the
+  fixture contained `sql.raw(mfaOffset)`.
+- The helper now accepts numeric minutes and binds them in
+  `clock_timestamp() + (${mfaOffsetMinutes} * interval '1 minute')`. Stale and
+  future cases use `-16` and `60`; no offset SQL fragment is composed.
+- Production repository and schema code were not changed by this repair.

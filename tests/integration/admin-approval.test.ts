@@ -17,7 +17,7 @@ const payload = { userId: "00000000-0000-4000-8000-000000000099", units: 500 };
 
 async function seedAdmin(
   role: AdminRole,
-  mfaOffset: string = "- 1 minute",
+  mfaOffsetMinutes: number = -1,
 ): Promise<{ adminId: string; sessionIdHash: string }> {
   const adminId = randomUUID();
   const sessionIdHash = `session:${randomUUID()}`;
@@ -29,7 +29,7 @@ async function seedAdmin(
       session_id_hash, admin_id, mfa_verified_at, expires_at
     ) values (
       ${sessionIdHash}, ${adminId}::uuid,
-      clock_timestamp() ${sql.raw(mfaOffset)},
+      clock_timestamp() + (${mfaOffsetMinutes} * interval '1 minute'),
       clock_timestamp() + interval '1 hour'
     )
   `);
@@ -50,8 +50,8 @@ afterAll(async () => testDb?.stop(), 60_000);
 describe("PostgreSQL admin approval lifecycle", () => {
   it("resolves a principal only from a valid platform session and DB-clock MFA", async () => {
     const valid = await seedAdmin("entitlement_admin");
-    const stale = await seedAdmin("entitlement_admin", "- 16 minutes");
-    const future = await seedAdmin("entitlement_admin", "+ 1 hour");
+    const stale = await seedAdmin("entitlement_admin", -16);
+    const future = await seedAdmin("entitlement_admin", 60);
     const repository = new PostgresAdminApprovalRepository(testDb!.db);
 
     await expect(repository.resolvePrincipal(valid.sessionIdHash)).resolves.toMatchObject({
