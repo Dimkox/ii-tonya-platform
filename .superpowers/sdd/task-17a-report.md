@@ -78,3 +78,30 @@
   passed, as did Drizzle metadata and diff checks.
 - A fresh `tests/integration/schema.test.ts` attempt again stopped before all
   six assertions with `Could not find a working container runtime strategy`.
+
+## CI 30530689534 fault-injection repair
+
+- CI diagnosis: production feedback concurrency passed. The failing tests used
+  `rejects.toThrow("forced ...")`, but Drizzle presented a top-level `Failed
+  query` wrapper around the PostgreSQL trigger exception. The assertion then
+  threw before linear trigger cleanup, leaving `fail_feedback_outbox` installed
+  and contaminating later cases.
+- RED command: `pnpm exec vitest run tests/support/postgres-error.test.ts`.
+- RED result: the intentionally incomplete helper failed the nested, cyclic
+  Drizzle-to-PostgreSQL cause-chain case with `Expected PostgreSQL error cause
+  did not match`.
+- GREEN command: `pnpm exec vitest run tests/support/postgres-error.test.ts
+  packages/application/src/feedback-service.test.ts
+  packages/application/src/admin-service.test.ts
+  apps/api/src/routes/admin.test.ts
+  packages/db/src/repositories/feedback-repository.test.ts
+  tests/integration/admin-ledger.test.ts`.
+- GREEN result: 6 files, 19 tests passed. Both fault-injection paths now check
+  a bounded, cycle-safe cause chain for SQLSTATE `P0001` and only the expected
+  trigger message; no query parameters are asserted or logged. Each trigger
+  and function is dropped in `finally` with `IF EXISTS`, preventing poisoning
+  after a failed assertion.
+- Final gates after this repair: full `pnpm typecheck`, `pnpm lint`, and
+  `pnpm build` passed; Drizzle metadata and `git diff --check` passed. The
+  local feedback PostgreSQL attempt remains blocked before test bodies by
+  `Could not find a working container runtime strategy`.

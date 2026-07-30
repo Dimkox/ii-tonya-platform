@@ -2,10 +2,33 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { PostgresFeedbackRepository } from "../../packages/db/src/index.js";
 import { startTestPostgres, type TestDatabase } from "../../packages/db/src/testkit/postgres.js";
+import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
 let testDb: TestDatabase;
 beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); }, 120_000);
 afterAll(async () => testDb?.stop(), 60_000);
+
+const rejected = async (operation: Promise<unknown>): Promise<unknown> =>
+  operation.then(
+    () => { throw new Error("Expected injected PostgreSQL failure"); },
+    (error: unknown) => error,
+  );
+
+const dropOutboxFailureInjection = async (): Promise<void> => {
+  try {
+    await testDb.db.execute(sql`drop trigger if exists fail_feedback_outbox on integration_outbox`);
+  } finally {
+    await testDb.db.execute(sql`drop function if exists fail_feedback_outbox()`);
+  }
+};
+
+const dropAuditFailureInjection = async (): Promise<void> => {
+  try {
+    await testDb.db.execute(sql`drop trigger if exists fail_feedback_audit on audit_events`);
+  } finally {
+    await testDb.db.execute(sql`drop function if exists fail_feedback_audit()`);
+  }
+};
 
 describe("feedback transaction gate", () => {
   it("deduplicates a concurrent negative source event into one feedback, free outbox, and immutable audit", async () => {
@@ -38,8 +61,11 @@ describe("feedback transaction gate", () => {
     const command = { userId, score: 2 as const, text: "private rollback feedback", sourceEventId: "feedback-rollback", correlationId: "feedback-rollback" };
     await testDb.db.execute(sql`create function fail_feedback_outbox() returns trigger language plpgsql as $$ begin raise exception 'forced outbox failure'; end; $$`);
     await testDb.db.execute(sql`create trigger fail_feedback_outbox before insert on integration_outbox for each row when (new.topic = 'admin.negative_feedback') execute function fail_feedback_outbox()`);
-    await expect(repository.submitFeedbackTransaction(command)).rejects.toThrow("forced outbox failure");
-    await testDb.db.execute(sql`drop trigger fail_feedback_outbox on integration_outbox; drop function fail_feedback_outbox()`);
+    try {
+      expectPostgresErrorCause(await rejected(repository.submitFeedbackTransaction(command)), "P0001", "forced outbox failure");
+    } finally {
+      await dropOutboxFailureInjection();
+    }
     await expect(repository.submitFeedbackTransaction(command)).resolves.toMatchObject({ escalated: true });
     const facts = await testDb.db.execute<{ feedback: string; outbox: string; audit: string }>(sql`
       select
@@ -56,14 +82,17 @@ describe("feedback transaction gate", () => {
     const command = { userId, score: 3 as const, text: "private audit failure", sourceEventId: "feedback-audit-failure", correlationId: "feedback-audit-failure" };
     await testDb.db.execute(sql`create function fail_feedback_audit() returns trigger language plpgsql as $$ begin raise exception 'forced audit failure'; end; $$`);
     await testDb.db.execute(sql`create trigger fail_feedback_audit before insert on audit_events for each row when (new.action = 'feedback.escalated') execute function fail_feedback_audit()`);
-    await expect(repository.submitFeedbackTransaction(command)).rejects.toThrow("forced audit failure");
-    const facts = await testDb.db.execute<{ feedback: string; outbox: string }>(sql`
-      select
-        (select count(*)::text from feedback where source_event_id = 'feedback-audit-failure') as feedback,
-        (select count(*)::text from integration_outbox where correlation_id = 'feedback-audit-failure') as outbox
-    `);
-    expect(facts.rows[0]).toEqual({ feedback: "0", outbox: "0" });
-    await testDb.db.execute(sql`drop trigger fail_feedback_audit on audit_events; drop function fail_feedback_audit()`);
+    try {
+      expectPostgresErrorCause(await rejected(repository.submitFeedbackTransaction(command)), "P0001", "forced audit failure");
+      const facts = await testDb.db.execute<{ feedback: string; outbox: string }>(sql`
+        select
+          (select count(*)::text from feedback where source_event_id = 'feedback-audit-failure') as feedback,
+          (select count(*)::text from integration_outbox where correlation_id = 'feedback-audit-failure') as outbox
+      `);
+      expect(facts.rows[0]).toEqual({ feedback: "0", outbox: "0" });
+    } finally {
+      await dropAuditFailureInjection();
+    }
     await expect(repository.submitFeedbackTransaction(command)).resolves.toMatchObject({ escalated: true });
   });
 
