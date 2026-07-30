@@ -63,6 +63,9 @@ jobs:
       - name: Run feedback transaction gate
         run: pnpm exec vitest run tests/integration/feedback-transaction.test.ts
 
+      - name: Run admin approval IAM gate
+        run: pnpm exec vitest run tests/integration/admin-approval.test.ts
+
       - name: Repeat atomic conversation completion gate
         run: pnpm test:repeat -- 20 tests/integration/conversation-message-repository.test.ts
 

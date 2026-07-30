@@ -8,6 +8,9 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   adminApprovals,
+  adminObjectAssignments,
+  adminRoleAssignments,
+  adminSessions,
   channelIdentities,
   clientProfiles,
   integrationInbox,
@@ -110,9 +113,26 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(promptVersions).uniques).toEqual([
       "prompt_versions_name_version_unique",
     ]);
-    expect(names(adminApprovals).uniques).toEqual([
-      "admin_approvals_scope_nonce_unique",
-    ]);
+    expect(names(adminApprovals)).toMatchObject({
+      checks: [
+        "admin_approvals_binding_complete",
+        "admin_approvals_lifecycle_order",
+        "admin_approvals_required_role_allowed",
+      ],
+      uniques: ["admin_approvals_scope_nonce_unique"],
+    });
+    expect(names(adminSessions)).toMatchObject({
+      checks: ["admin_sessions_lifecycle_order"],
+      foreignKeys: ["admin_sessions_admin_id_users_id_fk"],
+    });
+    expect(names(adminRoleAssignments)).toMatchObject({
+      checks: ["admin_role_assignments_role_allowed"],
+      uniques: ["admin_role_assignments_admin_role_unique"],
+    });
+    expect(names(adminObjectAssignments)).toMatchObject({
+      checks: ["admin_object_assignments_type_allowed"],
+      uniques: ["admin_object_assignments_scope_unique"],
+    });
     expect(names(privacyDeletionJobs).uniques).toEqual([
       "privacy_deletion_jobs_subject_idempotency_unique",
     ]);
@@ -167,6 +187,7 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0006_telegram-callback-expert-fk.sql",
         "utf8",
       ),
+      readFileSync("packages/db/migrations/0015_admin_iam.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -199,6 +220,15 @@ describe("authoritative Drizzle schema parity", () => {
       "integration_outbox_reconciliation_lease",
       "prompt_versions_name_version_unique",
       "admin_approvals_scope_nonce_unique",
+      "admin_approvals_required_role_allowed",
+      "admin_approvals_binding_complete",
+      "admin_approvals_lifecycle_order",
+      "admin_sessions_lifecycle_order",
+      "admin_sessions_admin_id_users_id_fk",
+      "admin_role_assignments_admin_role_unique",
+      "admin_role_assignments_role_allowed",
+      "admin_object_assignments_scope_unique",
+      "admin_object_assignments_type_allowed",
       "privacy_deletion_jobs_subject_idempotency_unique",
       "privacy_processor_attempts_job_processor_unique",
       "provider_cursors_provider_unique",
@@ -210,14 +240,14 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0010_snapshot.json";
+    const path = "packages/db/migrations/meta/0015_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
       tables?: Record<string, unknown>;
       views?: Record<string, unknown>;
     };
-    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(34);
+    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(37);
     expect(snapshot.views).toHaveProperty("public.package_balances");
     const notificationsTable = snapshot.tables?.["public.notifications"] as
       | {

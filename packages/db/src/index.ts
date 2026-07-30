@@ -73,6 +73,19 @@ export {
   type RevokeAdminPackageCommand,
 } from "./repositories/admin-repository.js";
 export {
+  PostgresAdminApprovalRepository,
+  canonicalAdminPayload,
+  canonicalAdminPayloadHash,
+  type AdminPayload,
+  type AdminRole,
+  type ApprovalAdminAction,
+  type ApproveAdminApproval,
+  type ConsumeAdminApproval,
+  type ConsumedAdminApproval,
+  type RequestAdminApproval,
+  type ResolvedAdminPrincipal,
+} from "./repositories/admin-approval-repository.js";
+export {
   PostgresFeedbackRepository,
   type FeedbackTransactionResult,
   type SubmitFeedbackTransactionCommand,

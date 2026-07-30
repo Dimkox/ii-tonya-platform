@@ -1,4 +1,5 @@
-import { jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -32,6 +33,7 @@ export const adminApprovals = pgTable(
     requiredRole: text("required_role").notNull().default("support"),
     requesterMfaVerifiedAt: timestamp("requester_mfa_verified_at", { withTimezone: true }),
     approverMfaVerifiedAt: timestamp("approver_mfa_verified_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     nonce: text("nonce").notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
@@ -43,8 +45,106 @@ export const adminApprovals = pgTable(
       table.objectType,
       table.objectId,
       table.requesterId,
-      table.approverId,
       table.nonce,
+    ),
+    check(
+      "admin_approvals_required_role_allowed",
+      sql`${table.requiredRole} in ('support', 'catalog_admin', 'entitlement_admin', 'security_admin')`,
+    ),
+    check(
+      "admin_approvals_binding_complete",
+      sql`${table.requesterSessionIdHash} = 'legacy-unbound' or (
+        ${table.requesterMfaVerifiedAt} is not null and (
+          (
+            ${table.approverId} is null and
+            ${table.approverSessionIdHash} is null and
+            ${table.approverMfaVerifiedAt} is null and
+            ${table.approvedAt} is null
+          ) or (
+            ${table.approverId} is not null and
+            ${table.approverSessionIdHash} is not null and
+            ${table.approverMfaVerifiedAt} is not null and
+            ${table.approvedAt} is not null
+          )
+        )
+      )`,
+    ),
+    check(
+      "admin_approvals_lifecycle_order",
+      sql`${table.requesterSessionIdHash} = 'legacy-unbound' or (
+        ${table.expiresAt} > ${table.createdAt} and
+        ${table.requesterMfaVerifiedAt} <= ${table.createdAt} and
+        (${table.approvedAt} is null or (
+          ${table.approvedAt} >= ${table.createdAt} and
+          ${table.approverMfaVerifiedAt} <= ${table.approvedAt}
+        )) and
+        (${table.consumedAt} is null or (
+          ${table.approvedAt} is not null and
+          ${table.consumedAt} >= ${table.approvedAt}
+        ))
+      )`,
+    ),
+  ],
+);
+
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    sessionIdHash: text("session_id_hash").primaryKey(),
+    adminId: uuid("admin_id").notNull().references(() => users.id),
+    mfaVerifiedAt: timestamp("mfa_verified_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    check(
+      "admin_sessions_lifecycle_order",
+      sql`${table.mfaVerifiedAt} <= ${table.expiresAt} and (
+        ${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt}
+      )`,
+    ),
+  ],
+);
+
+export const adminRoleAssignments = pgTable(
+  "admin_role_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id").notNull().references(() => users.id),
+    role: text("role").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("admin_role_assignments_admin_role_unique").on(
+      table.adminId,
+      table.role,
+    ),
+    check(
+      "admin_role_assignments_role_allowed",
+      sql`${table.role} in ('support', 'catalog_admin', 'entitlement_admin', 'security_admin')`,
+    ),
+  ],
+);
+
+export const adminObjectAssignments = pgTable(
+  "admin_object_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id").notNull().references(() => users.id),
+    objectType: text("object_type").notNull(),
+    objectId: uuid("object_id").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("admin_object_assignments_scope_unique").on(
+      table.adminId,
+      table.objectType,
+      table.objectId,
+    ),
+    check(
+      "admin_object_assignments_type_allowed",
+      sql`${table.objectType} in ('safety_case', 'feedback_queue')`,
     ),
   ],
 );
