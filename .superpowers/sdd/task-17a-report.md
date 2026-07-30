@@ -51,3 +51,30 @@
 - No migration was needed: the existing additive feedback
   `source_event_id` uniqueness plus hash/policy/status fields and existing
   immutable audit/outbox schema support the concrete transaction.
+
+## P1 remediation RED/GREEN
+
+- RED command: `pnpm exec vitest run apps/api/src/routes/admin.test.ts
+  packages/db/src/repositories/feedback-repository.test.ts`.
+- RED result: all three unregistered API paths invoked audit, and the new
+  canonical replay comparator did not exist.
+- GREEN command: `pnpm exec vitest run apps/api/src/routes/admin.test.ts
+  packages/db/src/repositories/feedback-repository.test.ts
+  packages/application/src/feedback-service.test.ts
+  packages/application/src/admin-service.test.ts
+  tests/integration/admin-ledger.test.ts`.
+- GREEN result: 5 files, 17 tests passed. Unregistered authorization invokes
+  neither approval nor audit ports. Duplicate feedback now compares stored
+  user, reservation, rating, content hash, and policy to canonical replay and
+  throws the typed `FEEDBACK_IDEMPOTENCY_CONFLICT` without stored identifiers.
+- PostgreSQL additions assert zero effects for neutral 4/5 feedback, zero
+  ledger facts for free escalation, immutable escalation audits, and unchanged
+  source-event effects after user/reservation/score/text/policy replay
+  conflicts. They remain subject to the recorded local Testcontainers boundary.
+- Fresh typecheck and lint passed. Full `pnpm build` was attempted twice but
+  exceeded the 120-second command limit under concurrent local Node workload;
+  neither timed-out attempt is counted as a successful full build. Isolated
+  `pnpm --filter @ii-tonya/db build` and `pnpm --filter @ii-tonya/api build`
+  passed, as did Drizzle metadata and diff checks.
+- A fresh `tests/integration/schema.test.ts` attempt again stopped before all
+  six assertions with `Could not find a working container runtime strategy`.

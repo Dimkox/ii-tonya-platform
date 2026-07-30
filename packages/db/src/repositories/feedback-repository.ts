@@ -16,6 +16,38 @@ export interface FeedbackTransactionResult {
   readonly escalated: boolean;
 }
 
+export interface CanonicalFeedbackReplay {
+  readonly userId: string;
+  readonly reservationId: string | null;
+  readonly score: number;
+  readonly contentHash: string;
+  readonly negativePolicyVersion: string;
+}
+
+export class FeedbackIdempotencyConflictError extends Error {
+  readonly code = "FEEDBACK_IDEMPOTENCY_CONFLICT";
+
+  constructor() {
+    super("Feedback source event conflicts with its original request");
+    this.name = "FeedbackIdempotencyConflictError";
+  }
+}
+
+export const assertFeedbackReplayMatches = (
+  stored: CanonicalFeedbackReplay,
+  replay: CanonicalFeedbackReplay,
+): void => {
+  if (
+    stored.userId !== replay.userId ||
+    stored.reservationId !== replay.reservationId ||
+    stored.score !== replay.score ||
+    stored.contentHash !== replay.contentHash ||
+    stored.negativePolicyVersion !== replay.negativePolicyVersion
+  ) {
+    throw new FeedbackIdempotencyConflictError();
+  }
+};
+
 const MAX_TEXT_LENGTH = 2_000;
 const NEGATIVE_POLICY_VERSION = "negative-v1";
 const digest = (value: string): string =>
@@ -34,6 +66,13 @@ export class PostgresFeedbackRepository {
     const escalated = command.score <= 3 ||
       (text !== undefined && isExplicitNegative(text));
     const status = escalated ? "escalated" : "none";
+    const replay = {
+      userId: command.userId,
+      reservationId: command.reservationId ?? null,
+      score: command.score,
+      contentHash,
+      negativePolicyVersion: NEGATIVE_POLICY_VERSION,
+    };
 
     return this.db.transaction(async (tx) => {
       const inserted = await tx.execute<{
@@ -55,15 +94,28 @@ export class PostgresFeedbackRepository {
       if (first === undefined) {
         const original = (await tx.execute<{
           id: string;
+          userId: string;
+          reservationId: string | null;
+          score: number;
+          contentHash: string;
+          negativePolicyVersion: string;
           escalationStatus: string;
         }>(sql`
-          select id, escalation_status as "escalationStatus"
+          select
+            id,
+            user_id as "userId",
+            reservation_id as "reservationId",
+            rating as score,
+            content_hash as "contentHash",
+            negative_policy_version as "negativePolicyVersion",
+            escalation_status as "escalationStatus"
           from feedback
           where source_event_id = ${command.sourceEventId}
         `)).rows[0];
         if (original === undefined) {
           throw new Error("Feedback source event was not persisted");
         }
+        assertFeedbackReplayMatches(original, replay);
         return {
           feedbackId: original.id,
           escalated: original.escalationStatus === "escalated",

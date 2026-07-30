@@ -24,6 +24,12 @@ describe("feedback transaction gate", () => {
         (select coalesce(string_agg(metadata_hash, ''), '') from audit_events where action = 'feedback.escalated') as "auditMetadata"
     `);
     expect(facts.rows[0]).toEqual({ feedback: "1", outbox: "1", audit: "1", rawText: expect.not.stringContaining("private negative feedback"), auditMetadata: expect.not.stringContaining("private negative feedback") });
+    const effects = await testDb.db.execute<{ ledger: string }>(sql`
+      select count(*)::text as ledger from message_ledger_entries
+    `);
+    expect(effects.rows[0]).toEqual({ ledger: "0" });
+    await expect(testDb.db.execute(sql`update audit_events set reason_code = 'tampered' where action = 'feedback.escalated'`)).rejects.toThrow();
+    await expect(testDb.db.execute(sql`delete from audit_events where action = 'feedback.escalated'`)).rejects.toThrow();
   });
 
   it("rolls back the whole effect when outbox or audit append fails and permits a later retry", async () => {
@@ -66,5 +72,52 @@ describe("feedback transaction gate", () => {
     const repository = new PostgresFeedbackRepository(testDb.db);
     const result = await repository.submitFeedbackTransaction({ userId, score, text, sourceEventId: `feedback-score-${score}-${text}`, correlationId: `feedback-score-${score}-${text}` });
     expect(result.escalated).toBe(score <= 3 || text === "явно негативный опыт");
+    const effects = await testDb.db.execute<{ outbox: string; audit: string }>(sql`
+      select
+        (select count(*)::text from integration_outbox where correlation_id = ${`feedback-score-${score}-${text}`}) as outbox,
+        (select count(*)::text from audit_events where correlation_id = ${`feedback-score-${score}-${text}`}) as audit
+    `);
+    if (score >= 4 && text === "neutral") {
+      expect(effects.rows[0]).toEqual({ outbox: "0", audit: "0" });
+    } else {
+      expect(effects.rows[0]).toEqual({ outbox: "1", audit: "1" });
+    }
+  });
+
+  it.each([
+    ["user", (command: { userId: string; reservationId?: string; score: 1 | 2 | 3 | 4 | 5; text?: string; sourceEventId: string; correlationId: string }, otherUserId: string) => ({ ...command, userId: otherUserId })],
+    ["reservation", (command: { userId: string; reservationId?: string; score: 1 | 2 | 3 | 4 | 5; text?: string; sourceEventId: string; correlationId: string }) => ({ ...command, reservationId: "00000000-0000-0000-0000-000000000001" })],
+    ["score", (command: { userId: string; reservationId?: string; score: 1 | 2 | 3 | 4 | 5; text?: string; sourceEventId: string; correlationId: string }) => ({ ...command, score: 3 as const })],
+    ["text", (command: { userId: string; reservationId?: string; score: 1 | 2 | 3 | 4 | 5; text?: string; sourceEventId: string; correlationId: string }) => ({ ...command, text: "changed private feedback" })],
+  ] as const)("rejects changed %s replays without creating new effects", async (_field, mutate) => {
+    const userId = await testDb.createUser();
+    const otherUserId = await testDb.createUser();
+    const repository = new PostgresFeedbackRepository(testDb.db);
+    const command = { userId, score: 1 as const, text: "original private feedback", sourceEventId: `feedback-conflict-${_field}`, correlationId: `feedback-conflict-${_field}` };
+    await repository.submitFeedbackTransaction(command);
+    await expect(repository.submitFeedbackTransaction(mutate(command, otherUserId))).rejects.toThrow("Feedback source event conflicts with its original request");
+    const effects = await testDb.db.execute<{ feedback: string; outbox: string; audit: string }>(sql`
+      select
+        (select count(*)::text from feedback where source_event_id = ${command.sourceEventId}) as feedback,
+        (select count(*)::text from integration_outbox where correlation_id = ${command.correlationId}) as outbox,
+        (select count(*)::text from audit_events where correlation_id = ${command.correlationId}) as audit
+    `);
+    expect(effects.rows[0]).toEqual({ feedback: "1", outbox: "1", audit: "1" });
+  });
+
+  it("rejects a changed stored policy replay without creating new effects", async () => {
+    const userId = await testDb.createUser();
+    const repository = new PostgresFeedbackRepository(testDb.db);
+    const command = { userId, score: 1 as const, text: "policy private feedback", sourceEventId: "feedback-conflict-policy", correlationId: "feedback-conflict-policy" };
+    await repository.submitFeedbackTransaction(command);
+    await testDb.db.execute(sql`update feedback set negative_policy_version = 'negative-v0' where source_event_id = ${command.sourceEventId}`);
+    await expect(repository.submitFeedbackTransaction(command)).rejects.toThrow("Feedback source event conflicts with its original request");
+    const effects = await testDb.db.execute<{ feedback: string; outbox: string; audit: string }>(sql`
+      select
+        (select count(*)::text from feedback where source_event_id = ${command.sourceEventId}) as feedback,
+        (select count(*)::text from integration_outbox where correlation_id = ${command.correlationId}) as outbox,
+        (select count(*)::text from audit_events where correlation_id = ${command.correlationId}) as audit
+    `);
+    expect(effects.rows[0]).toEqual({ feedback: "1", outbox: "1", audit: "1" });
   });
 });

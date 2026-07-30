@@ -16,10 +16,6 @@ describe("admin authorization boundary", () => {
       correlationId: `unregistered-${action}`,
     }, approvals, audit)).resolves.toBe("deny");
     expect(approvals.consumeIfValid).not.toHaveBeenCalled();
-    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({
-      action: `${action}.denied`,
-      decision: "denied",
-      reasonCode: "route_unregistered",
-    }));
+    expect(audit.append).not.toHaveBeenCalled();
   });
 });
