@@ -74,10 +74,17 @@ export function assertPrivacyWorkflowContract(): {
 export class PostgresPrivacyRepository implements PrivacyRepository {
   constructor(
     private readonly db: DrizzleDb,
-    private readonly options: { beforeWithdrawalAudit?: () => Promise<void> | void } = {},
+    private readonly options: {
+      beforeWithdrawalAudit?: () => Promise<void> | void;
+      privacyMutationCapability?: {
+        enabled: boolean;
+        captureManifests?: (userId: string) => Promise<readonly { processor: typeof PROCESSORS[number]; ciphertext: string; keyReference: string; algorithm: string; version: string; subjectDeletionKeyHash: string }[]>;
+      };
+    } = {},
   ) {}
 
   withdrawConsentAtomically(command: WithdrawConsentCommand): Promise<WithdrawalReceipt> {
+    if (!this.options.privacyMutationCapability?.enabled) return Promise.reject(new Error("Privacy mutations are disabled"));
     if (!["client_profile", "expert_note", "follow_up"].includes(command.purpose)) {
       return Promise.reject(new Error("Unknown privacy consent purpose"));
     }
@@ -167,6 +174,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
   }
 
   startErasureAtomically(command: StartErasureCommand): Promise<ErasureJob> {
+    const capability = this.options.privacyMutationCapability;
+    if (!capability?.enabled) return Promise.reject(new Error("Privacy mutations are disabled"));
+    const captureManifests = capability.captureManifests;
+    if (captureManifests === undefined) return Promise.reject(new Error("Privacy deletion target capture is not bound"));
     return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`);
@@ -177,6 +188,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       `)).rows[0];
       if (existing !== undefined) return this.erasureReceipt(tx, existing.jobId, existing.status);
 
+      const manifests = await captureManifests(command.targetUserId);
+      if (manifests.length !== PROCESSORS.length || new Set(manifests.map((manifest) => manifest.processor)).size !== PROCESSORS.length || manifests.some((manifest) => manifest.keyReference === "unbound-placeholder" || manifest.ciphertext.length === 0)) {
+        throw new Error("Privacy deletion target capture is incomplete");
+      }
       const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
         select display_name as "displayName", timezone, expert_note as "expertNote" from client_profiles where user_id = ${command.targetUserId}::uuid for update
       `)).rows[0];
@@ -184,15 +199,15 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)
         values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}, ${hash({ userId: command.targetUserId, kind: "legacy_provider_identifier_evidence" })}) returning id
       `)).rows, "privacy deletion job");
-      for (const processor of PROCESSORS) {
-        const idempotencyKey = `${job.id}:${processor}`;
+      for (const manifest of manifests) {
+        const idempotencyKey = `${job.id}:${manifest.processor}`;
         await tx.execute(sql`
-          insert into privacy_deletion_manifests (deletion_job_id, processor, manifest_ciphertext, subject_deletion_key_hash)
-          values (${job.id}::uuid, ${processor}, ${hash({ jobId: job.id, processor, pseudonym: command.pseudonym })}, ${hash({ jobId: job.id, processor, subject: command.targetUserId })})
+          insert into privacy_deletion_manifests (deletion_job_id, processor, manifest_ciphertext, subject_deletion_key_hash, key_reference, algorithm, version)
+          values (${job.id}::uuid, ${manifest.processor}, ${manifest.ciphertext}, ${manifest.subjectDeletionKeyHash}, ${manifest.keyReference}, ${manifest.algorithm}, ${manifest.version})
         `);
         await tx.execute(sql`
           insert into privacy_processor_attempts (deletion_job_id, processor, status, idempotency_key)
-          values (${job.id}::uuid, ${processor}, 'pending', ${idempotencyKey})
+          values (${job.id}::uuid, ${manifest.processor}, 'pending', ${idempotencyKey})
         `);
       }
       // Manifests exist before any deletable local mapping/content is cleared.

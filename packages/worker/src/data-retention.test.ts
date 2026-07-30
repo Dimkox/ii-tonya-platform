@@ -21,6 +21,7 @@ describe("data retention", () => {
         repository,
         allowedClasses: new Set(["conversation_content", "provider_payload"]),
         audit: { append: vi.fn() },
+        capability: { enabled: true },
       },
       new Date("2026-07-28T10:00:00.000Z"),
       100,
@@ -54,6 +55,7 @@ describe("data retention", () => {
       repository,
       allowedClasses: new Set(["conversation_content", "provider_payload"]),
       audit: { append: vi.fn() },
+      capability: { enabled: true },
     }, new Date("2026-07-28T10:00:00.000Z"), 100)).rejects.toThrow(
       "Retention class message_ledger is forbidden",
     );

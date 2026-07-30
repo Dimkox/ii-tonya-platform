@@ -28,6 +28,7 @@ export interface RetentionDeps {
   readonly repository: RetentionRepository;
   readonly allowedClasses: ReadonlySet<RetentionClass>;
   readonly audit: { append(event: Record<string, unknown>): Promise<void> | void };
+  readonly capability?: { enabled: boolean };
 }
 
 export interface RetentionReport {
@@ -46,6 +47,7 @@ export async function runRetentionBatch(
   now: Date,
   batchSize: number,
 ): Promise<RetentionReport> {
+  if (!deps.capability?.enabled) throw new Error("Privacy processing is disabled");
   if (!Number.isFinite(now.getTime()) || !Number.isSafeInteger(batchSize) || batchSize < 1) {
     throw new Error("Invalid retention batch input");
   }

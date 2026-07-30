@@ -21,6 +21,7 @@ describe("privacy lifecycle", () => {
       repository,
       audit,
       pseudonymize: () => "subject-deleted-01",
+      capability: { enabled: true },
     });
 
     await service.withdrawConsent({
@@ -51,6 +52,7 @@ describe("privacy lifecycle", () => {
       repository,
       audit: { append: vi.fn() },
       pseudonymize: () => "subject-deleted-02",
+      capability: { enabled: true },
     });
 
     await expect(service.exportSubject({
@@ -65,11 +67,24 @@ describe("privacy lifecycle", () => {
     const repository = {
       withdrawConsentAtomically: vi.fn(), exportOwnedSubject: vi.fn(), startErasureAtomically: vi.fn(),
     };
-    const service = createPrivacyService({ repository, audit: { append: vi.fn() }, pseudonymize: () => "p" });
+    const service = createPrivacyService({ repository, audit: { append: vi.fn() }, pseudonymize: () => "p", capability: { enabled: true } });
     await expect(service.withdrawConsent({
       principalUserId: "u-1", targetUserId: "u-1", purpose: "unbounded", policyVersion: "privacy-v1", correlationId: "privacy-purpose",
     })).rejects.toThrow("Unknown privacy consent purpose");
     expect(repository.withdrawConsentAtomically).not.toHaveBeenCalled();
+  });
+
+  it("blocks every privacy mutation when the runtime capability is disabled", async () => {
+    const repository = {
+      withdrawConsentAtomically: vi.fn(), exportOwnedSubject: vi.fn(), startErasureAtomically: vi.fn(),
+    };
+    const service = createPrivacyService({
+      repository, audit: { append: vi.fn() }, pseudonymize: () => "p", capability: { enabled: false },
+    });
+    await expect(service.withdrawConsent({ principalUserId: "u-1", targetUserId: "u-1", purpose: "client_profile", policyVersion: "v1", correlationId: "c1" })).rejects.toThrow("Privacy mutations are disabled");
+    await expect(service.eraseSubject({ principalUserId: "u-1", targetUserId: "u-1", correlationId: "c2" })).rejects.toThrow("Privacy mutations are disabled");
+    expect(repository.withdrawConsentAtomically).not.toHaveBeenCalled();
+    expect(repository.startErasureAtomically).not.toHaveBeenCalled();
   });
 
   it("starts owner-scoped erasure without rewriting immutable facts", async () => {
@@ -89,6 +104,7 @@ describe("privacy lifecycle", () => {
       repository,
       audit: { append: vi.fn() },
       pseudonymize: () => "subject-deleted-02",
+      capability: { enabled: true },
     });
 
     await expect(service.eraseSubject({

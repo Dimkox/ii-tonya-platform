@@ -67,6 +67,7 @@ export interface PrivacyDependencies {
   /** Repository transactions append audit facts. This port is retained for composition compatibility only. */
   readonly audit: { append(event: Record<string, unknown>): Promise<void> | void };
   readonly pseudonymize: (userId: string) => string;
+  readonly capability?: { enabled: boolean };
 }
 
 function assertOwner(principalUserId: string, targetUserId: string): void {
@@ -83,6 +84,7 @@ export const createEnvironmentHmacPseudonymizer = (environmentKey: string) =>
 
 export const createPrivacyService = (deps: PrivacyDependencies): PrivacyService => ({
   async withdrawConsent(command) {
+    if (!deps.capability?.enabled) throw new Error("Privacy mutations are disabled");
     assertOwner(command.principalUserId, command.targetUserId);
     if (!CONSENT_PURPOSES.has(command.purpose)) throw new Error("Unknown privacy consent purpose");
     // Audit and projection outbox are deliberately part of this serializable repository command.
@@ -93,6 +95,7 @@ export const createPrivacyService = (deps: PrivacyDependencies): PrivacyService 
     return deps.repository.exportOwnedSubject(command.targetUserId);
   },
   async eraseSubject(command) {
+    if (!deps.capability?.enabled) throw new Error("Privacy mutations are disabled");
     assertOwner(command.principalUserId, command.targetUserId);
     return deps.repository.startErasureAtomically({
       targetUserId: command.targetUserId,

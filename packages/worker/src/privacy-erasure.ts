@@ -65,6 +65,7 @@ export interface ErasureDeps {
   readonly now: () => Date;
   readonly hashReceipt: (receipt: string) => string;
   readonly manifestCipher: DeletionManifestCipher;
+  readonly capability?: { enabled: boolean };
 }
 
 export interface ErasureWorkflowResult {
@@ -89,6 +90,7 @@ export async function runErasureWorkflow(
   deps: ErasureDeps,
   jobId: string,
 ): Promise<ErasureWorkflowResult> {
+  if (!deps.capability?.enabled) throw new Error("Privacy processing is disabled");
   const job = await deps.repository.getJob(jobId);
   if (job.status === "dead_letter") throw new Error("Erasure job is dead-lettered");
   if (job.status === "processor_complete" || job.status === "backup_verified") return { jobId, status: job.status };
@@ -97,10 +99,10 @@ export async function runErasureWorkflow(
     const processor = processors.get(name);
     if (processor === undefined) continue;
     const idempotencyKey = `${jobId}:${name}`;
-    const manifest = await deps.repository.loadManifest(jobId, name);
-    const opaqueTarget = await deps.manifestCipher.decrypt(manifest);
     const state = await deps.repository.getAttempt(jobId, name);
     if (state === "acknowledged") continue;
+    const manifest = await deps.repository.loadManifest(jobId, name);
+    const opaqueTarget = await deps.manifestCipher.decrypt(manifest);
     if (state === "unknown_outcome" || state === "started") {
       const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey, opaqueTarget });
       if (reconciled === "erased") {

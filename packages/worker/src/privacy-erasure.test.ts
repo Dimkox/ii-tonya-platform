@@ -45,4 +45,11 @@ describe("processor-wide erasure", () => {
     expect(deps.processorCalls("object_store")).toBe(0);
     expect(deps.reconcileCalls("object_store")).toBe(1);
   });
+
+  it("does not load or dispatch a manifest while privacy processing is disabled", async () => {
+    const deps = erasureFixture({ processors: ["object_store", "selarti", "planerka", "make_projection"] });
+    await expect(runErasureWorkflow({ ...deps, capability: { enabled: false } }, "erase-job-5"))
+      .rejects.toThrow("Privacy processing is disabled");
+    expect(deps.processorCalls("object_store")).toBe(0);
+  });
 });

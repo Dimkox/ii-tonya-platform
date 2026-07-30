@@ -62,6 +62,7 @@ export function erasureFixture(input: {
     now: () => new Date("2026-07-28T10:00:00.000Z"),
     hashReceipt: (receipt) => createHash("sha256").update(receipt).digest("hex"),
     manifestCipher: { async decrypt(envelope) { return envelope.ciphertext.replace(/^cipher:[^:]+:/, ""); } },
+    capability: { enabled: true },
     processorCalls: (name) => calls.get(name) ?? 0,
     reconcileCalls: (name) => reconciles.get(name) ?? 0,
     job: () => ({ ...job }),
