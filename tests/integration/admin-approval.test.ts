@@ -330,7 +330,7 @@ describe("populated 0012 upgrade", () => {
           clock_timestamp() + interval '2 hours', 'legacy-nonce'
         )
       `);
-      for (const index of [13, 14, 15]) {
+      for (const index of [13, 14, 15, 16]) {
         const prefix = index.toString().padStart(4, "0");
         const file = GetMigrationFile(prefix);
         const sqlText = readFileSync(file, "utf8");
@@ -348,6 +348,21 @@ describe("populated 0012 upgrade", () => {
         { name: "approved_at" },
         { name: "payload_hash" },
       ]);
+      const task17cUpgrade = await legacy.db.execute<{
+        active: boolean;
+        caseActions: string;
+        integrationErrors: string;
+      }>(sql`
+        select
+          (select active from users where id = '00000000-0000-4000-8000-000000000081'::uuid) as active,
+          (select count(*)::text from admin_case_actions) as "caseActions",
+          (select count(*)::text from integration_errors) as "integrationErrors"
+      `);
+      expect(task17cUpgrade.rows).toEqual([{
+        active: true,
+        caseActions: "0",
+        integrationErrors: "0",
+      }]);
       const legacyRows = await legacy.db.execute<{
         id: string;
         nonce: string;

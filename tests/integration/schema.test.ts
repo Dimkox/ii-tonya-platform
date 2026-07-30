@@ -166,6 +166,7 @@ describe("MVP schema", () => {
     const names = rows.rows.map((row) => row.table_name);
     expect(names).toEqual([
       "admin_approvals",
+      "admin_case_actions",
       "admin_object_assignments",
       "admin_role_assignments",
       "admin_sessions",
@@ -181,6 +182,7 @@ describe("MVP schema", () => {
       "experts",
       "feedback",
       "human_escalations",
+      "integration_errors",
       "integration_inbox",
       "integration_outbox",
       "message_events",

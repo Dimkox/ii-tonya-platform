@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   pgTable,
   text,
@@ -16,6 +17,7 @@ const mutableTimestamps = {
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
+  active: boolean("active").notNull().default(true),
   ...mutableTimestamps,
 });
 

@@ -1,23 +1,95 @@
-import { describe, expect, it } from "vitest";
-import { createAdminService } from "./admin-service.js";
-import { adminFixture } from "./admin-service.testkit.js";
+import { describe, expect, it, vi } from "vitest";
+import { createAdminService, type AdminPrincipal, type AdminWorkflowPort } from "./admin-service.js";
 
-describe("admin application boundary", () => {
-  it.each([500, 1000, 1500, 2000] as const)("fails closed for unfinished package grant size %s", async (units) => {
-    const deps = adminFixture({ approval: "valid" });
-    await expect(createAdminService(deps).grantPackage(deps.principal, { userId: "u-1", units, idempotencyKey: `grant-${units}`, approvalId: `approval-${units}`, now: new Date("2026-07-28T10:00:00.000Z"), correlationId: `corr-${units}` })).rejects.toThrow("Admin workflows are not registered");
-    expect(deps.ledger.facts()).toEqual([]);
+const principal: AdminPrincipal = {
+  id: "server-resolved-only",
+  sessionIdHash: "session-hash",
+  roles: ["entitlement_admin"],
+  mfaVerifiedAt: new Date(0),
+};
+
+const workflows = (): AdminWorkflowPort => ({
+  createClient: vi.fn(),
+  deactivateClient: vi.fn(),
+  grantPackage: vi.fn(),
+  grantIntroPackage: vi.fn(),
+  revokePackage: vi.fn(),
+  verifyExpert: vi.fn(),
+  suspendExpert: vi.fn(),
+  activateService: vi.fn(),
+  deactivateService: vi.fn(),
+  resolveIntegrationError: vi.fn(),
+  acknowledgeSafetyAlert: vi.fn(),
+  resolveSafetyAlert: vi.fn(),
+  acknowledgeNegativeFeedback: vi.fn(),
+  resolveNegativeFeedback: vi.fn(),
+});
+
+const auth = {
+  routeObjectId: "00000000-0000-4000-8000-000000000001",
+  approvalId: "00000000-0000-4000-8000-000000000002",
+  nonce: "nonce-1",
+  correlationId: "corr-1",
+};
+
+describe("admin application command boundary", () => {
+  it("dispatches every operation to an exact workflow method using only the session hash", async () => {
+    const port = workflows();
+    const service = createAdminService({ workflows: port });
+    await service.createClient(principal, { ...auth, userId: auth.routeObjectId });
+    await service.deactivateClient(principal, { ...auth, userId: auth.routeObjectId });
+    await service.grantPackage(principal, { ...auth, userId: auth.routeObjectId, units: 500, idempotencyKey: "grant-1" });
+    await service.grantIntroPackage(principal, { ...auth, userId: auth.routeObjectId, units: 100, idempotencyKey: "intro-1" });
+    await service.revokePackage(principal, { ...auth, userId: auth.routeObjectId, packageId: "00000000-0000-4000-8000-000000000003", idempotencyKey: "revoke-1" });
+    await service.updateExpertVerification(principal, { ...auth, expertId: auth.routeObjectId, verified: true });
+    await service.updateExpertVerification(principal, { ...auth, expertId: auth.routeObjectId, verified: false });
+    await service.updateService(principal, { ...auth, serviceId: auth.routeObjectId, active: true });
+    await service.updateService(principal, { ...auth, serviceId: auth.routeObjectId, active: false });
+    await service.resolveIntegrationError(principal, { ...auth, errorId: auth.routeObjectId });
+    await service.resolveAlert(principal, { ...auth, alertId: auth.routeObjectId, alertType: "safety", resolution: "acknowledge" });
+    await service.resolveAlert(principal, { ...auth, alertId: auth.routeObjectId, alertType: "safety", resolution: "resolve" });
+    await service.resolveAlert(principal, { ...auth, alertId: auth.routeObjectId, alertType: "feedback", resolution: "acknowledge" });
+    await service.resolveAlert(principal, { ...auth, alertId: auth.routeObjectId, alertType: "feedback", resolution: "resolve" });
+
+    for (const method of Object.values(port)) expect(method).toHaveBeenCalledOnce();
+    expect(port.grantPackage).toHaveBeenCalledWith(expect.objectContaining({
+      sessionIdHash: "session-hash",
+      userId: auth.routeObjectId,
+      units: 500,
+    }));
   });
 
-  it("fails closed for unfinished revocation", async () => {
-    const deps = adminFixture({ approval: "valid", packageBalance: 500 });
-    await expect(createAdminService(deps).revokePackage(deps.principal, { userId: "u-1", packageId: "package-1", idempotencyKey: "revoke-1", approvalId: "approval-revoke", now: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-revoke" })).rejects.toThrow("Admin workflows are not registered");
-    expect(deps.ledger.facts()).toHaveLength(1);
+  it("rejects route/command target mismatch before any workflow call", async () => {
+    const port = workflows();
+    await expect(createAdminService({ workflows: port }).grantPackage(principal, {
+      ...auth,
+      routeObjectId: "00000000-0000-4000-8000-000000000099",
+      userId: auth.routeObjectId,
+      units: 500,
+      idempotencyKey: "grant-mismatch",
+    })).rejects.toThrow("Admin route object does not match command target");
+    for (const method of Object.values(port)) expect(method).not.toHaveBeenCalled();
   });
 
-  it("fails closed for unfinished intro package grants", async () => {
-    const deps = adminFixture({ approval: "valid" });
-    await expect(createAdminService(deps).grantIntroPackage(deps.principal, { userId: "u-1", units: 100, idempotencyKey: "intro-1", approvalId: "approval-intro", now: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-intro" })).rejects.toThrow("Admin workflows are not registered");
-    expect(deps.ledger.facts()).toEqual([]);
+  it.each([0, 100, 750, 2500])("rejects non-catalog admin package size %s", async (units) => {
+    const port = workflows();
+    await expect(createAdminService({ workflows: port }).grantPackage(principal, {
+      ...auth,
+      userId: auth.routeObjectId,
+      units,
+      idempotencyKey: `grant-${units}`,
+    })).rejects.toThrow("Package size is not allowed");
+    expect(port.grantPackage).not.toHaveBeenCalled();
+  });
+
+  it("keeps intro grant a distinct exact 100-unit operation", async () => {
+    const port = workflows();
+    await expect(createAdminService({ workflows: port }).grantIntroPackage(principal, {
+      ...auth,
+      userId: auth.routeObjectId,
+      units: 500,
+      idempotencyKey: "intro-invalid",
+    })).rejects.toThrow("Intro package must contain exactly 100 units");
+    expect(port.grantIntroPackage).not.toHaveBeenCalled();
   });
 });

@@ -65,12 +65,19 @@ export {
   type WithdrawalReceipt,
 } from "./repositories/privacy-repository.js";
 export {
+  AdminTargetNotFoundError,
+  AdminWorkflowConflictError,
   PostgresAdminRepository,
-  UnregisteredAdminWorkflowError,
-  type AdminPackageRepository,
+  type AdminWorkflowResult,
+  type AlertAdminCommand,
+  type ClientAdminCommand,
+  type ExpertAdminCommand,
   type GrantAdminPackageCommand,
-  type ExecuteApprovedGrantCommand,
+  type GrantIntroPackageCommand,
+  type IntegrationErrorAdminCommand,
   type RevokeAdminPackageCommand,
+  type ServiceAdminCommand,
+  type WorkflowAuthorization,
 } from "./repositories/admin-repository.js";
 export {
   PostgresAdminApprovalRepository,

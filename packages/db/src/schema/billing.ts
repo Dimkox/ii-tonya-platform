@@ -26,6 +26,8 @@ export const messagePackages = pgTable(
     grantedMessages: integer("granted_messages").notNull(),
     grantIdempotencyKey: text("grant_idempotency_key").notNull(),
     kind: text("kind").notNull().default("paid"),
+    adminApprovalId: uuid("admin_approval_id"),
+    adminRequesterSessionIdHash: text("admin_requester_session_id_hash"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt,
@@ -33,6 +35,15 @@ export const messagePackages = pgTable(
   (table) => [
     check("message_packages_grant_positive", sql`${table.grantedMessages} > 0`),
     check("message_packages_kind_allowed", sql`${table.kind} in ('admin', 'paid', 'intro')`),
+    check("message_packages_admin_binding_complete", sql`
+      (${table.adminApprovalId} is null and ${table.adminRequesterSessionIdHash} is null)
+      or (${table.adminApprovalId} is not null and ${table.adminRequesterSessionIdHash} is not null)
+    `),
+    check("message_packages_admin_contract", sql`
+      (${table.kind} = 'admin' and ${table.grantedMessages} in (500, 1000, 1500, 2000) and ${table.expiresAt} is not null)
+      or (${table.kind} = 'intro' and ${table.grantedMessages} = 100 and ${table.expiresAt} is null)
+      or (${table.kind} = 'paid')
+    `),
     unique("message_packages_grant_idempotency_unique").on(table.grantIdempotencyKey),
     index("message_packages_eligible_order").on(
       table.userId,
@@ -70,6 +81,8 @@ export const messageLedgerEntries = pgTable(
     direction: text("direction").notNull().default("outbound"),
     messageEventId: uuid("message_event_id").references(() => messageEvents.id),
     originalEntryId: uuid("original_entry_id"),
+    adminApprovalId: uuid("admin_approval_id"),
+    adminRequesterSessionIdHash: text("admin_requester_session_id_hash"),
     idempotencyKey: text("idempotency_key").notNull(),
     createdAt,
   },
@@ -86,6 +99,10 @@ export const messageLedgerEntries = pgTable(
       or (${table.entryKind} = 'free' and ${table.delta} = 0 and ${table.messageEventId} is not null and ${table.originalEntryId} is null)
       or (${table.entryKind} = 'compensation' and ${table.packageId} is not null and ${table.delta} = 1 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
       or (${table.entryKind} = 'revocation' and ${table.packageId} is not null and ${table.delta} <= 0 and ${table.messageEventId} is null and ${table.originalEntryId} is not null)
+    `),
+    check("message_ledger_admin_binding_complete", sql`
+      (${table.adminApprovalId} is null and ${table.adminRequesterSessionIdHash} is null)
+      or (${table.adminApprovalId} is not null and ${table.adminRequesterSessionIdHash} is not null)
     `),
     uniqueIndex("message_ledger_message_fact_once")
       .on(table.messageEventId, table.direction)

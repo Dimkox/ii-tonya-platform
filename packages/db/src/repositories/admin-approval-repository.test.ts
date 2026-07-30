@@ -42,9 +42,11 @@ describe("admin approval canonical payload", () => {
 });
 
 describe("admin approval object mappings", () => {
-  it("fixes safety and feedback reads to their assignment object types", () => {
+  it("fixes safety and feedback reads and resolutions to their assignment object types", () => {
     expect(requiredApprovalObjectType("safety.read")).toBe("safety_case");
+    expect(requiredApprovalObjectType("safety.resolve")).toBe("safety_case");
     expect(requiredApprovalObjectType("feedback.read")).toBe("feedback_queue");
+    expect(requiredApprovalObjectType("feedback.resolve")).toBe("feedback_queue");
     expect(requiredApprovalObjectType("package.grant")).toBeNull();
   });
 });

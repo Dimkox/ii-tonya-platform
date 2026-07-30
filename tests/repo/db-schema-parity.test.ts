@@ -8,12 +8,14 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   adminApprovals,
+  adminCaseActions,
   adminObjectAssignments,
   adminRoleAssignments,
   adminSessions,
   channelIdentities,
   clientProfiles,
   integrationInbox,
+  integrationErrors,
   integrationOutbox,
   messageEvents,
   messageLedgerEntries,
@@ -58,6 +60,8 @@ describe("authoritative Drizzle schema parity", () => {
     });
     expect(names(messagePackages)).toMatchObject({
       checks: [
+        "message_packages_admin_binding_complete",
+        "message_packages_admin_contract",
         "message_packages_grant_positive",
         "message_packages_kind_allowed",
       ],
@@ -68,7 +72,10 @@ describe("authoritative Drizzle schema parity", () => {
       "message_events_provider_external_unique",
     ]);
     expect(names(messageLedgerEntries)).toMatchObject({
-      checks: ["message_ledger_delta_matches_kind"],
+      checks: [
+        "message_ledger_admin_binding_complete",
+        "message_ledger_delta_matches_kind",
+      ],
       indexes: [
         "message_ledger_compensation_once_per_original",
         "message_ledger_grant_once_per_package",
@@ -122,6 +129,19 @@ describe("authoritative Drizzle schema parity", () => {
       indexes: ["admin_approvals_bound_scope_nonce_unique"],
       uniques: [],
     });
+    expect(names(adminCaseActions)).toMatchObject({
+      checks: [
+        "admin_case_actions_action_allowed",
+        "admin_case_actions_object_type_allowed",
+      ],
+      uniques: [
+        "admin_case_actions_approval_unique",
+        "admin_case_actions_object_action_unique",
+      ],
+    });
+    expect(names(integrationErrors).checks).toEqual([
+      "integration_errors_status_allowed",
+    ]);
     expect(names(adminSessions)).toMatchObject({
       checks: ["admin_sessions_lifecycle_order"],
       foreignKeys: ["admin_sessions_admin_id_users_id_fk"],

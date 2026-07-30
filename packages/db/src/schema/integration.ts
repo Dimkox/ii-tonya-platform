@@ -50,6 +50,21 @@ export const integrationInbox = pgTable(
     ),
   ],
 );
+export const integrationErrors = pgTable(
+  "integration_errors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: text("provider").notNull(),
+    reasonCode: text("reason_code").notNull(),
+    metadataHash: text("metadata_hash").notNull(),
+    status: text("status").notNull().default("open"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    check("integration_errors_status_allowed", sql`${table.status} in ('open', 'resolved')`),
+  ],
+);
 export const integrationOutbox = pgTable(
   "integration_outbox",
   {

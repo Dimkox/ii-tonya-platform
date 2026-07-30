@@ -87,7 +87,9 @@ const readObjectTypes: Readonly<
   Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>
 > = {
   "safety.read": "safety_case",
+  "safety.resolve": "safety_case",
   "feedback.read": "feedback_queue",
+  "feedback.resolve": "feedback_queue",
 };
 
 export const requiredApprovalObjectType = (

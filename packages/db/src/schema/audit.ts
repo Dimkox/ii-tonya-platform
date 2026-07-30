@@ -150,6 +150,34 @@ export const adminObjectAssignments = pgTable(
     ),
   ],
 );
+export const adminCaseActions = pgTable(
+  "admin_case_actions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    objectType: text("object_type").notNull(),
+    objectId: uuid("object_id").notNull(),
+    action: text("action").notNull(),
+    actorId: uuid("actor_id").notNull().references(() => users.id),
+    approvalId: uuid("approval_id").notNull().references(() => adminApprovals.id),
+    createdAt,
+  },
+  (table) => [
+    unique("admin_case_actions_object_action_unique").on(
+      table.objectType,
+      table.objectId,
+      table.action,
+    ),
+    unique("admin_case_actions_approval_unique").on(table.approvalId),
+    check(
+      "admin_case_actions_object_type_allowed",
+      sql`${table.objectType} in ('safety_alert', 'negative_feedback')`,
+    ),
+    check(
+      "admin_case_actions_action_allowed",
+      sql`${table.action} in ('acknowledge', 'resolve')`,
+    ),
+  ],
+);
 export const privacyDeletionJobs = pgTable(
   "privacy_deletion_jobs",
   {

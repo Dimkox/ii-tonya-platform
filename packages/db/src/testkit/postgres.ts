@@ -561,7 +561,8 @@ export async function startTestPostgres(
     },
     async reset() {
       await db.execute(sql`
-        truncate table reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
+        truncate table admin_case_actions, integration_errors,
+          reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
           dead_letters, integration_outbox,
           integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,
           privacy_processor_attempts, privacy_deletion_jobs, admin_object_assignments,
