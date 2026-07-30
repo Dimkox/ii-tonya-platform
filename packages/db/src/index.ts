@@ -76,6 +76,7 @@ export {
   PostgresAdminApprovalRepository,
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
+  requiredApprovalObjectType,
   type AdminPayload,
   type AdminRole,
   type ApprovalAdminAction,

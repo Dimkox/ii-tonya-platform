@@ -1,6 +1,6 @@
 ALTER TABLE "admin_approvals" ADD COLUMN "approved_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "admin_approvals" DROP CONSTRAINT "admin_approvals_scope_nonce_unique";--> statement-breakpoint
-ALTER TABLE "admin_approvals" ADD CONSTRAINT "admin_approvals_scope_nonce_unique" UNIQUE("action","object_type","object_id","requester_id","nonce");--> statement-breakpoint
+CREATE UNIQUE INDEX "admin_approvals_bound_scope_nonce_unique" ON "admin_approvals" USING btree ("action","object_type","object_id","requester_id","nonce") WHERE "admin_approvals"."requester_session_id_hash" <> 'legacy-unbound';--> statement-breakpoint
 CREATE TABLE "admin_sessions" (
 	"session_id_hash" text PRIMARY KEY NOT NULL,
 	"admin_id" uuid NOT NULL,

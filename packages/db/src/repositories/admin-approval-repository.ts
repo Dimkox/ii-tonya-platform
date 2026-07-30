@@ -83,6 +83,17 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "feedback.resolve": "support",
 };
 
+const readObjectTypes: Readonly<
+  Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>
+> = {
+  "safety.read": "safety_case",
+  "feedback.read": "feedback_queue",
+};
+
+export const requiredApprovalObjectType = (
+  action: ApprovalAdminAction,
+): "safety_case" | "feedback_queue" | null => readObjectTypes[action] ?? null;
+
 function canonicalize(value: AdminPayload | undefined): string {
   if (value === null) return "null";
   if (typeof value === "string" || typeof value === "boolean") {
@@ -159,7 +170,19 @@ export class PostgresAdminApprovalRepository {
     input: RequestAdminApproval,
   ): Promise<{ approvalId: string; expiresAt: Date } | null> {
     const requiredRole = actionRoles[input.action];
+    const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
+    const assignmentGate = requiredObjectType === null
+      ? sql`true`
+      : sql`
+          ${input.objectType} = ${requiredObjectType}
+          and exists (
+            select 1 from admin_object_assignments oa
+            where oa.admin_id = s.admin_id
+              and oa.object_type = ${requiredObjectType}
+              and oa.object_id = ${input.objectId}::uuid
+          )
+        `;
     const result = await this.db.execute<{ approvalId: string; expiresAt: Date }>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
@@ -175,6 +198,7 @@ export class PostgresAdminApprovalRepository {
           and s.expires_at > c.db_now
           and s.mfa_verified_at <= c.db_now
           and s.mfa_verified_at >= c.db_now - interval '15 minutes'
+          and ${assignmentGate}
       )
       insert into admin_approvals (
         action, object_type, object_id, requester_id,
@@ -188,7 +212,8 @@ export class PostgresAdminApprovalRepository {
       from requester r
       on conflict (
         action, object_type, object_id, requester_id, nonce
-      ) do nothing
+      ) where requester_session_id_hash <> 'legacy-unbound'
+      do nothing
       returning id as "approvalId", expires_at as "expiresAt"
     `);
     if (result.rows[0] !== undefined) return result.rows[0];
@@ -213,6 +238,7 @@ export class PostgresAdminApprovalRepository {
         and s.expires_at > c.db_now
         and s.mfa_verified_at <= c.db_now
         and s.mfa_verified_at >= c.db_now - interval '15 minutes'
+        and ${assignmentGate}
         and a.action = ${input.action}
         and a.object_type = ${input.objectType}
         and a.object_id = ${input.objectId}::uuid
@@ -270,7 +296,19 @@ export class PostgresAdminApprovalRepository {
     input: ConsumeAdminApproval,
   ): Promise<ConsumedAdminApproval | null> {
     const requiredRole = actionRoles[input.action];
+    const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
+    const assignmentGate = requiredObjectType === null
+      ? sql`true`
+      : sql`
+          ${input.objectType} = ${requiredObjectType}
+          and exists (
+            select 1 from admin_object_assignments oa
+            where oa.admin_id = s.admin_id
+              and oa.object_type = ${requiredObjectType}
+              and oa.object_id = ${input.objectId}::uuid
+          )
+        `;
     const result = await this.db.execute<ApprovalRow>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
@@ -286,6 +324,7 @@ export class PostgresAdminApprovalRepository {
           and s.expires_at > c.db_now
           and s.mfa_verified_at <= c.db_now
           and s.mfa_verified_at >= c.db_now - interval '15 minutes'
+          and ${assignmentGate}
       )
       update admin_approvals a
       set consumed_at = r.db_now

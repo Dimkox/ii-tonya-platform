@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -40,13 +40,15 @@ export const adminApprovals = pgTable(
     createdAt,
   },
   (table) => [
-    unique("admin_approvals_scope_nonce_unique").on(
-      table.action,
-      table.objectType,
-      table.objectId,
-      table.requesterId,
-      table.nonce,
-    ),
+    uniqueIndex("admin_approvals_bound_scope_nonce_unique")
+      .on(
+        table.action,
+        table.objectType,
+        table.objectId,
+        table.requesterId,
+        table.nonce,
+      )
+      .where(sql`${table.requesterSessionIdHash} <> 'legacy-unbound'`),
     check(
       "admin_approvals_required_role_allowed",
       sql`${table.requiredRole} in ('support', 'catalog_admin', 'entitlement_admin', 'security_admin')`,

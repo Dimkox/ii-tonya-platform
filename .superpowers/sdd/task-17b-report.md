@@ -77,3 +77,42 @@
 - Task 17C/17D must compose approval consume, exact domain mutation, and allow
   audit in one database transaction before any admin mutation route can be
   registered.
+
+## Independent-review P1 remediation
+
+### RED
+
+- Added the fixed read mapping assertions for `safety.read -> safety_case` and
+  `feedback.read -> feedback_queue`.
+- Command:
+  `pnpm exec vitest run packages/db/src/repositories/admin-approval-repository.test.ts`
+- Result: 1 of 3 tests failed with
+  `requiredApprovalObjectType is not a function`.
+- Extended the PostgreSQL suite before the fix with unassigned request, wrong
+  object type, wrong object, replay after assignment revocation, consume after
+  assignment revocation, two colliding legacy-unbound 0012 approvals, and a
+  conflicting bound nonce replay.
+
+### GREEN
+
+- Replaced the full nonce constraint with the schema-described partial unique
+  index `admin_approvals_bound_scope_nonce_unique`. It covers only approvals
+  whose requester session is not `legacy-unbound`; the repository's
+  `ON CONFLICT` predicate exactly matches that index.
+- Migration 0015 no longer rewrites, deletes, consumes, or renames any
+  legitimate legacy-unbound row. The populated upgrade test now requires two
+  0012-valid colliding approvals with distinct approvers to survive with their
+  IDs, approvers, and nonce unchanged, then proves a new bound conflicting
+  nonce creates only one row.
+- `requestApproval` and its idempotent-replay lookup require the exact mapped
+  read object type and current requester assignment. `consumeApproval`
+  independently repeats that check, so assignment revocation denies use.
+  Non-read actions retain their prior behavior.
+- Command:
+  `pnpm exec vitest run packages/db/src/repositories/admin-approval-repository.test.ts tests/repo/db-schema-parity.test.ts packages/application/src/admin-service.test.ts apps/api/src/routes/admin.test.ts tests/integration/admin-ledger.test.ts`
+- Result: 5 files, 20 tests passed.
+- Local PostgreSQL rerun:
+  `pnpm exec vitest run tests/integration/admin-approval.test.ts`.
+- Result: blocked before all six test bodies by
+  `Could not find a working container runtime strategy`; the expanded suite
+  remains wired into GitHub DB Gate.

@@ -119,7 +119,8 @@ describe("authoritative Drizzle schema parity", () => {
         "admin_approvals_lifecycle_order",
         "admin_approvals_required_role_allowed",
       ],
-      uniques: ["admin_approvals_scope_nonce_unique"],
+      indexes: ["admin_approvals_bound_scope_nonce_unique"],
+      uniques: [],
     });
     expect(names(adminSessions)).toMatchObject({
       checks: ["admin_sessions_lifecycle_order"],
@@ -219,7 +220,7 @@ describe("authoritative Drizzle schema parity", () => {
       "integration_outbox_dispatch_lease",
       "integration_outbox_reconciliation_lease",
       "prompt_versions_name_version_unique",
-      "admin_approvals_scope_nonce_unique",
+      "admin_approvals_bound_scope_nonce_unique",
       "admin_approvals_required_role_allowed",
       "admin_approvals_binding_complete",
       "admin_approvals_lifecycle_order",

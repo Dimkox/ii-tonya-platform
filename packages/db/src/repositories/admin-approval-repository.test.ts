@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
+  requiredApprovalObjectType,
 } from "./admin-approval-repository.js";
 
 describe("admin approval canonical payload", () => {
@@ -37,5 +38,13 @@ describe("admin approval canonical payload", () => {
     )).toThrow(
       "Unsupported admin payload object",
     );
+  });
+});
+
+describe("admin approval object mappings", () => {
+  it("fixes safety and feedback reads to their assignment object types", () => {
+    expect(requiredApprovalObjectType("safety.read")).toBe("safety_case");
+    expect(requiredApprovalObjectType("feedback.read")).toBe("feedback_queue");
+    expect(requiredApprovalObjectType("package.grant")).toBeNull();
   });
 });

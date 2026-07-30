@@ -1916,7 +1916,48 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "admin_approvals_bound_scope_nonce_unique": {
+          "name": "admin_approvals_bound_scope_nonce_unique",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "object_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "object_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requester_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "nonce",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"admin_approvals\".\"requester_session_id_hash\" <> 'legacy-unbound'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "admin_approvals_requester_id_users_id_fk": {
           "name": "admin_approvals_requester_id_users_id_fk",
@@ -1946,19 +1987,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "admin_approvals_scope_nonce_unique": {
-          "name": "admin_approvals_scope_nonce_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "action",
-            "object_type",
-            "object_id",
-            "requester_id",
-            "nonce"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "admin_approvals_required_role_allowed": {
