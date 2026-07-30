@@ -71,6 +71,13 @@
       "when": 1785392838941,
       "tag": "0009_young_arachne",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785394119335,
+      "tag": "0010_brown_purifiers",
+      "breakpoints": true
     }
   ]
 }

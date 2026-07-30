@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -50,6 +50,8 @@ export const privacyDeletionJobs = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     status: text("status").notNull(),
     evidencePseudonym: text("evidence_pseudonym"),
+    legacyProviderIdentifierEvidence: text("legacy_provider_identifier_evidence"),
+    erasureReceipt: jsonb("erasure_receipt"),
     backupPolicyVersion: text("backup_policy_version"),
     backupVerificationState: text("backup_verification_state"),
     backupVerifiedAt: timestamp("backup_verified_at", { withTimezone: true }),
@@ -70,12 +72,39 @@ export const privacyProcessorAttempts = pgTable(
     processor: text("processor").notNull(),
     status: text("status").notNull(),
     receiptRef: text("receipt_ref"),
-    idempotencyKey: text("idempotency_key"),
+    idempotencyKey: text("idempotency_key").notNull(),
     createdAt,
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     unique("privacy_processor_attempts_job_processor_unique")
       .on(table.deletionJobId, table.processor),
+    unique("privacy_processor_attempts_idempotency_unique")
+      .on(table.idempotencyKey),
   ],
 );
+
+export const privacyDeletionManifests = pgTable(
+  "privacy_deletion_manifests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    deletionJobId: uuid("deletion_job_id").notNull().references(() => privacyDeletionJobs.id),
+    processor: text("processor").notNull(),
+    manifestCiphertext: text("manifest_ciphertext").notNull(),
+    subjectDeletionKeyHash: text("subject_deletion_key_hash").notNull(),
+    createdAt,
+  },
+  (table) => [unique("privacy_deletion_manifests_job_processor_unique").on(table.deletionJobId, table.processor)],
+);
+
+export const privacyRetentionItems = pgTable("privacy_retention_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  contentClass: text("content_class").notNull(),
+  contentRef: text("content_ref"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("pending"),
+  idempotencyKey: text("idempotency_key"),
+  receiptHash: text("receipt_hash"),
+  createdAt,
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

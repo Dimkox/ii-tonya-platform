@@ -17,7 +17,10 @@ import {
   messagePackages,
   notifications,
   privacyDeletionJobs,
+  privacyDeletionManifests,
   privacyProcessorAttempts,
+  privacyRetentionItems,
+  providerSubjectMappings,
   projectionCheckpoints,
   promptVersions,
   providerCursors,
@@ -114,8 +117,16 @@ describe("authoritative Drizzle schema parity", () => {
       "privacy_deletion_jobs_subject_idempotency_unique",
     ]);
     expect(names(privacyProcessorAttempts).uniques).toEqual([
+      "privacy_processor_attempts_idempotency_unique",
       "privacy_processor_attempts_job_processor_unique",
     ]);
+    expect(names(privacyDeletionManifests).uniques).toEqual([
+      "privacy_deletion_manifests_job_processor_unique",
+    ]);
+    expect(names(providerSubjectMappings).uniques).toEqual([
+      "provider_subject_mappings_provider_token_unique",
+    ]);
+    expect(names(privacyRetentionItems).uniques).toEqual([]);
     expect(names(providerCursors).uniques).toEqual([
       "provider_cursors_provider_unique",
     ]);
@@ -199,14 +210,14 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0006_snapshot.json";
+    const path = "packages/db/migrations/meta/0010_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
       tables?: Record<string, unknown>;
       views?: Record<string, unknown>;
     };
-    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(31);
+    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(34);
     expect(snapshot.views).toHaveProperty("public.package_balances");
     const notificationsTable = snapshot.tables?.["public.notifications"] as
       | {

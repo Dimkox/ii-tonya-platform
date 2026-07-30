@@ -10,19 +10,23 @@ import type {
 export interface ErasureFixture extends ErasureDeps {
   processorCalls(name: PrivacyProcessorName): number;
   job(): ErasureJobState;
+  reconcileCalls(name: PrivacyProcessorName): number;
 }
 
 export function erasureFixture(input: {
   processors: readonly PrivacyProcessorName[];
   crashAfter?: PrivacyProcessorName;
+  started?: PrivacyProcessorName;
+  reconciled?: PrivacyProcessorName;
 }): ErasureFixture {
   const attempts = new Map<PrivacyProcessorName, ProcessorAttemptState>();
   const calls = new Map<PrivacyProcessorName, number>();
+  const reconciles = new Map<PrivacyProcessorName, number>();
   let job: ErasureJobState = { jobId: "erase-job-1", status: "pending" };
   let crashPending = input.crashAfter !== undefined;
   const repository: ErasureDeps["repository"] = {
     async getJob(jobId) { return { ...job, jobId }; },
-    async getAttempt(_jobId, processor) { return attempts.get(processor) ?? "pending"; },
+    async getAttempt(_jobId, processor) { return attempts.get(processor) ?? (input.started === processor ? "started" : "pending"); },
     async markStarted(_jobId, processor) { attempts.set(processor, "started"); },
     async markUnknown(_jobId, processor) { attempts.set(processor, "unknown_outcome"); },
     async acknowledge(_jobId, processor) {
@@ -34,6 +38,7 @@ export function erasureFixture(input: {
     },
     async deadLetter(_jobId, processor) { attempts.set(processor, "dead_letter"); job = { ...job, status: "dead_letter" }; },
     async completeProcessors(jobId, backupEvidence) { job = { jobId, status: "processor_complete", backupEvidence }; },
+    async verifyBackup(jobId) { job = { ...job, jobId, status: "backup_verified", backupEvidence: { ...job.backupEvidence!, verificationState: "verified" } }; },
   };
   const processors: PrivacyProcessor[] = input.processors.map((name) => ({
     name,
@@ -41,7 +46,10 @@ export function erasureFixture(input: {
       calls.set(name, (calls.get(name) ?? 0) + 1);
       return { kind: "erased", receipt: `receipt:${name}` };
     },
-    async reconcile() { return "not_erased"; },
+    async reconcile() {
+      reconciles.set(name, (reconciles.get(name) ?? 0) + 1);
+      return input.reconciled === name ? "erased" : "not_erased";
+    },
   }));
   return {
     repository,
@@ -53,6 +61,7 @@ export function erasureFixture(input: {
     now: () => new Date("2026-07-28T10:00:00.000Z"),
     hashReceipt: (receipt) => createHash("sha256").update(receipt).digest("hex"),
     processorCalls: (name) => calls.get(name) ?? 0,
+    reconcileCalls: (name) => reconciles.get(name) ?? 0,
     job: () => ({ ...job }),
   };
 }

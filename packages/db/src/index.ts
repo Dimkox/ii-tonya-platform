@@ -55,6 +55,7 @@ export {
 } from "./repositories/telegram-callback-repository.js";
 export {
   PostgresPrivacyRepository,
+  PostgresPrivacyWorkflowRepository,
   assertPrivacyWorkflowContract,
   type ErasureJob,
   type PrivacyRepository,

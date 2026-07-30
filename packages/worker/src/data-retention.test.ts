@@ -25,7 +25,15 @@ describe("data retention", () => {
       new Date("2026-07-28T10:00:00.000Z"),
       100,
     );
-    expect(result).toEqual({ examined: 2, deleted: 2, failed: 0 });
+    expect(result).toEqual({
+      examined: 2,
+      deleted: 2,
+      failed: 0,
+      byClass: {
+        conversation_content: { examined: 1, deleted: 1, failed: 0 },
+        provider_payload: { examined: 1, deleted: 1, failed: 0 },
+      },
+    });
     expect(repository.deleteContent).toHaveBeenCalledTimes(2);
   });
 

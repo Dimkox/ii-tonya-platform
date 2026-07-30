@@ -47,6 +47,7 @@ export interface ErasureRepository {
   acknowledge(jobId: string, processor: PrivacyProcessorName, receiptHash: string): Promise<void>;
   deadLetter(jobId: string, processor: PrivacyProcessorName, reason: string): Promise<void>;
   completeProcessors(jobId: string, evidence: NonNullable<ErasureJobState["backupEvidence"]>): Promise<void>;
+  verifyBackup(jobId: string, verifiedAt: Date): Promise<void>;
 }
 
 export interface ErasureDeps {
@@ -72,6 +73,9 @@ const orderedProcessors: readonly PrivacyProcessorName[] = [
 function processorMap(processors: readonly PrivacyProcessor[]): Map<PrivacyProcessorName, PrivacyProcessor> {
   const byName = new Map(processors.map((processor) => [processor.name, processor]));
   if (byName.size !== processors.length) throw new Error("Duplicate privacy processor");
+  if (byName.size !== orderedProcessors.length || orderedProcessors.some((name) => !byName.has(name))) {
+    throw new Error("Privacy processor set is incomplete or contains an unsupported processor");
+  }
   return byName;
 }
 
@@ -81,6 +85,7 @@ export async function runErasureWorkflow(
 ): Promise<ErasureWorkflowResult> {
   const job = await deps.repository.getJob(jobId);
   if (job.status === "dead_letter") throw new Error("Erasure job is dead-lettered");
+  if (job.status === "processor_complete" || job.status === "backup_verified") return { jobId, status: job.status };
   const processors = processorMap(deps.processors);
   for (const name of orderedProcessors) {
     const processor = processors.get(name);
@@ -88,10 +93,10 @@ export async function runErasureWorkflow(
     const idempotencyKey = `${jobId}:${name}`;
     const state = await deps.repository.getAttempt(jobId, name);
     if (state === "acknowledged") continue;
-    if (state === "unknown_outcome") {
+    if (state === "unknown_outcome" || state === "started") {
       const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey });
       if (reconciled === "erased") {
-        await deps.repository.acknowledge(jobId, name, "reconciled");
+        await deps.repository.acknowledge(jobId, name, deps.hashReceipt(`reconciled:${idempotencyKey}`));
         continue;
       }
       if (reconciled === "unknown") {
@@ -115,7 +120,7 @@ export async function runErasureWorkflow(
         await deps.repository.deadLetter(jobId, name, `reconcile_${reconciled}`);
         throw new Error(`Erasure processor ${name} outcome is ${reconciled}`);
       }
-      await deps.repository.acknowledge(jobId, name, "reconciled");
+      await deps.repository.acknowledge(jobId, name, deps.hashReceipt(`reconciled:${idempotencyKey}`));
       continue;
     }
     await deps.repository.acknowledge(jobId, name, deps.hashReceipt(outcome.receipt));
@@ -127,4 +132,20 @@ export async function runErasureWorkflow(
     verificationState: "scheduled",
   });
   return { jobId, status: "processor_complete" };
+}
+
+export async function verifyExpiredBackup(
+  deps: ErasureDeps,
+  jobId: string,
+): Promise<ErasureWorkflowResult> {
+  const job = await deps.repository.getJob(jobId);
+  if (job.status === "backup_verified") return { jobId, status: "backup_verified" };
+  if (job.status !== "processor_complete" || job.backupEvidence?.verificationState !== "scheduled") {
+    throw new Error("Backup verification is not scheduled");
+  }
+  if (new Date(job.backupEvidence.expiresNoLaterThan).getTime() > deps.now().getTime()) {
+    throw new Error("Backup expiry has not elapsed");
+  }
+  await deps.repository.verifyBackup(jobId, deps.now());
+  return { jobId, status: "backup_verified" };
 }

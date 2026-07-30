@@ -34,6 +34,20 @@ export const channelIdentities = pgTable(
   ],
 );
 
+/** Deletable mapping for future provider identifiers; immutable legacy facts remain evidence-only. */
+export const providerSubjectMappings = pgTable(
+  "provider_subject_mappings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    provider: text("provider").notNull(),
+    subjectToken: text("subject_token").notNull(),
+    subjectCiphertext: text("subject_ciphertext").notNull(),
+    ...mutableTimestamps,
+  },
+  (table) => [unique("provider_subject_mappings_provider_token_unique").on(table.provider, table.subjectToken)],
+);
+
 export const clientProfiles = pgTable(
   "client_profiles",
   {

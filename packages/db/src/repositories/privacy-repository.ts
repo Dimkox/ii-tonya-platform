@@ -172,6 +172,25 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       `)).rows[0];
       if (existing !== undefined) return this.erasureReceipt(tx, existing.jobId, existing.status);
 
+      const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
+        select display_name as "displayName", timezone, expert_note as "expertNote" from client_profiles where user_id = ${command.targetUserId}::uuid for update
+      `)).rows[0];
+      const job = one((await tx.execute<{ id: string }>(sql`
+        insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)
+        values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}, ${hash({ userId: command.targetUserId, kind: "legacy_provider_identifier_evidence" })}) returning id
+      `)).rows, "privacy deletion job");
+      for (const processor of PROCESSORS) {
+        const idempotencyKey = `${job.id}:${processor}`;
+        await tx.execute(sql`
+          insert into privacy_deletion_manifests (deletion_job_id, processor, manifest_ciphertext, subject_deletion_key_hash)
+          values (${job.id}::uuid, ${processor}, ${hash({ jobId: job.id, processor, pseudonym: command.pseudonym })}, ${hash({ jobId: job.id, processor, subject: command.targetUserId })})
+        `);
+        await tx.execute(sql`
+          insert into privacy_processor_attempts (deletion_job_id, processor, status, idempotency_key)
+          values (${job.id}::uuid, ${processor}, 'pending', ${idempotencyKey})
+        `);
+      }
+      // Manifests exist before any deletable local mapping/content is cleared.
       const content = await tx.execute<{ id: string }>(sql`
         update conversation_messages cm set content_ref = null
         from conversations c where cm.conversation_id = c.id and c.user_id = ${command.targetUserId}::uuid
@@ -185,20 +204,11 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         update reservations set meeting_url = null, updated_at = now()
         where user_id = ${command.targetUserId}::uuid and meeting_url is not null returning id
       `);
-      const profiles = await tx.execute<{ userId: string }>(sql`
+      await tx.execute<{ userId: string }>(sql`
         delete from client_profiles where user_id = ${command.targetUserId}::uuid returning user_id as "userId"
       `);
       await tx.execute(sql`delete from channel_identities where user_id = ${command.targetUserId}::uuid`);
-      const job = one((await tx.execute<{ id: string }>(sql`
-        insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym)
-        values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}) returning id
-      `)).rows, "privacy deletion job");
-      for (const processor of PROCESSORS) {
-        await tx.execute(sql`
-          insert into privacy_processor_attempts (deletion_job_id, processor, status)
-          values (${job.id}::uuid, ${processor}, 'pending')
-        `);
-      }
+      await tx.execute(sql`delete from provider_subject_mappings where user_id = ${command.targetUserId}::uuid`);
       const [ledgerFacts, auditFacts] = await Promise.all([
         tx.execute<{ count: number }>(sql`select count(*)::integer as count from message_ledger_entries l join message_packages p on p.id = l.package_id where p.user_id = ${command.targetUserId}::uuid`),
         tx.execute<{ count: number }>(sql`select count(*)::integer as count from audit_events where actor_id = ${command.targetUserId}::uuid`),
@@ -213,22 +223,29 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         correlationId: command.correlationId,
         payload: { jobId: job.id, evidencePseudonym: command.pseudonym },
       });
-      return {
+      const receipt: ErasureJob = {
         jobId: job.id, status: "pending",
         contentRefsDeleted: content.rows.length + feedback.rows.length + meetings.rows.length,
-        profileFieldsDeleted: profiles.rows.length === 0 ? 0 : 3,
+        profileFieldsDeleted: profileBefore === undefined ? 0 : [profileBefore.displayName, profileBefore.timezone, profileBefore.expertNote].filter((value) => value !== null).length,
         ledgerFactsPreserved: Number(ledgerFacts.rows[0]?.count ?? 0),
         auditFactsPreserved: Number(auditFacts.rows[0]?.count ?? 0),
       };
+      await tx.execute(sql`update privacy_deletion_jobs set erasure_receipt = ${JSON.stringify(receipt)}::jsonb, updated_at = now() where id = ${job.id}::uuid`);
+      return receipt;
     }));
   }
 
   private async erasureReceipt(tx: Transaction, jobId: string, status: ErasureJob["status"]): Promise<ErasureJob> {
-    const [ledger, audit] = await Promise.all([
-      tx.execute<{ count: number }>(sql`select 0::integer as count`),
-      tx.execute<{ count: number }>(sql`select 0::integer as count`),
-    ]);
-    return { jobId, status, contentRefsDeleted: 0, profileFieldsDeleted: 0, ledgerFactsPreserved: Number(ledger.rows[0]?.count ?? 0), auditFactsPreserved: Number(audit.rows[0]?.count ?? 0) };
+    const stored = (await tx.execute<{ receipt: unknown }>(sql`
+      select erasure_receipt as receipt from privacy_deletion_jobs where id = ${jobId}::uuid
+    `)).rows[0]?.receipt;
+    if (typeof stored === "object" && stored !== null && !Array.isArray(stored)) {
+      const receipt = stored as Partial<ErasureJob>;
+      if (typeof receipt.contentRefsDeleted === "number" && typeof receipt.profileFieldsDeleted === "number" && typeof receipt.ledgerFactsPreserved === "number" && typeof receipt.auditFactsPreserved === "number") {
+        return { jobId, status, contentRefsDeleted: receipt.contentRefsDeleted, profileFieldsDeleted: receipt.profileFieldsDeleted, ledgerFactsPreserved: receipt.ledgerFactsPreserved, auditFactsPreserved: receipt.auditFactsPreserved };
+      }
+    }
+    throw new Error("Persisted erasure receipt is missing or invalid");
   }
 
   private async auditAndProjection(tx: Transaction, input: {
@@ -244,4 +261,123 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       values (${`privacy:${input.action}:${input.objectId}`}, 'make.privacy_projection', ${JSON.stringify(input.payload)}::jsonb, ${input.correlationId}, ${`privacy:${input.objectId}`}, ${metadataHash})
     `);
   }
+}
+
+/** Concrete PostgreSQL worker repository. Claims are transactionally fenced and never dispatch provider work. */
+export class PostgresPrivacyWorkflowRepository {
+  constructor(private readonly db: DrizzleDb) {}
+
+  async getJob(jobId: string) {
+    const row = one((await this.db.execute<{
+      jobId: string; status: "pending" | "processor_complete" | "backup_verified" | "dead_letter";
+      policyVersion: string | null; expiresAt: Date | string | null; verificationState: "scheduled" | "verified" | null;
+    }>(sql`
+      select id as "jobId", status, backup_policy_version as "policyVersion", backup_expires_at as "expiresAt", backup_verification_state as "verificationState"
+      from privacy_deletion_jobs where id = ${jobId}::uuid
+    `)).rows, "privacy deletion job");
+    return {
+      jobId: row.jobId, status: row.status,
+      ...(row.policyVersion === null || row.expiresAt === null || row.verificationState === null ? {} : {
+        backupEvidence: { policyVersion: row.policyVersion, expiresNoLaterThan: new Date(row.expiresAt).toISOString(), verificationState: row.verificationState },
+      }),
+    };
+  }
+
+  async getAttempt(jobId: string, processor: string) {
+    return one((await this.db.execute<{ status: "pending" | "started" | "unknown_outcome" | "acknowledged" | "dead_letter" }>(sql`
+      select status from privacy_processor_attempts where deletion_job_id = ${jobId}::uuid and processor = ${processor}
+    `)).rows, "privacy processor attempt").status;
+  }
+
+  async markStarted(jobId: string, processor: string, idempotencyKey: string): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_processor_attempts set status = 'started', updated_at = now()
+      where deletion_job_id = ${jobId}::uuid and processor = ${processor} and idempotency_key = ${idempotencyKey}
+        and status in ('pending', 'unknown_outcome')
+      returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("Privacy processor attempt CAS lost");
+  }
+
+  async markUnknown(jobId: string, processor: string): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_processor_attempts set status = 'unknown_outcome', updated_at = now()
+      where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status = 'started' returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("Privacy processor unknown transition lost");
+  }
+
+  async acknowledge(jobId: string, processor: string, receiptHash: string): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_processor_attempts set status = 'acknowledged', receipt_ref = ${receiptHash}, updated_at = now()
+      where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status in ('started', 'unknown_outcome') returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("Privacy processor acknowledgement CAS lost");
+  }
+
+  async deadLetter(jobId: string, processor: string, reason: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        update privacy_processor_attempts set status = 'dead_letter', receipt_ref = ${hash({ reason })}, updated_at = now()
+        where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status <> 'acknowledged'
+      `);
+      await tx.execute(sql`update privacy_deletion_jobs set status = 'dead_letter', updated_at = now() where id = ${jobId}::uuid`);
+    });
+  }
+
+  async completeProcessors(jobId: string, evidence: { policyVersion: string; expiresNoLaterThan: string; verificationState: "scheduled" | "verified" }): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_deletion_jobs set status = 'processor_complete', backup_policy_version = ${evidence.policyVersion},
+        backup_expires_at = ${new Date(evidence.expiresNoLaterThan)}, backup_verification_state = ${evidence.verificationState}, updated_at = now()
+      where id = ${jobId}::uuid and status = 'pending'
+        and (select count(*) from privacy_processor_attempts where deletion_job_id = ${jobId}::uuid and status = 'acknowledged') = 4
+      returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("All four processor acknowledgements are required");
+  }
+
+  async verifyBackup(jobId: string, verifiedAt: Date): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_deletion_jobs set status = 'backup_verified', backup_verification_state = 'verified', backup_verified_at = ${verifiedAt}, updated_at = now()
+      where id = ${jobId}::uuid and status = 'processor_complete' and backup_expires_at <= ${verifiedAt}
+      returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("Backup verification CAS lost or expiry has not elapsed");
+  }
+
+  async claimExpiredContent(now: Date, batchSize: number) {
+    return this.db.transaction(async (tx) => (await tx.execute<{ id: string; class: string }>(sql`
+      with candidates as (
+        select id from privacy_retention_items
+        where status in ('pending', 'unknown_outcome') and expires_at <= ${now}
+        order by expires_at, id for update skip locked limit ${batchSize}
+      ) update privacy_retention_items i set status = 'claimed', updated_at = now()
+      from candidates where i.id = candidates.id returning i.id, i.content_class as class
+    `)).rows);
+  }
+
+  async markRetentionStarted(id: string, idempotencyKey: string): Promise<void> {
+    const updated = await this.db.execute(sql`
+      update privacy_retention_items set status = 'started', idempotency_key = ${idempotencyKey}, updated_at = now()
+      where id = ${id}::uuid and status = 'claimed' returning id
+    `);
+    if (updated.rows.length !== 1) throw new Error("Retention attempt CAS lost");
+  }
+  async deleteRetentionContent(id: string, idempotencyKey: string): Promise<{ kind: "deleted" }> {
+    void idempotencyKey;
+    const updated = await this.db.execute(sql`update privacy_retention_items set content_ref = null, updated_at = now() where id = ${id}::uuid and status = 'started' returning id`);
+    if (updated.rows.length !== 1) throw new Error("Retention deletion CAS lost");
+    return { kind: "deleted" };
+  }
+  async markRetentionDeleted(id: string, idempotencyKey: string): Promise<void> {
+    await this.db.execute(sql`update privacy_retention_items set status = 'deleted', receipt_hash = ${hash({ id, idempotencyKey })}, updated_at = now() where id = ${id}::uuid and status = 'started'`);
+  }
+  async markRetentionUnknown(id: string, idempotencyKey: string): Promise<void> { void idempotencyKey; await this.db.execute(sql`update privacy_retention_items set status = 'unknown_outcome', updated_at = now() where id = ${id}::uuid and status = 'started'`); }
+  async reconcileRetention(id: string, idempotencyKey: string): Promise<"deleted" | "not_deleted" | "unknown"> {
+    void idempotencyKey;
+    const row = one((await this.db.execute<{ contentRef: string | null }>(sql`select content_ref as "contentRef" from privacy_retention_items where id = ${id}::uuid`)).rows, "retention item");
+    return row.contentRef === null ? "deleted" : "not_deleted";
+  }
+  async deadLetterRetention(id: string, reason: string): Promise<void> { await this.db.execute(sql`update privacy_retention_items set status = 'dead_letter', receipt_hash = ${hash({ id, reason })}, updated_at = now() where id = ${id}::uuid`); }
+  async alertRetention(event: { class: string; reason: string }): Promise<void> { void event; }
 }
