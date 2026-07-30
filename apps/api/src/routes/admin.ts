@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 export type AdminRole = "support" | "catalog_admin" | "entitlement_admin" | "security_admin";
 export interface AdminPrincipal { readonly id: string; readonly sessionIdHash: string; readonly roles: readonly AdminRole[]; readonly mfaVerifiedAt: Date; }
 export type AdminAction = "client.create" | "client.deactivate" | "package.grant" | "package.intro_grant" | "package.revoke" | "expert.verify" | "expert.suspend" | "service.activate" | "service.deactivate" | "integration_error.resolve" | "safety.read" | "safety.resolve" | "feedback.read" | "feedback.resolve";
@@ -9,8 +10,26 @@ export interface ApprovalConsumption { readonly approvalId: string; readonly act
 export interface AdminApprovalRepository { request(input: BoundApprovalRequest): Promise<{ approvalId: string }>; approve(input: AuthenticatedApproval): Promise<void>; consumeIfValid(input: ApprovalConsumption): Promise<BoundApproval | null>; }
 export interface AuditPort { append(fact: { actorType: "admin" | "system"; actorId: string; sessionIdHash: string; action: string; objectType: string; objectId: string; decision: "allowed" | "denied"; reasonCode: string; correlationId: string; occurredAt: Date; metadataHash: string }): Promise<void>; }
 export interface AdminAuthorizationInput { readonly principal: AdminPrincipal; readonly action: AdminAction; readonly routeObjectId: string; readonly commandObjectId: string; readonly approvalId?: string; readonly payloadHash?: string; readonly now: Date; readonly correlationId: string; }
-const requiredRole: Record<AdminAction, AdminRole> = { "client.create": "support", "client.deactivate": "support", "package.grant": "entitlement_admin", "package.intro_grant": "entitlement_admin", "package.revoke": "entitlement_admin", "expert.verify": "catalog_admin", "expert.suspend": "catalog_admin", "service.activate": "catalog_admin", "service.deactivate": "catalog_admin", "integration_error.resolve": "security_admin", "safety.read": "security_admin", "safety.resolve": "security_admin", "feedback.read": "support", "feedback.resolve": "support" };
-const highRisk = new Set<AdminAction>(["client.create", "client.deactivate", "package.grant", "package.intro_grant", "package.revoke", "expert.verify", "expert.suspend", "service.activate", "service.deactivate", "integration_error.resolve", "safety.resolve", "feedback.resolve"]);
+
+const objectType = (action: AdminAction): string => action.startsWith("expert.") ? "expert" : action.startsWith("service.") ? "service" : action.startsWith("safety.") ? "safety_case" : action.startsWith("feedback.") ? "feedback" : action.startsWith("integration_error.") ? "integration_error" : "user";
 const hash = (value: string): string => createHash("sha256").update(value).digest("hex");
-const audit = (input: AdminAuthorizationInput, port: AuditPort, decision: "allowed" | "denied", reasonCode: string): Promise<void> => port.append({ actorType: "admin", actorId: input.principal.id, sessionIdHash: input.principal.sessionIdHash, action: `${input.action}.${decision === "allowed" ? "allowed" : "denied"}`, objectType: input.action.startsWith("expert.") ? "expert" : input.action.startsWith("service.") ? "service" : "user", objectId: input.commandObjectId, decision, reasonCode, correlationId: input.correlationId, occurredAt: input.now, metadataHash: hash(`${input.action}:${input.commandObjectId}:${decision}:${reasonCode}`) });
-export async function authorizeAdminAction(input: AdminAuthorizationInput, approvals: AdminApprovalRepository, auditPort: AuditPort): Promise<"allow" | "deny"> { const recentMfa = input.principal.mfaVerifiedAt.getTime() <= input.now.getTime() && input.now.getTime() - input.principal.mfaVerifiedAt.getTime() <= 15 * 60_000; if (!recentMfa || !input.principal.roles.includes(requiredRole[input.action])) { await audit(input, auditPort, "denied", "role_or_mfa"); return "deny"; } if (input.routeObjectId !== input.commandObjectId) { await audit(input, auditPort, "denied", "object_mismatch"); return "deny"; } if (!highRisk.has(input.action)) { await audit(input, auditPort, "allowed", "read_assigned"); return "allow"; } if (input.approvalId === undefined) { await audit(input, auditPort, "denied", "approval_not_found"); return "deny"; } const approval = await approvals.consumeIfValid({ approvalId: input.approvalId, action: input.action, objectId: input.commandObjectId, payloadHash: input.payloadHash ?? hash(`${input.action}:${input.commandObjectId}`), principal: input.principal, now: input.now }); if (approval === null) { await audit(input, auditPort, "denied", "approval_not_found"); return "deny"; } const reason = approval.expiresAt <= input.now ? "approval_expired" : approval.action !== input.action || approval.objectId !== input.commandObjectId ? "approval_binding" : approval.requesterId === approval.approverId ? "dual_control" : approval.payloadHash !== (input.payloadHash ?? hash(`${input.action}:${input.commandObjectId}`)) ? "approval_binding" : undefined; if (reason !== undefined) { await audit(input, auditPort, "denied", reason); return "deny"; } await audit(input, auditPort, "allowed", "approved"); return "allow"; }
+
+// This file intentionally exposes no HTTP registration and cannot authorize an
+// action until Task 17 wires server-resolved sessions, assignments, approvals,
+// and domain mutation into one concrete transaction.
+export async function authorizeAdminAction(input: AdminAuthorizationInput, _approvals: AdminApprovalRepository, auditPort: AuditPort): Promise<"deny"> {
+  await auditPort.append({
+    actorType: "admin",
+    actorId: input.principal.id,
+    sessionIdHash: input.principal.sessionIdHash,
+    action: `${input.action}.denied`,
+    objectType: objectType(input.action),
+    objectId: input.commandObjectId,
+    decision: "denied",
+    reasonCode: "route_unregistered",
+    correlationId: input.correlationId,
+    occurredAt: input.now,
+    metadataHash: hash(`${input.action}:${input.commandObjectId}:route_unregistered`),
+  });
+  return "deny";
+}
