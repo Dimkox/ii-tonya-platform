@@ -53,6 +53,7 @@ export const reservations = pgTable(
     reservedUntil: timestamp("reserved_until", {
       withTimezone: true,
     }).notNull(),
+    meetingUrl: text("meeting_url"),
     version: integer("version").notNull().default(1),
     ...mutableTimestamps,
   },
@@ -67,6 +68,10 @@ export const reservations = pgTable(
     check(
       "reservations_deadline_after_creation",
       sql`${table.reservedUntil} > ${table.createdAt}`,
+    ),
+    check(
+      "reservations_meeting_url_https",
+      sql`${table.meetingUrl} is null or (${table.meetingUrl} ~ '^https://[^[:space:]]+$' and char_length(${table.meetingUrl}) <= 2048)`,
     ),
   ],
 );

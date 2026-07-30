@@ -3783,6 +3783,17 @@ git commit -m "feat: orchestrate safety first conversations"
 
 ### Task 15: Orchestrate reserve, confirm, cancel, expiry, and expert schedule workflows
 
+**Verified checkpoint — 2026-07-30:** catalog eligibility, authoritative slot
+search, atomic reserve/confirm/cancel transitions, exact free outbox effects,
+single-use Telegram callback consumption, and Telegram-bound owner schedule
+reads are implemented in commits `09896db`, `76c3d4b`, `04dad73`, and
+`60f7603`. PostgreSQL Database Gate `30500639187` passed schema/catalog plus
+message, conversation, booking, outbox, and Telegram suites (repeat gates
+20x). The follow-up completion delta adds persisted consent-qualified expert
+notes, booked-only HTTPS meeting URLs, and the application-level expiry
+entrypoint; Task 15 remains in progress until that delta passes the real
+PostgreSQL gate.
+
 **Files:**
 
 - Create: `packages/application/src/booking-service.ts`

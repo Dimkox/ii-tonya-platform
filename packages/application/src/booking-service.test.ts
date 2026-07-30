@@ -66,6 +66,41 @@ describe("booking workflows", () => {
     expect(view.appointments[0]).not.toHaveProperty("expertNote");
   });
 
+  it("returns a consented note and meeting URL only for a booked owner appointment", async () => {
+    const deps = bookingFixture();
+    vi.spyOn(
+      deps.repository,
+      "listAuthorizedExpertSchedule",
+    ).mockResolvedValue([
+      {
+        reservationId: deps.reservationId,
+        expertId: deps.expertId,
+        status: "booked",
+        startsAt: new Date("2026-07-30T10:00:00.000Z"),
+        clientDisplayName: "Клиент",
+        expertNote: "Предпочитает утро",
+        expertNoteConsent: true,
+        meetingUrl: "https://meeting.invalid/private",
+      },
+    ]);
+
+    const view = await createBookingService(deps).getExpertSchedule({
+      expertId: deps.expertId,
+      telegramUserId: deps.telegramUserId,
+      from: "2026-07-28T00:00:00.000Z",
+      to: "2026-08-04T00:00:00.000Z",
+      timezone: "Europe/Moscow",
+    });
+
+    expect(view.appointments).toEqual([
+      expect.objectContaining({
+        reservationId: deps.reservationId,
+        expertNote: "Предпочитает утро",
+        meetingUrl: "https://meeting.invalid/private",
+      }),
+    ]);
+  });
+
   it("uses the authoritative clock for slot search and reservation", async () => {
     const deps = bookingFixture();
     const search = vi.spyOn(deps.repository, "searchSlots");
@@ -92,5 +127,40 @@ describe("booking workflows", () => {
         now: new Date("2026-07-28T10:01:00.000Z"),
       }),
     );
+  });
+
+  it("expires the expected reservation version as the system and emits free effects", async () => {
+    const deps = bookingFixture({ status: "reserved", version: 1 });
+    const transition = vi.spyOn(deps.repository, "transitionAndPublish");
+
+    const result = await createBookingService(deps).expire({
+      reservationId: deps.reservationId,
+      expectedVersion: 1,
+      systemActorId: "00000000-0000-4000-8000-000000000105",
+      correlationId: "expire-1",
+    });
+
+    expect(result).toEqual({
+      reservationId: deps.reservationId,
+      status: "expired",
+      version: 2,
+    });
+    expect(transition).toHaveBeenCalledWith({
+      reservationId: deps.reservationId,
+      expectedVersion: 1,
+      action: "expire",
+      actor: {
+        type: "system",
+        id: "00000000-0000-4000-8000-000000000105",
+      },
+      now: new Date("2026-07-28T10:01:00.000Z"),
+      correlationId: "expire-1",
+    });
+    expect(deps.outbox.topics()).toEqual([
+      "planerka.cancel",
+      "client.reservation_expired",
+      "expert.reservation_expired",
+    ]);
+    expect(deps.outbox.allFree()).toBe(true);
   });
 });

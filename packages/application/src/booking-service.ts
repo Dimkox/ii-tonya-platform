@@ -54,6 +54,13 @@ export interface ClientCancelCommand {
   readonly correlationId: string;
 }
 
+export interface ExpireReservationCommand {
+  readonly reservationId: string;
+  readonly expectedVersion: number;
+  readonly systemActorId: string;
+  readonly correlationId: string;
+}
+
 export interface BookingResult {
   readonly reservationId: string;
   readonly status: ReservationStatus;
@@ -104,8 +111,12 @@ export interface BookingWorkflowRepository {
     readonly action:
       | "expert_confirm"
       | "expert_cancel"
-      | "client_cancel";
-    readonly actor: { readonly type: "expert" | "client"; readonly id: string };
+      | "client_cancel"
+      | "expire";
+    readonly actor: {
+      readonly type: "expert" | "client" | "system";
+      readonly id: string;
+    };
     readonly now: Date;
     readonly correlationId: string;
   }): Promise<BookingResult>;
@@ -137,6 +148,7 @@ export interface BookingService {
   confirmByExpert(command: ExpertDecisionCommand): Promise<BookingResult>;
   cancelByExpert(command: ExpertDecisionCommand): Promise<BookingResult>;
   cancelByClient(command: ClientCancelCommand): Promise<BookingResult>;
+  expire(command: ExpireReservationCommand): Promise<BookingResult>;
   getExpertSchedule(
     command: ExpertScheduleCommand,
   ): Promise<ExpertScheduleView>;
@@ -216,6 +228,15 @@ export const createBookingService = (
     confirmByExpert: (command) => expertTransition(command, "confirm"),
     cancelByExpert: (command) => expertTransition(command, "cancel"),
     cancelByClient: clientTransition,
+    expire: (command) =>
+      deps.repository.transitionAndPublish({
+        reservationId: command.reservationId,
+        expectedVersion: command.expectedVersion,
+        action: "expire",
+        actor: { type: "system", id: command.systemActorId },
+        now: deps.clock.now(),
+        correlationId: command.correlationId,
+      }),
     async getExpertSchedule(command) {
       if (!/^[1-9]\d{0,19}$/.test(command.telegramUserId)) {
         throw new Error("Invalid Telegram identity");

@@ -1,4 +1,12 @@
-import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  check,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const mutableTimestamps = {
@@ -26,12 +34,22 @@ export const channelIdentities = pgTable(
   ],
 );
 
-export const clientProfiles = pgTable("client_profiles", {
-  userId: uuid("user_id").primaryKey().references(() => users.id),
-  displayName: text("display_name"),
-  timezone: text("timezone"),
-  ...mutableTimestamps,
-});
+export const clientProfiles = pgTable(
+  "client_profiles",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id),
+    displayName: text("display_name"),
+    timezone: text("timezone"),
+    expertNote: text("expert_note"),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    check(
+      "client_profiles_expert_note_bounded",
+      sql`${table.expertNote} is null or char_length(${table.expertNote}) between 1 and 2000`,
+    ),
+  ],
+);
 
 export const consents = pgTable("consents", {
   id: uuid("id").defaultRandom().primaryKey(),

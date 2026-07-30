@@ -541,6 +541,127 @@ describe("booking transaction", () => {
     expect(schedule[0]).not.toHaveProperty("expertNote");
     expect(schedule[0]).not.toHaveProperty("meetingUrl");
     await testDb.db.execute(sql`
+      insert into client_profiles (
+        user_id, display_name, timezone, expert_note
+      )
+      select user_id, 'Клиент с согласием', 'Europe/Moscow', 'Предпочитает утро'
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+      on conflict (user_id) do update
+      set display_name = excluded.display_name,
+          expert_note = excluded.expert_note,
+          updated_at = now()
+    `);
+    const noConsentSchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    expect(noConsentSchedule?.[0]).toMatchObject({
+      expertNoteConsent: false,
+    });
+    expect(noConsentSchedule?.[0]).not.toHaveProperty("expertNote");
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'unknown', 'expert-note-v1',
+        '2026-07-29T09:59:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const unknownConsentSchedule =
+      await repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      });
+    expect(unknownConsentSchedule?.[0]).toMatchObject({
+      expertNoteConsent: false,
+    });
+    expect(unknownConsentSchedule?.[0]).not.toHaveProperty("expertNote");
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'granted', 'expert-note-v1',
+        '2026-07-29T10:00:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    await testDb.db.execute(sql`
+      update reservations
+      set meeting_url = 'https://meeting.invalid/private',
+          updated_at = now()
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const reservedWithMeetingUrl =
+      await repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      });
+    expect(reservedWithMeetingUrl?.[0]).not.toHaveProperty("meetingUrl");
+    await testDb.db.execute(sql`
+      update reservations
+      set status = 'booked', updated_at = now()
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const consentedSchedule =
+      await repository.listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      });
+    expect(consentedSchedule).toEqual([
+      expect.objectContaining({
+        reservationId: reserved.reservationId,
+        status: "booked",
+        clientDisplayName: "Клиент с согласием",
+        expertNote: "Предпочитает утро",
+        expertNoteConsent: true,
+        meetingUrl: "https://meeting.invalid/private",
+      }),
+    ]);
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'denied', 'expert-note-v1',
+        '2026-07-29T10:01:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'granted', 'expert-note-v1-conflict',
+        '2026-07-29T10:01:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const revokedSchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    expect(revokedSchedule?.[0]).toMatchObject({
+      status: "booked",
+      expertNoteConsent: false,
+      meetingUrl: "https://meeting.invalid/private",
+    });
+    expect(revokedSchedule?.[0]).not.toHaveProperty("expertNote");
+    await testDb.db.execute(sql`
       update experts set active = false where id = ${fixture.expertId}::uuid
     `);
     await expect(

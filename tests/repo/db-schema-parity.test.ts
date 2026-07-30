@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   adminApprovals,
   channelIdentities,
+  clientProfiles,
   integrationInbox,
   integrationOutbox,
   messageEvents,
@@ -42,6 +43,9 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(channelIdentities).uniques).toEqual([
       "channel_identities_provider_external_unique",
     ]);
+    expect(names(clientProfiles).checks).toEqual([
+      "client_profiles_expert_note_bounded",
+    ]);
     expect(names(slots)).toMatchObject({
       checks: ["slots_capacity_positive"],
       uniques: ["slots_provider_external_unique"],
@@ -73,6 +77,7 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(reservations)).toMatchObject({
       checks: [
         "reservations_deadline_after_creation",
+        "reservations_meeting_url_https",
         "reservations_version_positive",
       ],
       indexes: [

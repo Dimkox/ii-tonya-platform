@@ -81,7 +81,9 @@ export interface BookingExpertScheduleRecord {
   status: ReservationStatus;
   startsAt: Date;
   clientDisplayName: string;
+  expertNote?: string;
   expertNoteConsent: boolean;
+  meetingUrl?: string;
 }
 
 export interface BookingRepositoryOptions {
@@ -498,13 +500,25 @@ export class PostgresBookingRepository {
       status: ReservationStatus;
       startsAt: Date | string;
       clientDisplayName: string;
+      expertNote: string | null;
+      expertNoteConsent: boolean;
+      meetingUrl: string | null;
     }>(sql`
       select
         r.id as "reservationId",
         r.expert_id as "expertId",
         r.status,
         s.starts_at as "startsAt",
-        coalesce(nullif(cp.display_name, ''), 'Клиент') as "clientDisplayName"
+        coalesce(nullif(cp.display_name, ''), 'Клиент') as "clientDisplayName",
+        case
+          when note_consent.granted then cp.expert_note
+          else null
+        end as "expertNote",
+        note_consent.granted as "expertNoteConsent",
+        case
+          when r.status = 'booked' then r.meeting_url
+          else null
+        end as "meetingUrl"
       from experts e
       join channel_identities ci
         on ci.user_id = e.user_id
@@ -513,6 +527,21 @@ export class PostgresBookingRepository {
       join reservations r on r.expert_id = e.id
       join slots s on s.id = r.slot_id
       left join client_profiles cp on cp.user_id = r.user_id
+      left join lateral (
+        select coalesce(
+          bool_and(latest.decision = 'granted'),
+          false
+        ) as granted
+        from consents latest
+        where latest.user_id = r.user_id
+          and latest.consent_type = 'expert_note'
+          and latest.created_at = (
+            select max(candidate.created_at)
+            from consents candidate
+            where candidate.user_id = r.user_id
+              and candidate.consent_type = 'expert_note'
+          )
+      ) note_consent on true
       where e.id = ${command.expertId}::uuid
         and e.active
         and e.verified
@@ -551,7 +580,13 @@ export class PostgresBookingRepository {
         status: row.status,
         startsAt,
         clientDisplayName: row.clientDisplayName,
-        expertNoteConsent: false,
+        ...(row.expertNoteConsent && row.expertNote !== null
+          ? { expertNote: row.expertNote }
+          : {}),
+        expertNoteConsent: row.expertNoteConsent,
+        ...(row.status === "booked" && row.meetingUrl !== null
+          ? { meetingUrl: row.meetingUrl }
+          : {}),
       };
     });
   }

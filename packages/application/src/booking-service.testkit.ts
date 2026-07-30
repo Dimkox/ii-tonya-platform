@@ -101,7 +101,9 @@ export const bookingFixture = (
             ? "booked"
             : command.action === "expert_cancel"
               ? "cancelled_by_expert"
-              : "cancelled_by_client";
+              : command.action === "client_cancel"
+                ? "cancelled_by_client"
+                : "expired";
         reservation = {
           status: nextStatus,
           version: reservation.version + 1,
@@ -109,6 +111,11 @@ export const bookingFixture = (
         if (command.action === "expert_confirm") {
           publish("planerka.confirm");
           publish("client.booking_confirmed");
+        }
+        if (command.action === "expire") {
+          publish("planerka.cancel");
+          publish("client.reservation_expired");
+          publish("expert.reservation_expired");
         }
         return { reservationId, ...reservation };
       },

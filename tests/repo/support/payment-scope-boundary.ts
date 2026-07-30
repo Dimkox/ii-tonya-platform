@@ -223,6 +223,10 @@ const approvedMigrationHashes = new Map([
     "cd056b56578fd09915da44e99bb63f025757c2561bfb0391a327107680748303",
   ],
   [
+    "packages/db/migrations/0008_booking-expert-view.sql",
+    "d08810977e9e8fef657e60147627a7c078ff91929626d4e2cd52a083f0bef840",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -255,8 +259,12 @@ const approvedMigrationHashes = new Map([
     "4c589a340cdd27dde006965ebe4abcb35e3ef5d81f2e564ad34385d99e1b115e",
   ],
   [
+    "packages/db/migrations/meta/0008_snapshot.json",
+    "70a79a380f0cd1476b9630700cca47dae309e4441ad37fb8ca38ae6c9c8c9b3a",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "90360b155e098c1f55b94a60553bb1e8844da3cb65b3836ddfa6ec1ab2ff5955",
+    "c3419efcddbf0c6e3163750075ed188bf5d21067c70353bee85a453f67714f0c",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
