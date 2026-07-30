@@ -60,6 +60,9 @@ jobs:
       - name: Repeat message-ledger concurrency gate
         run: pnpm test:repeat -- 20 tests/integration/message-ledger-concurrency.test.ts
 
+      - name: Run admin-ledger transaction gate
+        run: pnpm exec vitest run tests/integration/admin-ledger.test.ts
+
       - name: Repeat atomic conversation completion gate
         run: pnpm test:repeat -- 20 tests/integration/conversation-message-repository.test.ts
 

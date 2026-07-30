@@ -103,15 +103,19 @@ export const notifications = pgTable(
   ],
 );
 
-export const feedback = pgTable("feedback", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  reservationId: uuid("reservation_id")
-    .notNull()
-    .references(() => reservations.id),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  rating: integer("rating").notNull(),
-  commentRef: text("comment_ref"),
-  ...mutableTimestamps,
-});
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reservationId: uuid("reservation_id").references(() => reservations.id),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    rating: integer("rating").notNull(),
+    commentRef: text("comment_ref"),
+    sourceEventId: text("source_event_id").notNull(),
+    contentHash: text("content_hash").notNull(),
+    negativePolicyVersion: text("negative_policy_version").notNull(),
+    escalationStatus: text("escalation_status").notNull().default("none"),
+    createdAt: mutableTimestamps.createdAt,
+  },
+  (table) => [unique("feedback_source_event_unique").on(table.sourceEventId)],
+);

@@ -64,4 +64,11 @@ export {
   type WithdrawConsentCommand,
   type WithdrawalReceipt,
 } from "./repositories/privacy-repository.js";
+export {
+  PostgresAdminRepository,
+  type AdminPackageRepository,
+  type GrantAdminPackageCommand,
+  type ExecuteApprovedGrantCommand,
+  type RevokeAdminPackageCommand,
+} from "./repositories/admin-repository.js";
 export * from "./schema/index.js";
