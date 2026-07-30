@@ -79,6 +79,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       privacyMutationCapability?: {
         enabled: boolean;
         captureManifests?: (userId: string) => Promise<readonly { processor: typeof PROCESSORS[number]; ciphertext: string; keyReference: string; algorithm: string; version: string; subjectDeletionKeyHash: string }[]>;
+        verifyEnvelope?: (envelope: { ciphertext: string; keyReference: string; algorithm: string; version: string; subjectDeletionKeyHash: string }) => Promise<boolean> | boolean;
       };
     } = {},
   ) {}
@@ -178,6 +179,21 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     if (!capability?.enabled) return Promise.reject(new Error("Privacy mutations are disabled"));
     const captureManifests = capability.captureManifests;
     if (captureManifests === undefined) return Promise.reject(new Error("Privacy deletion target capture is not bound"));
+    const verifyEnvelope = capability.verifyEnvelope;
+    if (verifyEnvelope === undefined) return Promise.reject(new Error("Privacy deletion envelope verification is not bound"));
+    return this.startErasureWithVerifiedManifests(command, captureManifests, verifyEnvelope);
+  }
+
+  private async startErasureWithVerifiedManifests(
+    command: StartErasureCommand,
+    captureManifests: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["captureManifests"]>,
+    verifyEnvelope: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["verifyEnvelope"]>,
+  ): Promise<ErasureJob> {
+    const manifests = await captureManifests(command.targetUserId);
+    const verified = await Promise.all(manifests.map(async (manifest) => {
+      try { return await verifyEnvelope(manifest); } catch { return false; }
+    }));
+    if (verified.some((value) => !value)) throw new Error("Privacy deletion manifest verification failed");
     return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`);
@@ -188,7 +204,6 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       `)).rows[0];
       if (existing !== undefined) return this.erasureReceipt(tx, existing.jobId, existing.status);
 
-      const manifests = await captureManifests(command.targetUserId);
       if (
         manifests.length !== PROCESSORS.length
         || new Set(manifests.map((manifest) => manifest.processor)).size !== PROCESSORS.length
