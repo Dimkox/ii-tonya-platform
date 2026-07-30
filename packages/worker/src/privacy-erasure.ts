@@ -23,6 +23,7 @@ export interface PrivacyProcessor {
   reconcile(command: ProcessorReconcileCommand): Promise<"erased" | "not_erased" | "unknown">;
 }
 export interface DeletionManifestCipher {
+  verifyEnvelope(envelope: { ciphertext: string; keyReference: string; algorithm: string; version: string }): Promise<boolean>;
   decrypt(envelope: { ciphertext: string; keyReference: string; algorithm: string; version: string }): Promise<string>;
 }
 
@@ -85,6 +86,13 @@ function processorMap(processors: readonly PrivacyProcessor[]): Map<PrivacyProce
   }
   return byName;
 }
+function validManifestEnvelope(envelope: { ciphertext: string; keyReference: string; algorithm: string; version: string }): boolean {
+  return envelope.ciphertext.trim().length > 0
+    && envelope.keyReference.trim().length > 0
+    && envelope.keyReference !== "unbound-placeholder"
+    && envelope.algorithm.trim().length > 0
+    && envelope.version.trim().length > 0;
+}
 
 export async function runErasureWorkflow(
   deps: ErasureDeps,
@@ -102,6 +110,9 @@ export async function runErasureWorkflow(
     const state = await deps.repository.getAttempt(jobId, name);
     if (state === "acknowledged") continue;
     const manifest = await deps.repository.loadManifest(jobId, name);
+    if (!validManifestEnvelope(manifest) || !await deps.manifestCipher.verifyEnvelope(manifest)) {
+      throw new Error("Privacy deletion manifest envelope is invalid");
+    }
     const opaqueTarget = await deps.manifestCipher.decrypt(manifest);
     if (state === "unknown_outcome" || state === "started") {
       const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey, opaqueTarget });
@@ -148,6 +159,7 @@ export async function verifyExpiredBackup(
   deps: ErasureDeps,
   jobId: string,
 ): Promise<ErasureWorkflowResult> {
+  if (!deps.capability?.enabled) throw new Error("Privacy processing is disabled");
   const job = await deps.repository.getJob(jobId);
   if (job.status === "backup_verified") return { jobId, status: "backup_verified" };
   if (job.status !== "processor_complete" || job.backupEvidence?.verificationState !== "scheduled") {

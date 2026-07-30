@@ -189,7 +189,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       if (existing !== undefined) return this.erasureReceipt(tx, existing.jobId, existing.status);
 
       const manifests = await captureManifests(command.targetUserId);
-      if (manifests.length !== PROCESSORS.length || new Set(manifests.map((manifest) => manifest.processor)).size !== PROCESSORS.length || manifests.some((manifest) => manifest.keyReference === "unbound-placeholder" || manifest.ciphertext.length === 0)) {
+      if (
+        manifests.length !== PROCESSORS.length
+        || new Set(manifests.map((manifest) => manifest.processor)).size !== PROCESSORS.length
+        || PROCESSORS.some((processor) => !manifests.some((manifest) => manifest.processor === processor))
+        || manifests.some((manifest) => manifest.keyReference.trim().length === 0 || manifest.keyReference === "unbound-placeholder" || manifest.ciphertext.trim().length === 0 || manifest.algorithm.trim().length === 0 || manifest.version.trim().length === 0 || manifest.subjectDeletionKeyHash.trim().length === 0)
+      ) {
         throw new Error("Privacy deletion target capture is incomplete");
       }
       const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
@@ -285,7 +290,14 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
 
 /** Concrete PostgreSQL worker repository. Claims are transactionally fenced and never dispatch provider work. */
 export class PostgresPrivacyWorkflowRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly capability?: { enabled: boolean },
+  ) {}
+
+  private assertMutationEnabled(): void {
+    if (!this.capability?.enabled) throw new Error("Privacy processing is disabled");
+  }
 
   async getJob(jobId: string) {
     const row = one((await this.db.execute<{
@@ -316,6 +328,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async markStarted(jobId: string, processor: string, idempotencyKey: string): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_processor_attempts set status = 'started', updated_at = now()
       where deletion_job_id = ${jobId}::uuid and processor = ${processor} and idempotency_key = ${idempotencyKey}
@@ -326,6 +339,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async markUnknown(jobId: string, processor: string): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_processor_attempts set status = 'unknown_outcome', updated_at = now()
       where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status = 'started' returning id
@@ -334,6 +348,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async acknowledge(jobId: string, processor: string, receiptHash: string): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_processor_attempts set status = 'acknowledged', receipt_ref = ${receiptHash}, updated_at = now()
       where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status in ('started', 'unknown_outcome') returning id
@@ -342,6 +357,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async deadLetter(jobId: string, processor: string, reason: string): Promise<void> {
+    this.assertMutationEnabled();
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         update privacy_processor_attempts set status = 'dead_letter', receipt_ref = ${hash({ reason })}, updated_at = now()
@@ -352,6 +368,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async completeProcessors(jobId: string, evidence: { policyVersion: string; expiresNoLaterThan: string; verificationState: "scheduled" | "verified" }): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_deletion_jobs set status = 'processor_complete', backup_policy_version = ${evidence.policyVersion},
         backup_expires_at = ${new Date(evidence.expiresNoLaterThan)}, backup_verification_state = ${evidence.verificationState}, updated_at = now()
@@ -363,6 +380,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async verifyBackup(jobId: string, verifiedAt: Date): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_deletion_jobs set status = 'backup_verified', backup_verification_state = 'verified', backup_verified_at = ${verifiedAt}, updated_at = now()
       where id = ${jobId}::uuid and status = 'processor_complete' and backup_expires_at <= ${verifiedAt}
@@ -372,6 +390,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async claimExpiredContent(now: Date, batchSize: number) {
+    this.assertMutationEnabled();
     return this.db.transaction(async (tx) => (await tx.execute<{ id: string; class: string }>(sql`
       with candidates as (
         select id from privacy_retention_items
@@ -383,6 +402,7 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async markRetentionStarted(id: string, idempotencyKey: string): Promise<void> {
+    this.assertMutationEnabled();
     const updated = await this.db.execute(sql`
       update privacy_retention_items set status = 'started', idempotency_key = ${idempotencyKey}, updated_at = now()
       where id = ${id}::uuid and status = 'claimed' returning id
@@ -390,20 +410,22 @@ export class PostgresPrivacyWorkflowRepository {
     if (updated.rows.length !== 1) throw new Error("Retention attempt CAS lost");
   }
   async deleteRetentionContent(id: string, idempotencyKey: string): Promise<{ kind: "deleted" }> {
+    this.assertMutationEnabled();
     void idempotencyKey;
     const updated = await this.db.execute(sql`update privacy_retention_items set content_ref = null, updated_at = now() where id = ${id}::uuid and status = 'started' returning id`);
     if (updated.rows.length !== 1) throw new Error("Retention deletion CAS lost");
     return { kind: "deleted" };
   }
   async markRetentionDeleted(id: string, idempotencyKey: string): Promise<void> {
+    this.assertMutationEnabled();
     await this.db.execute(sql`update privacy_retention_items set status = 'deleted', receipt_hash = ${hash({ id, idempotencyKey })}, updated_at = now() where id = ${id}::uuid and status = 'started'`);
   }
-  async markRetentionUnknown(id: string, idempotencyKey: string): Promise<void> { void idempotencyKey; await this.db.execute(sql`update privacy_retention_items set status = 'unknown_outcome', updated_at = now() where id = ${id}::uuid and status = 'started'`); }
+  async markRetentionUnknown(id: string, idempotencyKey: string): Promise<void> { this.assertMutationEnabled(); void idempotencyKey; await this.db.execute(sql`update privacy_retention_items set status = 'unknown_outcome', updated_at = now() where id = ${id}::uuid and status = 'started'`); }
   async reconcileRetention(id: string, idempotencyKey: string): Promise<"deleted" | "not_deleted" | "unknown"> {
     void idempotencyKey;
     const row = one((await this.db.execute<{ contentRef: string | null }>(sql`select content_ref as "contentRef" from privacy_retention_items where id = ${id}::uuid`)).rows, "retention item");
     return row.contentRef === null ? "deleted" : "not_deleted";
   }
-  async deadLetterRetention(id: string, reason: string): Promise<void> { await this.db.execute(sql`update privacy_retention_items set status = 'dead_letter', receipt_hash = ${hash({ id, reason })}, updated_at = now() where id = ${id}::uuid`); }
-  async alertRetention(event: { class: string; reason: string }): Promise<void> { void event; }
+  async deadLetterRetention(id: string, reason: string): Promise<void> { this.assertMutationEnabled(); await this.db.execute(sql`update privacy_retention_items set status = 'dead_letter', receipt_hash = ${hash({ id, reason })}, updated_at = now() where id = ${id}::uuid`); }
+  async alertRetention(event: { class: string; reason: string }): Promise<void> { this.assertMutationEnabled(); void event; }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { erasureFixture } from "./privacy-erasure.testkit.js";
-import { runErasureWorkflow } from "./privacy-erasure.js";
+import { runErasureWorkflow, verifyExpiredBackup } from "./privacy-erasure.js";
 
 describe("processor-wide erasure", () => {
   it("resumes after a crash without repeating an acknowledged processor deletion", async () => {
@@ -51,5 +51,11 @@ describe("processor-wide erasure", () => {
     await expect(runErasureWorkflow({ ...deps, capability: { enabled: false } }, "erase-job-5"))
       .rejects.toThrow("Privacy processing is disabled");
     expect(deps.processorCalls("object_store")).toBe(0);
+  });
+
+  it("does not read or mutate backup state while privacy processing is disabled", async () => {
+    const deps = erasureFixture({ processors: ["object_store", "selarti", "planerka", "make_projection"] });
+    await expect(verifyExpiredBackup({ ...deps, capability: { enabled: false } }, "erase-job-6"))
+      .rejects.toThrow("Privacy processing is disabled");
   });
 });
