@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "project": {
+    "name": "ii-tonya-platform",
+    "repository": "Dimkox/ii-tonya-platform",
+    "canonical_path": "C:\\Users\\Dmitry\\Documents\\Codex\\2026-07-28\\new-chat\\work\\ii-tonya-platform"
+  },
+  "stages": [
+    {
+      "id": "format",
+      "status": "required",
+      "command": "pnpm exec prettier --check ."
+    },
+    {
+      "id": "lint",
+      "status": "required",
+      "command": "pnpm lint"
+    },
+    {
+      "id": "typecheck",
+      "status": "required",
+      "command": "pnpm typecheck"
+    },
+    {
+      "id": "unit",
+      "status": "required",
+      "command": "pnpm exec vitest run packages/contracts packages/domain packages/config packages/application packages/integrations packages/worker tests/repo tests/support"
+    },
+    {
+      "id": "integration",
+      "status": "required",
+      "command": "pnpm exec vitest run packages/db tests/integration"
+    },
+    {
+      "id": "contract",
+      "status": "required",
+      "command": "pnpm exec vitest run tests/contract"
+    },
+    {
+      "id": "e2e",
+      "status": "not_applicable",
+      "reason": "The repository has no executable application composition root, browser flow or end-to-end environment.",
+      "activation_condition": "Make this required when a deployable API or worker stack and deterministic staging fixture are added."
+    },
+    {
+      "id": "build",
+      "status": "required",
+      "command": "pnpm build"
+    },
+    {
+      "id": "secret-scan",
+      "status": "required",
+      "command": "gitleaks detect --source . --redact --no-banner"
+    },
+    {
+      "id": "dependency-scan",
+      "status": "required",
+      "command": "trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 ."
+    },
+    {
+      "id": "sast",
+      "status": "required",
+      "command": "semgrep scan --config p/typescript --error apps packages scripts tests"
+    },
+    {
+      "id": "sbom",
+      "status": "required",
+      "command": "syft dir:. -o cyclonedx-json=artifacts/sbom.cdx.json"
+    },
+    {
+      "id": "image-scan",
+      "status": "not_applicable",
+      "reason": "No Dockerfile or deployable OCI image exists in the repository.",
+      "activation_condition": "Make this required when the first Dockerfile or OCI build target is added."
+    },
+    {
+      "id": "immutable-artifact",
+      "status": "required",
+      "command": "git archive --format=zip --output artifacts/ii-tonya-platform-${GITHUB_SHA}.zip HEAD"
+    },
+    {
+      "id": "artifact-sign",
+      "status": "required",
+      "command": "openssl dgst -sha256 -sign \"$RUNNER_TEMP/artifact-signing-key.pem\" -passin env:ARTIFACT_SIGNING_KEY_PASSWORD -out artifacts/ii-tonya-platform-${GITHUB_SHA}.zip.sig artifacts/ii-tonya-platform-${GITHUB_SHA}.zip && openssl dgst -sha256 -verify .github/artifact-signing.pub -signature artifacts/ii-tonya-platform-${GITHUB_SHA}.zip.sig artifacts/ii-tonya-platform-${GITHUB_SHA}.zip"
+    },
+    {
+      "id": "deploy-smoke",
+      "status": "required",
+      "command": "pnpm test:pnpm-launcher && pnpm exec vitest run tests/contract"
+    }
+  ]
+}

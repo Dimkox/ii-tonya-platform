@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+artifacts/
 .env
 .env.*
 !.env.example
@@ -14,4 +15,3 @@ coverage/
 Thumbs.db
 .superpowers/
 work/
-

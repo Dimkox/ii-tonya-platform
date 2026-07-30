@@ -287,8 +287,10 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
-  it("pins the current approved workflow content", () => {
-    const path = ".github/workflows/db-gate.yml";
+  it.each([
+    ".github/workflows/db-gate.yml",
+    ".github/workflows/governance-ci.yml",
+  ])("pins approved workflow content %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
     expect(

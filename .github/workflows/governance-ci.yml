@@ -1,0 +1,324 @@
+name: Governance CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governance-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.9.0"
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+      - name: Create evidence directory
+        run: mkdir -p artifacts/quality
+      - name: Format
+        run: pnpm exec prettier --check . 2>&1 | tee artifacts/quality/format.log
+      - name: Lint
+        run: pnpm lint 2>&1 | tee artifacts/quality/lint.log
+      - name: Typecheck
+        run: pnpm typecheck 2>&1 | tee artifacts/quality/typecheck.log
+      - name: Unit
+        run: >-
+          pnpm exec vitest run
+          packages/contracts
+          packages/domain
+          packages/config
+          packages/application
+          packages/integrations
+          packages/worker
+          tests/repo
+          tests/support
+          2>&1 | tee artifacts/quality/unit.log
+      - name: Integration
+        run: >-
+          pnpm exec vitest run packages/db tests/integration
+          2>&1 | tee artifacts/quality/integration.log
+      - name: Contract
+        run: >-
+          pnpm exec vitest run tests/contract
+          2>&1 | tee artifacts/quality/contract.log
+      - name: Build
+        run: pnpm build 2>&1 | tee artifacts/quality/build.log
+      - name: Upload quality evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ii-tonya-quality-${{ github.sha }}
+          path: artifacts/quality/
+          if-no-files-found: warn
+          retention-days: 14
+
+  security:
+    name: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create evidence directory
+        run: mkdir -p artifacts/security
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Semgrep
+        run: python -m pip install --disable-pip-version-check semgrep==1.172.0
+      - name: SAST
+        run: >-
+          semgrep scan
+          --config p/typescript
+          --error
+          --json
+          --output artifacts/security/semgrep.json
+          apps packages scripts tests
+      - name: Dependency and configuration scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          severity: HIGH,CRITICAL
+          format: json
+          output: artifacts/security/trivy.json
+          exit-code: "1"
+          ignore-unfixed: "false"
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: ii-tonya-sbom-${{ github.sha }}.cdx.json
+          output-file: artifacts/security/sbom.cdx.json
+          upload-artifact: "false"
+      - name: Upload security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ii-tonya-security-${{ github.sha }}
+          path: artifacts/security/
+          if-no-files-found: warn
+          retention-days: 14
+
+  artifact:
+    name: artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Build immutable artifact
+        env:
+          ARTIFACT_NAME: ii-tonya-platform-${{ github.sha }}.zip
+        run: |
+          mkdir -p artifacts
+          git archive --format=zip --output "artifacts/${ARTIFACT_NAME}" HEAD
+          sha256sum "artifacts/${ARTIFACT_NAME}" > "artifacts/${ARTIFACT_NAME}.sha256"
+      - name: Upload immutable artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ii-tonya-artifact-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+  sign:
+    name: sign
+    needs: artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout public key
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Download immutable artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ii-tonya-artifact-${{ github.sha }}
+          path: artifacts
+      - name: Check signing readiness
+        id: signing
+        env:
+          ARTIFACT_SIGNING_PRIVATE_KEY: ${{ secrets.ARTIFACT_SIGNING_PRIVATE_KEY }}
+          ARTIFACT_SIGNING_KEY_PASSWORD: ${{ secrets.ARTIFACT_SIGNING_KEY_PASSWORD }}
+        run: |
+          private_key=false
+          password=false
+          public_key=false
+          test -n "$ARTIFACT_SIGNING_PRIVATE_KEY" && private_key=true
+          test -n "$ARTIFACT_SIGNING_KEY_PASSWORD" && password=true
+          test -f .github/artifact-signing.pub && public_key=true
+          if $private_key && $password && $public_key; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif ! $private_key && ! $password && ! $public_key; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Artifact signing configuration is incomplete." >&2
+            exit 1
+          fi
+      - name: Verify checksum
+        if: steps.signing.outputs.ready == 'true'
+        working-directory: artifacts
+        env:
+          ARTIFACT_NAME: ii-tonya-platform-${{ github.sha }}.zip
+        run: sha256sum -c "${ARTIFACT_NAME}.sha256"
+      - name: Sign and verify artifact
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          ARTIFACT_SIGNING_PRIVATE_KEY: ${{ secrets.ARTIFACT_SIGNING_PRIVATE_KEY }}
+          ARTIFACT_SIGNING_KEY_PASSWORD: ${{ secrets.ARTIFACT_SIGNING_KEY_PASSWORD }}
+          ARTIFACT_NAME: ii-tonya-platform-${{ github.sha }}.zip
+        run: |
+          umask 077
+          private_key_file="${RUNNER_TEMP}/artifact-signing-key.pem"
+          trap 'rm -f "$private_key_file"' EXIT
+          printf '%s' "$ARTIFACT_SIGNING_PRIVATE_KEY" > "$private_key_file"
+          openssl pkey \
+            -in "$private_key_file" \
+            -passin env:ARTIFACT_SIGNING_KEY_PASSWORD \
+            -pubout 2>/dev/null |
+            openssl pkey -pubin -text -noout 2>/dev/null |
+            grep -Eq 'ASN1 OID: (prime256v1|secp256r1)'
+          openssl pkey \
+            -pubin \
+            -in .github/artifact-signing.pub \
+            -text \
+            -noout 2>/dev/null |
+            grep -Eq 'ASN1 OID: (prime256v1|secp256r1)'
+          openssl dgst \
+            -sha256 \
+            -sign "$private_key_file" \
+            -passin env:ARTIFACT_SIGNING_KEY_PASSWORD \
+            -out "artifacts/${ARTIFACT_NAME}.sig" \
+            "artifacts/${ARTIFACT_NAME}"
+          openssl dgst \
+            -sha256 \
+            -verify .github/artifact-signing.pub \
+            -signature "artifacts/${ARTIFACT_NAME}.sig" \
+            "artifacts/${ARTIFACT_NAME}"
+      - name: Upload signature evidence
+        if: steps.signing.outputs.ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ii-tonya-signature-${{ github.sha }}
+          path: artifacts/*.sig
+          if-no-files-found: error
+          retention-days: 30
+
+  smoke:
+    name: non-production smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+      - name: Run non-production smoke
+        run: |
+          mkdir -p artifacts/smoke
+          pnpm test:pnpm-launcher 2>&1 | tee artifacts/smoke/launcher.log
+          pnpm exec vitest run tests/contract 2>&1 | tee artifacts/smoke/contract.log
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ii-tonya-smoke-${{ github.sha }}
+          path: artifacts/smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  required:
+    name: Governance CI / required
+    if: always()
+    needs:
+      - quality
+      - security
+      - artifact
+      - sign
+      - smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      SECURITY_RESULT: ${{ needs.security.result }}
+      ARTIFACT_RESULT: ${{ needs.artifact.result }}
+      SIGN_RESULT: ${{ needs.sign.result }}
+      SMOKE_RESULT: ${{ needs.smoke.result }}
+      EVENT_NAME: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref }}
+    steps:
+      - name: Enforce required results
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$SECURITY_RESULT" = "success"
+          test "$ARTIFACT_RESULT" = "success"
+          test "$SMOKE_RESULT" = "success"
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "refs/heads/main" ]; then
+            test "$SIGN_RESULT" = "success"
+          else
+            test "$SIGN_RESULT" = "skipped"
+          fi
