@@ -206,6 +206,30 @@ Webhook настраивается в интерфейсе `https://planerka.app
 
 Подключённый пользовательский Google Drive connector, если он используется в Codex, не является backend credential приложения. Google Sheets следует оставить проекцией/экспортом, а не источником истины транзакционного workflow.
 
+## Privacy lifecycle
+
+Task 16 опубликован только как явно отключённый фундамент. Consent withdrawal,
+erasure, retention, backup verification и PostgreSQL worker mutations требуют
+явной capability и по умолчанию завершаются fail-closed.
+
+Erasure не начинает локальную очистку, пока bound adapter не захватит ровно
+четыре provider target envelope (`object_store`, `selarti`, `planerka`,
+`make_projection`) и не проверит каждый envelope до первой мутации. Placeholder,
+пустой, неподдерживаемый или не прошедший криптографическую проверку envelope
+откатывает транзакцию без удаления локальных связей.
+
+Production enablement остаётся заблокированным до появления:
+
+- project-owned KMS/envelope encryption и key-rotation contract;
+- provider mapping ingestion и реальных deletion adapters;
+- provider-proof reconciliation с bounded retries;
+- crash-safe retention leases/reclaim;
+- durable backup verification, audit и operator alerts;
+- поведенческих PostgreSQL-сценариев PRIV-01..05.
+
+Safe foundation подтверждён GitHub Database Gate `30523619894` на SHA
+`95ee4d3`: реальная PostgreSQL schema/catalog и все repeat suites прошли.
+
 ## Go-live gates
 
 Live остаётся закрыт, пока не выполнены все пункты:
