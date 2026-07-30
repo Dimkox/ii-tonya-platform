@@ -8,6 +8,7 @@ export interface ProcessorErasureCommand {
   readonly jobId: string;
   readonly processor: PrivacyProcessorName;
   readonly idempotencyKey: string;
+  readonly opaqueTarget: string;
 }
 
 export type ProcessorReconcileCommand = ProcessorErasureCommand;
@@ -20,6 +21,9 @@ export interface PrivacyProcessor {
   readonly name: PrivacyProcessorName;
   erase(command: ProcessorErasureCommand): Promise<ProcessorErasureOutcome>;
   reconcile(command: ProcessorReconcileCommand): Promise<"erased" | "not_erased" | "unknown">;
+}
+export interface DeletionManifestCipher {
+  decrypt(envelope: { ciphertext: string; keyReference: string; algorithm: string; version: string }): Promise<string>;
 }
 
 export type ProcessorAttemptState =
@@ -42,6 +46,7 @@ export interface ErasureJobState {
 export interface ErasureRepository {
   getJob(jobId: string): Promise<ErasureJobState>;
   getAttempt(jobId: string, processor: PrivacyProcessorName): Promise<ProcessorAttemptState>;
+  loadManifest(jobId: string, processor: PrivacyProcessorName): Promise<{ ciphertext: string; keyReference: string; algorithm: string; version: string }>;
   markStarted(jobId: string, processor: PrivacyProcessorName, idempotencyKey: string): Promise<void>;
   markUnknown(jobId: string, processor: PrivacyProcessorName): Promise<void>;
   acknowledge(jobId: string, processor: PrivacyProcessorName, receiptHash: string): Promise<void>;
@@ -59,6 +64,7 @@ export interface ErasureDeps {
   };
   readonly now: () => Date;
   readonly hashReceipt: (receipt: string) => string;
+  readonly manifestCipher: DeletionManifestCipher;
 }
 
 export interface ErasureWorkflowResult {
@@ -91,10 +97,12 @@ export async function runErasureWorkflow(
     const processor = processors.get(name);
     if (processor === undefined) continue;
     const idempotencyKey = `${jobId}:${name}`;
+    const manifest = await deps.repository.loadManifest(jobId, name);
+    const opaqueTarget = await deps.manifestCipher.decrypt(manifest);
     const state = await deps.repository.getAttempt(jobId, name);
     if (state === "acknowledged") continue;
     if (state === "unknown_outcome" || state === "started") {
-      const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey });
+      const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey, opaqueTarget });
       if (reconciled === "erased") {
         await deps.repository.acknowledge(jobId, name, deps.hashReceipt(`reconciled:${idempotencyKey}`));
         continue;
@@ -108,14 +116,14 @@ export async function runErasureWorkflow(
     await deps.repository.markStarted(jobId, name, idempotencyKey);
     let outcome: ProcessorErasureOutcome;
     try {
-      outcome = await processor.erase({ jobId, processor: name, idempotencyKey });
+      outcome = await processor.erase({ jobId, processor: name, idempotencyKey, opaqueTarget });
     } catch (error) {
       await deps.repository.markUnknown(jobId, name);
       throw error;
     }
     if (outcome.kind === "unknown_outcome") {
       await deps.repository.markUnknown(jobId, name);
-      const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey });
+      const reconciled = await processor.reconcile({ jobId, processor: name, idempotencyKey, opaqueTarget });
       if (reconciled !== "erased") {
         await deps.repository.deadLetter(jobId, name, `reconcile_${reconciled}`);
         throw new Error(`Erasure processor ${name} outcome is ${reconciled}`);

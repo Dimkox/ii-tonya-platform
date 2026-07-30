@@ -78,6 +78,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
   ) {}
 
   withdrawConsentAtomically(command: WithdrawConsentCommand): Promise<WithdrawalReceipt> {
+    if (!["client_profile", "expert_note", "follow_up"].includes(command.purpose)) {
+      return Promise.reject(new Error("Unknown privacy consent purpose"));
+    }
     return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`);
@@ -86,21 +89,23 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         values (${command.targetUserId}::uuid, ${command.purpose}, 'denied', ${command.policyVersion})
         returning id
       `)).rows, "withdrawal consent fact");
-      const profile = await tx.execute<{ count: number }>(sql`
-        update client_profiles
-        set display_name = null, timezone = null, expert_note = null, updated_at = now()
-        where user_id = ${command.targetUserId}::uuid
-          and ${command.purpose} in ('client_profile', 'expert_note', 'profile')
-        returning 1 as count
-      `);
-      const cancelled = await tx.execute<{ count: number }>(sql`
-        delete from notifications n
-        using reservations r
-        where n.reservation_id = r.id
-          and r.user_id = ${command.targetUserId}::uuid
-          and n.callback_consumed_at is null
-        returning 1 as count
-      `);
+      const profile = command.purpose === "client_profile"
+        ? await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
+          update client_profiles set display_name = null, timezone = null, expert_note = null, updated_at = now()
+          where user_id = ${command.targetUserId}::uuid
+          returning display_name as "displayName", timezone, expert_note as "expertNote"
+        `)
+        : command.purpose === "expert_note"
+        ? await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
+          update client_profiles set expert_note = null, updated_at = now()
+          where user_id = ${command.targetUserId}::uuid returning display_name as "displayName", timezone, expert_note as "expertNote"
+        `)
+        : { rows: [] as { displayName: string | null; timezone: string | null; expertNote: string | null }[] };
+      const cancelled = command.purpose === "follow_up" ? await tx.execute<{ count: number }>(sql`
+        delete from notifications n using reservations r
+        where n.reservation_id = r.id and r.user_id = ${command.targetUserId}::uuid
+          and n.callback_action = 'follow_up' and n.callback_consumed_at is null returning 1 as count
+      `) : { rows: [] as { count: number }[] };
       await this.options.beforeWithdrawalAudit?.();
       await this.auditAndProjection(tx, {
         actorId: command.targetUserId,
@@ -114,7 +119,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       });
       return {
         consentDecisionId: consent.id,
-        optionalFieldsRemoved: profile.rows.length === 0 ? 0 : 3,
+        optionalFieldsRemoved: profile.rows.reduce((count, row) => count + [row.displayName, row.timezone, row.expertNote].filter((value) => value !== null).length, 0),
         followUpsCancelled: cancelled.rows.length,
       };
     }));
@@ -287,6 +292,12 @@ export class PostgresPrivacyWorkflowRepository {
     return one((await this.db.execute<{ status: "pending" | "started" | "unknown_outcome" | "acknowledged" | "dead_letter" }>(sql`
       select status from privacy_processor_attempts where deletion_job_id = ${jobId}::uuid and processor = ${processor}
     `)).rows, "privacy processor attempt").status;
+  }
+  async loadManifest(jobId: string, processor: string) {
+    return one((await this.db.execute<{ ciphertext: string; keyReference: string; algorithm: string; version: string }>(sql`
+      select manifest_ciphertext as ciphertext, key_reference as "keyReference", algorithm, version
+      from privacy_deletion_manifests where deletion_job_id = ${jobId}::uuid and processor = ${processor}
+    `)).rows, "privacy deletion manifest");
   }
 
   async markStarted(jobId: string, processor: string, idempotencyKey: string): Promise<void> {

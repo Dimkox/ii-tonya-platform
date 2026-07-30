@@ -27,6 +27,7 @@ export function erasureFixture(input: {
   const repository: ErasureDeps["repository"] = {
     async getJob(jobId) { return { ...job, jobId }; },
     async getAttempt(_jobId, processor) { return attempts.get(processor) ?? (input.started === processor ? "started" : "pending"); },
+    async loadManifest(_jobId, processor) { return { ciphertext: `cipher:${processor}:target`, keyReference: "test-key", algorithm: "test", version: "v1" }; },
     async markStarted(_jobId, processor) { attempts.set(processor, "started"); },
     async markUnknown(_jobId, processor) { attempts.set(processor, "unknown_outcome"); },
     async acknowledge(_jobId, processor) {
@@ -60,6 +61,7 @@ export function erasureFixture(input: {
     },
     now: () => new Date("2026-07-28T10:00:00.000Z"),
     hashReceipt: (receipt) => createHash("sha256").update(receipt).digest("hex"),
+    manifestCipher: { async decrypt(envelope) { return envelope.ciphertext.replace(/^cipher:[^:]+:/, ""); } },
     processorCalls: (name) => calls.get(name) ?? 0,
     reconcileCalls: (name) => reconciles.get(name) ?? 0,
     job: () => ({ ...job }),

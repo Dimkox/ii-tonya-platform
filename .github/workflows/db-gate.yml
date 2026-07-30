@@ -54,6 +54,9 @@ jobs:
       - name: Run PostgreSQL schema integration gate
         run: pnpm exec vitest run tests/integration/schema.test.ts
 
+      - name: Run privacy lifecycle PostgreSQL gate
+        run: pnpm exec vitest run tests/integration/privacy-workflow.test.ts
+
       - name: Run verified catalog integration gate
         run: pnpm exec vitest run tests/integration/catalog-repository.test.ts
 

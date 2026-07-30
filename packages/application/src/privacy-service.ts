@@ -74,6 +74,7 @@ function assertOwner(principalUserId: string, targetUserId: string): void {
     throw new Error("Cross-subject privacy access denied");
   }
 }
+const CONSENT_PURPOSES = new Set(["client_profile", "expert_note", "follow_up"]);
 
 /** The caller supplies a per-environment key from its secret manager; it is never persisted. */
 export const createEnvironmentHmacPseudonymizer = (environmentKey: string) =>
@@ -83,6 +84,7 @@ export const createEnvironmentHmacPseudonymizer = (environmentKey: string) =>
 export const createPrivacyService = (deps: PrivacyDependencies): PrivacyService => ({
   async withdrawConsent(command) {
     assertOwner(command.principalUserId, command.targetUserId);
+    if (!CONSENT_PURPOSES.has(command.purpose)) throw new Error("Unknown privacy consent purpose");
     // Audit and projection outbox are deliberately part of this serializable repository command.
     await deps.repository.withdrawConsentAtomically(command);
   },

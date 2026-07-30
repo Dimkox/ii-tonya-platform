@@ -61,6 +61,17 @@ describe("privacy lifecycle", () => {
     expect(repository.exportOwnedSubject).not.toHaveBeenCalled();
   });
 
+  it("fails closed for an unknown consent purpose before repository mutation", async () => {
+    const repository = {
+      withdrawConsentAtomically: vi.fn(), exportOwnedSubject: vi.fn(), startErasureAtomically: vi.fn(),
+    };
+    const service = createPrivacyService({ repository, audit: { append: vi.fn() }, pseudonymize: () => "p" });
+    await expect(service.withdrawConsent({
+      principalUserId: "u-1", targetUserId: "u-1", purpose: "unbounded", policyVersion: "privacy-v1", correlationId: "privacy-purpose",
+    })).rejects.toThrow("Unknown privacy consent purpose");
+    expect(repository.withdrawConsentAtomically).not.toHaveBeenCalled();
+  });
+
   it("starts owner-scoped erasure without rewriting immutable facts", async () => {
     const repository = {
       withdrawConsentAtomically: vi.fn(),
