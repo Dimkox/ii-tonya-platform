@@ -3789,10 +3789,10 @@ single-use Telegram callback consumption, and Telegram-bound owner schedule
 reads are implemented in commits `09896db`, `76c3d4b`, `04dad73`, and
 `60f7603`. PostgreSQL Database Gate `30500639187` passed schema/catalog plus
 message, conversation, booking, outbox, and Telegram suites (repeat gates
-20x). The follow-up completion delta adds persisted consent-qualified expert
+20x). Completion commit `31e2aea` adds persisted consent-qualified expert
 notes, booked-only HTTPS meeting URLs, and the application-level expiry
-entrypoint; Task 15 remains in progress until that delta passes the real
-PostgreSQL gate.
+entrypoint. PostgreSQL Database Gate `30502289472` passed on that exact SHA,
+including all repeat gates 20x. Task 15 is complete.
 
 **Files:**
 
@@ -3831,7 +3831,7 @@ export interface CatalogRepository {
 export function bookingFixture(initial?: { status: ReservationStatus; version: number }): BookingFixture;
 ```
 
-- [ ] **Step 1: Write failing booking-workflow tests**
+- [x] **Step 1: Write failing booking-workflow tests**
 
 ```ts
 // packages/application/src/booking-service.test.ts
@@ -3918,13 +3918,13 @@ describe("verified catalog", () => {
 });
 ```
 
-- [ ] **Step 2: Run the workflow test and confirm the expected failure**
+- [x] **Step 2: Run the workflow test and confirm the expected failure**
 
 Run: `pnpm exec vitest run packages/application/src/booking-service.test.ts packages/application/src/catalog-service.test.ts tests/integration/catalog-repository.test.ts`
 
 Expected: FAIL because booking/catalog services and the catalog repository do not exist.
 
-- [ ] **Step 3: Implement booking application transactions and free notifications**
+- [x] **Step 3: Implement booking application transactions and free notifications**
 
 Use the database repository as the sole transition owner. `searchSlots` reads only non-stale normalized slots starting at least 24 hours ahead. `reserve` writes the local reservation plus Planerka and Telegram outbox facts atomically. Confirm/cancel commands verify expert ownership and expected version before transition. Client cancellation verifies reservation ownership. Every user or expert notification has `charge = 0` and an idempotency key `{reservationId}:{newVersion}:{topic}`.
 
@@ -3932,13 +3932,13 @@ Use the database repository as the sole transition owner. `searchSlots` reads on
 
 `PostgresCatalogRepository.findEligible` joins experts, services, and slots with mandatory `experts.active`, `experts.verified`, `expert_services.active`, service/language filters, fresh provider observation, positive remaining capacity, and `starts_at >= now + 24h`. `CatalogService` maps only allowlisted public fields and performs deterministic filter/rank; an LLM may explain returned choices but cannot add an expert or slot absent from this result. The integration test seeds active/unverified, inactive/verified, inactive-service, stale-slot, sub-24-hour, full, and eligible rows and asserts only the eligible row is returned.
 
-- [ ] **Step 4: Run booking unit and concurrency suites**
+- [x] **Step 4: Run booking unit and concurrency suites**
 
 Run: `pnpm exec vitest run packages/application/src/booking-service.test.ts packages/application/src/catalog-service.test.ts tests/integration/catalog-repository.test.ts tests/integration/booking-concurrency.test.ts && pnpm typecheck`
 
 Expected: PASS; all transitions, ownership checks, and notification counts are deterministic.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/application/src/booking-service.ts packages/application/src/booking-service.testkit.ts packages/application/src/booking-service.test.ts packages/application/src/catalog-service.ts packages/application/src/catalog-service.test.ts packages/application/src/index.ts packages/db/src/repositories/catalog-repository.ts tests/integration/catalog-repository.test.ts
