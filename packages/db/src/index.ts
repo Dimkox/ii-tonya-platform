@@ -53,4 +53,14 @@ export {
   type ConsumeTelegramCallbackCommand,
   type StoredExpertCallbackClaims,
 } from "./repositories/telegram-callback-repository.js";
+export {
+  PostgresPrivacyRepository,
+  assertPrivacyWorkflowContract,
+  type ErasureJob,
+  type PrivacyRepository,
+  type StartErasureCommand,
+  type SubjectExport,
+  type WithdrawConsentCommand,
+  type WithdrawalReceipt,
+} from "./repositories/privacy-repository.js";
 export * from "./schema/index.js";
