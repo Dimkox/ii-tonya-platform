@@ -44,4 +44,15 @@ describe("API boundary", () => {
     expect(app.services.conversation.handleInbound).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it("does not poison Telegram deduplication before callback verification", async () => {
+    const app = await buildTestApp({ callbackVerified: false });
+    const headers = { "x-telegram-bot-api-secret-token": "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__" };
+    const rejected = await app.inject({ method: "POST", url: "/v1/webhooks/telegram", headers, payload: { update_id: 77, callback_query: { from: { id: 123 }, data: "invalid" } } });
+    expect(rejected.statusCode).toBe(403);
+    const retried = await app.inject({ method: "POST", url: "/v1/webhooks/telegram", headers, payload: { update_id: 77 } });
+    expect(retried.statusCode).toBe(200);
+    expect(app.services.telegram.processedUpdateCount("77")).toBe(1);
+    await app.close();
+  });
 });

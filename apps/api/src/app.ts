@@ -29,7 +29,11 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     const admin = await buildAdminApi({ approvals: deps.adminApprovals, admin: deps.adminService });
     app.all("/v1/admin/*", async (request, reply) => {
       const response = await admin.inject({ method: request.method === "GET" ? "GET" : "POST", url: request.url, headers: request.headers, ...(request.body === undefined ? {} : { payload: request.body as object }) });
-      return reply.code(response.statusCode).headers(response.headers).send(response.body);
+      reply.code(response.statusCode);
+      for (const [name, value] of Object.entries(response.headers)) {
+        if (name !== "content-length" && value !== undefined) reply.header(name, value);
+      }
+      return reply.send(response.rawPayload);
     });
     app.addHook("onClose", () => admin.close());
   }
@@ -50,10 +54,14 @@ const testMock = (): TestMockFunction => {
 type TestConversation = ConversationService & { handleInbound: TestMockFunction };
 type TestTelegram = TelegramCallbackService & { processedUpdateCount(id: string): number };
 export type TestApp = FastifyInstance & { services: { conversation: TestConversation; telegram: TestTelegram } };
-export async function buildTestApp(): Promise<TestApp> {
+export async function buildTestApp(options: { callbackVerified?: boolean } = {}): Promise<TestApp> {
   const seen = new Set<string>(); const counts = new Map<string, number>();
   const conversation = { handleInbound: testMock(), handleOutboundDelivery: testMock() } as unknown as TestConversation;
-  const telegram = { async process(update: Readonly<Record<string, unknown>>) { const id = String(update.update_id); counts.set(id, (counts.get(id) ?? 0) + 1); }, processedUpdateCount: (id: string) => counts.get(id) ?? 0 } satisfies TestTelegram;
+  const telegram = {
+    async verifyCallback() { return options.callbackVerified ?? true; },
+    async process(update: Readonly<Record<string, unknown>>) { const id = String(update.update_id); counts.set(id, (counts.get(id) ?? 0) + 1); },
+    processedUpdateCount: (id: string) => counts.get(id) ?? 0,
+  } satisfies TestTelegram;
   const never = new Proxy({}, { get: () => testMock() });
   const app = await buildApp({
     config: { databaseUrl: "postgresql://placeholder.invalid/test", integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false }, minorOnboarding: false, rawConversationLogging: false, selartiOutboundBillingMode: "disabled", displayTimezone: "Europe/Moscow" },

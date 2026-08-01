@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { InboxDeduplicator } from "./selarti-webhook.js";
 
 export interface TelegramCallbackService {
+  verifyCallback(update: Readonly<Record<string, unknown>>, correlationId: string): Promise<boolean>;
   process(update: Readonly<Record<string, unknown>>, correlationId: string): Promise<void>;
 }
 
@@ -34,15 +35,16 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     authenticated += 1;
     if (authenticated > (deps.authenticatedLimit ?? 10)) return reply.code(429).send({ error: "rate_limited" });
     const body = request.body as Record<string, unknown>;
-    const updateId = String(body.update_id);
-    if (!await deps.inbox.claim("telegram", updateId)) return { accepted: true, duplicate: true };
+    const correlationId = typeof request.headers["x-correlation-id"] === "string" ? request.headers["x-correlation-id"] : crypto.randomUUID();
     const callback = body.callback_query;
     if (callback && typeof callback === "object") {
       const from = (callback as Record<string, unknown>).from;
       const id = from && typeof from === "object" ? (from as Record<string, unknown>).id : undefined;
       if (!numericIdentity.test(String(id ?? ""))) return reply.code(403).send({ error: "unauthorized_expert" });
+      if (!await deps.callbacks.verifyCallback(body, correlationId)) return reply.code(403).send({ error: "invalid_callback" });
     }
-    const correlationId = typeof request.headers["x-correlation-id"] === "string" ? request.headers["x-correlation-id"] : crypto.randomUUID();
+    const updateId = String(body.update_id);
+    if (!await deps.inbox.claim("telegram", updateId)) return { accepted: true, duplicate: true };
     await deps.callbacks.process(body, correlationId);
     return { accepted: true };
   });
