@@ -221,3 +221,39 @@
 - Drizzle metadata check: passed.
 - Drizzle final generation: `No schema changes, nothing to migrate`.
 - `git diff --check`: passed.
+
+## DB-clock transition timestamp P1 remediation
+
+### RED
+
+- Added a structural guard requiring one captured PostgreSQL
+  `clock_timestamp()` inside the handoff transition trigger and explicit
+  DB-clock SLA/future-time checks.
+- Added real PostgreSQL rejection cases for early SLA escalation forged with
+  a future `NEW.updated_at`, acknowledgement before assignment time,
+  resolution before acknowledgement/escalation, and future assignment or
+  acknowledgement timestamps.
+- Command: `pnpm exec vitest run tests/repo/admin-workflow-guards.test.ts`.
+- Result before implementation: 1 failed and 7 passed because the trigger did
+  not capture an authoritative database transition time.
+
+### GREEN
+
+- `enforce_human_escalation_transition` captures exactly one
+  `transition_now := clock_timestamp()` per trigger invocation.
+- SLA eligibility now depends only on `transition_now` against the immutable
+  acknowledgement deadline. A caller-supplied future `NEW.updated_at` cannot
+  manufacture expiry.
+- Every transition requires `NEW.updated_at >= OLD.updated_at` and
+  `NEW.updated_at <= transition_now`. New acknowledgement and resolution
+  timestamps are bounded by their prior transition, the new `updated_at`, and
+  `transition_now`; prior transition timestamps remain immutable.
+- Focused result: 5 files and 30 tests passed.
+- PostgreSQL suite: 12 cases present; local execution remains BLOCKED in
+  `beforeAll`, with all 12 bodies skipped because no working Testcontainers
+  runtime is available.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- `pnpm build`: passed for all 10 built workspace projects.
+- Drizzle metadata check: passed with `Everything's fine`.
+- Drizzle generation: `No schema changes, nothing to migrate`.

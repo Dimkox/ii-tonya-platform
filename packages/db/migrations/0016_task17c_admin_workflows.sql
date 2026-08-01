@@ -72,6 +72,8 @@ ALTER TABLE "message_packages" ADD CONSTRAINT "message_packages_admin_contract" 
     );--> statement-breakpoint
 DROP TRIGGER IF EXISTS "human_escalations_append_only" ON "human_escalations";--> statement-breakpoint
 CREATE FUNCTION enforce_human_escalation_transition() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  transition_now timestamptz := clock_timestamp();
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'human escalation deletion is forbidden' USING ERRCODE = '55000';
@@ -90,8 +92,14 @@ BEGIN
   IF NEW.version <> OLD.version + 1 THEN
     RAISE EXCEPTION 'human escalation version must increment by one' USING ERRCODE = '40001';
   END IF;
-  IF NEW.updated_at <= OLD.updated_at THEN
-    RAISE EXCEPTION 'human escalation updated_at must advance' USING ERRCODE = '22007';
+  IF NEW.updated_at < OLD.updated_at THEN
+    RAISE EXCEPTION 'human escalation updated_at cannot move backward' USING ERRCODE = '22007';
+  END IF;
+  IF NEW.updated_at > transition_now
+    OR NEW.acknowledged_at > transition_now
+    OR NEW.resolved_at > transition_now
+  THEN
+    RAISE EXCEPTION 'human escalation transition timestamp is in the future' USING ERRCODE = '22007';
   END IF;
 
   IF OLD.status = 'opened' AND NEW.status = 'assigned' THEN
@@ -107,8 +115,8 @@ BEGIN
       OR NEW.owner_id IS DISTINCT FROM OLD.owner_id
       OR OLD.acknowledged_at IS NOT NULL
       OR NEW.acknowledged_at IS NULL
-      OR NEW.acknowledged_at < OLD.opened_at
-      OR NEW.acknowledged_at > NEW.updated_at
+      OR NEW.acknowledged_at < OLD.updated_at
+      OR NEW.updated_at < NEW.acknowledged_at
       OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at
     THEN
       RAISE EXCEPTION 'invalid assigned to acknowledged human escalation transition' USING ERRCODE = '23514';
@@ -118,6 +126,7 @@ BEGIN
       OR NEW.owner_id IS DISTINCT FROM OLD.owner_id
       OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at
       OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at
+      OR transition_now < OLD.acknowledgement_deadline
       OR NEW.updated_at < OLD.acknowledgement_deadline
     THEN
       RAISE EXCEPTION 'invalid assigned to escalated human escalation transition' USING ERRCODE = '23514';
@@ -128,8 +137,8 @@ BEGIN
       OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at
       OR OLD.resolved_at IS NOT NULL
       OR NEW.resolved_at IS NULL
-      OR NEW.resolved_at < OLD.opened_at
-      OR NEW.resolved_at > NEW.updated_at
+      OR NEW.resolved_at < COALESCE(OLD.acknowledged_at, OLD.updated_at)
+      OR NEW.updated_at < NEW.resolved_at
     THEN
       RAISE EXCEPTION 'invalid resolved human escalation transition' USING ERRCODE = '23514';
     END IF;

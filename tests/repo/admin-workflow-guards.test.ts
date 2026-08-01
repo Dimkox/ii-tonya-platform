@@ -88,6 +88,10 @@ describe("Task 17C structural guards", () => {
   });
 
   it("replaces the broad handoff append-only trigger with transition-integrity enforcement", () => {
+    const transitionTrigger = migration.slice(
+      migration.indexOf("CREATE FUNCTION enforce_human_escalation_transition"),
+      migration.indexOf("CREATE TRIGGER \"human_escalations_transition_integrity\""),
+    );
     expect(migration).toContain("enforce_human_escalation_transition");
     expect(migration).toContain("human escalation deletion is forbidden");
     expect(migration).toContain("NEW.version <> OLD.version + 1");
@@ -95,5 +99,11 @@ describe("Task 17C structural guards", () => {
     expect(migration).toContain("OLD.status = 'assigned' AND NEW.status = 'acknowledged'");
     expect(migration).toContain("OLD.status = 'assigned' AND NEW.status = 'escalated'");
     expect(migration).toContain("OLD.status IN ('acknowledged', 'escalated') AND NEW.status = 'resolved'");
+    expect(transitionTrigger).toContain("transition_now timestamptz := clock_timestamp()");
+    expect(transitionTrigger.match(/clock_timestamp\(\)/g)).toHaveLength(1);
+    expect(transitionTrigger).toContain("transition_now < OLD.acknowledgement_deadline");
+    expect(transitionTrigger).toContain("NEW.updated_at > transition_now");
+    expect(transitionTrigger).toContain("NEW.acknowledged_at < OLD.updated_at");
+    expect(transitionTrigger).toContain("NEW.resolved_at < COALESCE(OLD.acknowledged_at, OLD.updated_at)");
   });
 });

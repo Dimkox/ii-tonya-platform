@@ -444,6 +444,58 @@ describe("atomic approved admin workflows", () => {
     `)).rejects.toThrow("human escalation version must increment by one");
   });
 
+  it("rejects forged early-SLA, pre-transition, and future handoff timestamps", async () => {
+    const security = await seedAdmin("security_admin");
+
+    const earlySlaId = await seedSafetyAlert("assigned", security.adminId);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'escalated', version = version + 1,
+        updated_at = acknowledgement_deadline + interval '1 minute'
+      where id = ${earlySlaId}::uuid
+    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+
+    const earlyAckId = await seedSafetyAlert("assigned", security.adminId);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'acknowledged', acknowledged_at = updated_at - interval '1 second',
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${earlyAckId}::uuid
+    `)).rejects.toThrow("invalid assigned to acknowledged human escalation transition");
+
+    const futureAssignmentId = await seedSafetyAlert("opened", security.adminId);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'assigned', version = version + 1,
+        updated_at = clock_timestamp() + interval '1 minute'
+      where id = ${futureAssignmentId}::uuid
+    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+
+    const futureAckId = await seedSafetyAlert("assigned", security.adminId);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'acknowledged', acknowledged_at = clock_timestamp() + interval '1 minute',
+        version = version + 1, updated_at = clock_timestamp() + interval '1 minute'
+      where id = ${futureAckId}::uuid
+    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+
+    const earlyResolveAfterAckId = await seedSafetyAlert("acknowledged", security.adminId);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'resolved', resolved_at = acknowledged_at - interval '1 second',
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${earlyResolveAfterAckId}::uuid
+    `)).rejects.toThrow("invalid resolved human escalation transition");
+
+    const earlyResolveAfterEscalationId = await seedSafetyAlert("escalated", security.adminId, true);
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'resolved', resolved_at = updated_at - interval '1 second',
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${earlyResolveAfterEscalationId}::uuid
+    `)).rejects.toThrow("invalid resolved human escalation transition");
+  });
+
   it("allows only opened-assigned, assigned-acknowledged or SLA-escalated, and terminal resolution", async () => {
     const security = await seedAdmin("security_admin");
     const acknowledgedId = await seedSafetyAlert("opened", security.adminId);
