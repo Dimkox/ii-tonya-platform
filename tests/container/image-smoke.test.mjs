@@ -77,8 +77,9 @@ test("boots portable final images and imports emitted internal packages", () => 
       for (const packageName of packages) {
         const probe = [
           `const resolved=import.meta.resolve('${packageName}');`,
-          "if(!resolved.includes('/app/node_modules/@ii-tonya/')",
-          "||!resolved.endsWith('/dist/index.js'))process.exit(41);",
+          "if(!resolved.startsWith('file:///app/node_modules/')",
+          "||resolved.includes('/workspace/')",
+          `||!resolved.endsWith('/node_modules/${packageName}/dist/index.js'))process.exit(41);`,
           `await import('${packageName}');`,
         ].join("");
         run("docker", [

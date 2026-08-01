@@ -80,5 +80,7 @@ describe("release assets", () => {
     );
     expect(compose).toContain("--base-url=http://api:3000");
     expect(compose).toContain("profiles: [smoke]");
+    expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
+    expect(smoke).toContain("resolved.includes('/workspace/')");
   });
 });
