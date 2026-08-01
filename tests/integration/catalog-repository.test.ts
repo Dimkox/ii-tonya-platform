@@ -71,7 +71,7 @@ describe("catalog repository", () => {
       ) values (
         ${clientId}::uuid, ${full.slotId}::uuid, ${full.expertId}::uuid,
         ${full.serviceId}::uuid, 'booked', 'catalog-full',
-        ${new Date("2026-08-01T10:00:00.000Z")}
+        clock_timestamp() + interval '1 hour'
       )
     `);
 

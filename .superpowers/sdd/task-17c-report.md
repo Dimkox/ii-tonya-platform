@@ -146,6 +146,33 @@
 - Drizzle metadata check: passed with `Everything's fine`.
 - Drizzle generation: `No schema changes, nothing to migrate`.
 
+## Database Gate run 30696346265 remediation
+
+- GitHub Actions run `30696346265` executed commit `53117b4` and failed in
+  `Run verified catalog integration gate` before the atomic Task 17C workflow
+  gate could run.
+- The failed reservation row used fixed
+  `reserved_until = 2026-08-01T10:00:00Z`, while PostgreSQL assigned
+  `created_at = 2026-08-01T10:47:22.690161Z`. This violated
+  `reservations_deadline_after_creation` with SQLSTATE `23514`.
+- A narrow scan of `tests/integration/catalog-repository.test.ts` found only
+  this reservation deadline coupled to a fixed wall-clock value. Other fixed
+  timestamps in the suite define the catalog business-time scenario.
+- The test-only reservation insert now derives expiry from PostgreSQL as
+  `clock_timestamp() + interval '1 hour'`; no host clock, production code, or
+  schema changed.
+- TDD regression guard RED: 1 of 1 failed before the edit. GREEN: 1 of 1
+  passed afterward.
+- Focused repository gates: 3 files and 16 tests passed.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- The catalog PostgreSQL test was attempted locally but could not start a
+  container runtime; its body was skipped. The existing unconditional
+  `afterAll` then also observed undefined setup state. CI remains the
+  authoritative PostgreSQL rerun.
+- Build was not repeated because this isolated change affects test SQL only;
+  the prior build at commit `53117b4` passed.
+
 ## Boundaries
 
 - No credentials, secrets, live bindings, raw authorization headers, raw
