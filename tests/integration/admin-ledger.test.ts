@@ -49,7 +49,9 @@ async function seedSafetyAlert(
   const alertId = randomUUID();
   await testDb!.db.execute(sql`
     insert into safety_incidents (id, reason_code, metadata_hash)
-    values (${incidentId}::uuid, 'safety_test', 'sha256:redacted');
+    values (${incidentId}::uuid, 'safety_test', 'sha256:redacted')
+  `);
+  await testDb!.db.execute(sql`
     insert into human_escalations (
       id, incident_id, status, opened_at, acknowledgement_deadline,
       acknowledged_at, owner_id, escalation_reason
@@ -58,7 +60,9 @@ async function seedSafetyAlert(
       clock_timestamp() + case when ${slaExpired} then interval '-5 minutes' else interval '5 minutes' end,
       case when ${status} = 'acknowledged' then clock_timestamp() else null end,
       ${assignedAdminId}::uuid, 'safety_test'
-    );
+    )
+  `);
+  await testDb!.db.execute(sql`
     insert into admin_object_assignments (admin_id, object_type, object_id)
     values (${assignedAdminId}::uuid, 'safety_case', ${alertId}::uuid)
   `);
@@ -101,7 +105,9 @@ describe("atomic approved admin workflows", () => {
     })).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
     await testDb!.db.execute(sql`
       insert into admin_role_assignments (admin_id, role)
-      values (${requester.adminId}::uuid, 'support');
+      values (${requester.adminId}::uuid, 'support')
+    `);
+    await testDb!.db.execute(sql`
       delete from admin_role_assignments
       where admin_id = ${requester.adminId}::uuid and role = 'entitlement_admin'
     `);
@@ -571,13 +577,17 @@ describe("atomic approved admin workflows", () => {
     const safetyId = randomUUID();
     await testDb!.db.execute(sql`
       insert into safety_incidents (id, reason_code, metadata_hash)
-      values (${incidentId}::uuid, 'safety_test', 'sha256:redacted');
+      values (${incidentId}::uuid, 'safety_test', 'sha256:redacted')
+    `);
+    await testDb!.db.execute(sql`
       insert into human_escalations (
         id, incident_id, status, opened_at, acknowledgement_deadline, owner_id, escalation_reason
       ) values (
         ${safetyId}::uuid, ${incidentId}::uuid, 'assigned', clock_timestamp(),
         clock_timestamp() + interval '5 minutes', ${securityA.adminId}::uuid, 'safety_test'
-      );
+      )
+    `);
+    await testDb!.db.execute(sql`
       insert into admin_object_assignments (admin_id, object_type, object_id)
       values (${securityA.adminId}::uuid, 'safety_case', ${safetyId}::uuid)
     `);
@@ -600,7 +610,9 @@ describe("atomic approved admin workflows", () => {
       ) values (
         ${feedbackId}::uuid, ${feedbackUser}::uuid, 1, ${`case:${randomUUID()}`},
         'sha256:redacted', 'negative-v1', 'escalated'
-      );
+      )
+    `);
+    await testDb!.db.execute(sql`
       insert into admin_object_assignments (admin_id, object_type, object_id)
       values (${supportA.adminId}::uuid, 'feedback_queue', ${feedbackId}::uuid)
     `);

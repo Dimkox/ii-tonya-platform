@@ -338,3 +338,28 @@
   the authoritative behavioral rerun.
 - Build was not repeated because this remediation changes test/report files
   only; no production or schema file changed.
+
+## Database Gate run 30697327313 prepared-statement remediation
+
+- GitHub Actions run `30697327313` executed commit `8fb5980`. All pre-admin
+  gates and the admin IAM gate passed. The atomic admin workflow suite ran all
+  12 cases: 6 passed and 6 failed.
+- Every failure shared SQLSTATE `42601`, `cannot insert multiple commands into
+  a prepared statement`. The failures originated from test setup rather than
+  production or migration SQL.
+- A full-file structural scan found four multi-command prepared templates:
+  safety-alert seeding, the role swap, the final safety setup, and the final
+  feedback setup. They contained 10 commands total and now execute as 10
+  ordered single-command prepared calls, preserving parent-before-child and
+  insert-before-delete setup semantics.
+- The regression guard counts top-level commands while excluding quoted SQL
+  strings and dollar-quoted function bodies; it is not a blanket semicolon
+  prohibition. RED found all four templates; GREEN found none.
+- Focused repository gates: 4 files and 11 tests passed.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- The 12-case PostgreSQL suite was attempted locally, but all bodies were
+  skipped because no working Testcontainers runtime was available. CI remains
+  the authoritative behavioral rerun.
+- Build was not repeated because this remediation changes test/report files
+  only; no production or schema file changed.
