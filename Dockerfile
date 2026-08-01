@@ -35,7 +35,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 RUN groupadd --gid 10001 app && \
-    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
+    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app && \
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 FROM runtime-base AS api
 

@@ -49,6 +49,8 @@ describe("release assets", () => {
     );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
+    expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/npm");
+    expect(dockerfile).toContain("rm -f /usr/local/bin/npm /usr/local/bin/npx");
     expect(dockerfile).toContain(
       'CMD ["node", "--input-type=module", "--eval", "const s=(await import(\'node:fs/promises\')).stat;',
     );
