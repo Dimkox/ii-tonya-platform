@@ -15,7 +15,7 @@ test("boots portable final images and imports emitted internal packages", () => 
     compose(["up", "--build", "--wait"]);
     run(process.execPath, [
       "scripts/smoke.mjs",
-      "--base-url=http://localhost:3000",
+      "--base-url=http://127.0.0.1:3000",
     ]);
     for (const [service, command, packages] of [
       [

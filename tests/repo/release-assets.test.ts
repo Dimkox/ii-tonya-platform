@@ -71,4 +71,10 @@ describe("release assets", () => {
       expect(compose).toContain(`${flag}: \"false\"`);
     }
   });
+
+  it("probes the API through the IPv4-only published loopback binding", () => {
+    const smoke = readFileSync("tests/container/image-smoke.test.mjs", "utf8");
+    expect(smoke).toContain("--base-url=http://127.0.0.1:3000");
+    expect(smoke).not.toContain("--base-url=http://localhost:3000");
+  });
 });
