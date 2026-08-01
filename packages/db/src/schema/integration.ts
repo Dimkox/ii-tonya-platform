@@ -50,6 +50,23 @@ export const integrationInbox = pgTable(
     ),
   ],
 );
+export const webhookInbox = pgTable(
+  "webhook_inbox",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: text("provider").notNull(),
+    externalEventId: text("external_event_id").notNull(),
+    status: text("status").notNull(),
+    claimId: uuid("claim_id").notNull(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("webhook_inbox_provider_event_unique").on(table.provider, table.externalEventId),
+    check("webhook_inbox_status_allowed", sql`${table.status} in ('processing', 'complete', 'failed')`),
+    index("webhook_inbox_lease").on(table.status, table.leaseUntil),
+  ],
+);
 export const integrationErrors = pgTable(
   "integration_errors",
   {

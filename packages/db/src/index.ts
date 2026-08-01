@@ -1,4 +1,4 @@
-export { createDb, type DrizzleDb } from "./client.js";
+export { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, type DrizzleDb } from "./client.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -100,4 +100,5 @@ export {
   type SubmitFeedbackTransactionCommand,
 } from "./repositories/feedback-repository.js";
 export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
+export { PostgresWebhookInboxRepository, WebhookInboxClaimLostError } from "./repositories/webhook-inbox-repository.js";
 export * from "./schema/index.js";

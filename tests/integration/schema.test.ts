@@ -205,6 +205,7 @@ describe("MVP schema", () => {
       "safety_incidents",
       "slots",
       "users",
+      "webhook_inbox",
     ]);
   });
 

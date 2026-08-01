@@ -4,9 +4,12 @@ import type { ConversationService } from "@ii-tonya/application";
 import type { SelartiPort } from "@ii-tonya/integrations";
 import { operationalMetrics, traced, type Logger } from "@ii-tonya/observability";
 import type { FastifyPluginAsync } from "fastify";
+import type { RateLimitGate } from "../rate-limit.js";
 
-export interface InboxDeduplicator {
-  claim(provider: "selarti" | "telegram", eventId: string): Promise<boolean>;
+export interface WebhookInbox {
+  claim(provider: "telegram", eventId: string): Promise<{ kind: "claimed"; claimId: string } | { kind: "duplicate" | "busy" }>;
+  complete(claimId: string): Promise<void>;
+  fail(claimId: string): Promise<void>;
 }
 
 const headerRecord = (headers: Readonly<Record<string, string | string[] | undefined>>): Readonly<Record<string, string>> =>
@@ -15,14 +18,13 @@ const headerRecord = (headers: Readonly<Record<string, string | string[] | undef
 export const selartiWebhookRoutes: FastifyPluginAsync<{
   selarti: SelartiPort;
   conversation: ConversationService;
-  inbox: InboxDeduplicator;
   logger: Logger;
+  rateLimiter: RateLimitGate;
+  now?: () => Date;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
 }> = async (app, deps) => {
   const rawBodies = new WeakMap<object, Buffer>();
-  const unauthenticatedByIp = new Map<string, number>();
-  let authenticated = 0;
   app.addHook("preParsing", async (request, reply, payload) => {
     const chunks: Buffer[] = []; let size = 0;
     for await (const chunk of payload) {
@@ -42,26 +44,24 @@ export const selartiWebhookRoutes: FastifyPluginAsync<{
     try {
       event = await deps.selarti.decodeVerifiedWebhook(raw, headerRecord(request.headers));
     } catch {
-      const ipCount = (unauthenticatedByIp.get(request.ip) ?? 0) + 1;
-      unauthenticatedByIp.set(request.ip, ipCount);
-      return reply.code(ipCount > (deps.unauthenticatedLimit ?? 100) ? 429 : 401).send({ error: "unauthorized" });
+      const allowed = deps.rateLimiter.consume(`selarti:unauth:${request.ip}`, deps.unauthenticatedLimit ?? 100, 60_000);
+      return reply.code(allowed ? 401 : 429).send({ error: "unauthorized" });
     }
-    authenticated += 1;
-    if (authenticated > (deps.authenticatedLimit ?? 100)) return reply.code(429).send({ error: "rate_limited" });
-    if (!await deps.inbox.claim("selarti", event.providerEventId)) {
-      operationalMetrics.inboxDuplicates.add(1, { provider: "selarti" });
-      return { accepted: true, duplicate: true };
-    }
+    const occurredAt = new Date(event.occurredAt).getTime();
+    const ageMs = (deps.now ?? (() => new Date()))().getTime() - occurredAt;
+    if (!Number.isFinite(occurredAt) || ageMs < -30_000 || ageMs > 5 * 60_000) return reply.code(401).send({ error: "replay_window" });
+    if (!deps.rateLimiter.consume(`selarti:auth:${request.ip}`, deps.authenticatedLimit ?? 100, 60_000)) return reply.code(429).send({ error: "rate_limited" });
     if (event.kind !== "inbound_message") return reply.code(202).send({ accepted: true });
     const correlationId = typeof request.headers["x-correlation-id"] === "string"
       ? request.headers["x-correlation-id"] : crypto.randomUUID();
-    await traced("selarti.inbound", () => deps.conversation.handleInbound({
+    const result = await traced("selarti.inbound", () => deps.conversation.handleInbound({
       provider: "selarti", providerEventId: event.providerEventId,
       providerMessageId: event.providerMessageId, userId: event.channelUserId,
       text: event.text, locale: "ru", countryCode: "RU", regionCode: null,
       ageBand: "adult", occurredAt: event.occurredAt, correlationId,
       // The service owns all business validation after authenticated durable intake.
     }));
+    if (result.kind === "duplicate") operationalMetrics.inboxDuplicates.add(1, { provider: "selarti" });
     deps.logger.info({ correlationId, eventIdHash: createHash("sha256").update(event.providerEventId).digest("hex"), module: "api", operation: "selarti.inbound", outcome: "accepted" });
     return { accepted: true };
   });

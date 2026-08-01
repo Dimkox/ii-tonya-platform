@@ -1,3 +1,3 @@
-export { createLogger, redactProviderUrl, type Logger } from "./logger.js";
+export { createLogger, redactProviderUrl, sanitizeTelemetry, type Logger } from "./logger.js";
 export { operationalMetrics, type MetricLabels } from "./metrics.js";
-export { traced } from "./tracing.js";
+export { registerTelemetryShutdown, shutdownTelemetry, traced } from "./tracing.js";
