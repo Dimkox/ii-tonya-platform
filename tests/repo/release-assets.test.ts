@@ -82,5 +82,6 @@ describe("release assets", () => {
     expect(compose).toContain("profiles: [smoke]");
     expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
     expect(smoke).toContain("resolved.includes('/workspace/')");
+    expect(smoke.match(/"--input-type=module"/g)).toHaveLength(2);
   });
 });

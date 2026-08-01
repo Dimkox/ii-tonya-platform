@@ -52,6 +52,7 @@ test("boots portable final images and imports emitted internal packages", () => 
           "-T",
           service,
           "node",
+          "--input-type=module",
           "--eval",
           "const s=(await import('node:fs/promises')).stat;const m=(await s('/tmp/ii-tonya-worker-heartbeat')).mtimeMs;if(Date.now()-m>30000)process.exit(42)",
         ]);
