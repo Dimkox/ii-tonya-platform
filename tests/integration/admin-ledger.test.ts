@@ -12,6 +12,7 @@ import { startTestPostgres, type TestDatabase } from "../../packages/db/src/test
 import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
 let testDb: TestDatabase | undefined;
+const POSTGRES_DEFAULT_RAISE_SQLSTATE = "P0001";
 
 const rejected = async (operation: Promise<unknown>): Promise<unknown> =>
   operation.then(
@@ -24,6 +25,7 @@ const expectHandoffPostgresRejection = async (
   expectedCode: string,
   expectedMessage: string,
 ): Promise<void> => {
+  expect(expectedCode).not.toBe(POSTGRES_DEFAULT_RAISE_SQLSTATE);
   expectPostgresErrorCause(await rejected(operation), expectedCode, expectedMessage);
 };
 

@@ -49,14 +49,26 @@ describe("PRIV-01 through PRIV-05 privacy workflow contract", () => {
   it("erases identity mappings and optional content while conserving append-only ledger and audit facts under the internal UUID", async () => {
     const userId = await testDb!.createUser();
     await testDb!.db.execute(sql`
-      insert into channel_identities (user_id, provider, external_id) values (${userId}::uuid, 'telegram', '12345');
-      insert into client_profiles (user_id, display_name, timezone) values (${userId}::uuid, 'Private', 'Europe/Moscow');
-      insert into conversations (id, user_id) values ('00000000-0000-4000-8000-000000000301'::uuid, ${userId}::uuid);
-      insert into conversation_messages (conversation_id, author_type, content_ref) values ('00000000-0000-4000-8000-000000000301'::uuid, 'client', 'object://private');
-      insert into message_packages (id, user_id, granted_messages, grant_idempotency_key) values ('00000000-0000-4000-8000-000000000302'::uuid, ${userId}::uuid, 1, 'privacy-grant-${userId}');
-      insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key) values ('00000000-0000-4000-8000-000000000302'::uuid, 'grant', 1, 'privacy-ledger-${userId}');
+      insert into channel_identities (user_id, provider, external_id) values (${userId}::uuid, 'telegram', '12345')
+    `);
+    await testDb!.db.execute(sql`
+      insert into client_profiles (user_id, display_name, timezone) values (${userId}::uuid, 'Private', 'Europe/Moscow')
+    `);
+    await testDb!.db.execute(sql`
+      insert into conversations (id, user_id) values ('00000000-0000-4000-8000-000000000301'::uuid, ${userId}::uuid)
+    `);
+    await testDb!.db.execute(sql`
+      insert into conversation_messages (conversation_id, author_type, content_ref) values ('00000000-0000-4000-8000-000000000301'::uuid, 'client', 'object://private')
+    `);
+    await testDb!.db.execute(sql`
+      insert into message_packages (id, user_id, granted_messages, grant_idempotency_key) values ('00000000-0000-4000-8000-000000000302'::uuid, ${userId}::uuid, 1, ${`privacy-grant-${userId}`})
+    `);
+    await testDb!.db.execute(sql`
+      insert into message_ledger_entries (package_id, entry_kind, delta, idempotency_key) values ('00000000-0000-4000-8000-000000000302'::uuid, 'grant', 1, ${`privacy-ledger-${userId}`})
+    `);
+    await testDb!.db.execute(sql`
       insert into audit_events (actor_type, actor_id, authenticated_session_id_hash, action, object_type, object_id, decision, reason_code, correlation_id, occurred_at, metadata_hash)
-      values ('client', ${userId}::uuid, 'hash', 'privacy.seed', 'user', ${userId}::uuid, 'accepted', 'seed', 'privacy-seed', now(), 'hash');
+      values ('client', ${userId}::uuid, 'hash', 'privacy.seed', 'user', ${userId}::uuid, 'accepted', 'seed', 'privacy-seed', now(), 'hash')
     `);
     const service = createPrivacyService({
       repository: new PostgresPrivacyRepository(testDb!.db), audit: { append: () => undefined }, pseudonymize: () => "hmac:pseudonym",
