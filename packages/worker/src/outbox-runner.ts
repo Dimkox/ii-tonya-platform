@@ -78,8 +78,8 @@ export interface OutboxRepository {
     claimToken: string,
     reasonCode: string,
   ): Promise<void>;
-  recoverExpiredDispatchLeases(): Promise<number>;
-  recoverExpiredReconciliationLeases(): Promise<number>;
+  recoverExpiredDispatchLeases(limit?: number): Promise<number>;
+  recoverExpiredReconciliationLeases(limit?: number): Promise<number>;
 }
 
 export type DispatchOutcome =
@@ -301,8 +301,8 @@ export async function runOutboxBatch(
   deps: OutboxRunnerDeps,
 ): Promise<OutboxRunResult> {
   const now = deps.now();
-  await deps.repository.recoverExpiredDispatchLeases();
-  await deps.repository.recoverExpiredReconciliationLeases();
+  await deps.repository.recoverExpiredDispatchLeases(deps.batchSize);
+  await deps.repository.recoverExpiredReconciliationLeases(deps.batchSize);
   const leaseDurationMs = deps.leaseDurationMs ?? 30_000;
 
   const unknown = await deps.repository.claimUnknown(

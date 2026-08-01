@@ -591,11 +591,19 @@ export class PostgresOutboxRepository {
     `);
   }
 
-  async recoverExpiredDispatchLeases(): Promise<number> {
+  async recoverExpiredDispatchLeases(limit = 1_000): Promise<number> {
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
-        with recovered as (
-          update integration_outbox
+        with candidates as materialized (
+          select id
+          from integration_outbox
+          where status = 'processing'
+            and lease_until < clock_timestamp()
+          order by lease_until, id
+          for update skip locked
+          limit ${limit}
+        ), recovered as (
+          update integration_outbox o
           set
             status = 'unknown_outcome',
             dispatch_owner_id = null,
@@ -604,9 +612,9 @@ export class PostgresOutboxRepository {
             next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'dispatch_lease_expired_unknown_outcome',
             updated_at = now()
-          where status = 'processing'
-            and lease_until < clock_timestamp()
-          returning id, topic, attempt, reconciliation_key
+          from candidates
+          where o.id = candidates.id
+          returning o.id, o.topic, o.attempt, o.reconciliation_key
         )
         insert into delivery_attempts (
           outbox_id, attempt_id, attempt, provider, outcome,
@@ -627,11 +635,19 @@ export class PostgresOutboxRepository {
     });
   }
 
-  async recoverExpiredReconciliationLeases(): Promise<number> {
+  async recoverExpiredReconciliationLeases(limit = 1_000): Promise<number> {
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
-        with recovered as (
-          update integration_outbox
+        with candidates as materialized (
+          select id
+          from integration_outbox
+          where status = 'reconciling'
+            and reconciliation_lease_until < clock_timestamp()
+          order by reconciliation_lease_until, id
+          for update skip locked
+          limit ${limit}
+        ), recovered as (
+          update integration_outbox o
           set
             status = 'unknown_outcome',
             reconciliation_owner_id = null,
@@ -640,9 +656,9 @@ export class PostgresOutboxRepository {
             next_reconciliation_at = clock_timestamp(),
             last_normalized_reason = 'reconciliation_lease_expired',
             updated_at = now()
-          where status = 'reconciling'
-            and reconciliation_lease_until < clock_timestamp()
-          returning id, topic, attempt, reconciliation_attempt, reconciliation_key
+          from candidates
+          where o.id = candidates.id
+          returning o.id, o.topic, o.attempt, o.reconciliation_attempt, o.reconciliation_key
         )
         insert into delivery_attempts (
           outbox_id, attempt_id, attempt, provider, outcome,

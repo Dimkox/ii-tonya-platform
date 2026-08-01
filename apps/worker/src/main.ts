@@ -1,0 +1,134 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadEnv } from "@ii-tonya/config";
+import {
+  createDb,
+  PostgresOutboxRepository,
+  PostgresWorkerJobsRepository,
+} from "@ii-tonya/db";
+import {
+  createProductionWorkerRuntime,
+  type WorkerRuntime,
+} from "./runtime.js";
+
+type RuntimeConfig = ReturnType<typeof loadEnv>;
+
+export interface WorkerRuntimeFactory {
+  create(config: RuntimeConfig): Promise<WorkerRuntime>;
+}
+
+export interface WorkerLoopOptions {
+  readonly signal: AbortSignal;
+  readonly pollIntervalMs: number;
+}
+
+export interface WorkerMainOptions {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly runtimeFactory?: WorkerRuntimeFactory;
+  readonly pollIntervalMs?: number;
+}
+
+const productionRuntimeFactory: WorkerRuntimeFactory = {
+  async create(config) {
+    const db = createDb(config.databaseUrl);
+    return createProductionWorkerRuntime({
+      jobsRepository: new PostgresWorkerJobsRepository(db),
+      outboxRepository: new PostgresOutboxRepository(db),
+      closeDatabase: async () => db.$client.end(),
+      closeTelemetry: async () => undefined,
+      now: () => new Date(),
+    });
+  },
+};
+
+function waitForNextCycle(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolveWait) => {
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolveWait();
+    };
+    const timer = setTimeout(finish, milliseconds);
+    signal.addEventListener("abort", finish, { once: true });
+  });
+}
+
+export async function runWorkerLoop(
+  runtime: WorkerRuntime,
+  options: WorkerLoopOptions,
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(options.pollIntervalMs)
+    || options.pollIntervalMs < 1
+    || options.pollIntervalMs > 60_000
+  ) throw new Error("Invalid worker poll interval");
+  try {
+    while (!options.signal.aborted) {
+      const cycle = runtime.runOnce();
+      const outcome = await new Promise<"completed" | "aborted">((resolveCycle, rejectCycle) => {
+        const aborted = () => { resolveCycle("aborted"); };
+        options.signal.addEventListener("abort", aborted, { once: true });
+        void cycle.then(
+          () => {
+            options.signal.removeEventListener("abort", aborted);
+            resolveCycle("completed");
+          },
+          (error: unknown) => {
+            options.signal.removeEventListener("abort", aborted);
+            rejectCycle(error);
+          },
+        );
+      });
+      if (outcome === "aborted") break;
+      await waitForNextCycle(options.pollIntervalMs, options.signal);
+    }
+  } finally {
+    await runtime.close();
+  }
+}
+
+function environmentPollInterval(env: NodeJS.ProcessEnv): number {
+  const raw = env.WORKER_POLL_INTERVAL_MS ?? "1000";
+  if (!/^\d{1,5}$/u.test(raw)) throw new Error("Invalid WORKER_POLL_INTERVAL_MS");
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 60_000) {
+    throw new Error("Invalid WORKER_POLL_INTERVAL_MS");
+  }
+  return value;
+}
+
+export async function main(options: WorkerMainOptions = {}): Promise<void> {
+  const env = options.env ?? process.env;
+  const config = loadEnv(env);
+  const runtime = await (options.runtimeFactory ?? productionRuntimeFactory).create(config);
+  const controller = new AbortController();
+  const stop = () => { controller.abort(); };
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+  try {
+    await runWorkerLoop(runtime, {
+      signal: controller.signal,
+      pollIntervalMs: options.pollIntervalMs ?? environmentPollInterval(env),
+    });
+  } finally {
+    process.off("SIGTERM", stop);
+    process.off("SIGINT", stop);
+  }
+}
+
+export function isDirectExecution(moduleUrl: string, argument: string | undefined): boolean {
+  if (argument === undefined) return false;
+  const modulePath = resolve(fileURLToPath(moduleUrl));
+  const argumentPath = resolve(argument);
+  return process.platform === "win32"
+    ? modulePath.toLowerCase() === argumentPath.toLowerCase()
+    : modulePath === argumentPath;
+}
+
+if (isDirectExecution(import.meta.url, process.argv[1])) {
+  void main().catch(() => {
+    process.stderr.write("Worker startup or polling failed\n");
+    process.exitCode = 1;
+  });
+}

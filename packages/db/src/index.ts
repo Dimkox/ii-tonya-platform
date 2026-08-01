@@ -99,4 +99,5 @@ export {
   type FeedbackTransactionResult,
   type SubmitFeedbackTransactionCommand,
 } from "./repositories/feedback-repository.js";
+export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
 export * from "./schema/index.js";
