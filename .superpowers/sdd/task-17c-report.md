@@ -363,3 +363,31 @@
   the authoritative behavioral rerun.
 - Build was not repeated because this remediation changes test/report files
   only; no production or schema file changed.
+
+## Database Gate run 30697656518 adapter-assertion remediation
+
+- GitHub Actions run `30697656518` executed commit `79556ee`. Every pre-admin
+  gate and the admin IAM gate passed. The atomic admin suite ran all 12 cases:
+  8 passed and 4 failed after the relevant triggers and workflows executed.
+- The four failures were test-adapter mismatches. Drizzle exposes direct
+  trigger failures as a `Failed query` wrapper, while 10 direct handoff checks
+  matched only the inner message. Raw PostgreSQL timestamps in two state
+  assertions were strings, while the test required JavaScript `Date` objects.
+- All 10 direct handoff rejection checks now use the existing bounded,
+  cycle-safe cause-chain assertion through a local async helper. Each check
+  requires exact SQLSTATE `P0001` and the exact trigger message without
+  stringifying the wrapper, cause, or SQL.
+- Both state queries now project `acknowledged_at is not null` and
+  `resolved_at is not null` as booleans. Assertions for IDs, statuses,
+  versions, action counts, and feedback state remain unchanged.
+- TDD adapter guard RED: 2 of 2 failed. GREEN: 2 of 2 passed. A narrow scan
+  found no remaining direct inner-message handoff check, `expect.any(Date)`,
+  or `Date | null` assertion type in `admin-ledger.test.ts`.
+- Focused repository/support gates: 4 files and 13 tests passed.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- The 12-case PostgreSQL suite was attempted locally, but all bodies were
+  skipped because no working Testcontainers runtime was available. CI remains
+  the authoritative behavioral rerun.
+- Build was not repeated because this remediation changes test/report files
+  only; no production or schema file changed.

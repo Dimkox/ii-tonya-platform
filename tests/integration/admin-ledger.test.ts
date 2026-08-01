@@ -9,8 +9,22 @@ import {
   type ApprovalAdminAction,
 } from "../../packages/db/src/index.js";
 import { startTestPostgres, type TestDatabase } from "../../packages/db/src/testkit/postgres.js";
+import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
 let testDb: TestDatabase | undefined;
+
+const rejected = async (operation: Promise<unknown>): Promise<unknown> =>
+  operation.then(
+    () => { throw new Error("Expected PostgreSQL trigger rejection"); },
+    (error: unknown) => error,
+  );
+
+const expectHandoffPostgresRejection = async (
+  operation: Promise<unknown>,
+  expectedMessage: string,
+): Promise<void> => {
+  expectPostgresErrorCause(await rejected(operation), "P0001", expectedMessage);
+};
 
 async function seedAdmin(role: AdminRole) {
   const adminId = randomUUID();
@@ -428,78 +442,78 @@ describe("atomic approved admin workflows", () => {
     const security = await seedAdmin("security_admin");
     const alertId = await seedSafetyAlert("opened", security.adminId);
 
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       delete from human_escalations where id = ${alertId}::uuid
-    `)).rejects.toThrow("human escalation deletion is forbidden");
-    await expect(testDb!.db.execute(sql`
+    `), "human escalation deletion is forbidden");
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set acknowledgement_deadline = acknowledgement_deadline + interval '1 minute',
         status = 'assigned', version = version + 1, updated_at = clock_timestamp()
       where id = ${alertId}::uuid
-    `)).rejects.toThrow("human escalation immutable fields cannot change");
-    await expect(testDb!.db.execute(sql`
+    `), "human escalation immutable fields cannot change");
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'acknowledged', acknowledged_at = clock_timestamp(),
         version = version + 1, updated_at = clock_timestamp()
       where id = ${alertId}::uuid
-    `)).rejects.toThrow("human escalation status transition is not allowed");
-    await expect(testDb!.db.execute(sql`
+    `), "human escalation status transition is not allowed");
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'assigned', version = version + 2, updated_at = clock_timestamp()
       where id = ${alertId}::uuid
-    `)).rejects.toThrow("human escalation version must increment by one");
+    `), "human escalation version must increment by one");
   });
 
   it("rejects forged early-SLA, pre-transition, and future handoff timestamps", async () => {
     const security = await seedAdmin("security_admin");
 
     const earlySlaId = await seedSafetyAlert("assigned", security.adminId);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'escalated', version = version + 1,
         updated_at = acknowledgement_deadline + interval '1 minute'
       where id = ${earlySlaId}::uuid
-    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+    `), "human escalation transition timestamp is in the future");
 
     const earlyAckId = await seedSafetyAlert("assigned", security.adminId);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'acknowledged', acknowledged_at = updated_at - interval '1 second',
         version = version + 1, updated_at = clock_timestamp()
       where id = ${earlyAckId}::uuid
-    `)).rejects.toThrow("invalid assigned to acknowledged human escalation transition");
+    `), "invalid assigned to acknowledged human escalation transition");
 
     const futureAssignmentId = await seedSafetyAlert("opened", security.adminId);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'assigned', version = version + 1,
         updated_at = clock_timestamp() + interval '1 minute'
       where id = ${futureAssignmentId}::uuid
-    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+    `), "human escalation transition timestamp is in the future");
 
     const futureAckId = await seedSafetyAlert("assigned", security.adminId);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'acknowledged', acknowledged_at = clock_timestamp() + interval '1 minute',
         version = version + 1, updated_at = clock_timestamp() + interval '1 minute'
       where id = ${futureAckId}::uuid
-    `)).rejects.toThrow("human escalation transition timestamp is in the future");
+    `), "human escalation transition timestamp is in the future");
 
     const earlyResolveAfterAckId = await seedSafetyAlert("acknowledged", security.adminId);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'resolved', resolved_at = acknowledged_at - interval '1 second',
         version = version + 1, updated_at = clock_timestamp()
       where id = ${earlyResolveAfterAckId}::uuid
-    `)).rejects.toThrow("invalid resolved human escalation transition");
+    `), "invalid resolved human escalation transition");
 
     const earlyResolveAfterEscalationId = await seedSafetyAlert("escalated", security.adminId, true);
-    await expect(testDb!.db.execute(sql`
+    await expectHandoffPostgresRejection(testDb!.db.execute(sql`
       update human_escalations
       set status = 'resolved', resolved_at = updated_at - interval '1 second',
         version = version + 1, updated_at = clock_timestamp()
       where id = ${earlyResolveAfterEscalationId}::uuid
-    `)).rejects.toThrow("invalid resolved human escalation transition");
+    `), "invalid resolved human escalation transition");
   });
 
   it("allows only opened-assigned, assigned-acknowledged or SLA-escalated, and terminal resolution", async () => {
@@ -540,11 +554,12 @@ describe("atomic approved admin workflows", () => {
       id: string;
       status: string;
       version: number;
-      acknowledgedAt: Date | null;
-      resolvedAt: Date | null;
+      acknowledgedAtIsSet: boolean;
+      resolvedAtIsSet: boolean;
     }>(sql`
-      select id::text, status, version, acknowledged_at as "acknowledgedAt",
-        resolved_at as "resolvedAt"
+      select id::text, status, version,
+        acknowledged_at is not null as "acknowledgedAtIsSet",
+        resolved_at is not null as "resolvedAtIsSet"
       from human_escalations
       where id in (${acknowledgedId}::uuid, ${escalatedId}::uuid)
       order by id
@@ -554,15 +569,15 @@ describe("atomic approved admin workflows", () => {
         id: acknowledgedId,
         status: "resolved",
         version: 4,
-        acknowledgedAt: expect.any(Date),
-        resolvedAt: expect.any(Date),
+        acknowledgedAtIsSet: true,
+        resolvedAtIsSet: true,
       }),
       expect.objectContaining({
         id: escalatedId,
         status: "resolved",
         version: 3,
-        acknowledgedAt: null,
-        resolvedAt: expect.any(Date),
+        acknowledgedAtIsSet: false,
+        resolvedAtIsSet: true,
       }),
     ]));
   });
@@ -629,8 +644,8 @@ describe("atomic approved admin workflows", () => {
       count: string;
       safetyStatus: string;
       safetyVersion: number;
-      acknowledgedAt: Date | null;
-      resolvedAt: Date | null;
+      acknowledgedAtIsSet: boolean;
+      resolvedAtIsSet: boolean;
       feedbackStatus: string;
     }>(sql`
       select
@@ -638,16 +653,16 @@ describe("atomic approved admin workflows", () => {
           where object_id in (${safetyId}::uuid, ${feedbackId}::uuid)) as count,
         (select status from human_escalations where id = ${safetyId}::uuid) as "safetyStatus",
         (select version from human_escalations where id = ${safetyId}::uuid) as "safetyVersion",
-        (select acknowledged_at from human_escalations where id = ${safetyId}::uuid) as "acknowledgedAt",
-        (select resolved_at from human_escalations where id = ${safetyId}::uuid) as "resolvedAt",
+        (select acknowledged_at is not null from human_escalations where id = ${safetyId}::uuid) as "acknowledgedAtIsSet",
+        (select resolved_at is not null from human_escalations where id = ${safetyId}::uuid) as "resolvedAtIsSet",
         (select escalation_status from feedback where id = ${feedbackId}::uuid) as "feedbackStatus"
     `);
     expect(actions.rows[0]).toMatchObject({
       count: "4",
       safetyStatus: "resolved",
       safetyVersion: 3,
-      acknowledgedAt: expect.any(Date),
-      resolvedAt: expect.any(Date),
+      acknowledgedAtIsSet: true,
+      resolvedAtIsSet: true,
       feedbackStatus: "resolved",
     });
     await expect(testDb!.db.execute(sql`delete from admin_case_actions where object_id = ${safetyId}::uuid`)).rejects.toThrow();
