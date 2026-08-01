@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   classifyApprovedTrackedScopeContent,
@@ -10,6 +11,43 @@ import {
 } from "./support/payment-scope-boundary.js";
 
 describe("MVP scope boundary", () => {
+  it("contains no inbound Make or Sheets Fastify route", () => {
+    const violations: string[] = [];
+    for (const path of globSync("apps/api/src/**/*.ts")) {
+      const source = ts.createSourceFile(
+        path,
+        readFileSync(path, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+          const method = node.expression.name.text;
+          const firstArgument = node.arguments[0];
+          const route = method === "route" && firstArgument && ts.isObjectLiteralExpression(firstArgument)
+            ? firstArgument.properties.find(
+              (property): property is ts.PropertyAssignment =>
+                ts.isPropertyAssignment(property) &&
+                ((ts.isIdentifier(property.name) && property.name.text === "url") ||
+                  (ts.isStringLiteral(property.name) && property.name.text === "url")),
+            )?.initializer
+            : firstArgument;
+          if (
+            ["get", "post", "put", "patch", "delete", "route"].includes(method) &&
+            route &&
+            ts.isStringLiteral(route) &&
+            /(?:make|sheets?)/iu.test(route.text)
+          ) {
+            violations.push(`${path}:${route.text}`);
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(violations).toEqual([]);
+  });
+
   it("contains no live or deferred commercial and scheduling modules", () => {
     const forbidden = [
       "packages/integrations/src/payment/live-payment-adapter.ts",

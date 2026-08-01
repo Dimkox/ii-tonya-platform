@@ -12,7 +12,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "65dfa0cee22ec8d220252e290ce12ace829869feac92db64551e36a3ca77ff06",
+    "aae290c279d85d85ae90714b6526e8cda4fba070632b188d567302bfa7062c43",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -412,6 +412,8 @@ const isApprovedPaymentBoundaryImport = (
     [
       "./payment/disabled-payment-adapter.js",
       "./payment/payment-port.js",
+      "./projections/make-projection-sink.js",
+      "./projections/projection-port.js",
     ].includes(specifier)) ||
   (path ===
     "packages/integrations/src/payment/disabled-payment-adapter.ts" &&

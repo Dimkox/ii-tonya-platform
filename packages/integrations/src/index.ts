@@ -34,6 +34,19 @@ export {
   type SelartiTransportResponse,
 } from "./selarti/selarti-contract-adapter.js";
 export { TransportFailure } from "./http/transport-failure.js";
+export {
+  MakeProjectionPermanentFailure,
+  MakeProjectionRetryableFailure,
+  MakeProjectionSink,
+  type MakeProjectionRequest,
+  type MakeProjectionResponse,
+  type MakeProjectionSinkDeps,
+} from "./projections/make-projection-sink.js";
+export type {
+  ProjectionEvent,
+  ProjectionSink,
+  ProjectionTopic,
+} from "./projections/projection-port.js";
 export type {
   CanonicalInboundMessage,
   CanonicalOutboundDelivery,
