@@ -46,6 +46,8 @@ interface Counts {
 }
 
 const number = (value: unknown): number => Number(value ?? 0);
+const postgresInstant = (value: Date | string): Date =>
+  value instanceof Date ? value : new Date(value);
 
 export async function startMvpHarness(input: {
   readonly clock: Date;
@@ -196,11 +198,11 @@ export async function startMvpHarness(input: {
         idempotencyKey: command.idempotencyKey,
       });
       if (!result.allowed) throw new Error("Package grant was denied");
-      const stored = await testDb.db.execute<{ expiresAt: Date }>(sql`
+      const stored = await testDb.db.execute<{ expiresAt: Date | string }>(sql`
         select expires_at as "expiresAt" from message_packages
         where id = ${result.packageId}::uuid
       `);
-      return { expiresAt: stored.rows[0]!.expiresAt.toISOString() };
+      return { expiresAt: postgresInstant(stored.rows[0]!.expiresAt).toISOString() };
     },
 
     async acceptOrdinaryInbound(command: {
@@ -519,10 +521,10 @@ async function seedAdmin(
 ): Promise<AdminPrincipal> {
   const id = randomUUID();
   const sessionIdHash = `session:${randomUUID()}`;
-  const current = await testDb.db.execute<{ now: Date }>(
+  const current = await testDb.db.execute<{ now: Date | string }>(
     sql`select clock_timestamp() as now`,
   );
-  const mfaVerifiedAt = current.rows[0]!.now;
+  const mfaVerifiedAt = postgresInstant(current.rows[0]!.now);
   await testDb.db.execute(sql`insert into users (id) values (${id}::uuid)`);
   await testDb.db.execute(sql`
     insert into admin_sessions (session_id_hash, admin_id, mfa_verified_at, expires_at)

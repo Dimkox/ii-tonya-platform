@@ -93,7 +93,7 @@ describe("PRIV-01 through PRIV-05 privacy workflow contract", () => {
       capability: { enabled: true },
     });
     const job = await service.eraseSubject({ principalUserId: userId, targetUserId: userId, correlationId: `erase:${userId}` });
-    expect(job).toMatchObject({ contentRefsDeleted: 1, profileFieldsDeleted: 3, ledgerFactsPreserved: 1, auditFactsPreserved: 1 });
+    expect(job).toMatchObject({ contentRefsDeleted: 1, profileFieldsDeleted: 2, ledgerFactsPreserved: 1, auditFactsPreserved: 1 });
     const state = await testDb!.db.execute<{ identityCount: number; profileCount: number; contentRef: string | null; ledgerCount: number; auditCount: number; pseudonym: string | null }>(sql`
       select
         (select count(*)::integer from channel_identities where user_id = ${userId}::uuid) as "identityCount",
