@@ -6,7 +6,7 @@ import {
 } from "./make-projection-sink.js";
 
 const event = {
-  eventId: "019fa875-2d67-78f1-8c71-f4936268da29",
+  eventId: "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
   topic: "reservation_projection.v1" as const,
   occurredAt: "2026-07-28T10:00:00.000Z",
   correlationId: "corr-1",
@@ -33,7 +33,7 @@ describe("Make projection sink", () => {
       endpoint: new URL("https://projection.invalid/events"),
       headers: expect.objectContaining({
         Authorization: "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
-        "Idempotency-Key": "019fa875-2d67-78f1-8c71-f4936268da29",
+        "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
       }),
       body: event,
       signal: expect.any(AbortSignal),

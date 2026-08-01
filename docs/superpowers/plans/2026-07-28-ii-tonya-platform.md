@@ -3083,7 +3083,7 @@ const memoryCallbackStore = () => {
 describe("Telegram expert callback", () => {
   const secret = new TextEncoder().encode("__PLACEHOLDER_CALLBACK_HMAC_KEY__");
   const claims = {
-    reservationId: "019fa875-2d67-78f1-8c71-f4936268da29",
+    reservationId: "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
     expertId: "expert-1",
     action: "confirm" as const,
     version: 3,
@@ -3187,12 +3187,12 @@ describe("Telegram expert callback", () => {
     }],
     ["timeout-after-send", {
       kind: "unknown_outcome",
-      reconciliationKey: "telegram-notification-1",
+      reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
       reasonCode: "timeout_after_write",
     }],
     ["invalid-schema", {
       kind: "unknown_outcome",
-      reconciliationKey: "telegram-notification-1",
+      reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
       reasonCode: "invalid_success_schema",
     }],
   ] as const)("executes TelegramAdapter transport fixture %s", async (name, expected) => {
@@ -3207,13 +3207,13 @@ describe("Telegram expert callback", () => {
       maxBodyBytes: 64_000,
     });
     await expect(adapter.sendReservationRequest({
-      idempotencyKey: "telegram-notification-1",
+      idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
       telegramUserId: "123456789",
       text: "fixture",
     })).resolves.toEqual(expected);
     expect(transport.request).toHaveBeenCalledTimes(1);
     expect(transport.request.mock.calls[0]![0]).toMatchObject({
-      context: { idempotencyKey: "telegram-notification-1" },
+      context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__" },
     });
     const serializedLogs = JSON.stringify(logged);
     expect(serializedLogs).not.toContain("__PLACEHOLDER_TELEGRAM_BOT_TOKEN__");
@@ -4523,7 +4523,7 @@ describe("Make projection sink", () => {
       post,
     });
     await sink.publish({
-      eventId: "019fa875-2d67-78f1-8c71-f4936268da29",
+      eventId: "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
       topic: "reservation_projection.v1",
       occurredAt: "2026-07-28T10:00:00.000Z",
       correlationId: "corr-1",
@@ -4531,7 +4531,7 @@ describe("Make projection sink", () => {
       data: { reservationId: "r-1", status: "reserved", expertId: "e-1" },
     });
     expect(post).toHaveBeenCalledWith(expect.objectContaining({
-      headers: expect.objectContaining({ "Idempotency-Key": "019fa875-2d67-78f1-8c71-f4936268da29" }),
+      headers: expect.objectContaining({ "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__" }),
     }));
     expect(JSON.stringify(post.mock.calls[0])).not.toContain("rawConversation");
   });

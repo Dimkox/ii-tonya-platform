@@ -80,7 +80,7 @@ const memoryCallbackStore = () => {
 describe("Telegram expert callback", () => {
   const secret = new TextEncoder().encode("__PLACEHOLDER_CALLBACK_HMAC_KEY__");
   const claims = {
-    reservationId: "019fa875-2d67-78f1-8c71-f4936268da29",
+    reservationId: "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
     expertId: "expert-1",
     action: "confirm" as const,
     version: 3,
@@ -532,7 +532,7 @@ describe("Telegram expert callback", () => {
       "timeout-after-send",
       {
         kind: "unknown_outcome",
-        reconciliationKey: "telegram-notification-1",
+        reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
         reasonCode: "timeout_after_write",
       },
     ],
@@ -540,7 +540,7 @@ describe("Telegram expert callback", () => {
       "invalid-schema",
       {
         kind: "unknown_outcome",
-        reconciliationKey: "telegram-notification-1",
+        reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
         reasonCode: "invalid_success_schema",
       },
     ],
@@ -556,7 +556,7 @@ describe("Telegram expert callback", () => {
       "server-error-500",
       {
         kind: "unknown_outcome",
-        reconciliationKey: "telegram-notification-1",
+        reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
         reasonCode: "http_500_after_write",
       },
     ],
@@ -575,14 +575,14 @@ describe("Telegram expert callback", () => {
       });
       await expect(
         adapter.sendReservationRequest({
-          idempotencyKey: "telegram-notification-1",
+          idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
           telegramUserId: "123456789",
           text: "fixture",
         }),
       ).resolves.toEqual(expected);
       expect(transport.request).toHaveBeenCalledTimes(1);
       expect(transport.request.mock.calls[0]![0]).toMatchObject({
-        context: { idempotencyKey: "telegram-notification-1" },
+        context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__" },
       });
       const serializedLogs = JSON.stringify(logged);
       expect(serializedLogs).not.toContain(
@@ -606,7 +606,7 @@ describe("Telegram expert callback", () => {
 
     await expect(
       adapter.sendSchedule({
-        idempotencyKey: "telegram-schedule-1",
+        idempotencyKey: "__PLACEHOLDER_TELEGRAM_RECONCILIATION_KEY__",
         telegramUserId: "123456789",
         text: "Your authorized schedule",
       }),
@@ -617,7 +617,7 @@ describe("Telegram expert callback", () => {
         chat_id: "123456789",
         text: "Your authorized schedule",
       },
-      context: { idempotencyKey: "telegram-schedule-1" },
+      context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_RECONCILIATION_KEY__" },
     });
   });
 
