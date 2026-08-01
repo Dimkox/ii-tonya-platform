@@ -99,7 +99,7 @@ describe("PRIV-01 through PRIV-05 privacy workflow contract", () => {
         (select count(*)::integer from channel_identities where user_id = ${userId}::uuid) as "identityCount",
         (select count(*)::integer from client_profiles where user_id = ${userId}::uuid) as "profileCount",
         (select content_ref from conversation_messages where conversation_id = '00000000-0000-4000-8000-000000000301'::uuid) as "contentRef",
-        (select count(*)::integer from message_ledger_entries where idempotency_key = 'privacy-ledger-${userId}') as "ledgerCount",
+        (select count(*)::integer from message_ledger_entries where idempotency_key = ${`privacy-ledger-${userId}`}) as "ledgerCount",
         (select count(*)::integer from audit_events where actor_id = ${userId}::uuid) as "auditCount",
         (select evidence_pseudonym from privacy_deletion_jobs where id = ${job.jobId}::uuid) as pseudonym
     `);
