@@ -45,40 +45,19 @@ const callTarget = (
   return undefined;
 };
 
-const declarationName = (node: ts.VariableDeclaration): string | undefined =>
-  ts.isIdentifier(node.name) ? node.name.text : undefined;
-
 export const findProjectionCommandRouteViolations = ({
-  path,
+  path: rawPath,
   content,
 }: ProjectionRouteSource): string[] => {
+  const path = rawPath.replaceAll("\\", "/");
+  if (!path.startsWith("apps/api/")) return [];
   const source = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
   const constants = new Map<string, ts.Expression>();
-  const fastifyConstructors = new Set<string>();
-  const fastifyReceivers = new Set<string>();
-
-  for (const statement of source.statements) {
-    if (
-      ts.isImportDeclaration(statement) &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      statement.moduleSpecifier.text === "fastify" &&
-      statement.importClause?.name
-    ) {
-      fastifyConstructors.add(statement.importClause.name.text);
-    }
-  }
 
   const collectDeclarations = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
-      const name = declarationName(node);
-      if (name) constants.set(name, node.initializer);
-      if (
-        name &&
-        ts.isCallExpression(node.initializer) &&
-        ts.isIdentifier(node.initializer.expression) &&
-        fastifyConstructors.has(node.initializer.expression.text)
-      ) {
-        fastifyReceivers.add(name);
+      if (ts.isIdentifier(node.name)) {
+        constants.set(node.name.text, node.initializer);
       }
     }
     ts.forEachChild(node, collectDeclarations);
@@ -121,19 +100,12 @@ export const findProjectionCommandRouteViolations = ({
     }
 
     const target = callTarget(node.expression);
-    if (!target || !fastifyReceivers.has(target.receiver)) {
+    if (!target) {
       ts.forEachChild(node, inspect);
       return;
     }
 
     if (target.method === "register") {
-      const callback = node.arguments[0];
-      if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
-        const parameter = callback.parameters[0];
-        if (parameter && ts.isIdentifier(parameter.name)) {
-          fastifyReceivers.add(parameter.name.text);
-        }
-      }
       const prefix = resolveText(objectProperty(node.arguments[1], "prefix"));
       if (prefix && projectionRoute.test(prefix)) {
         violations.push(`${path}: Fastify register prefix ${prefix}`);

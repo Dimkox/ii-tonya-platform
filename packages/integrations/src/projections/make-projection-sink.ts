@@ -69,11 +69,12 @@ export class MakeProjectionPermanentFailure extends Error {
   }
 }
 
-const valueType = (value: string | number | boolean | null): ProjectionValueType => {
+const valueType = (value: unknown): ProjectionValueType | undefined => {
   if (value === null) return "null";
   if (typeof value === "string") return "string";
   if (typeof value === "number") return "number";
-  return "boolean";
+  if (typeof value === "boolean") return "boolean";
+  return undefined;
 };
 
 const isRetryableStatus = (status: number): boolean =>
@@ -122,10 +123,12 @@ const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
   for (const field of Object.keys(event.data)) {
     const value = event.data[field];
     const expectedTypes = allowed[field];
+    const actualType = valueType(value);
     if (
       value === undefined ||
+      actualType === undefined ||
       !expectedTypes ||
-      !expectedTypes.includes(valueType(value as string | number | boolean | null)) ||
+      !expectedTypes.includes(actualType) ||
       (typeof value === "number" && !Number.isFinite(value))
     ) {
       throw new MakeProjectionPermanentFailure("invalid_projection_data");

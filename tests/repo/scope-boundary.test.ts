@@ -29,10 +29,14 @@ describe("MVP scope boundary", () => {
     ["const route", 'const route = "/v1/sheets"; app.put(route, handler);'],
     ["route options variable", 'const options = { url: "/v1/make" }; app.route(options);'],
     ["register prefix", 'app.register(plugin, { prefix: "/v1/webhooks/sheets" });'],
+    ["FastifyInstance plugin parameter", 'export const plugin = (fastify: FastifyInstance) => fastify.post("/v1/make", handler);'],
+    ["Fastify alias", 'const server = app; server.post("/v1/sheets", handler);'],
+    ["named fastify import", 'const app = fastify(); app.post("/v1/make", handler);'],
+    ["unknown receiver", 'router.post("/v1/webhooks/sheets", handler);'],
   ])("detects an inbound Make or Sheets %s evasion", (_label, snippet) => {
     expect(findProjectionCommandRouteViolations({
       path: "apps/api/src/evasion.ts",
-      content: `import Fastify from "fastify"; const app = Fastify(); ${snippet}`,
+      content: `import Fastify, { fastify, type FastifyInstance } from "fastify"; const app = Fastify(); ${snippet}`,
     })).not.toEqual([]);
   });
 

@@ -131,6 +131,28 @@ describe("Make projection sink", () => {
   });
 
   it.each([
+    ["object", { unexpected: true }],
+    ["array", [true]],
+    ["undefined", undefined],
+    ["function", () => true],
+    ["bigint", 1n],
+  ])("rejects feedback escalated with a %s value", async (_label, escalated) => {
+    const post = vi.fn().mockResolvedValue({ status: 202 });
+    const sink = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post,
+    });
+
+    await expect(sink.publish({
+      ...event,
+      topic: "feedback_projection.v1",
+      data: { feedbackId: "f-1", score: 5, escalated },
+    } as never)).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ["event id", { ...event, eventId: 7 }],
     ["occurred at", { ...event, occurredAt: null }],
     ["correlation id", { ...event, correlationId: {} }],

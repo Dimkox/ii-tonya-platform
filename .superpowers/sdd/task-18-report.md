@@ -55,6 +55,45 @@ git diff --check
 # passed
 ```
 
+## Second review fix wave evidence
+
+Hostile tests were first run RED: 12 failures showed `feedback.escalated`
+accepting object/array/function/bigint values, projection access escaping through
+dynamic/CommonJS/TypeScript require forms, and route checks relying on a
+recognized Fastify receiver.
+
+The green changes make scalar classification explicit with no boolean fallback:
+only strings, finite numbers, booleans, and topic-allowed null reach the
+reconstructed envelope. The projection architecture classifier now inspects
+dynamic `import()`, `require`, and `import = require` edges; public integrations
+runtime namespace access is rejected outside the existing allowed boundaries.
+The API route classifier is intentionally receiver-independent within
+`apps/api`, while retaining static const/template/options/register-prefix
+resolution. New probes cover plugin parameters, aliases, named Fastify imports,
+and unknown receivers. Payment scope allowlists were unchanged.
+
+Focused GREEN evidence after those changes:
+
+```text
+pnpm exec vitest run ... -t "feedback escalated|dynamic|CommonJS|import equals|FastifyInstance|Fastify alias|named fastify|unknown receiver"
+# 14 passed, 106 skipped
+pnpm --filter @ii-tonya/integrations typecheck
+# passed
+```
+
+Final second-wave verification:
+
+```text
+pnpm exec vitest run packages/integrations/src/projections/make-projection-sink.test.ts tests/repo/architecture-boundaries.test.ts tests/repo/scope-boundary.test.ts
+# 3 files, 120 tests passed (19 projection, 14 architecture, 87 scope)
+pnpm typecheck
+# 10 workspace projects passed
+pnpm lint
+# passed
+git diff --check
+# passed
+```
+
 ## Known repository baseline concern
 
 The requested full focused Vitest command still fails two pre-existing
