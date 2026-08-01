@@ -60,9 +60,13 @@ export class AdminInvalidStateTransitionError extends Error {
     this.name = "AdminInvalidStateTransitionError";
   }
 }
-
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 type MutationResult = Record<string, unknown>;
+
+export interface PostgresAdminRepositoryOptions {
+  /** Deterministic acceptance-test seam. Production callers must omit it. */
+  readonly testOnlyNow?: Date;
+}
 
 const digest = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
@@ -85,7 +89,16 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
 };
 
 export class PostgresAdminRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly options: PostgresAdminRepositoryOptions = {},
+  ) {}
+
+  private grantClock() {
+    return this.options.testOnlyNow === undefined
+      ? sql`clock_timestamp()`
+      : sql`${this.options.testOnlyNow}`;
+  }
 
   private async appendAudit(
     executor: DrizzleDb | Transaction,
@@ -306,7 +319,7 @@ export class PostgresAdminRepository {
           case when ${kind} = 'admin'
             then c.db_now + interval '60 days' else null end,
           c.db_now
-        from (select clock_timestamp() as db_now) c
+        from (select ${this.grantClock()} as db_now) c
         on conflict (grant_idempotency_key) do nothing
         returning id as "packageId"
       `);

@@ -8,10 +8,10 @@ coverage/
 .pnpm-store/
 .turbo/
 .cache/
+.tmp/
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
 .superpowers/
 work/
-

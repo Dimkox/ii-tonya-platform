@@ -1,0 +1,162 @@
+name: Gated release
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_image_digest:
+        description: Tested API image digest (sha256:...)
+        required: true
+        type: string
+      worker_image_digest:
+        description: Tested worker image digest (sha256:...)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify_digest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      api_image_digest: ${{ steps.digests.outputs.api_image_digest }}
+      worker_image_digest: ${{ steps.digests.outputs.worker_image_digest }}
+    steps:
+      - name: Validate immutable tested digests
+        id: digests
+        env:
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          WORKER_IMAGE_DIGEST: ${{ inputs.worker_image_digest }}
+        run: |
+          pattern='^sha256:[0-9a-f]{64}$'
+          [[ "$API_IMAGE_DIGEST" =~ $pattern ]]
+          [[ "$WORKER_IMAGE_DIGEST" =~ $pattern ]]
+          echo "api_image_digest=$API_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "worker_image_digest=$WORKER_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+
+  staging:
+    needs: verify_digest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - name: Checkout staging runbooks and probes
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Record immutable staging candidates
+        env:
+          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
+          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
+        run: |
+          printf 'api=%s\nworker=%s\n' "$API_IMAGE_DIGEST" "$WORKER_IMAGE_DIGEST" > staging-digests.txt
+
+      - name: Deploy staging by tested image digest
+        run: |
+          echo "::error::Staging deployment adapter is not configured; provider-connected staging remains BLOCKED."
+          exit 1
+
+      - name: Run staging migration preflight
+        run: |
+          echo "::error::Staging migration preflight adapter is not configured."
+          exit 1
+
+      - name: Run staging smoke
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL }}
+        run: |
+          test -n "$BASE_URL"
+          node scripts/smoke.mjs "--base-url=$BASE_URL"
+
+      - name: Run staging reconciliation
+        run: |
+          echo "::error::Staging reconciliation adapter is not configured."
+          exit 1
+
+  evidence_gate:
+    needs: verify_digest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout evidence records
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Enforce independently reviewed evidence statuses
+        run: |
+          grep -Fx 'Release status: GO' docs/runbooks/go-live-evidence.md
+          grep -Fx 'Provider staging status: PASS' docs/runbooks/provider-staging-evidence.md
+
+      - name: Create digest-bound evidence artifact
+        env:
+          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
+          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
+        run: |
+          printf 'api=%s\nworker=%s\n' "$API_IMAGE_DIGEST" "$WORKER_IMAGE_DIGEST" > release-evidence.txt
+          cat docs/runbooks/go-live-evidence.md docs/runbooks/provider-staging-evidence.md >> release-evidence.txt
+          sha256sum release-evidence.txt > release-evidence.sha256
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: |
+            release-evidence.txt
+            release-evidence.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    needs: [verify_digest, staging, evidence_gate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout production runbooks and probes
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Bind production to reviewed image_digest values
+        env:
+          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
+          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
+        run: |
+          test -n "$API_IMAGE_DIGEST"
+          test -n "$WORKER_IMAGE_DIGEST"
+
+      - name: Deploy production by signed tested image digest
+        run: |
+          echo "::error::Production deployment is unavailable until rollback.md, signed digest verification, and the target adapter are approved."
+          exit 1
+
+      - name: Run production migration preflight
+        run: |
+          echo "::error::Production migration preflight adapter is not configured."
+          exit 1
+
+      - name: Run production smoke
+        env:
+          BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: |
+          test -n "$BASE_URL"
+          node scripts/smoke.mjs "--base-url=$BASE_URL"
+
+      - name: Run production reconciliation
+        run: |
+          echo "::error::Production reconciliation adapter is not configured."
+          exit 1
+
+      - name: Follow rollback.md after a failed production gate
+        if: failure()
+        run: |
+          test -f docs/runbooks/rollback.md
+          echo "::error::Production gate failed; execute the approved rollback.md procedure with the decision owner."
+          exit 1

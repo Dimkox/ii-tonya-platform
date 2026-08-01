@@ -26,7 +26,7 @@ const approvedPaymentBoundaryHashes = new Map([
 const approvedPackageManifestHashes = new Map([
   [
     "apps/api/package.json",
-    "eb1144b1f7b877efe8f6114ee9b627a8d065bfb64fbed3617e8463a8b3f83936",
+    "34edd6b480799b53b8e378fa596586ff3406adb945ef1c48910150bcc55e8449",
   ],
   [
     "apps/worker/package.json",
@@ -34,7 +34,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "ef4322d6abff5c0efa15392c3f3152a24b95ec665300bad64c35155c7a8800ca",
+    "4d3af025c003ca084fc82ec973bb6e71677c7a27c68ddb0f0bd1cf80394e16c4",
   ],
   [
     "packages/application/package.json",
@@ -50,7 +50,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/db/package.json",
-    "5f5e78ae5b15576ce6efc4db9f6bd9c43519d2eb9c5cdf553ad216a81c06cece",
+    "a353472305685ce82b891a6dfc7eff4a015d9f4cc376191fde47ec6b89fb155a",
   ],
   [
     "packages/domain/package.json",
@@ -62,7 +62,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/observability/package.json",
-    "f63fa081290353e171acddd22318f51dde50f2fb349f1e97fb0da0be07afc9f6",
+    "74a51f0c482a51b47f47a765619a1ddf35e9e8c1ff4ab1997507663e61f38f0f",
   ],
   [
     "packages/worker/package.json",
@@ -71,8 +71,24 @@ const approvedPackageManifestHashes = new Map([
 ]);
 const approvedAutomationArtifactHashes = new Map([
   [
+    ".github/workflows/ci.yml",
+    "1914f9f1853b5e1ccabdc0dc75cd8c5dabba6641f9ffb69338ce9ed25025ca16",
+  ],
+  [
     ".github/workflows/db-gate.yml",
-    "99fcb457f3c4d49fab95fca1ed68ef53bb6b88ca6f8677a30ede70702e9e0c93",
+    "e4d0009d9c9af5b053478a0070adfddf08a2f49df6bec365a92d91f52a673811",
+  ],
+  [
+    ".github/workflows/release.yml",
+    "eed2ed4ac98bbc825f4b77c99d7440cf48c61b019ebebef40cee3b34ded69317",
+  ],
+  [
+    "dockerfile",
+    "29de2a7900d41987b29f9d0196c80631ac78aacefaf19c92ddf564be7c8c12cf",
+  ],
+  [
+    "compose.yaml",
+    "ae8d5706ade72ea456c3d010b61f28443688efd5c621e72c95ae4bf4f104f547",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
@@ -167,13 +183,13 @@ const approvedDependencySpecifiers = new Map([
   ["@ii-tonya/observability", "workspace:*"],
   ["@ii-tonya/worker", "workspace:*"],
   ["@opentelemetry/api", "^1.9.0"],
-  ["@opentelemetry/sdk-node", "^0.203.0"],
+  ["@opentelemetry/sdk-node", "^0.221.0"],
   ["@testcontainers/postgresql", "^10.28.0"],
   ["@types/node", "^24.0.0"],
   ["@types/pg", "^8.15.5"],
   ["@vitest/coverage-v8", "^3.2.4"],
   ["drizzle-kit", "^0.31.4"],
-  ["drizzle-orm", "^0.44.3"],
+  ["drizzle-orm", "^0.45.2"],
   ["eslint", "^9.31.0"],
   ["fast-check", "^4.2.0"],
   ["fastify", "^5.5.0"],
@@ -259,6 +275,10 @@ const approvedMigrationHashes = new Map([
     "3fb0532ce45de66c4d1f86c74aaf473e525d9440e6937d716ed50dc3e93e9045",
   ],
   [
+    "packages/db/migrations/0017_adorable_sinister_six.sql",
+    "255b88191d6bdfc679ea5066b247c47ad19fca41832baace209db424736972fa",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -323,8 +343,12 @@ const approvedMigrationHashes = new Map([
     "e1b95f18854218f2a1e9376d03988e132f8bed6ea5f7969321a3e3be4566d9ef",
   ],
   [
+    "packages/db/migrations/meta/0017_snapshot.json",
+    "42dd577fe90276a165e03294701ea22ad799cfdd5e631e69d94b5008a9bcb903",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "93113689a6488265ffa20fcfd4f174fcbfb34b65843eb29a5219426b9a363493",
+    "91a9690a08b6d029aae0e0ae1a297f0c986f84be01a97a3d20a03e341a7e8efc",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -368,6 +392,7 @@ const approvedDatabaseRelations = new Set([
   "safety_incidents",
   "slots",
   "users",
+  "webhook_inbox",
 ]);
 
 const providerName =
@@ -385,12 +410,10 @@ const providerPath =
   /(?:^|\/)(?:commercial|commerce|stripe|yookassa|cloudpayments|paypal|adyen|square)(?:[-_.\/]|$)/iu;
 const paymentIntegrationArtifact =
   /(?:^|\/)payments?(?:[-_](?:adapter|client|codec|gateway|provider|service))?(?:[-_.\/]|$)/iu;
-const paymentApiPath =
-  /(?:^|\/)(?:checkout|payments?|refunds?)(?:[-_.\/]|$)/iu;
+const paymentApiPath = /(?:^|\/)(?:checkout|payments?|refunds?)(?:[-_.\/]|$)/iu;
 const paymentApplicationPath =
   /(?:^|\/)(?:payments?(?:[-_].*)?|.*payment[-_](?:consumer|handler)|entitlement[-_]grant|settlement[-_]worker|checkout[-_].*(?:access|entitlement|grant))(?:[-_.\/]|$)/iu;
-const paymentDbPath =
-  /(?:^|\/)(?:payments?|refunds?|charges?)(?:[-_.\/]|$)/iu;
+const paymentDbPath = /(?:^|\/)(?:payments?|refunds?|charges?)(?:[-_.\/]|$)/iu;
 const commercialRoute =
   /\/(?:checkout|payments?|refunds?|stripe|yookassa)(?:\/|$)/iu;
 const paymentApplicationIdentifier =
@@ -419,9 +442,7 @@ const isExecutableAutomationPath = (path: string): boolean =>
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
   if (path.endsWith("/package.json") || path === "package.json") return true;
-  if (
-    /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path)
-  ) {
+  if (/^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path)) {
     return true;
   }
   if (isExecutableAutomationPath(path)) return true;
@@ -443,7 +464,9 @@ const literalText = (node: ts.Expression | undefined): string | undefined =>
     ? node.text
     : undefined;
 
-const callMethodName = (expression: ts.LeftHandSideExpression): string | undefined => {
+const callMethodName = (
+  expression: ts.LeftHandSideExpression,
+): string | undefined => {
   if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
   if (ts.isElementAccessExpression(expression)) {
     return literalText(expression.argumentExpression);
@@ -483,8 +506,7 @@ const isApprovedPaymentBoundaryImport = (
       "./projections/make-projection-sink.js",
       "./projections/projection-port.js",
     ].includes(specifier)) ||
-  (path ===
-    "packages/integrations/src/payment/disabled-payment-adapter.ts" &&
+  (path === "packages/integrations/src/payment/disabled-payment-adapter.ts" &&
     specifier === "./payment-port.js");
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
@@ -494,8 +516,7 @@ const isNetworkCall = (node: ts.CallExpression): boolean => {
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
   const owner = node.expression.expression;
   return (
-    ts.isIdentifier(owner) &&
-    /^(?:axios|http|https|undici)$/u.test(owner.text)
+    ts.isIdentifier(owner) && /^(?:axios|http|https|undici)$/u.test(owner.text)
   );
 };
 
@@ -583,8 +604,7 @@ const inspectTypeScript = (
       }
     }
   } else if (
-    path ===
-    "packages/integrations/src/payment/disabled-payment-adapter.ts"
+    path === "packages/integrations/src/payment/disabled-payment-adapter.ts"
   ) {
     for (const statement of source.statements) {
       if (ts.isImportDeclaration(statement)) {
@@ -635,7 +655,9 @@ const inspectTypeScript = (
         /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
         !isApprovedPaymentBoundaryImport(path, specifier)
       ) {
-        violations.push(`payment boundary import outside allowlist: ${specifier}`);
+        violations.push(
+          `payment boundary import outside allowlist: ${specifier}`,
+        );
       }
     }
 
@@ -662,10 +684,7 @@ const inspectTypeScript = (
           violations.push(`commercial API route: ${route}`);
         }
       }
-      if (
-        ts.isIdentifier(node) &&
-        paymentApiIdentifier.test(node.text)
-      ) {
+      if (ts.isIdentifier(node) && paymentApiIdentifier.test(node.text)) {
         violations.push(`commercial API route identifier: ${node.text}`);
       }
     }
@@ -695,10 +714,7 @@ const inspectTypeScript = (
       }
     }
 
-    if (
-      ts.isCallExpression(node) &&
-      isNetworkCall(node)
-    ) {
+    if (ts.isCallExpression(node) && isNetworkCall(node)) {
       const target = literalText(node.arguments[0]);
       if (
         approvedPaymentBoundaryPaths.has(path) ||
@@ -709,14 +725,13 @@ const inspectTypeScript = (
     }
 
     if (
-      (ts.isPropertyAccessExpression(node) ||
-        ts.isElementAccessExpression(node))
+      ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)
     ) {
       const key = processEnvKey(node);
       if (
         key &&
-        (approvedPaymentBoundaryPaths.has(path) ||
-          isPaymentCredentialKey(key))
+        (approvedPaymentBoundaryPaths.has(path) || isPaymentCredentialKey(key))
       ) {
         violations.push(`payment credential environment access: ${key}`);
       }
@@ -811,14 +826,15 @@ const inspectMigration = (
         continue;
       }
       for (const relation of Object.values(section)) {
-        if (!relation || typeof relation !== "object" || Array.isArray(relation)) {
+        if (
+          !relation ||
+          typeof relation !== "object" ||
+          Array.isArray(relation)
+        ) {
           continue;
         }
         const name = (relation as Record<string, unknown>).name;
-        if (
-          typeof name === "string" &&
-          !approvedDatabaseRelations.has(name)
-        ) {
+        if (typeof name === "string" && !approvedDatabaseRelations.has(name)) {
           violations.push(`unapproved database snapshot relation: ${name}`);
         }
       }
@@ -834,7 +850,9 @@ const inspectMigration = (
   )) {
     const relationName = match[1];
     if (relationName && !approvedDatabaseRelations.has(relationName)) {
-      violations.push(`unapproved database migration relation: ${relationName}`);
+      violations.push(
+        `unapproved database migration relation: ${relationName}`,
+      );
     }
   }
 };
@@ -860,10 +878,7 @@ export const classifyPaymentScopeProbe = ({
     paymentApplicationPath.test(path)
   ) {
     violations.push("payment consumer or entitlement path");
-  } else if (
-    path.startsWith("packages/db/") &&
-    paymentDbPath.test(path)
-  ) {
+  } else if (path.startsWith("packages/db/") && paymentDbPath.test(path)) {
     violations.push("commercial database schema path");
   }
 

@@ -28,6 +28,24 @@ describe("worker main", () => {
     expect(runtime.close).toHaveBeenCalledOnce();
   });
 
+  it("updates the configured heartbeat after a successful built-worker cycle", async () => {
+    const { runWorkerLoop } = await import("./main.js");
+    const controller = new AbortController();
+    const heartbeat = vi.fn(() => { controller.abort(); });
+    const runtime = {
+      runOnce: vi.fn(async () => ({ safetyHandoffs: {} }) as never),
+      close: vi.fn(async () => undefined),
+    };
+
+    await runWorkerLoop(runtime, {
+      signal: controller.signal,
+      pollIntervalMs: 1,
+      heartbeat,
+    });
+
+    expect(heartbeat).toHaveBeenCalledOnce();
+  });
+
   it("does not accumulate abort listeners between polling intervals", async () => {
     const { runWorkerLoop } = await import("./main.js");
     const controller = new AbortController();

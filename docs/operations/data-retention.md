@@ -1,0 +1,13 @@
+# Data retention
+
+Owner: Privacy owner. Reviewer: Security owner. Status: not approved for live data.
+
+| Data class                        | Legal basis                               | Retention                                 | Deletion or anonymization                                                         | Backup expiry                  |
+| --------------------------------- | ----------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------ |
+| Identity and consent              | documented consent or contract            | account lifetime plus approved legal hold | privacy erasure worker; consent withdrawal immediately blocks optional processing | 35 days after primary deletion |
+| Message metadata and ledger facts | contract and fraud prevention             | 3 years, subject to legal approval        | anonymize subject identifiers; ledger facts remain immutable                      | 35 days                        |
+| Reservation and audit facts       | contract and legitimate security interest | 5 years, subject to legal approval        | minimize payload, retain immutable fact and reviewer trace                        | 35 days                        |
+| Raw conversation content          | none approved                             | prohibited                                | `RAW_CONVERSATION_LOGGING=false`; reject attempted enablement                     | not backed up                  |
+| Minor data                        | no approved policy                        | prohibited                                | `MINOR_ONBOARDING_ENABLED=false`                                                  | not backed up                  |
+
+Executable checks: `pnpm exec vitest run packages/worker/src/data-retention.test.ts packages/application/src/privacy-service.test.ts tests/integration/privacy-workflow.test.ts`. Every consent withdrawal and erasure job must be idempotent, processor-tracked, resumable, and followed by a dated backup-expiry receipt. No retention period becomes operative until legal review is recorded in `go-live-evidence.md`.

@@ -15,7 +15,6 @@ export interface LocalReservationSnapshot {
   readonly status: LocalReservationStatus;
   readonly projectionDelivery?: ProjectionDeliveryStatus;
 }
-
 export interface ProviderReservationSnapshot {
   readonly externalId: string;
   readonly status: ProviderReservationStatus;
@@ -90,6 +89,16 @@ export interface ReconciliationReport {
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 1_000;
+
+const statusesMatch = (
+  local: LocalReservationStatus,
+  provider: ProviderReservationStatus,
+): boolean =>
+  local === provider
+  || (
+    (local === "cancelled_by_client" || local === "cancelled_by_expert")
+    && provider === "cancelled"
+  );
 
 function parseWindow(window: ReconciliationWindow): {
   readonly range: { readonly from: string; readonly to: string };
@@ -171,7 +180,7 @@ export async function reconcileProviderReservations(
   for (const reservation of local) {
     const provider = providerById.get(reservation.externalId);
     if (provider === undefined) continue;
-    if (reservation.status === provider.status) matched += 1;
+    if (statusesMatch(reservation.status, provider.status)) matched += 1;
     else {
       mismatches.push({
         reservationId: reservation.id,

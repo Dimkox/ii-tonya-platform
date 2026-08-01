@@ -72,6 +72,9 @@ jobs:
       - name: Run atomic admin workflow gate
         run: pnpm exec vitest run tests/integration/admin-ledger.test.ts
 
+      - name: Run AC-025 exact MVP chain gate
+        run: pnpm exec vitest run tests/e2e/mvp-smoke.test.ts
+
       - name: Run authenticated admin API gate
         run: pnpm exec vitest run tests/integration/admin-api.test.ts
 

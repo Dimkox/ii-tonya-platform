@@ -3,6 +3,24 @@ import { reconcileProviderReservations } from "./reconciliation.js";
 import { reconciliationFixture } from "./worker-jobs.testkit.js";
 
 describe("provider reconciliation", () => {
+  it.each(["cancelled_by_client", "cancelled_by_expert"] as const)(
+    "normalizes local %s to the provider cancelled state",
+    async (status) => {
+      const deps = reconciliationFixture({
+        local: [{ id: "r-1", externalId: "p-1", status }],
+        provider: [{ externalId: "p-1", status: "cancelled" }],
+      });
+
+      const report = await reconcileProviderReservations(deps, {
+        from: "2026-07-28T00:00:00.000Z",
+        to: "2026-07-29T00:00:00.000Z",
+      });
+
+      expect(report.matched).toBe(1);
+      expect(report.mismatches).toEqual([]);
+    },
+  );
+
   it("reports drift, repairs only safe projection drift, and never guesses provider state", async () => {
     const deps = reconciliationFixture({
       local: [{ id: "r-1", externalId: "p-1", status: "reserved" }],

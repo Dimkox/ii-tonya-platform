@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
@@ -16,10 +17,10 @@ type RuntimeConfig = ReturnType<typeof loadEnv>;
 export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
-
 export interface WorkerLoopOptions {
   readonly signal: AbortSignal;
   readonly pollIntervalMs: number;
+  readonly heartbeat?: () => void | Promise<void>;
 }
 
 export interface WorkerMainOptions {
@@ -85,6 +86,7 @@ export async function runWorkerLoop(
         );
       });
       if (outcome === "aborted") break;
+      await options.heartbeat?.();
       await waitForNextCycle(options.pollIntervalMs, options.signal);
     }
   } finally {
@@ -128,6 +130,7 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
     await runWorkerLoop(runtime, {
       signal: controller.signal,
       pollIntervalMs: options.pollIntervalMs ?? environmentPollInterval(env),
+      heartbeat: () => writeFile("/tmp/ii-tonya-worker-heartbeat", new Date().toISOString()),
     });
   } finally {
     if (hardExitTimer !== undefined) clearTimeout(hardExitTimer);

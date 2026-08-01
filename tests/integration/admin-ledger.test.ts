@@ -91,6 +91,48 @@ beforeAll(async () => {
 afterAll(async () => testDb?.stop(), 60_000);
 
 describe("atomic approved admin workflows", () => {
+  it("allows an explicit test clock for AC-025 while the default remains DB-authoritative", async () => {
+    const requester = await seedAdmin("entitlement_admin");
+    const approver = await seedAdmin("entitlement_admin");
+    const userId = await testDb!.createUser();
+    const fixedNow = new Date("2026-07-28T10:00:00.000Z");
+    const idempotencyKey = `fixed-clock:${randomUUID()}`;
+    const auth = await approved({
+      requester, approver, action: "package.grant", objectType: "user", objectId: userId,
+      payload: { userId, units: 500, idempotencyKey },
+    });
+
+    await expect(new PostgresAdminRepository(testDb!.db, { testOnlyNow: fixedNow }).grantPackage({
+      ...auth, userId, units: 500, idempotencyKey,
+    })).resolves.toMatchObject({ allowed: true, replayed: false });
+
+    const fixed = await testDb!.db.execute<{ grantedAt: Date; expiresAt: Date }>(sql`
+      select granted_at as "grantedAt", expires_at as "expiresAt"
+      from message_packages where grant_idempotency_key = ${idempotencyKey}
+    `);
+    expect(fixed.rows[0]).toEqual({
+      grantedAt: fixedNow,
+      expiresAt: new Date("2026-09-26T10:00:00.000Z"),
+    });
+
+    const defaultUserId = await testDb!.createUser();
+    const defaultKey = `db-clock:${randomUUID()}`;
+    const defaultAuth = await approved({
+      requester, approver, action: "package.grant", objectType: "user", objectId: defaultUserId,
+      payload: { userId: defaultUserId, units: 500, idempotencyKey: defaultKey },
+    });
+    const bounds = await testDb!.db.execute<{ before: Date }>(sql`select clock_timestamp() as before`);
+    await new PostgresAdminRepository(testDb!.db).grantPackage({
+      ...defaultAuth, userId: defaultUserId, units: 500, idempotencyKey: defaultKey,
+    });
+    const dbClock = await testDb!.db.execute<{ grantedAt: Date; after: Date }>(sql`
+      select p.granted_at as "grantedAt", clock_timestamp() as after
+      from message_packages p where p.grant_idempotency_key = ${defaultKey}
+    `);
+    expect(dbClock.rows[0]!.grantedAt.getTime()).toBeGreaterThanOrEqual(bounds.rows[0]!.before.getTime());
+    expect(dbClock.rows[0]!.grantedAt.getTime()).toBeLessThanOrEqual(dbClock.rows[0]!.after.getTime());
+  });
+
   it("grants once under replay/concurrency with DB-authoritative 60-day immutable metadata and complete audit", async () => {
     const requester = await seedAdmin("entitlement_admin");
     const approver = await seedAdmin("entitlement_admin");

@@ -291,6 +291,8 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0009_young_arachne.sql",
     "packages/db/migrations/0016_task17c_admin_workflows.sql",
     "packages/db/migrations/meta/0016_snapshot.json",
+    "packages/db/migrations/0017_adorable_sinister_six.sql",
+    "packages/db/migrations/meta/0017_snapshot.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
@@ -349,6 +351,22 @@ describe("MVP scope boundary", () => {
       classifyApprovedTrackedScopeContent({
         path,
         content: `${content}\n# changed\n`,
+      }),
+    ).not.toEqual([]);
+  });
+
+  it.each([
+    "Dockerfile",
+    "compose.yaml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+  ])("pins reviewed Task21 release automation content for %s", (path) => {
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${content}\n# unreviewed mutation\n`,
       }),
     ).not.toEqual([]);
   });

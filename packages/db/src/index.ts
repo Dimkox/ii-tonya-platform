@@ -76,6 +76,7 @@ export {
   type GrantAdminPackageCommand,
   type GrantIntroPackageCommand,
   type IntegrationErrorAdminCommand,
+  type PostgresAdminRepositoryOptions,
   type RevokeAdminPackageCommand,
   type ServiceAdminCommand,
   type WorkflowAuthorization,
