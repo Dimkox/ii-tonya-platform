@@ -69,6 +69,9 @@ jobs:
       - name: Run atomic admin workflow gate
         run: pnpm exec vitest run tests/integration/admin-ledger.test.ts
 
+      - name: Run authenticated admin API gate
+        run: pnpm exec vitest run tests/integration/admin-api.test.ts
+
       - name: Repeat atomic conversation completion gate
         run: pnpm test:repeat -- 20 tests/integration/conversation-message-repository.test.ts
 
