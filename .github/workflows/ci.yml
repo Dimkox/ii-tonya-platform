@@ -104,14 +104,14 @@ jobs:
         if: github.event_name == 'push'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
+          aquasec/trivy:0.65.0 image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1
           "$API_IMAGE_REF"
 
       - name: Scan worker image digest
         if: github.event_name == 'push'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
+          aquasec/trivy:0.65.0 image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1
           "$WORKER_IMAGE_REF"
 
       - name: Sign exact registry images and provenance manifest

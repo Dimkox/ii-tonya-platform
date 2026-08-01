@@ -59,7 +59,7 @@ services:
     restart: "no"
 
   provider-stubs:
-    image: node:24.4.1-bookworm-slim
+    image: node:24.18.0-bookworm-slim
     working_dir: /fixtures
     command: ["node", "server.mjs"]
     environment:
@@ -121,7 +121,7 @@ services:
     networks: [backend]
 
   smoke:
-    image: node:24.4.1-bookworm-slim
+    image: node:24.18.0-bookworm-slim
     profiles: [smoke]
     working_dir: /workspace
     command: ["node", "scripts/smoke.mjs", "--base-url=http://api:3000"]

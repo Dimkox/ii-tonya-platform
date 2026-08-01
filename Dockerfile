@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24.4.1-bookworm-slim AS builder
+FROM node:24.18.0-bookworm-slim AS builder
 
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH
@@ -29,7 +29,7 @@ RUN pnpm build
 RUN pnpm --filter @ii-tonya/api --prod deploy /out/api
 RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
 
-FROM node:24.4.1-bookworm-slim AS runtime-base
+FROM node:24.18.0-bookworm-slim AS runtime-base
 
 ENV NODE_ENV=production
 WORKDIR /app

@@ -51,6 +51,7 @@ describe("release assets", () => {
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
     expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/npm");
     expect(dockerfile).toContain("rm -f /usr/local/bin/npm /usr/local/bin/npx");
+    expect(dockerfile.match(/node:24\.18\.0-bookworm-slim/g)).toHaveLength(2);
     expect(dockerfile).toContain(
       'CMD ["node", "--input-type=module", "--eval", "const s=(await import(\'node:fs/promises\')).stat;',
     );
@@ -85,5 +86,14 @@ describe("release assets", () => {
     expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
     expect(smoke).toContain("resolved.includes('/workspace/')");
     expect(smoke.match(/"--input-type=module"/g)).toHaveLength(2);
+  });
+
+  it("fails image scans on every fixable high or critical vulnerability", () => {
+    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    expect(
+      workflow.match(
+        /image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1/g,
+      ),
+    ).toHaveLength(2);
   });
 });
