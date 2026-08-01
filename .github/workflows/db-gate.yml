@@ -54,6 +54,9 @@ jobs:
       - name: Run PostgreSQL schema integration gate
         run: pnpm exec vitest run tests/integration/schema.test.ts
 
+      - name: Run webhook inbox ownership and retry gate
+        run: pnpm exec vitest run tests/integration/webhook-inbox.test.ts
+
       - name: Run verified catalog integration gate
         run: pnpm exec vitest run tests/integration/catalog-repository.test.ts
 
