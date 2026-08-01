@@ -68,7 +68,7 @@ jobs:
       - name: Scan repository for secrets with redaction
         run: >-
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0
-          detect --source=/repo --no-banner --redact
+          detect --source=/repo --config=/repo/.gitleaks.toml --no-banner --redact
 
       - name: Build and smoke final container images
         run: pnpm test:container
