@@ -140,7 +140,13 @@ export class PostgresWorkerJobsRepository {
           where (status = 'opened' and owner_id is not null)
              or (status in ('assigned', 'acknowledged')
                  and acknowledgement_deadline <= clock_timestamp())
-          order by acknowledgement_deadline, id
+          order by
+            case
+              when status = 'assigned' and acknowledged_at is null then 0
+              when status = 'opened' then 1
+              else 2
+            end,
+            acknowledgement_deadline, id
           for update skip locked
           limit ${command.batchSize}
         ), transitioned as (

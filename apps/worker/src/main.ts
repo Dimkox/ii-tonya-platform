@@ -26,7 +26,11 @@ export interface WorkerMainOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly runtimeFactory?: WorkerRuntimeFactory;
   readonly pollIntervalMs?: number;
+  readonly shutdownGraceMs?: number;
+  readonly hardExit?: (status: number) => void;
 }
+
+const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
 const productionRuntimeFactory: WorkerRuntimeFactory = {
   async create(config) {
@@ -100,10 +104,24 @@ function environmentPollInterval(env: NodeJS.ProcessEnv): number {
 
 export async function main(options: WorkerMainOptions = {}): Promise<void> {
   const env = options.env ?? process.env;
+  const shutdownGraceMs = options.shutdownGraceMs ?? DEFAULT_SHUTDOWN_GRACE_MS;
+  if (
+    !Number.isSafeInteger(shutdownGraceMs)
+    || shutdownGraceMs < 1
+    || shutdownGraceMs > 60_000
+  ) throw new Error("Invalid worker shutdown grace period");
   const config = loadEnv(env);
   const runtime = await (options.runtimeFactory ?? productionRuntimeFactory).create(config);
   const controller = new AbortController();
-  const stop = () => { controller.abort(); };
+  const hardExit = options.hardExit ?? ((status: number) => { process.exit(status); });
+  let hardExitTimer: NodeJS.Timeout | undefined;
+  const stop = () => {
+    controller.abort();
+    if (hardExitTimer === undefined) {
+      hardExitTimer = setTimeout(() => { hardExit(1); }, shutdownGraceMs);
+      hardExitTimer.unref();
+    }
+  };
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
   try {
@@ -112,6 +130,7 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
       pollIntervalMs: options.pollIntervalMs ?? environmentPollInterval(env),
     });
   } finally {
+    if (hardExitTimer !== undefined) clearTimeout(hardExitTimer);
     process.off("SIGTERM", stop);
     process.off("SIGINT", stop);
   }

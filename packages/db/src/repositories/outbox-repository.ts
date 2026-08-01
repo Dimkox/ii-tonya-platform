@@ -1,6 +1,18 @@
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 
+const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
+
+function assertRecoveryLimit(limit: number): void {
+  if (
+    !Number.isSafeInteger(limit)
+    || limit < 1
+    || limit > MAX_OUTBOX_RECOVERY_LIMIT
+  ) {
+    throw new RangeError("limit must be a safe integer between 1 and 1000");
+  }
+}
+
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   transaction: infer T,
 ) => unknown
@@ -592,6 +604,7 @@ export class PostgresOutboxRepository {
   }
 
   async recoverExpiredDispatchLeases(limit = 1_000): Promise<number> {
+    assertRecoveryLimit(limit);
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
         with candidates as materialized (
@@ -636,6 +649,7 @@ export class PostgresOutboxRepository {
   }
 
   async recoverExpiredReconciliationLeases(limit = 1_000): Promise<number> {
+    assertRecoveryLimit(limit);
     return this.db.transaction(async (tx) => {
       const result = await tx.execute<{ id: string }>(sql`
         with candidates as materialized (

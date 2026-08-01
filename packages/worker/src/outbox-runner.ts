@@ -116,6 +116,8 @@ export interface OutboxRunResult {
   dispatched: number;
 }
 
+export const MAX_OUTBOX_BATCH_SIZE = 1_000;
+
 export function boundedFullJitterDelay(
   attempt: number,
   baseDelayMs: number,
@@ -300,6 +302,13 @@ async function dispatchPending(
 export async function runOutboxBatch(
   deps: OutboxRunnerDeps,
 ): Promise<OutboxRunResult> {
+  if (
+    !Number.isSafeInteger(deps.batchSize)
+    || deps.batchSize < 1
+    || deps.batchSize > MAX_OUTBOX_BATCH_SIZE
+  ) {
+    throw new RangeError("batchSize must be a safe integer between 1 and 1000");
+  }
   const now = deps.now();
   await deps.repository.recoverExpiredDispatchLeases(deps.batchSize);
   await deps.repository.recoverExpiredReconciliationLeases(deps.batchSize);

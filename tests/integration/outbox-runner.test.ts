@@ -16,6 +16,21 @@ const baseDeps = () => ({
 });
 
 describe("outbox runner", () => {
+  it.each([0, -1, 1.5, 1_001, Number.NaN])(
+    "rejects unsafe batch size %s before repository access",
+    async (batchSize) => {
+      const repository = fakeOutboxRepository([]);
+
+      await expect(runOutboxBatch({
+        ...baseDeps(),
+        batchSize,
+        repository,
+        dispatcher: { dispatch: vi.fn() },
+        reconciler: { reconcile: vi.fn() },
+      })).rejects.toThrow("batchSize must be a safe integer between 1 and 1000");
+    },
+  );
+
   it("bounds exponential full jitter independently for each schedule", () => {
     expect(boundedFullJitterDelay(1, 1_000, 30_000, () => 0)).toBe(0);
     expect(boundedFullJitterDelay(4, 1_000, 5_000, () => 0.5)).toBe(2_500);

@@ -126,3 +126,44 @@ authoritative PostgreSQL result.
   Planerka or the intent model.
 - Disabled-provider production composition no longer emits one provider error
   row per poll cycle.
+
+## Re-review closure
+
+- Candidate ordering now prioritizes overdue, unacknowledged `assigned`
+  handoffs (then `opened` handoffs) ahead of non-transitionable
+  `acknowledged` rows, so historical acknowledgements cannot consume the
+  bounded candidate window.
+- The direct `main()` signal path arms a 30-second default hard-exit watchdog.
+  The exit function and grace period are injectable for tests, the watchdog
+  exits nonzero if shutdown never settles, and it is cleared after clean close.
+- `runOutboxBatch()` and both PostgreSQL lease-recovery methods reject any
+  non-integer, non-positive, or greater-than-1,000 batch before repository SQL.
+
+The strict re-review RED command produced the expected 12 failures:
+
+```text
+pnpm exec vitest run packages/db/src/repositories/worker-jobs-repository.test.ts packages/db/src/repositories/outbox-repository.test.ts tests/integration/outbox-runner.test.ts apps/worker/src/main.test.ts
+# 4 failed files; 12 failed, 17 passed
+```
+
+Final fresh verification after the fixes:
+
+```text
+pnpm exec vitest run packages/worker/src apps/worker/src packages/db/src/repositories/worker-jobs-repository.test.ts packages/db/src/repositories/outbox-repository.test.ts tests/integration/outbox-runner.test.ts tests/repo/workspace-dependencies.test.ts tests/repo/scope-boundary.test.ts
+# 12 files, 154 tests passed
+
+pnpm typecheck
+# all 10 runnable workspace projects passed
+
+pnpm --filter @ii-tonya/db build
+# passed
+
+pnpm --filter @ii-tonya/app-worker build
+# passed
+
+pnpm lint
+# passed
+
+git diff --check
+# passed
+```

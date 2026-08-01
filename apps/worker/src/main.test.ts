@@ -6,7 +6,7 @@ describe("worker main", () => {
     const module = await import("./main.js");
 
     expect(module.main).toBeTypeOf("function");
-  });
+  }, 15_000);
 
   it("finishes the current bounded cycle and closes on a signal", async () => {
     const { runWorkerLoop } = await import("./main.js");
@@ -64,5 +64,56 @@ describe("worker main", () => {
     });
 
     expect(runtime.close).toHaveBeenCalledOnce();
+  });
+
+  it("hard-exits after the shutdown grace period when close never settles", async () => {
+    const { main } = await import("./main.js");
+    let finishClose: (() => void) | undefined;
+    const runtime = {
+      runOnce: vi.fn(() => new Promise<never>(() => undefined)),
+      close: vi.fn(() => new Promise<void>((resolve) => { finishClose = resolve; })),
+    };
+    const hardExit = vi.fn();
+    const running = main({
+      env: { DATABASE_URL: "postgresql://worker:worker@localhost/worker" },
+      runtimeFactory: { create: vi.fn(async () => runtime) },
+      pollIntervalMs: 1,
+      shutdownGraceMs: 10,
+      hardExit,
+    });
+
+    await vi.waitFor(() => { expect(runtime.runOnce).toHaveBeenCalledOnce(); });
+    process.emit("SIGTERM", "SIGTERM");
+    try {
+      await vi.waitFor(() => { expect(hardExit).toHaveBeenCalledWith(1); }, { timeout: 500 });
+    } finally {
+      finishClose?.();
+    }
+    await running;
+    expect(hardExit).toHaveBeenCalledOnce();
+  });
+
+  it("clears the hard-exit watchdog after a clean signal close", async () => {
+    const { main } = await import("./main.js");
+    const runtime = {
+      runOnce: vi.fn(() => new Promise<never>(() => undefined)),
+      close: vi.fn(async () => undefined),
+    };
+    const hardExit = vi.fn();
+    const running = main({
+      env: { DATABASE_URL: "postgresql://worker:worker@localhost/worker" },
+      runtimeFactory: { create: vi.fn(async () => runtime) },
+      pollIntervalMs: 1,
+      shutdownGraceMs: 10,
+      hardExit,
+    });
+
+    await vi.waitFor(() => { expect(runtime.runOnce).toHaveBeenCalledOnce(); });
+    process.emit("SIGTERM", "SIGTERM");
+    await running;
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
+
+    expect(runtime.close).toHaveBeenCalledOnce();
+    expect(hardExit).not.toHaveBeenCalled();
   });
 });

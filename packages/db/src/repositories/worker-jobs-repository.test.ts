@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "../client.js";
 import { PostgresWorkerJobsRepository } from "./worker-jobs-repository.js";
@@ -39,6 +40,17 @@ describe("PostgreSQL worker job repository", () => {
 
     expect(transaction).toHaveBeenCalledOnce();
     expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("prioritizes overdue assigned handoffs ahead of acknowledged rows", () => {
+    const source = readFileSync(
+      new URL("./worker-jobs-repository.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toMatch(
+      /order by\s+case\s+when status = 'assigned' and acknowledged_at is null then 0\s+when status = 'opened' then 1\s+else 2\s+end,\s+acknowledgement_deadline, id/u,
+    );
   });
 
   it("delivers safety escalation to the durable operator queue atomically", async () => {
