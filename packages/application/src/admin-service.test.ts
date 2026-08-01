@@ -92,4 +92,42 @@ describe("admin application command boundary", () => {
     })).rejects.toThrow("Intro package must contain exactly 100 units");
     expect(port.grantIntroPackage).not.toHaveBeenCalled();
   });
+
+  it("propagates a denied workflow result instead of resolving as apparent success", async () => {
+    const port = workflows();
+    vi.mocked(port.grantPackage).mockResolvedValue({
+      allowed: false,
+      reasonCode: "approval_denied",
+    });
+    await expect(createAdminService({ workflows: port }).grantPackage(principal, {
+      ...auth,
+      userId: auth.routeObjectId,
+      units: 500,
+      idempotencyKey: "grant-denied",
+    })).resolves.toEqual({
+      allowed: false,
+      reasonCode: "approval_denied",
+    });
+  });
+
+  it("propagates the exact allowed payload and replay marker", async () => {
+    const port = workflows();
+    vi.mocked(port.revokePackage).mockResolvedValue({
+      allowed: true,
+      replayed: true,
+      packageId: "00000000-0000-4000-8000-000000000003",
+      delta: -500,
+      originalEntryId: "00000000-0000-4000-8000-000000000004",
+    });
+    await expect(createAdminService({ workflows: port }).revokePackage(principal, {
+      ...auth,
+      userId: auth.routeObjectId,
+      packageId: "00000000-0000-4000-8000-000000000003",
+      idempotencyKey: "revoke-result",
+    })).resolves.toMatchObject({
+      allowed: true,
+      replayed: true,
+      delta: -500,
+    });
+  });
 });

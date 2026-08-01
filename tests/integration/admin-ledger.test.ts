@@ -43,6 +43,7 @@ async function approved(input: {
 async function seedSafetyAlert(
   status: "opened" | "assigned" | "acknowledged" | "escalated",
   assignedAdminId: string,
+  slaExpired = false,
 ) {
   const incidentId = randomUUID();
   const alertId = randomUUID();
@@ -51,12 +52,12 @@ async function seedSafetyAlert(
     values (${incidentId}::uuid, 'safety_test', 'sha256:redacted');
     insert into human_escalations (
       id, incident_id, status, opened_at, acknowledgement_deadline,
-      acknowledged_at, escalation_reason
+      acknowledged_at, owner_id, escalation_reason
     ) values (
       ${alertId}::uuid, ${incidentId}::uuid, ${status}, clock_timestamp(),
-      clock_timestamp() + interval '5 minutes',
+      clock_timestamp() + case when ${slaExpired} then interval '-5 minutes' else interval '5 minutes' end,
       case when ${status} = 'acknowledged' then clock_timestamp() else null end,
-      'safety_test'
+      ${assignedAdminId}::uuid, 'safety_test'
     );
     insert into admin_object_assignments (admin_id, object_type, object_id)
     values (${assignedAdminId}::uuid, 'safety_case', ${alertId}::uuid)
@@ -417,6 +418,97 @@ describe("atomic approved admin workflows", () => {
     expect(rollback.rows[0]).toEqual({ status: "assigned", version: 1, actions: "0", consumed: "0", denied: "1" });
   });
 
+  it("rejects direct handoff deletion, immutable rewrites, skipped transitions, and wrong versions", async () => {
+    const security = await seedAdmin("security_admin");
+    const alertId = await seedSafetyAlert("opened", security.adminId);
+
+    await expect(testDb!.db.execute(sql`
+      delete from human_escalations where id = ${alertId}::uuid
+    `)).rejects.toThrow("human escalation deletion is forbidden");
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set acknowledgement_deadline = acknowledgement_deadline + interval '1 minute',
+        status = 'assigned', version = version + 1, updated_at = clock_timestamp()
+      where id = ${alertId}::uuid
+    `)).rejects.toThrow("human escalation immutable fields cannot change");
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'acknowledged', acknowledged_at = clock_timestamp(),
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${alertId}::uuid
+    `)).rejects.toThrow("human escalation status transition is not allowed");
+    await expect(testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'assigned', version = version + 2, updated_at = clock_timestamp()
+      where id = ${alertId}::uuid
+    `)).rejects.toThrow("human escalation version must increment by one");
+  });
+
+  it("allows only opened-assigned, assigned-acknowledged or SLA-escalated, and terminal resolution", async () => {
+    const security = await seedAdmin("security_admin");
+    const acknowledgedId = await seedSafetyAlert("opened", security.adminId);
+    await testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'assigned', version = version + 1, updated_at = clock_timestamp()
+      where id = ${acknowledgedId}::uuid
+    `);
+    await testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'acknowledged', acknowledged_at = clock_timestamp(),
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${acknowledgedId}::uuid
+    `);
+    await testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'resolved', resolved_at = clock_timestamp(),
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${acknowledgedId}::uuid
+    `);
+
+    const escalatedId = await seedSafetyAlert("assigned", security.adminId, true);
+    await testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'escalated', version = version + 1, updated_at = clock_timestamp()
+      where id = ${escalatedId}::uuid
+    `);
+    await testDb!.db.execute(sql`
+      update human_escalations
+      set status = 'resolved', resolved_at = clock_timestamp(),
+        version = version + 1, updated_at = clock_timestamp()
+      where id = ${escalatedId}::uuid
+    `);
+
+    const states = await testDb!.db.execute<{
+      id: string;
+      status: string;
+      version: number;
+      acknowledgedAt: Date | null;
+      resolvedAt: Date | null;
+    }>(sql`
+      select id::text, status, version, acknowledged_at as "acknowledgedAt",
+        resolved_at as "resolvedAt"
+      from human_escalations
+      where id in (${acknowledgedId}::uuid, ${escalatedId}::uuid)
+      order by id
+    `);
+    expect(states.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: acknowledgedId,
+        status: "resolved",
+        version: 4,
+        acknowledgedAt: expect.any(Date),
+        resolvedAt: expect.any(Date),
+      }),
+      expect.objectContaining({
+        id: escalatedId,
+        status: "resolved",
+        version: 3,
+        acknowledgedAt: null,
+        resolvedAt: expect.any(Date),
+      }),
+    ]));
+  });
+
   it("records assigned safety and negative-feedback acknowledgement/resolution as immutable actions", async () => {
     const securityA = await seedAdmin("security_admin");
     const securityB = await seedAdmin("security_admin");
@@ -429,10 +521,10 @@ describe("atomic approved admin workflows", () => {
       insert into safety_incidents (id, reason_code, metadata_hash)
       values (${incidentId}::uuid, 'safety_test', 'sha256:redacted');
       insert into human_escalations (
-        id, incident_id, status, opened_at, acknowledgement_deadline, escalation_reason
+        id, incident_id, status, opened_at, acknowledgement_deadline, owner_id, escalation_reason
       ) values (
         ${safetyId}::uuid, ${incidentId}::uuid, 'assigned', clock_timestamp(),
-        clock_timestamp() + interval '5 minutes', 'safety_test'
+        clock_timestamp() + interval '5 minutes', ${securityA.adminId}::uuid, 'safety_test'
       );
       insert into admin_object_assignments (admin_id, object_type, object_id)
       values (${securityA.adminId}::uuid, 'safety_case', ${safetyId}::uuid)

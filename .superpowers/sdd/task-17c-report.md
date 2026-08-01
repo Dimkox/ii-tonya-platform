@@ -94,6 +94,58 @@
   packages/db/drizzle.config.ts`: `No schema changes, nothing to migrate`.
 - `git diff --check`: passed.
 
+## Transition-integrity and application-result P1 remediation
+
+### RED
+
+- Added application tests proving denied and allowed/replayed workflow results
+  must cross the service boundary unchanged.
+- Added a migration guard for a dedicated human-escalation transition trigger,
+  deletion rejection, version increments, and all established status edges.
+- Command:
+  `pnpm exec vitest run packages/application/src/admin-service.test.ts
+  tests/repo/admin-workflow-guards.test.ts`
+- Result before implementation: 3 failed and 14 passed. Both application
+  results were `undefined`, and migration 0016 had no transition-integrity
+  function.
+
+### GREEN
+
+- `AdminWorkflowPort` and `AdminService` now use one exact discriminated
+  `AdminWorkflowResult<T>` contract with per-operation result payloads.
+  Every service method returns the repository result, so
+  `approval_denied` cannot collapse into apparent `undefined` success.
+- Migration 0016 replaces the removed broad handoff append-only trigger with
+  `enforce_human_escalation_transition`. Direct DELETE is always rejected;
+  identity, incident, opened/deadline/reason/created facts stay immutable;
+  version advances exactly once; `updated_at` advances; owner and transition
+  timestamps are constrained.
+- The only accepted edges are `opened -> assigned`,
+  `assigned -> acknowledged`, `assigned -> escalated` after the SLA deadline,
+  and `acknowledged|escalated -> resolved`.
+- The PostgreSQL suite now has 11 cases and directly covers deletion,
+  immutable rewrites, skipped transitions, wrong versions, both assignment
+  owner conventions, acknowledgement, SLA escalation, and resolution.
+- Focused command:
+  `pnpm exec vitest run packages/application/src/admin-service.test.ts
+  packages/db/src/repositories/admin-approval-repository.test.ts
+  tests/repo/admin-workflow-guards.test.ts
+  tests/repo/db-schema-parity.test.ts apps/api/src/routes/admin.test.ts`
+- Result: 5 files and 30 tests passed.
+- Local PostgreSQL command:
+  `pnpm exec vitest run tests/integration/admin-ledger.test.ts`
+- Result: BLOCKED in `beforeAll`; all 11 bodies were skipped because
+  Testcontainers reported `Could not find a working container runtime
+  strategy`. This remains a required GitHub Database Gate.
+
+### Final gates
+
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- `pnpm build`: passed for all 10 built workspace projects.
+- Drizzle metadata check: passed with `Everything's fine`.
+- Drizzle generation: `No schema changes, nothing to migrate`.
+
 ## Boundaries
 
 - No credentials, secrets, live bindings, raw authorization headers, raw

@@ -86,4 +86,14 @@ describe("Task 17C structural guards", () => {
     expect(migration).toContain("REFERENCES \"public\".\"admin_sessions\"");
     expect(migration).toContain("enforce_admin_ledger_provenance");
   });
+
+  it("replaces the broad handoff append-only trigger with transition-integrity enforcement", () => {
+    expect(migration).toContain("enforce_human_escalation_transition");
+    expect(migration).toContain("human escalation deletion is forbidden");
+    expect(migration).toContain("NEW.version <> OLD.version + 1");
+    expect(migration).toContain("OLD.status = 'opened' AND NEW.status = 'assigned'");
+    expect(migration).toContain("OLD.status = 'assigned' AND NEW.status = 'acknowledged'");
+    expect(migration).toContain("OLD.status = 'assigned' AND NEW.status = 'escalated'");
+    expect(migration).toContain("OLD.status IN ('acknowledged', 'escalated') AND NEW.status = 'resolved'");
+  });
 });

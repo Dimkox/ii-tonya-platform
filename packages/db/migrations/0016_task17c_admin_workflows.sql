@@ -71,6 +71,78 @@ ALTER TABLE "message_packages" ADD CONSTRAINT "message_packages_admin_contract" 
       or ("message_packages"."kind" = 'intro' and "message_packages"."legacy_admin_grant" = false and "message_packages"."admin_approval_id" is not null and "message_packages"."admin_requester_session_id_hash" is not null and "message_packages"."granted_messages" = 100 and "message_packages"."expires_at" is null)
     );--> statement-breakpoint
 DROP TRIGGER IF EXISTS "human_escalations_append_only" ON "human_escalations";--> statement-breakpoint
+CREATE FUNCTION enforce_human_escalation_transition() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'human escalation deletion is forbidden' USING ERRCODE = '55000';
+  END IF;
+
+  IF NEW.id IS DISTINCT FROM OLD.id
+    OR NEW.incident_id IS DISTINCT FROM OLD.incident_id
+    OR NEW.opened_at IS DISTINCT FROM OLD.opened_at
+    OR NEW.acknowledgement_deadline IS DISTINCT FROM OLD.acknowledgement_deadline
+    OR NEW.escalation_reason IS DISTINCT FROM OLD.escalation_reason
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at
+  THEN
+    RAISE EXCEPTION 'human escalation immutable fields cannot change' USING ERRCODE = '55000';
+  END IF;
+
+  IF NEW.version <> OLD.version + 1 THEN
+    RAISE EXCEPTION 'human escalation version must increment by one' USING ERRCODE = '40001';
+  END IF;
+  IF NEW.updated_at <= OLD.updated_at THEN
+    RAISE EXCEPTION 'human escalation updated_at must advance' USING ERRCODE = '22007';
+  END IF;
+
+  IF OLD.status = 'opened' AND NEW.status = 'assigned' THEN
+    IF NEW.owner_id IS NULL
+      OR (OLD.owner_id IS NOT NULL AND NEW.owner_id IS DISTINCT FROM OLD.owner_id)
+      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at
+      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at
+    THEN
+      RAISE EXCEPTION 'invalid opened to assigned human escalation transition' USING ERRCODE = '23514';
+    END IF;
+  ELSIF OLD.status = 'assigned' AND NEW.status = 'acknowledged' THEN
+    IF NEW.owner_id IS NULL
+      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id
+      OR OLD.acknowledged_at IS NOT NULL
+      OR NEW.acknowledged_at IS NULL
+      OR NEW.acknowledged_at < OLD.opened_at
+      OR NEW.acknowledged_at > NEW.updated_at
+      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at
+    THEN
+      RAISE EXCEPTION 'invalid assigned to acknowledged human escalation transition' USING ERRCODE = '23514';
+    END IF;
+  ELSIF OLD.status = 'assigned' AND NEW.status = 'escalated' THEN
+    IF NEW.owner_id IS NULL
+      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id
+      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at
+      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at
+      OR NEW.updated_at < OLD.acknowledgement_deadline
+    THEN
+      RAISE EXCEPTION 'invalid assigned to escalated human escalation transition' USING ERRCODE = '23514';
+    END IF;
+  ELSIF OLD.status IN ('acknowledged', 'escalated') AND NEW.status = 'resolved' THEN
+    IF NEW.owner_id IS NULL
+      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id
+      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at
+      OR OLD.resolved_at IS NOT NULL
+      OR NEW.resolved_at IS NULL
+      OR NEW.resolved_at < OLD.opened_at
+      OR NEW.resolved_at > NEW.updated_at
+    THEN
+      RAISE EXCEPTION 'invalid resolved human escalation transition' USING ERRCODE = '23514';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'human escalation status transition is not allowed' USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "human_escalations_transition_integrity"
+BEFORE UPDATE OR DELETE ON "human_escalations"
+FOR EACH ROW EXECUTE FUNCTION enforce_human_escalation_transition();--> statement-breakpoint
 CREATE TRIGGER "admin_case_actions_append_only"
 BEFORE UPDATE OR DELETE ON "admin_case_actions"
 FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();--> statement-breakpoint
