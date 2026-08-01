@@ -91,4 +91,12 @@ describe("API boundary", () => {
     expect(app.services.conversation.handleInbound.mock.calls).toHaveLength(2);
     await app.close();
   });
+
+  it("never rewrites unsupported admin verbs into mutation POSTs", async () => {
+    const app = await buildTestApp();
+    for (const method of ["PUT", "PATCH", "DELETE"] as const) {
+      expect((await app.inject({ method, url: "/v1/admin/commands/client.create/00000000-0000-4000-8000-000000000000", payload: {} })).statusCode).toBe(404);
+    }
+    await app.close();
+  });
 });

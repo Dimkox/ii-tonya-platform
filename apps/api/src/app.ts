@@ -29,8 +29,8 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   await app.register(telegramWebhookRoutes, { secret: deps.telegramWebhookSecret, callbacks: deps.telegramCallbacks, inbox: deps.inbox, rateLimiter: deps.rateLimiter });
   if (deps.adminApprovals !== undefined) {
     const admin = await buildAdminApi({ approvals: deps.adminApprovals, admin: deps.adminService });
-    app.all("/v1/admin/*", async (request, reply) => {
-      const response = await admin.inject({ method: request.method === "GET" ? "GET" : "POST", url: request.url, headers: request.headers, ...(request.body === undefined ? {} : { payload: request.body as object }) });
+    app.post("/v1/admin/*", async (request, reply) => {
+      const response = await admin.inject({ method: "POST", url: request.url, headers: request.headers, ...(request.body === undefined ? {} : { payload: request.body as object }) });
       reply.code(response.statusCode);
       for (const [name, value] of Object.entries(response.headers)) {
         if (name !== "content-length" && value !== undefined) reply.header(name, value);

@@ -56,15 +56,26 @@ export async function closeServer(app: FastifyInstance, lifecycle: ServerLifecyc
   await lifecycle.close(db);
 }
 
+export async function listenServer(
+  app: FastifyInstance,
+  lifecycle: ServerLifecycle,
+  db: DrizzleDb,
+  address: { host: string; port: number },
+  listen: () => Promise<unknown> = () => app.listen(address),
+): Promise<void> {
+  try { await listen(); } catch (error) { await closeServer(app, lifecycle, db); throw error; }
+}
+
 export async function main(lifecycle: ServerLifecycle = createDefaultLifecycle()): Promise<void> {
   const config = loadEnv(process.env);
   const db = createDb(config.databaseUrl);
   let app: FastifyInstance;
   try { app = await composeServer(lifecycle, db); } catch (error) { await lifecycle.close(db); throw error; }
   const host = process.env.HOST ?? "127.0.0.1"; const port = Number(process.env.PORT ?? "3000");
-  const shutdown = async () => closeServer(app, lifecycle, db);
+  await listenServer(app, lifecycle, db, { host, port });
+  let closing: Promise<void> | undefined;
+  const shutdown = () => closing ??= closeServer(app, lifecycle, db);
   process.once("SIGTERM", shutdown); process.once("SIGINT", shutdown);
-  await app.listen({ host, port });
 }
 const invokedPath = process.argv[1];
 if (invokedPath !== undefined && import.meta.url === pathToFileURL(invokedPath).href) {

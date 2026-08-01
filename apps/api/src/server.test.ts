@@ -3,7 +3,7 @@ import type { DrizzleDb } from "@ii-tonya/db";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { createLogger } from "@ii-tonya/observability";
 import { createWindowedRateLimiter } from "./rate-limit.js";
-import { closeServer, composeServer, createDefaultLifecycle, type ServerLifecycle } from "./server.js";
+import { closeServer, composeServer, createDefaultLifecycle, listenServer, type ServerLifecycle } from "./server.js";
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 afterEach(() => { if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = originalDatabaseUrl; });
@@ -42,5 +42,19 @@ describe("server composition", () => {
     expect((await app.inject({ method: "GET", url: "/health/live" })).statusCode).toBe(200);
     expect((await app.inject({ method: "POST", url: "/v1/webhooks/selarti", payload: {} })).statusCode).toBe(401);
     await app.close(); await lifecycle.close(fakeDb);
+  });
+
+  it("closes Fastify then telemetry/database exactly once when listen fails", async () => {
+    process.env.DATABASE_URL = "postgresql://placeholder.invalid/test";
+    const order: string[] = [];
+    const lifecycle: ServerLifecycle = {
+      async migrate() {},
+      async dependencies(config) { return { config, conversationService: disabled as never, bookingService: disabled as never, catalogService: disabled as never, privacyService: disabled as never, adminService: disabled as never, selarti: disabled as never, telegramCallbacks: disabled as never, readiness: { check: async () => ({ postgres: true, migrations: true, workerLease: true, adapters: true }) }, logger: createLogger(), inbox: disabled as never, rateLimiter: createWindowedRateLimiter(), telegramWebhookSecret: "ephemeral-test-placeholder" }; },
+      async close() { order.push("lifecycle-close"); },
+    };
+    const db = {} as DrizzleDb; const app = await composeServer(lifecycle, db);
+    app.addHook("onClose", () => { order.push("app-close"); });
+    await expect(listenServer(app, lifecycle, db, { host: "127.0.0.1", port: 1 }, async () => { throw new Error("EADDRINUSE"); })).rejects.toThrow("EADDRINUSE");
+    expect(order).toEqual(["app-close", "lifecycle-close"]);
   });
 });
