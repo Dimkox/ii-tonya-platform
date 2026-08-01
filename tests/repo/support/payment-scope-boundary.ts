@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "b7a0af13d5007ab7c2f2e505dea625a4b4eddf1959957860852dd5cebdf0ebfc",
+    "cae7aae383e14437db02a9c1e13c82d7195297fda306966259d9c4cc62b16e92",
   ],
   [
     ".github/workflows/db-gate.yml",

@@ -35,6 +35,7 @@ describe("Gitleaks policy", () => {
 
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
     expect(workflow).toContain("--config=/repo/.gitleaks.toml");
+    expect(workflow).toContain("--gitleaks-ignore-path=/repo/.gitleaksignore");
     expect(workflow).toContain("--redact");
   });
 
