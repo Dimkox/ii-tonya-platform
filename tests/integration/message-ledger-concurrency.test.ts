@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { PostgresMessageRepository } from "../../packages/db/src/index.js";
+import {
+  PostgresAdminApprovalRepository,
+  PostgresAdminRepository,
+  PostgresMessageRepository,
+} from "../../packages/db/src/index.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -14,6 +19,54 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => testDb?.stop(), 60_000);
+
+async function grantIntroPackageFixture(userId: string): Promise<string> {
+  const seedEntitlementAdmin = async () => {
+    const adminId = randomUUID();
+    const sessionIdHash = `session:${randomUUID()}`;
+    await testDb.db.execute(sql`insert into users (id) values (${adminId}::uuid)`);
+    await testDb.db.execute(sql`
+      insert into admin_sessions (session_id_hash, admin_id, mfa_verified_at, expires_at)
+      values (${sessionIdHash}, ${adminId}::uuid, clock_timestamp() - interval '1 minute', clock_timestamp() + interval '1 hour')
+    `);
+    await testDb.db.execute(sql`
+      insert into admin_role_assignments (admin_id, role)
+      values (${adminId}::uuid, 'entitlement_admin')
+    `);
+    return { adminId, sessionIdHash };
+  };
+  const requester = await seedEntitlementAdmin();
+  const approver = await seedEntitlementAdmin();
+  const idempotencyKey = `intro-order:${randomUUID()}`;
+  const nonce = `nonce:${randomUUID()}`;
+  const payload = { userId, units: 100, idempotencyKey };
+  const approvals = new PostgresAdminApprovalRepository(testDb.db);
+  const requested = await approvals.requestApproval({
+    sessionIdHash: requester.sessionIdHash,
+    action: "package.intro_grant",
+    objectType: "user",
+    objectId: userId,
+    payload,
+    nonce,
+  });
+  if (requested === null) throw new Error("Expected intro grant approval request");
+  const approved = await approvals.approveApproval({
+    approvalId: requested.approvalId,
+    sessionIdHash: approver.sessionIdHash,
+  });
+  if (!approved) throw new Error("Expected intro grant approval");
+  const result = await new PostgresAdminRepository(testDb.db).grantIntroPackage({
+    sessionIdHash: requester.sessionIdHash,
+    approvalId: requested.approvalId,
+    nonce,
+    correlationId: `corr:${randomUUID()}`,
+    userId,
+    units: 100,
+    idempotencyKey,
+  });
+  if (!result.allowed) throw new Error("Expected approved intro package grant");
+  return result.packageId;
+}
 
 describe("message ledger transaction", () => {
   it("records a retried provider message and debit exactly once", async () => {
@@ -166,10 +219,10 @@ describe("message ledger transaction", () => {
 
   it("uses paid, earliest expiry, grant time, then id as the package order", async () => {
     const userId = await testDb.createUser();
-    const makePackage = async (key: string, kind: string, expiresAt: Date | null, grantedAt: Date) => {
+    const makePaidPackage = async (key: string, expiresAt: Date | null, grantedAt: Date) => {
       const packageRow = await testDb.db.execute<{ id: string }>(sql`
         insert into message_packages (user_id, granted_messages, grant_idempotency_key, kind, expires_at, granted_at)
-        values (${userId}::uuid, 1, ${key}, ${kind}, ${expiresAt}, ${grantedAt}) returning id
+        values (${userId}::uuid, 1, ${key}, 'paid', ${expiresAt}, ${grantedAt}) returning id
       `);
       const id = packageRow.rows[0]?.id;
       if (id === undefined) throw new Error("Expected package");
@@ -179,9 +232,9 @@ describe("message ledger transaction", () => {
       `);
       return id;
     };
-    await makePackage("intro", "intro", new Date("2026-07-29T00:00:00.000Z"), new Date("2026-07-01T00:00:00.000Z"));
-    const expected = await makePackage("paid-early", "paid", new Date("2026-07-30T00:00:00.000Z"), new Date("2026-07-02T00:00:00.000Z"));
-    await makePackage("paid-null", "paid", null, new Date("2026-07-01T00:00:00.000Z"));
+    await grantIntroPackageFixture(userId);
+    const expected = await makePaidPackage("paid-early", new Date("2026-07-30T00:00:00.000Z"), new Date("2026-07-02T00:00:00.000Z"));
+    await makePaidPackage("paid-null", null, new Date("2026-07-01T00:00:00.000Z"));
     const result = await new PostgresMessageRepository(testDb.db).acceptInbound({
       provider: "selarti", externalEventId: "evt-order", externalMessageId: "msg-order", userId,
       messageClass: "ordinary_inbound", occurredAt: new Date("2026-07-28T10:00:00.000Z"), correlationId: "corr-order",

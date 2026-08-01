@@ -284,3 +284,32 @@
 - `pnpm build`: passed for all 10 built workspace projects.
 - Drizzle metadata check: passed with `Everything's fine`.
 - Drizzle generation: `No schema changes, nothing to migrate`.
+
+## Database Gate run 30696624634 remediation
+
+- GitHub Actions run `30696624634` executed commit `90972a0`. The catalog
+  gate passed, then `Repeat message-ledger concurrency gate` failed before
+  later gates could run.
+- Twelve message-ledger cases passed. The ordering case alone failed with
+  SQLSTATE `23514` because its old generic fixture directly inserted an
+  `intro` package with 1 unit, a non-null expiry, and no consumed approval or
+  requester-session provenance. Migration 0016 correctly rejected it.
+- Direct `admin`/`intro` inserts elsewhere in DB-gate integration suites were
+  reviewed. The remaining instances in `admin-approval.test.ts` deliberately
+  exercise populated-migration preservation or negative constraint checks.
+- The ordering case now creates its intro package through the production
+  workflow: two distinct current entitlement-admin sessions, approval
+  request, distinct approval, and
+  `PostgresAdminRepository.grantIntroPackage`. The result is a legitimate
+  100-unit, no-expiry intro grant with immutable approval/session provenance.
+- Direct fixtures in that case are now hardcoded to `paid`; the original
+  assertion that paid ordering wins before intro remains unchanged.
+- TDD structural guard RED: 1 of 1 failed. GREEN: 1 of 1 passed.
+- Focused repository gates: 4 files and 17 tests passed.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- The 13-case PostgreSQL suite was attempted locally, but all bodies were
+  skipped because no working Testcontainers runtime was available. CI remains
+  the authoritative behavioral rerun.
+- Build was not repeated because this remediation changes integration/support
+  test code only; no production or schema file changed.
