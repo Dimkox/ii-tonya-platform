@@ -51,5 +51,5 @@ FROM runtime-base AS worker
 COPY --from=builder --chown=10001:10001 /out/worker/ /app/
 USER 10001:10001
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 \
-  CMD ["node", "--eval", "const s=(await import('node:fs/promises')).stat;try{const m=(await s('/tmp/ii-tonya-worker-heartbeat')).mtimeMs;if(Date.now()-m>30000)process.exit(1)}catch{process.exit(1)}"]
+  CMD ["node", "--input-type=module", "--eval", "const s=(await import('node:fs/promises')).stat;try{const m=(await s('/tmp/ii-tonya-worker-heartbeat')).mtimeMs;if(Date.now()-m>30000)process.exit(1)}catch{process.exit(1)}"]
 CMD ["node", "dist/main.js"]

@@ -49,6 +49,9 @@ describe("release assets", () => {
     );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
+    expect(dockerfile).toContain(
+      'CMD ["node", "--input-type=module", "--eval", "const s=(await import(\'node:fs/promises\')).stat;',
+    );
     expect(dockerfile.match(/USER 10001:10001/g)).toHaveLength(2);
   });
 
