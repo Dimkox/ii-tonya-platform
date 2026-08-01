@@ -13,10 +13,7 @@ const compose = (args) => run("docker", ["compose", ...args]);
 test("boots portable final images and imports emitted internal packages", () => {
   try {
     compose(["up", "--build", "--wait"]);
-    run(process.execPath, [
-      "scripts/smoke.mjs",
-      "--base-url=http://127.0.0.1:3000",
-    ]);
+    compose(["--profile", "smoke", "run", "--rm", "smoke"]);
     for (const [service, command, packages] of [
       [
         "api",

@@ -120,6 +120,20 @@ services:
     tmpfs: [/tmp]
     networks: [backend]
 
+  smoke:
+    image: node:24.4.1-bookworm-slim
+    profiles: [smoke]
+    working_dir: /workspace
+    command: ["node", "scripts/smoke.mjs", "--base-url=http://api:3000"]
+    volumes:
+      - ./scripts/smoke.mjs:/workspace/scripts/smoke.mjs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [backend]
+
 networks:
   backend:
     internal: true

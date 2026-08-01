@@ -72,9 +72,13 @@ describe("release assets", () => {
     }
   });
 
-  it("probes the API through the IPv4-only published loopback binding", () => {
+  it("probes the API from a disposable container on the internal network", () => {
     const smoke = readFileSync("tests/container/image-smoke.test.mjs", "utf8");
-    expect(smoke).toContain("--base-url=http://127.0.0.1:3000");
-    expect(smoke).not.toContain("--base-url=http://localhost:3000");
+    const compose = readFileSync("compose.yaml", "utf8");
+    expect(smoke).toContain(
+      'compose(["--profile", "smoke", "run", "--rm", "smoke"]);',
+    );
+    expect(compose).toContain("--base-url=http://api:3000");
+    expect(compose).toContain("profiles: [smoke]");
   });
 });

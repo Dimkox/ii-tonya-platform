@@ -88,7 +88,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "compose.yaml",
-    "ae8d5706ade72ea456c3d010b61f28443688efd5c621e72c95ae4bf4f104f547",
+    "f54afc53f3f70d97788d69dd11d3142a1364f01c5bffd96026bfbcef7286ed3a",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
