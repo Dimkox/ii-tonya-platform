@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -71,22 +73,71 @@ jobs:
       - name: Build and smoke final container images
         run: pnpm test:container
 
-      - name: Resolve tested image digests
+      - name: Install pinned cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Authenticate to GHCR for trusted push provenance
+        if: github.event_name == 'push'
+        run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Publish tested images and resolve registry manifest digests
+        if: github.event_name == 'push'
         run: |
-          echo "API_IMAGE_DIGEST=$(docker image inspect --format='{{.Id}}' ii-tonya-api:local)" >> "$GITHUB_ENV"
-          echo "WORKER_IMAGE_DIGEST=$(docker image inspect --format='{{.Id}}' ii-tonya-worker:local)" >> "$GITHUB_ENV"
+          repository="${GITHUB_REPOSITORY,,}"
+          api_tag="ghcr.io/$repository/api:candidate-$GITHUB_SHA"
+          worker_tag="ghcr.io/$repository/worker:candidate-$GITHUB_SHA"
+          docker tag ii-tonya-api:local "$api_tag"
+          docker tag ii-tonya-worker:local "$worker_tag"
+          docker push "$api_tag"
+          docker push "$worker_tag"
+          api_digest="$(docker buildx imagetools inspect "$api_tag" --format '{{.Manifest.Digest}}')"
+          worker_digest="$(docker buildx imagetools inspect "$worker_tag" --format '{{.Manifest.Digest}}')"
+          [[ "$api_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$worker_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "API_IMAGE_REF=${api_tag%:*}@$api_digest" >> "$GITHUB_ENV"
+          echo "WORKER_IMAGE_REF=${worker_tag%:*}@$worker_digest" >> "$GITHUB_ENV"
 
       - name: Scan API image digest
+        if: github.event_name == 'push'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
-          "$API_IMAGE_DIGEST"
+          "$API_IMAGE_REF"
 
       - name: Scan worker image digest
+        if: github.event_name == 'push'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
-          "$WORKER_IMAGE_DIGEST"
+          "$WORKER_IMAGE_REF"
+
+      - name: Sign exact registry images and provenance manifest
+        if: github.event_name == 'push'
+        run: |
+          cosign sign --yes "$API_IMAGE_REF"
+          cosign sign --yes "$WORKER_IMAGE_REF"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg head_sha "$GITHUB_SHA" \
+            --arg head_ref "$GITHUB_REF" \
+            --arg ci_run_id "$GITHUB_RUN_ID" \
+            --arg api_image_ref "$API_IMAGE_REF" \
+            --arg worker_image_ref "$WORKER_IMAGE_REF" \
+            '{schema:1, repository:$repository, head_sha:$head_sha, head_ref:$head_ref, ci_run_id:$ci_run_id, api_image_ref:$api_image_ref, worker_image_ref:$worker_image_ref}' \
+            > release-provenance.json
+          cosign sign-blob --yes --bundle release-provenance.bundle release-provenance.json
+
+      - name: Upload signed release provenance
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: release-provenance-${{ github.sha }}
+          path: |
+            release-provenance.json
+            release-provenance.bundle
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Tear down containers
         if: always()

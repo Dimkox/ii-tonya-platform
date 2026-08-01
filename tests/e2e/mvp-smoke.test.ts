@@ -21,15 +21,13 @@ describe("AC-025 exact MVP chain", () => {
         text: "Подбери проверенного специалиста",
         providerEventId: "selarti-inbound-ac025-1",
       });
-      await app.queueOrdinaryAnswer({
+      const queuedAnswer = await app.queueOrdinaryAnswer({
         client,
         text: "Нашла подходящие варианты",
-        outboxId: "assistant-outbox-ac025-1",
       });
       expect(await app.dialogueDebitCount(client.userId)).toBe(1);
       await app.recordOutboundDelivery({
-        userId: client.userId,
-        outboxId: "assistant-outbox-ac025-1",
+        outbox: queuedAnswer,
         provider: "selarti",
         providerDeliveryEventId: "selarti-delivered-ac025-1",
         deliveredAt: "2026-07-28T10:00:03.000Z",
@@ -41,17 +39,18 @@ describe("AC-025 exact MVP chain", () => {
         startsAfter: "2026-07-29T10:00:00.000Z",
       });
       expect(matches.length).toBeGreaterThan(0);
-      expect(
-        matches.every(
-          (match) =>
-            match.expert.active &&
-            match.expert.verified &&
-            match.service.active,
-        ),
-      ).toBe(true);
+      const catalogFacts = await app.verifiedCatalogFacts(
+        matches[0]!.expertId,
+        matches[0]!.slotId,
+      );
+      expect(catalogFacts).toMatchObject({
+        expertActive: true,
+        expertVerified: true,
+        serviceActive: true,
+      });
       const reservation = await app.reserve({
         client,
-        slotId: matches[0]!.slot.id,
+        slotId: matches[0]!.slotId,
         idempotencyKey: "reserve-ac025-1",
       });
       await app.expertConfirm({
@@ -65,17 +64,15 @@ describe("AC-025 exact MVP chain", () => {
         userId: client.userId,
         idempotencyKey: "cancel-ac025-1",
       });
-      expect(await app.notificationLedgerFacts(reservation.id)).toEqual(
+      expect(await app.bookingNotificationFacts(reservation.id)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            reason: "reservation_confirmed",
-            kind: "free",
-            delta: 0,
+            reason: "client.booking_confirmed",
+            charge: 0,
           }),
           expect.objectContaining({
-            reason: "reservation_cancelled",
-            kind: "free",
-            delta: 0,
+            reason: "telegram.booking_cancelled",
+            charge: 0,
           }),
         ]),
       );
@@ -99,6 +96,26 @@ describe("AC-025 exact MVP chain", () => {
           "reservation.cancelled_by_client",
         ]),
       ).resolves.toBeUndefined();
+
+      app.setProviderStatusForNegativeControl(reservation.id, "booked");
+      expect((await app.runReconciliation()).mismatches).toEqual([
+        expect.objectContaining({ reservationId: reservation.id }),
+      ]);
+
+      await app.removeBookingNotificationForNegativeControl(reservation.id);
+      await expect(
+        app.assertBookingNotifications(reservation.id),
+      ).rejects.toThrow("Authoritative booking notifications");
+
+      await app.removeQueuedSendForNegativeControl(queuedAnswer.id);
+      await expect(
+        app.recordOutboundDelivery({
+          outbox: queuedAnswer,
+          provider: "selarti",
+          providerDeliveryEventId: "selarti-delivered-ac025-negative",
+          deliveredAt: "2026-07-28T10:00:04.000Z",
+        }),
+      ).rejects.toThrow("Provider send path has no authoritative outbox row");
     } finally {
       await app.close();
     }

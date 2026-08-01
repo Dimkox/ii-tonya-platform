@@ -24,19 +24,64 @@ describe("CI and release workflow semantics", () => {
     expect(JSON.stringify(workflow)).not.toContain("corepack");
   });
 
-  it("deploys only a tested digest after explicit evidence gates", () => {
+  it("derives release images only from signed provenance of a successful exact CI run", () => {
+    const ci = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const workflow = parse(
       readFileSync(".github/workflows/release.yml", "utf8"),
     );
-    expect(workflow.jobs.release.needs).toEqual(
-      expect.arrayContaining(["verify_digest", "staging", "evidence_gate"]),
+    expect(Object.keys(workflow.on.workflow_dispatch.inputs)).toEqual([
+      "ci_run_id",
+    ]);
+    expect(JSON.stringify(workflow.on.workflow_dispatch.inputs)).not.toContain(
+      "image_digest",
     );
-    expect(JSON.stringify(workflow.jobs.release)).toContain("image_digest");
+    const ciText = JSON.stringify(ci.jobs.verify);
+    expect(ciText).toContain("docker push");
+    expect(ciText).toContain("imagetools inspect");
+    expect(ciText).not.toContain("docker image inspect");
+    expect(ciText).toContain("cosign sign --yes");
+    expect(ciText).toContain("cosign sign-blob");
+    expect(ciText).toContain("release-provenance-${{ github.sha }}");
+    const publishSteps = (
+      ci.jobs.verify.steps as Array<WorkflowStep & { if?: string }>
+    ).filter(
+      (step) =>
+        step.name?.includes("GHCR") ||
+        step.name?.includes("Publish tested") ||
+        step.name?.includes("Sign exact") ||
+        step.name?.includes("signed release provenance"),
+    );
+    expect(publishSteps.length).toBeGreaterThan(0);
+    expect(
+      publishSteps.every((step) => step.if === "github.event_name == 'push'"),
+    ).toBe(true);
+
+    const provenanceText = JSON.stringify(workflow.jobs.verify_provenance);
+    const provenanceRun = (
+      workflow.jobs.verify_provenance.steps as WorkflowStep[]
+    )
+      .map((step) => step.run ?? "")
+      .join("\n");
+    expect(provenanceText).toContain("actions/runs/$CI_RUN_ID");
+    expect(provenanceRun).toContain('.conclusion == "success"');
+    expect(provenanceRun).toContain('.path == ".github/workflows/ci.yml"');
+    expect(provenanceText).toContain("run-id");
+    expect(provenanceText).toContain("cosign verify-blob");
+    expect(provenanceText).toContain("cosign verify --certificate-identity");
+    expect(provenanceText).toContain("token.actions.githubusercontent.com");
+    expect(provenanceText).toContain("@sha256:");
+    expect(workflow.jobs.release.needs).toEqual(
+      expect.arrayContaining(["verify_provenance", "staging", "evidence_gate"]),
+    );
+    expect(JSON.stringify(workflow.jobs.release)).toContain("image_ref");
     expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain(
       "Release status: GO",
     );
     expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain(
       "Provider staging status: PASS",
+    );
+    expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain(
+      "release-evidence.bundle",
     );
 
     const stagingSteps = workflow.jobs.staging.steps as WorkflowStep[];
@@ -57,5 +102,15 @@ describe("CI and release workflow semantics", () => {
       expect(reconciliation).toBeGreaterThan(smoke);
     }
     expect(JSON.stringify(workflow.jobs.release)).toContain("rollback.md");
+    for (const jobName of ["staging", "evidence_gate", "release"]) {
+      const checkout = (
+        workflow.jobs[jobName].steps as Array<
+          WorkflowStep & { with?: { ref?: string } }
+        >
+      ).find((step) => step.uses?.startsWith("actions/checkout@"));
+      expect(checkout?.with?.ref).toBe(
+        "${{ needs.verify_provenance.outputs.head_sha }}",
+      );
+    }
   });
 });

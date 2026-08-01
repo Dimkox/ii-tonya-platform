@@ -3,44 +3,95 @@ name: Gated release
 on:
   workflow_dispatch:
     inputs:
-      api_image_digest:
-        description: Tested API image digest (sha256:...)
-        required: true
-        type: string
-      worker_image_digest:
-        description: Tested worker image digest (sha256:...)
+      ci_run_id:
+        description: Successful trusted CI run containing signed release provenance
         required: true
         type: string
 
 permissions:
+  actions: read
   contents: read
+  packages: read
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  verify_digest:
+  verify_provenance:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
-      api_image_digest: ${{ steps.digests.outputs.api_image_digest }}
-      worker_image_digest: ${{ steps.digests.outputs.worker_image_digest }}
+      api_image_ref: ${{ steps.verify.outputs.api_image_ref }}
+      worker_image_ref: ${{ steps.verify.outputs.worker_image_ref }}
+      head_sha: ${{ steps.run.outputs.head_sha }}
     steps:
-      - name: Validate immutable tested digests
-        id: digests
+      - name: Validate successful exact trusted CI run
+        id: run
         env:
-          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
-          WORKER_IMAGE_DIGEST: ${{ inputs.worker_image_digest }}
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
         run: |
-          pattern='^sha256:[0-9a-f]{64}$'
-          [[ "$API_IMAGE_DIGEST" =~ $pattern ]]
-          [[ "$WORKER_IMAGE_DIGEST" =~ $pattern ]]
-          echo "api_image_digest=$API_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "worker_image_digest=$WORKER_IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          [[ "$CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID" > ci-run.json
+          jq -e --arg repository "$GITHUB_REPOSITORY" '
+            .name == "CI" and
+            .path == ".github/workflows/ci.yml" and
+            .event == "push" and
+            .status == "completed" and
+            .conclusion == "success" and
+            .repository.full_name == $repository and
+            (.head_branch == "main" or (.head_branch | startswith("codex/")))
+          ' ci-run.json
+          echo "head_sha=$(jq -r .head_sha ci-run.json)" >> "$GITHUB_OUTPUT"
+          echo "head_ref=refs/heads/$(jq -r .head_branch ci-run.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Download signed provenance from exact CI run
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-provenance-${{ steps.run.outputs.head_sha }}
+          path: provenance
+          run-id: ${{ inputs.ci_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install pinned cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify signed manifest and exact registry image signatures
+        id: verify
+        env:
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          EXPECTED_SHA: ${{ steps.run.outputs.head_sha }}
+          EXPECTED_REF: ${{ steps.run.outputs.head_ref }}
+        run: |
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/ci.yml@$EXPECTED_REF"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify-blob \
+            --bundle provenance/release-provenance.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/release-provenance.json
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg head_sha "$EXPECTED_SHA" \
+            --arg head_ref "$EXPECTED_REF" \
+            --arg ci_run_id "$CI_RUN_ID" '
+              .schema == 1 and .repository == $repository and
+              .head_sha == $head_sha and .head_ref == $head_ref and
+              .ci_run_id == $ci_run_id and
+              (.api_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$")) and
+              (.worker_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$"))
+            ' provenance/release-provenance.json
+          api_image_ref="$(jq -r .api_image_ref provenance/release-provenance.json)"
+          worker_image_ref="$(jq -r .worker_image_ref provenance/release-provenance.json)"
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$api_image_ref"
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$worker_image_ref"
+          echo "api_image_ref=$api_image_ref" >> "$GITHUB_OUTPUT"
+          echo "worker_image_ref=$worker_image_ref" >> "$GITHUB_OUTPUT"
 
   staging:
-    needs: verify_digest
+    needs: verify_provenance
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: staging
@@ -49,15 +100,15 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
 
-      - name: Record immutable staging candidates
+      - name: Record signed staging candidates
         env:
-          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
-          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
-        run: |
-          printf 'api=%s\nworker=%s\n' "$API_IMAGE_DIGEST" "$WORKER_IMAGE_DIGEST" > staging-digests.txt
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+        run: printf 'api=%s\nworker=%s\n' "$API_IMAGE_REF" "$WORKER_IMAGE_REF" > staging-images.txt
 
-      - name: Deploy staging by tested image digest
+      - name: Deploy staging by signed tested image digest
         run: |
           echo "::error::Staging deployment adapter is not configured; provider-connected staging remains BLOCKED."
           exit 1
@@ -80,7 +131,7 @@ jobs:
           exit 1
 
   evidence_gate:
-    needs: verify_digest
+    needs: verify_provenance
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -88,33 +139,38 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
 
       - name: Enforce independently reviewed evidence statuses
         run: |
           grep -Fx 'Release status: GO' docs/runbooks/go-live-evidence.md
           grep -Fx 'Provider staging status: PASS' docs/runbooks/provider-staging-evidence.md
 
-      - name: Create digest-bound evidence artifact
-        env:
-          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
-          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
-        run: |
-          printf 'api=%s\nworker=%s\n' "$API_IMAGE_DIGEST" "$WORKER_IMAGE_DIGEST" > release-evidence.txt
-          cat docs/runbooks/go-live-evidence.md docs/runbooks/provider-staging-evidence.md >> release-evidence.txt
-          sha256sum release-evidence.txt > release-evidence.sha256
+      - name: Install pinned cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Upload release evidence
+      - name: Create and sign provenance-bound evidence artifact
+        env:
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+          HEAD_SHA: ${{ needs.verify_provenance.outputs.head_sha }}
+        run: |
+          printf 'head_sha=%s\napi=%s\nworker=%s\n' "$HEAD_SHA" "$API_IMAGE_REF" "$WORKER_IMAGE_REF" > release-evidence.txt
+          cat docs/runbooks/go-live-evidence.md docs/runbooks/provider-staging-evidence.md >> release-evidence.txt
+          cosign sign-blob --yes --bundle release-evidence.bundle release-evidence.txt
+
+      - name: Upload signed release evidence
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: release-evidence-${{ github.run_id }}
           path: |
             release-evidence.txt
-            release-evidence.sha256
+            release-evidence.bundle
           if-no-files-found: error
           retention-days: 90
 
   release:
-    needs: [verify_digest, staging, evidence_gate]
+    needs: [verify_provenance, staging, evidence_gate]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production
@@ -123,18 +179,19 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
 
-      - name: Bind production to reviewed image_digest values
+      - name: Bind production to signed image refs
         env:
-          API_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.api_image_digest }}
-          WORKER_IMAGE_DIGEST: ${{ needs.verify_digest.outputs.worker_image_digest }}
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
         run: |
-          test -n "$API_IMAGE_DIGEST"
-          test -n "$WORKER_IMAGE_DIGEST"
+          [[ "$API_IMAGE_REF" == *@sha256:* ]]
+          [[ "$WORKER_IMAGE_REF" == *@sha256:* ]]
 
       - name: Deploy production by signed tested image digest
         run: |
-          echo "::error::Production deployment is unavailable until rollback.md, signed digest verification, and the target adapter are approved."
+          echo "::error::Production deployment is unavailable until rollback.md and the target adapter are approved."
           exit 1
 
       - name: Run production migration preflight

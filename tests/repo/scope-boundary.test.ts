@@ -355,6 +355,24 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
+  it("keeps deterministic database clocks outside the production API", () => {
+    const repository = readFileSync(
+      "packages/db/src/repositories/admin-repository.ts",
+      "utf8",
+    );
+    const publicIndex = readFileSync("packages/db/src/index.ts", "utf8");
+    const testkit = readFileSync(
+      "packages/db/src/testkit/admin-repository.ts",
+      "utf8",
+    );
+    expect(repository).not.toContain("testOnlyNow");
+    expect(repository).toContain("private grantClock()");
+    expect(repository).not.toContain("protected grantClock()");
+    expect(publicIndex).not.toContain("createTestClockAdminRepository");
+    expect(publicIndex).not.toContain("TestClockAdminRepository");
+    expect(testkit).toContain("createTestClockAdminRepository");
+  });
+
   it.each([
     "Dockerfile",
     "compose.yaml",

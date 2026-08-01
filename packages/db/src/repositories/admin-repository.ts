@@ -63,13 +63,10 @@ export class AdminInvalidStateTransitionError extends Error {
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 type MutationResult = Record<string, unknown>;
 
-export interface PostgresAdminRepositoryOptions {
-  /** Deterministic acceptance-test seam. Production callers must omit it. */
-  readonly testOnlyNow?: Date;
-}
-
 const digest = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
+
+const testClockByRepository = new WeakMap<PostgresAdminRepository, Date>();
 
 const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
   "client.create": "user",
@@ -89,15 +86,11 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
 };
 
 export class PostgresAdminRepository {
-  constructor(
-    private readonly db: DrizzleDb,
-    private readonly options: PostgresAdminRepositoryOptions = {},
-  ) {}
+  constructor(private readonly db: DrizzleDb) {}
 
   private grantClock() {
-    return this.options.testOnlyNow === undefined
-      ? sql`clock_timestamp()`
-      : sql`${this.options.testOnlyNow}`;
+    const testClock = testClockByRepository.get(this);
+    return testClock === undefined ? sql`clock_timestamp()` : sql`${testClock}`;
   }
 
   private async appendAudit(
@@ -628,3 +621,13 @@ export class PostgresAdminRepository {
     return this.recordCaseAction(command, { approvalAction: "feedback.resolve", objectType: "negative_feedback", action: "resolve" });
   }
 }
+
+/** Deep-source testkit seam; deliberately absent from the package root export. */
+export const createAdminRepositoryWithClockForTest = (
+  db: DrizzleDb,
+  now: Date,
+): PostgresAdminRepository => {
+  const repository = new PostgresAdminRepository(db);
+  testClockByRepository.set(repository, new Date(now));
+  return repository;
+};

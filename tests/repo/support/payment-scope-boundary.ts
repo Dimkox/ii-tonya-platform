@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "1914f9f1853b5e1ccabdc0dc75cd8c5dabba6641f9ffb69338ce9ed25025ca16",
+    "1624c26dc9be797853e44957a955cddc59c7e38ffee1bf955715f8e4034d167d",
   ],
   [
     ".github/workflows/db-gate.yml",
@@ -80,7 +80,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/release.yml",
-    "eed2ed4ac98bbc825f4b77c99d7440cf48c61b019ebebef40cee3b34ded69317",
+    "b95d351116b6af84264e3b48c36f4bbcc684c9e24dbddafe0c859091355f9d02",
   ],
   [
     "dockerfile",

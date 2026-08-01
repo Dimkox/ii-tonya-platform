@@ -10,7 +10,6 @@ import {
 } from "../../../packages/application/src/index.js";
 import {
   PostgresAdminApprovalRepository,
-  PostgresAdminRepository,
   PostgresBookingRepository,
   PostgresCatalogRepository,
   PostgresMessageRepository,
@@ -22,6 +21,7 @@ import {
   startTestPostgres,
   type TestDatabase,
 } from "../../../packages/db/src/testkit/postgres.js";
+import { createTestClockAdminRepository } from "../../../packages/db/src/testkit/admin-repository.js";
 import { reconcileProviderReservations } from "../../../packages/worker/src/reconciliation.js";
 
 interface ClientHandle {
@@ -32,6 +32,11 @@ interface ReservationHandle {
   readonly id: string;
   readonly expertId: string;
   readonly version: number;
+}
+
+interface OutboxHandle {
+  readonly id: string;
+  readonly userId: string;
 }
 
 interface Counts {
@@ -54,7 +59,7 @@ export async function startMvpHarness(input: {
   const approver = await seedAdmin(testDb, ["support", "entitlement_admin"]);
   const approvals = new PostgresAdminApprovalRepository(testDb.db);
   const admin = createAdminService({
-    workflows: new PostgresAdminRepository(testDb.db, { testOnlyNow: now }),
+    workflows: createTestClockAdminRepository(testDb.db, now),
   });
   const messageRepository = new PostgresMessageRepository(testDb.db);
   const conversation = createConversationService({
@@ -85,26 +90,6 @@ export async function startMvpHarness(input: {
     outboundBillingMode: input.testOnlyOutboundBillingMode,
     approvedSafetyContactIds: [],
   });
-  const freeNotificationConversation = createConversationService({
-    deterministicSafety: { detect: () => null },
-    typedSafety: { classify: async () => "ordinary" },
-    intentEngine: { propose: async () => ({ kind: "answer", text: "unused" }) },
-    intentAuthorization: {
-      scopeFor: async () => ({ allowedExpertIds: [], allowedServiceCodes: [] }),
-    },
-    messageRepository,
-    safetyDirectory: { list: async () => [] },
-    safetyHandoff: {
-      accept: async () => {
-        throw new Error("Safety handoff is outside AC-025");
-      },
-    },
-    clock: { now: () => new Date(now) },
-    handoffOwnerId: requester.id,
-    handoffAcknowledgeWithinMs: 5 * 60 * 1_000,
-    outboundBillingMode: "disabled",
-    approvedSafetyContactIds: [],
-  });
   const catalog = createCatalogService({
     repository: new PostgresCatalogRepository(testDb.db),
   });
@@ -115,7 +100,10 @@ export async function startMvpHarness(input: {
   const workerRepository = new PostgresWorkerJobsRepository(testDb.db);
   const catalogFixture = await seedCatalog(testDb, now);
   const reservationVersions = new Map<string, number>();
-  const notificationMessageIds = new Map<string, readonly string[]>();
+  const providerReservations = new Map<
+    string,
+    "reserved" | "booked" | "cancelled"
+  >();
 
   const approvalFor = async (
     action: ApprovalAdminAction,
@@ -144,29 +132,6 @@ export async function startMvpHarness(input: {
       nonce,
       correlationId: `ac025:${action}:${randomUUID()}`,
     };
-  };
-
-  const recordFreeNotification = async (
-    reservationId: string,
-    reason: "reservation_confirmed" | "reservation_cancelled",
-  ) => {
-    const providerMessageId = `${reason}:${reservationId}`;
-    await freeNotificationConversation.handleOutboundDelivery({
-      kind: "outbound_delivery",
-      provider: "selarti",
-      providerEventId: `event:${providerMessageId}`,
-      providerMessageId,
-      userId: (
-        await testDb.db.execute<{ userId: string }>(sql`
-          select user_id as "userId" from reservations where id = ${reservationId}::uuid
-        `)
-      ).rows[0]!.userId,
-      occurredAt: now.toISOString(),
-      correlationId: `ac025:${reason}`,
-      status: "delivered",
-    });
-    const current = notificationMessageIds.get(reservationId) ?? [];
-    notificationMessageIds.set(reservationId, [...current, providerMessageId]);
   };
 
   const snapshotCounts = async (): Promise<Counts> => {
@@ -261,18 +226,17 @@ export async function startMvpHarness(input: {
     async queueOrdinaryAnswer(command: {
       readonly client: ClientHandle;
       readonly text: string;
-      readonly outboxId: string;
-    }) {
-      const queued = await testDb.db.execute<{ count: string }>(sql`
-        select count(*)::text as count from integration_outbox
+    }): Promise<OutboxHandle> {
+      const queued = await testDb.db.execute<{ id: string }>(sql`
+        select id::text as id from integration_outbox
         where topic = 'selarti.send'
           and payload @> ${JSON.stringify({ text: command.text })}::jsonb
           and correlation_id = 'ac025:ordinary-inbound'
+        order by created_at, id
       `);
-      if (queued.rows[0]?.count !== "1")
+      if (queued.rows.length !== 1)
         throw new Error("Ordinary answer was not queued exactly once");
-      void command.client;
-      return { outboxId: command.outboxId };
+      return { id: queued.rows[0]!.id, userId: command.client.userId };
     },
 
     async dialogueDebitCount(userId: string) {
@@ -286,18 +250,24 @@ export async function startMvpHarness(input: {
     },
 
     async recordOutboundDelivery(command: {
-      readonly userId: string;
-      readonly outboxId: string;
+      readonly outbox: OutboxHandle;
       readonly provider: "selarti";
       readonly providerDeliveryEventId: string;
       readonly deliveredAt: string;
     }) {
+      const queued = await testDb.db.execute<{ id: string }>(sql`
+        select id::text as id from integration_outbox
+        where id = ${command.outbox.id}::uuid and topic = 'selarti.send'
+      `);
+      if (queued.rows.length !== 1) {
+        throw new Error("Provider send path has no authoritative outbox row");
+      }
       return conversation.handleOutboundDelivery({
         kind: "outbound_delivery",
         provider: command.provider,
         providerEventId: command.providerDeliveryEventId,
-        providerMessageId: command.outboxId,
-        userId: command.userId,
+        providerMessageId: `selarti:${command.outbox.id}`,
+        userId: command.outbox.userId,
         occurredAt: command.deliveredAt,
         correlationId: "ac025:ordinary-outbound",
         status: "delivered",
@@ -324,11 +294,29 @@ export async function startMvpHarness(input: {
       });
       return results.flatMap((expert) =>
         expert.slots.map((slot) => ({
-          expert: { id: expert.expertId, active: true, verified: true },
-          service: { id: catalogFixture.serviceId, active: true },
-          slot: { id: slot.slotId },
+          expertId: expert.expertId,
+          slotId: slot.slotId,
         })),
       );
+    },
+
+    async verifiedCatalogFacts(expertId: string, slotId: string) {
+      const result = await testDb.db.execute<{
+        expertActive: boolean;
+        expertVerified: boolean;
+        serviceActive: boolean;
+        serviceId: string;
+      }>(sql`
+        select e.active as "expertActive", e.verified as "expertVerified",
+          es.active as "serviceActive", es.id::text as "serviceId"
+        from slots s
+        join expert_services es on es.id = s.expert_service_id
+        join experts e on e.id = es.expert_id
+        where s.id = ${slotId}::uuid and e.id = ${expertId}::uuid
+      `);
+      if (result.rows.length !== 1)
+        throw new Error("Catalog result lost its authoritative row");
+      return result.rows[0]!;
     },
 
     async reserve(command: {
@@ -346,6 +334,7 @@ export async function startMvpHarness(input: {
       if (result.kind === "unavailable")
         throw new Error(`Reservation unavailable: ${result.reason}`);
       reservationVersions.set(result.reservationId, result.version);
+      providerReservations.set(result.reservationId, "reserved");
       return {
         id: result.reservationId,
         expertId: catalogFixture.expertId,
@@ -387,10 +376,7 @@ export async function startMvpHarness(input: {
         correlationId: "ac025:reservation-booked",
       });
       reservationVersions.set(command.reservationId, result.version);
-      await recordFreeNotification(
-        command.reservationId,
-        "reservation_confirmed",
-      );
+      providerReservations.set(command.reservationId, "booked");
       return result;
     },
 
@@ -406,38 +392,55 @@ export async function startMvpHarness(input: {
         correlationId: `ac025:${command.idempotencyKey}`,
       });
       reservationVersions.set(command.reservationId, result.version);
-      await recordFreeNotification(
-        command.reservationId,
-        "reservation_cancelled",
-      );
+      providerReservations.set(command.reservationId, "cancelled");
       return result;
     },
 
-    async notificationLedgerFacts(reservationId: string) {
-      const ids = notificationMessageIds.get(reservationId) ?? [];
-      if (ids.length === 0) return [];
+    async bookingNotificationFacts(reservationId: string) {
       const result = await testDb.db.execute<{
-        externalMessageId: string;
-        kind: string;
-        delta: number;
+        topic: string;
+        charge: number;
       }>(sql`
-        select m.external_message_id as "externalMessageId",
-          l.entry_kind::text as kind, l.delta
-        from message_ledger_entries l
-        join message_events m on m.id = l.message_event_id
-        where m.external_message_id in (${sql.join(
-          ids.map((id) => sql`${id}`),
-          sql`, `,
-        )})
-        order by m.external_message_id
+        select topic, (payload ->> 'charge')::integer as charge
+        from integration_outbox
+        where payload @> ${JSON.stringify({ reservationId })}::jsonb
+          and topic in ('client.booking_confirmed', 'telegram.booking_cancelled')
+        order by topic
       `);
       return result.rows.map((row) => ({
-        reason: row.externalMessageId.startsWith("reservation_confirmed:")
-          ? "reservation_confirmed"
-          : "reservation_cancelled",
-        kind: row.kind,
-        delta: number(row.delta),
+        reason: row.topic,
+        charge: number(row.charge),
       }));
+    },
+
+    async assertBookingNotifications(reservationId: string) {
+      const facts = await this.bookingNotificationFacts(reservationId);
+      if (facts.length !== 2 || facts.some((fact) => fact.charge !== 0)) {
+        throw new Error(
+          "Authoritative booking notifications are incomplete or billable",
+        );
+      }
+    },
+
+    async removeQueuedSendForNegativeControl(outboxId: string) {
+      await testDb.db.execute(
+        sql`delete from integration_outbox where id = ${outboxId}::uuid`,
+      );
+    },
+
+    async removeBookingNotificationForNegativeControl(reservationId: string) {
+      await testDb.db.execute(sql`
+        delete from integration_outbox
+        where payload @> ${JSON.stringify({ reservationId })}::jsonb
+          and topic = 'telegram.booking_cancelled'
+      `);
+    },
+
+    setProviderStatusForNegativeControl(
+      reservationId: string,
+      status: "reserved" | "booked" | "cancelled",
+    ) {
+      providerReservations.set(reservationId, status);
     },
 
     async runReconciliation() {
@@ -447,20 +450,10 @@ export async function startMvpHarness(input: {
           repository: workerRepository,
           provider: {
             async listReservations(window, batchSize) {
-              const local = await workerRepository.listLocalReservations(
-                window,
-                batchSize,
-              );
-              return local.map((reservation) => ({
-                externalId: reservation.externalId,
-                status:
-                  reservation.status === "cancelled_by_client" ||
-                  reservation.status === "cancelled_by_expert"
-                    ? ("cancelled" as const)
-                    : reservation.status === "reserved"
-                      ? ("reserved" as const)
-                      : ("booked" as const),
-              }));
+              void window;
+              return [...providerReservations.entries()]
+                .slice(0, batchSize)
+                .map(([externalId, status]) => ({ externalId, status }));
             },
           },
           circuit: {

@@ -8,6 +8,7 @@ import {
   type AdminRole,
   type ApprovalAdminAction,
 } from "../../packages/db/src/index.js";
+import { createTestClockAdminRepository } from "../../packages/db/src/testkit/admin-repository.js";
 import { startTestPostgres, type TestDatabase } from "../../packages/db/src/testkit/postgres.js";
 import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
@@ -104,7 +105,7 @@ describe("atomic approved admin workflows", () => {
       payload: { userId, units: 500, idempotencyKey },
     });
 
-    await expect(new PostgresAdminRepository(testDb!.db, { testOnlyNow: fixedNow }).grantPackage({
+    await expect(createTestClockAdminRepository(testDb!.db, fixedNow).grantPackage({
       ...auth, userId, units: 500, idempotencyKey,
     })).resolves.toMatchObject({ allowed: true, replayed: false });
 
@@ -112,7 +113,10 @@ describe("atomic approved admin workflows", () => {
       select granted_at as "grantedAt", expires_at as "expiresAt"
       from message_packages where grant_idempotency_key = ${idempotencyKey}
     `);
-    expect(fixed.rows[0]).toEqual({
+    expect({
+      grantedAt: new Date(fixed.rows[0]!.grantedAt),
+      expiresAt: new Date(fixed.rows[0]!.expiresAt),
+    }).toEqual({
       grantedAt: fixedNow,
       expiresAt: new Date("2026-09-26T10:00:00.000Z"),
     });

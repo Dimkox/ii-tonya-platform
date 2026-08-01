@@ -33,6 +33,7 @@ describe("PRIV-01 through PRIV-05 privacy workflow contract", () => {
     `);
     const repository = new PostgresPrivacyRepository(testDb!.db, {
       beforeWithdrawalAudit: () => { throw new Error("injected rollback"); },
+      privacyMutationCapability: { enabled: true },
     });
     await expect(repository.withdrawConsentAtomically({
       targetUserId: userId, purpose: "client_profile", policyVersion: "privacy-v1", correlationId: "privacy-atomic",
@@ -70,8 +71,26 @@ describe("PRIV-01 through PRIV-05 privacy workflow contract", () => {
       insert into audit_events (actor_type, actor_id, authenticated_session_id_hash, action, object_type, object_id, decision, reason_code, correlation_id, occurred_at, metadata_hash)
       values ('client', ${userId}::uuid, 'hash', 'privacy.seed', 'user', ${userId}::uuid, 'accepted', 'seed', 'privacy-seed', now(), 'hash')
     `);
+    const processors = ["object_store", "selarti", "planerka", "make_projection"] as const;
+    const repository = new PostgresPrivacyRepository(testDb!.db, {
+      privacyMutationCapability: {
+        enabled: true,
+        captureManifests: async () => processors.map((processor) => ({
+          processor,
+          ciphertext: `ciphertext:${processor}`,
+          keyReference: `test-key:${processor}`,
+          algorithm: "test-envelope-v1",
+          version: "1",
+          subjectDeletionKeyHash: `sha256:${processor}`,
+        })),
+        verifyEnvelope: () => true,
+      },
+    });
     const service = createPrivacyService({
-      repository: new PostgresPrivacyRepository(testDb!.db), audit: { append: () => undefined }, pseudonymize: () => "hmac:pseudonym",
+      repository,
+      audit: { append: () => undefined },
+      pseudonymize: () => "hmac:pseudonym",
+      capability: { enabled: true },
     });
     const job = await service.eraseSubject({ principalUserId: userId, targetUserId: userId, correlationId: `erase:${userId}` });
     expect(job).toMatchObject({ contentRefsDeleted: 1, profileFieldsDeleted: 3, ledgerFactsPreserved: 1, auditFactsPreserved: 1 });
