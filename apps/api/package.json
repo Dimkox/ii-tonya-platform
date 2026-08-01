@@ -3,9 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "files": ["dist"],
+  "main": "dist/server.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc --noEmit -p ../../tsconfig.base.json",
+    "build": "tsup src/server.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
   },
   "dependencies": {
