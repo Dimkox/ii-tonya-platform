@@ -92,4 +92,98 @@ describe("Make projection sink", () => {
       MakeProjectionPermanentFailure,
     );
   });
+
+  it.each([
+    ["nested object", { ...event.data, status: { value: "reserved" } }],
+    ["array", { ...event.data, status: ["reserved"] }],
+    ["undefined", { ...event.data, status: undefined }],
+  ])("rejects non-scalar projection data: %s", async (_label, data) => {
+    const post = vi.fn().mockResolvedValue({ status: 202 });
+    const sink = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post,
+    });
+
+    await expect(sink.publish({ ...event, data } as never)).rejects.toBeInstanceOf(
+      MakeProjectionPermanentFailure,
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-finite numbers and inherited topic names", async () => {
+    const post = vi.fn().mockResolvedValue({ status: 202 });
+    const sink = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post,
+    });
+
+    await expect(sink.publish({
+      ...event,
+      topic: "package_balance_projection.v1",
+      data: { userId: "u-1", packageId: "p-1", ledgerDerivedBalance: Number.NaN },
+    } as never)).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
+    await expect(sink.publish({ ...event, topic: "toString", data: {} } as never)).rejects.toBeInstanceOf(
+      MakeProjectionPermanentFailure,
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["event id", { ...event, eventId: 7 }],
+    ["occurred at", { ...event, occurredAt: null }],
+    ["correlation id", { ...event, correlationId: {} }],
+    ["schema version", { ...event, schemaVersion: "1" }],
+  ])("rejects an invalid %s envelope field", async (_label, invalidEvent) => {
+    const post = vi.fn().mockResolvedValue({ status: 202 });
+    const sink = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post,
+    });
+
+    await expect(sink.publish(invalidEvent as never)).rejects.toBeInstanceOf(
+      MakeProjectionPermanentFailure,
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("retains a private HTTPS endpoint after the injected URL is mutated", async () => {
+    const endpoint = new URL("https://projection.invalid/events");
+    const post = vi.fn().mockResolvedValue({ status: 202 });
+    const sink = new MakeProjectionSink({
+      endpoint,
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post,
+    });
+    endpoint.protocol = "http:";
+
+    await sink.publish(event);
+
+    expect(post.mock.calls[0]?.[0].endpoint.href).toBe("https://projection.invalid/events");
+  });
+
+  it("classifies malformed transport results and authorization failures as permanent", async () => {
+    const malformed = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+      post: vi.fn().mockResolvedValue(null),
+    });
+    const authorizationFailure = new MakeProjectionSink({
+      endpoint: new URL("https://projection.invalid/events"),
+      authorization: () => {
+        throw new Error("__PLACEHOLDER_MAKE_PROJECTION_TOKEN__");
+      },
+      post: vi.fn(),
+    });
+
+    await expect(malformed.publish(event)).rejects.toBeInstanceOf(
+      MakeProjectionPermanentFailure,
+    );
+    await expect(authorizationFailure.publish(event)).rejects.toMatchObject({
+      name: "MakeProjectionPermanentFailure",
+      reasonCode: "invalid_projection_authorization",
+    });
+  });
 });

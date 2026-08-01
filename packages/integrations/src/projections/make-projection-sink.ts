@@ -82,8 +82,24 @@ const isRetryableStatus = (status: number): boolean =>
   status === 429 ||
   (status >= 500 && status <= 599);
 
-const validateEvent = (event: ProjectionEvent): void => {
-  if (!(event.topic in topicDataTypes)) {
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" &&
+  value !== null &&
+  Object.getPrototypeOf(value) === Object.prototype;
+
+const invalidProjection = (reasonCode: string): never => {
+  throw new MakeProjectionPermanentFailure(reasonCode);
+};
+
+const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
+  if (!isPlainObject(input)) {
+    return invalidProjection("invalid_projection_envelope");
+  }
+  const event = input as Record<string, unknown>;
+  if (
+    typeof event.topic !== "string" ||
+    !Object.hasOwn(topicDataTypes, event.topic)
+  ) {
     throw new MakeProjectionPermanentFailure("invalid_projection_topic");
   }
   if (event.schemaVersion !== 1) {
@@ -91,64 +107,100 @@ const validateEvent = (event: ProjectionEvent): void => {
   }
   if (
     [event.eventId, event.occurredAt, event.correlationId].some(
-      (value) => value.length === 0,
+      (value) => typeof value !== "string" || value.trim().length === 0,
     )
   ) {
     throw new MakeProjectionPermanentFailure("invalid_projection_envelope");
   }
 
-  const allowed = topicDataTypes[event.topic];
-  for (const [field, value] of Object.entries(event.data)) {
+  if (!isPlainObject(event.data)) {
+    return invalidProjection("invalid_projection_data");
+  }
+
+  const allowed = topicDataTypes[event.topic as ProjectionTopic];
+  const data: Record<string, string | number | boolean | null> = {};
+  for (const field of Object.keys(event.data)) {
+    const value = event.data[field];
     const expectedTypes = allowed[field];
-    if (!expectedTypes || !expectedTypes.includes(valueType(value))) {
+    if (
+      value === undefined ||
+      !expectedTypes ||
+      !expectedTypes.includes(valueType(value as string | number | boolean | null)) ||
+      (typeof value === "number" && !Number.isFinite(value))
+    ) {
       throw new MakeProjectionPermanentFailure("invalid_projection_data");
     }
+    data[field] = value as string | number | boolean | null;
   }
+
+  return {
+    eventId: event.eventId as string,
+    topic: event.topic as ProjectionTopic,
+    occurredAt: event.occurredAt as string,
+    correlationId: event.correlationId as string,
+    schemaVersion: 1,
+    data,
+  };
 };
 
-const sanitizedEvent = (event: ProjectionEvent): ProjectionEvent => ({
-  eventId: event.eventId,
-  topic: event.topic,
-  occurredAt: event.occurredAt,
-  correlationId: event.correlationId,
-  schemaVersion: 1,
-  data: { ...event.data },
-});
+const responseStatus = (response: unknown): number | undefined => {
+  if (!isPlainObject(response) || !Object.hasOwn(response, "status")) {
+    return undefined;
+  }
+  return typeof response.status === "number" && Number.isSafeInteger(response.status)
+    ? response.status
+    : undefined;
+};
 
 export class MakeProjectionSink implements ProjectionSink {
+  private readonly endpoint: Readonly<URL>;
+
   constructor(private readonly deps: MakeProjectionSinkDeps) {
-    if (deps.endpoint.protocol !== "https:") {
+    const endpoint = new URL(deps.endpoint.href);
+    if (endpoint.protocol !== "https:") {
       throw new Error("make_projection_https_required");
     }
+    this.endpoint = Object.freeze(endpoint);
   }
 
   async publish(event: ProjectionEvent): Promise<void> {
-    validateEvent(event);
+    const projection = validatedEvent(event);
+    let authorization: unknown;
+    try {
+      authorization = this.deps.authorization();
+    } catch {
+      throw new MakeProjectionPermanentFailure("invalid_projection_authorization");
+    }
+    if (typeof authorization !== "string" || authorization.trim().length === 0) {
+      throw new MakeProjectionPermanentFailure("invalid_projection_authorization");
+    }
+    const headerAuthorization = authorization;
 
-    let response: MakeProjectionResponse;
+    let response: unknown;
     try {
       response = await this.deps.post({
-        endpoint: this.deps.endpoint,
+        endpoint: new URL(this.endpoint.href),
         method: "POST",
         headers: {
-          Authorization: this.deps.authorization(),
+          Authorization: headerAuthorization,
           "Content-Type": "application/json",
-          "Idempotency-Key": event.eventId,
+          "Idempotency-Key": projection.eventId,
         },
-        body: sanitizedEvent(event),
+        body: projection,
         signal: AbortSignal.timeout(5_000),
       });
     } catch {
       throw new MakeProjectionRetryableFailure("transport_failure");
     }
 
-    if (!Number.isSafeInteger(response.status)) {
+    const status = responseStatus(response);
+    if (status === undefined) {
       throw new MakeProjectionPermanentFailure("invalid_transport_response");
     }
-    if (response.status >= 200 && response.status <= 299) return;
-    if (isRetryableStatus(response.status)) {
-      throw new MakeProjectionRetryableFailure(`http_${response.status}`);
+    if (status >= 200 && status <= 299) return;
+    if (isRetryableStatus(status)) {
+      throw new MakeProjectionRetryableFailure(`http_${status}`);
     }
-    throw new MakeProjectionPermanentFailure(`http_${response.status}`);
+    throw new MakeProjectionPermanentFailure(`http_${status}`);
   }
 }

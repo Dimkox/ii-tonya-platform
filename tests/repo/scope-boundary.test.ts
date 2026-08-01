@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
-import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   classifyApprovedTrackedScopeContent,
@@ -9,43 +8,32 @@ import {
   PAYMENT_SCOPE_MAX_FILE_BYTES,
   PAYMENT_SCOPE_MAX_TRACKED_FILES,
 } from "./support/payment-scope-boundary.js";
+import { findProjectionCommandRouteViolations } from "./support/projection-command-route-boundary.js";
 
 describe("MVP scope boundary", () => {
   it("contains no inbound Make or Sheets Fastify route", () => {
     const violations: string[] = [];
     for (const path of globSync("apps/api/src/**/*.ts")) {
-      const source = ts.createSourceFile(
+      violations.push(...findProjectionCommandRouteViolations({
         path,
-        readFileSync(path, "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-      );
-      const visit = (node: ts.Node): void => {
-        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
-          const method = node.expression.name.text;
-          const firstArgument = node.arguments[0];
-          const route = method === "route" && firstArgument && ts.isObjectLiteralExpression(firstArgument)
-            ? firstArgument.properties.find(
-              (property): property is ts.PropertyAssignment =>
-                ts.isPropertyAssignment(property) &&
-                ((ts.isIdentifier(property.name) && property.name.text === "url") ||
-                  (ts.isStringLiteral(property.name) && property.name.text === "url")),
-            )?.initializer
-            : firstArgument;
-          if (
-            ["get", "post", "put", "patch", "delete", "route"].includes(method) &&
-            route &&
-            ts.isStringLiteral(route) &&
-            /(?:make|sheets?)/iu.test(route.text)
-          ) {
-            violations.push(`${path}:${route.text}`);
-          }
-        }
-        ts.forEachChild(node, visit);
-      };
-      visit(source);
+        content: readFileSync(path, "utf8"),
+      }));
     }
     expect(violations).toEqual([]);
+  });
+
+  it.each([
+    ["property route", 'app.post("/v1/webhooks/make", handler);'],
+    ["element route", 'app["post"]("/v1/webhooks/sheets", handler);'],
+    ["template route", "app.get(`/v1/make`, handler);"],
+    ["const route", 'const route = "/v1/sheets"; app.put(route, handler);'],
+    ["route options variable", 'const options = { url: "/v1/make" }; app.route(options);'],
+    ["register prefix", 'app.register(plugin, { prefix: "/v1/webhooks/sheets" });'],
+  ])("detects an inbound Make or Sheets %s evasion", (_label, snippet) => {
+    expect(findProjectionCommandRouteViolations({
+      path: "apps/api/src/evasion.ts",
+      content: `import Fastify from "fastify"; const app = Fastify(); ${snippet}`,
+    })).not.toEqual([]);
   });
 
   it("contains no live or deferred commercial and scheduling modules", () => {
@@ -293,6 +281,30 @@ describe("MVP scope boundary", () => {
         content: "ALTER TABLE users ADD cashier_id text;",
       }),
     ).not.toEqual([]);
+  });
+
+  it.each([
+    "packages/db/migrations/0009_young_arachne.sql",
+    "packages/db/migrations/0016_task17c_admin_workflows.sql",
+    "packages/db/migrations/meta/0016_snapshot.json",
+  ])("pins approved post-MVP migration content for %s", (path) => {
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(classifyApprovedTrackedScopeContent({
+      path,
+      content: `${content}\n-- unexpected\n`,
+    })).not.toEqual([]);
+  });
+
+  it.each([
+    "packages/db/src/schema/audit.ts",
+    "packages/db/src/schema/identity.ts",
+    "packages/db/src/schema/integration.ts",
+  ])("allows reviewed non-payment relations in %s", (path) => {
+    expect(classifyPaymentScopeProbe({
+      path,
+      content: readFileSync(path, "utf8"),
+    })).toEqual([]);
   });
 
   it.each([

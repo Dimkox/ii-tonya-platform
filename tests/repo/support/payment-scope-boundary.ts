@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/db-gate.yml",
-    "cf03fe5ad90b3538f0a0762476c6179660f8ee12081e4152c7e3afa31fbee690",
+    "99fcb457f3c4d49fab95fca1ed68ef53bb6b88ca6f8677a30ede70702e9e0c93",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
@@ -227,6 +227,38 @@ const approvedMigrationHashes = new Map([
     "d08810977e9e8fef657e60147627a7c078ff91929626d4e2cd52a083f0bef840",
   ],
   [
+    "packages/db/migrations/0009_young_arachne.sql",
+    "4ffb0a9a5746c46873fed26adeac21865b02c3bac50a22bf8cf96b6a00c99f34",
+  ],
+  [
+    "packages/db/migrations/0010_brown_purifiers.sql",
+    "b00006d3b168a7b1295e7da6028756e3fd8dda5f13310765c54484fd205b8da0",
+  ],
+  [
+    "packages/db/migrations/0011_sad_red_ghost.sql",
+    "e51142adf199100404453875cff4088614019eb126805d28ce2922fe114b1bf7",
+  ],
+  [
+    "packages/db/migrations/0012_productive_siren.sql",
+    "12fe46e565320459cccb9c23f7637b1a34ccb4407fef3ad25fc767cfa5ca6851",
+  ],
+  [
+    "packages/db/migrations/0013_gorgeous_deathstrike.sql",
+    "2e7d88b34ca12b010c18ca722cddad2323c7a60dbb0c56db408d8db5d5d292c2",
+  ],
+  [
+    "packages/db/migrations/0014_admin_feedback_controls.sql",
+    "b1b36ae08655a70398b0133e38bbb1442a6bc0ea37f75a78c1e5b01808e67339",
+  ],
+  [
+    "packages/db/migrations/0015_admin_iam.sql",
+    "c84622593e18513feae28abf47d82f52bf2bb77f54a50e77d4d5c353cda1aabc",
+  ],
+  [
+    "packages/db/migrations/0016_task17c_admin_workflows.sql",
+    "3fb0532ce45de66c4d1f86c74aaf473e525d9440e6937d716ed50dc3e93e9045",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -263,12 +295,44 @@ const approvedMigrationHashes = new Map([
     "70a79a380f0cd1476b9630700cca47dae309e4441ad37fb8ca38ae6c9c8c9b3a",
   ],
   [
+    "packages/db/migrations/meta/0009_snapshot.json",
+    "9baef30564ea5f3ac9b4fce898a8290e625bba601bfaf1a87bc25a44ad208e59",
+  ],
+  [
+    "packages/db/migrations/meta/0010_snapshot.json",
+    "3ed7aec9d82f66e55c47fcb644dc04816d94c05a74a4dabd71fe749683eae0a8",
+  ],
+  [
+    "packages/db/migrations/meta/0011_snapshot.json",
+    "06c3b7b0aec9f3acfd260ac6f0d4ca261ddb41c2ed45993577c0b8753dbdc6e6",
+  ],
+  [
+    "packages/db/migrations/meta/0012_snapshot.json",
+    "f8ceccd525ca144dd160976b487acd41116ffcfde65ff630d92003928a49b045",
+  ],
+  [
+    "packages/db/migrations/meta/0013_snapshot.json",
+    "162528fc521552603321ee76c0cce5afa8ea558ace356f3fd0b69065ba511923",
+  ],
+  [
+    "packages/db/migrations/meta/0015_snapshot.json",
+    "201253c5d75b93fb1e3b483d91e4dbc2cedeab93912f029b681a92ea3cb82ebb",
+  ],
+  [
+    "packages/db/migrations/meta/0016_snapshot.json",
+    "e1b95f18854218f2a1e9376d03988e132f8bed6ea5f7969321a3e3be4566d9ef",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "c3419efcddbf0c6e3163750075ed188bf5d21067c70353bee85a453f67714f0c",
+    "93113689a6488265ffa20fcfd4f174fcbfb34b65843eb29a5219426b9a363493",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  "admin_case_actions",
   "admin_approvals",
+  "admin_object_assignments",
+  "admin_role_assignments",
+  "admin_sessions",
   "audit_events",
   "channel_identities",
   "client_profiles",
@@ -281,6 +345,7 @@ const approvedDatabaseRelations = new Set([
   "experts",
   "feedback",
   "human_escalations",
+  "integration_errors",
   "integration_inbox",
   "integration_outbox",
   "message_events",
@@ -290,10 +355,13 @@ const approvedDatabaseRelations = new Set([
   "outbox_operator_alerts",
   "package_balances",
   "privacy_deletion_jobs",
+  "privacy_deletion_manifests",
   "privacy_processor_attempts",
+  "privacy_retention_items",
   "projection_checkpoints",
   "prompt_versions",
   "provider_cursors",
+  "provider_subject_mappings",
   "reconciliation_mismatches",
   "reconciliation_runs",
   "reservations",
