@@ -14,6 +14,8 @@ import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
 let testDb: TestDatabase | undefined;
 const POSTGRES_DEFAULT_RAISE_SQLSTATE = "P0001";
+const postgresInstant = (value: Date | string): Date =>
+  value instanceof Date ? value : new Date(value);
 
 const rejected = async (operation: Promise<unknown>): Promise<unknown> =>
   operation.then(
@@ -114,8 +116,8 @@ describe("atomic approved admin workflows", () => {
       from message_packages where grant_idempotency_key = ${idempotencyKey}
     `);
     expect({
-      grantedAt: new Date(fixed.rows[0]!.grantedAt),
-      expiresAt: new Date(fixed.rows[0]!.expiresAt),
+      grantedAt: postgresInstant(fixed.rows[0]!.grantedAt),
+      expiresAt: postgresInstant(fixed.rows[0]!.expiresAt),
     }).toEqual({
       grantedAt: fixedNow,
       expiresAt: new Date("2026-09-26T10:00:00.000Z"),
@@ -135,8 +137,12 @@ describe("atomic approved admin workflows", () => {
       select p.granted_at as "grantedAt", clock_timestamp() as after
       from message_packages p where p.grant_idempotency_key = ${defaultKey}
     `);
-    expect(dbClock.rows[0]!.grantedAt.getTime()).toBeGreaterThanOrEqual(bounds.rows[0]!.before.getTime());
-    expect(dbClock.rows[0]!.grantedAt.getTime()).toBeLessThanOrEqual(dbClock.rows[0]!.after.getTime());
+    expect(postgresInstant(dbClock.rows[0]!.grantedAt).getTime()).toBeGreaterThanOrEqual(
+      postgresInstant(bounds.rows[0]!.before).getTime(),
+    );
+    expect(postgresInstant(dbClock.rows[0]!.grantedAt).getTime()).toBeLessThanOrEqual(
+      postgresInstant(dbClock.rows[0]!.after).getTime(),
+    );
   });
 
   it("grants once under replay/concurrency with DB-authoritative 60-day immutable metadata and complete audit", async () => {
