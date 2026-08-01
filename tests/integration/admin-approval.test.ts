@@ -342,7 +342,7 @@ describe("populated 0012 upgrade", () => {
           '00000000-0000-4000-8000-000000000087'::uuid,
           '00000000-0000-4000-8000-000000000081'::uuid,
           77, 'legacy-intro-package', 'intro',
-          clock_timestamp() + interval '9 days', clock_timestamp()
+          timestamptz '2036-08-10T00:00:00Z', clock_timestamp()
         );
         insert into message_ledger_entries (
           id, package_id, entry_kind, delta, idempotency_key
@@ -393,7 +393,8 @@ describe("populated 0012 upgrade", () => {
         id: string;
         units: number;
         kind: string;
-        expiresAt: Date | null;
+        expiryIsNull: boolean;
+        expiryPreserved: boolean;
         legacyGrant: boolean;
         approvalId: string | null;
         sessionIdHash: string | null;
@@ -401,7 +402,11 @@ describe("populated 0012 upgrade", () => {
         delta: number;
       }>(sql`
         select p.id, p.granted_messages as units, p.kind,
-          p.expires_at as "expiresAt",
+          p.expires_at is null as "expiryIsNull",
+          coalesce(
+            p.expires_at = timestamptz '2036-08-10T00:00:00Z',
+            false
+          ) as "expiryPreserved",
           p.legacy_admin_grant as "legacyGrant",
           p.admin_approval_id as "approvalId",
           p.admin_requester_session_id_hash as "sessionIdHash",
@@ -419,7 +424,8 @@ describe("populated 0012 upgrade", () => {
           id: "00000000-0000-4000-8000-000000000086",
           units: 333,
           kind: "admin",
-          expiresAt: null,
+          expiryIsNull: true,
+          expiryPreserved: false,
           legacyGrant: true,
           approvalId: null,
           sessionIdHash: null,
@@ -430,7 +436,8 @@ describe("populated 0012 upgrade", () => {
           id: "00000000-0000-4000-8000-000000000087",
           units: 77,
           kind: "intro",
-          expiresAt: expect.any(Date),
+          expiryIsNull: false,
+          expiryPreserved: true,
           legacyGrant: true,
           approvalId: null,
           sessionIdHash: null,

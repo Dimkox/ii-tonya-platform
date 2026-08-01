@@ -313,3 +313,28 @@
   the authoritative behavioral rerun.
 - Build was not repeated because this remediation changes integration/support
   test code only; no production or schema file changed.
+
+## Database Gate run 30696960145 timestamp assertion remediation
+
+- GitHub Actions run `30696960145` executed commit `3ca1367`. Schema,
+  catalog, message-ledger, and feedback gates passed. Five of six admin IAM
+  cases passed; the populated 0012 upgrade alone failed because the raw
+  PostgreSQL result returned `timestamptz` as a string while the test required
+  a JavaScript `Date` instance.
+- The inert legacy intro fixture now uses the fixed expiry
+  `2036-08-10T00:00:00Z`. The preservation query asserts database booleans for
+  exact timestamp equality and the separate admin-null case, avoiding any
+  dependency on driver timestamp representation.
+- Existing assertions for row identity, units, kind, legacy status, approval
+  and requester-session provenance, source reference, and ledger delta remain
+  intact. A narrow scan found no other raw timestamp `Date` matcher in this
+  upgrade suite.
+- TDD structural guard RED: 1 of 1 failed. GREEN: 1 of 1 passed.
+- Focused repository gates: 5 files and 18 tests passed.
+- `pnpm typecheck`: passed for all 10 checked workspace projects.
+- `pnpm lint`: passed.
+- The six-case PostgreSQL suite was attempted locally, but all bodies were
+  skipped because no working Testcontainers runtime was available. CI remains
+  the authoritative behavioral rerun.
+- Build was not repeated because this remediation changes test/report files
+  only; no production or schema file changed.
