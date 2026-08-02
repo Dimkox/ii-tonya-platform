@@ -73,7 +73,7 @@ jobs:
           --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
 
       - name: Build and smoke final container images
-        run: pnpm test:container
+        run: VCS_REF="$GITHUB_SHA" pnpm test:container
 
       - name: Install pinned cosign
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

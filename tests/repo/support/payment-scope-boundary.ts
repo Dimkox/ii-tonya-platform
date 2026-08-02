@@ -34,7 +34,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "4d3af025c003ca084fc82ec973bb6e71677c7a27c68ddb0f0bd1cf80394e16c4",
+    "2179764edb54da441dd68559e329d3a500ab2c6ba72c733395d79a2dbfea325f",
   ],
   [
     "packages/application/package.json",
@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "febaf15ddf25dfec6a2b8f2ef3452d92d9ef4522bb84db014e1eee0c58f55b72",
+    "9f2991da5e1a5721953b467d585a87dbee14a865f98f2481060a09d6c68150fb",
   ],
   [
     ".github/workflows/db-gate.yml",
@@ -80,15 +80,27 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/release.yml",
-    "3035244aca96783a43d860f72a1973ceb501240693fd852927760b340d60effa",
+    "547acbd9a8121c53641636512fe7f7048ec57c448332bd190d84090d06658953",
+  ],
+  [
+    "deploy/compose.remote.yml",
+    "770925eae581bbd1fea73d4d52e526cbf26d7c28cfa241585b29ae38c37d4f17",
+  ],
+  [
+    "scripts/deploy-compose-remote.sh",
+    "3448eb38e5b561534bfdfda3d8edc0af58becf271cd0899a3b6d93fbe58a4f7e",
+  ],
+  [
+    "scripts/validate-runtime-env.sh",
+    "fd44cf8a73a6e8e8403d49b0415696b38b756e051da3533775c25cca92b35a40",
   ],
   [
     "dockerfile",
-    "5e36bdb100eb862c47a0ccfe0c9fa5540d4e8b9a0603000e5016ca69a59d09fd",
+    "c3f3ba347ca19b03cc5f57e2e934afccdab6ba441676d7b97466f8b8e6107ec2",
   ],
   [
     "compose.yaml",
-    "bfd986177aa2572ab3981bac34121a190f1fd2b59b832db66dc4ac02bc38be35",
+    "dbb4863e1bf51df3bc655aec6a6381ba5b9d41c6480ab1c2455f15440200ac15",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([

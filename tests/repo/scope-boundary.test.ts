@@ -400,9 +400,12 @@ describe("MVP scope boundary", () => {
   it.each([
     "Dockerfile",
     "compose.yaml",
+    "deploy/compose.remote.yml",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
-  ])("pins reviewed Task21/22 release automation content for %s", (path) => {
+    "scripts/deploy-compose-remote.sh",
+    "scripts/validate-runtime-env.sh",
+  ])("pins reviewed Task21/22/23 release automation content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
     expect(

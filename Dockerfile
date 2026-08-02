@@ -31,6 +31,8 @@ RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
 
 FROM node:24.18.0-bookworm-slim AS runtime-base
 
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.revision=$VCS_REF
 ENV NODE_ENV=production
 WORKDIR /app
 

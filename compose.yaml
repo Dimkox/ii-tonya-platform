@@ -42,6 +42,8 @@ services:
     build:
       context: .
       target: api
+      args:
+        VCS_REF: ${VCS_REF:-local}
     environment: *app-runtime
     command:
       - node
@@ -96,6 +98,8 @@ services:
     build:
       context: .
       target: api
+      args:
+        VCS_REF: ${VCS_REF:-local}
     environment:
       <<: *app-runtime
       HOST: 0.0.0.0
@@ -119,6 +123,8 @@ services:
     build:
       context: .
       target: worker
+      args:
+        VCS_REF: ${VCS_REF:-local}
     environment:
       <<: *app-runtime
       WORKER_POLL_INTERVAL_MS: "1000"

@@ -45,6 +45,10 @@ test("boots portable final images and imports emitted internal packages", () => 
       assert.equal(inspected.HostConfig.ReadonlyRootfs, true);
       assert.equal(inspected.State.Health.Status, "healthy");
       assert.deepEqual(inspected.Config.Cmd, ["node", command]);
+      assert.equal(
+        inspected.Config.Labels?.["org.opencontainers.image.revision"],
+        process.env.VCS_REF ?? "local",
+      );
       if (service === "worker") {
         run("docker", [
           "compose",

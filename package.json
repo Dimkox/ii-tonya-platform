@@ -20,11 +20,12 @@
     "test:repeat": "node scripts/repeat-vitest.mjs",
     "test:pnpm-launcher": "node scripts/pnpm-launcher-self-test.mjs",
     "verify:clean-workspace": "node scripts/verify-clean-workspace.mjs",
-    "format:check": "prettier --check README.md package.json compose.yaml .github/workflows/ci.yml .github/workflows/release.yml scripts/smoke.mjs tests/container/image-smoke.test.mjs tests/provider-stubs/server.mjs tests/repo/release-assets.test.ts tests/repo/workflow-semantics.test.ts docs/operations docs/runbooks",
+    "format:check": "prettier --check README.md package.json compose.yaml deploy/compose.remote.yml .github/workflows/ci.yml .github/workflows/release.yml scripts/smoke.mjs tests/container/image-smoke.test.mjs tests/provider-stubs/server.mjs tests/repo/release-assets.test.ts tests/repo/workflow-semantics.test.ts docs/operations docs/runbooks docs/spec/deployment-readiness-amendment.md",
+    "verify:deploy": "bash -n scripts/deploy-compose-remote.sh scripts/validate-runtime-env.sh && vitest run tests/repo/release-assets.test.ts tests/repo/workflow-semantics.test.ts",
     "lint": "eslint .",
     "typecheck": "pnpm -r --sort run typecheck",
     "build": "pnpm --workspace-concurrency=1 -r --sort run build",
-    "verify": "pnpm build && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:property && pnpm test:integration && pnpm test:contract && pnpm test:security && pnpm test:e2e && pnpm audit --prod --audit-level high"
+    "verify": "pnpm build && pnpm format:check && pnpm verify:deploy && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:property && pnpm test:integration && pnpm test:contract && pnpm test:security && pnpm test:e2e && pnpm audit --prod --audit-level high"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
