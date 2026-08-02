@@ -58,9 +58,12 @@ describe("release assets", () => {
     );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
-    expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/npm");
-    expect(dockerfile).toContain("rm -f /usr/local/bin/npm /usr/local/bin/npx");
-    expect(dockerfile.match(/node:24\.18\.0-bookworm-slim/g)).toHaveLength(2);
+    expect(dockerfile).toContain(
+      "FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS runtime-base",
+    );
+    expect(dockerfile).toContain("ENV PATH=/nodejs/bin:$PATH");
+    expect(dockerfile).toContain("ENTRYPOINT []");
+    expect(dockerfile.match(/node:24\.18\.0-bookworm-slim/g)).toHaveLength(1);
     expect(dockerfile).toContain(
       'CMD ["node", "--input-type=module", "--eval", "const s=(await import(\'node:fs/promises\')).stat;',
     );

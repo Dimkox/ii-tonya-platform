@@ -96,7 +96,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "dockerfile",
-    "c3f3ba347ca19b03cc5f57e2e934afccdab6ba441676d7b97466f8b8e6107ec2",
+    "264dac837c1b3b81f07605b825be994f8ce7a1c7865eb243ced4ec81b3e3baca",
   ],
   [
     "compose.yaml",
