@@ -31,7 +31,9 @@ describe("worker main", () => {
   it("updates the configured heartbeat after a successful built-worker cycle", async () => {
     const { runWorkerLoop } = await import("./main.js");
     const controller = new AbortController();
-    const heartbeat = vi.fn(() => { controller.abort(); });
+    const heartbeat = vi.fn(() => {
+      controller.abort();
+    });
     const runtime = {
       runOnce: vi.fn(async () => ({ safetyHandoffs: {} }) as never),
       close: vi.fn(async () => undefined),
@@ -52,7 +54,9 @@ describe("worker main", () => {
     const listenerCounts: number[] = [];
     const runtime = {
       runOnce: vi.fn(async () => {
-        listenerCounts.push(getEventListeners(controller.signal, "abort").length);
+        listenerCounts.push(
+          getEventListeners(controller.signal, "abort").length,
+        );
         if (listenerCounts.length === 12) controller.abort();
         return { safetyHandoffs: {} } as never;
       }),
@@ -74,7 +78,9 @@ describe("worker main", () => {
       runOnce: vi.fn(() => new Promise<never>(() => undefined)),
       close: vi.fn(async () => undefined),
     };
-    setTimeout(() => { controller.abort(); }, 5);
+    setTimeout(() => {
+      controller.abort();
+    }, 5);
 
     await runWorkerLoop(runtime, {
       signal: controller.signal,
@@ -89,21 +95,36 @@ describe("worker main", () => {
     let finishClose: (() => void) | undefined;
     const runtime = {
       runOnce: vi.fn(() => new Promise<never>(() => undefined)),
-      close: vi.fn(() => new Promise<void>((resolve) => { finishClose = resolve; })),
+      close: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishClose = resolve;
+          }),
+      ),
     };
     const hardExit = vi.fn();
     const running = main({
-      env: { DATABASE_URL: "postgresql://worker:worker@localhost/worker" },
+      env: {
+        DATABASE_URL:
+          "postgresql://worker:worker@localhost/worker?sslmode=require",
+      },
       runtimeFactory: { create: vi.fn(async () => runtime) },
       pollIntervalMs: 1,
       shutdownGraceMs: 10,
       hardExit,
     });
 
-    await vi.waitFor(() => { expect(runtime.runOnce).toHaveBeenCalledOnce(); });
+    await vi.waitFor(() => {
+      expect(runtime.runOnce).toHaveBeenCalledOnce();
+    });
     process.emit("SIGTERM", "SIGTERM");
     try {
-      await vi.waitFor(() => { expect(hardExit).toHaveBeenCalledWith(1); }, { timeout: 500 });
+      await vi.waitFor(
+        () => {
+          expect(hardExit).toHaveBeenCalledWith(1);
+        },
+        { timeout: 500 },
+      );
     } finally {
       finishClose?.();
     }
@@ -119,17 +140,24 @@ describe("worker main", () => {
     };
     const hardExit = vi.fn();
     const running = main({
-      env: { DATABASE_URL: "postgresql://worker:worker@localhost/worker" },
+      env: {
+        DATABASE_URL:
+          "postgresql://worker:worker@localhost/worker?sslmode=require",
+      },
       runtimeFactory: { create: vi.fn(async () => runtime) },
       pollIntervalMs: 1,
       shutdownGraceMs: 10,
       hardExit,
     });
 
-    await vi.waitFor(() => { expect(runtime.runOnce).toHaveBeenCalledOnce(); });
+    await vi.waitFor(() => {
+      expect(runtime.runOnce).toHaveBeenCalledOnce();
+    });
     process.emit("SIGTERM", "SIGTERM");
     await running;
-    await new Promise((resolve) => { setTimeout(resolve, 25); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 25);
+    });
 
     expect(runtime.close).toHaveBeenCalledOnce();
     expect(hardExit).not.toHaveBeenCalled();
