@@ -229,9 +229,7 @@ describe("release assets", () => {
     expect(adapter).toContain("unknown_outcome");
     expect(adapter).toContain("migration-recover)");
     expect(adapter).toContain("rollback-complete)");
-    expect(adapter).toContain(
-      'cat "$deploy_path/.rollback-in-progress"',
-    );
+    expect(adapter).toContain('cat "$deploy_path/.rollback-in-progress"');
     expect(adapter).toContain("capture-current)");
     expect(adapter).toContain("ROLLBACK_API_IMAGE_REF");
     expect(adapter).toContain("ROLLBACK_WORKER_IMAGE_REF");
