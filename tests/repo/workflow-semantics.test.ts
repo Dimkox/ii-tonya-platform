@@ -53,8 +53,13 @@ describe("CI and release workflow semantics", () => {
     );
     expect(publishSteps.length).toBeGreaterThan(0);
     expect(
-      publishSteps.every((step) => step.if === "github.event_name == 'push'"),
+      publishSteps.every(
+        (step) =>
+          step.if ===
+          "github.event_name == 'push' && github.ref == 'refs/heads/main'",
+      ),
     ).toBe(true);
+    expect(ci.on.push.branches).toEqual(["main"]);
 
     const provenanceText = JSON.stringify(workflow.jobs.verify_provenance);
     const provenanceRun = (
@@ -65,6 +70,8 @@ describe("CI and release workflow semantics", () => {
     expect(provenanceText).toContain("actions/runs/$CI_RUN_ID");
     expect(provenanceRun).toContain('.conclusion == "success"');
     expect(provenanceRun).toContain('.path == ".github/workflows/ci.yml"');
+    expect(provenanceRun).toContain('.head_branch == "main"');
+    expect(provenanceRun).not.toContain('startswith("codex/")');
     expect(provenanceText).toContain("run-id");
     expect(provenanceText).toContain("cosign verify-blob");
     expect(provenanceText).toContain("cosign verify --certificate-identity");

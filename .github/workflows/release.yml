@@ -42,7 +42,7 @@ jobs:
             .status == "completed" and
             .conclusion == "success" and
             .repository.full_name == $repository and
-            (.head_branch == "main" or (.head_branch | startswith("codex/")))
+            .head_branch == "main"
           ' ci-run.json
           echo "head_sha=$(jq -r .head_sha ci-run.json)" >> "$GITHUB_OUTPUT"
           echo "head_ref=refs/heads/$(jq -r .head_branch ci-run.json)" >> "$GITHUB_OUTPUT"
@@ -72,19 +72,53 @@ jobs:
             --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer" \
             provenance/release-provenance.json
+          cosign verify-blob \
+            --bundle provenance/api-sbom.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/api-sbom.spdx.json
+          cosign verify-blob \
+            --bundle provenance/worker-sbom.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/worker-sbom.spdx.json
+          api_sbom_sha256="$(sha256sum provenance/api-sbom.spdx.json | awk '{print $1}')"
+          worker_sbom_sha256="$(sha256sum provenance/worker-sbom.spdx.json | awk '{print $1}')"
           jq -e \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg head_sha "$EXPECTED_SHA" \
             --arg head_ref "$EXPECTED_REF" \
-            --arg ci_run_id "$CI_RUN_ID" '
-              .schema == 1 and .repository == $repository and
+            --arg ci_run_id "$CI_RUN_ID" \
+            --arg api_sbom_sha256 "$api_sbom_sha256" \
+            --arg worker_sbom_sha256 "$worker_sbom_sha256" '
+              .schema == 2 and .repository == $repository and
               .head_sha == $head_sha and .head_ref == $head_ref and
               .ci_run_id == $ci_run_id and
+              .api_sbom_file == "api-sbom.spdx.json" and
+              .worker_sbom_file == "worker-sbom.spdx.json" and
+              .api_sbom_sha256 == $api_sbom_sha256 and
+              .worker_sbom_sha256 == $worker_sbom_sha256 and
               (.api_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$")) and
               (.worker_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$"))
             ' provenance/release-provenance.json
           api_image_ref="$(jq -r .api_image_ref provenance/release-provenance.json)"
           worker_image_ref="$(jq -r .worker_image_ref provenance/release-provenance.json)"
+          api_digest="${api_image_ref##*@}"
+          worker_digest="${worker_image_ref##*@}"
+          jq -e --arg digest "$api_digest" --arg checksum "${api_digest#sha256:}" '
+            any(.packages[]?;
+              .primaryPackagePurpose == "CONTAINER" and
+              .versionInfo == $digest and
+              any(.checksums[]?; .algorithm == "SHA256" and .checksumValue == $checksum)
+            )
+          ' provenance/api-sbom.spdx.json
+          jq -e --arg digest "$worker_digest" --arg checksum "${worker_digest#sha256:}" '
+            any(.packages[]?;
+              .primaryPackagePurpose == "CONTAINER" and
+              .versionInfo == $digest and
+              any(.checksums[]?; .algorithm == "SHA256" and .checksumValue == $checksum)
+            )
+          ' provenance/worker-sbom.spdx.json
           cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$api_image_ref"
           cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$worker_image_ref"
           echo "api_image_ref=$api_image_ref" >> "$GITHUB_OUTPUT"

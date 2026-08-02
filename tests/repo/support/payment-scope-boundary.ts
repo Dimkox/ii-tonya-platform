@@ -72,7 +72,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "7d001b22870acf252c96485504c2721263cb81e7694263dd5977a1a3d18468cc",
+    "febaf15ddf25dfec6a2b8f2ef3452d92d9ef4522bb84db014e1eee0c58f55b72",
   ],
   [
     ".github/workflows/db-gate.yml",
@@ -80,7 +80,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/release.yml",
-    "b95d351116b6af84264e3b48c36f4bbcc684c9e24dbddafe0c859091355f9d02",
+    "3035244aca96783a43d860f72a1973ceb501240693fd852927760b340d60effa",
   ],
   [
     "dockerfile",
@@ -88,7 +88,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "compose.yaml",
-    "63d353c8268c0aab0453871af9d40e976956bda2f863d61a40854a3577d177bb",
+    "bfd986177aa2572ab3981bac34121a190f1fd2b59b832db66dc4ac02bc38be35",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([

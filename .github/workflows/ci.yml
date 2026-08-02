@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "codex/**"]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -76,15 +76,15 @@ jobs:
         run: pnpm test:container
 
       - name: Install pinned cosign
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Authenticate to GHCR for trusted push provenance
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Publish tested images and resolve registry manifest digests
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           repository="${GITHUB_REPOSITORY,,}"
           api_tag="ghcr.io/$repository/api:candidate-$GITHUB_SHA"
@@ -101,24 +101,50 @@ jobs:
           echo "WORKER_IMAGE_REF=${worker_tag%:*}@$worker_digest" >> "$GITHUB_ENV"
 
       - name: Scan API image digest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.65.0 image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1
+          aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
           "$API_IMAGE_REF"
 
       - name: Scan worker image digest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.65.0 image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1
+          aquasec/trivy:0.65.0 image --severity HIGH,CRITICAL --exit-code 1
           "$WORKER_IMAGE_REF"
 
+      - name: Generate API image SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ env.API_IMAGE_REF }}
+          format: spdx-json
+          output-file: api-sbom.spdx.json
+          upload-artifact: "false"
+          upload-release-assets: "false"
+
+      - name: Generate worker image SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ env.WORKER_IMAGE_REF }}
+          format: spdx-json
+          output-file: worker-sbom.spdx.json
+          upload-artifact: "false"
+          upload-release-assets: "false"
+
       - name: Sign exact registry images and provenance manifest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           cosign sign --yes "$API_IMAGE_REF"
           cosign sign --yes "$WORKER_IMAGE_REF"
+          cosign sign-blob --yes --bundle api-sbom.bundle api-sbom.spdx.json
+          cosign sign-blob --yes --bundle worker-sbom.bundle worker-sbom.spdx.json
+          api_sbom_sha256="$(sha256sum api-sbom.spdx.json | awk '{print $1}')"
+          worker_sbom_sha256="$(sha256sum worker-sbom.spdx.json | awk '{print $1}')"
+          [[ "$api_sbom_sha256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$worker_sbom_sha256" =~ ^[0-9a-f]{64}$ ]]
           jq -n \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg head_sha "$GITHUB_SHA" \
@@ -126,18 +152,24 @@ jobs:
             --arg ci_run_id "$GITHUB_RUN_ID" \
             --arg api_image_ref "$API_IMAGE_REF" \
             --arg worker_image_ref "$WORKER_IMAGE_REF" \
-            '{schema:1, repository:$repository, head_sha:$head_sha, head_ref:$head_ref, ci_run_id:$ci_run_id, api_image_ref:$api_image_ref, worker_image_ref:$worker_image_ref}' \
+            --arg api_sbom_sha256 "$api_sbom_sha256" \
+            --arg worker_sbom_sha256 "$worker_sbom_sha256" \
+            '{schema:2, repository:$repository, head_sha:$head_sha, head_ref:$head_ref, ci_run_id:$ci_run_id, api_image_ref:$api_image_ref, worker_image_ref:$worker_image_ref, api_sbom_file:"api-sbom.spdx.json", api_sbom_sha256:$api_sbom_sha256, worker_sbom_file:"worker-sbom.spdx.json", worker_sbom_sha256:$worker_sbom_sha256}' \
             > release-provenance.json
           cosign sign-blob --yes --bundle release-provenance.bundle release-provenance.json
 
       - name: Upload signed release provenance
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: release-provenance-${{ github.sha }}
           path: |
             release-provenance.json
             release-provenance.bundle
+            api-sbom.spdx.json
+            api-sbom.bundle
+            worker-sbom.spdx.json
+            worker-sbom.bundle
           if-no-files-found: error
           retention-days: 90
 

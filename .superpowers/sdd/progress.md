@@ -32,6 +32,7 @@
 | 19. Worker jobs | completed: expiry, reconciliation, safety handoff, runnable bounded worker | complete | PASS after starvation/shutdown/batch-cap fixes | PASS; 154 non-container tests and full PostgreSQL CI | `f9833b7`, `fdfa17a`; run `30703519380` |
 | 20. Hardened API | completed: runnable disabled composition, hardened ingress, observability, retry-safe webhook inbox | complete | PASS after two adversarial fix waves | PASS; 147/147 local and exact-SHA PostgreSQL CI | `85a103e`..`ce248bc`; run `30705734230` |
 | 21. Docker, CI/CD, and release evidence | completed: non-root images, isolated smoke, exact-digest scanning/signing, run-bound release provenance | complete | PASS after executable CI fix loop | PASS; exact-SHA CI and PostgreSQL gates | `526601c`..`1a2f514`; runs `30714417342`, `30714431793` |
+| 22. Deployment-readiness hardening | in progress: main-only provenance, strict image gate, provenance-bound SBOMs, runtime hardening, explicit local DB exception | remediation implemented | PASS after SBOM binding and local-database contract fixes; no remaining Critical/Important findings | local targeted verification PASS; hosted exact-SHA verification pending | pending |
 
 ## Cross-task findings
 

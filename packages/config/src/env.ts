@@ -1,35 +1,78 @@
 import { z } from "zod";
 
-const isPostgresUrl = (value: string): boolean => {
+const isPostgresUrl = (
+  value: string,
+  allowInsecureLocalDatabase: boolean,
+): boolean => {
   try {
     const url = new URL(value);
-    const hasPostgresProtocol = url.protocol === "postgres:" || url.protocol === "postgresql:";
-    return hasPostgresProtocol && url.hostname.length > 0 && url.pathname.length > 1;
+    const hasPostgresProtocol =
+      url.protocol === "postgres:" || url.protocol === "postgresql:";
+    if (
+      !hasPostgresProtocol ||
+      url.hostname.length === 0 ||
+      url.pathname.length <= 1
+    ) {
+      return false;
+    }
+
+    const sslModes = url.searchParams.getAll("sslmode");
+    if (sslModes.length > 1) {
+      return false;
+    }
+
+    const localHosts = new Set(["localhost", "127.0.0.1", "[::1]", "postgres"]);
+    if (
+      allowInsecureLocalDatabase &&
+      localHosts.has(url.hostname.toLowerCase())
+    ) {
+      return true;
+    }
+
+    return (
+      sslModes.length === 1 &&
+      ["require", "verify-ca", "verify-full"].includes(sslModes[0] ?? "")
+    );
   } catch {
     return false;
   }
 };
 
-const schema = z.object({
-  DATABASE_URL: z.string().refine(
-    isPostgresUrl,
-    "DATABASE_URL must be a hierarchical postgres: or postgresql: URL with a host and database path",
-  ),
-  SELARTI_ENABLED: z.literal("false").default("false"),
-  SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
-  PLANERKA_ENABLED: z.literal("false").default("false"),
-  TELEGRAM_ENABLED: z.literal("false").default("false"),
-  LLM_ENABLED: z.literal("false").default("false"),
-  MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
-  GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
-  INTENT_MODEL_ENABLED: z.literal("false").default("false"),
-  PAYMENTS_ENABLED: z.literal("false").default("false"),
-  PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
-  LLM_PROVIDER: z.literal("disabled").default("disabled"),
-  MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
-  RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
-  DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),
-}).passthrough();
+const schema = z
+  .object({
+    DATABASE_URL: z.string(),
+    ALLOW_INSECURE_LOCAL_DATABASE: z.enum(["true", "false"]).default("false"),
+    SELARTI_ENABLED: z.literal("false").default("false"),
+    SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
+    PLANERKA_ENABLED: z.literal("false").default("false"),
+    TELEGRAM_ENABLED: z.literal("false").default("false"),
+    LLM_ENABLED: z.literal("false").default("false"),
+    MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
+    GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
+    INTENT_MODEL_ENABLED: z.literal("false").default("false"),
+    PAYMENTS_ENABLED: z.literal("false").default("false"),
+    PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
+    LLM_PROVIDER: z.literal("disabled").default("disabled"),
+    MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
+    RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
+    DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),
+  })
+  .passthrough()
+  .superRefine((value, context) => {
+    if (
+      !isPostgresUrl(
+        value.DATABASE_URL,
+        value.ALLOW_INSECURE_LOCAL_DATABASE === "true",
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATABASE_URL"],
+        message:
+          "DATABASE_URL must be a hierarchical Postgres URL with an unambiguous TLS mode unless explicit local evidence mode is enabled",
+      });
+    }
+  });
 
 export type RuntimeConfig = {
   databaseUrl: string;

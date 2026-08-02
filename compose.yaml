@@ -17,6 +17,7 @@ x-disabled-runtime: &disabled-runtime
 
 x-app-runtime: &app-runtime
   DATABASE_URL: postgresql://ii_tonya:local-placeholder-only@postgres:5432/ii_tonya
+  ALLOW_INSECURE_LOCAL_DATABASE: "true"
   DISPLAY_TIMEZONE: Europe/Moscow
   <<: *disabled-runtime
 
@@ -55,11 +56,15 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
     networks: [backend]
     restart: "no"
 
   provider-stubs:
     image: node:24.18.0-bookworm-slim
+    user: "10001:10001"
     working_dir: /fixtures
     command: ["node", "server.mjs"]
     environment:
@@ -69,6 +74,9 @@ services:
       - ./tests/provider-stubs/server.mjs:/fixtures/server.mjs:ro
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
     healthcheck:
       test:
         [
@@ -101,6 +109,9 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
     networks: [backend]
 
   worker:
@@ -118,10 +129,14 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
     networks: [backend]
 
   smoke:
     image: node:24.18.0-bookworm-slim
+    user: "10001:10001"
     profiles: [smoke]
     working_dir: /workspace
     command: ["node", "scripts/smoke.mjs", "--base-url=http://api:3000"]
@@ -132,6 +147,9 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
     networks: [backend]
 
 networks:

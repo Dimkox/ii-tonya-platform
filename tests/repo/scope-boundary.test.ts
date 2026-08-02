@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  globSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   classifyApprovedTrackedScopeContent,
@@ -14,10 +20,12 @@ describe("MVP scope boundary", () => {
   it("contains no inbound Make or Sheets Fastify route", () => {
     const violations: string[] = [];
     for (const path of globSync("apps/api/src/**/*.ts")) {
-      violations.push(...findProjectionCommandRouteViolations({
-        path,
-        content: readFileSync(path, "utf8"),
-      }));
+      violations.push(
+        ...findProjectionCommandRouteViolations({
+          path,
+          content: readFileSync(path, "utf8"),
+        }),
+      );
     }
     expect(violations).toEqual([]);
   });
@@ -27,17 +35,34 @@ describe("MVP scope boundary", () => {
     ["element route", 'app["post"]("/v1/webhooks/sheets", handler);'],
     ["template route", "app.get(`/v1/make`, handler);"],
     ["const route", 'const route = "/v1/sheets"; app.put(route, handler);'],
-    ["route options variable", 'const options = { url: "/v1/make" }; app.route(options);'],
-    ["register prefix", 'app.register(plugin, { prefix: "/v1/webhooks/sheets" });'],
-    ["FastifyInstance plugin parameter", 'export const plugin = (fastify: FastifyInstance) => fastify.post("/v1/make", handler);'],
-    ["Fastify alias", 'const server = app; server.post("/v1/sheets", handler);'],
-    ["named fastify import", 'const app = fastify(); app.post("/v1/make", handler);'],
+    [
+      "route options variable",
+      'const options = { url: "/v1/make" }; app.route(options);',
+    ],
+    [
+      "register prefix",
+      'app.register(plugin, { prefix: "/v1/webhooks/sheets" });',
+    ],
+    [
+      "FastifyInstance plugin parameter",
+      'export const plugin = (fastify: FastifyInstance) => fastify.post("/v1/make", handler);',
+    ],
+    [
+      "Fastify alias",
+      'const server = app; server.post("/v1/sheets", handler);',
+    ],
+    [
+      "named fastify import",
+      'const app = fastify(); app.post("/v1/make", handler);',
+    ],
     ["unknown receiver", 'router.post("/v1/webhooks/sheets", handler);'],
   ])("detects an inbound Make or Sheets %s evasion", (_label, snippet) => {
-    expect(findProjectionCommandRouteViolations({
-      path: "apps/api/src/evasion.ts",
-      content: `import Fastify, { fastify, type FastifyInstance } from "fastify"; const app = Fastify(); ${snippet}`,
-    })).not.toEqual([]);
+    expect(
+      findProjectionCommandRouteViolations({
+        path: "apps/api/src/evasion.ts",
+        content: `import Fastify, { fastify, type FastifyInstance } from "fastify"; const app = Fastify(); ${snippet}`,
+      }),
+    ).not.toEqual([]);
   });
 
   it("contains no live or deferred commercial and scheduling modules", () => {
@@ -64,10 +89,7 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
-    [
-      "Apps/API/src/routes/payments.ts",
-      'fastify.post("/checkout", handler);',
-    ],
+    ["Apps/API/src/routes/payments.ts", 'fastify.post("/checkout", handler);'],
     ["packages/integrations/src/commercial/gateway.ts", "export {};"],
     ["packages/integrations/src/stripe/adapter.ts", "export {};"],
     ["packages/integrations/src/yookassa-adapter.ts", "export {};"],
@@ -89,10 +111,7 @@ describe("MVP scope boundary", () => {
       "apps/api/src/routes/neutral.ts",
       'fastify["post"]("/checkout", handler);',
     ],
-    [
-      "apps/api/src/routes/neutral.ts",
-      'app.use("/checkout", router);',
-    ],
+    ["apps/api/src/routes/neutral.ts", 'app.use("/checkout", router);'],
     [
       "packages/application/src/workers/orders.ts",
       "export class PaymentCapturedConsumer {}",
@@ -222,13 +241,13 @@ describe("MVP scope boundary", () => {
       "packages/db/src/schema/billing.ts",
       "// payment and refund tables are outside MVP\nexport {};",
     ],
-    [
-      "packages/integrations/package.json",
-      '{"dependencies":{"zod":"^4.3.6"}}',
-    ],
-  ])("allows explicit boundaries and comment-only vocabulary in %s", (path, content) => {
-    expect(classifyPaymentScopeProbe({ path, content })).toEqual([]);
-  });
+    ["packages/integrations/package.json", '{"dependencies":{"zod":"^4.3.6"}}'],
+  ])(
+    "allows explicit boundaries and comment-only vocabulary in %s",
+    (path, content) => {
+      expect(classifyPaymentScopeProbe({ path, content })).toEqual([]);
+    },
+  );
 
   it.each([
     "Apps/API/src/routes/payments.ts",
@@ -253,9 +272,7 @@ describe("MVP scope boundary", () => {
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
   ])("pins exact reviewed payment boundary content for %s", (path) => {
     const content = readFileSync(path, "utf8");
-    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual(
-      [],
-    );
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
     expect(
       classifyApprovedTrackedScopeContent({
         path,
@@ -296,10 +313,12 @@ describe("MVP scope boundary", () => {
   ])("pins approved post-MVP migration content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
-    expect(classifyApprovedTrackedScopeContent({
-      path,
-      content: `${content}\n-- unexpected\n`,
-    })).not.toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${content}\n-- unexpected\n`,
+      }),
+    ).not.toEqual([]);
   });
 
   it.each([
@@ -307,10 +326,12 @@ describe("MVP scope boundary", () => {
     "packages/db/src/schema/identity.ts",
     "packages/db/src/schema/integration.ts",
   ])("allows reviewed non-payment relations in %s", (path) => {
-    expect(classifyPaymentScopeProbe({
-      path,
-      content: readFileSync(path, "utf8"),
-    })).toEqual([]);
+    expect(
+      classifyPaymentScopeProbe({
+        path,
+        content: readFileSync(path, "utf8"),
+      }),
+    ).toEqual([]);
   });
 
   it.each([
@@ -320,11 +341,14 @@ describe("MVP scope boundary", () => {
     [".github/workflows/pay.yml", "jobs: {}"],
     ["Dockerfile.payment", "FROM node:24"],
     ["compose.yml", "services: {}"],
-  ])("rejects unapproved executable automation artifact %s", (path, content) => {
-    expect(classifyApprovedTrackedScopeContent({ path, content })).not.toEqual(
-      [],
-    );
-  });
+  ])(
+    "rejects unapproved executable automation artifact %s",
+    (path, content) => {
+      expect(
+        classifyApprovedTrackedScopeContent({ path, content }),
+      ).not.toEqual([]);
+    },
+  );
 
   it("pins full package manifest content including scripts", () => {
     const path = "packages/integrations/package.json";
@@ -333,7 +357,7 @@ describe("MVP scope boundary", () => {
 
     const manifest = JSON.parse(content) as Record<string, unknown>;
     manifest.scripts = {
-      pay: 'node -e "fetch(\'https://pay.invalid\')"',
+      pay: "node -e \"fetch('https://pay.invalid')\"",
     };
     expect(
       classifyApprovedTrackedScopeContent({
@@ -378,7 +402,7 @@ describe("MVP scope boundary", () => {
     "compose.yaml",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
-  ])("pins reviewed Task21 release automation content for %s", (path) => {
+  ])("pins reviewed Task21/22 release automation content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
     expect(
