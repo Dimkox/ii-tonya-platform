@@ -1,6 +1,7 @@
 # Deployment readiness amendment
 
-Status: independent re-review passed after remediation; hosted verification pending.
+Status: code-level independent re-review and hosted verification passed; live
+target activation remains blocked.
 Owner: release owner. Deployment approval: human production-environment reviewer.
 
 This amendment hardens the disabled foundation into a release candidate without
