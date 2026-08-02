@@ -1,0 +1,29 @@
+{
+  "name": "@ii-tonya/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist"],
+  "main": "dist/server.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/server.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.3.0",
+    "@ii-tonya/application": "workspace:*",
+    "@ii-tonya/config": "workspace:*",
+    "@ii-tonya/db": "workspace:*",
+    "@ii-tonya/integrations": "workspace:*",
+    "@ii-tonya/observability": "workspace:*",
+    "fastify": "^5.5.0"
+  }
+}

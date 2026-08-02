@@ -1,0 +1,13 @@
+{
+  "threatId": "LLM-03",
+  "scenario": "Model emits a valid-looking unauthorized intent",
+  "expectedControl": "Backend authorization rejects it",
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  },
+  "modelOutput": {
+    "kind": "start_booking",
+    "expertId": "b7ab91db-4988-4ec6-bf23-42d2ea3333a1"
+  }
+}

@@ -1,0 +1,422 @@
+name: Gated release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: Successful trusted CI run containing signed release provenance
+        required: true
+        type: string
+      migration_approval_pr:
+        description: Merged PR containing an independent migration compatibility approval
+        required: true
+        type: string
+      migration_approval_review_id:
+        description: GitHub review ID whose body approves the exact release SHA
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify_provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      api_image_ref: ${{ steps.verify.outputs.api_image_ref }}
+      worker_image_ref: ${{ steps.verify.outputs.worker_image_ref }}
+      head_sha: ${{ steps.run.outputs.head_sha }}
+      migration_reviewer: ${{ steps.run.outputs.migration_reviewer }}
+      migration_review_id: ${{ steps.run.outputs.migration_review_id }}
+    steps:
+      - name: Validate successful exact trusted CI run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          APPROVAL_PR: ${{ inputs.migration_approval_pr }}
+          APPROVAL_REVIEW_ID: ${{ inputs.migration_approval_review_id }}
+          TRIGGERING_ACTOR: ${{ github.actor }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          [[ "$CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$APPROVAL_PR" =~ ^[1-9][0-9]*$ ]]
+          [[ "$APPROVAL_REVIEW_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID" > ci-run.json
+          jq -e --arg repository "$GITHUB_REPOSITORY" '
+            .name == "CI" and
+            .path == ".github/workflows/ci.yml" and
+            .event == "push" and
+            .status == "completed" and
+            .conclusion == "success" and
+            .repository.full_name == $repository and
+            .head_branch == "main"
+          ' ci-run.json
+          echo "head_sha=$(jq -r .head_sha ci-run.json)" >> "$GITHUB_OUTPUT"
+          echo "head_ref=refs/heads/$(jq -r .head_branch ci-run.json)" >> "$GITHUB_OUTPUT"
+          expected_sha="$(jq -r .head_sha ci-run.json)"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$APPROVAL_PR" > approval-pr.json
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$APPROVAL_PR/reviews/$APPROVAL_REVIEW_ID" > approval-review.json
+          jq -e --arg repository "$GITHUB_REPOSITORY" '
+            .merged == true and .base.ref == "main" and .head.repo.full_name == $repository
+          ' approval-pr.json
+          jq -e --arg actor "$TRIGGERING_ACTOR" --arg marker "MIGRATION-COMPATIBILITY: $expected_sha" '
+            .state == "APPROVED" and .user.login != $actor and
+            (.submitted_at | type == "string") and
+            ((.body // "") | contains($marker))
+          ' approval-review.json
+          echo "migration_reviewer=$(jq -r .user.login approval-review.json)" >> "$GITHUB_OUTPUT"
+          echo "migration_review_id=$(jq -r .id approval-review.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Download signed provenance from exact CI run
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-provenance-${{ steps.run.outputs.head_sha }}
+          path: provenance
+          run-id: ${{ inputs.ci_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install pinned cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify signed manifest and exact registry image signatures
+        id: verify
+        env:
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          EXPECTED_SHA: ${{ steps.run.outputs.head_sha }}
+          EXPECTED_REF: ${{ steps.run.outputs.head_ref }}
+        run: |
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/ci.yml@$EXPECTED_REF"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify-blob \
+            --bundle provenance/release-provenance.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/release-provenance.json
+          cosign verify-blob \
+            --bundle provenance/api-sbom.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/api-sbom.spdx.json
+          cosign verify-blob \
+            --bundle provenance/worker-sbom.bundle \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            provenance/worker-sbom.spdx.json
+          api_sbom_sha256="$(sha256sum provenance/api-sbom.spdx.json | awk '{print $1}')"
+          worker_sbom_sha256="$(sha256sum provenance/worker-sbom.spdx.json | awk '{print $1}')"
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg head_sha "$EXPECTED_SHA" \
+            --arg head_ref "$EXPECTED_REF" \
+            --arg ci_run_id "$CI_RUN_ID" \
+            --arg api_sbom_sha256 "$api_sbom_sha256" \
+            --arg worker_sbom_sha256 "$worker_sbom_sha256" '
+              .schema == 2 and .repository == $repository and
+              .head_sha == $head_sha and .head_ref == $head_ref and
+              .ci_run_id == $ci_run_id and
+              .api_sbom_file == "api-sbom.spdx.json" and
+              .worker_sbom_file == "worker-sbom.spdx.json" and
+              .api_sbom_sha256 == $api_sbom_sha256 and
+              .worker_sbom_sha256 == $worker_sbom_sha256 and
+              (.api_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$")) and
+              (.worker_image_ref | test("^ghcr\\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$"))
+            ' provenance/release-provenance.json
+          api_image_ref="$(jq -r .api_image_ref provenance/release-provenance.json)"
+          worker_image_ref="$(jq -r .worker_image_ref provenance/release-provenance.json)"
+          api_digest="${api_image_ref##*@}"
+          worker_digest="${worker_image_ref##*@}"
+          jq -e --arg digest "$api_digest" --arg checksum "${api_digest#sha256:}" '
+            any(.packages[]?;
+              .primaryPackagePurpose == "CONTAINER" and
+              .versionInfo == $digest and
+              any(.checksums[]?; .algorithm == "SHA256" and .checksumValue == $checksum)
+            )
+          ' provenance/api-sbom.spdx.json
+          jq -e --arg digest "$worker_digest" --arg checksum "${worker_digest#sha256:}" '
+            any(.packages[]?;
+              .primaryPackagePurpose == "CONTAINER" and
+              .versionInfo == $digest and
+              any(.checksums[]?; .algorithm == "SHA256" and .checksumValue == $checksum)
+            )
+          ' provenance/worker-sbom.spdx.json
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$api_image_ref"
+          cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$worker_image_ref"
+          echo "api_image_ref=$api_image_ref" >> "$GITHUB_OUTPUT"
+          echo "worker_image_ref=$worker_image_ref" >> "$GITHUB_OUTPUT"
+
+  staging:
+    needs: verify_provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging
+    env:
+      DEPLOY_HOST: ${{ vars.STAGING_HOST }}
+      DEPLOY_USER: ${{ vars.STAGING_USER }}
+      DEPLOY_PORT: ${{ vars.STAGING_PORT }}
+      DEPLOY_PATH: ${{ vars.STAGING_DEPLOY_PATH }}
+      RUNTIME_ENV_FILE: ${{ vars.STAGING_RUNTIME_ENV_FILE }}
+      DEPLOY_ENVIRONMENT: staging
+      API_BIND_PORT: ${{ vars.STAGING_API_BIND_PORT }}
+      API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+      WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+      RELEASE_SHA: ${{ needs.verify_provenance.outputs.head_sha }}
+    steps:
+      - name: Checkout staging runbooks and probes
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
+
+      - name: Record signed staging candidates
+        env:
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+        run: printf 'api=%s\nworker=%s\n' "$API_IMAGE_REF" "$WORKER_IMAGE_REF" > staging-images.txt
+
+      - name: Install pinned cosign for rollback capture
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Configure pinned staging SSH identity and host trust
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          ssh_dir="$RUNNER_TEMP/ii-tonya-ssh"
+          mkdir -p "$ssh_dir"
+          printf '%s\n' "$SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          test -s "$ssh_dir/key"
+          test -s "$ssh_dir/known_hosts"
+          printf 'SSH_KEY_FILE=%s\nKNOWN_HOSTS_FILE=%s\n' \
+            "$ssh_dir/key" "$ssh_dir/known_hosts" >> "$GITHUB_ENV"
+
+      - name: Capture and verify signed staging rollback digests
+        run: |
+          bash scripts/deploy-compose-remote.sh capture-current > "$RUNNER_TEMP/rollback.env"
+          . "$RUNNER_TEMP/rollback.env"
+          if test "$ROLLBACK_TARGET" != none; then
+            identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/ci.yml@refs/heads/main"
+            issuer="https://token.actions.githubusercontent.com"
+            cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ROLLBACK_API_IMAGE_REF"
+            cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ROLLBACK_WORKER_IMAGE_REF"
+          fi
+          cat "$RUNNER_TEMP/rollback.env" >> "$GITHUB_ENV"
+
+      - name: Run staging migration preflight
+        run: bash scripts/deploy-compose-remote.sh preflight
+
+      - name: Apply approved backward-compatible staging migration
+        id: migration
+        run: bash scripts/deploy-compose-remote.sh migration
+
+      - name: Deploy staging by signed tested image digest
+        id: deploy
+        run: bash scripts/deploy-compose-remote.sh deploy
+
+      - name: Run staging smoke
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL }}
+        run: |
+          test -n "$BASE_URL"
+          node scripts/smoke.mjs "--base-url=$BASE_URL"
+
+      - name: Run staging reconciliation
+        run: bash scripts/deploy-compose-remote.sh reconcile
+
+      - name: Record exact staging evidence
+        env:
+          MIGRATION_REVIEWER: ${{ needs.verify_provenance.outputs.migration_reviewer }}
+          MIGRATION_REVIEW_ID: ${{ needs.verify_provenance.outputs.migration_review_id }}
+        run: |
+          printf 'head_sha=%s\napi=%s\nworker=%s\nmigration_reviewer=%s\nmigration_review_id=%s\nsmoke=PASS\nreconciliation=PASS\n' \
+            "$RELEASE_SHA" "$API_IMAGE_REF" "$WORKER_IMAGE_REF" "$MIGRATION_REVIEWER" "$MIGRATION_REVIEW_ID" > staging-evidence.txt
+
+      - name: Upload exact staging evidence
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: staging-evidence-${{ github.run_id }}
+          path: staging-evidence.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Recover the current staging worker after migration-phase failure
+        if: failure() && steps.migration.outcome != 'skipped' && steps.deploy.outcome == 'skipped'
+        run: bash scripts/deploy-compose-remote.sh migration-recover
+
+      - name: Roll back staging after a failed post-deploy gate
+        if: failure() && steps.deploy.outcome != 'skipped'
+        env:
+          BASE_URL: ${{ vars.STAGING_BASE_URL }}
+        run: |
+          bash scripts/deploy-compose-remote.sh rollback
+          if test "$ROLLBACK_TARGET" != none; then
+            node scripts/smoke.mjs "--base-url=$BASE_URL"
+            bash scripts/deploy-compose-remote.sh rollback-complete
+          fi
+
+  evidence_gate:
+    needs: [verify_provenance, staging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout evidence records
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
+
+      - name: Enforce independently reviewed evidence statuses
+        run: |
+          grep -Fx 'Release status: GO' docs/runbooks/go-live-evidence.md
+          grep -Fx 'Provider staging status: PASS' docs/runbooks/provider-staging-evidence.md
+
+      - name: Download exact staging evidence
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: staging-evidence-${{ github.run_id }}
+          path: staging-evidence
+
+      - name: Bind evidence to this staging execution
+        env:
+          EXPECTED_SHA: ${{ needs.verify_provenance.outputs.head_sha }}
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+        run: |
+          grep -Fx "head_sha=$EXPECTED_SHA" staging-evidence/staging-evidence.txt
+          grep -Fx "api=$API_IMAGE_REF" staging-evidence/staging-evidence.txt
+          grep -Fx "worker=$WORKER_IMAGE_REF" staging-evidence/staging-evidence.txt
+          grep -E '^migration_reviewer=[A-Za-z0-9-]+$' staging-evidence/staging-evidence.txt
+          grep -E '^migration_review_id=[1-9][0-9]*$' staging-evidence/staging-evidence.txt
+          grep -Fx 'smoke=PASS' staging-evidence/staging-evidence.txt
+          grep -Fx 'reconciliation=PASS' staging-evidence/staging-evidence.txt
+
+      - name: Install pinned cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Create and sign provenance-bound evidence artifact
+        env:
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+          HEAD_SHA: ${{ needs.verify_provenance.outputs.head_sha }}
+        run: |
+          printf 'head_sha=%s\napi=%s\nworker=%s\n' "$HEAD_SHA" "$API_IMAGE_REF" "$WORKER_IMAGE_REF" > release-evidence.txt
+          cat staging-evidence/staging-evidence.txt >> release-evidence.txt
+          cat docs/runbooks/go-live-evidence.md docs/runbooks/provider-staging-evidence.md >> release-evidence.txt
+          cosign sign-blob --yes --bundle release-evidence.bundle release-evidence.txt
+
+      - name: Upload signed release evidence
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: |
+            release-evidence.txt
+            release-evidence.bundle
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    needs: [verify_provenance, staging, evidence_gate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ vars.PRODUCTION_HOST }}
+      DEPLOY_USER: ${{ vars.PRODUCTION_USER }}
+      DEPLOY_PORT: ${{ vars.PRODUCTION_PORT }}
+      DEPLOY_PATH: ${{ vars.PRODUCTION_DEPLOY_PATH }}
+      RUNTIME_ENV_FILE: ${{ vars.PRODUCTION_RUNTIME_ENV_FILE }}
+      DEPLOY_ENVIRONMENT: production
+      API_BIND_PORT: ${{ vars.PRODUCTION_API_BIND_PORT }}
+      API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+      WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+      RELEASE_SHA: ${{ needs.verify_provenance.outputs.head_sha }}
+    steps:
+      - name: Checkout production runbooks and probes
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.verify_provenance.outputs.head_sha }}
+
+      - name: Bind production to signed image refs
+        env:
+          API_IMAGE_REF: ${{ needs.verify_provenance.outputs.api_image_ref }}
+          WORKER_IMAGE_REF: ${{ needs.verify_provenance.outputs.worker_image_ref }}
+        run: |
+          [[ "$API_IMAGE_REF" == *@sha256:* ]]
+          [[ "$WORKER_IMAGE_REF" == *@sha256:* ]]
+
+      - name: Install pinned cosign for rollback capture
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Configure pinned production SSH identity and host trust
+        env:
+          SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          ssh_dir="$RUNNER_TEMP/ii-tonya-ssh"
+          mkdir -p "$ssh_dir"
+          printf '%s\n' "$SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          test -s "$ssh_dir/key"
+          test -s "$ssh_dir/known_hosts"
+          printf 'SSH_KEY_FILE=%s\nKNOWN_HOSTS_FILE=%s\n' \
+            "$ssh_dir/key" "$ssh_dir/known_hosts" >> "$GITHUB_ENV"
+
+      - name: Capture and verify signed production rollback digests
+        run: |
+          bash scripts/deploy-compose-remote.sh capture-current > "$RUNNER_TEMP/rollback.env"
+          . "$RUNNER_TEMP/rollback.env"
+          if test "$ROLLBACK_TARGET" != none; then
+            identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/ci.yml@refs/heads/main"
+            issuer="https://token.actions.githubusercontent.com"
+            cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ROLLBACK_API_IMAGE_REF"
+            cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ROLLBACK_WORKER_IMAGE_REF"
+          fi
+          cat "$RUNNER_TEMP/rollback.env" >> "$GITHUB_ENV"
+
+      - name: Run production migration preflight
+        run: bash scripts/deploy-compose-remote.sh preflight
+
+      - name: Apply approved backward-compatible production migration
+        id: migration
+        run: bash scripts/deploy-compose-remote.sh migration
+
+      - name: Deploy production by signed tested image digest
+        id: deploy
+        run: bash scripts/deploy-compose-remote.sh deploy
+
+      - name: Run production smoke
+        env:
+          BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: |
+          test -n "$BASE_URL"
+          node scripts/smoke.mjs "--base-url=$BASE_URL"
+
+      - name: Run production reconciliation
+        run: bash scripts/deploy-compose-remote.sh reconcile
+
+      - name: Recover the current production worker after migration-phase failure
+        if: failure() && steps.migration.outcome != 'skipped' && steps.deploy.outcome == 'skipped'
+        run: bash scripts/deploy-compose-remote.sh migration-recover
+
+      - name: Follow rollback.md after a failed production gate
+        if: failure() && steps.deploy.outcome != 'skipped'
+        env:
+          BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: |
+          bash scripts/deploy-compose-remote.sh rollback
+          if test "$ROLLBACK_TARGET" != none; then
+            node scripts/smoke.mjs "--base-url=$BASE_URL"
+            bash scripts/deploy-compose-remote.sh rollback-complete
+          fi

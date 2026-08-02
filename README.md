@@ -30,3 +30,33 @@ and projections.
 No real client messages, bookings, balances, payments, or crisis workflows are enabled
 until the staging contract tests and the documented go-live gates pass.
 
+## Local verification and container evidence
+
+Use Node 24 and pnpm 11.9.0. After installing the frozen dependency graph, the single
+repository verification entrypoint is:
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm verify
+```
+
+Build and boot the actual packaged API and worker images, probe readiness, inspect the
+non-root/read-only runtime, and tear the stack down with:
+
+```powershell
+pnpm test:container
+```
+
+Probe an already deployed API with `pnpm smoke -- --base-url=http://localhost:3000`.
+The local Compose stack binds only the API to loopback, uses placeholder-only database
+credentials, and keeps every live integration flag set to `false`.
+
+## Release boundary
+
+Local application tests, sanitized provider fixtures, and built-container health are
+three distinct evidence classes. None is provider-connected staging evidence.
+Production remains blocked until `docs/runbooks/go-live-evidence.md` records
+`Release status: GO`, `docs/runbooks/provider-staging-evidence.md` records separately
+reviewed `Provider staging status: PASS`, and both tested image digests have approved
+signatures. The committed records intentionally remain `NO-GO` and `BLOCKED`; the
+provider staging and production deployment adapters are not configured.

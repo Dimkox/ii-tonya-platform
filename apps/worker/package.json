@@ -1,0 +1,27 @@
+{
+  "name": "@ii-tonya/app-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist"],
+  "main": "dist/main.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/main.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+  },
+  "dependencies": {
+    "@ii-tonya/config": "workspace:*",
+    "@ii-tonya/db": "workspace:*",
+    "@ii-tonya/integrations": "workspace:*",
+    "@ii-tonya/observability": "workspace:*",
+    "@ii-tonya/worker": "workspace:*"
+  }
+}

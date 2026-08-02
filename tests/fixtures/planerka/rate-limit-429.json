@@ -1,0 +1,10 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "retryable",
+  "payload": {
+    "status": 429,
+    "reasonCode": "rate_limit_contract_unconfirmed"
+  }
+}

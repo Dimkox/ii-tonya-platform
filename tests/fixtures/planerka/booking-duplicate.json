@@ -1,0 +1,10 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "duplicate",
+  "payload": {
+    "operation": "reserve",
+    "reasonCode": "idempotency_duplicate"
+  }
+}

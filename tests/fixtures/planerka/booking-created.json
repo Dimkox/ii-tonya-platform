@@ -1,0 +1,10 @@
+{
+  "sanitized": true,
+  "source": "contract-hypothesis",
+  "captureDate": "2026-07-29",
+  "expectedOutcome": "applied",
+  "payload": {
+    "operation": "reserve",
+    "providerOperationId": "operation-example-1"
+  }
+}

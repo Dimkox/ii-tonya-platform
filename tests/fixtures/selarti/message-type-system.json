@@ -1,0 +1,22 @@
+{
+  "source_document": "https://manual.selarti.com/dopolnitelno/tipy-vebkhukov-i-integracii-s-servisami",
+  "captured_at": "2026-07-29T00:00:00.000Z",
+  "sanitized": true,
+  "contract_status": "unsupported_direction_negative_fixture",
+  "body": {
+    "wh_type": "all_messages",
+    "channel_id": "channel-fixture-1",
+    "company_id": "company-fixture-1",
+    "external_chat_id": "client-fixture-1",
+    "message_id": "message-system",
+    "message_text": "unsupported direction",
+    "message_type": "system",
+    "task_id": "task-fixture-1",
+    "thread_id": "thread-fixture-1",
+    "occurred_at": "2026-07-28T12:00:00.000Z"
+  },
+  "expected": {
+    "error": "invalid_schema",
+    "applicationMutations": 0
+  }
+}

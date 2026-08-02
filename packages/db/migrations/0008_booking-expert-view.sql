@@ -1,0 +1,4 @@
+ALTER TABLE "client_profiles" ADD COLUMN "expert_note" text;--> statement-breakpoint
+ALTER TABLE "reservations" ADD COLUMN "meeting_url" text;--> statement-breakpoint
+ALTER TABLE "client_profiles" ADD CONSTRAINT "client_profiles_expert_note_bounded" CHECK ("client_profiles"."expert_note" is null or char_length("client_profiles"."expert_note") between 1 and 2000);--> statement-breakpoint
+ALTER TABLE "reservations" ADD CONSTRAINT "reservations_meeting_url_https" CHECK ("reservations"."meeting_url" is null or ("reservations"."meeting_url" ~ '^https://[^[:space:]]+$' and char_length("reservations"."meeting_url") <= 2048));

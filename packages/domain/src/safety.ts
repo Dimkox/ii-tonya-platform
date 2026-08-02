@@ -1,0 +1,143 @@
+export type SafetyRisk = "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
+export type AgeBand = "minor" | "adult" | "unknown";
+export type SafetyContactChannel = "phone" | "sms" | "url";
+
+export interface SafetyContact {
+  id: string;
+  label: string;
+  channel: SafetyContactChannel;
+  value: string;
+  countryCode: string;
+  regionCode: string | null;
+  ageBands: readonly AgeBand[];
+  riskTypes: readonly SafetyRisk[];
+  sourceUrl: string;
+  owner: string;
+  verifiedAt: Date;
+  validUntil: Date;
+}
+
+const e164Phone = /^\+[1-9][0-9]{7,14}$/u;
+const httpsUrl = /^https:\/\/[A-Za-z0-9.-]+(?:\/[^\s@]*)?$/u;
+
+export const isActionableSafetyContact = (
+  contact: Pick<SafetyContact, "channel" | "value">,
+): boolean => {
+  if (contact.channel === "phone" || contact.channel === "sms") {
+    return e164Phone.test(contact.value);
+  }
+  return contact.channel === "url" && httpsUrl.test(contact.value);
+};
+
+export interface DeterministicSafetyGuard {
+  detect(text: string): SafetyRisk | null;
+}
+
+export interface SafetyClassifier {
+  classify(text: string): Promise<"ordinary" | SafetyRisk>;
+}
+
+export interface SafetyDirectory {
+  list(): readonly SafetyContact[];
+}
+
+export interface SafetyInput {
+  text: string;
+  countryCode: string;
+  regionCode: string | null;
+  ageBand: AgeBand;
+  ledgerBalance: number;
+  now: Date;
+}
+
+export type SafetyDecision =
+  | { kind: "ordinary"; charge: -1; contacts: [] }
+  | {
+    kind: "human_handoff";
+    charge: 0;
+    reason: SafetyRisk | "classifier_unavailable";
+    directoryState: "fresh" | "no_fresh_contact" | "fresh_fallback" | "fallback_required";
+    contacts: SafetyContact[];
+  };
+
+const normalizeCode = (code: string | null): string | null =>
+  code === null ? null : code.trim().toUpperCase();
+
+export async function evaluateSafety(
+  input: SafetyInput,
+  guard: DeterministicSafetyGuard,
+  classifier: SafetyClassifier,
+  directory: SafetyDirectory,
+): Promise<SafetyDecision> {
+  const countryCode = normalizeCode(input.countryCode);
+  const regionCode = normalizeCode(input.regionCode);
+  const selectContacts = (risk: SafetyRisk): SafetyContact[] => directory.list().filter((contact) =>
+    normalizeCode(contact.countryCode) === countryCode
+    && (contact.regionCode === null || normalizeCode(contact.regionCode) === regionCode)
+    && contact.ageBands.includes(input.ageBand)
+    && contact.riskTypes.includes(risk)
+    && contact.verifiedAt.getTime() <= input.now.getTime()
+    && contact.validUntil.getTime() >= input.now.getTime()
+    && contact.sourceUrl.startsWith("https://")
+    && contact.owner.length > 0
+    && isActionableSafetyContact(contact));
+
+  try {
+    const level = guard.detect(input.text) ?? await classifier.classify(input.text);
+    if (level === "ordinary") return { kind: "ordinary", charge: -1, contacts: [] };
+    const contacts = selectContacts(level);
+    return {
+      kind: "human_handoff",
+      charge: 0,
+      reason: level,
+      directoryState: contacts.length > 0 ? "fresh" : "no_fresh_contact",
+      contacts,
+    };
+  } catch {
+    const contacts = selectContacts("uncertain");
+    return {
+      kind: "human_handoff",
+      charge: 0,
+      reason: "classifier_unavailable",
+      directoryState: contacts.length > 0 ? "fresh_fallback" : "fallback_required",
+      contacts,
+    };
+  }
+}
+
+export interface HandoffState {
+  status: "opened" | "assigned" | "acknowledged" | "escalated" | "resolved";
+  ownerId: string | null;
+  openedAt: Date;
+  acknowledgeBy: Date;
+  acknowledgedAt: Date | null;
+  resolvedAt: Date | null;
+  version: number;
+}
+
+export type HandoffAction =
+  | { kind: "assign"; ownerId: string }
+  | { kind: "acknowledge" }
+  | { kind: "check_ack_sla" }
+  | { kind: "resolve" };
+
+export function transitionHandoff(state: HandoffState, action: HandoffAction, now: Date): HandoffState {
+  if (action.kind === "assign" && state.status === "opened" && action.ownerId.length > 0) {
+    return { ...state, status: "assigned", ownerId: action.ownerId, version: state.version + 1 };
+  }
+  if (
+    action.kind === "check_ack_sla"
+    && state.status === "assigned"
+    && state.acknowledgedAt === null
+    && now.getTime() >= state.acknowledgeBy.getTime()
+  ) {
+    return { ...state, status: "escalated", version: state.version + 1 };
+  }
+  if (action.kind === "acknowledge" && state.status === "assigned") {
+    return { ...state, status: "acknowledged", acknowledgedAt: now, version: state.version + 1 };
+  }
+  if (action.kind === "resolve" && (state.status === "acknowledged" || state.status === "escalated")) {
+    return { ...state, status: "resolved", resolvedAt: now, version: state.version + 1 };
+  }
+  throw new Error("Invalid handoff transition");
+}

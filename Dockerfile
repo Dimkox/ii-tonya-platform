@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24.18.0-bookworm-slim AS builder
+
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH
+WORKDIR /workspace
+
+RUN npm install --global pnpm@11.9.0 && npm cache clean --force
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/worker/package.json apps/worker/package.json
+COPY packages/application/package.json packages/application/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/integrations/package.json packages/integrations/package.json
+COPY packages/observability/package.json packages/observability/package.json
+COPY packages/worker/package.json packages/worker/package.json
+
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN pnpm build
+RUN pnpm --filter @ii-tonya/api --prod deploy /out/api
+RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
+
+FROM node:24.18.0-bookworm-slim AS runtime-base
+
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.revision=$VCS_REF
+ENV NODE_ENV=production
+WORKDIR /app
+
+RUN groupadd --gid 10001 app && \
+    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app && \
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx
+
+FROM runtime-base AS api
+
+COPY --from=builder --chown=10001:10001 /out/api/ /app/
+USER 10001:10001
+EXPOSE 3000
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 \
+  CMD ["node", "--input-type=module", "--eval", "const r=await fetch('http://127.0.0.1:3000/health/ready');if(!r.ok)process.exit(1)"]
+CMD ["node", "dist/server.js"]
+
+FROM runtime-base AS worker
+
+COPY --from=builder --chown=10001:10001 /out/worker/ /app/
+USER 10001:10001
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 \
+  CMD ["node", "--input-type=module", "--eval", "const s=(await import('node:fs/promises')).stat;try{const m=(await s('/tmp/ii-tonya-worker-heartbeat')).mtimeMs;if(Date.now()-m>30000)process.exit(1)}catch{process.exit(1)}"]
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,166 @@
+name: ii-tonya-local-evidence
+
+x-disabled-runtime: &disabled-runtime
+  MINOR_ONBOARDING_ENABLED: "false"
+  SELARTI_ENABLED: "false"
+  SELARTI_OUTBOUND_BILLING_MODE: disabled
+  PLANERKA_ENABLED: "false"
+  TELEGRAM_ENABLED: "false"
+  PAYMENTS_ENABLED: "false"
+  PAYMENT_PROVIDER: disabled
+  LLM_ENABLED: "false"
+  LLM_PROVIDER: disabled
+  INTENT_MODEL_ENABLED: "false"
+  MAKE_PROJECTION_ENABLED: "false"
+  GOOGLE_SHEETS_PROJECTION_ENABLED: "false"
+  RAW_CONVERSATION_LOGGING: "false"
+
+x-app-runtime: &app-runtime
+  DATABASE_URL: postgresql://ii_tonya:local-placeholder-only@postgres:5432/ii_tonya
+  ALLOW_INSECURE_LOCAL_DATABASE: "true"
+  DISPLAY_TIMEZONE: Europe/Moscow
+  <<: *disabled-runtime
+
+services:
+  postgres:
+    image: postgres:17.5-bookworm
+    environment:
+      POSTGRES_DB: ii_tonya
+      POSTGRES_USER: ii_tonya
+      POSTGRES_PASSWORD: local-placeholder-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ii_tonya -d ii_tonya"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+
+  migrate:
+    image: ii-tonya-api:local
+    build:
+      context: .
+      target: api
+      args:
+        VCS_REF: ${VCS_REF:-local}
+    environment: *app-runtime
+    command:
+      - node
+      - --input-type=module
+      - --eval
+      - >-
+        import { closeDb, createDb, defaultMigrationsFolder, migrateDb } from '@ii-tonya/db';
+        const db=createDb(process.env.DATABASE_URL);
+        try { await migrateDb(db, defaultMigrationsFolder); } finally { await closeDb(db); }
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    networks: [backend]
+    restart: "no"
+
+  provider-stubs:
+    image: node:24.18.0-bookworm-slim
+    user: "10001:10001"
+    working_dir: /fixtures
+    command: ["node", "server.mjs"]
+    environment:
+      PROVIDER_STUB_HOST: 0.0.0.0
+      PROVIDER_STUB_PORT: "4010"
+    volumes:
+      - ./tests/provider-stubs/server.mjs:/fixtures/server.mjs:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "--input-type=module",
+          "--eval",
+          "const r=await fetch('http://127.0.0.1:4010/health');if(!r.ok)process.exit(1)",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [backend]
+
+  api:
+    image: ii-tonya-api:local
+    build:
+      context: .
+      target: api
+      args:
+        VCS_REF: ${VCS_REF:-local}
+    environment:
+      <<: *app-runtime
+      HOST: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      provider-stubs:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    networks: [backend]
+
+  worker:
+    image: ii-tonya-worker:local
+    build:
+      context: .
+      target: worker
+      args:
+        VCS_REF: ${VCS_REF:-local}
+    environment:
+      <<: *app-runtime
+      WORKER_POLL_INTERVAL_MS: "1000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      provider-stubs:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    networks: [backend]
+
+  smoke:
+    image: node:24.18.0-bookworm-slim
+    user: "10001:10001"
+    profiles: [smoke]
+    working_dir: /workspace
+    command: ["node", "scripts/smoke.mjs", "--base-url=http://api:3000"]
+    volumes:
+      - ./scripts/smoke.mjs:/workspace/scripts/smoke.mjs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    networks: [backend]
+
+networks:
+  backend:
+    internal: true
+
+volumes:
+  postgres-data:
