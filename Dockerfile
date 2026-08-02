@@ -29,17 +29,14 @@ RUN pnpm build
 RUN pnpm --filter @ii-tonya/api --prod deploy /out/api
 RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
 
-FROM node:24.18.0-bookworm-slim AS runtime-base
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS runtime-base
 
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.revision=$VCS_REF
 ENV NODE_ENV=production
+ENV PATH=/nodejs/bin:$PATH
 WORKDIR /app
-
-RUN groupadd --gid 10001 app && \
-    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app && \
-    rm -rf /usr/local/lib/node_modules/npm && \
-    rm -f /usr/local/bin/npm /usr/local/bin/npx
+ENTRYPOINT []
 
 FROM runtime-base AS api
 
