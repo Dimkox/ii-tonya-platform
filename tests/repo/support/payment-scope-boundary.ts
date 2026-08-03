@@ -363,7 +363,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
-    "d43a74fddaa0d26aa2f55196fd97ad09cb7360f8a240b36d2d3a8914722baaa1",
+    "b3a179ca83cf70cc1579db5c522ffddd6616779a32f6932f5619a5b069941954",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

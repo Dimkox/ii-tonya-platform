@@ -8,7 +8,10 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
-import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import {
+  assertVerifiedExpertResidencyPaymentEvent,
+  verifiedEventFixture,
+} from "../../packages/integrations/src/expert-residency/verified-event.js";
 let testDb: ExpertReferralTestDatabase | undefined;
 describe("expert residency settlement concurrency", () => {
   beforeAll(async () => {
@@ -56,7 +59,10 @@ describe("expert residency settlement concurrency", () => {
     }) as unknown as Parameters<
       PostgresExpertResidencyProviderInboxRepository["settle"]
     >[0];
-    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(
+      testDb!.db,
+      assertVerifiedExpertResidencyPaymentEvent,
+    );
     const results = await Promise.all([
       repo.settle(verified),
       repo.settle(verified),

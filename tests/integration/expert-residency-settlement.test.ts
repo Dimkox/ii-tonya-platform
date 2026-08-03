@@ -8,7 +8,10 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
-import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import {
+  assertVerifiedExpertResidencyPaymentEvent,
+  verifiedEventFixture,
+} from "../../packages/integrations/src/expert-residency/verified-event.js";
 let testDb: ExpertReferralTestDatabase | undefined;
 async function orderFixture() {
   const expert = await testDb!.createExpertIdentity();
@@ -69,7 +72,10 @@ describe("expert residency settlement", () => {
   beforeEach(async () => testDb!.reset());
   it("settles once without inventing a referral reward", async () => {
     const { order } = await orderFixture();
-    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(
+      testDb!.db,
+      assertVerifiedExpertResidencyPaymentEvent,
+    );
     const result = await repo.settle(event(order.id));
     expect(result).toMatchObject({
       kind: "settled",
@@ -84,7 +90,10 @@ describe("expert residency settlement", () => {
   });
   it("returns the exact prior result and rejects conflicting replay content", async () => {
     const { order } = await orderFixture();
-    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(
+      testDb!.db,
+      assertVerifiedExpertResidencyPaymentEvent,
+    );
     const first = await repo.settle(event(order.id));
     await expect(repo.settle(event(order.id))).resolves.toEqual(first);
     await expect(
@@ -107,9 +116,10 @@ describe("expert residency settlement", () => {
       PostgresExpertResidencyProviderInboxRepository["settle"]
     >[0];
     await expect(
-      new PostgresExpertResidencyProviderInboxRepository(testDb!.db).settle(
-        bad,
-      ),
+      new PostgresExpertResidencyProviderInboxRepository(
+        testDb!.db,
+        assertVerifiedExpertResidencyPaymentEvent,
+      ).settle(bad),
     ).rejects.toThrow("EXPERT_RESIDENCY_PAYMENT_MISMATCH");
   });
 });

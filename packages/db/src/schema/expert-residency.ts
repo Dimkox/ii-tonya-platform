@@ -428,6 +428,13 @@ export const expertResidencyProviderEventInbox = pgTable(
     externalEventId: text("external_event_id").notNull(),
     payloadDigest: text("payload_digest").notNull(),
     eventKind: text("event_kind").notNull(),
+    paymentId: text("payment_id").notNull(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => expertResidencyOrders.id),
+    amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull(),
+    currency: text("currency").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     authenticated: boolean("authenticated").notNull(),
     verificationId: text("verification_id").notNull(),
     verifierKeyVersion: text("verifier_key_version").notNull(),
@@ -452,6 +459,19 @@ export const expertResidencyProviderEventInbox = pgTable(
       "expert_provider_event_digest_format",
       sql`${table.payloadDigest} ~ '^[0-9a-f]{64}$'`,
     ),
+    check(
+      "expert_provider_verification_id_bounded",
+      sql`char_length(${table.verificationId}) between 1 and 200`,
+    ),
+    check(
+      "expert_provider_verifier_key_bounded",
+      sql`char_length(${table.verifierKeyVersion}) between 1 and 100`,
+    ),
+    check(
+      "expert_provider_event_amount_bounded",
+      sql`${table.amountMinor} >= 0 and ${table.amountMinor} <= 999999999999`,
+    ),
+    check("expert_provider_event_currency_rub", sql`${table.currency} = 'RUB'`),
     check(
       "expert_provider_event_processing_state",
       sql`
