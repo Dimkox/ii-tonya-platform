@@ -1,19 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
-vi.mock(
-  "@ii-tonya/integrations",
-  async () =>
-    await import("../../packages/integrations/src/expert-residency/verified-event.js"),
-);
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { expertResidencyPaymentEventSchema } from "../../packages/contracts/src/expert-residency.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
 import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
