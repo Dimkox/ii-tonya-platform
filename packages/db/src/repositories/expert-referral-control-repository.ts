@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { canonicalAdminPayloadHash } from "./admin-approval-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { assertTrustedExpertReferralTransaction, type TrustedExpertReferralTransaction } from "./expert-referral-transaction-capability.js";
 
 export const EXPERT_REFERRAL_FEATURE_CONTROL_ID =
   "00000000-0000-0000-0000-000000000041";
@@ -124,7 +125,7 @@ function validateReasonCode(reasonCode: string): void {
 }
 
 export class PostgresExpertReferralControlRepository {
-  constructor(private readonly db: DrizzleDb, private readonly options: { skipIsolationStatement?: boolean } = {}) {}
+  constructor(private readonly db: DrizzleDb) {}
 
   async activeCodeKeyVersions(): Promise<string[]> {
     const result = await this.db.execute<{ keyVersion: number }>(sql`
@@ -189,9 +190,9 @@ export class PostgresExpertReferralControlRepository {
   async setFeatureControl(
     command: SetExpertReferralFeatureControlCommand,
   ): Promise<ExpertReferralFeatureControl> {
-    return withSerializableRetry(() =>
+    return withControlTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedControls.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('expert-referral-feature-control', 0))`,
         );
@@ -247,9 +248,9 @@ export class PostgresExpertReferralControlRepository {
     command: OpenExpertAbuseHoldCommand,
   ): Promise<ExpertAbuseHoldResult> {
     validateReasonCode(command.reasonCode);
-    return withSerializableRetry(() =>
+    return withControlTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedControls.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         await this.lockExpertForHold(tx, command.expertId);
         const repeated = await tx.execute<{
           id: string;
@@ -318,9 +319,9 @@ export class PostgresExpertReferralControlRepository {
     command: CloseExpertAbuseHoldCommand,
   ): Promise<ExpertAbuseHoldResult> {
     validateReasonCode(command.reasonCode);
-    return withSerializableRetry(() =>
+    return withControlTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedControls.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         await this.lockExpertForHold(tx, command.expertId);
         const repeated = await tx.execute<{
           id: string;
@@ -462,4 +463,26 @@ export class PostgresExpertReferralControlRepository {
       );
     }
   }
+}
+
+const transactionOwnedControls = new WeakSet<PostgresExpertReferralControlRepository>();
+
+function withControlTransactionRetry<T>(
+  repository: PostgresExpertReferralControlRepository,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return transactionOwnedControls.has(repository)
+    ? operation()
+    : withSerializableRetry(operation);
+}
+
+/** Internal transaction-owned factory. Deliberately absent from the package root. */
+export function createTransactionOwnedExpertReferralControlRepository(
+  tx: ExpertReferralTransaction,
+  capability: TrustedExpertReferralTransaction,
+): PostgresExpertReferralControlRepository {
+  assertTrustedExpertReferralTransaction(capability, tx);
+  const repository = new PostgresExpertReferralControlRepository(tx as unknown as DrizzleDb);
+  transactionOwnedControls.add(repository);
+  return repository;
 }

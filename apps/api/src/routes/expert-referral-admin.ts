@@ -1,7 +1,7 @@
 import rateLimit from "@fastify/rate-limit";
 import type { ExpertReferralAdminAction, ExpertReferralAdminPayload, ExpertReferralAdminService, ExpertReferralEnvironmentCeilings } from "@ii-tonya/application";
 import { expertReferralAdminActions } from "@ii-tonya/application";
-import type { AdminPayload, PostgresAdminApprovalRepository } from "@ii-tonya/db";
+import { expertReferralOverrideApprovalPayload, type AdminPayload, type PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import Fastify from "fastify";
 import { hashAdminSessionToken } from "./admin.js";
 
@@ -50,7 +50,16 @@ const canonicalPayload = (action: ExpertReferralAdminAction, objectId: string, r
   if (action === "expert_referral.code_revoke") return { codeId: objectId };
   if (action === "expert_referral.issuance_override") {
     if (actor === undefined) throw new Error("invalid_command");
-    return { ...p, overrideId: objectId, requesterId: actor.id, requesterSessionIdHash: actor.sessionIdHash };
+    return expertReferralOverrideApprovalPayload({
+      overrideId: objectId,
+      inviterExpertId: p.inviterExpertId as string,
+      additionalQuota: p.additionalQuota as number,
+      reasonCode: p.reasonCode as string,
+      validFrom: p.validFrom as string,
+      validUntil: p.validUntil as string,
+      requesterId: actor.id,
+      requesterSessionIdHash: actor.sessionIdHash,
+    });
   }
   if (action === "expert_referral.abuse_hold_open" || action === "expert_referral.abuse_hold_close") return { ...p, expertId: objectId };
   if (action === "expert_residency.tariff_create") return { ...p, tariffVersionId: objectId };

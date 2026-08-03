@@ -41,4 +41,15 @@ describe("expert referral admin routes", () => {
     expect(response.json()).toEqual({ error: "conflict" });
     await app.close();
   });
+
+  it("normalizes override timestamps and maps dual-control denial to 403", async () => {
+    const approvals = { resolvePrincipal: vi.fn(async () => principal), requestApproval: vi.fn(), approveApproval: vi.fn() };
+    const admin = { execute: vi.fn(async () => ({ allowed: false as const, reasonCode: "approval_denied" as const })), inventory: vi.fn() };
+    const app = await buildExpertReferralAdminApi({ approvals, admin, sessionTokenHash: () => principal.sessionIdHash, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } });
+    const response = await app.inject({ method: "POST", url: "/v1/admin/actions/expert_referral.issuance_override/00000000-0000-4000-8000-000000000030/execute", headers: { authorization: `Bearer ${token}` }, payload: { approvalId: "00000000-0000-4000-8000-000000000020", secondApprovalId: "00000000-0000-4000-8000-000000000021", nonce: "nonce-task9-0004", secondNonce: "nonce-task9-0005", correlationId: "correlation-task9-0004", command: { inviterExpertId: "00000000-0000-4000-8000-000000000010", additionalQuota: 1, reasonCode: "approved", validFrom: "2026-08-04T12:00:00+03:00", validUntil: "2026-08-04T13:00:00+03:00" } } });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "approval_denied" });
+    expect(admin.execute).toHaveBeenCalledWith(principal, expect.objectContaining({ payload: expect.objectContaining({ validFrom: "2026-08-04T09:00:00.000Z", validUntil: "2026-08-04T10:00:00.000Z", requesterId: principal.id, requesterSessionIdHash: principal.sessionIdHash }) }));
+    await app.close();
+  });
 });

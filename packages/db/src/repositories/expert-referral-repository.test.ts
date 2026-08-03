@@ -268,8 +268,7 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
     "object",
     "session",
     "payload",
-    "expired",
-    "consumed",
+    "unconsumed",
   ] as const)("rejects an override with invalid %s approval binding", async (field) => {
     await testDb!.enableExpertReferralCommands();
     const inviter = await testDb!.createExpertIdentity();
@@ -291,8 +290,7 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
       object: sql`object_id = ${randomUUID()}::uuid`,
       session: sql`requester_session_id_hash = ${unrelatedAudit?.sessionIdHash}`,
       payload: sql`payload_hash = ${`sha256:${"b".repeat(64)}`}`,
-      expired: sql`expires_at = transaction_timestamp() - interval '1 second'`,
-      consumed: sql`consumed_at = transaction_timestamp()`,
+      unconsumed: sql`consumed_at = null`,
     }[field];
     await testDb!.db.execute(sql`
       update admin_approvals set ${mutation}
@@ -303,7 +301,7 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
     ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
   });
 
-  it("rejects reuse of already consumed override approvals", async () => {
+  it("reuses already consumed approval facts only within override count", async () => {
     await testDb!.enableExpertReferralCommands();
     const inviter = await testDb!.createExpertIdentity();
     await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
@@ -313,9 +311,51 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
       additionalQuota: 2,
     });
     await issue(repository, inviter.expertId, 1, override.overrideId);
-    await expect(
+    await expect(issue(repository, inviter.expertId, 1, override.overrideId))
+      .resolves.toMatchObject({ codes: { length: 1 } });
+    await expect(issue(repository, inviter.expertId, 1, override.overrideId))
+      .rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
+  });
+
+  it("serializes concurrent consumers so an override cannot exceed its count", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+    const results = await Promise.allSettled([
       issue(repository, inviter.expertId, 1, override.overrideId),
-    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
+      issue(repository, inviter.expertId, 1, override.overrideId),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const usage = await testDb!.db.execute<{ consumed: number }>(sql`
+      select consumed_count as consumed
+      from expert_referral_issuance_overrides
+      where id=${override.overrideId}::uuid
+    `);
+    expect(usage.rows[0]?.consumed).toBe(1);
+  });
+
+  it("rejects an expired override even though its approval facts remain consumed", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+    await testDb!.db.execute(sql`
+      update expert_referral_issuance_overrides
+      set valid_until=transaction_timestamp() - interval '1 second'
+      where id=${override.overrideId}::uuid
+    `);
+    await expect(issue(repository, inviter.expertId, 1, override.overrideId))
+      .rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
   });
 
   it("retrieves override instants canonically under non-ISO DateStyle and non-UTC session timezone", async () => {

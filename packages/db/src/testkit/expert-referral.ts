@@ -27,6 +27,7 @@ export interface ExpertIdentityFixture {
 export interface ExpertAdminAuditFixture {
   adminId: string;
   approvalId: string;
+  nonce: string;
   sessionIdHash: string;
   approverId: string;
   approverSessionIdHash: string;
@@ -155,6 +156,7 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
         undefined,
         approverMfaVerifiedAt,
       );
+      const nonce = randomUUID();
       const approvalId = requiredId(
         (
           await base.db.execute<{ id: string }>(sql`
@@ -170,7 +172,7 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
               ${requesterSession.sessionIdHash}, ${approverSession.sessionIdHash},
               ${canonicalAdminPayloadHash(payload)}, 'security_admin',
               ${requesterSession.mfaVerifiedAt}, ${approverSession.mfaVerifiedAt},
-              ${approvedAt}, ${expiresAt}, ${randomUUID()},
+              ${approvedAt}, ${expiresAt}, ${nonce},
               ${consumed ? now : null}, ${createdAt}
             ) returning id
           `)
@@ -180,6 +182,7 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
       return {
         adminId: resolvedAdminId,
         approvalId,
+        nonce,
         sessionIdHash: requesterSession.sessionIdHash,
         approverId: resolvedApproverId,
         approverSessionIdHash: approverSession.sessionIdHash,
@@ -295,6 +298,12 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
         approverId: approverTwoId,
         payload,
       });
+      await base.db.execute(sql`
+        update admin_approvals
+        set consumed_at = transaction_timestamp()
+        where id in (${first.approvalId}::uuid, ${second.approvalId}::uuid)
+          and consumed_at is null
+      `);
       await base.db.execute(sql`
         insert into expert_referral_issuance_overrides (
           id, inviter_expert_id, additional_quota, reason_code,

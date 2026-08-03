@@ -8,6 +8,7 @@ import {
 } from "../schema/expert-residency.js";
 import { PostgresExpertReferralControlRepository } from "./expert-referral-control-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { assertTrustedExpertReferralTransaction, type TrustedExpertReferralTransaction } from "./expert-referral-transaction-capability.js";
 
 const BASE_ISSUANCE_QUOTA = 1000;
 
@@ -310,18 +311,17 @@ export class PostgresExpertReferralRepository {
   constructor(
     private readonly db: DrizzleDb,
     private readonly crypto: ExpertReferralCodeCrypto,
-    private readonly options: { skipIsolationStatement?: boolean } = {},
   ) {
-    this.#controls = new PostgresExpertReferralControlRepository(db, options);
+    this.#controls = new PostgresExpertReferralControlRepository(db);
   }
 
   async issueBatch(
     command: IssueExpertReferralBatchCommand,
   ): Promise<IssuedExpertReferralBatch> {
     assertBatchSize(command.count);
-    return withSerializableRetry(() =>
+    return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -451,9 +451,9 @@ export class PostgresExpertReferralRepository {
   async revokeCode(
     command: RevokeExpertReferralCodeCommand,
   ): Promise<{ id: string; status: "revoked" }> {
-    return withSerializableRetry(() =>
+    return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -512,9 +512,9 @@ export class PostgresExpertReferralRepository {
     command: RedeemExpertReferralCodeCommand,
   ): Promise<ExpertReferralBinding> {
     const candidates = this.crypto.digestCandidates(command.plaintext);
-    return withSerializableRetry(() =>
+    return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -747,28 +747,9 @@ export class PostgresExpertReferralRepository {
       from expert_referral_issuance_overrides o
       join admin_approvals a1 on a1.id = o.approval_one_id
       join admin_approvals a2 on a2.id = o.approval_two_id
-      join admin_sessions requester_session
-        on requester_session.session_id_hash = o.requester_session_id_hash
-        and requester_session.admin_id = o.requester_id
-      join admin_role_assignments requester_role
-        on requester_role.admin_id = o.requester_id
-        and requester_role.role = 'security_admin'
-      join admin_sessions approver_one_session
-        on approver_one_session.session_id_hash = a1.approver_session_id_hash
-        and approver_one_session.admin_id = o.approver_one_id
-      join admin_role_assignments approver_one_role
-        on approver_one_role.admin_id = o.approver_one_id
-        and approver_one_role.role = 'security_admin'
-      join admin_sessions approver_two_session
-        on approver_two_session.session_id_hash = a2.approver_session_id_hash
-        and approver_two_session.admin_id = o.approver_two_id
-      join admin_role_assignments approver_two_role
-        on approver_two_role.admin_id = o.approver_two_id
-        and approver_two_role.role = 'security_admin'
       cross join db_clock c
       where o.id = ${overrideId}::uuid
         and o.inviter_expert_id = ${inviterExpertId}::uuid
-        and o.consumed_count = 0
         and date_trunc('milliseconds', o.valid_from) = o.valid_from
         and date_trunc('milliseconds', o.valid_until) = o.valid_until
         and o.valid_from >= timestamp with time zone '0001-01-01 00:00:00+00 AD'
@@ -786,29 +767,16 @@ export class PostgresExpertReferralRepository {
         and a2.requester_id = o.requester_id
         and a1.requester_session_id_hash = o.requester_session_id_hash
         and a2.requester_session_id_hash = o.requester_session_id_hash
-        and a1.requester_mfa_verified_at = requester_session.mfa_verified_at
-        and a2.requester_mfa_verified_at = requester_session.mfa_verified_at
         and a1.required_role = 'security_admin'
         and a2.required_role = 'security_admin'
         and a1.approver_id = o.approver_one_id
         and a2.approver_id = o.approver_two_id
         and a1.approved_at is not null and a2.approved_at is not null
-        and a1.consumed_at is null and a2.consumed_at is null
-        and a1.expires_at > c.db_now and a2.expires_at > c.db_now
-        and requester_session.revoked_at is null
-        and requester_session.expires_at > c.db_now
-        and requester_session.mfa_verified_at <= c.db_now
-        and requester_session.mfa_verified_at >= c.db_now - interval '15 minutes'
-        and approver_one_session.mfa_verified_at = a1.approver_mfa_verified_at
-        and approver_one_session.revoked_at is null
-        and approver_one_session.expires_at > c.db_now
-        and approver_one_session.mfa_verified_at <= c.db_now
-        and approver_one_session.mfa_verified_at >= c.db_now - interval '15 minutes'
-        and approver_two_session.mfa_verified_at = a2.approver_mfa_verified_at
-        and approver_two_session.revoked_at is null
-        and approver_two_session.expires_at > c.db_now
-        and approver_two_session.mfa_verified_at <= c.db_now
-        and approver_two_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+        and a1.approver_session_id_hash is not null
+        and a2.approver_session_id_hash is not null
+        and a1.approver_mfa_verified_at is not null
+        and a2.approver_mfa_verified_at is not null
+        and a1.consumed_at is not null and a2.consumed_at is not null
       for update of o, a1, a2
     `);
     const row = override.rows[0];
@@ -830,24 +798,11 @@ export class PostgresExpertReferralRepository {
         "Expert referral issuance override is invalid",
       );
     }
-    const approvals = await tx.execute<{ id: string }>(sql`
-      update admin_approvals
-      set consumed_at = clock_timestamp()
-      where id in (${row.approvalOneId}::uuid, ${row.approvalTwoId}::uuid)
-        and consumed_at is null
-      returning id
-    `);
-    if (approvals.rows.length !== 2) {
-      throw new ExpertReferralCommandError(
-        "EXPERT_REFERRAL_OVERRIDE_INVALID",
-        "Expert referral issuance override is invalid",
-      );
-    }
     const consumed = await tx.execute<{ consumedCount: number }>(sql`
       update expert_referral_issuance_overrides
       set consumed_count = consumed_count + ${required}
       where id = ${overrideId}::uuid
-        and consumed_count = 0
+        and consumed_count = ${row.consumedCount}
         and consumed_count + ${required} <= additional_quota
       returning consumed_count as "consumedCount"
     `);
@@ -879,4 +834,27 @@ export class PostgresExpertReferralRepository {
       where id = ${batchId}::uuid
     `);
   }
+}
+
+const transactionOwnedReferrals = new WeakSet<PostgresExpertReferralRepository>();
+
+function withReferralTransactionRetry<T>(
+  repository: PostgresExpertReferralRepository,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return transactionOwnedReferrals.has(repository)
+    ? operation()
+    : withSerializableRetry(operation);
+}
+
+/** Internal transaction-owned factory. Deliberately absent from the package root. */
+export function createTransactionOwnedExpertReferralRepository(
+  tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+  crypto: ExpertReferralCodeCrypto,
+  capability: TrustedExpertReferralTransaction,
+): PostgresExpertReferralRepository {
+  assertTrustedExpertReferralTransaction(capability, tx);
+  const repository = new PostgresExpertReferralRepository(tx as unknown as DrizzleDb, crypto);
+  transactionOwnedReferrals.add(repository);
+  return repository;
 }
