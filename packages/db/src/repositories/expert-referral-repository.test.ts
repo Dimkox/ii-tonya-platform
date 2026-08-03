@@ -126,8 +126,13 @@ describe("expert referral issuance policy", () => {
     "2026-08-03 09:00:00",
     "2026-08-03T09:00:00",
     "08/03/2026 09:00:00 UTC",
+    "2026-08-03T09:00:00.1234Z",
     "2026-08-03T09:00:00+24:00",
+    "2026-08-03T09:00:00+14:01",
+    "2026-08-03T09:00:00-15:00",
     "2026-02-30T09:00:00Z",
+    "0001-01-01T00:00:00+14:00",
+    "9999-12-31T23:59:59-14:00",
     new Date(Number.NaN),
   ])("rejects noncanonical or invalid override timestamp %s", (validFrom) => {
     const base = {
@@ -286,6 +291,48 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
       additionalQuota: 2,
     });
     await issue(repository, inviter.expertId, 1, override.overrideId);
+    await expect(
+      issue(repository, inviter.expertId, 1, override.overrideId),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
+  });
+
+  it("retrieves override instants canonically under non-ISO DateStyle and non-UTC session timezone", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+
+    await testDb!.db.execute(sql`set datestyle = 'SQL, DMY'`);
+    await testDb!.db.execute(sql`set timezone = 'Asia/Tokyo'`);
+    try {
+      await expect(
+        issue(repository, inviter.expertId, 1, override.overrideId),
+      ).resolves.toMatchObject({ codes: { length: 1 } });
+    } finally {
+      await testDb!.db.execute(sql`reset datestyle`);
+      await testDb!.db.execute(sql`reset timezone`);
+    }
+  });
+
+  it("rejects database override instants that are not millisecond aligned", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+    await testDb!.db.execute(sql`
+      update expert_referral_issuance_overrides
+      set valid_from = valid_from + interval '1 microsecond'
+      where id = ${override.overrideId}::uuid
+    `);
+
     await expect(
       issue(repository, inviter.expertId, 1, override.overrideId),
     ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });

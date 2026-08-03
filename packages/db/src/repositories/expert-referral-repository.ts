@@ -178,7 +178,18 @@ export class ExpertReferralDataIntegrityError extends Error {
 }
 
 const EXPERT_REFERRAL_INSTANT_PATTERN =
-  /^(\d{4})-(\d{2})-(\d{2})([ T])(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|([+-])(\d{2})(?::(\d{2}))?)$/u;
+  /^(\d{4})-(\d{2})-(\d{2})([ T])(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2})(?::(\d{2}))?)$/u;
+
+const CANONICAL_EXPERT_REFERRAL_INSTANT_PATTERN =
+  /^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
+
+function canonicalExpertReferralInstant(value: Date, field: string): string {
+  const canonical = value.toISOString();
+  if (!CANONICAL_EXPERT_REFERRAL_INSTANT_PATTERN.test(canonical)) {
+    throw new ExpertReferralDataIntegrityError(field);
+  }
+  return canonical;
+}
 
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
@@ -198,7 +209,7 @@ function normalizeExpertReferralInstant(
     if (!Number.isFinite(normalized.getTime())) {
       throw new ExpertReferralDataIntegrityError(field);
     }
-    return normalized.toISOString();
+    return canonicalExpertReferralInstant(normalized, field);
   }
 
   const match = EXPERT_REFERRAL_INSTANT_PATTERN.exec(value);
@@ -230,8 +241,9 @@ function normalizeExpertReferralInstant(
     hour > 23 ||
     minute > 59 ||
     second > 59 ||
-    offsetHour > 23 ||
-    offsetMinute > 59
+    offsetHour > 14 ||
+    offsetMinute > 59 ||
+    (offsetHour === 14 && offsetMinute !== 0)
   ) {
     throw new ExpertReferralDataIntegrityError(field);
   }
@@ -246,7 +258,7 @@ function normalizeExpertReferralInstant(
   if (!Number.isFinite(normalized.getTime())) {
     throw new ExpertReferralDataIntegrityError(field);
   }
-  return normalized.toISOString();
+  return canonicalExpertReferralInstant(normalized, field);
 }
 
 export function expertReferralOverrideApprovalPayload(
@@ -716,8 +728,14 @@ export class PostgresExpertReferralRepository {
         o.additional_quota as "additionalQuota",
         o.consumed_count as "consumedCount",
         o.reason_code as "reasonCode",
-        o.valid_from as "validFrom",
-        o.valid_until as "validUntil",
+        to_char(
+          o.valid_from at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        ) as "validFrom",
+        to_char(
+          o.valid_until at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        ) as "validUntil",
         o.requester_id as "requesterId",
         o.requester_session_id_hash as "requesterSessionIdHash",
         o.approver_one_id as "approverOneId",
@@ -750,6 +768,8 @@ export class PostgresExpertReferralRepository {
       where o.id = ${overrideId}::uuid
         and o.inviter_expert_id = ${inviterExpertId}::uuid
         and o.consumed_count = 0
+        and date_trunc('milliseconds', o.valid_from) = o.valid_from
+        and date_trunc('milliseconds', o.valid_until) = o.valid_until
         and c.db_now >= o.valid_from and c.db_now < o.valid_until
         and a1.id <> a2.id
         and a1.action = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION}
