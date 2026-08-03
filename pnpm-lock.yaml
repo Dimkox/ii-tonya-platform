@@ -6,7 +6,7 @@ settings:
   injectWorkspacePackages: true
 
 overrides:
-  fast-uri@<3.1.5: 3.1.5
+  fast-uri@>=3.0.0 <3.1.5: 3.1.5
   fast-uri@>=4.0.0 <4.1.2: 4.1.2
 
 importers:
