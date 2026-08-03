@@ -109,6 +109,7 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_order_credit_cap",
         "expert_order_currency_rub",
         "expert_order_deadline_after_creation",
+        "expert_order_deadline_not_after_provider",
         "expert_order_duration_positive",
         "expert_order_money_bounds",
         "expert_order_settlement_interval",

@@ -96,7 +96,7 @@ export function parseMoneySnapshot(input: {
 type TariffRow = {
   id: string;
   displayName: string;
-  priceMinor: bigint;
+  priceMinor: bigint | string;
   currency: "RUB";
   durationSeconds: number;
 };
@@ -109,7 +109,10 @@ type OrderRow = TariffRow & {
   providerDeadline: Date | string;
 };
 
-function dbBigInt(value: bigint | string | number, field: string): bigint {
+export function normalizeDatabaseMoney(
+  value: bigint | string | number,
+  field: string,
+): bigint {
   try {
     return BigInt(value);
   } catch {
@@ -118,6 +121,12 @@ function dbBigInt(value: bigint | string | number, field: string): bigint {
       `Invalid database money value: ${field}`,
     );
   }
+}
+
+export function releaseAmountFromReservation(
+  amountMinor: bigint | string,
+): bigint {
+  return -normalizeDatabaseMoney(amountMinor, "reservation.amountMinor");
 }
 
 export class PostgresExpertResidencyRepository {
@@ -229,13 +238,20 @@ export class PostgresExpertResidencyRepository {
         );
         const normalizedGrants = grants.rows.map((g) => ({
           ...g,
-          remainingMinor: dbBigInt(g.remainingMinor, "grant.remainingMinor"),
+          remainingMinor: normalizeDatabaseMoney(
+            g.remainingMinor,
+            "grant.remainingMinor",
+          ),
         }));
         const available = normalizedGrants.reduce(
           (sum, g) => sum + (g.remainingMinor > 0n ? g.remainingMinor : 0n),
           0n,
         );
-        const amounts = quoteResidency(tariff.priceMinor, available);
+        const tariffPriceMinor = normalizeDatabaseMoney(
+          tariff.priceMinor,
+          "tariff.priceMinor",
+        );
+        const amounts = quoteResidency(tariffPriceMinor, available);
         let remaining = amounts.creditMinor;
         const allocations: {
           grantId: string;
@@ -264,7 +280,7 @@ export class PostgresExpertResidencyRepository {
           command.providerDeadline,
         );
         const inserted = await tx.execute<{ id: string }>(
-          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariff.priceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${deadline},${command.providerDeadline},'payment_pending',${command.idempotencyKey}) returning id`,
+          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariffPriceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${deadline},${command.providerDeadline},'payment_pending',${command.idempotencyKey}) returning id`,
         );
         const orderId = this.required(
           inserted.rows[0],
@@ -318,13 +334,13 @@ export class PostgresExpertResidencyRepository {
         if (!changed.rows[0]) continue;
         const reservations = await tx.execute<{
           id: string;
-          amountMinor: bigint;
+          amountMinor: bigint | string;
         }>(
           sql`select id,amount_minor as "amountMinor" from expert_referral_ledger_entries where order_id=${order.id}::uuid and entry_kind='reservation' for update`,
         );
         for (const reservation of reservations.rows) {
           const release = await tx.execute<{ id: string }>(
-            sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) values (${order.expertId}::uuid,'release',${-reservation.amountMinor},${order.id}::uuid,${reservation.id}::uuid,'residency_order',${order.id}::uuid,${`release:${reservation.id}`}) on conflict (idempotency_key) do nothing returning id`,
+            sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) values (${order.expertId}::uuid,'release',${releaseAmountFromReservation(reservation.amountMinor)},${order.id}::uuid,${reservation.id}::uuid,'residency_order',${order.id}::uuid,${`release:${reservation.id}`}) on conflict (idempotency_key) do nothing returning id`,
           );
           if (release.rows[0])
             await tx.execute(
@@ -366,17 +382,20 @@ export class PostgresExpertResidencyRepository {
       debtMinor: 0n,
     };
     return {
-      availableCreditMinor: dbBigInt(
+      availableCreditMinor: normalizeDatabaseMoney(
         row.availableCreditMinor,
         "balance.available",
       ).toString(),
-      reservedCreditMinor: dbBigInt(
+      reservedCreditMinor: normalizeDatabaseMoney(
         row.reservedCreditMinor,
         "balance.reserved",
       ).toString(),
       nearestExpiryAt:
         row.nearestExpiryAt === null ? null : dateString(row.nearestExpiryAt),
-      debtMinor: dbBigInt(row.debtMinor, "balance.debt").toString(),
+      debtMinor: normalizeDatabaseMoney(
+        row.debtMinor,
+        "balance.debt",
+      ).toString(),
     };
   }
 
@@ -428,10 +447,16 @@ export class PostgresExpertResidencyRepository {
       ) select greatest(live.amount-greatest(-ledger.net,0),0)::bigint as available
       from live cross join ledger`,
     );
-    return dbBigInt(result.rows[0]?.available ?? 0n, "availableCredit");
+    return normalizeDatabaseMoney(
+      result.rows[0]?.available ?? 0n,
+      "availableCredit",
+    );
   }
   private toQuote(t: TariffRow, available: bigint): ResidencyQuote {
-    const priceMinor = dbBigInt(t.priceMinor, "tariff.priceMinor");
+    const priceMinor = normalizeDatabaseMoney(
+      t.priceMinor,
+      "tariff.priceMinor",
+    );
     const q = quoteResidency(priceMinor, available);
     return {
       tariffVersionId: t.id,
@@ -457,16 +482,25 @@ export class PostgresExpertResidencyRepository {
       tariffVersionId: (row as OrderRow & { tariffVersionId: string })
         .tariffVersionId,
       displayName: row.displayName,
-      priceMinor: dbBigInt(row.priceMinor, "order.priceMinor").toString(),
+      priceMinor: normalizeDatabaseMoney(
+        row.priceMinor,
+        "order.priceMinor",
+      ).toString(),
       currency: "RUB",
       durationSeconds: row.durationSeconds,
-      creditMinor: dbBigInt(row.creditMinor, "order.creditMinor").toString(),
-      cashMinor: dbBigInt(row.cashMinor, "order.cashMinor").toString(),
+      creditMinor: normalizeDatabaseMoney(
+        row.creditMinor,
+        "order.creditMinor",
+      ).toString(),
+      cashMinor: normalizeDatabaseMoney(
+        row.cashMinor,
+        "order.cashMinor",
+      ).toString(),
       paymentDeadline: dateString(row.paymentDeadline),
       status: row.status,
       allocations: allocations.rows.map((a) => ({
         grantId: a.grantId,
-        amountMinor: dbBigInt(
+        amountMinor: normalizeDatabaseMoney(
           a.amountMinor,
           "allocation.amountMinor",
         ).toString(),

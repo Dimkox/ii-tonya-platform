@@ -27,3 +27,11 @@
 - PostgreSQL suites: locally blocked before tests by `Could not find a working container runtime strategy`; exact Claw rerun remains the root-owned verification gate.
 
 No deploy, staging, production, provider SDK, or feature activation was performed.
+
+## Final re-review loop
+
+- Normalized the raw active-tariff `price_minor` before checkout arithmetic and reused the normalized bigint for quote calculation, order insertion, and output.
+- Declared raw reservation amounts as `bigint | string` and normalized them before computing the positive release amount.
+- Added the database and Drizzle invariant `payment_deadline <= provider_deadline`, with the upgrade-safe migration order preserved.
+- Added focused string-bigint regression coverage and updated schema-parity expectations.
+- Final static verification: 24/24 focused tests, typecheck, build/DTS, ESLint, and diff check all pass.

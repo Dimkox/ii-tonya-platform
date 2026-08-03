@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   minPaymentDeadline,
+  normalizeDatabaseMoney,
+  releaseAmountFromReservation,
   parseMoneySnapshot,
   validateTariffVersionCommand,
 } from "./expert-residency-repository.js";
@@ -24,6 +26,11 @@ describe("expert residency repository boundaries", () => {
         new Date("2026-08-03T11:00:00Z"),
       ),
     ).toEqual(new Date("2026-08-03T11:00:00Z"));
+  });
+
+  it("normalizes raw PostgreSQL bigint strings before arithmetic", () => {
+    expect(normalizeDatabaseMoney("250001", "tariff.priceMinor")).toBe(250001n);
+    expect(releaseAmountFromReservation("-125000")).toBe(125000n);
   });
 
   it.each([

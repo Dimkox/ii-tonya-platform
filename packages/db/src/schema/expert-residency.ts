@@ -342,6 +342,10 @@ export const expertResidencyOrders = pgTable(
       sql`${table.paymentDeadline} > ${table.createdAt}`,
     ),
     check(
+      "expert_order_deadline_not_after_provider",
+      sql`${table.paymentDeadline} <= ${table.providerDeadline}`,
+    ),
+    check(
       "expert_order_settlement_interval",
       sql`
         (${table.settledAt} is null and ${table.residencyStartsAt} is null and ${table.residencyEndsAt} is null)

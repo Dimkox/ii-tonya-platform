@@ -21,3 +21,7 @@ $$;
 CREATE TRIGGER "expert_orders_provider_deadline_default"
   BEFORE INSERT ON "expert_residency_orders"
   FOR EACH ROW EXECUTE FUNCTION expert_residency_default_provider_deadline();
+--> statement-breakpoint
+ALTER TABLE "expert_residency_orders"
+  ADD CONSTRAINT "expert_order_deadline_not_after_provider"
+  CHECK ("payment_deadline" <= "provider_deadline");
