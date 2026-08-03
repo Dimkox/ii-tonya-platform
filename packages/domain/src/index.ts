@@ -1,26 +1,13 @@
-export {
-  computeReservedUntil,
-  transitionReservation,
-} from "./reservation.js";
-export type {
-  ReservationAction,
-  ReservationStatus,
-} from "./reservation.js";
-export {
-  chargeDelta,
-  choosePackage,
-  derivePackageBalance,
-} from "./billing.js";
+export { computeReservedUntil, transitionReservation } from "./reservation.js";
+export type { ReservationAction, ReservationStatus } from "./reservation.js";
+export { chargeDelta, choosePackage, derivePackageBalance } from "./billing.js";
 export type {
   AvailablePackage,
   LedgerFact,
   MessageClass,
   PackageKind,
 } from "./billing.js";
-export {
-  buildExpertView,
-  buildProfilePatch,
-} from "./consent.js";
+export { buildExpertView, buildProfilePatch } from "./consent.js";
 export type {
   ConsentGrant,
   ConsentPurpose,
@@ -47,3 +34,22 @@ export type {
   SafetyInput,
   SafetyRisk,
 } from "./safety.js";
+export {
+  allocateCreditFifo,
+  applyRewardToDebt,
+  MAX_RESIDENCY_DURATION_SECONDS,
+  MIN_RESIDENCY_DURATION_SECONDS,
+  nextResidencyInterval,
+  POSTGRES_BIGINT_MAX,
+  quoteResidency,
+  resolveRewardReversal,
+  rewardExpiresAt,
+  settlementBeforeDeadline,
+} from "./expert-referral.js";
+export type {
+  CreditAllocation,
+  CreditGrant,
+  ResidencyIntervalInput,
+  RewardReversalInput,
+  RewardStatus,
+} from "./expert-referral.js";

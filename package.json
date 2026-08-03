@@ -10,7 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run packages apps",
-    "test:property": "vitest run packages/domain/src/billing.property.test.ts",
+    "test:property": "vitest run packages/domain/src/billing.property.test.ts packages/domain/src/expert-referral.property.test.ts",
     "test:integration": "vitest run tests/integration tests/support tests/repo",
     "test:contract": "vitest run tests/contract",
     "test:security": "vitest run tests/repo/env-policy.test.ts tests/repo/scope-boundary.test.ts packages/application/src/prompt-safety.test.ts packages/observability/src/logger.test.ts apps/api/src/rate-limit.test.ts",
