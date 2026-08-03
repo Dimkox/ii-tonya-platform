@@ -143,8 +143,8 @@ describe("expert residency settlement", () => {
       sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${approval.approvalId}::uuid,${approval.sessionIdHash})`,
     );
     const referralId = randomUUID(),
-      grantOne = randomUUID(),
-      grantTwo = randomUUID(),
+      grantOne = "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      grantTwo = "00000000-0000-4000-8000-000000000001",
       reversalOne = randomUUID(),
       reversalTwo = randomUUID();
     await testDb!.db.transaction(async (tx) => {
@@ -184,5 +184,55 @@ describe("expert residency settlement", () => {
       ]),
     );
     expect(allocations.rows).toHaveLength(2);
+  });
+  it("repays partial debt and grants the exact spendable remainder once", async () => {
+    const inviter = await testDb!.createExpertIdentity();
+    const { expert: invitee, order } = await orderFixture();
+    const approval = await testDb!.createFeatureControlApproval({
+      expectedVersion: 0,
+      newCommandsEnabled: false,
+      rewardGrantsEnabled: true,
+    });
+    await testDb!.db.execute(
+      sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${approval.approvalId}::uuid,${approval.sessionIdHash})`,
+    );
+    const referral = randomUUID(),
+      grant = randomUUID(),
+      reversal = randomUUID();
+    await testDb!.db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role=replica`);
+      await tx.execute(
+        sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${referral}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${invitee.expertId}::uuid)`,
+      );
+      await tx.execute(
+        sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grant}::uuid,${inviter.expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-interval '1 day',transaction_timestamp()+interval '1 day',${randomUUID()})`,
+      );
+      await tx.execute(
+        sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${reversal}::uuid,${inviter.expertId}::uuid,'reversal',-30000,${randomUUID()}::uuid,'test_debt',${grant}::uuid,${randomUUID()})`,
+      );
+      await tx.execute(
+        sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${reversal}::uuid,${grant}::uuid,${inviter.expertId}::uuid,-30000)`,
+      );
+    });
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
+    const verified = event(
+      order.id,
+      "evt_partial_debt",
+      `sha256:${"f".repeat(64)}`,
+    );
+    const first = await repo.settle(verified);
+    await expect(repo.settle(verified)).resolves.toEqual(first);
+    const totals = await testDb!.db.execute<{
+      repaid: bigint | string;
+      granted: bigint | string;
+      allocations: number;
+    }>(
+      sql`select coalesce(sum(e.amount_minor) filter(where e.entry_kind='debt_repayment'),0)::bigint repaid,coalesce(sum(e.amount_minor) filter(where e.entry_kind='reward_grant' and e.source_type='reward_grant'),0)::bigint granted,(select count(*)::int from expert_referral_ledger_allocations a join expert_referral_ledger_entries x on x.id=a.ledger_entry_id where x.expert_id=${inviter.expertId}::uuid and (x.source_type='first_settlement' or (x.source_type='reward_grant' and x.source_id in (select id from expert_referral_reward_grants where qualifying_order_id=${order.id}::uuid)))) allocations from expert_referral_ledger_entries e where e.expert_id=${inviter.expertId}::uuid`,
+    );
+    expect({
+      ...totals.rows[0],
+      repaid: BigInt(totals.rows[0]!.repaid),
+      granted: BigInt(totals.rows[0]!.granted),
+    }).toEqual({ repaid: 30000n, granted: 70000n, allocations: 2 });
   });
 });

@@ -220,12 +220,18 @@ export class PostgresExpertResidencyProviderInboxRepository {
             grantId: string;
             amount: bigint | string;
             createdAt: Date | string;
+            expiresAt: Date | string;
           }>(
-            sql`select e.id as "entryId",a.reward_grant_id as "grantId",a.amount_minor as amount,e.created_at as "createdAt" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id join expert_referral_reward_grants g on g.id=a.reward_grant_id where e.expert_id=${inviter}::uuid and e.entry_kind in ('reversal','debt_repayment') order by g.expires_at,e.created_at,e.id,a.reward_grant_id for update of e,a,g`,
+            sql`select e.id as "entryId",a.reward_grant_id as "grantId",a.amount_minor as amount,e.created_at as "createdAt",g.expires_at as "expiresAt" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id join expert_referral_reward_grants g on g.id=a.reward_grant_id where e.expert_id=${inviter}::uuid and e.entry_kind in ('reversal','debt_repayment') order by g.expires_at,e.created_at,a.reward_grant_id,e.id for update of e,a,g`,
           );
           const debts = new Map<
             string,
-            { originalId: string; amount: bigint; createdAt: number }
+            {
+              originalId: string;
+              amount: bigint;
+              createdAt: number;
+              expiresAt: number;
+            }
           >();
           for (const fact of debtFacts.rows) {
             const current = debts.get(fact.grantId);
@@ -235,12 +241,16 @@ export class PostgresExpertResidencyProviderInboxRepository {
               amount,
               createdAt:
                 current?.createdAt ?? new Date(fact.createdAt).getTime(),
+              expiresAt:
+                current?.expiresAt ?? new Date(fact.expiresAt).getTime(),
             });
           }
           let rewardRemaining = 100000n;
           for (const [grantId, debt] of [...debts].sort(
             (a, b) =>
-              a[1].createdAt - b[1].createdAt || a[0].localeCompare(b[0]),
+              a[1].expiresAt - b[1].expiresAt ||
+              a[1].createdAt - b[1].createdAt ||
+              a[0].localeCompare(b[0]),
           )) {
             const outstanding = debt.amount < 0n ? -debt.amount : 0n;
             if (outstanding === 0n || rewardRemaining === 0n) continue;
