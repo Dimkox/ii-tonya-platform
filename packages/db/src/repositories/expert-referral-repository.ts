@@ -177,12 +177,72 @@ export class ExpertReferralDataIntegrityError extends Error {
   }
 }
 
+const EXPERT_REFERRAL_INSTANT_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})([ T])(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|([+-])(\d{2})(?::(\d{2}))?)$/u;
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
 function normalizeExpertReferralInstant(
   value: Date | string,
   field: string,
 ): string {
-  const normalized =
-    value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (value instanceof Date) {
+    const normalized = new Date(value.getTime());
+    if (!Number.isFinite(normalized.getTime())) {
+      throw new ExpertReferralDataIntegrityError(field);
+    }
+    return normalized.toISOString();
+  }
+
+  const match = EXPERT_REFERRAL_INSTANT_PATTERN.exec(value);
+  if (match === null) {
+    throw new ExpertReferralDataIntegrityError(field);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const separator = match[4];
+  const hour = Number(match[5]);
+  const minute = Number(match[6]);
+  const second = Number(match[7]);
+  const milliseconds = Number((match[8] ?? "").padEnd(3, "0").slice(0, 3));
+  const zone = match[9];
+  const offsetSign = match[10];
+  const offsetHour = Number(match[11] ?? "0");
+  const offsetMinute = Number(match[12] ?? "0");
+  const isPostgresForm = separator === " " && zone !== "Z";
+  const isIsoForm =
+    separator === "T" && (zone === "Z" || match[12] !== undefined);
+  if (
+    (!isPostgresForm && !isIsoForm) ||
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHour > 23 ||
+    offsetMinute > 59
+  ) {
+    throw new ExpertReferralDataIntegrityError(field);
+  }
+
+  const localClock = new Date(0);
+  localClock.setUTCFullYear(year, month - 1, day);
+  localClock.setUTCHours(hour, minute, second, milliseconds);
+  const direction = offsetSign === "-" ? -1 : 1;
+  const offsetMilliseconds =
+    direction * (offsetHour * 60 + offsetMinute) * 60_000;
+  const normalized = new Date(localClock.getTime() - offsetMilliseconds);
   if (!Number.isFinite(normalized.getTime())) {
     throw new ExpertReferralDataIntegrityError(field);
   }

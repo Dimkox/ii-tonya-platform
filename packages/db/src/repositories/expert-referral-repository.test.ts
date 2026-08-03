@@ -109,15 +109,49 @@ describe("expert referral issuance policy", () => {
       validFrom: "2026-08-03T09:00:00.123Z",
       validUntil: "2026-08-03T10:00:00.123Z",
     });
-    expect(() =>
+
+    expect(
       expertReferralOverrideApprovalPayload({
         ...base,
-        validFrom: "not-a-postgres-timestamp",
-        validUntil: "2026-08-03 10:00:00.123+00",
+        validFrom: "2026-08-03T11:00:00.123+02:00",
+        validUntil: "2026-08-03T12:00:00.123+02:00",
       }),
-    ).toThrow(
+    ).toMatchObject({
+      validFrom: "2026-08-03T09:00:00.123Z",
+      validUntil: "2026-08-03T10:00:00.123Z",
+    });
+  });
+
+  it.each([
+    "2026-08-03 09:00:00",
+    "2026-08-03T09:00:00",
+    "08/03/2026 09:00:00 UTC",
+    "2026-08-03T09:00:00+24:00",
+    "2026-02-30T09:00:00Z",
+    new Date(Number.NaN),
+  ])("rejects noncanonical or invalid override timestamp %s", (validFrom) => {
+    const base = {
+      overrideId: randomUUID(),
+      inviterExpertId: randomUUID(),
+      additionalQuota: 1,
+      reasonCode: "approved_test",
+      requesterId: randomUUID(),
+      requesterSessionIdHash: "session-test",
+    };
+    let thrown: unknown;
+    try {
+      expertReferralOverrideApprovalPayload({
+        ...base,
+        validFrom,
+        validUntil: "2026-08-03T10:00:00.123Z",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(String(thrown)).toContain(
       "Invalid database timestamp: expert_referral_issuance_overrides.valid_from",
     );
+    expect(String(thrown)).not.toContain(String(validFrom));
   });
 });
 
