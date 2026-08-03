@@ -351,6 +351,10 @@ const approvedMigrationHashes = new Map([
     "255b88191d6bdfc679ea5066b247c47ad19fca41832baace209db424736972fa",
   ],
   [
+    "packages/db/migrations/0018_expert_residency_referrals.sql",
+    "73b2f47b8bdcdb8f541fe169aa6d5cf6f3787c293b9d8d96344e1831e1bf522a",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -419,8 +423,12 @@ const approvedMigrationHashes = new Map([
     "42dd577fe90276a165e03294701ea22ad799cfdd5e631e69d94b5008a9bcb903",
   ],
   [
+    "packages/db/migrations/meta/0018_snapshot.json",
+    "f3c693f5e3c21fdc66681f764ddf0c9225e0503ff4baf69ae03d966cd4eba73b",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "91a9690a08b6d029aae0e0ae1a297f0c986f84be01a97a3d20a03e341a7e8efc",
+    "173d7f69f4d984db473b802ff7a73360f944ceaa312a8415579dab04094b7573",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1033,7 +1041,6 @@ export const classifyApprovedTrackedScopeContent = ({
   const isPackageManifest =
     path.endsWith("/package.json") || path === "package.json";
   const isMigration = path.startsWith("packages/db/migrations/");
-  if (EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS.has(path)) return [];
   const expectedHash =
     approvedPaymentBoundaryHashes.get(path) ??
     approvedMigrationHashes.get(path) ??
