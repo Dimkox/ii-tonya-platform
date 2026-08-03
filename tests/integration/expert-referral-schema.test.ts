@@ -95,13 +95,17 @@ async function createAdminApproval(): Promise<{
   const approvalId = randomUUID();
   const sessionIdHash = `session:${randomUUID()}`;
   await testDb!.db.execute(sql`
-    insert into users (id) values (${adminId}::uuid);
+    insert into users (id) values (${adminId}::uuid)
+  `);
+  await testDb!.db.execute(sql`
     insert into admin_sessions (
       session_id_hash, admin_id, mfa_verified_at, expires_at
     ) values (
       ${sessionIdHash}, ${adminId}::uuid,
       '2026-08-03T09:00:00.000Z', '2026-08-04T09:00:00.000Z'
-    );
+    )
+  `);
+  await testDb!.db.execute(sql`
     insert into admin_approvals (
       id, action, object_type, object_id, requester_id,
       requester_session_id_hash, payload_hash, required_role,
@@ -122,7 +126,9 @@ async function createExpert(): Promise<string> {
   const userId = randomUUID();
   const expertId = randomUUID();
   await testDb!.db.execute(sql`
-    insert into users (id) values (${userId}::uuid);
+    insert into users (id) values (${userId}::uuid)
+  `);
+  await testDb!.db.execute(sql`
     insert into experts (id, user_id, active, verified)
     values (${expertId}::uuid, ${userId}::uuid, true, true)
   `);
@@ -170,7 +176,9 @@ async function createOrderForExpert(expertId: string): Promise<{
       'Test residency', 1000, 'RUB', 2592000, 0, 1000,
       '2026-08-04T00:00:00.000Z', ${`order:${randomUUID()}`},
       '2026-08-03T00:00:00.000Z'
-    );
+    )
+  `);
+  await testDb!.db.execute(sql`
     insert into expert_residency_payment_attempts (
       id, order_id, provider, provider_request_id, expected_amount_minor,
       currency, status, idempotency_key, resolved_at
@@ -200,7 +208,9 @@ async function createReferralGraph(input?: {
   await testDb!.db.execute(sql`
     update expert_referral_codes
     set status = 'redeemed', redeemed_at = '2026-08-03T00:30:00.000Z'
-    where id = ${codeId}::uuid;
+    where id = ${codeId}::uuid
+  `);
+  await testDb!.db.execute(sql`
     insert into expert_referrals (
       id, code_id, inviter_expert_id, invitee_expert_id
     ) values (
@@ -226,7 +236,9 @@ async function createReferralCode(inviterId: string): Promise<{
     ) values (
       ${batchId}::uuid, ${inviterId}::uuid, 1, ${adminId}::uuid,
       ${approvalId}::uuid, ${sessionIdHash}
-    );
+    )
+  `);
+  await testDb!.db.execute(sql`
     insert into expert_referral_codes (
       id, batch_id, inviter_expert_id, code_hash, key_version,
       masked_suffix
@@ -559,7 +571,9 @@ describe("expert referral residency schema", () => {
   it("enforces reviewed singleton and duplicate guards with stable evidence", async () => {
     const userId = randomUUID();
     await testDb!.db.execute(sql`
-      insert into users (id) values (${userId}::uuid);
+      insert into users (id) values (${userId}::uuid)
+    `);
+    await testDb!.db.execute(sql`
       insert into experts (user_id) values (${userId}::uuid)
     `);
     await expectDatabaseError(
