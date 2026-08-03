@@ -94,7 +94,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "2179764edb54da441dd68559e329d3a500ab2c6ba72c733395d79a2dbfea325f",
+    "72663e3c3fec8213589133841b9f10cd39ee1a7cefe00967fa279befa1deb891",
   ],
   [
     "packages/application/package.json",
