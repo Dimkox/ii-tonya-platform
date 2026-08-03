@@ -12,9 +12,12 @@ import {
 } from "./server.js";
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
+const originalExpertKeys = process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
 afterEach(() => {
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
+  if (originalExpertKeys === undefined) delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
+  else process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON = originalExpertKeys;
 });
 const disabled = new Proxy(
   {},
@@ -100,6 +103,7 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
+      features: { expertReferral: false, expertResidencyBilling: false },
     };
     const app = await (
       await import("./app.js")
@@ -118,6 +122,26 @@ describe("server composition", () => {
     ).toBe(401);
     await app.close();
     await lifecycle.close(fakeDb);
+  });
+
+  it("fails before app composition when an enabled referral key version is unavailable", async () => {
+    delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
+    const lifecycle = createDefaultLifecycle();
+    const fakeDb = {
+      execute: async () => ({ rows: [{ keyVersion: 2 }] }),
+      $client: { end: async () => undefined },
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      features: { expertReferral: true, expertResidencyBilling: false },
+      expertReferralKey: { currentVersion: "v1", reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON" },
+    };
+    await expect(lifecycle.dependencies(config, fakeDb)).rejects.toThrow("expert_referral_key_unavailable");
   });
 
   it("closes Fastify then telemetry/database exactly once when listen fails", async () => {

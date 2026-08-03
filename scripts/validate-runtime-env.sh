@@ -37,7 +37,8 @@ if [[ -n "$release_sha" ]]; then
   grep -Fx "MIGRATION_COMPATIBILITY_APPROVED_SHA=$release_sha" "$runtime_env" >/dev/null || fail "migration approval must match the release"
   for flag in MINOR_ONBOARDING_ENABLED SELARTI_ENABLED PLANERKA_ENABLED TELEGRAM_ENABLED \
     PAYMENTS_ENABLED LLM_ENABLED INTENT_MODEL_ENABLED MAKE_PROJECTION_ENABLED \
-    GOOGLE_SHEETS_PROJECTION_ENABLED RAW_CONVERSATION_LOGGING; do
+    GOOGLE_SHEETS_PROJECTION_ENABLED EXPERT_REFERRAL_ENABLED \
+    EXPERT_RESIDENCY_BILLING_ENABLED RAW_CONVERSATION_LOGGING; do
     grep -Fx "$flag=false" "$runtime_env" >/dev/null || fail "$flag must be false"
   done
   grep -Fx 'SELARTI_OUTBOUND_BILLING_MODE=disabled' "$runtime_env" >/dev/null || fail "Selarti billing must be disabled"

@@ -126,6 +126,16 @@ function validateReasonCode(reasonCode: string): void {
 export class PostgresExpertReferralControlRepository {
   constructor(private readonly db: DrizzleDb) {}
 
+  async activeCodeKeyVersions(): Promise<string[]> {
+    const result = await this.db.execute<{ keyVersion: number }>(sql`
+      select distinct key_version as "keyVersion"
+      from expert_referral_codes
+      where status = 'issued'
+      order by key_version
+    `);
+    return result.rows.map((row) => `v${row.keyVersion}`);
+  }
+
   async lockFeatureControl(
     tx: ExpertReferralTransaction,
   ): Promise<ExpertReferralFeatureControl> {

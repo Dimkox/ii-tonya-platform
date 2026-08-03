@@ -69,7 +69,7 @@ export async function buildTestApp(options: { callbackVerified?: boolean; author
   } satisfies TestTelegram;
   const never = new Proxy({}, { get: () => testMock() });
   const app = await buildApp({
-    config: { databaseUrl: "postgresql://placeholder.invalid/test", integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false }, minorOnboarding: false, rawConversationLogging: false, selartiOutboundBillingMode: "disabled", displayTimezone: "Europe/Moscow" },
+    config: { databaseUrl: "postgresql://placeholder.invalid/test", integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false }, minorOnboarding: false, rawConversationLogging: false, selartiOutboundBillingMode: "disabled", displayTimezone: "Europe/Moscow", features: { expertReferral: false, expertResidencyBilling: false } },
     conversationService: conversation, bookingService: never as BookingService, catalogService: never as CatalogService, privacyService: never as PrivacyService, adminService: never as AdminService,
     selarti: { decodeVerifiedWebhook: async () => { if (options.selartiEvent === undefined) throw new Error("unverified"); return options.selartiEvent; }, sendMessage: async () => { throw new Error("disabled"); } }, telegramCallbacks: telegram,
     readiness: { check: async () => ({ postgres: true, migrations: true, workerLease: true, adapters: true }) }, logger: createLogger(),

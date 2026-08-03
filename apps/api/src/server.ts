@@ -2,8 +2,8 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createAdminService, type BookingService, type CatalogService, type ConversationService, type PrivacyService } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
-import { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, PostgresAdminApprovalRepository, PostgresAdminRepository, PostgresWebhookInboxRepository, type DrizzleDb } from "@ii-tonya/db";
-import { DisabledSelartiAdapter } from "@ii-tonya/integrations";
+import { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, PostgresAdminApprovalRepository, PostgresAdminRepository, PostgresExpertReferralControlRepository, PostgresWebhookInboxRepository, type DrizzleDb } from "@ii-tonya/db";
+import { DisabledSelartiAdapter, EnvironmentExpertCodeSecretResolver } from "@ii-tonya/integrations";
 import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
@@ -21,6 +21,12 @@ const disabledService = <T extends object>(name: string): T => new Proxy({}, {
 export const createDefaultLifecycle = (): ServerLifecycle => ({
   async migrate(db) { await migrateDb(db, defaultMigrationsFolder); },
   async dependencies(config, db) {
+    if (config.features?.expertReferral) {
+      const keyConfig = config.expertReferralKey;
+      if (keyConfig === undefined) throw new Error("expert_referral_key_unavailable");
+      const requiredVersions = await new PostgresExpertReferralControlRepository(db).activeCodeKeyVersions();
+      new EnvironmentExpertCodeSecretResolver(process.env).resolve({ reference: keyConfig.reference, currentVersion: keyConfig.currentVersion, requiredVersions });
+    }
     const adminApprovals = new PostgresAdminApprovalRepository(db);
     return {
       config,

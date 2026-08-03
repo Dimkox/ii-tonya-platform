@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { quoteResidency } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { PostgresExpertReferralControlRepository } from "./expert-referral-control-repository.js";
 
 export class ExpertResidencyCommandError extends Error {
   constructor(
@@ -130,7 +131,16 @@ export function releaseAmountFromReservation(
 }
 
 export class PostgresExpertResidencyRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  readonly #controls: PostgresExpertReferralControlRepository;
+  constructor(private readonly db: DrizzleDb) {
+    this.#controls = new PostgresExpertReferralControlRepository(db);
+  }
+
+  private async assertNewCommandsEnabled(tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0]): Promise<void> {
+    if (!(await this.#controls.lockFeatureControl(tx)).newCommandsEnabled) {
+      throw new ExpertResidencyCommandError("EXPERT_RESIDENCY_DISABLED", "Expert residency commands are disabled");
+    }
+  }
 
   async createTariffVersion(command: TariffVersionCommand): Promise<TariffRow> {
     validateTariffVersionCommand(command);
@@ -168,6 +178,7 @@ export class PostgresExpertResidencyRepository {
   }): Promise<ResidencyQuote> {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level repeatable read`);
+      await this.assertNewCommandsEnabled(tx);
       await this.assertEligibleExpert(tx, input.expertId);
       const tariff = await this.activeTariff(tx, input.tariffVersionId);
       const available = await this.availableCredit(tx, input.expertId);
@@ -193,6 +204,7 @@ export class PostgresExpertResidencyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await this.assertNewCommandsEnabled(tx);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.expertId}, 0))`,
         );

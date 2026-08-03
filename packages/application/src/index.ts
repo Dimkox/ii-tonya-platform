@@ -6,3 +6,6 @@ export * from "./conversation-service.js";
 export * from "./ports.js";
 export * from "./privacy-service.js";
 export * from "./expert-code-crypto.js";
+export * from "./expert-code-secret-resolver.js";
+export * from "./expert-referral-service.js";
+export * from "./expert-residency-service.js";
