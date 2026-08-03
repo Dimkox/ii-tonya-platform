@@ -55,7 +55,7 @@ $$;
 ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_reversal_result_shape" CHECK (
   event_kind NOT IN ('refunded','charged_back') OR status <> 'processed' OR
   (result_legacy_exempt AND result_schema_version IS NULL AND result_payload IS NULL) OR
-  (result_schema_version=1 AND jsonb_typeof(result_payload)='object' AND expert_jsonb_has_exact_keys(result_payload,ARRAY['kind','eventId','paymentId','orderId','cashRefundedMinor','restoredCreditMinor','rewardReversed','debtMinor','terminated']::text[])
+  COALESCE((result_schema_version IS NOT DISTINCT FROM 1 AND result_payload IS NOT NULL AND jsonb_typeof(result_payload)='object' AND expert_jsonb_has_exact_keys(result_payload,ARRAY['kind','eventId','paymentId','orderId','cashRefundedMinor','restoredCreditMinor','rewardReversed','debtMinor','terminated']::text[])
    AND result_payload->>'kind'=event_kind
    AND result_payload->>'eventId'=external_event_id
    AND result_payload->>'paymentId'=payment_id
@@ -64,7 +64,7 @@ ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provi
    AND result_payload->>'restoredCreditMinor'='0'
    AND jsonb_typeof(result_payload->'rewardReversed')='boolean'
    AND result_payload->>'debtMinor' ~ '^(0|[1-9][0-9]{0,11})$'
-   AND jsonb_typeof(result_payload->'terminated')='boolean')
+   AND jsonb_typeof(result_payload->'terminated')='boolean'),false)
 );
 --> statement-breakpoint
 CREATE FUNCTION expert_provider_reversal_result_guard() RETURNS trigger

@@ -82,6 +82,9 @@ describe("expert residency provider inbox", () => {
     expect(migration).toContain("expert_jsonb_has_exact_keys");
     expect(migration).not.toContain("jsonb_object_length");
     expect(migration).toContain("BEFORE INSERT OR UPDATE");
+    expect(migration).toContain("result_schema_version IS NOT DISTINCT FROM 1");
+    expect(migration).toContain("result_payload IS NOT NULL");
+    expect(migration).toContain("COALESCE((result_schema_version");
     expect(source).toContain("expert.rows[0].active");
     expect(source).toContain("settlement_abuse_cleared");
     expect(source).toMatch(
