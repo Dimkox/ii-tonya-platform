@@ -182,9 +182,10 @@ describe("expert residency refund and reversal", () => {
     const { expert, order } = await orderFixture();
     await testDb!.db.transaction(async (tx) => {
       await tx.execute(sql`set local session_replication_role=replica`);
-      await tx.execute(
-        sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${randomUUID()}::uuid,'test')`,
+      const switched = await tx.execute<{ version: number }>(
+        sql`update expert_referral_feature_controls set version=version+1,new_commands_enabled=false,reward_grants_enabled=true where control_key='expert_referrals' returning version`,
       );
+      expect(switched.rows).toHaveLength(1);
       await tx.execute(
         sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${randomUUID()}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${expert.expertId}::uuid)`,
       );
@@ -248,9 +249,10 @@ describe("expert residency refund and reversal", () => {
       await seedHistoricalDebt(inviter.expertId, priorDebt);
       await testDb!.db.transaction(async (tx) => {
         await tx.execute(sql`set local session_replication_role=replica`);
-        await tx.execute(
-          sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${randomUUID()}::uuid,'test')`,
+        const switched = await tx.execute<{ version: number }>(
+          sql`update expert_referral_feature_controls set version=version+1,new_commands_enabled=false,reward_grants_enabled=true where control_key='expert_referrals' returning version`,
         );
+        expect(switched.rows).toHaveLength(1);
         await tx.execute(
           sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${randomUUID()}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${expert.expertId}::uuid)`,
         );

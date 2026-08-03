@@ -73,6 +73,7 @@ describe("expert residency settlement concurrency", () => {
   });
   it("settles reciprocal referrals without deadlock", async () => {
     await testDb!.reset();
+    await testDb!.enableExpertReferralCommands();
     const [a, b] = await Promise.all([
       testDb!.createExpertIdentity(),
       testDb!.createExpertIdentity(),
