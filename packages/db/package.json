@@ -19,6 +19,7 @@
   "dependencies": {
     "@ii-tonya/contracts": "workspace:*",
     "@ii-tonya/domain": "workspace:*",
+    "@ii-tonya/integrations": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.16.3"
   },

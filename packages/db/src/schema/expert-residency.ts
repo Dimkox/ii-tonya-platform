@@ -429,6 +429,9 @@ export const expertResidencyProviderEventInbox = pgTable(
     payloadDigest: text("payload_digest").notNull(),
     eventKind: text("event_kind").notNull(),
     authenticated: boolean("authenticated").notNull(),
+    verificationId: text("verification_id").notNull(),
+    verifierKeyVersion: text("verifier_key_version").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
     status: expertResidencyProviderEventStatus("status")
       .notNull()
       .default("received"),

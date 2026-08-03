@@ -141,6 +141,13 @@
       "when": 1785745800000,
       "tag": "0019_expert_order_provider_deadline",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785758400000,
+      "tag": "0020_expert_provider_verification_evidence",
+      "breakpoints": true
     }
   ]
 }

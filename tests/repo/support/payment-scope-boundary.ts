@@ -15,6 +15,7 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
+  "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
@@ -73,7 +74,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "aae290c279d85d85ae90714b6526e8cda4fba070632b188d567302bfa7062c43",
+    "fe24aa820f122f9f110231b21c4b868c6f4850f8073b9aedb5349e48e2143c9c",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -111,7 +112,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/db/package.json",
-    "a353472305685ce82b891a6dfc7eff4a015d9f4cc376191fde47ec6b89fb155a",
+    "a31b01f44fb01dd663df8ad8ec456567d445b2d43ffca7a16eaf8bc115ee6090",
   ],
   [
     "packages/domain/package.json",
@@ -217,6 +218,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
     new Set([
       "@ii-tonya/contracts",
       "@ii-tonya/domain",
+      "@ii-tonya/integrations",
       "@testcontainers/postgresql",
       "@types/pg",
       "drizzle-kit",
@@ -360,6 +362,10 @@ const approvedMigrationHashes = new Map([
     "be80e9b716d42bb6e39fb4da8958b6685337cc6ef73ee0beb58f8487c058918a",
   ],
   [
+    "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
+    "d43a74fddaa0d26aa2f55196fd97ad09cb7360f8a240b36d2d3a8914722baaa1",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -433,7 +439,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "02f55d8874eeb269cb557a1e1bb0c7855b6643d21aedc5778c474f5722a883bd",
+    "d9273ec8f014dce3d23ac8a5128a0296f7870bae87128b60dece5cb79da678b1",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -597,6 +603,9 @@ const isApprovedPaymentBoundaryImport = (
     [
       "./payment/disabled-payment-adapter.js",
       "./payment/payment-port.js",
+      "./expert-residency/disabled-payment-adapter.js",
+      "./expert-residency/payment-port.js",
+      "./expert-residency/verified-event.js",
       "./projections/make-projection-sink.js",
       "./projections/projection-port.js",
     ].includes(specifier)) ||
