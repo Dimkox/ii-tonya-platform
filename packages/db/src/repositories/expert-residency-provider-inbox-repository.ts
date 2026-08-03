@@ -39,16 +39,11 @@ const iso = (v: Date | string) =>
   v instanceof Date ? v.toISOString() : new Date(v).toISOString();
 
 export class PostgresExpertResidencyProviderInboxRepository {
-  constructor(
-    private readonly db: DrizzleDb,
-    private readonly assertVerified: (
-      value: unknown,
-    ) => asserts value is VerifiedExpertResidencyPaymentEvent = assertVerifiedExpertResidencyPaymentEvent,
-  ) {}
+  constructor(private readonly db: DrizzleDb) {}
   async settle(
     input: VerifiedExpertResidencyPaymentEvent,
   ): Promise<ExpertResidencySettlementResult> {
-    this.assertVerified(input);
+    assertVerifiedExpertResidencyPaymentEvent(input);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         const digest = input.payloadDigest.slice("sha256:".length);
@@ -121,12 +116,29 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_PAYMENT_EXPIRED",
           );
+        const prospectiveReferral = await tx.execute<{
+          inviterExpertId: string;
+        }>(
+          sql`select inviter_expert_id as "inviterExpertId" from expert_referrals where invitee_expert_id=${order.expertId}::uuid`,
+        );
+        const expertIds = [
+          order.expertId,
+          prospectiveReferral.rows[0]?.inviterExpertId,
+        ]
+          .filter((id): id is string => Boolean(id))
+          .sort();
+        await tx.execute(
+          sql`select id from experts where id in (${sql.join(
+            expertIds.map((id) => sql`${id}::uuid`),
+            sql`,`,
+          )}) order by id for update`,
+        );
         const expert = await tx.execute<{
           active: boolean;
           verified: boolean;
           userId: string;
         }>(
-          sql`select active,verified,user_id as "userId" from experts where id=${order.expertId}::uuid for update`,
+          sql`select active,verified,user_id as "userId" from experts where id=${order.expertId}::uuid`,
         );
         if (!expert.rows[0])
           throw new ExpertResidencySettlementError(
