@@ -109,7 +109,10 @@ describe("expert residency refund and reversal", () => {
     testDb = await startExpertReferralTestDatabase();
   }, 120000);
   afterAll(async () => testDb?.stop());
-  beforeEach(async () => testDb!.reset());
+  beforeEach(async () => {
+    await testDb!.reset();
+    await testDb!.enableExpertReferralCommands();
+  });
   it("bounds cumulative cash refunds and never restores credit", async () => {
     const { order } = await orderFixture();
     await providerRepo().settle(

@@ -14,6 +14,7 @@ let testDb: ExpertReferralTestDatabase | undefined;
 const provider = () =>
   new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
 async function setup(enabled: boolean, abuseHold = false) {
+  await testDb!.enableExpertReferralCommands();
   const inviter = await testDb!.createExpertIdentity();
   const invitee = await testDb!.createExpertIdentity();
   const audit = await testDb!.createAdminAudit({
@@ -40,7 +41,7 @@ async function setup(enabled: boolean, abuseHold = false) {
   await testDb!.db.transaction(async (tx) => {
     await tx.execute(sql`set local session_replication_role=replica`);
     await tx.execute(
-      sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,${enabled},${randomUUID()}::uuid,'test')`,
+      sql`update expert_referral_feature_controls set reward_grants_enabled=${enabled} where control_key='expert_referrals'`,
     );
     await tx.execute(
       sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${randomUUID()}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${invitee.expertId}::uuid)`,

@@ -66,7 +66,10 @@ describe("expert residency settlement", () => {
     testDb = await startExpertReferralTestDatabase();
   }, 120000);
   afterAll(async () => testDb?.stop());
-  beforeEach(async () => testDb!.reset());
+  beforeEach(async () => {
+    await testDb!.reset();
+    await testDb!.enableExpertReferralCommands();
+  });
   it("settles once without inventing a referral reward", async () => {
     const { order } = await orderFixture();
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
@@ -122,13 +125,8 @@ describe("expert residency settlement", () => {
   it("repays multiple debt grants FIFO with allocations and replay idempotency", async () => {
     const inviter = await testDb!.createExpertIdentity();
     const { expert: invitee, order } = await orderFixture();
-    const approval = await testDb!.createFeatureControlApproval({
-      expectedVersion: 0,
-      newCommandsEnabled: false,
-      rewardGrantsEnabled: true,
-    });
     await testDb!.db.execute(
-      sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${approval.approvalId}::uuid,${approval.sessionIdHash})`,
+      sql`update expert_referral_feature_controls set version=2,new_commands_enabled=false,reward_grants_enabled=true where control_key='expert_referrals'`,
     );
     const referralId = randomUUID(),
       grantOne = "ffffffff-ffff-4fff-8fff-ffffffffffff",
@@ -176,13 +174,8 @@ describe("expert residency settlement", () => {
   it("repays partial debt and grants the exact spendable remainder once", async () => {
     const inviter = await testDb!.createExpertIdentity();
     const { expert: invitee, order } = await orderFixture();
-    const approval = await testDb!.createFeatureControlApproval({
-      expectedVersion: 0,
-      newCommandsEnabled: false,
-      rewardGrantsEnabled: true,
-    });
     await testDb!.db.execute(
-      sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${approval.approvalId}::uuid,${approval.sessionIdHash})`,
+      sql`update expert_referral_feature_controls set version=2,new_commands_enabled=false,reward_grants_enabled=true where control_key='expert_referrals'`,
     );
     const referral = randomUUID(),
       grant = randomUUID(),

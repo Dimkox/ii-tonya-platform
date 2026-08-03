@@ -15,6 +15,7 @@ describe("expert residency checkout concurrency", () => {
     await testDb?.stop();
   });
   it("never double-reserves one grant", async () => {
+    await testDb!.enableExpertReferralCommands();
     const expert = await testDb!.createExpertIdentity();
     const repo = new PostgresExpertResidencyRepository(testDb!.db);
     const audit = await testDb!.createAdminAudit({

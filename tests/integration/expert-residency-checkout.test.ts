@@ -36,6 +36,10 @@ describe("expert residency checkout", () => {
       approvalId: audit.approvalId,
       adminSessionIdHash: audit.sessionIdHash,
     });
+    await expect(
+      repo.quote({ expertId: expert.expertId, tariffVersionId: tariff.id }),
+    ).rejects.toMatchObject({ code: "EXPERT_RESIDENCY_DISABLED" });
+    await testDb!.enableExpertReferralCommands();
     const fifoGrantIds = [
       "00000000-0000-4000-8000-000000000001",
       "00000000-0000-4000-8000-000000000002",
@@ -100,6 +104,7 @@ describe("expert residency checkout", () => {
   });
 
   it("excludes a grant at expiry equality without waiting for a worker", async () => {
+    await testDb!.enableExpertReferralCommands();
     const expert = await testDb!.createExpertIdentity();
     const grantId = randomUUID();
     await testDb!.db.transaction(async (tx) => {

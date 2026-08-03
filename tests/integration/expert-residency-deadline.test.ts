@@ -13,6 +13,7 @@ describe("expert residency deadline", () => {
   }, 120000);
   afterAll(async () => testDb?.stop());
   it("treats equality as expiry and releases exactly once", async () => {
+    await testDb!.enableExpertReferralCommands();
     const expert = await testDb!.createExpertIdentity();
     const repo = new PostgresExpertResidencyRepository(testDb!.db);
     const audit = await testDb!.createAdminAudit({

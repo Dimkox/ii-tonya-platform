@@ -13,6 +13,7 @@ let testDb: ExpertReferralTestDatabase | undefined;
 describe("expert residency settlement concurrency", () => {
   beforeAll(async () => {
     testDb = await startExpertReferralTestDatabase();
+    await testDb.enableExpertReferralCommands();
   }, 120000);
   afterAll(async () => testDb?.stop());
   it("creates one marker and at most one reward", async () => {
