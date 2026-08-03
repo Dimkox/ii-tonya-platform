@@ -770,6 +770,10 @@ export class PostgresExpertReferralRepository {
         and o.consumed_count = 0
         and date_trunc('milliseconds', o.valid_from) = o.valid_from
         and date_trunc('milliseconds', o.valid_until) = o.valid_until
+        and extract(era from o.valid_from at time zone 'UTC') = 1
+        and extract(year from o.valid_from at time zone 'UTC') between 1 and 9999
+        and extract(era from o.valid_until at time zone 'UTC') = 1
+        and extract(year from o.valid_until at time zone 'UTC') between 1 and 9999
         and c.db_now >= o.valid_from and c.db_now < o.valid_until
         and a1.id <> a2.id
         and a1.action = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION}

@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExpertCodeCrypto } from "../../../application/src/expert-code-crypto.js";
+import { canonicalAdminPayloadHash } from "./admin-approval-repository.js";
 import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
@@ -16,6 +18,25 @@ import {
 } from "./expert-referral-repository.js";
 
 describe("expert referral issuance policy", () => {
+  it("binds deterministic override rendering to AD years 0001 through 9999 in UTC", () => {
+    const source = readFileSync(
+      new URL("./expert-referral-repository.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain(
+      "extract(era from o.valid_from at time zone 'UTC') = 1",
+    );
+    expect(source).toContain(
+      "extract(year from o.valid_from at time zone 'UTC') between 1 and 9999",
+    );
+    expect(source).toContain(
+      "extract(era from o.valid_until at time zone 'UTC') = 1",
+    );
+    expect(source).toContain(
+      "extract(year from o.valid_until at time zone 'UTC') between 1 and 9999",
+    );
+  });
+
   it("requires override capacity equal to the largest exceeded quota", () => {
     expect(
       calculateIssuanceOverrideUsage({
@@ -331,6 +352,56 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
       update expert_referral_issuance_overrides
       set valid_from = valid_from + interval '1 microsecond'
       where id = ${override.overrideId}::uuid
+    `);
+
+    await expect(
+      issue(repository, inviter.expertId, 1, override.overrideId),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
+  });
+
+  it("rejects a BC override instant even when its era-less rendered payload hash matches", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+    const binding = await testDb!.db.execute<{
+      requesterId: string;
+      requesterSessionIdHash: string;
+      validUntil: string;
+    }>(sql`
+      select
+        requester_id as "requesterId",
+        requester_session_id_hash as "requesterSessionIdHash",
+        to_char(valid_until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "validUntil"
+      from expert_referral_issuance_overrides
+      where id = ${override.overrideId}::uuid
+    `);
+    const row = binding.rows[0]!;
+    const payloadHash = canonicalAdminPayloadHash(
+      expertReferralOverrideApprovalPayload({
+        overrideId: override.overrideId,
+        inviterExpertId: inviter.expertId,
+        additionalQuota: 1,
+        reasonCode: "approved_test",
+        validFrom: "0002-01-01T00:00:00.000Z",
+        validUntil: row.validUntil,
+        requesterId: row.requesterId,
+        requesterSessionIdHash: row.requesterSessionIdHash,
+      }),
+    );
+    await testDb!.db.execute(sql`
+      update expert_referral_issuance_overrides
+      set valid_from = timestamp with time zone '0002-01-01 00:00:00+00 BC'
+      where id = ${override.overrideId}::uuid
+    `);
+    await testDb!.db.execute(sql`
+      update admin_approvals
+      set payload_hash = ${payloadHash}
+      where id in (${override.approvalOneId}::uuid, ${override.approvalTwoId}::uuid)
     `);
 
     await expect(
