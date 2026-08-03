@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  EXPERT_RESIDENCY_ALLOWED_PATHS,
   classifyApprovedTrackedScopeContent,
   classifyPaymentScopeProbe,
   isPaymentScopeInspectionPath,
@@ -75,6 +76,15 @@ describe("MVP scope boundary", () => {
     ];
 
     expect(forbidden.filter(existsSync)).toEqual([]);
+  });
+
+  it("keeps the expert residency payment boundary explicitly allowlisted", () => {
+    expect([...EXPERT_RESIDENCY_ALLOWED_PATHS]).toEqual(
+      expect.arrayContaining([
+        "packages/contracts/src/expert-residency.ts",
+        "packages/integrations/src/expert-residency/payment-port.ts",
+      ]),
+    );
   });
 
   it("keeps the payment integration directory limited to the disabled boundary", () => {

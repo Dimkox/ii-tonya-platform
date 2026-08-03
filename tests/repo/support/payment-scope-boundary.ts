@@ -4,6 +4,66 @@ import * as ts from "typescript";
 export const PAYMENT_SCOPE_MAX_TRACKED_FILES = 5_000;
 export const PAYMENT_SCOPE_MAX_FILE_BYTES = 1_048_576;
 
+export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
+  "packages/contracts/src/expert-residency.ts",
+  "packages/integrations/src/expert-residency/payment-port.ts",
+  "packages/integrations/src/expert-residency/disabled-payment-adapter.ts",
+  "packages/integrations/src/expert-residency/verified-event.ts",
+  "packages/integrations/src/expert-residency/environment-secret-resolver.ts",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0018_expert_residency_referrals.sql",
+  "packages/db/migrations/meta/0018_snapshot.json",
+  "packages/db/migrations/meta/_journal.json",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "expert_referral_code_batches",
+  "expert_referral_codes",
+  "expert_referrals",
+  "expert_residency_tariff_versions",
+  "expert_residency_orders",
+  "expert_residency_payment_attempts",
+  "expert_residency_provider_event_inbox",
+  "expert_first_residency_settlements",
+  "expert_referral_reward_grants",
+  "expert_referral_ledger_entries",
+  "expert_referral_ledger_allocations",
+  "expert_referral_issuance_overrides",
+  "expert_referral_abuse_holds",
+  "expert_referral_feature_controls",
+  "expert_referral_balances",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/expert/referrals/redeem",
+  "/v1/expert/referrals/summary",
+  "/v1/expert/residency/quotes",
+  "/v1/expert/residency/checkouts",
+  "/v1/admin/expert-referrals/inventory",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "EXPERT_REFERRAL_ENABLED",
+  "EXPERT_RESIDENCY_BILLING_ENABLED",
+  "EXPERT_REFERRAL_HMAC_KEY_VERSION",
+  "EXPERT_REFERRAL_HMAC_KEY_REF",
+  "EXPERT_REFERRAL_HMAC_KEYS_JSON",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
+  "expert_referral.batch_generate",
+  "expert_referral.code_revoke",
+  "expert_referral.issuance_override",
+  "expert_referral.abuse_hold_open",
+  "expert_referral.abuse_hold_close",
+  "expert_referral.hold_replay",
+  "expert_referral.feature_switch",
+  "expert_residency.tariff_create",
+  "expert_residency.tariff_retire",
+]);
+
 const approvedPaymentBoundaryPaths = new Set([
   "packages/integrations/src/index.ts",
   "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -405,7 +465,11 @@ const approvedDatabaseRelations = new Set([
   "slots",
   "users",
   "webhook_inbox",
+  ...EXPERT_RESIDENCY_ALLOWED_RELATIONS,
 ]);
+
+const forbiddenProviderContent =
+  /\b(fetch|axios|stripe|yookassa|PAYMENT_API_KEY)\b/u;
 
 const providerName =
   /^(?:@stripe\/|stripe(?:\/|$)|@yookassa\/|yookassa(?:\/|$)|@a2seven\/yoo-checkout(?:\/|$)|cloudpayments(?:\/|$)|paypal(?:\/|$)|@paypal\/|adyen(?:\/|$)|@adyen\/|square(?:\/|$)|@square\/)/iu;
@@ -432,6 +496,11 @@ const paymentApplicationIdentifier =
   /^(?:Payment\w*Consumer|\w*PaymentConsumer|grant\w*Entitlement\w*Payment|grant\w*Payment\w*Entitlement|Payment\w*EntitlementGrant|(?:Payment|Checkout|Refund)\w*Routes?)$/iu;
 const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
+const expertResidencyRoute = /^\/v1\/(?:admin\/)?expert(?:-|\/)/u;
+const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY)_/u;
+const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
+const prohibitedCouponOrReferralModel =
+  /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;
 
 export interface PaymentScopeProbe {
   readonly path: string;
@@ -519,6 +588,9 @@ const isApprovedPaymentBoundaryImport = (
       "./projections/projection-port.js",
     ].includes(specifier)) ||
   (path === "packages/integrations/src/payment/disabled-payment-adapter.ts" &&
+    specifier === "./payment-port.js") ||
+  (path ===
+    "packages/integrations/src/expert-residency/disabled-payment-adapter.ts" &&
     specifier === "./payment-port.js");
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
@@ -593,6 +665,13 @@ const inspectTypeScript = (
     true,
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+
+  if (
+    EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
+    forbiddenProviderContent.test(content)
+  ) {
+    violations.push("forbidden provider content in expert residency boundary");
+  }
 
   if (path === "packages/integrations/src/index.ts") {
     for (const statement of source.statements) {
@@ -692,8 +771,19 @@ const inspectTypeScript = (
     if (path.startsWith("apps/api/")) {
       if (ts.isCallExpression(node)) {
         const route = routeFromCall(node);
-        if (route && commercialRoute.test(route)) {
+        if (
+          route &&
+          commercialRoute.test(route) &&
+          !EXPERT_RESIDENCY_ALLOWED_ROUTES.has(route)
+        ) {
           violations.push(`commercial API route: ${route}`);
+        }
+        if (
+          route &&
+          expertResidencyRoute.test(route) &&
+          !EXPERT_RESIDENCY_ALLOWED_ROUTES.has(route)
+        ) {
+          violations.push(`unapproved expert residency API route: ${route}`);
         }
       }
       if (ts.isIdentifier(node) && paymentApiIdentifier.test(node.text)) {
@@ -730,6 +820,7 @@ const inspectTypeScript = (
       const target = literalText(node.arguments[0]);
       if (
         approvedPaymentBoundaryPaths.has(path) ||
+        EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) ||
         (target && isCommercialNetworkTarget(target))
       ) {
         violations.push("payment provider network call");
@@ -747,6 +838,21 @@ const inspectTypeScript = (
       ) {
         violations.push(`payment credential environment access: ${key}`);
       }
+      if (
+        key &&
+        expertResidencyFlag.test(key) &&
+        !EXPERT_RESIDENCY_ALLOWED_FLAGS.has(key)
+      ) {
+        violations.push(`unapproved expert residency environment flag: ${key}`);
+      }
+    }
+
+    if (
+      ts.isStringLiteral(node) &&
+      expertResidencyAdminAction.test(node.text) &&
+      !EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS.has(node.text)
+    ) {
+      violations.push(`unapproved expert residency admin action: ${node.text}`);
     }
 
     if (
@@ -879,9 +985,16 @@ export const classifyPaymentScopeProbe = ({
   if (path.startsWith("packages/integrations/")) {
     if (
       !approvedPaymentBoundaryPaths.has(path) &&
+      !EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
       (providerPath.test(path) || paymentIntegrationArtifact.test(path))
     ) {
       violations.push("live or deferred payment integration path");
+    }
+    if (
+      path.startsWith("packages/integrations/src/expert-residency/") &&
+      !EXPERT_RESIDENCY_ALLOWED_PATHS.has(path)
+    ) {
+      violations.push("unapproved expert residency integration path");
     }
   } else if (path.startsWith("apps/api/") && paymentApiPath.test(path)) {
     violations.push("commercial API route path");
@@ -892,6 +1005,13 @@ export const classifyPaymentScopeProbe = ({
     violations.push("payment consumer or entitlement path");
   } else if (path.startsWith("packages/db/") && paymentDbPath.test(path)) {
     violations.push("commercial database schema path");
+  }
+
+  if (
+    path.startsWith("packages/domain/src/") &&
+    prohibitedCouponOrReferralModel.test(path)
+  ) {
+    violations.push("commercial coupon or referral domain model path");
   }
 
   if (path.endsWith("/package.json") || path === "package.json") {
@@ -913,6 +1033,7 @@ export const classifyApprovedTrackedScopeContent = ({
   const isPackageManifest =
     path.endsWith("/package.json") || path === "package.json";
   const isMigration = path.startsWith("packages/db/migrations/");
+  if (EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS.has(path)) return [];
   const expectedHash =
     approvedPaymentBoundaryHashes.get(path) ??
     approvedMigrationHashes.get(path) ??
