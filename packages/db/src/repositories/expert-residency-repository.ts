@@ -23,6 +23,33 @@ export interface TariffVersionCommand {
   approvalId: string;
   adminSessionIdHash: string;
 }
+const MAX_MONEY_MINOR = 999_999_999_999n;
+const MAX_TARIFF_KEY_LENGTH = 128;
+const MAX_DISPLAY_NAME_LENGTH = 256;
+
+export function validateTariffVersionCommand(
+  command: TariffVersionCommand,
+): void {
+  if (
+    !validDate(command.activeFrom) ||
+    !validDate(command.activeTo) ||
+    command.activeTo <= command.activeFrom ||
+    typeof command.priceMinor !== "bigint" ||
+    command.priceMinor <= 0n ||
+    command.priceMinor > MAX_MONEY_MINOR ||
+    !Number.isSafeInteger(command.durationSeconds) ||
+    command.durationSeconds < 86400 ||
+    command.durationSeconds > 315360000 ||
+    command.tariffKey.trim().length < 1 ||
+    command.tariffKey.length > MAX_TARIFF_KEY_LENGTH ||
+    command.displayName.trim().length < 1 ||
+    command.displayName.length > MAX_DISPLAY_NAME_LENGTH
+  )
+    throw new ExpertResidencyCommandError(
+      "EXPERT_RESIDENCY_INVALID_TARIFF",
+      "Invalid tariff version",
+    );
+}
 export interface ResidencyQuote {
   tariffVersionId: string;
   displayName: string;
@@ -79,23 +106,25 @@ type OrderRow = TariffRow & {
   status: "payment_pending" | "expired";
   creditMinor: bigint;
   cashMinor: bigint;
+  providerDeadline: Date | string;
 };
+
+function dbBigInt(value: bigint | string | number, field: string): bigint {
+  try {
+    return BigInt(value);
+  } catch {
+    throw new ExpertResidencyCommandError(
+      "EXPERT_RESIDENCY_INVALID_DATABASE_MONEY",
+      `Invalid database money value: ${field}`,
+    );
+  }
+}
 
 export class PostgresExpertResidencyRepository {
   constructor(private readonly db: DrizzleDb) {}
 
   async createTariffVersion(command: TariffVersionCommand): Promise<TariffRow> {
-    if (
-      !validDate(command.activeFrom) ||
-      !validDate(command.activeTo) ||
-      command.activeTo <= command.activeFrom ||
-      command.durationSeconds < 86400 ||
-      command.durationSeconds > 315360000
-    )
-      throw new ExpertResidencyCommandError(
-        "EXPERT_RESIDENCY_INVALID_TARIFF",
-        "Invalid tariff version",
-      );
+    validateTariffVersionCommand(command);
     const result = await this.db.execute<TariffRow>(
       sql`insert into expert_residency_tariff_versions (tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values (${command.tariffKey},${command.displayName},${command.priceMinor},'RUB',${command.durationSeconds},${command.activeFrom},${command.activeTo},${command.approvalId}::uuid,${command.adminSessionIdHash}) returning id,display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds"`,
     );
@@ -128,12 +157,13 @@ export class PostgresExpertResidencyRepository {
     expertId: string;
     tariffVersionId: string;
   }): Promise<ResidencyQuote> {
-    const [tariff, available] = await Promise.all([
-      this.activeTariff(this.db, input.tariffVersionId),
-      this.availableCredit(this.db, input.expertId),
-    ]);
-    await this.assertEligibleExpert(this.db, input.expertId);
-    return this.toQuote(tariff, available);
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set transaction isolation level repeatable read`);
+      await this.assertEligibleExpert(tx, input.expertId);
+      const tariff = await this.activeTariff(tx, input.tariffVersionId);
+      const available = await this.availableCredit(tx, input.expertId);
+      return this.toQuote(tariff, available);
+    });
   }
 
   async createCheckoutOrder(command: {
@@ -158,27 +188,16 @@ export class PostgresExpertResidencyRepository {
           sql`select pg_advisory_xact_lock(hashtextextended(${command.expertId}, 0))`,
         );
         const prior = await tx.execute<OrderRow>(
-          sql`select id,expert_id as "expertId",tariff_version_id as "tariffVersionId",snapshot_display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds",credit_minor as "creditMinor",cash_minor as "cashMinor",payment_deadline as "paymentDeadline",status from expert_residency_orders where expert_id=${command.expertId}::uuid and idempotency_key=${command.idempotencyKey} for update`,
+          sql`select id,expert_id as "expertId",tariff_version_id as "tariffVersionId",snapshot_display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds",credit_minor as "creditMinor",cash_minor as "cashMinor",payment_deadline as "paymentDeadline",provider_deadline as "providerDeadline",status from expert_residency_orders where expert_id=${command.expertId}::uuid and idempotency_key=${command.idempotencyKey} for update`,
         );
         if (prior.rows[0]) {
           const stored = prior.rows[0] as OrderRow & {
             tariffVersionId: string;
           };
-          const expiry = await tx.execute<{
-            earliestExpiryAt: Date | string | null;
-          }>(
-            sql`select min(g.expires_at) as "earliestExpiryAt" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id join expert_referral_reward_grants g on g.id=a.reward_grant_id where e.order_id=${stored.id}::uuid and e.entry_kind='reservation'`,
-          );
-          const expected =
-            expiry.rows[0]?.earliestExpiryAt == null
-              ? command.providerDeadline
-              : minPaymentDeadline(
-                  command.providerDeadline,
-                  new Date(expiry.rows[0].earliestExpiryAt),
-                );
           if (
             stored.tariffVersionId !== command.tariffVersionId ||
-            expected.getTime() !== new Date(stored.paymentDeadline).getTime()
+            command.providerDeadline.getTime() !==
+              new Date(stored.providerDeadline).getTime()
           )
             throw new ExpertResidencyCommandError(
               "EXPERT_RESIDENCY_IDEMPOTENCY_CONFLICT",
@@ -204,11 +223,15 @@ export class PostgresExpertResidencyRepository {
           id: string;
           expiresAt: Date | string;
           grantedAt: Date | string;
-          remainingMinor: bigint;
+          remainingMinor: bigint | string;
         }>(
           sql`select g.id,g.expires_at as "expiresAt",g.granted_at as "grantedAt",coalesce((select sum(a.amount_minor) from expert_referral_ledger_allocations a where a.reward_grant_id=g.id),0)::bigint as "remainingMinor" from expert_referral_reward_grants g where g.expert_id=${command.expertId}::uuid and g.expires_at > transaction_timestamp() order by g.expires_at,g.granted_at,g.id for update of g`,
         );
-        const available = grants.rows.reduce(
+        const normalizedGrants = grants.rows.map((g) => ({
+          ...g,
+          remainingMinor: dbBigInt(g.remainingMinor, "grant.remainingMinor"),
+        }));
+        const available = normalizedGrants.reduce(
           (sum, g) => sum + (g.remainingMinor > 0n ? g.remainingMinor : 0n),
           0n,
         );
@@ -219,7 +242,7 @@ export class PostgresExpertResidencyRepository {
           amountMinor: bigint;
           expiresAt: Date;
         }[] = [];
-        for (const grant of grants.rows) {
+        for (const grant of normalizedGrants) {
           if (remaining === 0n) break;
           if (grant.remainingMinor <= 0n) continue;
           const amount =
@@ -241,7 +264,7 @@ export class PostgresExpertResidencyRepository {
           command.providerDeadline,
         );
         const inserted = await tx.execute<{ id: string }>(
-          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariff.priceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${deadline},'payment_pending',${command.idempotencyKey}) returning id`,
+          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariff.priceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${deadline},${command.providerDeadline},'payment_pending',${command.idempotencyKey}) returning id`,
         );
         const orderId = this.required(
           inserted.rows[0],
@@ -321,7 +344,20 @@ export class PostgresExpertResidencyRepository {
       nearestExpiryAt: Date | string | null;
       debtMinor: bigint;
     }>(
-      sql`select available_credit_minor as "availableCreditMinor",reserved_credit_minor as "reservedCreditMinor",nearest_expiry_at as "nearestExpiryAt",debt_minor as "debtMinor" from expert_referral_balances where expert_id=${expertId}::uuid`,
+      sql`with live_grants as (
+        select coalesce(sum(a.amount_minor),0)::bigint as available,
+          min(g.expires_at) filter (where coalesce(r.remaining,0) > 0) as nearest_expiry
+        from expert_referral_reward_grants g
+        join expert_referral_ledger_allocations a on a.reward_grant_id=g.id
+        left join lateral (select sum(a2.amount_minor)::bigint as remaining from expert_referral_ledger_allocations a2 where a2.reward_grant_id=g.id) r on true
+        where g.expert_id=${expertId}::uuid and g.expires_at > transaction_timestamp()
+      ), totals as (
+        select coalesce(sum(amount_minor),0)::bigint as net,
+          coalesce(-sum(amount_minor) filter (where entry_kind in ('reservation','release')),0)::bigint as reserved
+        from expert_referral_ledger_entries where expert_id=${expertId}::uuid
+      ) select greatest(l.available-greatest(-t.net,0),0)::bigint as "availableCreditMinor",
+        greatest(t.reserved,0)::bigint as "reservedCreditMinor", l.nearest_expiry as "nearestExpiryAt",
+        greatest(-t.net,0)::bigint as "debtMinor" from live_grants l cross join totals t`,
     );
     const row = result.rows[0] ?? {
       availableCreditMinor: 0n,
@@ -330,11 +366,17 @@ export class PostgresExpertResidencyRepository {
       debtMinor: 0n,
     };
     return {
-      availableCreditMinor: row.availableCreditMinor.toString(),
-      reservedCreditMinor: row.reservedCreditMinor.toString(),
+      availableCreditMinor: dbBigInt(
+        row.availableCreditMinor,
+        "balance.available",
+      ).toString(),
+      reservedCreditMinor: dbBigInt(
+        row.reservedCreditMinor,
+        "balance.reserved",
+      ).toString(),
       nearestExpiryAt:
         row.nearestExpiryAt === null ? null : dateString(row.nearestExpiryAt),
-      debtMinor: row.debtMinor.toString(),
+      debtMinor: dbBigInt(row.debtMinor, "balance.debt").toString(),
     };
   }
 
@@ -374,17 +416,27 @@ export class PostgresExpertResidencyRepository {
     executor: Pick<DrizzleDb, "execute">,
     expertId: string,
   ) {
-    const result = await executor.execute<{ available: bigint }>(
-      sql`select greatest(coalesce(sum(a.amount_minor),0),0)::bigint as available from expert_referral_reward_grants g join expert_referral_ledger_allocations a on a.reward_grant_id=g.id where g.expert_id=${expertId}::uuid and g.expires_at > transaction_timestamp()`,
+    const result = await executor.execute<{ available: bigint | string }>(
+      sql`with live as (
+        select coalesce(sum(a.amount_minor),0)::bigint as amount
+        from expert_referral_reward_grants g
+        join expert_referral_ledger_allocations a on a.reward_grant_id=g.id
+        where g.expert_id=${expertId}::uuid and g.expires_at > transaction_timestamp()
+      ), ledger as (
+        select coalesce(sum(amount_minor),0)::bigint as net
+        from expert_referral_ledger_entries where expert_id=${expertId}::uuid
+      ) select greatest(live.amount-greatest(-ledger.net,0),0)::bigint as available
+      from live cross join ledger`,
     );
-    return result.rows[0]?.available ?? 0n;
+    return dbBigInt(result.rows[0]?.available ?? 0n, "availableCredit");
   }
   private toQuote(t: TariffRow, available: bigint): ResidencyQuote {
-    const q = quoteResidency(t.priceMinor, available);
+    const priceMinor = dbBigInt(t.priceMinor, "tariff.priceMinor");
+    const q = quoteResidency(priceMinor, available);
     return {
       tariffVersionId: t.id,
       displayName: t.displayName,
-      ...parseMoneySnapshot({ priceMinor: t.priceMinor, ...q }),
+      ...parseMoneySnapshot({ priceMinor, ...q }),
       currency: "RUB",
       durationSeconds: t.durationSeconds,
     };
@@ -405,16 +457,19 @@ export class PostgresExpertResidencyRepository {
       tariffVersionId: (row as OrderRow & { tariffVersionId: string })
         .tariffVersionId,
       displayName: row.displayName,
-      priceMinor: row.priceMinor.toString(),
+      priceMinor: dbBigInt(row.priceMinor, "order.priceMinor").toString(),
       currency: "RUB",
       durationSeconds: row.durationSeconds,
-      creditMinor: row.creditMinor.toString(),
-      cashMinor: row.cashMinor.toString(),
+      creditMinor: dbBigInt(row.creditMinor, "order.creditMinor").toString(),
+      cashMinor: dbBigInt(row.cashMinor, "order.cashMinor").toString(),
       paymentDeadline: dateString(row.paymentDeadline),
       status: row.status,
       allocations: allocations.rows.map((a) => ({
         grantId: a.grantId,
-        amountMinor: a.amountMinor.toString(),
+        amountMinor: dbBigInt(
+          a.amountMinor,
+          "allocation.amountMinor",
+        ).toString(),
       })),
     };
   }

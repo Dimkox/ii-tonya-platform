@@ -298,6 +298,9 @@ export const expertResidencyOrders = pgTable(
     paymentDeadline: timestamp("payment_deadline", {
       withTimezone: true,
     }).notNull(),
+    providerDeadline: timestamp("provider_deadline", {
+      withTimezone: true,
+    }).notNull(),
     providerPaymentId: text("provider_payment_id"),
     status: expertResidencyOrderStatus("status").notNull().default("quoted"),
     settledAt: timestamp("settled_at", { withTimezone: true }),
