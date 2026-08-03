@@ -23,17 +23,18 @@ describe("expert referral issuance policy", () => {
       new URL("./expert-referral-repository.ts", import.meta.url),
       "utf8",
     );
+    expect(source).not.toContain("extract(era from");
     expect(source).toContain(
-      "extract(era from o.valid_from at time zone 'UTC') = 1",
+      "o.valid_from >= timestamp with time zone '0001-01-01 00:00:00+00 AD'",
     );
     expect(source).toContain(
-      "extract(year from o.valid_from at time zone 'UTC') between 1 and 9999",
+      "o.valid_from < timestamp with time zone '10000-01-01 00:00:00+00 AD'",
     );
     expect(source).toContain(
-      "extract(era from o.valid_until at time zone 'UTC') = 1",
+      "o.valid_until >= timestamp with time zone '0001-01-01 00:00:00+00 AD'",
     );
     expect(source).toContain(
-      "extract(year from o.valid_until at time zone 'UTC') between 1 and 9999",
+      "o.valid_until < timestamp with time zone '10000-01-01 00:00:00+00 AD'",
     );
   });
 
