@@ -9,6 +9,7 @@ import {
 import {
   calculateIssuanceOverrideUsage,
   deriveExpertReferralBatchStatus,
+  expertReferralOverrideApprovalPayload,
   toPublicIssuedExpertReferralCode,
   parseExpertCodeKeyVersion,
   PostgresExpertReferralRepository,
@@ -86,6 +87,37 @@ describe("expert referral issuance policy", () => {
     },
   ])("derives $expected for $statuses", ({ statuses, expected }) => {
     expect(deriveExpertReferralBatchStatus(statuses)).toBe(expected);
+  });
+
+  it("canonicalizes PostgreSQL override timestamps and rejects invalid instants", () => {
+    const base = {
+      overrideId: randomUUID(),
+      inviterExpertId: randomUUID(),
+      additionalQuota: 1,
+      reasonCode: "approved_test",
+      requesterId: randomUUID(),
+      requesterSessionIdHash: "session-test",
+    };
+
+    expect(
+      expertReferralOverrideApprovalPayload({
+        ...base,
+        validFrom: "2026-08-03 09:00:00.123+00",
+        validUntil: "2026-08-03 10:00:00.123+00",
+      }),
+    ).toMatchObject({
+      validFrom: "2026-08-03T09:00:00.123Z",
+      validUntil: "2026-08-03T10:00:00.123Z",
+    });
+    expect(() =>
+      expertReferralOverrideApprovalPayload({
+        ...base,
+        validFrom: "not-a-postgres-timestamp",
+        validUntil: "2026-08-03 10:00:00.123+00",
+      }),
+    ).toThrow(
+      "Invalid database timestamp: expert_referral_issuance_overrides.valid_from",
+    );
   });
 });
 

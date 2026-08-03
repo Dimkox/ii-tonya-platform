@@ -113,6 +113,7 @@ export {
 } from "./repositories/webhook-inbox-repository.js";
 export {
   ExpertReferralCommandError,
+  ExpertReferralDataIntegrityError,
   PostgresExpertReferralRepository,
   EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION,
   EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE,

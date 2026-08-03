@@ -162,10 +162,31 @@ export interface ExpertReferralOverrideApprovalPayloadInput {
   inviterExpertId: string;
   additionalQuota: number;
   reasonCode: string;
-  validFrom: Date;
-  validUntil: Date;
+  validFrom: Date | string;
+  validUntil: Date | string;
   requesterId: string;
   requesterSessionIdHash: string;
+}
+
+export class ExpertReferralDataIntegrityError extends Error {
+  readonly code = "expert_referral_invalid_timestamp";
+
+  constructor(readonly field: string) {
+    super(`Invalid database timestamp: ${field}`);
+    this.name = "ExpertReferralDataIntegrityError";
+  }
+}
+
+function normalizeExpertReferralInstant(
+  value: Date | string,
+  field: string,
+): string {
+  const normalized =
+    value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (!Number.isFinite(normalized.getTime())) {
+    throw new ExpertReferralDataIntegrityError(field);
+  }
+  return normalized.toISOString();
 }
 
 export function expertReferralOverrideApprovalPayload(
@@ -178,8 +199,14 @@ export function expertReferralOverrideApprovalPayload(
     reasonCode: input.reasonCode,
     requesterId: input.requesterId,
     requesterSessionIdHash: input.requesterSessionIdHash,
-    validFrom: input.validFrom.toISOString(),
-    validUntil: input.validUntil.toISOString(),
+    validFrom: normalizeExpertReferralInstant(
+      input.validFrom,
+      "expert_referral_issuance_overrides.valid_from",
+    ),
+    validUntil: normalizeExpertReferralInstant(
+      input.validUntil,
+      "expert_referral_issuance_overrides.valid_until",
+    ),
   } as const;
 }
 
@@ -611,8 +638,8 @@ export class PostgresExpertReferralRepository {
       additionalQuota: number;
       consumedCount: number;
       reasonCode: string;
-      validFrom: Date;
-      validUntil: Date;
+      validFrom: Date | string;
+      validUntil: Date | string;
       requesterId: string;
       requesterSessionIdHash: string;
       approverOneId: string;
