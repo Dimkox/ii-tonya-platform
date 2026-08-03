@@ -320,6 +320,8 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/meta/0016_snapshot.json",
     "packages/db/migrations/0017_adorable_sinister_six.sql",
     "packages/db/migrations/meta/0017_snapshot.json",
+    "packages/db/migrations/0019_expert_order_provider_deadline.sql",
+    "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);

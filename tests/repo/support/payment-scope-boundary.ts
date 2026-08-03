@@ -14,6 +14,7 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0018_expert_residency_referrals.sql",
+  "packages/db/migrations/0019_expert_order_provider_deadline.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
@@ -355,6 +356,10 @@ const approvedMigrationHashes = new Map([
     "8ecae37aea385c75659f0dbba2c06f62e5bffabca20ed85dd1b703e7d7a032a4",
   ],
   [
+    "packages/db/migrations/0019_expert_order_provider_deadline.sql",
+    "be80e9b716d42bb6e39fb4da8958b6685337cc6ef73ee0beb58f8487c058918a",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -428,7 +433,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "92cbb395d2b635a912730f39c9cfe10a463fa1eff10d839e45b2f11b089afd22",
+    "02f55d8874eeb269cb557a1e1bb0c7855b6643d21aedc5778c474f5722a883bd",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

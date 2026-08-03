@@ -20,6 +20,7 @@ describe("expert residency referral scope boundary", () => {
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS].sort()).toEqual([
       "packages/db/migrations/0018_expert_residency_referrals.sql",
+      "packages/db/migrations/0019_expert_order_provider_deadline.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
     ]);
