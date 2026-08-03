@@ -187,6 +187,27 @@ describe("PostgresExpertReferralAdminRepository", () => {
     expect(inserts.filter((result) => result.status === "rejected")).toHaveLength(1);
   });
 
+  it("keeps immutable triggers enabled after transactional test cleanup", async () => {
+    const triggers = await testDb!.db.execute<{ name: string; enabled: string }>(sql`select tgname as name,tgenabled as enabled from pg_trigger where tgrelid='expert_referral_admin_execution_results'::regclass and tgname in ('expert_referral_admin_results_immutable','expert_referral_admin_results_truncate_immutable') order by tgname`);
+    expect(triggers.rows).toEqual([
+      { name: "expert_referral_admin_results_immutable", enabled: "O" },
+      { name: "expert_referral_admin_results_truncate_immutable", enabled: "O" },
+    ]);
+  });
+
+  it("consumes swapped dual approvals in one global order without leaking a deadlock", async () => {
+    const inviter = await testDb!.createExpertIdentity();
+    const pair = await overrideApprovals({ inviterExpertId: inviter.expertId, additionalQuota: 1 });
+    const admin = new PostgresExpertReferralAdminRepository(testDb!.db, crypto);
+    const base = { action: "expert_referral.issuance_override" as const, objectId: pair.overrideId, payload: pair.payload, sessionIdHash: pair.first.sessionIdHash, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } };
+    const executions = await Promise.allSettled([
+      admin.execute({ ...base, approvalId: pair.first.approvalId, secondApprovalId: pair.second.approvalId, nonce: pair.first.nonce, secondNonce: pair.second.nonce, correlationId: `normal-${randomUUID()}` }),
+      admin.execute({ ...base, approvalId: pair.second.approvalId, secondApprovalId: pair.first.approvalId, nonce: pair.second.nonce, secondNonce: pair.first.nonce, correlationId: `swapped-${randomUUID()}` }),
+    ]);
+    expect(executions.filter((result) => result.status === "fulfilled" && result.value.allowed)).toHaveLength(1);
+    for (const result of executions) if (result.status === "rejected") expect((result.reason as { code?: string }).code).not.toBe("40P01");
+  });
+
   it("retries the whole serializable unit without double consumption or exposing first-attempt plaintext", async () => {
     await testDb!.enableExpertReferralCommands();
     const inviter = await testDb!.createExpertIdentity();

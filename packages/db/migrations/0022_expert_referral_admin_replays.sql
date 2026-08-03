@@ -37,10 +37,10 @@ CREATE UNIQUE INDEX "expert_referral_admin_results_second_approval_unique" ON "e
 ALTER TABLE "expert_referral_admin_execution_results" ADD CONSTRAINT "expert_referral_admin_results_session_fk" FOREIGN KEY ("requester_session_id_hash") REFERENCES "public"."admin_sessions"("session_id_hash") ON DELETE restrict ON UPDATE no action;
 --> statement-breakpoint
 CREATE FUNCTION enforce_expert_referral_admin_approval_global_unique() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE approval uuid;
+DECLARE lock_key bigint;
 BEGIN
-  FOR approval IN SELECT value FROM unnest(array[NEW.approval_id,NEW.second_approval_id]) AS approvals(value) WHERE value is not null ORDER BY value LOOP
-    PERFORM pg_advisory_xact_lock(hashtextextended(approval::text, 928451));
+  FOR lock_key IN SELECT DISTINCT hashtextextended(value::text, 928451) AS advisory_key FROM unnest(array[NEW.approval_id,NEW.second_approval_id]) AS approvals(value) WHERE value is not null ORDER BY advisory_key LOOP
+    PERFORM pg_advisory_xact_lock(lock_key);
   END LOOP;
   IF EXISTS (SELECT 1 FROM expert_referral_admin_execution_results existing WHERE existing.approval_id in (NEW.approval_id,NEW.second_approval_id) OR existing.second_approval_id in (NEW.approval_id,NEW.second_approval_id)) THEN
     RAISE EXCEPTION USING ERRCODE='23505', MESSAGE='expert_referral_admin_approval_global_unique';

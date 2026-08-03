@@ -84,9 +84,10 @@ export class PostgresExpertReferralAdminRepository {
           await tx.execute(sql`release savepoint expert_referral_admin_unit`);
           return { allowed: true as const, replayed: true as const, ...replay };
         }
-        const approval = await this.consume(tx, command, command.approvalId, command.nonce);
-        if (approval === null) throw new ApprovalDenied();
-        const result = await this.mutate(tx, capability, command, approval);
+        const consumed = await this.consumeCommandApprovals(tx, command);
+        if (consumed === null) throw new ApprovalDenied();
+        const { approval, second } = consumed;
+        const result = await this.mutate(tx, capability, command, approval, second);
         const safeResult = safeExecutionResult(command, result);
         await tx.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${approval.approvalId}::uuid,${command.secondApprovalId ?? null}::uuid,${command.action},${command.objectId}::uuid,${canonicalAdminPayloadHash(command.payload as AdminPayload)},${`sha256:${digest(command.nonce)}`},${command.secondNonce === undefined ? null : `sha256:${digest(command.secondNonce)}`},${command.sessionIdHash},${command.action === "expert_referral.feature_switch" ? number(command.payload,"expectedVersion") : null},${JSON.stringify(safeResult)}::jsonb)`);
         await this.appendAudit(tx, command, approval.requesterId, "allowed", "approved_dual_control");
@@ -130,7 +131,28 @@ export class PostgresExpertReferralAdminRepository {
     return new PostgresAdminApprovalRepository(tx as unknown as DrizzleDb).consumeApproval({ approvalId, sessionIdHash: command.sessionIdHash, action: command.action, objectType: types[command.action], objectId: command.objectId, payload: command.payload as AdminPayload, nonce });
   }
 
-  private async mutate(tx: Tx, capability: TrustedExpertReferralTransaction, command: ExpertReferralAdminRepositoryCommand, approval: ConsumedAdminApproval): Promise<Record<string, unknown>> {
+  private async consumeCommandApprovals(tx: Tx, command: ExpertReferralAdminRepositoryCommand): Promise<{ approval: ConsumedAdminApproval; second?: ConsumedAdminApproval } | null> {
+    if (command.action !== "expert_referral.issuance_override") {
+      const approval = await this.consume(tx, command, command.approvalId, command.nonce);
+      return approval === null ? null : { approval };
+    }
+    if (command.secondApprovalId === undefined || command.secondNonce === undefined || command.secondApprovalId === command.approvalId) return null;
+    const ordered = [
+      { semantic: "primary" as const, id: command.approvalId, nonce: command.nonce },
+      { semantic: "second" as const, id: command.secondApprovalId, nonce: command.secondNonce },
+    ].sort((left, right) => left.id.localeCompare(right.id));
+    const consumed = new Map<"primary" | "second", ConsumedAdminApproval>();
+    for (const item of ordered) {
+      const approval = await this.consume(tx, command, item.id, item.nonce);
+      if (approval === null) return null;
+      consumed.set(item.semantic, approval);
+    }
+    const approval = consumed.get("primary"), second = consumed.get("second");
+    if (approval === undefined || second === undefined || second.requesterId !== approval.requesterId || second.approverId === approval.approverId || second.approverId === approval.requesterId) return null;
+    return { approval, second };
+  }
+
+  private async mutate(tx: Tx, capability: TrustedExpertReferralTransaction, command: ExpertReferralAdminRepositoryCommand, approval: ConsumedAdminApproval, second?: ConsumedAdminApproval): Promise<Record<string, unknown>> {
     const db = tx as unknown as DrizzleDb;
     const p = command.payload;
     if (command.action === "expert_referral.batch_generate") {
@@ -139,9 +161,7 @@ export class PostgresExpertReferralAdminRepository {
     }
     if (command.action === "expert_referral.code_revoke") return createTransactionOwnedExpertReferralRepository(tx, this.codeCrypto, capability).revokeCode({ codeId: command.objectId, approvalId: approval.approvalId, adminSessionIdHash: command.sessionIdHash });
     if (command.action === "expert_referral.issuance_override") {
-      if (command.secondApprovalId === undefined || command.secondNonce === undefined) throw new Error("invalid_admin_command");
-      const second = await this.consume(tx, command, command.secondApprovalId, command.secondNonce);
-      if (second === null || second.requesterId !== approval.requesterId || second.approverId === approval.approverId || second.approverId === approval.requesterId) throw new ApprovalDenied();
+      if (second === undefined) throw new ApprovalDenied();
       const inserted = await tx.execute<{ id: string }>(sql`insert into expert_referral_issuance_overrides (id,inviter_expert_id,additional_quota,reason_code,valid_from,valid_until,requester_id,approver_one_id,approver_two_id,approval_one_id,approval_two_id,requester_session_id_hash) values (${command.objectId}::uuid,${text(p,"inviterExpertId")}::uuid,${number(p,"additionalQuota")},${text(p,"reasonCode")},${new Date(text(p,"validFrom"))},${new Date(text(p,"validUntil"))},${approval.requesterId}::uuid,${approval.approverId}::uuid,${second.approverId}::uuid,${approval.approvalId}::uuid,${second.approvalId}::uuid,${command.sessionIdHash}) returning id`);
       return { overrideId: inserted.rows[0]!.id };
     }

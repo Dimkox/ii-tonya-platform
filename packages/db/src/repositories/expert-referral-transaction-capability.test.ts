@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import type { DrizzleDb } from "../client.js";
@@ -7,6 +8,13 @@ import * as transactionApi from "./expert-referral-transaction-capability.js";
 import { assertTrustedExpertReferralTransaction, withTrustedExpertReferralTransaction } from "./expert-referral-transaction-capability.js";
 
 describe("expert referral transaction capability", () => {
+  it("pins numeric deduplicated advisory locking and truncate immutability", () => {
+    const migration = readFileSync(new URL("../../migrations/0022_expert_referral_admin_replays.sql", import.meta.url), "utf8");
+    expect(migration).toContain("SELECT DISTINCT hashtextextended(value::text, 928451) AS advisory_key");
+    expect(migration).toContain("ORDER BY advisory_key");
+    expect(migration).toContain("BEFORE TRUNCATE");
+  });
+
   it("does not expose transaction-owned factories from the package root", () => {
     expect(publicDb).not.toHaveProperty("withTrustedExpertReferralTransaction");
     expect(publicDb).not.toHaveProperty("createTransactionOwnedExpertReferralRepository");
