@@ -151,4 +151,13 @@ export {
   type OpenExpertAbuseHoldCommand,
   type SetExpertReferralFeatureControlCommand,
 } from "./repositories/expert-referral-control-repository.js";
+export {
+  ExpertResidencyCommandError,
+  PostgresExpertResidencyRepository,
+  minPaymentDeadline,
+  parseMoneySnapshot,
+  type ResidencyOrder,
+  type ResidencyQuote,
+  type TariffVersionCommand,
+} from "./repositories/expert-residency-repository.js";
 export * from "./schema/index.js";
