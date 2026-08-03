@@ -83,7 +83,7 @@ describe("PostgresExpertReferralAdminRepository", () => {
       additionalQuota: 1,
     });
     const admin = new PostgresExpertReferralAdminRepository(testDb!.db, crypto);
-    await expect(admin.execute({
+    const command = {
       action: "expert_referral.issuance_override",
       objectId: pair.overrideId,
       approvalId: pair.first.approvalId,
@@ -94,7 +94,9 @@ describe("PostgresExpertReferralAdminRepository", () => {
       payload: pair.payload,
       sessionIdHash: pair.first.sessionIdHash,
       environmentCeilings: { expertReferral: true, expertResidencyBilling: true },
-    })).resolves.toMatchObject({ allowed: true, overrideId: pair.overrideId });
+    } as const;
+    await expect(admin.execute(command)).resolves.toMatchObject({ allowed: true, overrideId: pair.overrideId });
+    await expect(admin.execute(command)).resolves.toEqual({ allowed: true, replayed: true, overrideId: pair.overrideId });
 
     const approvals = await testDb!.db.execute<{ consumed: boolean }>(sql`
       select consumed_at is not null as consumed
@@ -104,6 +106,10 @@ describe("PostgresExpertReferralAdminRepository", () => {
     `);
     expect(approvals.rows).toHaveLength(2);
     expect(approvals.rows.every((row) => row.consumed)).toBe(true);
+
+    await testDb!.db.execute(sql`update admin_approvals set consumed_at=null where id=${pair.second.approvalId}::uuid`);
+    await expect(admin.execute(command)).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+    await testDb!.db.execute(sql`update admin_approvals set consumed_at=transaction_timestamp() where id=${pair.second.approvalId}::uuid`);
 
     const batchApproval = await testDb!.createAdminAudit({
       action: "expert_referral.batch_generate",
@@ -150,6 +156,19 @@ describe("PostgresExpertReferralAdminRepository", () => {
       where object_id=${pair.overrideId}::uuid and decision='denied'
     `);
     expect(audit.rows).toEqual([{ decision: "denied" }]);
+  });
+
+  it("rejects NULL dual bindings and semantically invalid or recursively secret safe results", async () => {
+    const objectId = randomUUID();
+    const audit = await testDb!.createAdminAudit({ action: "expert_referral.code_revoke", objectId, objectType: "expert_referral_code" });
+    const base = sql`${audit.approvalId}::uuid,'expert_referral.code_revoke',${objectId}::uuid,${`sha256:${"a".repeat(64)}`},${`sha256:${"b".repeat(64)}`},${audit.sessionIdHash}`;
+    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${base},${JSON.stringify({ id: randomUUID(), status: "banana" })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    const overrideAudit = await testDb!.createAdminAudit({ action: "expert_referral.issuance_override", objectId, objectType: "expert_referral_issuance_override" });
+    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"c".repeat(64)}`},${`sha256:${"d".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    const featureAudit = await testDb!.createAdminAudit({ action: "expert_referral.feature_switch", objectId: "00000000-0000-0000-0000-000000000041", objectType: "expert_referral_feature_control" });
+    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${featureAudit.approvalId}::uuid,'expert_referral.feature_switch','00000000-0000-0000-0000-000000000041'::uuid,${`sha256:${"e".repeat(64)}`},${`sha256:${"f".repeat(64)}`},${featureAudit.sessionIdHash},2,${JSON.stringify({ version: 9 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    const batchAudit = await testDb!.createAdminAudit({ action: "expert_referral.batch_generate", objectId, objectType: "expert" });
+    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${batchAudit.approvalId}::uuid,'expert_referral.batch_generate',${objectId}::uuid,${`sha256:${"1".repeat(64)}`},${`sha256:${"2".repeat(64)}`},${batchAudit.sessionIdHash},${JSON.stringify({ batchId: { plaintext: "secret" }, count: 1 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
   });
 
   it("retries the whole serializable unit without double consumption or exposing first-attempt plaintext", async () => {

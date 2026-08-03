@@ -68,4 +68,19 @@ describe("expert referral admin routes", () => {
     expect(approvals.requestApproval).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it.each([
+    ["expert_referral.batch_generate", { secondApprovalId: "00000000-0000-4000-8000-000000000021", secondNonce: "nonce-task9-second" }],
+    ["expert_referral.issuance_override", {}],
+  ])("rejects invalid dual-control field shape for %s", async (action, dualFields) => {
+    const approvals = { resolvePrincipal: vi.fn(async () => principal), requestApproval: vi.fn(), approveApproval: vi.fn() };
+    const admin = { execute: vi.fn(), inventory: vi.fn() };
+    const app = await buildExpertReferralAdminApi({ approvals, admin, sessionTokenHash: () => principal.sessionIdHash, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } });
+    const command = action === "expert_referral.batch_generate" ? { count: 1 } : { inviterExpertId: "00000000-0000-4000-8000-000000000010", additionalQuota: 1, reasonCode: "approved", validFrom: "2026-08-04T09:00:00.000Z", validUntil: "2026-08-04T10:00:00.000Z" };
+    const response = await app.inject({ method: "POST", url: `/v1/admin/actions/${action}/00000000-0000-4000-8000-000000000030/execute`, headers: { authorization: `Bearer ${token}` }, payload: { approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task9-dual", correlationId: "correlation-task9-dual", command, ...dualFields } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_command" });
+    expect(admin.execute).not.toHaveBeenCalled();
+    await app.close();
+  });
 });

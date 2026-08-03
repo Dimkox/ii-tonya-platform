@@ -43,19 +43,24 @@ const resultText = (result: Record<string, unknown>, key: string): string => {
 const resultNumber = (result: Record<string, unknown>, key: string): number => {
   const value = result[key]; if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new Error("invalid_admin_result"); return value;
 };
-function safeExecutionResult(action: Action, result: Record<string, unknown>, count?: number): Record<string, string | number> {
+const resultUuid = (result: Record<string, unknown>, key: string): string => {
+  const value = resultText(result,key); if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(value)) throw new Error("invalid_admin_result"); return value;
+};
+function safeExecutionResult(command: ExpertReferralAdminRepositoryCommand, result: Record<string, unknown>): Record<string, string | number> {
+  const action = command.action;
   if (action === "expert_referral.batch_generate") {
-    if ("codes" in result) exactResult(result, ["batchId", "codes"]);
+    const count = number(command.payload,"count");
+    if ("codes" in result) { exactResult(result, ["batchId", "codes"]); if (!Array.isArray(result.codes) || result.codes.length !== count) throw new Error("invalid_admin_result"); }
     else { exactResult(result, ["batchId", "count"]); if (resultNumber(result,"count") !== count) throw new Error("admin_replay_conflict"); }
-    return { batchId: resultText(result,"batchId"), count: count! };
+    return { batchId: resultUuid(result,"batchId"), count };
   }
-  if (action === "expert_referral.code_revoke") { exactResult(result,["id","status"]); return { id: resultText(result,"id"), status: resultText(result,"status") }; }
-  if (action === "expert_referral.issuance_override") { exactResult(result,["overrideId"]); return { overrideId: resultText(result,"overrideId") }; }
-  if (action === "expert_referral.abuse_hold_open" || action === "expert_referral.abuse_hold_close") { exactResult(result,["id","expertId","status"]); return { id: resultText(result,"id"), expertId: resultText(result,"expertId"), status: resultText(result,"status") }; }
-  if (action === "expert_residency.tariff_create") { exactResult(result,["tariffVersionId"]); return { tariffVersionId: resultText(result,"tariffVersionId") }; }
-  if (action === "expert_residency.tariff_retire") { exactResult(result,["tariffVersionId","activeTo"]); return { tariffVersionId: resultText(result,"tariffVersionId"), activeTo: resultText(result,"activeTo") }; }
-  if (action === "expert_referral.hold_replay") { exactResult(result,["kind","reason"]); return { kind: resultText(result,"kind"), reason: resultText(result,"reason") }; }
-  exactResult(result,["version"]); return { version: resultNumber(result,"version") };
+  if (action === "expert_referral.code_revoke") { exactResult(result,["id","status"]); if (resultUuid(result,"id") !== command.objectId || resultText(result,"status") !== "revoked") throw new Error("invalid_admin_result"); return { id: command.objectId, status: "revoked" }; }
+  if (action === "expert_referral.issuance_override") { exactResult(result,["overrideId"]); if (resultUuid(result,"overrideId") !== command.objectId) throw new Error("invalid_admin_result"); return { overrideId: command.objectId }; }
+  if (action === "expert_referral.abuse_hold_open" || action === "expert_referral.abuse_hold_close") { exactResult(result,["id","expertId","status"]); const status = action.endsWith("_open") ? "open" : "closed"; if (resultUuid(result,"expertId") !== command.objectId || resultText(result,"status") !== status) throw new Error("invalid_admin_result"); return { id: resultUuid(result,"id"), expertId: command.objectId, status }; }
+  if (action === "expert_residency.tariff_create") { exactResult(result,["tariffVersionId"]); if (resultUuid(result,"tariffVersionId") !== command.objectId) throw new Error("invalid_admin_result"); return { tariffVersionId: command.objectId }; }
+  if (action === "expert_residency.tariff_retire") { exactResult(result,["tariffVersionId","activeTo"]); if (resultUuid(result,"tariffVersionId") !== command.objectId || resultText(result,"activeTo") !== text(command.payload,"retiredAt")) throw new Error("invalid_admin_result"); return { tariffVersionId: command.objectId, activeTo: text(command.payload,"retiredAt") }; }
+  if (action === "expert_referral.hold_replay") { exactResult(result,["kind","reason"]); const kind=resultText(result,"kind"), reason=resultText(result,"reason"); if (!["granted","not_granted"].includes(kind) || !["not_pending","snapshot_incomplete","gate_closed","debt_repaid","already_replayed","feature_enabled"].includes(reason)) throw new Error("invalid_admin_result"); return { kind, reason }; }
+  exactResult(result,["version"]); const version=resultNumber(result,"version"); if (version !== number(command.payload,"expectedVersion") + 1) throw new Error("invalid_admin_result"); return { version };
 }
 
 export class PostgresExpertReferralAdminRepository {
@@ -82,8 +87,8 @@ export class PostgresExpertReferralAdminRepository {
         const approval = await this.consume(tx, command, command.approvalId, command.nonce);
         if (approval === null) throw new ApprovalDenied();
         const result = await this.mutate(tx, capability, command, approval);
-        const safeResult = safeExecutionResult(command.action, result, command.action === "expert_referral.batch_generate" ? number(command.payload,"count") : undefined);
-        await tx.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${approval.approvalId}::uuid,${command.secondApprovalId ?? null}::uuid,${command.action},${command.objectId}::uuid,${canonicalAdminPayloadHash(command.payload as AdminPayload)},${`sha256:${digest(command.nonce)}`},${command.secondNonce === undefined ? null : `sha256:${digest(command.secondNonce)}`},${command.sessionIdHash},${JSON.stringify(safeResult)}::jsonb)`);
+        const safeResult = safeExecutionResult(command, result);
+        await tx.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${approval.approvalId}::uuid,${command.secondApprovalId ?? null}::uuid,${command.action},${command.objectId}::uuid,${canonicalAdminPayloadHash(command.payload as AdminPayload)},${`sha256:${digest(command.nonce)}`},${command.secondNonce === undefined ? null : `sha256:${digest(command.secondNonce)}`},${command.sessionIdHash},${command.action === "expert_referral.feature_switch" ? number(command.payload,"expectedVersion") : null},${JSON.stringify(safeResult)}::jsonb)`);
         await this.appendAudit(tx, command, approval.requesterId, "allowed", "approved_dual_control");
         await tx.execute(sql`release savepoint expert_referral_admin_unit`);
         return { allowed: true as const, replayed: false as const, ...result };
@@ -101,13 +106,19 @@ export class PostgresExpertReferralAdminRepository {
   }
 
   private async findReplay(tx: Tx, command: ExpertReferralAdminRepositoryCommand): Promise<Record<string, string | number> | null> {
-    const approval = await new PostgresAdminApprovalRepository(tx as unknown as DrizzleDb).validateConsumedApprovalReplay({ approvalId: command.approvalId, sessionIdHash: command.sessionIdHash, action: command.action, objectType: types[command.action], objectId: command.objectId, payload: command.payload as AdminPayload, nonce: command.nonce });
+    const approvals = new PostgresAdminApprovalRepository(tx as unknown as DrizzleDb);
+    const approval = await approvals.validateConsumedApprovalReplay({ approvalId: command.approvalId, sessionIdHash: command.sessionIdHash, action: command.action, objectType: types[command.action], objectId: command.objectId, payload: command.payload as AdminPayload, nonce: command.nonce });
     if (approval === null) return null;
+    if (command.action === "expert_referral.issuance_override") {
+      if (command.secondApprovalId === undefined || command.secondNonce === undefined || command.secondApprovalId === command.approvalId) return null;
+      const second = await approvals.validateConsumedApprovalReplay({ approvalId: command.secondApprovalId, sessionIdHash: command.sessionIdHash, action: command.action, objectType: types[command.action], objectId: command.objectId, payload: command.payload as AdminPayload, nonce: command.secondNonce });
+      if (second === null || second.requesterId !== approval.requesterId || second.approverId === approval.approverId || second.approverId === approval.requesterId) return null;
+    } else if (command.secondApprovalId !== undefined || command.secondNonce !== undefined) return null;
     const stored = await tx.execute<{ action: Action; secondApprovalId: string | null; objectId: string; payloadHash: string; nonceHash: string; secondNonceHash: string | null; sessionIdHash: string; safeResult: Record<string, unknown> }>(sql`select action,second_approval_id as "secondApprovalId",object_id as "objectId",payload_hash as "payloadHash",nonce_hash as "nonceHash",second_nonce_hash as "secondNonceHash",requester_session_id_hash as "sessionIdHash",safe_result as "safeResult" from expert_referral_admin_execution_results where approval_id=${command.approvalId}::uuid`);
     const row = stored.rows[0];
     if (row === undefined) return null;
     if (row.action !== command.action || row.secondApprovalId !== (command.secondApprovalId ?? null) || row.objectId !== command.objectId || row.payloadHash !== canonicalAdminPayloadHash(command.payload as AdminPayload) || row.nonceHash !== `sha256:${digest(command.nonce)}` || row.secondNonceHash !== (command.secondNonce === undefined ? null : `sha256:${digest(command.secondNonce)}`) || row.sessionIdHash !== command.sessionIdHash) throw new Error("admin_replay_conflict");
-    return safeExecutionResult(command.action, row.safeResult, command.action === "expert_referral.batch_generate" ? number(command.payload,"count") : undefined);
+    return safeExecutionResult(command, row.safeResult);
   }
 
   private async appendAudit(tx: Tx, command: ExpertReferralAdminRepositoryCommand, actorId: string, decision: "allowed" | "denied", reasonCode: string): Promise<void> {

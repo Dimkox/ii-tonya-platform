@@ -109,6 +109,8 @@ export async function buildExpertReferralAdminApi(deps: ExpertReferralAdminApiDe
   });
   app.post<{ Params: { action: ExpertReferralAdminAction; objectId: string }; Body: { approvalId: string; secondApprovalId?: string; nonce: string; secondNonce?: string; correlationId: string; command: unknown } }>("/v1/admin/actions/:action/:objectId/execute", { schema: { params, body: executionBody }, config: { rateLimit: limit } }, async (request, reply) => {
     const actor = await principal(request.headers.authorization); if (actor === null) return reply.code(401).send({ error: "unauthorized" });
+    const dual = request.params.action === "expert_referral.issuance_override";
+    if (dual !== (request.body.secondApprovalId !== undefined && request.body.secondNonce !== undefined) || (!dual && (request.body.secondApprovalId !== undefined || request.body.secondNonce !== undefined))) return reply.code(400).send({ error: "invalid_command" });
     let payload: ExpertReferralAdminPayload; try { payload = canonicalPayload(request.params.action, request.params.objectId, request.body.command, actor); } catch { return reply.code(400).send({ error: "invalid_command" }); }
     try {
       const result = await deps.admin.execute(actor, { action: request.params.action, objectId: request.params.objectId, approvalId: request.body.approvalId, ...(request.body.secondApprovalId === undefined ? {} : { secondApprovalId: request.body.secondApprovalId }), nonce: request.body.nonce, ...(request.body.secondNonce === undefined ? {} : { secondNonce: request.body.secondNonce }), correlationId: request.body.correlationId, payload, environmentCeilings: deps.environmentCeilings });

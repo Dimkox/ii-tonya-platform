@@ -58,6 +58,8 @@ const validInstant = (value: unknown): value is string => {
 
 function validate(command: ExpertReferralAdminCommand): void {
   const p = command.payload;
+  const dual = command.action === "expert_referral.issuance_override";
+  if (dual !== (command.secondApprovalId !== undefined && command.secondNonce !== undefined) || (!dual && (command.secondApprovalId !== undefined || command.secondNonce !== undefined))) invalid();
   if (command.objectId !== EXPERT_REFERRAL_ADMIN_FEATURE_CONTROL_ID && !uuid.test(command.objectId)) invalid();
   if (!uuid.test(command.approvalId) || (command.secondApprovalId !== undefined && !uuid.test(command.secondApprovalId))) invalid();
   for (const [key, value] of Object.entries(p)) if (key.endsWith("Id") && (typeof value !== "string" || !uuid.test(value))) invalid();

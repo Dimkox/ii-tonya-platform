@@ -69,4 +69,13 @@ describe("expert referral admin application boundary", () => {
     })).rejects.toThrow("invalid_admin_command");
     expect(workflows.execute).not.toHaveBeenCalled();
   });
+
+  it("rejects dual-control fields on non-override commands", async () => {
+    const workflows = { execute: vi.fn(), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await expect(service.execute(principal, {
+      action: "expert_referral.batch_generate", objectId: "00000000-0000-4000-8000-000000000010", approvalId: "00000000-0000-4000-8000-000000000020", secondApprovalId: "00000000-0000-4000-8000-000000000021", nonce: "nonce-task9-dual", secondNonce: "nonce-task9-dual-2", correlationId: "correlation-task9-dual", payload: { inviterExpertId: "00000000-0000-4000-8000-000000000010", count: 1 }, environmentCeilings: { expertReferral: true, expertResidencyBilling: true },
+    })).rejects.toThrow("invalid_admin_command");
+    expect(workflows.execute).not.toHaveBeenCalled();
+  });
 });

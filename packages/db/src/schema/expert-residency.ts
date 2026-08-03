@@ -40,6 +40,7 @@ export const expertReferralAdminExecutionResults = pgTable(
     nonceHash: text("nonce_hash").notNull(),
     secondNonceHash: text("second_nonce_hash"),
     requesterSessionIdHash: text("requester_session_id_hash").notNull().references(() => adminSessions.sessionIdHash),
+    expectedVersion: integer("expected_version"),
     safeResult: jsonb("safe_result").$type<Record<string, string | number | boolean>>().notNull(),
     createdAt,
   },
@@ -47,9 +48,10 @@ export const expertReferralAdminExecutionResults = pgTable(
     check("expert_referral_admin_result_action_allowed", sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`),
     check("expert_referral_admin_result_payload_hash_format", sql`${table.payloadHash} ~ '^sha256:[0-9a-f]{64}$'`),
     check("expert_referral_admin_result_nonce_hash_format", sql`${table.nonceHash} ~ '^sha256:[0-9a-f]{64}$'`),
-    check("expert_referral_admin_result_second_binding", sql`(${table.action} <> 'expert_referral.issuance_override' and ${table.secondApprovalId} is null and ${table.secondNonceHash} is null) or (${table.action} = 'expert_referral.issuance_override' and ${table.secondApprovalId} is not null and ${table.secondNonceHash} ~ '^sha256:[0-9a-f]{64}$' and ${table.secondApprovalId} <> ${table.approvalId})`),
+    check("expert_referral_admin_result_second_binding", sql`coalesce((${table.action} <> 'expert_referral.issuance_override' and ${table.secondApprovalId} is null and ${table.secondNonceHash} is null) or (${table.action} = 'expert_referral.issuance_override' and ${table.secondApprovalId} is not null and ${table.secondNonceHash} is not null and ${table.secondNonceHash} ~ '^sha256:[0-9a-f]{64}$' and ${table.secondApprovalId} <> ${table.approvalId}), false)`),
+    check("expert_referral_admin_result_expected_version", sql`coalesce((${table.action} = 'expert_referral.feature_switch' and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} <> 'expert_referral.feature_switch' and ${table.expectedVersion} is null), false)`),
     check("expert_referral_admin_result_object_only", sql`jsonb_typeof(${table.safeResult}) = 'object'`),
-    check("expert_referral_admin_result_no_secrets", sql`not (${table.safeResult} ?| array['codes','plaintext','digest','hash','nonce'])`),
+    check("expert_referral_admin_result_no_secrets", sql`not (${table.safeResult} ?| array['codes','plaintext','digest','hash','nonce']) and ${table.safeResult}::text !~ '"(codes|plaintext|digest|hash|nonce)"[[:space:]]*:'`),
     check("expert_referral_admin_result_exact_schema", sql`
       (${table.action} = 'expert_referral.batch_generate' and ${table.safeResult} ?& array['batchId','count'] and ${table.safeResult} - array['batchId','count'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'batchId')='string' and jsonb_typeof(${table.safeResult}->'count')='number') or
       (${table.action} = 'expert_referral.code_revoke' and ${table.safeResult} ?& array['id','status'] and ${table.safeResult} - array['id','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
@@ -60,6 +62,7 @@ export const expertReferralAdminExecutionResults = pgTable(
       (${table.action} = 'expert_referral.hold_replay' and ${table.safeResult} ?& array['kind','reason'] and ${table.safeResult} - array['kind','reason'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'kind')='string' and jsonb_typeof(${table.safeResult}->'reason')='string') or
       (${table.action} = 'expert_referral.feature_switch' and ${table.safeResult} ? 'version' and ${table.safeResult} - 'version' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number')
     `),
+    uniqueIndex("expert_referral_admin_results_second_approval_unique").on(table.secondApprovalId).where(sql`${table.secondApprovalId} is not null`),
   ],
 );
 
