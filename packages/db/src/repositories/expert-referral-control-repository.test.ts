@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   startExpertReferralTestDatabase,
@@ -43,15 +44,15 @@ describe("PostgresExpertReferralControlRepository", () => {
 
   it("persists optimistic controls and rejects stale versions", async () => {
     const repository = new PostgresExpertReferralControlRepository(testDb!.db);
-    const firstAudit = await testDb!.createAdminAudit({
-      action: "expert_referral.feature_switch",
-      objectId: crypto.randomUUID(),
-    });
+    const firstCommand = {
+      expectedVersion: 0,
+      newCommandsEnabled: true,
+      rewardGrantsEnabled: false,
+    };
+    const firstAudit = await testDb!.createFeatureControlApproval(firstCommand);
     await expect(
       repository.setFeatureControl({
-        expectedVersion: 0,
-        newCommandsEnabled: true,
-        rewardGrantsEnabled: false,
+        ...firstCommand,
         approvalId: firstAudit.approvalId,
         adminSessionIdHash: firstAudit.sessionIdHash,
       }),
@@ -61,20 +62,81 @@ describe("PostgresExpertReferralControlRepository", () => {
       newCommandsEnabled: true,
       rewardGrantsEnabled: false,
     });
-    const staleAudit = await testDb!.createAdminAudit({
-      action: "expert_referral.feature_switch",
-      objectId: crypto.randomUUID(),
-    });
     await expect(
       repository.setFeatureControl({
-        expectedVersion: 0,
+        expectedVersion: 1,
         newCommandsEnabled: false,
         rewardGrantsEnabled: false,
+        approvalId: firstAudit.approvalId,
+        adminSessionIdHash: firstAudit.sessionIdHash,
+      }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_APPROVAL_INVALID" });
+
+    const staleCommand = {
+      expectedVersion: 0,
+      newCommandsEnabled: false,
+      rewardGrantsEnabled: false,
+    };
+    const staleAudit = await testDb!.createFeatureControlApproval(staleCommand);
+    await expect(
+      repository.setFeatureControl({
+        ...staleCommand,
         approvalId: staleAudit.approvalId,
         adminSessionIdHash: staleAudit.sessionIdHash,
       }),
     ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
+
+    const secondCommand = {
+      expectedVersion: 1,
+      newCommandsEnabled: false,
+      rewardGrantsEnabled: true,
+    };
+    const secondAudit = await testDb!.createFeatureControlApproval(secondCommand);
+    await expect(
+      repository.setFeatureControl({
+        ...secondCommand,
+        approvalId: secondAudit.approvalId,
+        adminSessionIdHash: secondAudit.sessionIdHash,
+      }),
+    ).resolves.toMatchObject({ version: 2 });
   });
+
+  it.each(["action", "object", "session", "payload"] as const)(
+    "rejects a feature switch approval with wrong %s binding",
+    async (field) => {
+      const repository = new PostgresExpertReferralControlRepository(testDb!.db);
+      const command = {
+        expectedVersion: 0,
+        newCommandsEnabled: true,
+        rewardGrantsEnabled: false,
+      };
+      const audit = await testDb!.createFeatureControlApproval(command);
+      const unrelatedAudit =
+        field === "session"
+          ? await testDb!.createAdminAudit({
+              action: "unrelated.action",
+              objectId: crypto.randomUUID(),
+            })
+          : undefined;
+      const mutation = {
+        action: sql`action = 'unrelated.action'`,
+        object: sql`object_id = ${crypto.randomUUID()}::uuid`,
+        session: sql`requester_session_id_hash = ${unrelatedAudit?.sessionIdHash}`,
+        payload: sql`payload_hash = ${`sha256:${"b".repeat(64)}`}`,
+      }[field];
+      await testDb!.db.execute(sql`
+        update admin_approvals set ${mutation}
+        where id = ${audit.approvalId}::uuid
+      `);
+      await expect(
+        repository.setFeatureControl({
+          ...command,
+          approvalId: audit.approvalId,
+          adminSessionIdHash: audit.sessionIdHash,
+        }),
+      ).rejects.toMatchObject({ code: "FEATURE_CONTROL_APPROVAL_INVALID" });
+    },
+  );
 
   it("opens and closes holds idempotently under the expert lock", async () => {
     const expert = await testDb!.createExpertIdentity();
@@ -93,6 +155,26 @@ describe("PostgresExpertReferralControlRepository", () => {
     await expect(repository.openAbuseHold(openCommand)).resolves.toEqual(
       opened,
     );
+    await expect(
+      repository.openAbuseHold({ ...openCommand, reasonCode: "different" }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
+    await expect(
+      repository.openAbuseHold({
+        ...openCommand,
+        adminSessionIdHash: "different-session",
+      }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
+    const conflictingOpenAudit = await testDb!.createAdminAudit({
+      action: "expert_referral.abuse_hold_open",
+      objectId: expert.expertId,
+    });
+    await expect(
+      repository.openAbuseHold({
+        ...openCommand,
+        approvalId: conflictingOpenAudit.approvalId,
+        adminSessionIdHash: conflictingOpenAudit.sessionIdHash,
+      }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
     await expect(
       testDb!.db.transaction((tx) =>
         repository.lockEligibility(tx, expert.expertId),
@@ -113,6 +195,15 @@ describe("PostgresExpertReferralControlRepository", () => {
     await expect(repository.closeAbuseHold(closeCommand)).resolves.toEqual(
       closed,
     );
+    await expect(
+      repository.closeAbuseHold({ ...closeCommand, reasonCode: "different" }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
+    await expect(
+      repository.closeAbuseHold({
+        ...closeCommand,
+        adminSessionIdHash: "different-session",
+      }),
+    ).rejects.toMatchObject({ code: "FEATURE_CONTROL_CONFLICT" });
     await expect(repository.openAbuseHold(openCommand)).resolves.toEqual(
       closed,
     );

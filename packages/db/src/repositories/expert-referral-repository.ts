@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import { canonicalAdminPayloadHash } from "./admin-approval-repository.js";
 import {
   expertReferralCodeBatches,
   expertReferralCodes,
@@ -36,8 +37,10 @@ export interface IssueExpertReferralBatchCommand {
   overrideId?: string;
 }
 
-export interface IssuedExpertReferralCode extends ExpertReferralIssuedCodeMaterial {
+export interface IssuedExpertReferralCode {
   id: string;
+  plaintext: string;
+  maskedSuffix: string;
 }
 
 export interface IssuedExpertReferralBatch {
@@ -75,6 +78,19 @@ export interface MaskedExpertReferralCode extends Record<string, unknown> {
   redeemedAt: Date | null;
   revokedAt: Date | null;
 }
+
+export type ExpertReferralBatchStatus =
+  | "issued"
+  | "partially_redeemed"
+  | "fully_redeemed"
+  | "revoked";
+
+type ExpertReferralCodeStatus = "issued" | "redeemed" | "revoked";
+
+export const EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION =
+  "expert_referral.issuance_override";
+export const EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE =
+  "expert_referral_issuance_override";
 
 export class ExpertReferralCommandError extends Error {
   constructor(
@@ -114,6 +130,57 @@ export function calculateIssuanceOverrideUsage(input: {
     incrementalExcess(input.outstandingOrUnsettled),
     incrementalExcess(input.issuedInRollingWindow),
   );
+}
+
+export function toPublicIssuedExpertReferralCode(
+  id: string,
+  material: ExpertReferralIssuedCodeMaterial,
+): IssuedExpertReferralCode {
+  return {
+    id,
+    plaintext: material.plaintext,
+    maskedSuffix: material.maskedSuffix,
+  };
+}
+
+export function deriveExpertReferralBatchStatus(
+  statuses: readonly ExpertReferralCodeStatus[],
+): ExpertReferralBatchStatus {
+  if (statuses.length === 0) {
+    throw new Error("Expert referral batch has no codes");
+  }
+  if (statuses.every((status) => status === "issued")) return "issued";
+  if (statuses.every((status) => status === "redeemed")) {
+    return "fully_redeemed";
+  }
+  if (statuses.every((status) => status === "revoked")) return "revoked";
+  return "partially_redeemed";
+}
+
+export interface ExpertReferralOverrideApprovalPayloadInput {
+  overrideId: string;
+  inviterExpertId: string;
+  additionalQuota: number;
+  reasonCode: string;
+  validFrom: Date;
+  validUntil: Date;
+  requesterId: string;
+  requesterSessionIdHash: string;
+}
+
+export function expertReferralOverrideApprovalPayload(
+  input: ExpertReferralOverrideApprovalPayloadInput,
+) {
+  return {
+    additionalQuota: input.additionalQuota,
+    inviterExpertId: input.inviterExpertId,
+    overrideId: input.overrideId,
+    reasonCode: input.reasonCode,
+    requesterId: input.requesterId,
+    requesterSessionIdHash: input.requesterSessionIdHash,
+    validFrom: input.validFrom.toISOString(),
+    validUntil: input.validUntil.toISOString(),
+  } as const;
 }
 
 function storedDigestMatches(
@@ -273,10 +340,9 @@ export class PostgresExpertReferralRepository {
         }
         return {
           batchId,
-          codes: issued.map((code, index) => ({
-            ...code,
-            id: storedRows[index]!.id,
-          })),
+          codes: issued.map((code, index) =>
+            toPublicIssuedExpertReferralCode(storedRows[index]!.id, code),
+          ),
         };
       }),
     );
@@ -540,41 +606,111 @@ export class PostgresExpertReferralRepository {
       );
     }
     const override = await tx.execute<{
+      overrideId: string;
+      inviterExpertId: string;
       additionalQuota: number;
       consumedCount: number;
+      reasonCode: string;
+      validFrom: Date;
+      validUntil: Date;
       requesterId: string;
+      requesterSessionIdHash: string;
       approverOneId: string;
       approverTwoId: string;
-      approvalOneApproverId: string | null;
-      approvalTwoApproverId: string | null;
+      approvalOneId: string;
+      approvalTwoId: string;
+      approvalOnePayloadHash: string;
+      approvalTwoPayloadHash: string;
     }>(sql`
+      with db_clock as (select clock_timestamp() as db_now)
       select
+        o.id as "overrideId",
+        o.inviter_expert_id as "inviterExpertId",
         o.additional_quota as "additionalQuota",
         o.consumed_count as "consumedCount",
+        o.reason_code as "reasonCode",
+        o.valid_from as "validFrom",
+        o.valid_until as "validUntil",
         o.requester_id as "requesterId",
+        o.requester_session_id_hash as "requesterSessionIdHash",
         o.approver_one_id as "approverOneId",
         o.approver_two_id as "approverTwoId",
-        a1.approver_id as "approvalOneApproverId",
-        a2.approver_id as "approvalTwoApproverId"
+        a1.id as "approvalOneId", a2.id as "approvalTwoId",
+        a1.payload_hash as "approvalOnePayloadHash",
+        a2.payload_hash as "approvalTwoPayloadHash"
       from expert_referral_issuance_overrides o
       join admin_approvals a1 on a1.id = o.approval_one_id
       join admin_approvals a2 on a2.id = o.approval_two_id
+      join admin_sessions requester_session
+        on requester_session.session_id_hash = o.requester_session_id_hash
+        and requester_session.admin_id = o.requester_id
+      join admin_role_assignments requester_role
+        on requester_role.admin_id = o.requester_id
+        and requester_role.role = 'security_admin'
+      join admin_sessions approver_one_session
+        on approver_one_session.session_id_hash = a1.approver_session_id_hash
+        and approver_one_session.admin_id = o.approver_one_id
+      join admin_role_assignments approver_one_role
+        on approver_one_role.admin_id = o.approver_one_id
+        and approver_one_role.role = 'security_admin'
+      join admin_sessions approver_two_session
+        on approver_two_session.session_id_hash = a2.approver_session_id_hash
+        and approver_two_session.admin_id = o.approver_two_id
+      join admin_role_assignments approver_two_role
+        on approver_two_role.admin_id = o.approver_two_id
+        and approver_two_role.role = 'security_admin'
+      cross join db_clock c
       where o.id = ${overrideId}::uuid
         and o.inviter_expert_id = ${inviterExpertId}::uuid
-        and transaction_timestamp() >= o.valid_from
-        and transaction_timestamp() < o.valid_until
-        and a1.approved_at is not null
-        and a2.approved_at is not null
-      for update of o
+        and o.consumed_count = 0
+        and c.db_now >= o.valid_from and c.db_now < o.valid_until
+        and a1.id <> a2.id
+        and a1.action = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION}
+        and a2.action = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION}
+        and a1.object_type = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE}
+        and a2.object_type = ${EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE}
+        and a1.object_id = o.id and a2.object_id = o.id
+        and a1.requester_id = o.requester_id
+        and a2.requester_id = o.requester_id
+        and a1.requester_session_id_hash = o.requester_session_id_hash
+        and a2.requester_session_id_hash = o.requester_session_id_hash
+        and a1.requester_mfa_verified_at = requester_session.mfa_verified_at
+        and a2.requester_mfa_verified_at = requester_session.mfa_verified_at
+        and a1.required_role = 'security_admin'
+        and a2.required_role = 'security_admin'
+        and a1.approver_id = o.approver_one_id
+        and a2.approver_id = o.approver_two_id
+        and a1.approved_at is not null and a2.approved_at is not null
+        and a1.consumed_at is null and a2.consumed_at is null
+        and a1.expires_at > c.db_now and a2.expires_at > c.db_now
+        and requester_session.revoked_at is null
+        and requester_session.expires_at > c.db_now
+        and requester_session.mfa_verified_at <= c.db_now
+        and requester_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+        and approver_one_session.mfa_verified_at = a1.approver_mfa_verified_at
+        and approver_one_session.revoked_at is null
+        and approver_one_session.expires_at > c.db_now
+        and approver_one_session.mfa_verified_at <= c.db_now
+        and approver_one_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+        and approver_two_session.mfa_verified_at = a2.approver_mfa_verified_at
+        and approver_two_session.revoked_at is null
+        and approver_two_session.expires_at > c.db_now
+        and approver_two_session.mfa_verified_at <= c.db_now
+        and approver_two_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+      for update of o, a1, a2
     `);
     const row = override.rows[0];
+    const expectedPayloadHash =
+      row === undefined
+        ? undefined
+        : canonicalAdminPayloadHash(expertReferralOverrideApprovalPayload(row));
     if (
       row === undefined ||
       row.requesterId === row.approverOneId ||
       row.requesterId === row.approverTwoId ||
       row.approverOneId === row.approverTwoId ||
-      row.approvalOneApproverId !== row.approverOneId ||
-      row.approvalTwoApproverId !== row.approverTwoId ||
+      row.approvalOnePayloadHash !== expectedPayloadHash ||
+      row.approvalTwoPayloadHash !== expectedPayloadHash ||
       row.additionalQuota - row.consumedCount < required
     ) {
       throw new ExpertReferralCommandError(
@@ -582,36 +718,53 @@ export class PostgresExpertReferralRepository {
         "Expert referral issuance override is invalid",
       );
     }
-    await tx.execute(sql`
+    const approvals = await tx.execute<{ id: string }>(sql`
+      update admin_approvals
+      set consumed_at = clock_timestamp()
+      where id in (${row.approvalOneId}::uuid, ${row.approvalTwoId}::uuid)
+        and consumed_at is null
+      returning id
+    `);
+    if (approvals.rows.length !== 2) {
+      throw new ExpertReferralCommandError(
+        "EXPERT_REFERRAL_OVERRIDE_INVALID",
+        "Expert referral issuance override is invalid",
+      );
+    }
+    const consumed = await tx.execute<{ consumedCount: number }>(sql`
       update expert_referral_issuance_overrides
       set consumed_count = consumed_count + ${required}
       where id = ${overrideId}::uuid
+        and consumed_count = 0
         and consumed_count + ${required} <= additional_quota
+      returning consumed_count as "consumedCount"
     `);
+    if (consumed.rows.length !== 1) {
+      throw new ExpertReferralCommandError(
+        "EXPERT_REFERRAL_OVERRIDE_INVALID",
+        "Expert referral issuance override is invalid",
+      );
+    }
   }
 
   private async refreshBatchStatus(
     tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
     batchId: string,
   ): Promise<void> {
+    const codes = await tx.execute<{ status: ExpertReferralCodeStatus }>(sql`
+      select status
+      from expert_referral_codes
+      where batch_id = ${batchId}::uuid
+      order by id
+      for update
+    `);
+    const status = deriveExpertReferralBatchStatus(
+      codes.rows.map((row) => row.status),
+    );
     await tx.execute(sql`
-      update expert_referral_code_batches b
-      set status = case
-        when not exists (
-          select 1 from expert_referral_codes c
-          where c.batch_id = b.id and c.status <> 'revoked'
-        ) then 'revoked'::expert_referral_batch_status
-        when not exists (
-          select 1 from expert_referral_codes c
-          where c.batch_id = b.id and c.status = 'issued'
-        ) then 'fully_redeemed'::expert_referral_batch_status
-        when exists (
-          select 1 from expert_referral_codes c
-          where c.batch_id = b.id and c.status <> 'issued'
-        ) then 'partially_redeemed'::expert_referral_batch_status
-        else 'issued'::expert_referral_batch_status
-      end
-      where b.id = ${batchId}::uuid
+      update expert_referral_code_batches
+      set status = ${status}::expert_referral_batch_status
+      where id = ${batchId}::uuid
     `);
   }
 }

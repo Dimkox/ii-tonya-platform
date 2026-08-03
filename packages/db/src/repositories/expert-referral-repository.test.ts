@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExpertCodeCrypto } from "../../../application/src/expert-code-crypto.js";
@@ -7,6 +8,8 @@ import {
 } from "../testkit/expert-referral.js";
 import {
   calculateIssuanceOverrideUsage,
+  deriveExpertReferralBatchStatus,
+  toPublicIssuedExpertReferralCode,
   parseExpertCodeKeyVersion,
   PostgresExpertReferralRepository,
 } from "./expert-referral-repository.js";
@@ -48,6 +51,41 @@ describe("expert referral issuance policy", () => {
     expect(() => parseExpertCodeKeyVersion("current")).toThrowError(
       "Invalid expert referral key version",
     );
+  });
+
+  it("returns plaintext once without exposing persistent lookup material", () => {
+    const result = toPublicIssuedExpertReferralCode("code-id", {
+      plaintext: "EXR_AAAAAAAAAAAAAAAAAAAAAA",
+      digest: `hmac-sha256:v1:${"a".repeat(64)}`,
+      hash: "a".repeat(64),
+      keyVersion: "v1",
+      maskedSuffix: "AAAAAA",
+    });
+    expect(result).toEqual({
+      id: "code-id",
+      plaintext: "EXR_AAAAAAAAAAAAAAAAAAAAAA",
+      maskedSuffix: "AAAAAA",
+    });
+    expect(JSON.stringify(result)).not.toMatch(/digest|hash/iu);
+  });
+
+  it.each([
+    { statuses: ["issued", "issued"] as const, expected: "issued" },
+    {
+      statuses: ["redeemed", "redeemed"] as const,
+      expected: "fully_redeemed",
+    },
+    { statuses: ["revoked", "revoked"] as const, expected: "revoked" },
+    {
+      statuses: ["issued", "redeemed"] as const,
+      expected: "partially_redeemed",
+    },
+    {
+      statuses: ["redeemed", "revoked"] as const,
+      expected: "partially_redeemed",
+    },
+  ])("derives $expected for $statuses", ({ statuses, expected }) => {
+    expect(deriveExpertReferralBatchStatus(statuses)).toBe(expected);
   });
 });
 
@@ -117,18 +155,73 @@ describe("PostgresExpertReferralRepository issuance quotas", () => {
       code: "EXPERT_REFERRAL_QUOTA_EXCEEDED",
     });
 
-    const overrideId = await testDb!.createDualApprovedOverride({
+    const override = await testDb!.createDualApprovedOverride({
       inviterExpertId: inviter.expertId,
       additionalQuota: 1,
     });
     await expect(
-      issue(repository, inviter.expertId, 1, overrideId),
+      issue(repository, inviter.expertId, 1, override.overrideId),
     ).resolves.toMatchObject({ codes: { length: 1 } });
     const consumed = await testDb!.db.execute<{ consumed: number }>(sql`
       select consumed_count as consumed
       from expert_referral_issuance_overrides
-      where id = ${overrideId}::uuid
+      where id = ${override.overrideId}::uuid
     `);
     expect(consumed.rows[0]?.consumed).toBe(1);
+  });
+
+  it.each([
+    "action",
+    "object",
+    "session",
+    "payload",
+    "expired",
+    "consumed",
+  ] as const)("rejects an override with invalid %s approval binding", async (field) => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 1,
+    });
+    const unrelatedAudit =
+      field === "session"
+        ? await testDb!.createAdminAudit({
+            action: "unrelated.action",
+            objectId: randomUUID(),
+          })
+        : undefined;
+    const mutation = {
+      action: sql`action = 'unrelated.action'`,
+      object: sql`object_id = ${randomUUID()}::uuid`,
+      session: sql`requester_session_id_hash = ${unrelatedAudit?.sessionIdHash}`,
+      payload: sql`payload_hash = ${`sha256:${"b".repeat(64)}`}`,
+      expired: sql`expires_at = transaction_timestamp() - interval '1 second'`,
+      consumed: sql`consumed_at = transaction_timestamp()`,
+    }[field];
+    await testDb!.db.execute(sql`
+      update admin_approvals set ${mutation}
+      where id = ${override.approvalOneId}::uuid
+    `);
+    await expect(
+      issue(repository, inviter.expertId, 1, override.overrideId),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
+  });
+
+  it("rejects reuse of already consumed override approvals", async () => {
+    await testDb!.enableExpertReferralCommands();
+    const inviter = await testDb!.createExpertIdentity();
+    await testDb!.seedExpertReferralQuotaLimit(inviter.expertId);
+    const repository = new PostgresExpertReferralRepository(testDb!.db, crypto);
+    const override = await testDb!.createDualApprovedOverride({
+      inviterExpertId: inviter.expertId,
+      additionalQuota: 2,
+    });
+    await issue(repository, inviter.expertId, 1, override.overrideId);
+    await expect(
+      issue(repository, inviter.expertId, 1, override.overrideId),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_OVERRIDE_INVALID" });
   });
 });

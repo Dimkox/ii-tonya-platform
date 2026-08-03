@@ -59,10 +59,10 @@ describe("expert referral lifecycle", () => {
     `);
     expect(JSON.stringify(stored.rows)).not.toContain(plaintext);
     expect(stored.rows[0]).toMatchObject({
-      code_hash: issued.codes[0]!.hash,
       key_version: 1,
       masked_suffix: issued.codes[0]!.maskedSuffix,
     });
+    expect(stored.rows[0]?.code_hash).toMatch(/^[0-9a-f]{64}$/u);
 
     const result = await repository.redeemCode({
       plaintext,
@@ -179,8 +179,14 @@ describe("expert referral lifecycle", () => {
     await expect(repository.revokeCode(command)).resolves.toMatchObject({
       status: "revoked",
     });
-    expect(
-      JSON.stringify(await repository.maskedInventory(inviter.expertId)),
-    ).not.toContain(issued.codes[0]!.hash);
+    const inventory = await repository.maskedInventory(inviter.expertId);
+    expect(inventory).toEqual([
+      expect.objectContaining({
+        id: issued.codes[0]!.id,
+        maskedSuffix: issued.codes[0]!.maskedSuffix,
+        status: "revoked",
+      }),
+    ]);
+    expect(JSON.stringify(inventory)).not.toMatch(/digest|hash/iu);
   });
 });

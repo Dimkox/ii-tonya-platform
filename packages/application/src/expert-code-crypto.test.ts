@@ -56,6 +56,26 @@ describe("ExpertCodeCrypto", () => {
     ]);
   });
 
+  it("rejects an ambiguous keyring with more than current and previous", () => {
+    let resolutions = 0;
+    expect(
+      () =>
+        new ResolvedExpertCodeKeyring({
+          currentVersion: "v3",
+          secretReferences: {
+            v1: "secret://expert-code/v1",
+            v2: "secret://expert-code/v2",
+            v3: "secret://expert-code/v3",
+          },
+          resolve: () => {
+            resolutions += 1;
+            return new Uint8Array(32).fill(1);
+          },
+        }),
+    ).toThrowError("Expert referral keyring must contain at most two versions");
+    expect(resolutions).toBe(0);
+  });
+
   it("compares digests in constant-time form and rejects unsafe input opaquely", () => {
     const key = new Uint8Array(32).fill(9);
     const digest = digestExpertCode("EXR_AAAAAAAAAAAAAAAAAAAAAA", "v1", key);

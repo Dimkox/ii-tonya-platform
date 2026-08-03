@@ -1,5 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import {
+  canonicalAdminPayloadHash,
+  type AdminPayload,
+} from "../repositories/admin-approval-repository.js";
+import {
+  EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION,
+  EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE,
+  EXPERT_REFERRAL_FEATURE_CONTROL_ID,
+  expertReferralFeatureControlApprovalPayload,
+} from "../repositories/expert-referral-control-repository.js";
+import {
+  EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION,
+  EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE,
+  expertReferralOverrideApprovalPayload,
+} from "../repositories/expert-referral-repository.js";
 import { startTestPostgres, type TestDatabase } from "./postgres.js";
 
 export interface ExpertIdentityFixture {
@@ -13,6 +28,15 @@ export interface ExpertAdminAuditFixture {
   adminId: string;
   approvalId: string;
   sessionIdHash: string;
+  approverId: string;
+  approverSessionIdHash: string;
+}
+
+export interface ExpertReferralOverrideFixture {
+  overrideId: string;
+  approvalOneId: string;
+  approvalTwoId: string;
+  requesterSessionIdHash: string;
 }
 
 export interface ExpertReferralTestDatabase extends TestDatabase {
@@ -26,12 +50,24 @@ export interface ExpertReferralTestDatabase extends TestDatabase {
     action: string;
     objectId: string;
     adminId?: string;
+    sessionIdHash?: string;
+    approverId?: string;
+    objectType?: string;
+    payload?: AdminPayload;
+    consumed?: boolean;
+    expired?: boolean;
   }): Promise<ExpertAdminAuditFixture>;
   enableExpertReferralCommands(): Promise<void>;
+  createFeatureControlApproval(input: {
+    expectedVersion: number;
+    newCommandsEnabled: boolean;
+    rewardGrantsEnabled: boolean;
+  }): Promise<ExpertAdminAuditFixture>;
   createDualApprovedOverride(input: {
     inviterExpertId: string;
     additionalQuota: number;
-  }): Promise<string>;
+  }): Promise<ExpertReferralOverrideFixture>;
+  seedExpertReferralQuotaLimit(inviterExpertId: string): Promise<void>;
   seedFirstSettlement(expertId: string): Promise<void>;
 }
 
@@ -48,37 +84,106 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
   const base = await startTestPostgres();
   await base.migrate();
 
+  const ensureAdminSession = async (
+    adminId: string,
+    requestedSessionIdHash?: string,
+    mfaVerifiedAt = new Date(Date.now() - 3 * 60_000),
+  ): Promise<{ sessionIdHash: string; mfaVerifiedAt: Date }> => {
+    const sessionIdHash =
+      requestedSessionIdHash ?? `session-${randomUUID()}`;
+    await base.db.execute(sql`
+      insert into admin_role_assignments (admin_id, role)
+      values (${adminId}::uuid, 'security_admin')
+      on conflict (admin_id, role) do nothing
+    `);
+    await base.db.execute(sql`
+      insert into admin_sessions (
+        session_id_hash, admin_id, mfa_verified_at, expires_at
+      ) values (
+        ${sessionIdHash}, ${adminId}::uuid, ${mfaVerifiedAt},
+        transaction_timestamp() + interval '1 hour'
+      ) on conflict (session_id_hash) do nothing
+    `);
+    const stored = await base.db.execute<{
+      session_id_hash: string;
+      mfa_verified_at: Date;
+    }>(sql`
+      select session_id_hash, mfa_verified_at
+      from admin_sessions
+      where session_id_hash = ${sessionIdHash}
+        and admin_id = ${adminId}::uuid
+    `);
+    const session = stored.rows[0];
+    if (session === undefined) {
+      throw new Error("Expected admin session bound to requested admin");
+    }
+    return {
+      sessionIdHash: session.session_id_hash,
+      mfaVerifiedAt: session.mfa_verified_at,
+    };
+  };
+
   const createAdminAudit: ExpertReferralTestDatabase["createAdminAudit"] =
-    async ({ action, objectId, adminId }) => {
+    async ({
+      action,
+      objectId,
+      adminId,
+      sessionIdHash: requestedSessionIdHash,
+      approverId,
+      objectType = "expert_referral",
+      payload = {},
+      consumed = false,
+      expired = false,
+    }) => {
+      const now = new Date();
+      const createdAt = new Date(now.getTime() - 2 * 60_000);
+      const requesterMfaVerifiedAt = new Date(now.getTime() - 3 * 60_000);
+      const approverMfaVerifiedAt = new Date(now.getTime() - 3 * 60_000);
+      const approvedAt = new Date(now.getTime() - 60_000);
+      const expiresAt = new Date(
+        now.getTime() + (expired ? -30_000 : 5 * 60_000),
+      );
       const resolvedAdminId = adminId ?? (await base.createUser());
-      const sessionIdHash = `session-${randomUUID()}`;
-      await base.db.execute(sql`
-        insert into admin_sessions (
-          session_id_hash, admin_id, mfa_verified_at, expires_at
-        ) values (
-          ${sessionIdHash}, ${resolvedAdminId}::uuid,
-          transaction_timestamp() - interval '1 minute',
-          transaction_timestamp() + interval '1 hour'
-        )
-      `);
+      const resolvedApproverId = approverId ?? (await base.createUser());
+      const requesterSession = await ensureAdminSession(
+        resolvedAdminId,
+        requestedSessionIdHash,
+        requesterMfaVerifiedAt,
+      );
+      const approverSession = await ensureAdminSession(
+        resolvedApproverId,
+        undefined,
+        approverMfaVerifiedAt,
+      );
       const approvalId = requiredId(
         (
           await base.db.execute<{ id: string }>(sql`
             insert into admin_approvals (
-              action, object_type, object_id, requester_id,
-              requester_session_id_hash, payload_hash, required_role,
-              requester_mfa_verified_at, expires_at, nonce
+              action, object_type, object_id, requester_id, approver_id,
+              requester_session_id_hash, approver_session_id_hash,
+              payload_hash, required_role, requester_mfa_verified_at,
+              approver_mfa_verified_at, approved_at, expires_at, nonce,
+              consumed_at, created_at
             ) values (
-              ${action}, 'expert_referral', ${objectId}::uuid, ${resolvedAdminId}::uuid,
-              ${sessionIdHash}, ${"a".repeat(64)}, 'security_admin',
-              transaction_timestamp() - interval '1 minute',
-              transaction_timestamp() + interval '1 hour', ${randomUUID()}
+              ${action}, ${objectType}, ${objectId}::uuid,
+              ${resolvedAdminId}::uuid, ${resolvedApproverId}::uuid,
+              ${requesterSession.sessionIdHash}, ${approverSession.sessionIdHash},
+              ${canonicalAdminPayloadHash(payload)}, 'security_admin',
+              ${requesterSession.mfaVerifiedAt}, ${approverSession.mfaVerifiedAt},
+              ${approvedAt}, ${expiresAt}, ${randomUUID()},
+              ${consumed ? now : null}, ${createdAt}
             ) returning id
           `)
         ).rows,
         "admin approval",
       );
-      return { adminId: resolvedAdminId, approvalId, sessionIdHash };
+      return {
+        adminId: resolvedAdminId,
+        approvalId,
+        sessionIdHash: requesterSession.sessionIdHash,
+        approverId: resolvedApproverId,
+        approverSessionIdHash: approverSession.sessionIdHash,
+      };
     };
 
   const reset = async (): Promise<void> => {
@@ -122,10 +227,17 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
       return { userId, expertId, provider, externalId };
     },
     async enableExpertReferralCommands() {
-      const objectId = randomUUID();
+      const command = {
+        expectedVersion: 0,
+        newCommandsEnabled: true,
+        rewardGrantsEnabled: false,
+      };
       const audit = await createAdminAudit({
-        action: "expert_referral.feature_switch",
-        objectId,
+        action: EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION,
+        objectType: EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE,
+        objectId: EXPERT_REFERRAL_FEATURE_CONTROL_ID,
+        payload: expertReferralFeatureControlApprovalPayload(command),
+        consumed: true,
       });
       await base.db.execute(sql`
         insert into expert_referral_feature_controls (
@@ -138,56 +250,104 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
         )
       `);
     },
+    async createFeatureControlApproval(input) {
+      return createAdminAudit({
+        action: EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION,
+        objectType: EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE,
+        objectId: EXPERT_REFERRAL_FEATURE_CONTROL_ID,
+        payload: expertReferralFeatureControlApprovalPayload(input),
+      });
+    },
     async createDualApprovedOverride({ inviterExpertId, additionalQuota }) {
+      const overrideId = randomUUID();
       const requesterId = await base.createUser();
       const approverOneId = await base.createUser();
       const approverTwoId = await base.createUser();
+      const requesterSession = await ensureAdminSession(requesterId);
+      const reasonCode = "approved_test";
+      const validFrom = new Date(Date.now() - 60_000);
+      const validUntil = new Date(Date.now() + 60 * 60_000);
+      const payload = expertReferralOverrideApprovalPayload({
+        overrideId,
+        inviterExpertId,
+        additionalQuota,
+        reasonCode,
+        validFrom,
+        validUntil,
+        requesterId,
+        requesterSessionIdHash: requesterSession.sessionIdHash,
+      });
       const first = await createAdminAudit({
-        action: "expert_referral.issuance_override",
-        objectId: inviterExpertId,
+        action: EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION,
+        objectType: EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE,
+        objectId: overrideId,
         adminId: requesterId,
+        sessionIdHash: requesterSession.sessionIdHash,
+        approverId: approverOneId,
+        payload,
       });
       const second = await createAdminAudit({
-        action: "expert_referral.issuance_override",
-        objectId: inviterExpertId,
+        action: EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION,
+        objectType: EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE,
+        objectId: overrideId,
         adminId: requesterId,
+        sessionIdHash: requesterSession.sessionIdHash,
+        approverId: approverTwoId,
+        payload,
       });
       await base.db.execute(sql`
-        update admin_approvals
-        set approver_id = ${approverOneId}::uuid,
-            approver_session_id_hash = ${`approver-${randomUUID()}`},
-            approver_mfa_verified_at = transaction_timestamp(),
-            approved_at = transaction_timestamp()
-        where id = ${first.approvalId}::uuid
+        insert into expert_referral_issuance_overrides (
+          id, inviter_expert_id, additional_quota, reason_code,
+          valid_from, valid_until, requester_id, approver_one_id,
+          approver_two_id, approval_one_id, approval_two_id,
+          requester_session_id_hash
+        ) values (
+          ${overrideId}::uuid, ${inviterExpertId}::uuid, ${additionalQuota},
+          ${reasonCode}, ${validFrom}, ${validUntil}, ${requesterId}::uuid,
+          ${approverOneId}::uuid, ${approverTwoId}::uuid,
+          ${first.approvalId}::uuid, ${second.approvalId}::uuid,
+          ${requesterSession.sessionIdHash}
+        )
       `);
-      await base.db.execute(sql`
-        update admin_approvals
-        set approver_id = ${approverTwoId}::uuid,
-            approver_session_id_hash = ${`approver-${randomUUID()}`},
-            approver_mfa_verified_at = transaction_timestamp(),
-            approved_at = transaction_timestamp()
-        where id = ${second.approvalId}::uuid
-      `);
-      return requiredId(
+      return {
+        overrideId,
+        approvalOneId: first.approvalId,
+        approvalTwoId: second.approvalId,
+        requesterSessionIdHash: requesterSession.sessionIdHash,
+      };
+    },
+    async seedExpertReferralQuotaLimit(inviterExpertId) {
+      const audit = await createAdminAudit({
+        action: "expert_referral.batch_issue",
+        objectId: randomUUID(),
+      });
+      const batchId = requiredId(
         (
           await base.db.execute<{ id: string }>(sql`
-            insert into expert_referral_issuance_overrides (
-              inviter_expert_id, additional_quota, reason_code,
-              valid_from, valid_until, requester_id, approver_one_id,
-              approver_two_id, approval_one_id, approval_two_id,
-              requester_session_id_hash
+            insert into expert_referral_code_batches (
+              inviter_expert_id, requested_count, approval_id,
+              issued_by_admin_id, admin_session_id_hash
             ) values (
-              ${inviterExpertId}::uuid, ${additionalQuota}, 'approved_test',
-              transaction_timestamp() - interval '1 minute',
-              transaction_timestamp() + interval '1 hour',
-              ${requesterId}::uuid, ${approverOneId}::uuid,
-              ${approverTwoId}::uuid, ${first.approvalId}::uuid,
-              ${second.approvalId}::uuid, ${first.sessionIdHash}
+              ${inviterExpertId}::uuid, 1000, ${audit.approvalId}::uuid,
+              ${audit.adminId}::uuid, ${audit.sessionIdHash}
             ) returning id
           `)
         ).rows,
-        "issuance override",
+        "expert referral batch",
       );
+      await base.db.execute(sql`
+        insert into expert_referral_codes (
+          batch_id, inviter_expert_id, code_hash, key_version, masked_suffix
+        )
+        select
+          ${batchId}::uuid,
+          ${inviterExpertId}::uuid,
+          md5(${batchId}::text || generated::text) ||
+            md5('hash-' || ${batchId}::text || generated::text),
+          1,
+          lpad(generated::text, 6, '0')
+        from generate_series(1, 1000) generated
+      `);
     },
     async seedFirstSettlement(expertId) {
       const tariffAudit = await createAdminAudit({

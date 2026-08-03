@@ -53,6 +53,11 @@ export class ResolvedExpertCodeKeyring implements ExpertCodeKeyring {
   constructor(options: ResolvedExpertCodeKeyringOptions) {
     assertKeyVersion(options.currentVersion);
     const versions = Object.keys(options.secretReferences);
+    if (versions.length > 2) {
+      throw new Error(
+        "Expert referral keyring must contain at most two versions",
+      );
+    }
     if (!versions.includes(options.currentVersion)) {
       throw new Error("Current expert referral key version is unavailable");
     }

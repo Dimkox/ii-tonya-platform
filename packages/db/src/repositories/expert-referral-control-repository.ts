@@ -1,6 +1,14 @@
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import { canonicalAdminPayloadHash } from "./admin-approval-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
+
+export const EXPERT_REFERRAL_FEATURE_CONTROL_ID =
+  "00000000-0000-0000-0000-000000000041";
+export const EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION =
+  "expert_referral.feature_switch";
+export const EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE =
+  "expert_referral_feature_control";
 
 export type ExpertReferralTransaction = Parameters<
   Parameters<DrizzleDb["transaction"]>[0]
@@ -25,6 +33,19 @@ export interface SetExpertReferralFeatureControlCommand {
   rewardGrantsEnabled: boolean;
   approvalId: string;
   adminSessionIdHash: string;
+}
+
+export function expertReferralFeatureControlApprovalPayload(
+  command: Pick<
+    SetExpertReferralFeatureControlCommand,
+    "expectedVersion" | "newCommandsEnabled" | "rewardGrantsEnabled"
+  >,
+) {
+  return {
+    expectedVersion: command.expectedVersion,
+    newCommandsEnabled: command.newCommandsEnabled,
+    rewardGrantsEnabled: command.rewardGrantsEnabled,
+  } as const;
 }
 
 export interface ExpertEligibilityLock {
@@ -57,7 +78,10 @@ export interface ExpertAbuseHoldResult {
 export class ExpertReferralControlError extends Error {
   constructor(
     readonly code:
-      "EXPERT_NOT_FOUND" | "FEATURE_CONTROL_CONFLICT" | "ABUSE_HOLD_NOT_FOUND",
+      | "EXPERT_NOT_FOUND"
+      | "FEATURE_CONTROL_CONFLICT"
+      | "FEATURE_CONTROL_APPROVAL_INVALID"
+      | "ABUSE_HOLD_NOT_FOUND",
     message: string,
   ) {
     super(message);
@@ -166,6 +190,7 @@ export class PostgresExpertReferralControlRepository {
           command.expectedVersion,
           current.persisted ? current : undefined,
         );
+        await this.consumeFeatureControlApproval(tx, command);
         if (!current.persisted) {
           await tx.execute(sql`
             insert into expert_referral_feature_controls (
@@ -220,15 +245,23 @@ export class PostgresExpertReferralControlRepository {
           id: string;
           expertId: string;
           status: "open" | "closed";
+          reasonCode: string;
+          adminSessionIdHash: string;
         }>(sql`
-          select id, expert_id as "expertId", status
+          select id, expert_id as "expertId", status,
+            reason_code as "reasonCode",
+            opened_admin_session_id_hash as "adminSessionIdHash"
           from expert_referral_abuse_holds
           where opened_approval_id = ${command.approvalId}::uuid
           for update
         `);
         const repeatedRow = repeated.rows[0];
         if (repeatedRow !== undefined) {
-          if (repeatedRow.expertId !== command.expertId) {
+          if (
+            repeatedRow.expertId !== command.expertId ||
+            repeatedRow.reasonCode !== command.reasonCode ||
+            repeatedRow.adminSessionIdHash !== command.adminSessionIdHash
+          ) {
             throw new ExpertReferralControlError(
               "FEATURE_CONTROL_CONFLICT",
               "Expert referral abuse-hold command conflict",
@@ -247,11 +280,10 @@ export class PostgresExpertReferralControlRepository {
           for update
         `);
         if (existing.rows[0] !== undefined) {
-          return {
-            id: existing.rows[0].id,
-            expertId: command.expertId,
-            status: "open" as const,
-          };
+          throw new ExpertReferralControlError(
+            "FEATURE_CONTROL_CONFLICT",
+            "Expert referral abuse-hold command conflict",
+          );
         }
         const inserted = await tx.execute<{ id: string }>(sql`
           insert into expert_referral_abuse_holds (
@@ -280,15 +312,26 @@ export class PostgresExpertReferralControlRepository {
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
         await this.lockExpertForHold(tx, command.expertId);
-        const repeated = await tx.execute<{ id: string; expertId: string }>(sql`
-          select id, expert_id as "expertId"
+        const repeated = await tx.execute<{
+          id: string;
+          expertId: string;
+          reasonCode: string;
+          adminSessionIdHash: string;
+        }>(sql`
+          select id, expert_id as "expertId",
+            closed_reason_code as "reasonCode",
+            closed_admin_session_id_hash as "adminSessionIdHash"
           from expert_referral_abuse_holds
           where closed_approval_id = ${command.approvalId}::uuid
           for update
         `);
         const repeatedRow = repeated.rows[0];
         if (repeatedRow !== undefined) {
-          if (repeatedRow.expertId !== command.expertId) {
+          if (
+            repeatedRow.expertId !== command.expertId ||
+            repeatedRow.reasonCode !== command.reasonCode ||
+            repeatedRow.adminSessionIdHash !== command.adminSessionIdHash
+          ) {
             throw new ExpertReferralControlError(
               "FEATURE_CONTROL_CONFLICT",
               "Expert referral abuse-hold command conflict",
@@ -329,6 +372,70 @@ export class PostgresExpertReferralControlRepository {
         };
       }),
     );
+  }
+
+  private async consumeFeatureControlApproval(
+    tx: ExpertReferralTransaction,
+    command: SetExpertReferralFeatureControlCommand,
+  ): Promise<void> {
+    const payloadHash = canonicalAdminPayloadHash(
+      expertReferralFeatureControlApprovalPayload(command),
+    );
+    const consumed = await tx.execute<{ id: string }>(sql`
+      with db_clock as (
+        select clock_timestamp() as db_now
+      ), valid_approval as (
+        select a.id, c.db_now
+        from admin_approvals a
+        join admin_sessions requester_session
+          on requester_session.session_id_hash = a.requester_session_id_hash
+          and requester_session.admin_id = a.requester_id
+        join admin_role_assignments requester_role
+          on requester_role.admin_id = a.requester_id
+          and requester_role.role = 'security_admin'
+        join admin_sessions approver_session
+          on approver_session.session_id_hash = a.approver_session_id_hash
+          and approver_session.admin_id = a.approver_id
+        join admin_role_assignments approver_role
+          on approver_role.admin_id = a.approver_id
+          and approver_role.role = 'security_admin'
+        cross join db_clock c
+        where a.id = ${command.approvalId}::uuid
+          and a.action = ${EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION}
+          and a.object_type = ${EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE}
+          and a.object_id = ${EXPERT_REFERRAL_FEATURE_CONTROL_ID}::uuid
+          and a.requester_session_id_hash = ${command.adminSessionIdHash}
+          and a.payload_hash = ${payloadHash}
+          and a.required_role = 'security_admin'
+          and a.requester_mfa_verified_at = requester_session.mfa_verified_at
+          and a.approver_id is not null
+          and a.approver_id <> a.requester_id
+          and a.approved_at is not null
+          and a.consumed_at is null
+          and a.expires_at > c.db_now
+          and requester_session.revoked_at is null
+          and requester_session.expires_at > c.db_now
+          and requester_session.mfa_verified_at <= c.db_now
+          and requester_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+          and approver_session.mfa_verified_at = a.approver_mfa_verified_at
+          and approver_session.revoked_at is null
+          and approver_session.expires_at > c.db_now
+          and approver_session.mfa_verified_at <= c.db_now
+          and approver_session.mfa_verified_at >= c.db_now - interval '15 minutes'
+        for update of a
+      )
+      update admin_approvals a
+      set consumed_at = valid_approval.db_now
+      from valid_approval
+      where a.id = valid_approval.id and a.consumed_at is null
+      returning a.id
+    `);
+    if (consumed.rows.length !== 1) {
+      throw new ExpertReferralControlError(
+        "FEATURE_CONTROL_APPROVAL_INVALID",
+        "Expert referral feature-control approval is invalid",
+      );
+    }
   }
 
   private async lockExpertForHold(
