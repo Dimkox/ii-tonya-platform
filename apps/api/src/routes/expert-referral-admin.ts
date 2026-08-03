@@ -45,6 +45,7 @@ const instant = (value: unknown, field: string): string => {
   return canonicalAdminInstant(value, field);
 };
 const canonicalPayload = (action: ExpertReferralAdminAction, objectId: string, raw: unknown, actor?: { id: string; sessionIdHash: string }): ExpertReferralAdminPayload => {
+  if ((action === "expert_referral.feature_switch") !== (objectId === controlId)) throw new Error("invalid_command");
   if (objectId !== controlId && !canonicalUuid(objectId)) throw new Error("invalid_command");
   if (typeof raw !== "object" || raw === null || Array.isArray(raw) || Object.getPrototypeOf(raw) !== Object.prototype) throw new Error("invalid_command");
   const p = raw as ExpertReferralAdminPayload;

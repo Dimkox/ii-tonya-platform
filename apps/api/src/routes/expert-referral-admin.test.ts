@@ -83,4 +83,16 @@ describe("expert referral admin routes", () => {
     expect(admin.execute).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it.each([
+    ["expert_referral.feature_switch", "00000000-0000-4000-8000-000000000030", { expectedVersion: 0, newCommandsEnabled: false, rewardGrantsEnabled: false }],
+    ["expert_referral.batch_generate", "00000000-0000-0000-0000-000000000041", { count: 1 }],
+  ])("enforces the feature-control sentinel iff feature_switch for %s", async (action, objectId, command) => {
+    const approvals = { resolvePrincipal: vi.fn(async () => principal), requestApproval: vi.fn(), approveApproval: vi.fn() };
+    const app = await buildExpertReferralAdminApi({ approvals, admin: { execute: vi.fn(), inventory: vi.fn() }, sessionTokenHash: () => principal.sessionIdHash, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } });
+    const response = await app.inject({ method: "POST", url: `/v1/admin/actions/${action}/${objectId}/approvals`, headers: { authorization: `Bearer ${token}` }, payload: { nonce: "nonce-task9-sentinel", command } });
+    expect(response.statusCode).toBe(400);
+    expect(approvals.requestApproval).not.toHaveBeenCalled();
+    await app.close();
+  });
 });

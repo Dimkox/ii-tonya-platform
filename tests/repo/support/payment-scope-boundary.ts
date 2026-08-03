@@ -375,7 +375,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0022_expert_referral_admin_replays.sql",
-    "1862e20f1e5dddf282c3da0eb5660dfe580b1d3bb0ebe2c13f1a3512fb78154d",
+    "e027346ac3ac267dac011691707e5878f08d28c724da35e1e4c81579aa50dc7f",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

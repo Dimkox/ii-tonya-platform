@@ -190,6 +190,8 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
     };
 
   const reset = async (): Promise<void> => {
+    await base.db.execute(sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_immutable`);
+    await base.db.execute(sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_truncate_immutable`);
     await base.db.execute(sql`
       truncate table expert_referral_admin_execution_results,
         expert_referral_feature_controls,
@@ -201,6 +203,8 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
         expert_residency_tariff_versions, expert_referrals,
         expert_referral_codes, expert_referral_code_batches cascade
     `);
+    await base.db.execute(sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_immutable`);
+    await base.db.execute(sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_truncate_immutable`);
     await base.reset();
   };
 

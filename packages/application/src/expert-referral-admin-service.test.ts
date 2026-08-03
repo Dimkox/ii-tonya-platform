@@ -78,4 +78,11 @@ describe("expert referral admin application boundary", () => {
     })).rejects.toThrow("invalid_admin_command");
     expect(workflows.execute).not.toHaveBeenCalled();
   });
+
+  it("rejects the feature-control sentinel for every non-feature action", async () => {
+    const workflows = { execute: vi.fn(), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await expect(service.execute(principal, { action: "expert_referral.batch_generate", objectId: "00000000-0000-0000-0000-000000000041", approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task9-sentinel", correlationId: "correlation-task9-sentinel", payload: { inviterExpertId: "00000000-0000-0000-0000-000000000041", count: 1 }, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } })).rejects.toThrow("invalid_admin_command");
+    expect(workflows.execute).not.toHaveBeenCalled();
+  });
 });

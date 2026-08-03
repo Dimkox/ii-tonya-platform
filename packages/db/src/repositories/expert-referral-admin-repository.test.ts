@@ -169,6 +169,22 @@ describe("PostgresExpertReferralAdminRepository", () => {
     await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${featureAudit.approvalId}::uuid,'expert_referral.feature_switch','00000000-0000-0000-0000-000000000041'::uuid,${`sha256:${"e".repeat(64)}`},${`sha256:${"f".repeat(64)}`},${featureAudit.sessionIdHash},2,${JSON.stringify({ version: 9 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
     const batchAudit = await testDb!.createAdminAudit({ action: "expert_referral.batch_generate", objectId, objectType: "expert" });
     await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${batchAudit.approvalId}::uuid,'expert_referral.batch_generate',${objectId}::uuid,${`sha256:${"1".repeat(64)}`},${`sha256:${"2".repeat(64)}`},${batchAudit.sessionIdHash},${JSON.stringify({ batchId: { plaintext: "secret" }, count: 1 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    await testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${audit.approvalId}::uuid,'expert_referral.code_revoke',${objectId}::uuid,${`sha256:${"3".repeat(64)}`},${`sha256:${"4".repeat(64)}`},${audit.sessionIdHash},${JSON.stringify({ id: objectId, status: "revoked" })}::jsonb)`);
+    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,${audit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"5".repeat(64)}`},${`sha256:${"6".repeat(64)}`},${`sha256:${"7".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`)).rejects.toMatchObject({ code: "23505" });
+    await expect(testDb!.db.execute(sql`truncate table expert_referral_admin_execution_results`)).rejects.toMatchObject({ code: "55000" });
+  });
+
+  it("serializes swapped cross-column approval bindings so only one insert commits", async () => {
+    const objectOne = randomUUID(), objectTwo = randomUUID();
+    const first = await testDb!.createAdminAudit({ action: "expert_referral.issuance_override", objectId: objectOne, objectType: "expert_referral_issuance_override" });
+    const second = await testDb!.createAdminAudit({ action: "expert_referral.issuance_override", objectId: objectTwo, objectType: "expert_referral_issuance_override" });
+    const hash = (character: string) => `sha256:${character.repeat(64)}`;
+    const inserts = await Promise.allSettled([
+      testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${first.approvalId}::uuid,${second.approvalId}::uuid,'expert_referral.issuance_override',${objectOne}::uuid,${hash("a")},${hash("b")},${hash("c")},${first.sessionIdHash},${JSON.stringify({ overrideId: objectOne })}::jsonb)`),
+      testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${second.approvalId}::uuid,${first.approvalId}::uuid,'expert_referral.issuance_override',${objectTwo}::uuid,${hash("d")},${hash("e")},${hash("f")},${second.sessionIdHash},${JSON.stringify({ overrideId: objectTwo })}::jsonb)`),
+    ]);
+    expect(inserts.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(inserts.filter((result) => result.status === "rejected")).toHaveLength(1);
   });
 
   it("retries the whole serializable unit without double consumption or exposing first-attempt plaintext", async () => {
