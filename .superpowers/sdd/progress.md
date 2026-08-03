@@ -56,5 +56,5 @@
 | Task | Status | Base | Implementer report | Spec review | Quality review | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | complete | `1bfae356` | `3d21f51`, PASS, 106/106 | PASS | PASS, no findings | focused Vitest 106/106; Prettier; diff check; Claw run `30778931988` PASS |
-| 2 | complete | `9e99e2e` | `ec2bc33`, PASS, 14/14 | PASS | PASS, no findings | focused Vitest 14/14; domain typecheck; Prettier; diff check |
+| 2 | complete | `9e99e2e` | `ec2bc33`, manifest-pin fix `5b7e53c` | PASS | PASS after Claw finding and re-review | 112/112; domain typecheck; deploy check; ESLint; Claw rerun pending |
 | 3–12 | pending | — | — | — | — | — |
