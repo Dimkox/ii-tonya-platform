@@ -1,4 +1,4 @@
-import type { AdminService, BookingService, CatalogService, ConversationService, PrivacyService } from "@ii-tonya/application";
+import type { AdminService, BookingService, CatalogService, ConversationService, ExpertCodeKeyring, PrivacyService } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
@@ -16,6 +16,7 @@ export interface AppDependencies {
   catalogService: CatalogService; privacyService: PrivacyService; adminService: AdminService;
   selarti: SelartiPort; telegramCallbacks: TelegramCallbackService; readiness: ReadinessProbe; logger: Logger;
   inbox: WebhookInbox; rateLimiter: RateLimitGate; telegramWebhookSecret: string; adminApprovals?: ApprovalPort;
+  expertCodeKeyring?: ExpertCodeKeyring;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -24,6 +25,9 @@ const assertDisabled = (config: RuntimeConfig): void => {
 export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
   assertDisabled(deps.config);
   const app = Fastify({ loggerInstance: deps.logger, bodyLimit: 64_000 });
+  if (deps.expertCodeKeyring !== undefined) {
+    app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
+  }
   await app.register(healthRoutes, { readiness: deps.readiness });
   await app.register(selartiWebhookRoutes, { selarti: deps.selarti, conversation: deps.conversationService, logger: deps.logger, rateLimiter: deps.rateLimiter, ...(deps.now === undefined ? {} : { now: deps.now }) });
   await app.register(telegramWebhookRoutes, { secret: deps.telegramWebhookSecret, callbacks: deps.telegramCallbacks, inbox: deps.inbox, rateLimiter: deps.rateLimiter });

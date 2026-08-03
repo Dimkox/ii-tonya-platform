@@ -16,4 +16,14 @@ describe("environment expert-code secret resolver", () => {
       expect(String(error)).not.toContain(secret);
     }
   });
+  it("rejects an invalid extra retained version even when it is not required", () => {
+    const resolver = new EnvironmentExpertCodeSecretResolver({
+      EXPERT_REFERRAL_HMAC_KEYS_JSON: JSON.stringify({ v1: key, v2: Buffer.alloc(8, 1).toString("base64url") }),
+    });
+    expect(() => resolver.resolve({
+      reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      currentVersion: "v1",
+      requiredVersions: ["v1"],
+    })).toThrow("expert_referral_key_unavailable");
+  });
 });
