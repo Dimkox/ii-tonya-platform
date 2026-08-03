@@ -16,7 +16,9 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
   "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
+  "packages/db/migrations/0021_expert_settlement_snapshot.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
+  "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
 
@@ -366,6 +368,10 @@ const approvedMigrationHashes = new Map([
     "651c8a5a99acb9c36e7cf8e99d8f9202e37bd077dfe6d8826079e7a8f402605e",
   ],
   [
+    "packages/db/migrations/0021_expert_settlement_snapshot.sql",
+    "6a19fc5e36686f25ca4bbb8137bdbf016c3a4f7bcd8599d2fefa71a2e85f1d54",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -438,8 +444,12 @@ const approvedMigrationHashes = new Map([
     "83da1296cdc198313c219a968c6f66caa7503b745a6429fc2e34feab70eaeb37",
   ],
   [
+    "packages/db/migrations/meta/0021_snapshot.json",
+    "cb0e1ee293f2ca84628151387539a9371c56cda59e1a770e05fb23f5b8639f24",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "d9273ec8f014dce3d23ac8a5128a0296f7870bae87128b60dece5cb79da678b1",
+    "bf1f7c67545e3f6c68b155d0dbcc090f3f606cf8d4d7f82b23fe1a4b39b2adc1",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

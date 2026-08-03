@@ -90,9 +90,6 @@ describe("expert residency held reward replay", () => {
       rewardGranted: false,
       eligibility: "pending_feature_hold",
     });
-    await provider().reverse(
-      payment("charged_back", order.id, "hold_chargeback"),
-    );
     await testDb!.db.transaction(async (tx) => {
       await tx.execute(sql`set local session_replication_role=replica`);
       await tx.execute(
@@ -100,20 +97,21 @@ describe("expert residency held reward replay", () => {
       );
     });
     await Promise.all([
-      provider().replayHeldReward(invitee.expertId),
+      provider().reverse(payment("charged_back", order.id, "hold_chargeback")),
       provider().replayHeldReward(invitee.expertId),
     ]);
     const marker = await testDb!.db.execute<{ eligibility: string }>(
       sql`select eligibility from expert_first_residency_settlements where expert_id=${invitee.expertId}::uuid`,
     );
     expect(marker.rows[0]!.eligibility).toBe("cancelled_by_refund");
-    expect(
-      (
-        await testDb!.db.execute(
-          sql`select count(*)::int as n from expert_referral_reward_grants where expert_id=${inviter.expertId}::uuid`,
-        )
-      ).rows[0]!.n,
-    ).toBe(0);
+    const balance = await testDb!.db.execute<{
+      available: bigint | string;
+      debt: bigint | string;
+    }>(
+      sql`select available_minor as available,debt_minor as debt from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
+    );
+    expect(BigInt(balance.rows[0]?.available ?? 0)).toBe(0n);
+    expect(BigInt(balance.rows[0]?.debt ?? 0)).toBe(0n);
   });
   it("captures an open abuse hold as permanently ineligible", async () => {
     const { invitee, order } = await setup(true, true);
@@ -127,5 +125,61 @@ describe("expert residency held reward replay", () => {
       sql`select reason_code as reason from expert_first_residency_settlements where expert_id=${invitee.expertId}::uuid`,
     );
     expect(marker.rows[0]!.reason).toBe("ineligible_abuse_hold");
+  });
+  it("locks complete expert sets deterministically for reciprocal replay", async () => {
+    const { inviter, invitee, order } = await setup(false);
+    const orderRow = await testDb!.db.execute<{ tariffId: string }>(
+      sql`select tariff_version_id as "tariffId" from expert_residency_orders where id=${order.id}::uuid`,
+    );
+    const reciprocalOrder = await new PostgresExpertResidencyRepository(
+      testDb!.db,
+    ).createCheckoutOrder({
+      expertId: inviter.expertId,
+      tariffVersionId: orderRow.rows[0]!.tariffId,
+      providerDeadline: new Date(Date.now() + 3600000),
+      idempotencyKey: randomUUID(),
+    });
+    await testDb!.db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role=replica`);
+      await tx.execute(
+        sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${randomUUID()}::uuid,${randomUUID()}::uuid,${invitee.expertId}::uuid,${inviter.expertId}::uuid)`,
+      );
+    });
+    await provider().settle(payment("settled", order.id, "reciprocal_b"));
+    await provider().settle(
+      verifiedEventFixture(
+        expertResidencyPaymentEventSchema.parse({
+          kind: "settled",
+          provider: "sandbox",
+          eventId: "reciprocal_a",
+          paymentId: "pay_hold_2",
+          orderId: reciprocalOrder.id,
+          amountMinor: "50000",
+          currency: "RUB",
+          occurredAt: "2026-08-03T00:00:00.000Z",
+          payloadDigest: `sha256:${"d".repeat(64)}`,
+        }),
+        {
+          verificationId: "verify_reciprocal_a",
+          verifierKeyVersion: "sandbox-v1",
+          verifiedAt: "2026-08-03T00:00:01.000Z",
+        },
+      ) as never,
+    );
+    await testDb!.db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role=replica`);
+      await tx.execute(
+        sql`update expert_referral_feature_controls set version=2,reward_grants_enabled=true where control_key='expert_referrals'`,
+      );
+    });
+    await expect(
+      Promise.all([
+        provider().replayHeldReward(inviter.expertId),
+        provider().replayHeldReward(invitee.expertId),
+      ]),
+    ).resolves.toEqual([
+      expect.objectContaining({ kind: "granted" }),
+      expect.objectContaining({ kind: "granted" }),
+    ]);
   });
 });

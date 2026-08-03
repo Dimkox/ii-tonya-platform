@@ -7,6 +7,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   pgView,
@@ -19,7 +20,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { adminApprovals, adminSessions } from "./audit.js";
 import { experts } from "./catalog.js";
-import { users } from "./identity.js";
+import { channelIdentities, users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -442,6 +443,7 @@ export const expertResidencyProviderEventInbox = pgTable(
       .notNull()
       .default("received"),
     resultCode: text("result_code"),
+    resultPayload: jsonb("result_payload").$type<Record<string, unknown>>(),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -507,6 +509,24 @@ export const expertFirstResidencySettlements = pgTable(
     settlementExpertActive: boolean("settlement_expert_active").notNull(),
     settlementExpertVerified: boolean("settlement_expert_verified").notNull(),
     settlementAbuseCleared: boolean("settlement_abuse_cleared").notNull(),
+    settlementControlVersion: integer("settlement_control_version")
+      .notNull()
+      .default(0),
+    settlementInviteeUserId: uuid("settlement_invitee_user_id").references(
+      () => users.id,
+    ),
+    settlementInviteeChannelIdentityId: uuid(
+      "settlement_invitee_channel_identity_id",
+    ).references(() => channelIdentities.id),
+    settlementInviterExpertId: uuid("settlement_inviter_expert_id").references(
+      () => experts.id,
+    ),
+    settlementInviterUserId: uuid("settlement_inviter_user_id").references(
+      () => users.id,
+    ),
+    settlementInviterChannelIdentityId: uuid(
+      "settlement_inviter_channel_identity_id",
+    ).references(() => channelIdentities.id),
     settledAt: timestamp("settled_at", { withTimezone: true }).notNull(),
     createdAt,
   },
@@ -549,6 +569,10 @@ export const expertFirstResidencySettlements = pgTable(
         (${table.eligibility} in ('eligible', 'pending_feature_hold') and ${table.referralId} is not null and ${table.settlementExpertActive} and ${table.settlementExpertVerified} and ${table.settlementAbuseCleared})
         or (${table.eligibility} in ('permanently_ineligible', 'cancelled_by_refund'))
       `,
+    ),
+    check(
+      "expert_first_settlement_pending_snapshot_complete",
+      sql`${table.eligibility} <> 'pending_feature_hold' or (${table.settlementInviteeUserId} is not null and ${table.settlementInviteeChannelIdentityId} is not null and ${table.settlementInviterExpertId} is not null and ${table.settlementInviterUserId} is not null and ${table.settlementInviterChannelIdentityId} is not null)`,
     ),
   ],
 );

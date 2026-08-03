@@ -68,6 +68,22 @@ function providerEvent(
     },
   ) as never;
 }
+async function seedHistoricalDebt(expertId: string, amount: bigint) {
+  const grantId = randomUUID();
+  const reversalId = randomUUID();
+  await testDb!.db.transaction(async (tx) => {
+    await tx.execute(sql`set local session_replication_role=replica`);
+    await tx.execute(
+      sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grantId}::uuid,${expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-interval '1 day',transaction_timestamp()+interval '364 days',${randomUUID()})`,
+    );
+    await tx.execute(
+      sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${reversalId}::uuid,${expertId}::uuid,'reversal',${-amount},${randomUUID()}::uuid,'historical_debt',${grantId}::uuid,${randomUUID()})`,
+    );
+    await tx.execute(
+      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${reversalId}::uuid,${grantId}::uuid,${expertId}::uuid,${-amount})`,
+    );
+  });
+}
 describe("expert residency refund and reversal", () => {
   beforeAll(async () => {
     testDb = await startExpertReferralTestDatabase();
@@ -80,16 +96,14 @@ describe("expert residency refund and reversal", () => {
       providerEvent("settled", order.id, "50000", "a1"),
     );
     const partial = providerEvent("refunded", order.id, "10000", "a2");
-    await expect(providerRepo().reverse(partial)).resolves.toMatchObject({
+    const first = await providerRepo().reverse(partial);
+    expect(first).toMatchObject({
       cashRefundedMinor: 10000n,
       restoredCreditMinor: 0n,
       rewardReversed: false,
       terminated: false,
     });
-    await expect(providerRepo().reverse(partial)).resolves.toMatchObject({
-      cashRefundedMinor: 10000n,
-      terminated: false,
-    });
+    await expect(providerRepo().reverse(partial)).resolves.toEqual(first);
     await expect(
       providerRepo().reverse(
         providerEvent("refunded", order.id, "40001", "a3"),
@@ -102,6 +116,10 @@ describe("expert residency refund and reversal", () => {
         )
       ).rows[0]!.n,
     ).toBe(1);
+    const persisted = await testDb!.db.execute<{ payload: unknown }>(
+      sql`select result_payload as payload from expert_residency_provider_event_inbox where external_event_id='a2'`,
+    );
+    expect(persisted.rows[0]!.payload).toMatchObject({ debtMinor: "0" });
   });
   it("turns historically spent reward into debt exactly once", async () => {
     const inviter = await testDb!.createExpertIdentity();
@@ -124,10 +142,19 @@ describe("expert residency refund and reversal", () => {
       )
     ).rows[0]!;
     const spend = await testDb!.db.execute<{ id: string }>(
-      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'spend',-60000,${grant.ledgerId}::uuid,'test_spend',${order.id}::uuid,${randomUUID()}) returning id`,
+      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'spend',-30000,${grant.ledgerId}::uuid,'test_spend',${order.id}::uuid,${randomUUID()}) returning id`,
     );
     await testDb!.db.execute(
-      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${spend.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-60000)`,
+      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${spend.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-30000)`,
+    );
+    const reservation = await testDb!.db.execute<{ id: string }>(
+      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'reservation',-20000,${order.id}::uuid,'test_reservation',${order.id}::uuid,${randomUUID()}) returning id`,
+    );
+    const expiry = await testDb!.db.execute<{ id: string }>(
+      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'expiry',-10000,${grant.ledgerId}::uuid,'test_expiry',${grant.id}::uuid,${randomUUID()}) returning id`,
+    );
+    await testDb!.db.execute(
+      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${reservation.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-20000),(${expiry.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-10000)`,
     );
     const chargeback = providerEvent("charged_back", order.id, "50000", "b2");
     await expect(
@@ -137,7 +164,7 @@ describe("expert residency refund and reversal", () => {
       ]),
     ).resolves.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ debtMinor: 60000n, restoredCreditMinor: 0n }),
+        expect.objectContaining({ debtMinor: 30000n, restoredCreditMinor: 0n }),
       ]),
     );
     expect(
@@ -147,5 +174,61 @@ describe("expert residency refund and reversal", () => {
         )
       ).rows[0]!.n,
     ).toBe(1);
+    expect(
+      (
+        await testDb!.db.execute(
+          sql`select count(*)::int as n from expert_referral_ledger_entries where entry_kind='release' and original_entry_id=${reservation.rows[0]!.id}::uuid`,
+        )
+      ).rows[0]!.n,
+    ).toBe(1);
   });
+  it.each([
+    [100000n, 0],
+    [60000n, 1],
+  ])(
+    "compensates debt repayment provenance for prior debt %s",
+    async (priorDebt, expectedNewGrants) => {
+      const inviter = await testDb!.createExpertIdentity();
+      const { expert, order } = await orderFixture();
+      await seedHistoricalDebt(inviter.expertId, priorDebt);
+      await testDb!.db.transaction(async (tx) => {
+        await tx.execute(sql`set local session_replication_role=replica`);
+        await tx.execute(
+          sql`insert into expert_referral_feature_controls (control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values ('expert_referrals',1,false,true,${randomUUID()}::uuid,'test')`,
+        );
+        await tx.execute(
+          sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${randomUUID()}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${expert.expertId}::uuid)`,
+        );
+      });
+      await providerRepo().settle(
+        providerEvent("settled", order.id, "50000", `debt${expectedNewGrants}`),
+      );
+      expect(
+        (
+          await testDb!.db.execute(
+            sql`select count(*)::int as n from expert_referral_reward_grants where expert_id=${inviter.expertId}::uuid and qualifying_order_id=${order.id}::uuid`,
+          )
+        ).rows[0]!.n,
+      ).toBe(expectedNewGrants);
+      const result = await providerRepo().reverse(
+        providerEvent(
+          "charged_back",
+          order.id,
+          "50000",
+          `debtcb${expectedNewGrants}`,
+        ),
+      );
+      expect(result.debtMinor).toBe(priorDebt);
+      const balance = await testDb!.db.execute<{
+        available: bigint | string;
+      }>(
+        sql`select available_minor as available from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
+      );
+      expect(BigInt(balance.rows[0]?.available ?? 0)).toBe(0n);
+      const repaymentReversal = await testDb!.db.execute<{ n: number }>(
+        sql`select count(*)::int as n from expert_referral_ledger_entries r join expert_referral_ledger_entries p on p.id=r.original_entry_id where r.entry_kind='reversal' and r.source_type='provider_reversal' and p.entry_kind='debt_repayment' and p.source_id in (select id from expert_first_residency_settlements where qualifying_order_id=${order.id}::uuid)`,
+      );
+      expect(repaymentReversal.rows[0]!.n).toBe(1);
+    },
+  );
 });

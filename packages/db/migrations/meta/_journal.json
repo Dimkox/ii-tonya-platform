@@ -148,6 +148,13 @@
       "when": 1785758400000,
       "tag": "0020_expert_provider_verification_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785762000000,
+      "tag": "0021_expert_settlement_snapshot",
+      "breakpoints": true
     }
   ]
 }

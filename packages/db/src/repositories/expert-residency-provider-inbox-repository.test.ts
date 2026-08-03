@@ -61,6 +61,10 @@ describe("expert residency provider inbox", () => {
     expect(source).toContain("'release'");
     expect(source).toContain("'spend'");
     expect(source).toContain("'debt_repayment'");
+    expect(source).toContain("from expert_referral_balances");
+    expect(source).not.toContain("expert_referral_credit_balances");
+    expect(source).toContain("repayment-reversal:");
+    expect(source).toContain("result_payload");
     expect(source).toContain("expert.rows[0].active");
     expect(source).toContain("settlement_abuse_cleared");
     expect(source).toMatch(
