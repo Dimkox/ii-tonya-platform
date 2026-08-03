@@ -8,7 +8,7 @@ const identifier = z
 const utcInstant = z.string().datetime({ offset: true });
 export const expertResidencyPaymentEventSchema = z
   .object({
-    kind: z.literal("settled"),
+    kind: z.enum(["settled", "refunded", "charged_back"]),
     provider: identifier,
     eventId: identifier,
     paymentId: identifier,
