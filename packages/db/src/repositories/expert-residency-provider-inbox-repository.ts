@@ -52,25 +52,33 @@ export class PostgresExpertResidencyProviderInboxRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         const digest = input.payloadDigest.slice("sha256:".length);
+        await tx.execute(
+          sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
+        );
         const existing = await tx.execute<{
           payloadDigest: string;
           status: string;
-          paymentId: string;
-          orderId: string;
-          amountMinor: bigint | string;
-          currency: string;
+          identityVersion: number;
+          paymentId: string | null;
+          orderId: string | null;
+          amountMinor: bigint | string | null;
+          currency: string | null;
           eventKind: string;
-          occurredAt: Date | string;
-          verificationId: string;
-          verifierKeyVersion: string;
-          verifiedAt: Date | string;
+          occurredAt: Date | string | null;
+          verificationId: string | null;
+          verifierKeyVersion: string | null;
+          verifiedAt: Date | string | null;
         }>(
-          sql`select payload_digest as "payloadDigest",status,payment_id as "paymentId",order_id as "orderId",amount_minor as "amountMinor",currency,event_kind as "eventKind",occurred_at as "occurredAt",verification_id as "verificationId",verifier_key_version as "verifierKeyVersion",verified_at as "verifiedAt" from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} for update`,
+          sql`select payload_digest as "payloadDigest",status,identity_version as "identityVersion",payment_id as "paymentId",order_id as "orderId",amount_minor as "amountMinor",currency,event_kind as "eventKind",occurred_at as "occurredAt",verification_id as "verificationId",verifier_key_version as "verifierKeyVersion",verified_at as "verifiedAt" from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} for update`,
         );
         const priorEvent = existing.rows[0];
         if (
           priorEvent &&
-          (priorEvent.payloadDigest !== digest ||
+          (priorEvent.identityVersion !== 1 ||
+            priorEvent.amountMinor === null ||
+            priorEvent.occurredAt === null ||
+            priorEvent.verifiedAt === null ||
+            priorEvent.payloadDigest !== digest ||
             priorEvent.paymentId !== input.paymentId ||
             priorEvent.orderId !== input.orderId ||
             BigInt(priorEvent.amountMinor) !== BigInt(input.amountMinor) ||
@@ -124,9 +132,6 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_EXPERT_NOT_FOUND",
           );
-        await tx.execute(
-          sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
-        );
         const attempted = await tx.execute<{ id: string }>(
           sql`insert into expert_residency_payment_attempts (order_id,provider,provider_request_id,expected_amount_minor,currency,status,idempotency_key,resolved_at) values (${order.id}::uuid,${input.provider},${input.paymentId},${input.amountMinor},${input.currency},'settled',${`settlement:${input.provider}:${input.paymentId}`},${now}) on conflict (provider,provider_request_id) do nothing returning id`,
         );
@@ -198,19 +203,47 @@ export class PostgresExpertResidencyProviderInboxRepository {
           await tx.execute(
             sql`select id from experts where id=${inviter}::uuid for update`,
           );
-          const debt = await tx.execute<{
+          const debtFacts = await tx.execute<{
+            entryId: string;
+            grantId: string;
             amount: bigint | string;
-            originalId: string | null;
+            createdAt: Date | string;
           }>(
-            sql`select greatest(-coalesce(sum(amount_minor) filter(where entry_kind not in ('reservation','release')),0),0)::bigint as amount,(array_agg(id order by created_at,id) filter(where amount_minor<0 and entry_kind not in ('reservation','release')))[1] as "originalId" from expert_referral_ledger_entries where expert_id=${inviter}::uuid`,
+            sql`select e.id as "entryId",a.reward_grant_id as "grantId",a.amount_minor as amount,e.created_at as "createdAt" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id join expert_referral_reward_grants g on g.id=a.reward_grant_id where e.expert_id=${inviter}::uuid and e.entry_kind in ('reversal','debt_repayment') order by g.expires_at,e.created_at,e.id,a.reward_grant_id for update of e,a,g`,
           );
-          const debtMinor = BigInt(debt.rows[0]?.amount ?? 0);
-          const repaid = debtMinor < 100000n ? debtMinor : 100000n;
-          const remainder = 100000n - repaid;
-          if (repaid > 0n && debt.rows[0]?.originalId)
-            await tx.execute(
-              sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter}::uuid,'debt_repayment',${repaid},${debt.rows[0].originalId}::uuid,'first_settlement',${marker.rows[0].id}::uuid,${`reward-debt:${marker.rows[0].id}`}) on conflict (idempotency_key) do nothing`,
+          const debts = new Map<
+            string,
+            { originalId: string; amount: bigint; createdAt: number }
+          >();
+          for (const fact of debtFacts.rows) {
+            const current = debts.get(fact.grantId);
+            const amount = (current?.amount ?? 0n) + BigInt(fact.amount);
+            debts.set(fact.grantId, {
+              originalId: current?.originalId ?? fact.entryId,
+              amount,
+              createdAt:
+                current?.createdAt ?? new Date(fact.createdAt).getTime(),
+            });
+          }
+          let rewardRemaining = 100000n;
+          for (const [grantId, debt] of [...debts].sort(
+            (a, b) =>
+              a[1].createdAt - b[1].createdAt || a[0].localeCompare(b[0]),
+          )) {
+            const outstanding = debt.amount < 0n ? -debt.amount : 0n;
+            if (outstanding === 0n || rewardRemaining === 0n) continue;
+            const amount =
+              outstanding < rewardRemaining ? outstanding : rewardRemaining;
+            const repayment = await tx.execute<{ id: string }>(
+              sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter}::uuid,'debt_repayment',${amount},${debt.originalId}::uuid,'first_settlement',${marker.rows[0].id}::uuid,${`reward-debt:${marker.rows[0].id}:${grantId}`}) on conflict (idempotency_key) do nothing returning id`,
             );
+            if (repayment.rows[0])
+              await tx.execute(
+                sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${repayment.rows[0].id}::uuid,${grantId}::uuid,${inviter}::uuid,${amount})`,
+              );
+            rewardRemaining -= amount;
+          }
+          const remainder = rewardRemaining;
           if (remainder > 0n) {
             const grant = await tx.execute<{ id: string }>(
               sql`insert into expert_referral_reward_grants (expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${inviter}::uuid,${referral.rows[0].id}::uuid,${marker.rows[0].id}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,100000,${now},${new Date(now.getTime() + 365 * 86400000)},${`reward:${marker.rows[0].id}`}) returning id`,

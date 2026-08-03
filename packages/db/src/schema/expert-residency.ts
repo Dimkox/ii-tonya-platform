@@ -428,17 +428,16 @@ export const expertResidencyProviderEventInbox = pgTable(
     externalEventId: text("external_event_id").notNull(),
     payloadDigest: text("payload_digest").notNull(),
     eventKind: text("event_kind").notNull(),
-    paymentId: text("payment_id").notNull(),
-    orderId: uuid("order_id")
-      .notNull()
-      .references(() => expertResidencyOrders.id),
-    amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull(),
-    currency: text("currency").notNull(),
-    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    identityVersion: integer("identity_version").notNull().default(0),
+    paymentId: text("payment_id"),
+    orderId: uuid("order_id").references(() => expertResidencyOrders.id),
+    amountMinor: pgBigint("amount_minor", { mode: "bigint" }),
+    currency: text("currency"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
     authenticated: boolean("authenticated").notNull(),
-    verificationId: text("verification_id").notNull(),
-    verifierKeyVersion: text("verifier_key_version").notNull(),
-    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+    verificationId: text("verification_id"),
+    verifierKeyVersion: text("verifier_key_version"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
     status: expertResidencyProviderEventStatus("status")
       .notNull()
       .default("received"),
@@ -472,6 +471,10 @@ export const expertResidencyProviderEventInbox = pgTable(
       sql`${table.amountMinor} >= 0 and ${table.amountMinor} <= 999999999999`,
     ),
     check("expert_provider_event_currency_rub", sql`${table.currency} = 'RUB'`),
+    check(
+      "expert_provider_event_identity_complete",
+      sql`(${table.identityVersion}=0 and ${table.paymentId} is null and ${table.orderId} is null and ${table.amountMinor} is null and ${table.currency} is null and ${table.occurredAt} is null and ${table.verificationId} is null and ${table.verifierKeyVersion} is null and ${table.verifiedAt} is null) or (${table.identityVersion}=1 and ${table.paymentId} is not null and ${table.orderId} is not null and ${table.amountMinor} is not null and ${table.currency} is not null and ${table.occurredAt} is not null and ${table.verificationId} is not null and ${table.verifierKeyVersion} is not null and ${table.verifiedAt} is not null)`,
+    ),
     check(
       "expert_provider_event_processing_state",
       sql`

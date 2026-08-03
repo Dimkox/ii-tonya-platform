@@ -104,8 +104,15 @@ describe("expert residency settlement", () => {
     const { order } = await orderFixture();
     const bad = verifiedEventFixture(
       expertResidencyPaymentEventSchema.parse({
-        ...event(order.id),
+        kind: "settled",
+        provider: "sandbox",
+        eventId: "evt_mismatch",
+        paymentId: "pay_mismatch",
+        orderId: order.id,
         amountMinor: "49999",
+        currency: "RUB",
+        occurredAt: "2026-08-03T00:00:00.000Z",
+        payloadDigest: `sha256:${"d".repeat(64)}`,
       }),
       {
         verificationId: "verify_2",

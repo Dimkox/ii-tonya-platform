@@ -651,17 +651,38 @@ describe("expert referral residency schema", () => {
     );
 
     const eventId = `event:${randomUUID()}`;
+    const legacyEventId = `legacy:${randomUUID()}`;
+    await testDb!.db.execute(
+      sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,authenticated) values ('legacy-provider',${legacyEventId},${"c".repeat(64)},'settled',true)`,
+    );
+    const legacy = await testDb!.db.execute<{
+      identityVersion: number;
+      orderId: string | null;
+    }>(
+      sql`select identity_version as "identityVersion",order_id as "orderId" from expert_residency_provider_event_inbox where provider='legacy-provider' and external_event_id=${legacyEventId}`,
+    );
+    expect(legacy.rows[0]).toEqual({ identityVersion: 0, orderId: null });
     await testDb!.db.execute(sql`
       insert into expert_residency_provider_event_inbox (
-        provider, external_event_id, payload_digest, event_kind, authenticated
-      ) values ('test-provider', ${eventId}, ${"a".repeat(64)}, 'settled', true)
+        provider, external_event_id, payload_digest, event_kind, authenticated,
+        identity_version, payment_id, order_id, amount_minor, currency,
+        occurred_at, verification_id, verifier_key_version, verified_at
+      ) values ('test-provider', ${eventId}, ${"a".repeat(64)}, 'settled', true,
+        1, ${`payment:${randomUUID()}`}, ${secondPayment.orderId}::uuid, 1000,
+        'RUB', '2026-08-03T01:00:00.000Z', ${`verify:${randomUUID()}`},
+        'test-v1', '2026-08-03T01:00:01.000Z')
     `);
     await expectDatabaseError(
       () =>
         testDb!.db.execute(sql`
           insert into expert_residency_provider_event_inbox (
-            provider, external_event_id, payload_digest, event_kind, authenticated
-          ) values ('test-provider', ${eventId}, ${"b".repeat(64)}, 'settled', true)
+            provider, external_event_id, payload_digest, event_kind, authenticated,
+            identity_version, payment_id, order_id, amount_minor, currency,
+            occurred_at, verification_id, verifier_key_version, verified_at
+          ) values ('test-provider', ${eventId}, ${"b".repeat(64)}, 'settled', true,
+            1, ${`payment:${randomUUID()}`}, ${secondPayment.orderId}::uuid, 1000,
+            'RUB', '2026-08-03T01:00:00.000Z', ${`verify:${randomUUID()}`},
+            'test-v1', '2026-08-03T01:00:01.000Z')
         `),
       { code: "23505", constraint: "expert_provider_event_unique" },
     );
