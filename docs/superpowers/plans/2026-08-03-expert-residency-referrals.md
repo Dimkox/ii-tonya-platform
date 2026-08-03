@@ -358,7 +358,7 @@ Run: `pnpm --filter @ii-tonya/db exec drizzle-kit generate --name expert_residen
 
 Expected: migration `0018_expert_residency_referrals.sql`, snapshot, and journal entry are created.
 
-Add `btree_gist`, the `[active_from, active_to)` tariff exclusion constraint, append-only triggers for grants/ledger/allocations/referrals/first-settlement markers, and derived balance/debt views. Seed nothing. An absent feature-control row is read as disabled; the first approved feature-switch command inserts version 1. Seed no tariff, code, referral, reward, order, or balance. After migration and snapshot content is final, calculate their normalized SHA-256 values and add them to `approvedMigrationHashes` in the same commit; the planned path names were already authorized in Task 1.
+Add `btree_gist`, the `[active_from, active_to)` tariff exclusion constraint, append-only triggers for grants/ledger/allocations/referrals, and derived balance/debt views. The single first-settlement marker instead has a guarded monotonic trigger: immutable identity/order/referral/settlement/captured-eligibility columns cannot change; only `pending_feature_hold -> eligible | permanently_ineligible | cancelled_by_refund` is permitted; terminal updates and every delete fail closed. Seed nothing. An absent feature-control row is read as disabled; the first approved feature-switch command inserts version 1. Seed no tariff, code, referral, reward, order, or balance. After migration and snapshot content is final, calculate their normalized SHA-256 values and add them to `approvedMigrationHashes` in the same commit; the planned path names were already authorized in Task 1.
 
 Before any 0018 DDL, execute this fail-closed guard:
 

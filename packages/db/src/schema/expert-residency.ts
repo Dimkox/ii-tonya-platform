@@ -73,7 +73,12 @@ export const expertResidencyProviderEventStatus = pgEnum(
 );
 export const expertFirstSettlementEligibility = pgEnum(
   "expert_first_settlement_eligibility",
-  ["eligible", "ineligible", "pending_feature_hold", "cancelled_by_refund"],
+  [
+    "eligible",
+    "permanently_ineligible",
+    "pending_feature_hold",
+    "cancelled_by_refund",
+  ],
 );
 export const expertReferralLedgerEntryKind = pgEnum(
   "expert_referral_ledger_entry_kind",
@@ -119,6 +124,10 @@ export const expertReferralCodeBatches = pgTable(
       sql`${table.requestedCount} between 1 and 1000`,
     ),
     unique("expert_referral_batches_approval_unique").on(table.approvalId),
+    unique("expert_referral_batches_id_inviter_unique").on(
+      table.id,
+      table.inviterExpertId,
+    ),
     index("expert_referral_batches_inviter_created_idx").on(
       table.inviterExpertId,
       table.createdAt,
@@ -130,9 +139,7 @@ export const expertReferralCodes = pgTable(
   "expert_referral_codes",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    batchId: uuid("batch_id")
-      .notNull()
-      .references(() => expertReferralCodeBatches.id),
+    batchId: uuid("batch_id").notNull(),
     inviterExpertId: uuid("inviter_expert_id")
       .notNull()
       .references(() => experts.id),
@@ -155,6 +162,18 @@ export const expertReferralCodes = pgTable(
   },
   (table) => [
     unique("expert_referral_codes_hash_unique").on(table.codeHash),
+    unique("expert_referral_codes_id_inviter_unique").on(
+      table.id,
+      table.inviterExpertId,
+    ),
+    foreignKey({
+      columns: [table.batchId, table.inviterExpertId],
+      foreignColumns: [
+        expertReferralCodeBatches.id,
+        expertReferralCodeBatches.inviterExpertId,
+      ],
+      name: "expert_referral_codes_batch_owner_fk",
+    }),
     check(
       "expert_referral_codes_hash_format",
       sql`${table.codeHash} ~ '^[0-9a-f]{64}$'`,
@@ -187,9 +206,7 @@ export const expertReferrals = pgTable(
   "expert_referrals",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    codeId: uuid("code_id")
-      .notNull()
-      .references(() => expertReferralCodes.id),
+    codeId: uuid("code_id").notNull(),
     inviterExpertId: uuid("inviter_expert_id")
       .notNull()
       .references(() => experts.id),
@@ -203,6 +220,22 @@ export const expertReferrals = pgTable(
   (table) => [
     unique("expert_referrals_code_unique").on(table.codeId),
     unique("expert_referrals_invitee_unique").on(table.inviteeExpertId),
+    unique("expert_referrals_id_inviter_unique").on(
+      table.id,
+      table.inviterExpertId,
+    ),
+    unique("expert_referrals_id_invitee_unique").on(
+      table.id,
+      table.inviteeExpertId,
+    ),
+    foreignKey({
+      columns: [table.codeId, table.inviterExpertId],
+      foreignColumns: [
+        expertReferralCodes.id,
+        expertReferralCodes.inviterExpertId,
+      ],
+      name: "expert_referrals_code_owner_fk",
+    }),
     check(
       "expert_referrals_distinct_experts",
       sql`${table.inviterExpertId} <> ${table.inviteeExpertId}`,
@@ -279,6 +312,7 @@ export const expertResidencyOrders = pgTable(
       table.expertId,
       table.idempotencyKey,
     ),
+    unique("expert_orders_id_expert_unique").on(table.id, table.expertId),
     uniqueIndex("expert_orders_provider_payment_unique")
       .on(table.providerPaymentId)
       .where(sql`${table.providerPaymentId} is not null`),
@@ -352,6 +386,10 @@ export const expertResidencyPaymentAttempts = pgTable(
     ),
     unique("expert_payment_attempt_idempotency_unique").on(
       table.idempotencyKey,
+    ),
+    unique("expert_payment_attempt_id_order_unique").on(
+      table.id,
+      table.orderId,
     ),
     check(
       "expert_payment_attempt_amount_bounds",
@@ -428,10 +466,9 @@ export const expertFirstResidencySettlements = pgTable(
     settlementSequence: bigserial("settlement_sequence", {
       mode: "bigint",
     }).notNull(),
-    qualifyingOrderId: uuid("qualifying_order_id")
-      .notNull()
-      .references(() => expertResidencyOrders.id),
-    referralId: uuid("referral_id").references(() => expertReferrals.id),
+    qualifyingOrderId: uuid("qualifying_order_id").notNull(),
+    qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
+    referralId: uuid("referral_id"),
     eligibility: expertFirstSettlementEligibility("eligibility").notNull(),
     reasonCode: text("reason_code").notNull(),
     settlementExpertActive: boolean("settlement_expert_active").notNull(),
@@ -446,11 +483,38 @@ export const expertFirstResidencySettlements = pgTable(
     unique("expert_first_settlement_sequence_unique").on(
       table.settlementSequence,
     ),
+    unique("expert_first_settlement_identity_unique").on(
+      table.id,
+      table.referralId,
+      table.qualifyingOrderId,
+      table.qualifyingPaymentAttemptId,
+    ),
+    foreignKey({
+      columns: [table.qualifyingOrderId, table.expertId],
+      foreignColumns: [
+        expertResidencyOrders.id,
+        expertResidencyOrders.expertId,
+      ],
+      name: "expert_first_settlement_order_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.qualifyingPaymentAttemptId, table.qualifyingOrderId],
+      foreignColumns: [
+        expertResidencyPaymentAttempts.id,
+        expertResidencyPaymentAttempts.orderId,
+      ],
+      name: "expert_first_settlement_payment_order_fk",
+    }),
+    foreignKey({
+      columns: [table.referralId, table.expertId],
+      foreignColumns: [expertReferrals.id, expertReferrals.inviteeExpertId],
+      name: "expert_first_settlement_referral_invitee_fk",
+    }),
     check(
       "expert_first_settlement_eligibility_evidence",
       sql`
         (${table.eligibility} in ('eligible', 'pending_feature_hold') and ${table.referralId} is not null and ${table.settlementExpertActive} and ${table.settlementExpertVerified} and ${table.settlementAbuseCleared})
-        or (${table.eligibility} in ('ineligible', 'cancelled_by_refund'))
+        or (${table.eligibility} in ('permanently_ineligible', 'cancelled_by_refund'))
       `,
     ),
   ],
@@ -463,15 +527,10 @@ export const expertReferralRewardGrants = pgTable(
     expertId: uuid("expert_id")
       .notNull()
       .references(() => experts.id),
-    referralId: uuid("referral_id")
-      .notNull()
-      .references(() => expertReferrals.id),
-    firstSettlementId: uuid("first_settlement_id")
-      .notNull()
-      .references(() => expertFirstResidencySettlements.id),
-    qualifyingOrderId: uuid("qualifying_order_id")
-      .notNull()
-      .references(() => expertResidencyOrders.id),
+    referralId: uuid("referral_id").notNull(),
+    firstSettlementId: uuid("first_settlement_id").notNull(),
+    qualifyingOrderId: uuid("qualifying_order_id").notNull(),
+    qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
     amountMinor: pgBigint("amount_minor", { mode: "bigint" })
       .notNull()
       .default(sql`100000`),
@@ -490,7 +549,34 @@ export const expertReferralRewardGrants = pgTable(
     unique("expert_reward_grants_qualifying_order_unique").on(
       table.qualifyingOrderId,
     ),
+    unique("expert_reward_grants_qualifying_payment_unique").on(
+      table.qualifyingPaymentAttemptId,
+    ),
+    unique("expert_reward_grants_id_expert_unique").on(
+      table.id,
+      table.expertId,
+    ),
     unique("expert_reward_grants_idempotency_unique").on(table.idempotencyKey),
+    foreignKey({
+      columns: [table.referralId, table.expertId],
+      foreignColumns: [expertReferrals.id, expertReferrals.inviterExpertId],
+      name: "expert_reward_grants_referral_inviter_fk",
+    }),
+    foreignKey({
+      columns: [
+        table.firstSettlementId,
+        table.referralId,
+        table.qualifyingOrderId,
+        table.qualifyingPaymentAttemptId,
+      ],
+      foreignColumns: [
+        expertFirstResidencySettlements.id,
+        expertFirstResidencySettlements.referralId,
+        expertFirstResidencySettlements.qualifyingOrderId,
+        expertFirstResidencySettlements.qualifyingPaymentAttemptId,
+      ],
+      name: "expert_reward_grants_first_marker_fk",
+    }),
     check(
       "expert_reward_grant_exact_amount",
       sql`${table.amountMinor} = 100000`,
@@ -530,6 +616,10 @@ export const expertReferralLedgerEntries = pgTable(
   },
   (table) => [
     unique("expert_ledger_idempotency_unique").on(table.idempotencyKey),
+    unique("expert_ledger_entries_id_expert_unique").on(
+      table.id,
+      table.expertId,
+    ),
     foreignKey({
       columns: [table.originalEntryId],
       foreignColumns: [table.id],
@@ -566,12 +656,9 @@ export const expertReferralLedgerEntries = pgTable(
 export const expertReferralLedgerAllocations = pgTable(
   "expert_referral_ledger_allocations",
   {
-    ledgerEntryId: uuid("ledger_entry_id")
-      .notNull()
-      .references(() => expertReferralLedgerEntries.id),
-    rewardGrantId: uuid("reward_grant_id")
-      .notNull()
-      .references(() => expertReferralRewardGrants.id),
+    ledgerEntryId: uuid("ledger_entry_id").notNull(),
+    rewardGrantId: uuid("reward_grant_id").notNull(),
+    expertId: uuid("expert_id").notNull(),
     amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull(),
     createdAt,
   },
@@ -579,6 +666,22 @@ export const expertReferralLedgerAllocations = pgTable(
     primaryKey({
       columns: [table.ledgerEntryId, table.rewardGrantId],
       name: "expert_ledger_allocations_pk",
+    }),
+    foreignKey({
+      columns: [table.ledgerEntryId, table.expertId],
+      foreignColumns: [
+        expertReferralLedgerEntries.id,
+        expertReferralLedgerEntries.expertId,
+      ],
+      name: "expert_ledger_allocations_entry_owner_fk",
+    }),
+    foreignKey({
+      columns: [table.rewardGrantId, table.expertId],
+      foreignColumns: [
+        expertReferralRewardGrants.id,
+        expertReferralRewardGrants.expertId,
+      ],
+      name: "expert_ledger_allocations_grant_owner_fk",
     }),
     check(
       "expert_ledger_allocation_nonzero",
@@ -766,10 +869,21 @@ export const expertReferralBalances = pgView("expert_referral_balances", {
       coalesce(-sum(amount_minor) filter (where entry_kind = 'expiry'), 0)::bigint as expired_minor
     from expert_referral_ledger_entries
     group by expert_id
+  ), grant_remaining as (
+    select
+      g.id,
+      g.expert_id,
+      g.expires_at,
+      coalesce(sum(a.amount_minor), 0)::bigint as remaining_minor
+    from expert_referral_reward_grants g
+    left join expert_referral_ledger_allocations a
+      on a.reward_grant_id = g.id
+    where g.expires_at > transaction_timestamp()
+    group by g.id, g.expert_id, g.expires_at
+    having sum(a.amount_minor) > 0
   ), grant_expiry as (
     select expert_id, min(expires_at) as nearest_expiry_at
-    from expert_referral_reward_grants
-    where expires_at > transaction_timestamp()
+    from grant_remaining
     group by expert_id
   )
   select

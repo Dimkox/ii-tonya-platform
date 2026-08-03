@@ -14,6 +14,7 @@ import {
   adminSessions,
   channelIdentities,
   clientProfiles,
+  experts,
   integrationInbox,
   integrationErrors,
   integrationOutbox,
@@ -80,10 +81,25 @@ describe("authoritative Drizzle schema parity", () => {
       return names(table as AnyPgTable);
     };
 
+    expect(names(experts).uniques).toEqual(["experts_user_id_unique"]);
+    expect(requiredTable("expertReferralCodeBatches")?.uniques).toContain(
+      "expert_referral_batches_id_inviter_unique",
+    );
+    expect(requiredTable("expertReferralCodes")).toMatchObject({
+      foreignKeys: expect.arrayContaining([
+        "expert_referral_codes_batch_owner_fk",
+      ]),
+      uniques: expect.arrayContaining([
+        "expert_referral_codes_id_inviter_unique",
+      ]),
+    });
     expect(requiredTable("expertReferrals")).toMatchObject({
       checks: ["expert_referrals_distinct_experts"],
+      foreignKeys: expect.arrayContaining(["expert_referrals_code_owner_fk"]),
       uniques: [
         "expert_referrals_code_unique",
+        "expert_referrals_id_invitee_unique",
+        "expert_referrals_id_inviter_unique",
         "expert_referrals_invitee_unique",
       ],
     });
@@ -97,22 +113,53 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_order_money_bounds",
         "expert_order_settlement_interval",
       ],
-      uniques: ["expert_orders_expert_idempotency_unique"],
+      uniques: [
+        "expert_orders_expert_idempotency_unique",
+        "expert_orders_id_expert_unique",
+      ],
+    });
+    expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
+      "expert_payment_attempt_id_order_unique",
+      "expert_payment_attempt_idempotency_unique",
+      "expert_payment_attempt_provider_request_unique",
+    ]);
+    expect(requiredTable("expertFirstResidencySettlements")).toMatchObject({
+      foreignKeys: expect.arrayContaining([
+        "expert_first_settlement_order_owner_fk",
+        "expert_first_settlement_payment_order_fk",
+        "expert_first_settlement_referral_invitee_fk",
+      ]),
+      uniques: expect.arrayContaining([
+        "expert_first_settlement_identity_unique",
+      ]),
     });
     expect(requiredTable("expertReferralRewardGrants")).toMatchObject({
       checks: [
         "expert_reward_grant_exact_amount",
         "expert_reward_grant_expiry_exact",
       ],
+      foreignKeys: expect.arrayContaining([
+        "expert_reward_grants_first_marker_fk",
+        "expert_reward_grants_referral_inviter_fk",
+      ]),
       uniques: [
         "expert_reward_grants_first_settlement_unique",
+        "expert_reward_grants_id_expert_unique",
         "expert_reward_grants_idempotency_unique",
         "expert_reward_grants_qualifying_order_unique",
+        "expert_reward_grants_qualifying_payment_unique",
         "expert_reward_grants_referral_unique",
       ],
     });
+    expect(requiredTable("expertReferralLedgerEntries")?.uniques).toContain(
+      "expert_ledger_entries_id_expert_unique",
+    );
     expect(requiredTable("expertReferralLedgerAllocations")).toMatchObject({
       checks: ["expert_ledger_allocation_nonzero"],
+      foreignKeys: [
+        "expert_ledger_allocations_entry_owner_fk",
+        "expert_ledger_allocations_grant_owner_fk",
+      ],
     });
     expect(requiredTable("expertReferralFeatureControls")).toMatchObject({
       checks: [
@@ -348,6 +395,8 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_referral_controls_singleton",
       "expert_provider_event_unique",
       "expert_referral_append_only",
+      "expert_first_settlement_guard",
+      "expert_ledger_allocations_exact_total",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
   });
@@ -363,6 +412,9 @@ describe("authoritative Drizzle schema parity", () => {
     expect(Object.keys(snapshot.tables ?? {})).toHaveLength(54);
     expect(snapshot.views).toHaveProperty("public.package_balances");
     expect(snapshot.views).toHaveProperty("public.expert_referral_balances");
+    const balanceView = snapshot.views?.["public.expert_referral_balances"] as
+      { definition?: string } | undefined;
+    expect(balanceView?.definition).toContain("having sum(a.amount_minor) > 0");
     const expertsTable = snapshot.tables?.["public.experts"] as
       { uniqueConstraints?: Record<string, unknown> } | undefined;
     expect(expertsTable?.uniqueConstraints).toHaveProperty(

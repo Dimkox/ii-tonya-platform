@@ -1,5 +1,5 @@
 {
-  "id": "19a7f2cb-91be-4e0a-8771-73e9f1e885ca",
+  "id": "d8b86664-60da-4792-bd5f-32b5e67a4ab1",
   "prevId": "a39874cd-f2d5-4228-99c6-832a751ba7b9",
   "version": "7",
   "dialect": "postgresql",
@@ -54,12 +54,8 @@
           "name": "channel_identities_user_id_users_id_fk",
           "tableFrom": "channel_identities",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -69,10 +65,7 @@
         "channel_identities_provider_external_unique": {
           "name": "channel_identities_provider_external_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_id"
-          ]
+          "columns": ["provider", "external_id"]
         }
       },
       "policies": {},
@@ -128,12 +121,8 @@
           "name": "client_profiles_user_id_users_id_fk",
           "tableFrom": "client_profiles",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -198,12 +187,8 @@
           "name": "consents_user_id_users_id_fk",
           "tableFrom": "consents",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -270,12 +255,8 @@
           "name": "provider_subject_mappings_user_id_users_id_fk",
           "tableFrom": "provider_subject_mappings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -285,10 +266,7 @@
         "provider_subject_mappings_provider_token_unique": {
           "name": "provider_subject_mappings_provider_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "subject_token"
-          ]
+          "columns": ["provider", "subject_token"]
         }
       },
       "policies": {},
@@ -405,12 +383,8 @@
           "name": "expert_services_expert_id_experts_id_fk",
           "tableFrom": "expert_services",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -479,12 +453,8 @@
           "name": "experts_user_id_users_id_fk",
           "tableFrom": "experts",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -494,9 +464,7 @@
         "experts_user_id_unique": {
           "name": "experts_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
+          "columns": ["user_id"]
         }
       },
       "policies": {},
@@ -577,12 +545,8 @@
           "name": "slots_expert_service_id_expert_services_id_fk",
           "tableFrom": "slots",
           "tableTo": "expert_services",
-          "columnsFrom": [
-            "expert_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_service_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -592,10 +556,7 @@
         "slots_provider_external_unique": {
           "name": "slots_provider_external_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_slot_id"
-          ]
+          "columns": ["provider", "external_slot_id"]
         }
       },
       "policies": {},
@@ -681,12 +642,8 @@
           "name": "feedback_reservation_id_reservations_id_fk",
           "tableFrom": "feedback",
           "tableTo": "reservations",
-          "columnsFrom": [
-            "reservation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reservation_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -694,12 +651,8 @@
           "name": "feedback_user_id_users_id_fk",
           "tableFrom": "feedback",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -709,9 +662,7 @@
         "feedback_source_event_unique": {
           "name": "feedback_source_event_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "source_event_id"
-          ]
+          "columns": ["source_event_id"]
         }
       },
       "policies": {},
@@ -821,12 +772,8 @@
           "name": "notifications_reservation_id_reservations_id_fk",
           "tableFrom": "notifications",
           "tableTo": "reservations",
-          "columnsFrom": [
-            "reservation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reservation_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -834,12 +781,8 @@
           "name": "notifications_callback_expert_id_experts_id_fk",
           "tableFrom": "notifications",
           "tableTo": "experts",
-          "columnsFrom": [
-            "callback_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["callback_expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -849,9 +792,7 @@
         "notifications_idempotency_unique": {
           "name": "notifications_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -990,12 +931,8 @@
           "name": "reservations_user_id_users_id_fk",
           "tableFrom": "reservations",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1003,12 +940,8 @@
           "name": "reservations_slot_id_slots_id_fk",
           "tableFrom": "reservations",
           "tableTo": "slots",
-          "columnsFrom": [
-            "slot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["slot_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1016,12 +949,8 @@
           "name": "reservations_expert_id_experts_id_fk",
           "tableFrom": "reservations",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1029,12 +958,8 @@
           "name": "reservations_expert_service_id_expert_services_id_fk",
           "tableFrom": "reservations",
           "tableTo": "expert_services",
-          "columnsFrom": [
-            "expert_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_service_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1044,9 +969,7 @@
         "reservations_idempotency_unique": {
           "name": "reservations_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -1115,12 +1038,8 @@
           "name": "message_events_user_id_users_id_fk",
           "tableFrom": "message_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1130,10 +1049,7 @@
         "message_events_provider_external_unique": {
           "name": "message_events_provider_external_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_message_id"
-          ]
+          "columns": ["provider", "external_message_id"]
         }
       },
       "policies": {},
@@ -1305,12 +1221,8 @@
           "name": "message_ledger_entries_package_id_message_packages_id_fk",
           "tableFrom": "message_ledger_entries",
           "tableTo": "message_packages",
-          "columnsFrom": [
-            "package_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["package_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1318,12 +1230,8 @@
           "name": "message_ledger_entries_message_event_id_message_events_id_fk",
           "tableFrom": "message_ledger_entries",
           "tableTo": "message_events",
-          "columnsFrom": [
-            "message_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["message_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1331,12 +1239,8 @@
           "name": "message_ledger_entries_admin_approval_id_admin_approvals_id_fk",
           "tableFrom": "message_ledger_entries",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "admin_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1344,12 +1248,8 @@
           "name": "message_ledger_entries_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "message_ledger_entries",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "admin_requester_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["admin_requester_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1357,12 +1257,8 @@
           "name": "message_ledger_original_entry_fk",
           "tableFrom": "message_ledger_entries",
           "tableTo": "message_ledger_entries",
-          "columnsFrom": [
-            "original_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["original_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1372,9 +1268,7 @@
         "message_ledger_idempotency_unique": {
           "name": "message_ledger_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -1512,12 +1406,8 @@
           "name": "message_packages_user_id_users_id_fk",
           "tableFrom": "message_packages",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1525,12 +1415,8 @@
           "name": "message_packages_admin_approval_id_admin_approvals_id_fk",
           "tableFrom": "message_packages",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "admin_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1538,12 +1424,8 @@
           "name": "message_packages_admin_requester_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "message_packages",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "admin_requester_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["admin_requester_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1553,9 +1435,7 @@
         "message_packages_grant_idempotency_unique": {
           "name": "message_packages_grant_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "grant_idempotency_key"
-          ]
+          "columns": ["grant_idempotency_key"]
         }
       },
       "policies": {},
@@ -1622,12 +1502,8 @@
           "name": "conversation_messages_conversation_id_conversations_id_fk",
           "tableFrom": "conversation_messages",
           "tableTo": "conversations",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1676,12 +1552,8 @@
           "name": "conversations_user_id_users_id_fk",
           "tableFrom": "conversations",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1779,12 +1651,8 @@
           "name": "human_escalations_incident_id_safety_incidents_id_fk",
           "tableFrom": "human_escalations",
           "tableTo": "safety_incidents",
-          "columnsFrom": [
-            "incident_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["incident_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1792,12 +1660,8 @@
           "name": "human_escalations_owner_id_users_id_fk",
           "tableFrom": "human_escalations",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1852,10 +1716,7 @@
         "prompt_versions_name_version_unique": {
           "name": "prompt_versions_name_version_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name",
-            "version"
-          ]
+          "columns": ["name", "version"]
         }
       },
       "policies": {},
@@ -1905,12 +1766,8 @@
           "name": "safety_incidents_conversation_id_conversations_id_fk",
           "tableFrom": "safety_incidents",
           "tableTo": "conversations",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2080,12 +1937,8 @@
           "name": "admin_approvals_requester_id_users_id_fk",
           "tableFrom": "admin_approvals",
           "tableTo": "users",
-          "columnsFrom": [
-            "requester_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requester_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2093,12 +1946,8 @@
           "name": "admin_approvals_approver_id_users_id_fk",
           "tableFrom": "admin_approvals",
           "tableTo": "users",
-          "columnsFrom": [
-            "approver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2177,12 +2026,8 @@
           "name": "admin_case_actions_actor_id_users_id_fk",
           "tableFrom": "admin_case_actions",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2190,12 +2035,8 @@
           "name": "admin_case_actions_approval_id_admin_approvals_id_fk",
           "tableFrom": "admin_case_actions",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2205,18 +2046,12 @@
         "admin_case_actions_object_action_unique": {
           "name": "admin_case_actions_object_action_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "object_type",
-            "object_id",
-            "action"
-          ]
+          "columns": ["object_type", "object_id", "action"]
         },
         "admin_case_actions_approval_unique": {
           "name": "admin_case_actions_approval_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "approval_id"
-          ]
+          "columns": ["approval_id"]
         }
       },
       "policies": {},
@@ -2275,12 +2110,8 @@
           "name": "admin_object_assignments_admin_id_users_id_fk",
           "tableFrom": "admin_object_assignments",
           "tableTo": "users",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2290,11 +2121,7 @@
         "admin_object_assignments_scope_unique": {
           "name": "admin_object_assignments_scope_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "admin_id",
-            "object_type",
-            "object_id"
-          ]
+          "columns": ["admin_id", "object_type", "object_id"]
         }
       },
       "policies": {},
@@ -2343,12 +2170,8 @@
           "name": "admin_role_assignments_admin_id_users_id_fk",
           "tableFrom": "admin_role_assignments",
           "tableTo": "users",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2358,10 +2181,7 @@
         "admin_role_assignments_admin_role_unique": {
           "name": "admin_role_assignments_admin_role_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "admin_id",
-            "role"
-          ]
+          "columns": ["admin_id", "role"]
         }
       },
       "policies": {},
@@ -2421,12 +2241,8 @@
           "name": "admin_sessions_admin_id_users_id_fk",
           "tableFrom": "admin_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2627,12 +2443,8 @@
           "name": "privacy_deletion_jobs_user_id_users_id_fk",
           "tableFrom": "privacy_deletion_jobs",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2642,10 +2454,7 @@
         "privacy_deletion_jobs_subject_idempotency_unique": {
           "name": "privacy_deletion_jobs_subject_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "idempotency_key"
-          ]
+          "columns": ["user_id", "idempotency_key"]
         }
       },
       "policies": {},
@@ -2719,12 +2528,8 @@
           "name": "privacy_deletion_manifests_deletion_job_id_privacy_deletion_jobs_id_fk",
           "tableFrom": "privacy_deletion_manifests",
           "tableTo": "privacy_deletion_jobs",
-          "columnsFrom": [
-            "deletion_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deletion_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2734,10 +2539,7 @@
         "privacy_deletion_manifests_job_processor_unique": {
           "name": "privacy_deletion_manifests_job_processor_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "deletion_job_id",
-            "processor"
-          ]
+          "columns": ["deletion_job_id", "processor"]
         }
       },
       "policies": {},
@@ -2806,12 +2608,8 @@
           "name": "privacy_processor_attempts_deletion_job_id_privacy_deletion_jobs_id_fk",
           "tableFrom": "privacy_processor_attempts",
           "tableTo": "privacy_deletion_jobs",
-          "columnsFrom": [
-            "deletion_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["deletion_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2821,17 +2619,12 @@
         "privacy_processor_attempts_job_processor_unique": {
           "name": "privacy_processor_attempts_job_processor_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "deletion_job_id",
-            "processor"
-          ]
+          "columns": ["deletion_job_id", "processor"]
         },
         "privacy_processor_attempts_idempotency_unique": {
           "name": "privacy_processor_attempts_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -2959,12 +2752,8 @@
           "name": "dead_letters_outbox_id_integration_outbox_id_fk",
           "tableFrom": "dead_letters",
           "tableTo": "integration_outbox",
-          "columnsFrom": [
-            "outbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["outbox_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2974,9 +2763,7 @@
         "dead_letters_outbox_unique": {
           "name": "dead_letters_outbox_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "outbox_id"
-          ]
+          "columns": ["outbox_id"]
         }
       },
       "policies": {},
@@ -3052,12 +2839,8 @@
           "name": "delivery_attempts_outbox_id_integration_outbox_id_fk",
           "tableFrom": "delivery_attempts",
           "tableTo": "integration_outbox",
-          "columnsFrom": [
-            "outbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["outbox_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3200,12 +2983,8 @@
           "name": "integration_inbox_message_event_id_message_events_id_fk",
           "tableFrom": "integration_inbox",
           "tableTo": "message_events",
-          "columnsFrom": [
-            "message_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["message_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3215,10 +2994,7 @@
         "integration_inbox_provider_event_unique": {
           "name": "integration_inbox_provider_event_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_event_id"
-          ]
+          "columns": ["provider", "external_event_id"]
         }
       },
       "policies": {},
@@ -3418,9 +3194,7 @@
         "integration_outbox_idempotency_unique": {
           "name": "integration_outbox_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -3473,12 +3247,8 @@
           "name": "outbox_operator_alerts_outbox_id_integration_outbox_id_fk",
           "tableFrom": "outbox_operator_alerts",
           "tableTo": "integration_outbox",
-          "columnsFrom": [
-            "outbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["outbox_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3488,10 +3258,7 @@
         "outbox_operator_alerts_outbox_reason_unique": {
           "name": "outbox_operator_alerts_outbox_reason_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "outbox_id",
-            "reason_code"
-          ]
+          "columns": ["outbox_id", "reason_code"]
         }
       },
       "policies": {},
@@ -3543,9 +3310,7 @@
         "projection_checkpoints_projection_unique": {
           "name": "projection_checkpoints_projection_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "projection"
-          ]
+          "columns": ["projection"]
         }
       },
       "policies": {},
@@ -3597,9 +3362,7 @@
         "provider_cursors_provider_unique": {
           "name": "provider_cursors_provider_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider"
-          ]
+          "columns": ["provider"]
         }
       },
       "policies": {},
@@ -3649,12 +3412,8 @@
           "name": "reconciliation_mismatches_reconciliation_run_id_reconciliation_runs_id_fk",
           "tableFrom": "reconciliation_mismatches",
           "tableTo": "reconciliation_runs",
-          "columnsFrom": [
-            "reconciliation_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reconciliation_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3662,12 +3421,8 @@
           "name": "reconciliation_mismatches_outbox_id_integration_outbox_id_fk",
           "tableFrom": "reconciliation_mismatches",
           "tableTo": "integration_outbox",
-          "columnsFrom": [
-            "outbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["outbox_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3808,10 +3563,7 @@
         "webhook_inbox_provider_event_unique": {
           "name": "webhook_inbox_provider_event_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_event_id"
-          ]
+          "columns": ["provider", "external_event_id"]
         }
       },
       "policies": {},
@@ -3848,6 +3600,12 @@
         },
         "qualifying_order_id": {
           "name": "qualifying_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qualifying_payment_attempt_id": {
+          "name": "qualifying_payment_attempt_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -3909,38 +3667,38 @@
           "name": "expert_first_residency_settlements_expert_id_experts_id_fk",
           "tableFrom": "expert_first_residency_settlements",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "expert_first_residency_settlements_qualifying_order_id_expert_residency_orders_id_fk": {
-          "name": "expert_first_residency_settlements_qualifying_order_id_expert_residency_orders_id_fk",
+        "expert_first_settlement_order_owner_fk": {
+          "name": "expert_first_settlement_order_owner_fk",
           "tableFrom": "expert_first_residency_settlements",
           "tableTo": "expert_residency_orders",
-          "columnsFrom": [
-            "qualifying_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["qualifying_order_id", "expert_id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "expert_first_residency_settlements_referral_id_expert_referrals_id_fk": {
-          "name": "expert_first_residency_settlements_referral_id_expert_referrals_id_fk",
+        "expert_first_settlement_payment_order_fk": {
+          "name": "expert_first_settlement_payment_order_fk",
+          "tableFrom": "expert_first_residency_settlements",
+          "tableTo": "expert_residency_payment_attempts",
+          "columnsFrom": [
+            "qualifying_payment_attempt_id",
+            "qualifying_order_id"
+          ],
+          "columnsTo": ["id", "order_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "expert_first_settlement_referral_invitee_fk": {
+          "name": "expert_first_settlement_referral_invitee_fk",
           "tableFrom": "expert_first_residency_settlements",
           "tableTo": "expert_referrals",
-          "columnsFrom": [
-            "referral_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["referral_id", "expert_id"],
+          "columnsTo": ["id", "invitee_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3950,22 +3708,26 @@
         "expert_first_settlement_expert_unique": {
           "name": "expert_first_settlement_expert_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "expert_id"
-          ]
+          "columns": ["expert_id"]
         },
         "expert_first_settlement_order_unique": {
           "name": "expert_first_settlement_order_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "qualifying_order_id"
-          ]
+          "columns": ["qualifying_order_id"]
         },
         "expert_first_settlement_sequence_unique": {
           "name": "expert_first_settlement_sequence_unique",
           "nullsNotDistinct": false,
+          "columns": ["settlement_sequence"]
+        },
+        "expert_first_settlement_identity_unique": {
+          "name": "expert_first_settlement_identity_unique",
+          "nullsNotDistinct": false,
           "columns": [
-            "settlement_sequence"
+            "id",
+            "referral_id",
+            "qualifying_order_id",
+            "qualifying_payment_attempt_id"
           ]
         }
       },
@@ -3973,7 +3735,7 @@
       "checkConstraints": {
         "expert_first_settlement_eligibility_evidence": {
           "name": "expert_first_settlement_eligibility_evidence",
-          "value": "\n        (\"expert_first_residency_settlements\".\"eligibility\" in ('eligible', 'pending_feature_hold') and \"expert_first_residency_settlements\".\"referral_id\" is not null and \"expert_first_residency_settlements\".\"settlement_expert_active\" and \"expert_first_residency_settlements\".\"settlement_expert_verified\" and \"expert_first_residency_settlements\".\"settlement_abuse_cleared\")\n        or (\"expert_first_residency_settlements\".\"eligibility\" in ('ineligible', 'cancelled_by_refund'))\n      "
+          "value": "\n        (\"expert_first_residency_settlements\".\"eligibility\" in ('eligible', 'pending_feature_hold') and \"expert_first_residency_settlements\".\"referral_id\" is not null and \"expert_first_residency_settlements\".\"settlement_expert_active\" and \"expert_first_residency_settlements\".\"settlement_expert_verified\" and \"expert_first_residency_settlements\".\"settlement_abuse_cleared\")\n        or (\"expert_first_residency_settlements\".\"eligibility\" in ('permanently_ineligible', 'cancelled_by_refund'))\n      "
         }
       },
       "isRLSEnabled": false
@@ -4099,12 +3861,8 @@
           "name": "expert_referral_abuse_holds_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_abuse_holds",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4112,12 +3870,8 @@
           "name": "expert_referral_abuse_holds_opened_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_abuse_holds",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "opened_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["opened_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4125,12 +3879,8 @@
           "name": "expert_referral_abuse_holds_opened_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_abuse_holds",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "opened_admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["opened_admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4138,12 +3888,8 @@
           "name": "expert_referral_abuse_holds_closed_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_abuse_holds",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "closed_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["closed_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4151,12 +3897,8 @@
           "name": "expert_referral_abuse_holds_closed_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_abuse_holds",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "closed_admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["closed_admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4166,9 +3908,7 @@
         "expert_abuse_holds_opened_approval_unique": {
           "name": "expert_abuse_holds_opened_approval_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "opened_approval_id"
-          ]
+          "columns": ["opened_approval_id"]
         }
       },
       "policies": {},
@@ -4269,12 +4009,8 @@
           "name": "expert_referral_code_batches_inviter_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_code_batches",
           "tableTo": "experts",
-          "columnsFrom": [
-            "inviter_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4282,12 +4018,8 @@
           "name": "expert_referral_code_batches_issued_by_admin_id_users_id_fk",
           "tableFrom": "expert_referral_code_batches",
           "tableTo": "users",
-          "columnsFrom": [
-            "issued_by_admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issued_by_admin_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4295,12 +4027,8 @@
           "name": "expert_referral_code_batches_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_code_batches",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4308,12 +4036,8 @@
           "name": "expert_referral_code_batches_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_code_batches",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4323,9 +4047,12 @@
         "expert_referral_batches_approval_unique": {
           "name": "expert_referral_batches_approval_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "approval_id"
-          ]
+          "columns": ["approval_id"]
+        },
+        "expert_referral_batches_id_inviter_unique": {
+          "name": "expert_referral_batches_id_inviter_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "inviter_expert_id"]
         }
       },
       "policies": {},
@@ -4455,29 +4182,12 @@
         }
       },
       "foreignKeys": {
-        "expert_referral_codes_batch_id_expert_referral_code_batches_id_fk": {
-          "name": "expert_referral_codes_batch_id_expert_referral_code_batches_id_fk",
-          "tableFrom": "expert_referral_codes",
-          "tableTo": "expert_referral_code_batches",
-          "columnsFrom": [
-            "batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "expert_referral_codes_inviter_expert_id_experts_id_fk": {
           "name": "expert_referral_codes_inviter_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_codes",
           "tableTo": "experts",
-          "columnsFrom": [
-            "inviter_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4485,12 +4195,8 @@
           "name": "expert_referral_codes_revoked_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_codes",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "revoked_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["revoked_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4498,12 +4204,17 @@
           "name": "expert_referral_codes_revoked_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_codes",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "revoked_admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["revoked_admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "expert_referral_codes_batch_owner_fk": {
+          "name": "expert_referral_codes_batch_owner_fk",
+          "tableFrom": "expert_referral_codes",
+          "tableTo": "expert_referral_code_batches",
+          "columnsFrom": ["batch_id", "inviter_expert_id"],
+          "columnsTo": ["id", "inviter_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4513,9 +4224,12 @@
         "expert_referral_codes_hash_unique": {
           "name": "expert_referral_codes_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code_hash"
-          ]
+          "columns": ["code_hash"]
+        },
+        "expert_referral_codes_id_inviter_unique": {
+          "name": "expert_referral_codes_id_inviter_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "inviter_expert_id"]
         }
       },
       "policies": {},
@@ -4596,12 +4310,8 @@
           "name": "expert_referral_feature_controls_updated_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_feature_controls",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "updated_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["updated_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4609,12 +4319,8 @@
           "name": "expert_referral_feature_controls_updated_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_feature_controls",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "updated_admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["updated_admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4624,9 +4330,7 @@
         "expert_referral_controls_approval_unique": {
           "name": "expert_referral_controls_approval_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "updated_approval_id"
-          ]
+          "columns": ["updated_approval_id"]
         }
       },
       "policies": {},
@@ -4762,12 +4466,8 @@
           "name": "expert_referral_issuance_overrides_inviter_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "experts",
-          "columnsFrom": [
-            "inviter_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4775,12 +4475,8 @@
           "name": "expert_referral_issuance_overrides_requester_id_users_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "users",
-          "columnsFrom": [
-            "requester_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["requester_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4788,12 +4484,8 @@
           "name": "expert_referral_issuance_overrides_approver_one_id_users_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "users",
-          "columnsFrom": [
-            "approver_one_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approver_one_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4801,12 +4493,8 @@
           "name": "expert_referral_issuance_overrides_approver_two_id_users_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "users",
-          "columnsFrom": [
-            "approver_two_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approver_two_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4814,12 +4502,8 @@
           "name": "expert_referral_issuance_overrides_approval_one_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "approval_one_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_one_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4827,12 +4511,8 @@
           "name": "expert_referral_issuance_overrides_approval_two_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "approval_two_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_two_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4840,12 +4520,8 @@
           "name": "expert_referral_issuance_overrides_requester_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_issuance_overrides",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "requester_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["requester_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4855,16 +4531,12 @@
         "expert_issuance_overrides_approval_one_unique": {
           "name": "expert_issuance_overrides_approval_one_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "approval_one_id"
-          ]
+          "columns": ["approval_one_id"]
         },
         "expert_issuance_overrides_approval_two_unique": {
           "name": "expert_issuance_overrides_approval_two_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "approval_two_id"
-          ]
+          "columns": ["approval_two_id"]
         }
       },
       "policies": {},
@@ -4904,6 +4576,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "expert_id": {
+          "name": "expert_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "amount_minor": {
           "name": "amount_minor",
           "type": "bigint",
@@ -4936,29 +4614,21 @@
         }
       },
       "foreignKeys": {
-        "expert_referral_ledger_allocations_ledger_entry_id_expert_referral_ledger_entries_id_fk": {
-          "name": "expert_referral_ledger_allocations_ledger_entry_id_expert_referral_ledger_entries_id_fk",
+        "expert_ledger_allocations_entry_owner_fk": {
+          "name": "expert_ledger_allocations_entry_owner_fk",
           "tableFrom": "expert_referral_ledger_allocations",
           "tableTo": "expert_referral_ledger_entries",
-          "columnsFrom": [
-            "ledger_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ledger_entry_id", "expert_id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "expert_referral_ledger_allocations_reward_grant_id_expert_referral_reward_grants_id_fk": {
-          "name": "expert_referral_ledger_allocations_reward_grant_id_expert_referral_reward_grants_id_fk",
+        "expert_ledger_allocations_grant_owner_fk": {
+          "name": "expert_ledger_allocations_grant_owner_fk",
           "tableFrom": "expert_referral_ledger_allocations",
           "tableTo": "expert_referral_reward_grants",
-          "columnsFrom": [
-            "reward_grant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reward_grant_id", "expert_id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4966,10 +4636,7 @@
       "compositePrimaryKeys": {
         "expert_ledger_allocations_pk": {
           "name": "expert_ledger_allocations_pk",
-          "columns": [
-            "ledger_entry_id",
-            "reward_grant_id"
-          ]
+          "columns": ["ledger_entry_id", "reward_grant_id"]
         }
       },
       "uniqueConstraints": {},
@@ -5090,12 +4757,8 @@
           "name": "expert_referral_ledger_entries_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_ledger_entries",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5103,12 +4766,8 @@
           "name": "expert_referral_ledger_entries_order_id_expert_residency_orders_id_fk",
           "tableFrom": "expert_referral_ledger_entries",
           "tableTo": "expert_residency_orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5116,12 +4775,8 @@
           "name": "expert_referral_ledger_entries_admin_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_referral_ledger_entries",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "admin_approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["admin_approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5129,12 +4784,8 @@
           "name": "expert_referral_ledger_entries_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_referral_ledger_entries",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5142,12 +4793,8 @@
           "name": "expert_ledger_original_entry_fk",
           "tableFrom": "expert_referral_ledger_entries",
           "tableTo": "expert_referral_ledger_entries",
-          "columnsFrom": [
-            "original_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["original_entry_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -5157,9 +4804,12 @@
         "expert_ledger_idempotency_unique": {
           "name": "expert_ledger_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
+        },
+        "expert_ledger_entries_id_expert_unique": {
+          "name": "expert_ledger_entries_id_expert_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "expert_id"]
         }
       },
       "policies": {},
@@ -5210,6 +4860,12 @@
         },
         "qualifying_order_id": {
           "name": "qualifying_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qualifying_payment_attempt_id": {
+          "name": "qualifying_payment_attempt_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -5276,50 +4932,35 @@
           "name": "expert_referral_reward_grants_expert_id_experts_id_fk",
           "tableFrom": "expert_referral_reward_grants",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "expert_referral_reward_grants_referral_id_expert_referrals_id_fk": {
-          "name": "expert_referral_reward_grants_referral_id_expert_referrals_id_fk",
+        "expert_reward_grants_referral_inviter_fk": {
+          "name": "expert_reward_grants_referral_inviter_fk",
           "tableFrom": "expert_referral_reward_grants",
           "tableTo": "expert_referrals",
-          "columnsFrom": [
-            "referral_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["referral_id", "expert_id"],
+          "columnsTo": ["id", "inviter_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "expert_referral_reward_grants_first_settlement_id_expert_first_residency_settlements_id_fk": {
-          "name": "expert_referral_reward_grants_first_settlement_id_expert_first_residency_settlements_id_fk",
+        "expert_reward_grants_first_marker_fk": {
+          "name": "expert_reward_grants_first_marker_fk",
           "tableFrom": "expert_referral_reward_grants",
           "tableTo": "expert_first_residency_settlements",
           "columnsFrom": [
-            "first_settlement_id"
+            "first_settlement_id",
+            "referral_id",
+            "qualifying_order_id",
+            "qualifying_payment_attempt_id"
           ],
           "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "expert_referral_reward_grants_qualifying_order_id_expert_residency_orders_id_fk": {
-          "name": "expert_referral_reward_grants_qualifying_order_id_expert_residency_orders_id_fk",
-          "tableFrom": "expert_referral_reward_grants",
-          "tableTo": "expert_residency_orders",
-          "columnsFrom": [
-            "qualifying_order_id"
-          ],
-          "columnsTo": [
-            "id"
+            "id",
+            "referral_id",
+            "qualifying_order_id",
+            "qualifying_payment_attempt_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -5330,30 +4971,32 @@
         "expert_reward_grants_referral_unique": {
           "name": "expert_reward_grants_referral_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "referral_id"
-          ]
+          "columns": ["referral_id"]
         },
         "expert_reward_grants_first_settlement_unique": {
           "name": "expert_reward_grants_first_settlement_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "first_settlement_id"
-          ]
+          "columns": ["first_settlement_id"]
         },
         "expert_reward_grants_qualifying_order_unique": {
           "name": "expert_reward_grants_qualifying_order_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "qualifying_order_id"
-          ]
+          "columns": ["qualifying_order_id"]
+        },
+        "expert_reward_grants_qualifying_payment_unique": {
+          "name": "expert_reward_grants_qualifying_payment_unique",
+          "nullsNotDistinct": false,
+          "columns": ["qualifying_payment_attempt_id"]
+        },
+        "expert_reward_grants_id_expert_unique": {
+          "name": "expert_reward_grants_id_expert_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "expert_id"]
         },
         "expert_reward_grants_idempotency_unique": {
           "name": "expert_reward_grants_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
         }
       },
       "policies": {},
@@ -5424,29 +5067,12 @@
         }
       },
       "foreignKeys": {
-        "expert_referrals_code_id_expert_referral_codes_id_fk": {
-          "name": "expert_referrals_code_id_expert_referral_codes_id_fk",
-          "tableFrom": "expert_referrals",
-          "tableTo": "expert_referral_codes",
-          "columnsFrom": [
-            "code_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "expert_referrals_inviter_expert_id_experts_id_fk": {
           "name": "expert_referrals_inviter_expert_id_experts_id_fk",
           "tableFrom": "expert_referrals",
           "tableTo": "experts",
-          "columnsFrom": [
-            "inviter_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5454,12 +5080,17 @@
           "name": "expert_referrals_invitee_expert_id_experts_id_fk",
           "tableFrom": "expert_referrals",
           "tableTo": "experts",
-          "columnsFrom": [
-            "invitee_expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invitee_expert_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "expert_referrals_code_owner_fk": {
+          "name": "expert_referrals_code_owner_fk",
+          "tableFrom": "expert_referrals",
+          "tableTo": "expert_referral_codes",
+          "columnsFrom": ["code_id", "inviter_expert_id"],
+          "columnsTo": ["id", "inviter_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -5469,16 +5100,22 @@
         "expert_referrals_code_unique": {
           "name": "expert_referrals_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code_id"
-          ]
+          "columns": ["code_id"]
         },
         "expert_referrals_invitee_unique": {
           "name": "expert_referrals_invitee_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "invitee_expert_id"
-          ]
+          "columns": ["invitee_expert_id"]
+        },
+        "expert_referrals_id_inviter_unique": {
+          "name": "expert_referrals_id_inviter_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "inviter_expert_id"]
+        },
+        "expert_referrals_id_invitee_unique": {
+          "name": "expert_referrals_id_invitee_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "invitee_expert_id"]
         }
       },
       "policies": {},
@@ -5653,12 +5290,8 @@
           "name": "expert_residency_orders_expert_id_experts_id_fk",
           "tableFrom": "expert_residency_orders",
           "tableTo": "experts",
-          "columnsFrom": [
-            "expert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["expert_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5666,12 +5299,8 @@
           "name": "expert_residency_orders_tariff_version_id_expert_residency_tariff_versions_id_fk",
           "tableFrom": "expert_residency_orders",
           "tableTo": "expert_residency_tariff_versions",
-          "columnsFrom": [
-            "tariff_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tariff_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -5681,10 +5310,12 @@
         "expert_orders_expert_idempotency_unique": {
           "name": "expert_orders_expert_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "expert_id",
-            "idempotency_key"
-          ]
+          "columns": ["expert_id", "idempotency_key"]
+        },
+        "expert_orders_id_expert_unique": {
+          "name": "expert_orders_id_expert_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "expert_id"]
         }
       },
       "policies": {},
@@ -5825,12 +5456,8 @@
           "name": "expert_residency_payment_attempts_order_id_expert_residency_orders_id_fk",
           "tableFrom": "expert_residency_payment_attempts",
           "tableTo": "expert_residency_orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["order_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -5840,17 +5467,17 @@
         "expert_payment_attempt_provider_request_unique": {
           "name": "expert_payment_attempt_provider_request_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "provider_request_id"
-          ]
+          "columns": ["provider", "provider_request_id"]
         },
         "expert_payment_attempt_idempotency_unique": {
           "name": "expert_payment_attempt_idempotency_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
+          "columns": ["idempotency_key"]
+        },
+        "expert_payment_attempt_id_order_unique": {
+          "name": "expert_payment_attempt_id_order_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "order_id"]
         }
       },
       "policies": {},
@@ -5982,10 +5609,7 @@
         "expert_provider_event_unique": {
           "name": "expert_provider_event_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "external_event_id"
-          ]
+          "columns": ["provider", "external_event_id"]
         }
       },
       "policies": {},
@@ -6103,12 +5727,8 @@
           "name": "expert_residency_tariff_versions_approval_id_admin_approvals_id_fk",
           "tableFrom": "expert_residency_tariff_versions",
           "tableTo": "admin_approvals",
-          "columnsFrom": [
-            "approval_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["approval_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -6116,12 +5736,8 @@
           "name": "expert_residency_tariff_versions_admin_session_id_hash_admin_sessions_session_id_hash_fk",
           "tableFrom": "expert_residency_tariff_versions",
           "tableTo": "admin_sessions",
-          "columnsFrom": [
-            "admin_session_id_hash"
-          ],
-          "columnsTo": [
-            "session_id_hash"
-          ],
+          "columnsFrom": ["admin_session_id_hash"],
+          "columnsTo": ["session_id_hash"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -6131,9 +5747,7 @@
         "expert_tariff_versions_approval_unique": {
           "name": "expert_tariff_versions_approval_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "approval_id"
-          ]
+          "columns": ["approval_id"]
         }
       },
       "policies": {},
@@ -6175,13 +5789,7 @@
     "public.ledger_entry_kind": {
       "name": "ledger_entry_kind",
       "schema": "public",
-      "values": [
-        "grant",
-        "debit",
-        "free",
-        "compensation",
-        "revocation"
-      ]
+      "values": ["grant", "debit", "free", "compensation", "revocation"]
     },
     "public.outbox_status": {
       "name": "outbox_status",
@@ -6201,7 +5809,7 @@
       "schema": "public",
       "values": [
         "eligible",
-        "ineligible",
+        "permanently_ineligible",
         "pending_feature_hold",
         "cancelled_by_refund"
       ]
@@ -6209,29 +5817,17 @@
     "public.expert_referral_abuse_hold_status": {
       "name": "expert_referral_abuse_hold_status",
       "schema": "public",
-      "values": [
-        "open",
-        "closed"
-      ]
+      "values": ["open", "closed"]
     },
     "public.expert_referral_batch_status": {
       "name": "expert_referral_batch_status",
       "schema": "public",
-      "values": [
-        "issued",
-        "partially_redeemed",
-        "fully_redeemed",
-        "revoked"
-      ]
+      "values": ["issued", "partially_redeemed", "fully_redeemed", "revoked"]
     },
     "public.expert_referral_code_status": {
       "name": "expert_referral_code_status",
       "schema": "public",
-      "values": [
-        "issued",
-        "redeemed",
-        "revoked"
-      ]
+      "values": ["issued", "redeemed", "revoked"]
     },
     "public.expert_referral_ledger_entry_kind": {
       "name": "expert_referral_ledger_entry_kind",
@@ -6368,7 +5964,7 @@
           "notNull": true
         }
       },
-      "definition": "\n  with ledger_totals as (\n    select\n      expert_id,\n      coalesce(sum(amount_minor), 0)::bigint as net_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind in ('reservation', 'release')), 0)::bigint as reserved_minor,\n      coalesce(sum(amount_minor) filter (where entry_kind = 'reward_grant'), 0)::bigint as granted_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind = 'spend'), 0)::bigint as spent_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind = 'expiry'), 0)::bigint as expired_minor\n    from expert_referral_ledger_entries\n    group by expert_id\n  ), grant_expiry as (\n    select expert_id, min(expires_at) as nearest_expiry_at\n    from expert_referral_reward_grants\n    where expires_at > transaction_timestamp()\n    group by expert_id\n  )\n  select\n    e.id as expert_id,\n    greatest(coalesce(l.net_minor, 0), 0)::bigint as available_credit_minor,\n    greatest(coalesce(l.reserved_minor, 0), 0)::bigint as reserved_credit_minor,\n    g.nearest_expiry_at,\n    greatest(coalesce(l.granted_minor, 0), 0)::bigint as lifetime_granted_minor,\n    greatest(coalesce(l.spent_minor, 0), 0)::bigint as lifetime_spent_minor,\n    greatest(coalesce(l.expired_minor, 0), 0)::bigint as lifetime_expired_minor,\n    greatest(-coalesce(l.net_minor, 0), 0)::bigint as debt_minor\n  from experts e\n  left join ledger_totals l on l.expert_id = e.id\n  left join grant_expiry g on g.expert_id = e.id\n",
+      "definition": "\n  with ledger_totals as (\n    select\n      expert_id,\n      coalesce(sum(amount_minor), 0)::bigint as net_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind in ('reservation', 'release')), 0)::bigint as reserved_minor,\n      coalesce(sum(amount_minor) filter (where entry_kind = 'reward_grant'), 0)::bigint as granted_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind = 'spend'), 0)::bigint as spent_minor,\n      coalesce(-sum(amount_minor) filter (where entry_kind = 'expiry'), 0)::bigint as expired_minor\n    from expert_referral_ledger_entries\n    group by expert_id\n  ), grant_remaining as (\n    select\n      g.id,\n      g.expert_id,\n      g.expires_at,\n      coalesce(sum(a.amount_minor), 0)::bigint as remaining_minor\n    from expert_referral_reward_grants g\n    left join expert_referral_ledger_allocations a\n      on a.reward_grant_id = g.id\n    where g.expires_at > transaction_timestamp()\n    group by g.id, g.expert_id, g.expires_at\n    having sum(a.amount_minor) > 0\n  ), grant_expiry as (\n    select expert_id, min(expires_at) as nearest_expiry_at\n    from grant_remaining\n    group by expert_id\n  )\n  select\n    e.id as expert_id,\n    greatest(coalesce(l.net_minor, 0), 0)::bigint as available_credit_minor,\n    greatest(coalesce(l.reserved_minor, 0), 0)::bigint as reserved_credit_minor,\n    g.nearest_expiry_at,\n    greatest(coalesce(l.granted_minor, 0), 0)::bigint as lifetime_granted_minor,\n    greatest(coalesce(l.spent_minor, 0), 0)::bigint as lifetime_spent_minor,\n    greatest(coalesce(l.expired_minor, 0), 0)::bigint as lifetime_expired_minor,\n    greatest(-coalesce(l.net_minor, 0), 0)::bigint as debt_minor\n  from experts e\n  left join ledger_totals l on l.expert_id = e.id\n  left join grant_expiry g on g.expert_id = e.id\n",
       "name": "expert_referral_balances",
       "schema": "public",
       "isExisting": false,

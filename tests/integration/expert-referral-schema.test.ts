@@ -87,6 +87,7 @@ async function effectiveControl(): Promise<{
 }
 
 async function createAdminApproval(): Promise<{
+  adminId: string;
   approvalId: string;
   sessionIdHash: string;
 }> {
@@ -114,7 +115,7 @@ async function createAdminApproval(): Promise<{
       '2026-08-03T10:00:00.000Z'
     )
   `);
-  return { approvalId, sessionIdHash };
+  return { adminId, approvalId, sessionIdHash };
 }
 
 async function createExpert(): Promise<string> {
@@ -150,6 +151,168 @@ async function createTariff(input?: {
     )
   `);
   return tariffId;
+}
+
+async function createOrderForExpert(expertId: string): Promise<{
+  orderId: string;
+  paymentAttemptId: string;
+}> {
+  const tariffId = await createTariff();
+  const orderId = randomUUID();
+  const paymentAttemptId = randomUUID();
+  await testDb!.db.execute(sql`
+    insert into expert_residency_orders (
+      id, expert_id, tariff_version_id, snapshot_display_name,
+      price_minor, currency, duration_seconds, credit_minor, cash_minor,
+      payment_deadline, idempotency_key, created_at
+    ) values (
+      ${orderId}::uuid, ${expertId}::uuid, ${tariffId}::uuid,
+      'Test residency', 1000, 'RUB', 2592000, 0, 1000,
+      '2026-08-04T00:00:00.000Z', ${`order:${randomUUID()}`},
+      '2026-08-03T00:00:00.000Z'
+    );
+    insert into expert_residency_payment_attempts (
+      id, order_id, provider, provider_request_id, expected_amount_minor,
+      currency, status, idempotency_key, resolved_at
+    ) values (
+      ${paymentAttemptId}::uuid, ${orderId}::uuid, 'test-provider',
+      ${`request:${randomUUID()}`}, 1000, 'RUB', 'settled',
+      ${`payment:${randomUUID()}`}, '2026-08-03T01:00:00.000Z'
+    )
+  `);
+  return { orderId, paymentAttemptId };
+}
+
+async function createReferralGraph(input?: {
+  inviterId?: string;
+  inviteeId?: string;
+}): Promise<{
+  inviterId: string;
+  inviteeId: string;
+  batchId: string;
+  codeId: string;
+  referralId: string;
+}> {
+  const inviterId = input?.inviterId ?? (await createExpert());
+  const inviteeId = input?.inviteeId ?? (await createExpert());
+  const { adminId, approvalId, sessionIdHash } = await createAdminApproval();
+  const batchId = randomUUID();
+  const codeId = randomUUID();
+  const referralId = randomUUID();
+  const codeHash = randomUUID().replaceAll("-", "").repeat(2);
+  await testDb!.db.execute(sql`
+    insert into expert_referral_code_batches (
+      id, inviter_expert_id, requested_count, issued_by_admin_id,
+      approval_id, admin_session_id_hash
+    ) values (
+      ${batchId}::uuid, ${inviterId}::uuid, 1, ${adminId}::uuid,
+      ${approvalId}::uuid, ${sessionIdHash}
+    );
+    insert into expert_referral_codes (
+      id, batch_id, inviter_expert_id, code_hash, key_version,
+      masked_suffix, status, redeemed_at
+    ) values (
+      ${codeId}::uuid, ${batchId}::uuid, ${inviterId}::uuid,
+      ${codeHash}, 1, 'abcdef', 'redeemed', '2026-08-03T00:30:00.000Z'
+    );
+    insert into expert_referrals (
+      id, code_id, inviter_expert_id, invitee_expert_id
+    ) values (
+      ${referralId}::uuid, ${codeId}::uuid, ${inviterId}::uuid,
+      ${inviteeId}::uuid
+    )
+  `);
+  return { inviterId, inviteeId, batchId, codeId, referralId };
+}
+
+async function createSettlementFixture(
+  eligibility: "eligible" | "pending_feature_hold" = "eligible",
+): Promise<{
+  inviterId: string;
+  inviteeId: string;
+  batchId: string;
+  codeId: string;
+  referralId: string;
+  orderId: string;
+  paymentAttemptId: string;
+  firstSettlementId: string;
+}> {
+  const graph = await createReferralGraph();
+  const payment = await createOrderForExpert(graph.inviteeId);
+  const firstSettlementId = randomUUID();
+  await testDb!.db.execute(sql`
+    insert into expert_first_residency_settlements (
+      id, expert_id, qualifying_order_id, qualifying_payment_attempt_id,
+      referral_id, eligibility, reason_code, settlement_expert_active,
+      settlement_expert_verified, settlement_abuse_cleared, settled_at
+    ) values (
+      ${firstSettlementId}::uuid, ${graph.inviteeId}::uuid,
+      ${payment.orderId}::uuid, ${payment.paymentAttemptId}::uuid,
+      ${graph.referralId}::uuid, ${eligibility}, 'eligible_referral',
+      true, true, true, '2026-08-03T01:00:00.000Z'
+    )
+  `);
+  return { ...graph, ...payment, firstSettlementId };
+}
+
+async function createRewardGrant(
+  fixture: {
+    inviterId: string;
+    referralId: string;
+    firstSettlementId: string;
+    orderId: string;
+    paymentAttemptId: string;
+  },
+  amountMinor = 100000n,
+): Promise<string> {
+  const grantId = randomUUID();
+  await testDb!.db.execute(sql`
+    insert into expert_referral_reward_grants (
+      id, expert_id, referral_id, first_settlement_id,
+      qualifying_order_id, qualifying_payment_attempt_id, amount_minor,
+      granted_at, expires_at, idempotency_key
+    ) values (
+      ${grantId}::uuid, ${fixture.inviterId}::uuid,
+      ${fixture.referralId}::uuid, ${fixture.firstSettlementId}::uuid,
+      ${fixture.orderId}::uuid, ${fixture.paymentAttemptId}::uuid,
+      ${amountMinor}, '2026-08-03T01:00:00.000Z',
+      '2026-08-03T01:00:00.000Z'::timestamptz + interval '365 days',
+      ${`grant:${randomUUID()}`}
+    )
+  `);
+  return grantId;
+}
+
+async function createAllocatedLedgerEntry(input: {
+  expertId: string;
+  grantId: string;
+  amountMinor: bigint;
+  entryKind?: "reward_grant" | "spend";
+  originalEntryId?: string;
+}): Promise<string> {
+  const entryId = randomUUID();
+  await testDb!.db.transaction(async (tx) => {
+    await tx.execute(sql`
+      insert into expert_referral_ledger_entries (
+        id, expert_id, entry_kind, amount_minor, original_entry_id,
+        source_type, source_id, idempotency_key
+      ) values (
+        ${entryId}::uuid, ${input.expertId}::uuid,
+        ${input.entryKind ?? "reward_grant"}, ${input.amountMinor},
+        ${input.originalEntryId ?? null}::uuid, 'test', ${randomUUID()}::uuid,
+        ${`ledger:${randomUUID()}`}
+      )
+    `);
+    await tx.execute(sql`
+      insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, expert_id, amount_minor
+      ) values (
+        ${entryId}::uuid, ${input.grantId}::uuid, ${input.expertId}::uuid,
+        ${input.amountMinor}
+      )
+    `);
+  });
+  return entryId;
 }
 
 async function insertOrder(input: {
@@ -295,6 +458,429 @@ describe("expert referral residency schema", () => {
     );
   });
 
+  it("enforces reviewed singleton and duplicate guards with stable evidence", async () => {
+    const userId = randomUUID();
+    await testDb!.db.execute(sql`
+      insert into users (id) values (${userId}::uuid);
+      insert into experts (user_id) values (${userId}::uuid)
+    `);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into experts (user_id) values (${userId}::uuid)
+        `),
+      { code: "23505", constraint: "experts_user_id_unique" },
+    );
+
+    const fixture = await createSettlementFixture();
+    await expectDatabaseError(() => createRewardGrant(fixture, 99999n), {
+      code: "23514",
+      constraint: "expert_reward_grant_exact_amount",
+    });
+
+    const secondPayment = await createOrderForExpert(fixture.inviteeId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_first_residency_settlements (
+            expert_id, qualifying_order_id, qualifying_payment_attempt_id,
+            referral_id, eligibility, reason_code, settlement_expert_active,
+            settlement_expert_verified, settlement_abuse_cleared, settled_at
+          ) values (
+            ${fixture.inviteeId}::uuid, ${secondPayment.orderId}::uuid,
+            ${secondPayment.paymentAttemptId}::uuid, ${fixture.referralId}::uuid,
+            'eligible', 'duplicate_first', true, true, true,
+            '2026-08-03T02:00:00.000Z'
+          )
+        `),
+      { code: "23505", constraint: "expert_first_settlement_expert_unique" },
+    );
+
+    const firstHoldApproval = await createAdminApproval();
+    const secondHoldApproval = await createAdminApproval();
+    await testDb!.db.execute(sql`
+      insert into expert_referral_abuse_holds (
+        expert_id, reason_code, opened_approval_id,
+        opened_admin_session_id_hash
+      ) values (
+        ${fixture.inviterId}::uuid, 'review',
+        ${firstHoldApproval.approvalId}::uuid,
+        ${firstHoldApproval.sessionIdHash}
+      )
+    `);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referral_abuse_holds (
+            expert_id, reason_code, opened_approval_id,
+            opened_admin_session_id_hash
+          ) values (
+            ${fixture.inviterId}::uuid, 'second_review',
+            ${secondHoldApproval.approvalId}::uuid,
+            ${secondHoldApproval.sessionIdHash}
+          )
+        `),
+      { code: "23505", constraint: "expert_abuse_holds_one_open_per_expert" },
+    );
+
+    const controlApproval = await createAdminApproval();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referral_feature_controls (
+            control_key, version, updated_approval_id,
+            updated_admin_session_id_hash
+          ) values (
+            'unexpected_control', 1, ${controlApproval.approvalId}::uuid,
+            ${controlApproval.sessionIdHash}
+          )
+        `),
+      { code: "23514", constraint: "expert_referral_controls_singleton" },
+    );
+
+    const eventId = `event:${randomUUID()}`;
+    await testDb!.db.execute(sql`
+      insert into expert_residency_provider_event_inbox (
+        provider, external_event_id, payload_digest, event_kind, authenticated
+      ) values ('test-provider', ${eventId}, ${"a".repeat(64)}, 'settled', true)
+    `);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_residency_provider_event_inbox (
+            provider, external_event_id, payload_digest, event_kind, authenticated
+          ) values ('test-provider', ${eventId}, ${"b".repeat(64)}, 'settled', true)
+        `),
+      { code: "23505", constraint: "expert_provider_event_unique" },
+    );
+  });
+
+  it("rejects cross-owner referral, settlement, reward, and allocation links", async () => {
+    const owner = await createExpert();
+    const other = await createExpert();
+    const { adminId, approvalId, sessionIdHash } = await createAdminApproval();
+    const batchId = randomUUID();
+    await testDb!.db.execute(sql`
+      insert into expert_referral_code_batches (
+        id, inviter_expert_id, requested_count, issued_by_admin_id,
+        approval_id, admin_session_id_hash
+      ) values (
+        ${batchId}::uuid, ${owner}::uuid, 1, ${adminId}::uuid,
+        ${approvalId}::uuid, ${sessionIdHash}
+      )
+    `);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referral_codes (
+            batch_id, inviter_expert_id, code_hash, key_version, masked_suffix
+          ) values (
+            ${batchId}::uuid, ${other}::uuid, ${"c".repeat(64)}, 1, 'cccccc'
+          )
+        `),
+      { code: "23503", constraint: "expert_referral_codes_batch_owner_fk" },
+    );
+
+    const unusedCodeId = randomUUID();
+    await testDb!.db.execute(sql`
+      insert into expert_referral_codes (
+        id, batch_id, inviter_expert_id, code_hash, key_version, masked_suffix
+      ) values (
+        ${unusedCodeId}::uuid, ${batchId}::uuid, ${owner}::uuid,
+        ${"d".repeat(64)}, 1, 'dddddd'
+      )
+    `);
+    const wrongInvitee = await createExpert();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referrals (
+            code_id, inviter_expert_id, invitee_expert_id
+          ) values (
+            ${unusedCodeId}::uuid, ${other}::uuid, ${wrongInvitee}::uuid
+          )
+        `),
+      { code: "23503", constraint: "expert_referrals_code_owner_fk" },
+    );
+
+    const graph = await createReferralGraph();
+    const thirdExpert = await createExpert();
+    const ownerPayment = await createOrderForExpert(graph.inviterId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_first_residency_settlements (
+            expert_id, qualifying_order_id, qualifying_payment_attempt_id,
+            referral_id, eligibility, reason_code, settlement_expert_active,
+            settlement_expert_verified, settlement_abuse_cleared, settled_at
+          ) values (
+            ${graph.inviteeId}::uuid, ${ownerPayment.orderId}::uuid,
+            ${ownerPayment.paymentAttemptId}::uuid, ${graph.referralId}::uuid,
+            'eligible', 'wrong_order_owner', true, true, true,
+            '2026-08-03T01:00:00.000Z'
+          )
+        `),
+      { code: "23503", constraint: "expert_first_settlement_order_owner_fk" },
+    );
+
+    const firstInviteePayment = await createOrderForExpert(graph.inviteeId);
+    const secondInviteePayment = await createOrderForExpert(graph.inviteeId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_first_residency_settlements (
+            expert_id, qualifying_order_id, qualifying_payment_attempt_id,
+            referral_id, eligibility, reason_code, settlement_expert_active,
+            settlement_expert_verified, settlement_abuse_cleared, settled_at
+          ) values (
+            ${graph.inviteeId}::uuid, ${firstInviteePayment.orderId}::uuid,
+            ${secondInviteePayment.paymentAttemptId}::uuid,
+            ${graph.referralId}::uuid, 'eligible', 'wrong_payment_order',
+            true, true, true, '2026-08-03T01:00:00.000Z'
+          )
+        `),
+      { code: "23503", constraint: "expert_first_settlement_payment_order_fk" },
+    );
+
+    const unrelatedGraph = await createReferralGraph();
+    const validInviteePayment = await createOrderForExpert(graph.inviteeId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_first_residency_settlements (
+            expert_id, qualifying_order_id, qualifying_payment_attempt_id,
+            referral_id, eligibility, reason_code, settlement_expert_active,
+            settlement_expert_verified, settlement_abuse_cleared, settled_at
+          ) values (
+            ${graph.inviteeId}::uuid, ${validInviteePayment.orderId}::uuid,
+            ${validInviteePayment.paymentAttemptId}::uuid,
+            ${unrelatedGraph.referralId}::uuid, 'eligible',
+            'wrong_referral_invitee', true, true, true,
+            '2026-08-03T01:00:00.000Z'
+          )
+        `),
+      {
+        code: "23503",
+        constraint: "expert_first_settlement_referral_invitee_fk",
+      },
+    );
+
+    const fixture = await createSettlementFixture();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referral_reward_grants (
+            expert_id, referral_id, first_settlement_id, qualifying_order_id,
+            qualifying_payment_attempt_id, granted_at, expires_at,
+            idempotency_key
+          ) values (
+            ${thirdExpert}::uuid, ${fixture.referralId}::uuid,
+            ${fixture.firstSettlementId}::uuid, ${fixture.orderId}::uuid,
+            ${fixture.paymentAttemptId}::uuid,
+            '2026-08-03T01:00:00.000Z',
+            '2026-08-03T01:00:00.000Z'::timestamptz + interval '365 days',
+            ${`wrong-owner:${randomUUID()}`}
+          )
+        `),
+      { code: "23503", constraint: "expert_reward_grants_referral_inviter_fk" },
+    );
+
+    const otherFixture = await createSettlementFixture();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referral_reward_grants (
+            expert_id, referral_id, first_settlement_id, qualifying_order_id,
+            qualifying_payment_attempt_id, granted_at, expires_at,
+            idempotency_key
+          ) values (
+            ${otherFixture.inviterId}::uuid, ${otherFixture.referralId}::uuid,
+            ${fixture.firstSettlementId}::uuid, ${otherFixture.orderId}::uuid,
+            ${otherFixture.paymentAttemptId}::uuid,
+            '2026-08-03T01:00:00.000Z',
+            '2026-08-03T01:00:00.000Z'::timestamptz + interval '365 days',
+            ${`wrong-marker:${randomUUID()}`}
+          )
+        `),
+      { code: "23503", constraint: "expert_reward_grants_first_marker_fk" },
+    );
+
+    const grantId = await createRewardGrant(fixture);
+    const wrongEntryId = randomUUID();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.transaction(async (tx) => {
+          await tx.execute(sql`
+            insert into expert_referral_ledger_entries (
+              id, expert_id, entry_kind, amount_minor, source_type,
+              source_id, idempotency_key
+            ) values (
+              ${wrongEntryId}::uuid, ${thirdExpert}::uuid, 'reward_grant',
+              100000, 'test', ${randomUUID()}::uuid,
+              ${`wrong-allocation:${randomUUID()}`}
+            )
+          `);
+          await tx.execute(sql`
+            insert into expert_referral_ledger_allocations (
+              ledger_entry_id, reward_grant_id, expert_id, amount_minor
+            ) values (
+              ${wrongEntryId}::uuid, ${grantId}::uuid, ${thirdExpert}::uuid,
+              100000
+            )
+          `);
+        }),
+      { code: "23503", constraint: "expert_ledger_allocations_grant_owner_fk" },
+    );
+  });
+
+  it("requires every ledger entry to be attributed exactly to owned grants", async () => {
+    const fixture = await createSettlementFixture();
+    const grantId = await createRewardGrant(fixture);
+    const missingEntryId = randomUUID();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.transaction(async (tx) => {
+          await tx.execute(sql`
+            insert into expert_referral_ledger_entries (
+              id, expert_id, entry_kind, amount_minor, source_type,
+              source_id, idempotency_key
+            ) values (
+              ${missingEntryId}::uuid, ${fixture.inviterId}::uuid,
+              'reward_grant', 100000, 'test', ${randomUUID()}::uuid,
+              ${`missing-allocation:${randomUUID()}`}
+            )
+          `);
+        }),
+      { code: "23514", constraint: "expert_ledger_allocations_exact_total" },
+    );
+
+    const partialEntryId = randomUUID();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.transaction(async (tx) => {
+          await tx.execute(sql`
+            insert into expert_referral_ledger_entries (
+              id, expert_id, entry_kind, amount_minor, source_type,
+              source_id, idempotency_key
+            ) values (
+              ${partialEntryId}::uuid, ${fixture.inviterId}::uuid,
+              'reward_grant', 100000, 'test', ${randomUUID()}::uuid,
+              ${`partial-allocation:${randomUUID()}`}
+            )
+          `);
+          await tx.execute(sql`
+            insert into expert_referral_ledger_allocations (
+              ledger_entry_id, reward_grant_id, expert_id, amount_minor
+            ) values (
+              ${partialEntryId}::uuid, ${grantId}::uuid,
+              ${fixture.inviterId}::uuid, 99999
+            )
+          `);
+        }),
+      { code: "23514", constraint: "expert_ledger_allocations_exact_total" },
+    );
+
+    const grantEntryId = await createAllocatedLedgerEntry({
+      expertId: fixture.inviterId,
+      grantId,
+      amountMinor: 100000n,
+    });
+    const beforeSpend = await testDb!.db.execute<{ nearest: Date | null }>(sql`
+      select nearest_expiry_at as nearest
+      from expert_referral_balances
+      where expert_id = ${fixture.inviterId}::uuid
+    `);
+    expect(beforeSpend.rows[0]?.nearest).not.toBeNull();
+
+    await createAllocatedLedgerEntry({
+      expertId: fixture.inviterId,
+      grantId,
+      amountMinor: -100000n,
+      entryKind: "spend",
+      originalEntryId: grantEntryId,
+    });
+    const afterSpend = await testDb!.db.execute<{ nearest: Date | null }>(sql`
+      select nearest_expiry_at as nearest
+      from expert_referral_balances
+      where expert_id = ${fixture.inviterId}::uuid
+    `);
+    expect(afterSpend.rows[0]?.nearest).toBeNull();
+  });
+
+  it("keeps history append-only while allowing only pending marker resolution", async () => {
+    const fixture = await createSettlementFixture();
+    const grantId = await createRewardGrant(fixture);
+    const ledgerEntryId = await createAllocatedLedgerEntry({
+      expertId: fixture.inviterId,
+      grantId,
+      amountMinor: 100000n,
+    });
+
+    for (const operation of [
+      () =>
+        testDb!.db.execute(sql`
+          update expert_referrals set bound_at = now()
+          where id = ${fixture.referralId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          update expert_referral_reward_grants set idempotency_key = 'changed'
+          where id = ${grantId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          update expert_referral_ledger_entries set source_type = 'changed'
+          where id = ${ledgerEntryId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          update expert_referral_ledger_allocations set amount_minor = 1
+          where ledger_entry_id = ${ledgerEntryId}::uuid
+        `),
+    ]) {
+      await expectDatabaseError(operation, { code: "55000" });
+    }
+
+    const pendingFixture = await createSettlementFixture(
+      "pending_feature_hold",
+    );
+    await testDb!.db.execute(sql`
+      update expert_first_residency_settlements
+      set eligibility = 'eligible', reason_code = 'feature_enabled'
+      where id = ${pendingFixture.firstSettlementId}::uuid
+    `);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          update expert_first_residency_settlements
+          set reason_code = 'second_resolution'
+          where id = ${pendingFixture.firstSettlementId}::uuid
+        `),
+      { code: "55000", constraint: "expert_first_settlement_transition" },
+    );
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          delete from expert_first_residency_settlements
+          where id = ${pendingFixture.firstSettlementId}::uuid
+        `),
+      { code: "55000", constraint: "expert_first_settlement_transition" },
+    );
+
+    const immutableFixture = await createSettlementFixture(
+      "pending_feature_hold",
+    );
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          update expert_first_residency_settlements
+          set eligibility = 'permanently_ineligible', settled_at = now()
+          where id = ${immutableFixture.firstSettlementId}::uuid
+        `),
+      { code: "55000", constraint: "expert_first_settlement_transition" },
+    );
+  });
+
   it("publishes the required uniqueness, money, lifecycle, and append-only controls", async () => {
     const constraints = await testDb!.db.execute<{
       constraintName: string;
@@ -340,11 +926,20 @@ describe("expert referral residency schema", () => {
       order by c.relname
     `);
     expect(triggers.rows.map(({ tableName }) => tableName).sort()).toEqual([
-      "expert_first_residency_settlements",
       "expert_referral_ledger_allocations",
       "expert_referral_ledger_entries",
       "expert_referral_reward_grants",
       "expert_referrals",
     ]);
+
+    const guardedMarker = await testDb!.db.execute<{ count: string }>(sql`
+      select count(*)::text as count
+      from pg_trigger t
+      join pg_class c on c.oid = t.tgrelid
+      where c.relname = 'expert_first_residency_settlements'
+        and t.tgname = 'expert_first_settlement_guard'
+        and not t.tgisinternal
+    `);
+    expect(guardedMarker.rows[0]?.count).toBe("1");
   });
 });

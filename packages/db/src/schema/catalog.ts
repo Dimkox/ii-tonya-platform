@@ -12,22 +12,34 @@ import {
 import { users } from "./identity.js";
 
 const mutableTimestamps = {
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 };
 
-export const experts = pgTable("experts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  publicDisplayName: text("public_display_name"),
-  active: boolean("active").notNull().default(false),
-  verified: boolean("verified").notNull().default(false),
-  ...mutableTimestamps,
-});
+export const experts = pgTable(
+  "experts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    publicDisplayName: text("public_display_name"),
+    active: boolean("active").notNull().default(false),
+    verified: boolean("verified").notNull().default(false),
+    ...mutableTimestamps,
+  },
+  (table) => [unique("experts_user_id_unique").on(table.userId)],
+);
 
 export const expertServices = pgTable("expert_services", {
   id: uuid("id").defaultRandom().primaryKey(),
-  expertId: uuid("expert_id").notNull().references(() => experts.id),
+  expertId: uuid("expert_id")
+    .notNull()
+    .references(() => experts.id),
   name: text("name").notNull(),
   code: text("code"),
   language: text("language"),
@@ -40,7 +52,9 @@ export const slots = pgTable(
   "slots",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    expertServiceId: uuid("expert_service_id").notNull().references(() => expertServices.id),
+    expertServiceId: uuid("expert_service_id")
+      .notNull()
+      .references(() => expertServices.id),
     provider: text("provider").notNull(),
     externalSlotId: text("external_slot_id").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
@@ -50,7 +64,10 @@ export const slots = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
-    unique("slots_provider_external_unique").on(table.provider, table.externalSlotId),
+    unique("slots_provider_external_unique").on(
+      table.provider,
+      table.externalSlotId,
+    ),
     check("slots_capacity_positive", sql`${table.capacity} > 0`),
   ],
 );

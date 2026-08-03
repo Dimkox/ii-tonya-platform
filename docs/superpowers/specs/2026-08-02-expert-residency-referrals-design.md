@@ -250,7 +250,12 @@ provider/event identity prevents duplicate financial effects.
 Stores one durable first-settlement marker per expert, the database-assigned
 settlement sequence, qualifying order, and reward-eligibility result/reason. A
 unique expert key selects one winner during concurrent settlements, including a
-permanent ineligible result.
+permanent ineligible result. The marker is not a financial fact: immutable
+identity, order, referral, settlement, and captured-eligibility columns never
+change, while a database trigger permits only the monotonic
+`pending_feature_hold -> eligible | permanently_ineligible | cancelled_by_refund`
+resolution required by ERR-FR-042. Terminal states reject every update and all
+marker deletes are forbidden.
 
 ### `expert_referral_issuance_overrides`
 
