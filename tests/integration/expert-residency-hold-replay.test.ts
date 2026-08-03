@@ -108,7 +108,7 @@ describe("expert residency held reward replay", () => {
       available: bigint | string;
       debt: bigint | string;
     }>(
-      sql`select available_minor as available,debt_minor as debt from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
+      sql`select available_credit_minor as available,debt_minor as debt from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
     );
     expect(BigInt(balance.rows[0]?.available ?? 0)).toBe(0n);
     expect(BigInt(balance.rows[0]?.debt ?? 0)).toBe(0n);

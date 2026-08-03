@@ -9,10 +9,30 @@ import {
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
 import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import { expectPostgresErrorCause } from "../support/postgres-error.js";
 
 let testDb: ExpertReferralTestDatabase | undefined;
 const providerRepo = () =>
   new PostgresExpertResidencyProviderInboxRepository(testDb!.db);
+async function expectConstraintFailure(
+  operation: () => Promise<unknown>,
+  constraint: string,
+) {
+  let caught: unknown;
+  try {
+    await operation();
+  } catch (error) {
+    caught = error;
+  }
+  let current = caught;
+  for (let depth = 0; depth < 12; depth += 1) {
+    if (!current || typeof current !== "object") break;
+    const evidence = current as { constraint?: unknown; cause?: unknown };
+    if (evidence.constraint === constraint) return;
+    current = evidence.cause;
+  }
+  throw new Error(`Expected PostgreSQL constraint ${constraint}`);
+}
 async function orderFixture() {
   const expert = await testDb!.createExpertIdentity();
   const audit = await testDb!.createAdminAudit({
@@ -124,21 +144,35 @@ describe("expert residency refund and reversal", () => {
     );
     expect(persisted.rows[0]!.payload).toMatchObject({ debtMinor: "0" });
     expect(persisted.rows[0]!.version).toBe(1);
-    await expect(
-      testDb!.db.execute(
+    let immutableError: unknown;
+    try {
+      await testDb!.db.execute(
         sql`update expert_residency_provider_event_inbox set result_payload='{}'::jsonb where external_event_id='a2'`,
+      );
+    } catch (error) {
+      immutableError = error;
+    }
+    expect(() =>
+      expectPostgresErrorCause(
+        immutableError,
+        "55000",
+        "expert_provider_reversal_result_immutable",
       ),
-    ).rejects.toThrow(/expert_provider_reversal_result_immutable/u);
-    await expect(
-      testDb!.db.execute(
-        sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at) select provider,'missing_result',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_missing_result',verifier_key_version,verified_at,'processed',transaction_timestamp() from expert_residency_provider_event_inbox where external_event_id='a2'`,
-      ),
-    ).rejects.toThrow(/expert_provider_reversal_result/u);
-    await expect(
-      testDb!.db.execute(
-        sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at,result_legacy_exempt) select provider,'forged_legacy',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_forged_legacy',verifier_key_version,verified_at,'processed',transaction_timestamp(),true from expert_residency_provider_event_inbox where external_event_id='a2'`,
-      ),
-    ).rejects.toThrow(/expert_provider_reversal_legacy_exempt_forbidden/u);
+    ).not.toThrow();
+    await expectConstraintFailure(
+      () =>
+        testDb!.db.execute(
+          sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at) select provider,'missing_result',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_missing_result',verifier_key_version,verified_at,'processed',transaction_timestamp() from expert_residency_provider_event_inbox where external_event_id='a2'`,
+        ),
+      "expert_provider_reversal_result_shape",
+    );
+    await expectConstraintFailure(
+      () =>
+        testDb!.db.execute(
+          sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at,result_legacy_exempt) select provider,'forged_legacy',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_forged_legacy',verifier_key_version,verified_at,'processed',transaction_timestamp(),true from expert_residency_provider_event_inbox where external_event_id='a2'`,
+        ),
+      "expert_provider_reversal_legacy_exempt_forbidden",
+    );
   });
   it("turns historically spent reward into debt exactly once", async () => {
     const inviter = await testDb!.createExpertIdentity();
@@ -160,21 +194,20 @@ describe("expert residency refund and reversal", () => {
         sql`select g.id,e.id as "ledgerId" from expert_referral_reward_grants g join expert_referral_ledger_entries e on e.source_id=g.id and e.entry_kind='reward_grant'`,
       )
     ).rows[0]!;
-    const spend = await testDb!.db.execute<{ id: string }>(
-      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'spend',-30000,${grant.ledgerId}::uuid,'test_spend',${order.id}::uuid,${randomUUID()}) returning id`,
-    );
-    await testDb!.db.execute(
-      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${spend.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-30000)`,
-    );
-    const reservation = await testDb!.db.execute<{ id: string }>(
-      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'reservation',-20000,${order.id}::uuid,'test_reservation',${order.id}::uuid,${randomUUID()}) returning id`,
-    );
-    const expiry = await testDb!.db.execute<{ id: string }>(
-      sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter.expertId}::uuid,'expiry',-10000,${grant.ledgerId}::uuid,'test_expiry',${grant.id}::uuid,${randomUUID()}) returning id`,
-    );
-    await testDb!.db.execute(
-      sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${reservation.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-20000),(${expiry.rows[0]!.id}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-10000)`,
-    );
+    const spendId = randomUUID();
+    const reservationId = randomUUID();
+    const expiryId = randomUUID();
+    await testDb!.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${spendId}::uuid,${inviter.expertId}::uuid,'spend',-30000,${grant.ledgerId}::uuid,'test_spend',${order.id}::uuid,${randomUUID()}),(${expiryId}::uuid,${inviter.expertId}::uuid,'expiry',-10000,${grant.ledgerId}::uuid,'test_expiry',${grant.id}::uuid,${randomUUID()})`,
+      );
+      await tx.execute(
+        sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,order_id,source_type,source_id,idempotency_key) values (${reservationId}::uuid,${inviter.expertId}::uuid,'reservation',-20000,${order.id}::uuid,'test_reservation',${order.id}::uuid,${randomUUID()})`,
+      );
+      await tx.execute(
+        sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${spendId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-30000),(${reservationId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-20000),(${expiryId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-10000)`,
+      );
+    });
     const chargeback = providerEvent("charged_back", order.id, "50000", "b2");
     await expect(
       Promise.all([
@@ -196,7 +229,7 @@ describe("expert residency refund and reversal", () => {
     expect(
       (
         await testDb!.db.execute(
-          sql`select count(*)::int as n from expert_referral_ledger_entries where entry_kind='release' and original_entry_id=${reservation.rows[0]!.id}::uuid`,
+          sql`select count(*)::int as n from expert_referral_ledger_entries where entry_kind='release' and original_entry_id=${reservationId}::uuid`,
         )
       ).rows[0]!.n,
     ).toBe(1);
@@ -241,7 +274,7 @@ describe("expert residency refund and reversal", () => {
       const balance = await testDb!.db.execute<{
         available: bigint | string;
       }>(
-        sql`select available_minor as available from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
+        sql`select available_credit_minor as available from expert_referral_balances where expert_id=${inviter.expertId}::uuid`,
       );
       expect(BigInt(balance.rows[0]?.available ?? 0)).toBe(0n);
       const repaymentReversal = await testDb!.db.execute<{ n: number }>(

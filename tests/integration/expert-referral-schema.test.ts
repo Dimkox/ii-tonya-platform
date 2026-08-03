@@ -132,6 +132,10 @@ async function createExpert(): Promise<string> {
     insert into experts (id, user_id, active, verified)
     values (${expertId}::uuid, ${userId}::uuid, true, true)
   `);
+  await testDb!.db.execute(sql`
+    insert into channel_identities (user_id, provider, external_id)
+    values (${userId}::uuid, 'telegram', ${`expert:${expertId}`})
+  `);
   return expertId;
 }
 
@@ -269,16 +273,37 @@ async function createSettlementFixture(
   const graph = await createReferralGraph();
   const payment = await createOrderForExpert(graph.inviteeId);
   const firstSettlementId = randomUUID();
+  const snapshot = await testDb!.db.execute<{
+    inviteeUserId: string;
+    inviteeChannelId: string;
+    inviterUserId: string;
+    inviterChannelId: string;
+  }>(sql`
+    select invitee.user_id as "inviteeUserId",
+      (select ci.id from channel_identities ci where ci.user_id=invitee.user_id order by ci.id limit 1) as "inviteeChannelId",
+      inviter.user_id as "inviterUserId",
+      (select ci.id from channel_identities ci where ci.user_id=inviter.user_id order by ci.id limit 1) as "inviterChannelId"
+    from experts invitee cross join experts inviter
+    where invitee.id=${graph.inviteeId}::uuid and inviter.id=${graph.inviterId}::uuid
+  `);
+  const identity = snapshot.rows[0]!;
   await testDb!.db.execute(sql`
     insert into expert_first_residency_settlements (
       id, expert_id, qualifying_order_id, qualifying_payment_attempt_id,
       referral_id, eligibility, reason_code, settlement_expert_active,
-      settlement_expert_verified, settlement_abuse_cleared, settled_at
+      settlement_expert_verified, settlement_abuse_cleared,
+      settlement_control_version, settlement_invitee_user_id,
+      settlement_invitee_channel_identity_id, settlement_inviter_expert_id,
+      settlement_inviter_user_id, settlement_inviter_channel_identity_id,
+      settled_at
     ) values (
       ${firstSettlementId}::uuid, ${graph.inviteeId}::uuid,
       ${payment.orderId}::uuid, ${payment.paymentAttemptId}::uuid,
       ${graph.referralId}::uuid, ${eligibility}, 'eligible_referral',
-      true, true, true, '2026-08-03T01:00:00.000Z'
+      true, true, true, 1, ${identity.inviteeUserId}::uuid,
+      ${identity.inviteeChannelId}::uuid, ${graph.inviterId}::uuid,
+      ${identity.inviterUserId}::uuid, ${identity.inviterChannelId}::uuid,
+      '2026-08-03T01:00:00.000Z'
     )
   `);
   return { ...graph, ...payment, firstSettlementId };
