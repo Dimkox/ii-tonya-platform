@@ -318,7 +318,7 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
     },
     async seedExpertReferralQuotaLimit(inviterExpertId) {
       const audit = await createAdminAudit({
-        action: "expert_referral.batch_issue",
+        action: "expert_referral.batch_generate",
         objectId: randomUUID(),
       });
       const batchId = requiredId(
