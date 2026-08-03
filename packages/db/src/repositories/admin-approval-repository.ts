@@ -21,7 +21,16 @@ export type ApprovalAdminAction =
   | "safety.read"
   | "safety.resolve"
   | "feedback.read"
-  | "feedback.resolve";
+  | "feedback.resolve"
+  | "expert_referral.batch_generate"
+  | "expert_referral.code_revoke"
+  | "expert_referral.issuance_override"
+  | "expert_referral.abuse_hold_open"
+  | "expert_referral.abuse_hold_close"
+  | "expert_residency.tariff_create"
+  | "expert_residency.tariff_retire"
+  | "expert_referral.hold_replay"
+  | "expert_referral.feature_switch";
 
 type JsonScalar = string | number | boolean | null;
 export type AdminPayload =
@@ -81,7 +90,18 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "safety.resolve": "security_admin",
   "feedback.read": "support",
   "feedback.resolve": "support",
+  "expert_referral.batch_generate": "security_admin",
+  "expert_referral.code_revoke": "security_admin",
+  "expert_referral.issuance_override": "security_admin",
+  "expert_referral.abuse_hold_open": "security_admin",
+  "expert_referral.abuse_hold_close": "security_admin",
+  "expert_residency.tariff_create": "entitlement_admin",
+  "expert_residency.tariff_retire": "entitlement_admin",
+  "expert_referral.hold_replay": "security_admin",
+  "expert_referral.feature_switch": "security_admin",
 };
+
+export const requiredApprovalRole = (action: ApprovalAdminAction): AdminRole => actionRoles[action];
 
 const readObjectTypes: Readonly<
   Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>

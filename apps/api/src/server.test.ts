@@ -168,6 +168,7 @@ describe("server composition", () => {
     };
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertCodeKeyring).toBe(keyring);
+    expect(dependencies.expertReferralAdminService).toBeDefined();
     const app = await (await import("./app.js")).buildApp(dependencies);
     expect((app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring).toBe(keyring);
     await app.close();

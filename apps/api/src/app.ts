@@ -1,4 +1,4 @@
-import type { AdminService, BookingService, CatalogService, ConversationService, ExpertCodeKeyring, PrivacyService } from "@ii-tonya/application";
+import type { AdminService, BookingService, CatalogService, ConversationService, ExpertCodeKeyring, ExpertReferralAdminService, PrivacyService } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
@@ -6,6 +6,7 @@ import { createLogger, type Logger } from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
+import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
 import { healthRoutes, type ReadinessProbe } from "./routes/health.js";
 import { selartiWebhookRoutes, type WebhookInbox } from "./routes/selarti-webhook.js";
 import { telegramWebhookRoutes, type TelegramCallbackService } from "./routes/telegram-webhook.js";
@@ -16,6 +17,7 @@ export interface AppDependencies {
   catalogService: CatalogService; privacyService: PrivacyService; adminService: AdminService;
   selarti: SelartiPort; telegramCallbacks: TelegramCallbackService; readiness: ReadinessProbe; logger: Logger;
   inbox: WebhookInbox; rateLimiter: RateLimitGate; telegramWebhookSecret: string; adminApprovals?: ApprovalPort;
+  expertReferralAdminService?: ExpertReferralAdminService;
   expertCodeKeyring?: ExpertCodeKeyring;
   now?: () => Date;
 }
@@ -33,15 +35,22 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   await app.register(telegramWebhookRoutes, { secret: deps.telegramWebhookSecret, callbacks: deps.telegramCallbacks, inbox: deps.inbox, rateLimiter: deps.rateLimiter });
   if (deps.adminApprovals !== undefined) {
     const admin = await buildAdminApi({ approvals: deps.adminApprovals, admin: deps.adminService });
+    const expertAdmin = deps.expertReferralAdminService === undefined ? undefined : await buildExpertReferralAdminApi({ approvals: deps.adminApprovals, admin: deps.expertReferralAdminService, environmentCeilings: { expertReferral: deps.config.features?.expertReferral ?? false, expertResidencyBilling: deps.config.features?.expertResidencyBilling ?? false } });
+    if (expertAdmin !== undefined) app.get("/v1/admin/expert-referrals/inventory", async (request, reply) => {
+      const response = await expertAdmin.inject({ method: "GET", url: request.url, headers: request.headers });
+      reply.code(response.statusCode); for (const [name, value] of Object.entries(response.headers)) if (name !== "content-length" && value !== undefined) reply.header(name, value); return reply.send(response.rawPayload);
+    });
     app.post("/v1/admin/*", async (request, reply) => {
-      const response = await admin.inject({ method: "POST", url: request.url, headers: request.headers, ...(request.body === undefined ? {} : { payload: request.body as object }) });
+      const expertAction = /^\/v1\/admin\/actions\/(?:expert_referral|expert_residency)\./u.test(request.url);
+      const target = expertAdmin !== undefined && expertAction ? expertAdmin : admin;
+      const response = await target.inject({ method: "POST", url: request.url, headers: request.headers, ...(request.body === undefined ? {} : { payload: request.body as object }) });
       reply.code(response.statusCode);
       for (const [name, value] of Object.entries(response.headers)) {
         if (name !== "content-length" && value !== undefined) reply.header(name, value);
       }
       return reply.send(response.rawPayload);
     });
-    app.addHook("onClose", () => admin.close());
+    app.addHook("onClose", async () => { await admin.close(); await expertAdmin?.close(); });
   }
   return app as unknown as FastifyInstance;
 }

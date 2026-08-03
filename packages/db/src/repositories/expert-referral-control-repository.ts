@@ -124,7 +124,7 @@ function validateReasonCode(reasonCode: string): void {
 }
 
 export class PostgresExpertReferralControlRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(private readonly db: DrizzleDb, private readonly options: { skipIsolationStatement?: boolean } = {}) {}
 
   async activeCodeKeyVersions(): Promise<string[]> {
     const result = await this.db.execute<{ keyVersion: number }>(sql`
@@ -191,7 +191,7 @@ export class PostgresExpertReferralControlRepository {
   ): Promise<ExpertReferralFeatureControl> {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('expert-referral-feature-control', 0))`,
         );
@@ -249,7 +249,7 @@ export class PostgresExpertReferralControlRepository {
     validateReasonCode(command.reasonCode);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         await this.lockExpertForHold(tx, command.expertId);
         const repeated = await tx.execute<{
           id: string;
@@ -320,7 +320,7 @@ export class PostgresExpertReferralControlRepository {
     validateReasonCode(command.reasonCode);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         await this.lockExpertForHold(tx, command.expertId);
         const repeated = await tx.execute<{
           id: string;

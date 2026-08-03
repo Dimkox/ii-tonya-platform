@@ -83,6 +83,15 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
   "safety.resolve": "safety_case",
   "feedback.read": "feedback_queue",
   "feedback.resolve": "feedback_queue",
+  "expert_referral.batch_generate": "expert",
+  "expert_referral.code_revoke": "expert_referral_code",
+  "expert_referral.issuance_override": "expert_referral_issuance_override",
+  "expert_referral.abuse_hold_open": "expert",
+  "expert_referral.abuse_hold_close": "expert",
+  "expert_residency.tariff_create": "expert_residency_tariff_version",
+  "expert_residency.tariff_retire": "expert_residency_tariff_version",
+  "expert_referral.hold_replay": "expert",
+  "expert_referral.feature_switch": "expert_referral_feature_control",
 };
 
 export class PostgresAdminRepository {

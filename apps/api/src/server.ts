@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { createAdminService, type BookingService, type CatalogService, type ConversationService, type ExpertCodeKeyring, type PrivacyService } from "@ii-tonya/application";
+import { createAdminService, createExpertReferralAdminService, ExpertCodeCrypto, type BookingService, type CatalogService, type ConversationService, type ExpertCodeKeyring, type PrivacyService } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
-import { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, PostgresAdminApprovalRepository, PostgresAdminRepository, PostgresExpertReferralControlRepository, PostgresWebhookInboxRepository, type DrizzleDb } from "@ii-tonya/db";
+import { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, PostgresAdminApprovalRepository, PostgresAdminRepository, PostgresExpertReferralAdminRepository, PostgresExpertReferralControlRepository, PostgresWebhookInboxRepository, type DrizzleDb } from "@ii-tonya/db";
 import { DisabledSelartiAdapter, EnvironmentExpertCodeSecretResolver } from "@ii-tonya/integrations";
 import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
@@ -32,6 +32,7 @@ export const createDefaultLifecycle = (options: {
       expertCodeKeyring = resolver.resolve({ reference: keyConfig.reference, currentVersion: keyConfig.currentVersion, requiredVersions });
     }
     const adminApprovals = new PostgresAdminApprovalRepository(db);
+    const codeCrypto = expertCodeKeyring === undefined ? { issue() { throw new Error("expert_referral_key_unavailable"); }, digestCandidates() { throw new Error("expert_referral_key_unavailable"); } } : new ExpertCodeCrypto(expertCodeKeyring);
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -41,6 +42,7 @@ export const createDefaultLifecycle = (options: {
       privacyService: disabledService<PrivacyService>("privacy ingress"),
       adminService: createAdminService({ workflows: new PostgresAdminRepository(db) }),
       adminApprovals,
+      expertReferralAdminService: createExpertReferralAdminService({ workflows: new PostgresExpertReferralAdminRepository(db, codeCrypto) }),
       selarti: new DisabledSelartiAdapter(),
       telegramCallbacks: {
         async isAuthorizedIdentity() { return false; },

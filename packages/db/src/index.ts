@@ -92,6 +92,7 @@ export {
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
   requiredApprovalObjectType,
+  requiredApprovalRole,
   type AdminPayload,
   type AdminRole,
   type ApprovalAdminAction,
@@ -161,4 +162,5 @@ export {
   type TariffVersionCommand,
 } from "./repositories/expert-residency-repository.js";
 export { ExpertResidencySettlementError, PostgresExpertResidencyProviderInboxRepository, type ExpertResidencySettlementResult } from "./repositories/expert-residency-provider-inbox-repository.js";
+export { PostgresExpertReferralAdminRepository, type ExpertReferralAdminRepositoryCommand } from "./repositories/expert-referral-admin-repository.js";
 export * from "./schema/index.js";

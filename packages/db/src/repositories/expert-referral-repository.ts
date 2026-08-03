@@ -310,8 +310,9 @@ export class PostgresExpertReferralRepository {
   constructor(
     private readonly db: DrizzleDb,
     private readonly crypto: ExpertReferralCodeCrypto,
+    private readonly options: { skipIsolationStatement?: boolean } = {},
   ) {
-    this.#controls = new PostgresExpertReferralControlRepository(db);
+    this.#controls = new PostgresExpertReferralControlRepository(db, options);
   }
 
   async issueBatch(
@@ -320,7 +321,7 @@ export class PostgresExpertReferralRepository {
     assertBatchSize(command.count);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -452,7 +453,7 @@ export class PostgresExpertReferralRepository {
   ): Promise<{ id: string; status: "revoked" }> {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -513,7 +514,7 @@ export class PostgresExpertReferralRepository {
     const candidates = this.crypto.digestCandidates(command.plaintext);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.skipIsolationStatement !== true) await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
