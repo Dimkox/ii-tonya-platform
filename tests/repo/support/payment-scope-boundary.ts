@@ -369,7 +369,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0021_expert_settlement_snapshot.sql",
-    "e37a581e7934755a72c5da1c3735bf601322f2f02eece1d642cbf9b9c753cb3c",
+    "fabafd3827a30f8b6eff57cdfa5c1a8ef3a2fdeb5e6d54848c3ddeaf690db119",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -445,7 +445,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0021_snapshot.json",
-    "7bc279018a01db01ee0856c441346b0ace31875efa2b53456680bf52f2f5144d",
+    "c11204410659fc0d48c52ec9bedb156d6b010aff275b84009de22b76621067ba",
   ],
   [
     "packages/db/migrations/meta/_journal.json",

@@ -45,10 +45,17 @@ ALTER TABLE "expert_first_residency_settlements" ADD CONSTRAINT "expert_first_re
 --> statement-breakpoint
 ALTER TABLE "expert_first_residency_settlements" ADD CONSTRAINT "expert_first_settlement_pending_snapshot_complete" CHECK (eligibility <> 'pending_feature_hold' OR (settlement_invitee_user_id IS NOT NULL AND settlement_invitee_channel_identity_id IS NOT NULL AND settlement_inviter_expert_id IS NOT NULL AND settlement_inviter_user_id IS NOT NULL AND settlement_inviter_channel_identity_id IS NOT NULL));
 --> statement-breakpoint
+CREATE FUNCTION expert_jsonb_has_exact_keys(value jsonb, expected text[]) RETURNS boolean
+LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT jsonb_typeof(value)='object'
+    AND (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(value) AS keys(k))
+      = (SELECT array_agg(k ORDER BY k) FROM unnest(expected) AS keys(k));
+$$;
+--> statement-breakpoint
 ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_reversal_result_shape" CHECK (
   event_kind NOT IN ('refunded','charged_back') OR status <> 'processed' OR
   (result_legacy_exempt AND result_schema_version IS NULL AND result_payload IS NULL) OR
-  (result_schema_version=1 AND jsonb_typeof(result_payload)='object' AND jsonb_object_length(result_payload)=9
+  (result_schema_version=1 AND jsonb_typeof(result_payload)='object' AND expert_jsonb_has_exact_keys(result_payload,ARRAY['kind','eventId','paymentId','orderId','cashRefundedMinor','restoredCreditMinor','rewardReversed','debtMinor','terminated']::text[])
    AND result_payload->>'kind'=event_kind
    AND result_payload->>'eventId'=external_event_id
    AND result_payload->>'paymentId'=payment_id
@@ -63,6 +70,15 @@ ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provi
 CREATE FUNCTION expert_provider_reversal_result_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF TG_OP='INSERT' AND NEW.result_legacy_exempt THEN
+    RAISE EXCEPTION USING ERRCODE='23514', CONSTRAINT='expert_provider_reversal_legacy_exempt_forbidden', MESSAGE='expert_provider_reversal_legacy_exempt_forbidden';
+  END IF;
+  IF TG_OP='UPDATE' AND NEW.result_legacy_exempt AND NOT OLD.result_legacy_exempt THEN
+    RAISE EXCEPTION USING ERRCODE='23514', CONSTRAINT='expert_provider_reversal_legacy_exempt_forbidden', MESSAGE='expert_provider_reversal_legacy_exempt_forbidden';
+  END IF;
+  IF TG_OP='INSERT' THEN
+    RETURN NEW;
+  END IF;
   IF OLD.status='processed' AND OLD.event_kind IN ('refunded','charged_back')
      AND (NEW.result_payload IS DISTINCT FROM OLD.result_payload OR NEW.result_schema_version IS DISTINCT FROM OLD.result_schema_version OR NEW.result_legacy_exempt IS DISTINCT FROM OLD.result_legacy_exempt)
   THEN
@@ -78,7 +94,7 @@ END;
 $$;
 --> statement-breakpoint
 CREATE TRIGGER "expert_provider_reversal_result_guard"
-  BEFORE UPDATE ON "expert_residency_provider_event_inbox"
+  BEFORE INSERT OR UPDATE ON "expert_residency_provider_event_inbox"
   FOR EACH ROW EXECUTE FUNCTION expert_provider_reversal_result_guard();
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION expert_first_settlement_guard_change() RETURNS trigger

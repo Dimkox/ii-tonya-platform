@@ -134,6 +134,11 @@ describe("expert residency refund and reversal", () => {
         sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at) select provider,'missing_result',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_missing_result',verifier_key_version,verified_at,'processed',transaction_timestamp() from expert_residency_provider_event_inbox where external_event_id='a2'`,
       ),
     ).rejects.toThrow(/expert_provider_reversal_result/u);
+    await expect(
+      testDb!.db.execute(
+        sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at,result_legacy_exempt) select provider,'forged_legacy',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_forged_legacy',verifier_key_version,verified_at,'processed',transaction_timestamp(),true from expert_residency_provider_event_inbox where external_event_id='a2'`,
+      ),
+    ).rejects.toThrow(/expert_provider_reversal_legacy_exempt_forbidden/u);
   });
   it("turns historically spent reward into debt exactly once", async () => {
     const inviter = await testDb!.createExpertIdentity();

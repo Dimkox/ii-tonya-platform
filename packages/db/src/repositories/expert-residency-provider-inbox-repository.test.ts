@@ -79,6 +79,9 @@ describe("expert residency provider inbox", () => {
     expect(migration).not.toMatch(/min\s*\(\s*ci\.id\s*\)/iu);
     expect(migration.match(/ORDER BY ci\.id LIMIT 1/gu)).toHaveLength(2);
     expect(migration).toContain("expert_provider_reversal_result_immutable");
+    expect(migration).toContain("expert_jsonb_has_exact_keys");
+    expect(migration).not.toContain("jsonb_object_length");
+    expect(migration).toContain("BEFORE INSERT OR UPDATE");
     expect(source).toContain("expert.rows[0].active");
     expect(source).toContain("settlement_abuse_cleared");
     expect(source).toMatch(
