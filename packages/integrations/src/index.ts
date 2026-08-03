@@ -85,5 +85,5 @@ export {
 } from "./telegram/telegram-adapter.js";
 export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
 export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
-export { assertVerifiedExpertResidencyPaymentEvent, disabledExpertResidencyPaymentEventVerifier, verifiedEventFixture } from "./expert-residency/verified-event.js";
+export { assertVerifiedExpertResidencyPaymentEvent, disabledExpertResidencyPaymentEventVerifier } from "./expert-residency/verified-event.js";
 export type { ExpertResidencyPaymentEventVerifier, ExpertResidencyVerificationEvidence, VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
