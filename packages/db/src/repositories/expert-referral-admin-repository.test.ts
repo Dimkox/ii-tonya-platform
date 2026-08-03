@@ -187,7 +187,7 @@ describe("PostgresExpertReferralAdminRepository", () => {
       digestCandidates: (plaintext) => crypto.digestCandidates(plaintext),
     };
     const admin = new PostgresExpertReferralAdminRepository(retryDb, recordingCrypto);
-    const result = await admin.execute({
+    const command = {
       action: "expert_referral.batch_generate",
       objectId: inviter.expertId,
       approvalId: approval.approvalId,
@@ -196,15 +196,28 @@ describe("PostgresExpertReferralAdminRepository", () => {
       payload,
       sessionIdHash: approval.sessionIdHash,
       environmentCeilings: { expertReferral: true, expertResidencyBilling: true },
-    });
+    } as const;
+    const result = await admin.execute(command);
     expect(plaintextAttempts).toHaveLength(2);
     expect(result).toMatchObject({ allowed: true, codes: plaintextAttempts[1] });
     expect(JSON.stringify(result)).not.toContain(plaintextAttempts[0]![0]);
-    const committed = await testDb!.db.execute<{ batches: number; consumed: number }>(sql`
+    if (!result.allowed || typeof result.batchId !== "string") throw new Error("Expected successful batch result");
+    const replay = await admin.execute(command);
+    expect(replay).toEqual({ allowed: true, replayed: true, batchId: result.batchId, count: 1 });
+    expect(JSON.stringify(replay)).not.toMatch(/codes|plaintext|digest|hash/iu);
+    const committed = await testDb!.db.execute<{ batches: number; consumed: number; audits: number; results: number; safeResult: unknown }>(sql`
       select
         (select count(*)::int from expert_referral_code_batches) as batches,
-        (select count(*)::int from admin_approvals where id=${approval.approvalId}::uuid and consumed_at is not null) as consumed
+        (select count(*)::int from admin_approvals where id=${approval.approvalId}::uuid and consumed_at is not null) as consumed,
+        (select count(*)::int from audit_events where object_id=${inviter.expertId}::uuid and decision='allowed') as audits,
+        (select count(*)::int from expert_referral_admin_execution_results where approval_id=${approval.approvalId}::uuid) as results,
+        (select safe_result from expert_referral_admin_execution_results where approval_id=${approval.approvalId}::uuid) as "safeResult"
     `);
-    expect(committed.rows[0]).toEqual({ batches: 1, consumed: 1 });
+    expect(committed.rows[0]).toMatchObject({ batches: 1, consumed: 1, audits: 1, results: 1 });
+    expect(JSON.stringify(committed.rows[0]?.safeResult)).not.toMatch(/codes|plaintext|digest|hash/iu);
+    await expect(testDb!.db.execute(sql`
+      update expert_referral_admin_execution_results set safe_result='{}'::jsonb
+      where approval_id=${approval.approvalId}::uuid
+    `)).rejects.toMatchObject({ code: "55000" });
   });
 });

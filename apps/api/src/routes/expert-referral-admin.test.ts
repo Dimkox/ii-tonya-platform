@@ -52,4 +52,20 @@ describe("expert referral admin routes", () => {
     expect(admin.execute).toHaveBeenCalledWith(principal, expect.objectContaining({ payload: expect.objectContaining({ validFrom: "2026-08-04T09:00:00.000Z", validUntil: "2026-08-04T10:00:00.000Z", requesterId: principal.id, requesterSessionIdHash: principal.sessionIdHash }) }));
     await app.close();
   });
+
+  it.each([
+    ["expert_referral.batch_generate", { count: 1, overrideId: "00000000-0000-4000-8000-0000000000AA" }],
+    ["expert_referral.issuance_override", { inviterExpertId: "00000000-0000-4000-8000-0000000000AA", additionalQuota: 1, reasonCode: "approved", validFrom: "2026-08-04T09:00:00.000Z", validUntil: "2026-08-04T10:00:00.000Z" }],
+    ["expert_referral.issuance_override", { inviterExpertId: "00000000-0000-4000-8000-000000000010", additionalQuota: 1, reasonCode: "approved", validFrom: "2026-02-30T09:00:00.000Z", validUntil: "2026-03-01T10:00:00.000Z" }],
+    ["expert_referral.issuance_override", { inviterExpertId: "00000000-0000-4000-8000-000000000010", additionalQuota: 1, reasonCode: "approved", validFrom: "2026-08-04T10:00:00.000Z", validUntil: "2026-08-04T09:00:00.000Z" }],
+    ["expert_residency.tariff_create", { tariffKey: "monthly", displayName: "Monthly", priceMinor: 100000, durationSeconds: 86400, activeFrom: "2026-08-04T10:00:00.000Z", activeTo: "2026-08-04T09:00:00.000Z" }],
+  ])("rejects noncanonical embedded identifiers or invalid intervals for %s", async (action, command) => {
+    const approvals = { resolvePrincipal: vi.fn(async () => principal), requestApproval: vi.fn(), approveApproval: vi.fn() };
+    const app = await buildExpertReferralAdminApi({ approvals, admin: { execute: vi.fn(), inventory: vi.fn() }, sessionTokenHash: () => principal.sessionIdHash, environmentCeilings: { expertReferral: true, expertResidencyBilling: true } });
+    const response = await app.inject({ method: "POST", url: `/v1/admin/actions/${action}/00000000-0000-4000-8000-000000000030/approvals`, headers: { authorization: `Bearer ${token}` }, payload: { nonce: "nonce-task9-strict", command } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_command" });
+    expect(approvals.requestApproval).not.toHaveBeenCalled();
+    await app.close();
+  });
 });

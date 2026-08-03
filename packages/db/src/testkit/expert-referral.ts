@@ -191,7 +191,8 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
 
   const reset = async (): Promise<void> => {
     await base.db.execute(sql`
-      truncate table expert_referral_feature_controls,
+      truncate table expert_referral_admin_execution_results,
+        expert_referral_feature_controls,
         expert_referral_abuse_holds, expert_referral_issuance_overrides,
         expert_referral_ledger_allocations, expert_referral_ledger_entries,
         expert_referral_reward_grants, expert_first_residency_settlements,

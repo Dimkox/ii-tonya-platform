@@ -29,6 +29,40 @@ const updatedAt = timestamp("updated_at", { withTimezone: true })
   .notNull()
   .defaultNow();
 
+export const expertReferralAdminExecutionResults = pgTable(
+  "expert_referral_admin_execution_results",
+  {
+    approvalId: uuid("approval_id").primaryKey().references(() => adminApprovals.id),
+    secondApprovalId: uuid("second_approval_id").references(() => adminApprovals.id),
+    action: text("action").notNull(),
+    objectId: uuid("object_id").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    nonceHash: text("nonce_hash").notNull(),
+    secondNonceHash: text("second_nonce_hash"),
+    requesterSessionIdHash: text("requester_session_id_hash").notNull().references(() => adminSessions.sessionIdHash),
+    safeResult: jsonb("safe_result").$type<Record<string, string | number | boolean>>().notNull(),
+    createdAt,
+  },
+  (table) => [
+    check("expert_referral_admin_result_action_allowed", sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`),
+    check("expert_referral_admin_result_payload_hash_format", sql`${table.payloadHash} ~ '^sha256:[0-9a-f]{64}$'`),
+    check("expert_referral_admin_result_nonce_hash_format", sql`${table.nonceHash} ~ '^sha256:[0-9a-f]{64}$'`),
+    check("expert_referral_admin_result_second_binding", sql`(${table.action} <> 'expert_referral.issuance_override' and ${table.secondApprovalId} is null and ${table.secondNonceHash} is null) or (${table.action} = 'expert_referral.issuance_override' and ${table.secondApprovalId} is not null and ${table.secondNonceHash} ~ '^sha256:[0-9a-f]{64}$' and ${table.secondApprovalId} <> ${table.approvalId})`),
+    check("expert_referral_admin_result_object_only", sql`jsonb_typeof(${table.safeResult}) = 'object'`),
+    check("expert_referral_admin_result_no_secrets", sql`not (${table.safeResult} ?| array['codes','plaintext','digest','hash','nonce'])`),
+    check("expert_referral_admin_result_exact_schema", sql`
+      (${table.action} = 'expert_referral.batch_generate' and ${table.safeResult} ?& array['batchId','count'] and ${table.safeResult} - array['batchId','count'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'batchId')='string' and jsonb_typeof(${table.safeResult}->'count')='number') or
+      (${table.action} = 'expert_referral.code_revoke' and ${table.safeResult} ?& array['id','status'] and ${table.safeResult} - array['id','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
+      (${table.action} = 'expert_referral.issuance_override' and ${table.safeResult} ? 'overrideId' and ${table.safeResult} - 'overrideId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'overrideId')='string') or
+      (${table.action} in ('expert_referral.abuse_hold_open','expert_referral.abuse_hold_close') and ${table.safeResult} ?& array['id','expertId','status'] and ${table.safeResult} - array['id','expertId','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and jsonb_typeof(${table.safeResult}->'expertId')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
+      (${table.action} = 'expert_residency.tariff_create' and ${table.safeResult} ? 'tariffVersionId' and ${table.safeResult} - 'tariffVersionId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string') or
+      (${table.action} = 'expert_residency.tariff_retire' and ${table.safeResult} ?& array['tariffVersionId','activeTo'] and ${table.safeResult} - array['tariffVersionId','activeTo'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string' and jsonb_typeof(${table.safeResult}->'activeTo')='string') or
+      (${table.action} = 'expert_referral.hold_replay' and ${table.safeResult} ?& array['kind','reason'] and ${table.safeResult} - array['kind','reason'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'kind')='string' and jsonb_typeof(${table.safeResult}->'reason')='string') or
+      (${table.action} = 'expert_referral.feature_switch' and ${table.safeResult} ? 'version' and ${table.safeResult} - 'version' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number')
+    `),
+  ],
+);
+
 export const expertReferralBatchStatus = pgEnum(
   "expert_referral_batch_status",
   ["issued", "partially_redeemed", "fully_redeemed", "revoked"],

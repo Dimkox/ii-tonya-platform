@@ -262,6 +262,10 @@ function normalizeExpertReferralInstant(
   return canonicalExpertReferralInstant(normalized, field);
 }
 
+export function canonicalAdminInstant(value: string, field: string): string {
+  return normalizeExpertReferralInstant(value, field);
+}
+
 export function expertReferralOverrideApprovalPayload(
   input: ExpertReferralOverrideApprovalPayloadInput,
 ) {

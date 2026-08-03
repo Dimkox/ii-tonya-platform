@@ -155,6 +155,13 @@
       "when": 1785762000000,
       "tag": "0021_expert_settlement_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785770400000,
+      "tag": "0022_expert_referral_admin_replays",
+      "breakpoints": true
     }
   ]
 }

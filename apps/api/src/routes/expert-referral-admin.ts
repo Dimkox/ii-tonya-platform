@@ -1,7 +1,7 @@
 import rateLimit from "@fastify/rate-limit";
 import type { ExpertReferralAdminAction, ExpertReferralAdminPayload, ExpertReferralAdminService, ExpertReferralEnvironmentCeilings } from "@ii-tonya/application";
 import { expertReferralAdminActions } from "@ii-tonya/application";
-import { expertReferralOverrideApprovalPayload, type AdminPayload, type PostgresAdminApprovalRepository } from "@ii-tonya/db";
+import { canonicalAdminInstant, expertReferralOverrideApprovalPayload, type AdminPayload, type PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import Fastify from "fastify";
 import { hashAdminSessionToken } from "./admin.js";
 
@@ -13,7 +13,10 @@ export interface ExpertReferralAdminApiDependencies {
   sessionTokenHash?: (token: string) => string;
   rateLimitMax?: number;
 }
-const uuid = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
+const uuid = "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+const uuidPattern = new RegExp(uuid, "u");
+const controlId = "00000000-0000-0000-0000-000000000041";
+const rfc3339 = /^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/u;
 const opaque = "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$";
 const objectTypes: Record<ExpertReferralAdminAction, string> = {
   "expert_referral.batch_generate": "expert",
@@ -26,7 +29,7 @@ const objectTypes: Record<ExpertReferralAdminAction, string> = {
   "expert_referral.hold_replay": "expert",
   "expert_referral.feature_switch": "expert_referral_feature_control",
 };
-const params = { type: "object", additionalProperties: false, required: ["action", "objectId"], properties: { action: { type: "string", enum: expertReferralAdminActions }, objectId: { anyOf: [{ type: "string", pattern: uuid }, { const: "00000000-0000-0000-0000-000000000041" }] } } } as const;
+const params = { type: "object", additionalProperties: false, required: ["action", "objectId"], properties: { action: { type: "string", enum: expertReferralAdminActions }, objectId: { anyOf: [{ type: "string", pattern: uuid }, { const: controlId }] } } } as const;
 const authBody = { type: "object", additionalProperties: false, required: ["nonce", "command"], properties: { nonce: { type: "string", pattern: opaque }, command: { type: "object", maxProperties: 8 } } } as const;
 const executionBody = { type: "object", additionalProperties: false, required: ["approvalId", "nonce", "correlationId", "command"], properties: { approvalId: { type: "string", pattern: uuid }, secondApprovalId: { type: "string", pattern: uuid }, nonce: { type: "string", pattern: opaque }, secondNonce: { type: "string", pattern: opaque }, correlationId: { type: "string", pattern: opaque }, command: { type: "object", maxProperties: 8 } } } as const;
 const bearer = (value: string | undefined): string | null => /^Bearer ([A-Za-z0-9._~-]{32,512})$/u.exec(value ?? "")?.[1] ?? null;
@@ -36,12 +39,18 @@ const exactKeys = (value: ExpertReferralAdminPayload, required: readonly string[
 };
 const boundedText = (value: unknown, min = 1, max = 128): value is string => typeof value === "string" && value.length >= min && value.length <= max;
 const safeInteger = (value: unknown, min: number, max: number): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;
+const canonicalUuid = (value: unknown): value is string => typeof value === "string" && uuidPattern.test(value);
+const instant = (value: unknown, field: string): string => {
+  if (typeof value !== "string" || !rfc3339.test(value)) throw new Error("invalid_command");
+  return canonicalAdminInstant(value, field);
+};
 const canonicalPayload = (action: ExpertReferralAdminAction, objectId: string, raw: unknown, actor?: { id: string; sessionIdHash: string }): ExpertReferralAdminPayload => {
+  if (objectId !== controlId && !canonicalUuid(objectId)) throw new Error("invalid_command");
   if (typeof raw !== "object" || raw === null || Array.isArray(raw) || Object.getPrototypeOf(raw) !== Object.prototype) throw new Error("invalid_command");
   const p = raw as ExpertReferralAdminPayload;
-  if (action === "expert_referral.batch_generate" && (!exactKeys(p,["count"],["overrideId"]) || !safeInteger(p.count,1,1000) || (p.overrideId !== undefined && !boundedText(p.overrideId)))) throw new Error("invalid_command");
+  if (action === "expert_referral.batch_generate" && (!exactKeys(p,["count"],["overrideId"]) || !safeInteger(p.count,1,1000) || (p.overrideId !== undefined && !canonicalUuid(p.overrideId)))) throw new Error("invalid_command");
   if ((action === "expert_referral.code_revoke" || action === "expert_referral.hold_replay") && !exactKeys(p,[])) throw new Error("invalid_command");
-  if (action === "expert_referral.issuance_override" && (!exactKeys(p,["inviterExpertId","additionalQuota","reasonCode","validFrom","validUntil"]) || !boundedText(p.inviterExpertId) || !safeInteger(p.additionalQuota,1,1000) || !boundedText(p.reasonCode) || !boundedText(p.validFrom) || !boundedText(p.validUntil))) throw new Error("invalid_command");
+  if (action === "expert_referral.issuance_override" && (!exactKeys(p,["inviterExpertId","additionalQuota","reasonCode","validFrom","validUntil"]) || !canonicalUuid(p.inviterExpertId) || !safeInteger(p.additionalQuota,1,1000) || !boundedText(p.reasonCode) || !boundedText(p.validFrom) || !boundedText(p.validUntil))) throw new Error("invalid_command");
   if ((action === "expert_referral.abuse_hold_open" || action === "expert_referral.abuse_hold_close") && (!exactKeys(p,["reasonCode"]) || !boundedText(p.reasonCode))) throw new Error("invalid_command");
   if (action === "expert_residency.tariff_create" && (!exactKeys(p,["tariffKey","displayName","priceMinor","durationSeconds","activeFrom","activeTo"]) || !boundedText(p.tariffKey) || !boundedText(p.displayName) || !safeInteger(p.priceMinor,1,999_999_999_999) || !safeInteger(p.durationSeconds,1,2_147_483_647) || !boundedText(p.activeFrom) || !boundedText(p.activeTo))) throw new Error("invalid_command");
   if (action === "expert_residency.tariff_retire" && (!exactKeys(p,["retiredAt"]) || !boundedText(p.retiredAt))) throw new Error("invalid_command");
@@ -50,7 +59,7 @@ const canonicalPayload = (action: ExpertReferralAdminAction, objectId: string, r
   if (action === "expert_referral.code_revoke") return { codeId: objectId };
   if (action === "expert_referral.issuance_override") {
     if (actor === undefined) throw new Error("invalid_command");
-    return expertReferralOverrideApprovalPayload({
+    const payload = expertReferralOverrideApprovalPayload({
       overrideId: objectId,
       inviterExpertId: p.inviterExpertId as string,
       additionalQuota: p.additionalQuota as number,
@@ -60,10 +69,17 @@ const canonicalPayload = (action: ExpertReferralAdminAction, objectId: string, r
       requesterId: actor.id,
       requesterSessionIdHash: actor.sessionIdHash,
     });
+    if (payload.validUntil <= payload.validFrom) throw new Error("invalid_command");
+    return payload;
   }
   if (action === "expert_referral.abuse_hold_open" || action === "expert_referral.abuse_hold_close") return { ...p, expertId: objectId };
-  if (action === "expert_residency.tariff_create") return { ...p, tariffVersionId: objectId };
-  if (action === "expert_residency.tariff_retire") return { ...p, tariffVersionId: objectId };
+  if (action === "expert_residency.tariff_create") {
+    const activeFrom = instant(p.activeFrom, "expert_residency_tariff_versions.active_from");
+    const activeTo = instant(p.activeTo, "expert_residency_tariff_versions.active_to");
+    if (activeTo <= activeFrom) throw new Error("invalid_command");
+    return { ...p, activeFrom, activeTo, tariffVersionId: objectId };
+  }
+  if (action === "expert_residency.tariff_retire") return { retiredAt: instant(p.retiredAt, "expert_residency_tariff_versions.retired_at"), tariffVersionId: objectId };
   if (action === "expert_referral.hold_replay") return { expertId: objectId };
   return p;
 };

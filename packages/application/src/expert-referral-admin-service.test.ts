@@ -57,4 +57,16 @@ describe("expert referral admin application boundary", () => {
     })).rejects.toThrow("invalid_admin_command");
     expect(workflows.execute).not.toHaveBeenCalled();
   });
+
+  it("rejects noncanonical embedded UUIDs and reversed canonical instants before persistence", async () => {
+    const workflows = { execute: vi.fn(), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await expect(service.execute(principal, {
+      action: "expert_referral.issuance_override", objectId: "00000000-0000-4000-8000-000000000030",
+      approvalId: "00000000-0000-4000-8000-000000000020", secondApprovalId: "00000000-0000-4000-8000-000000000021", nonce: "nonce-task9-strict", secondNonce: "nonce-task9-strict-2", correlationId: "correlation-task9-strict",
+      payload: { overrideId: "00000000-0000-4000-8000-000000000030", inviterExpertId: "00000000-0000-4000-8000-0000000000AA", requesterId: principal.id, requesterSessionIdHash: principal.sessionIdHash, additionalQuota: 1, reasonCode: "approved", validFrom: "2026-08-04T10:00:00.000Z", validUntil: "2026-08-04T09:00:00.000Z" },
+      environmentCeilings: { expertReferral: true, expertResidencyBilling: true },
+    })).rejects.toThrow("invalid_admin_command");
+    expect(workflows.execute).not.toHaveBeenCalled();
+  });
 });

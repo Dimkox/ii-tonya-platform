@@ -121,6 +121,7 @@ export {
   calculateIssuanceOverrideUsage,
   deriveExpertReferralBatchStatus,
   expertReferralOverrideApprovalPayload,
+  canonicalAdminInstant,
   parseExpertCodeKeyVersion,
   toPublicIssuedExpertReferralCode,
   type ExpertReferralBinding,
