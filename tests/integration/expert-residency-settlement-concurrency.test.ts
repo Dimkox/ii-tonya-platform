@@ -3,7 +3,8 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock(
   "@ii-tonya/integrations",
-  async () => await import("../../packages/integrations/src/index.js"),
+  async () =>
+    await import("../../packages/integrations/src/expert-residency/verified-event.js"),
 );
 import { expertResidencyPaymentEventSchema } from "../../packages/contracts/src/expert-residency.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";

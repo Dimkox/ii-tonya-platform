@@ -11,7 +11,8 @@ import {
 } from "vitest";
 vi.mock(
   "@ii-tonya/integrations",
-  async () => await import("../../packages/integrations/src/index.js"),
+  async () =>
+    await import("../../packages/integrations/src/expert-residency/verified-event.js"),
 );
 import { expertResidencyPaymentEventSchema } from "../../packages/contracts/src/expert-residency.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
@@ -153,11 +154,11 @@ describe("expert residency settlement", () => {
         sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${referralId}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${invitee.expertId}::uuid)`,
       );
       for (const [grantId, amount, reversalId, days] of [
-        [grantOne, 60000, reversalOne, 1],
-        [grantTwo, 70000, reversalTwo, 2],
+        [grantOne, 60000, reversalOne, 2],
+        [grantTwo, 70000, reversalTwo, 1],
       ] as const) {
         await tx.execute(
-          sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grantId}::uuid,${inviter.expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-interval '1 day',transaction_timestamp()+(${days}||' days')::interval,${randomUUID()})`,
+          sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grantId}::uuid,${inviter.expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-(${days}||' days')::interval,transaction_timestamp()+(${365 - days}||' days')::interval,${randomUUID()})`,
         );
         await tx.execute(
           sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${reversalId}::uuid,${inviter.expertId}::uuid,'reversal',${-amount},${randomUUID()}::uuid,'test_debt',${grantId}::uuid,${randomUUID()})`,
@@ -205,7 +206,7 @@ describe("expert residency settlement", () => {
         sql`insert into expert_referrals (id,code_id,inviter_expert_id,invitee_expert_id) values (${referral}::uuid,${randomUUID()}::uuid,${inviter.expertId}::uuid,${invitee.expertId}::uuid)`,
       );
       await tx.execute(
-        sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grant}::uuid,${inviter.expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-interval '1 day',transaction_timestamp()+interval '1 day',${randomUUID()})`,
+        sql`insert into expert_referral_reward_grants (id,expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${grant}::uuid,${inviter.expertId}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,${randomUUID()}::uuid,100000,transaction_timestamp()-interval '1 day',transaction_timestamp()+interval '364 days',${randomUUID()})`,
       );
       await tx.execute(
         sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${reversal}::uuid,${inviter.expertId}::uuid,'reversal',-30000,${randomUUID()}::uuid,'test_debt',${grant}::uuid,${randomUUID()})`,
