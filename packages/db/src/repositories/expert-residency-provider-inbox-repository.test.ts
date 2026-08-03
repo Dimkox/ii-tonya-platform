@@ -65,6 +65,20 @@ describe("expert residency provider inbox", () => {
     expect(source).not.toContain("expert_referral_credit_balances");
     expect(source).toContain("repayment-reversal:");
     expect(source).toContain("result_payload");
+    expect(source).not.toMatch(/min\s*\(\s*ci\.id\s*\)/iu);
+    expect(source).toMatch(
+      /channel_identities[\s\S]{0,180}order by ci\.id limit 1/iu,
+    );
+    const migration = readFileSync(
+      new URL(
+        "../../migrations/0021_expert_settlement_snapshot.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(migration).not.toMatch(/min\s*\(\s*ci\.id\s*\)/iu);
+    expect(migration.match(/ORDER BY ci\.id LIMIT 1/gu)).toHaveLength(2);
+    expect(migration).toContain("expert_provider_reversal_result_immutable");
     expect(source).toContain("expert.rows[0].active");
     expect(source).toContain("settlement_abuse_cleared");
     expect(source).toMatch(

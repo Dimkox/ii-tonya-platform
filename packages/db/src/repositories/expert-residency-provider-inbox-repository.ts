@@ -34,9 +34,13 @@ export interface ExpertResidencyReversalResult {
   readonly debtMinor: bigint;
   readonly terminated: boolean;
 }
-function reversalResultPayload(result: ExpertResidencyReversalResult) {
+function reversalResultPayload(
+  result: ExpertResidencyReversalResult,
+  eventId: string,
+) {
   return {
     ...result,
+    eventId,
     cashRefundedMinor: result.cashRefundedMinor.toString(),
     restoredCreditMinor: "0",
     debtMinor: result.debtMinor.toString(),
@@ -44,17 +48,35 @@ function reversalResultPayload(result: ExpertResidencyReversalResult) {
 }
 function reversalResultFromPayload(
   value: unknown,
+  expectedEventId: string,
 ): ExpertResidencyReversalResult | undefined {
   if (!value || typeof value !== "object") return undefined;
   const row = value as Record<string, unknown>;
+  const keys = Object.keys(row).sort();
+  const expectedKeys = [
+    "cashRefundedMinor",
+    "debtMinor",
+    "eventId",
+    "kind",
+    "orderId",
+    "paymentId",
+    "restoredCreditMinor",
+    "rewardReversed",
+    "terminated",
+  ];
   if (
+    keys.length !== expectedKeys.length ||
+    keys.some((key, index) => key !== expectedKeys[index]) ||
     (row.kind !== "refunded" && row.kind !== "charged_back") ||
     typeof row.orderId !== "string" ||
+    row.eventId !== expectedEventId ||
     typeof row.paymentId !== "string" ||
     typeof row.cashRefundedMinor !== "string" ||
+    !/^(?:0|[1-9][0-9]{0,11})$/u.test(row.cashRefundedMinor) ||
     row.restoredCreditMinor !== "0" ||
     typeof row.rewardReversed !== "boolean" ||
     typeof row.debtMinor !== "string" ||
+    !/^(?:0|[1-9][0-9]{0,11})$/u.test(row.debtMinor) ||
     typeof row.terminated !== "boolean"
   )
     return undefined;
@@ -203,7 +225,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
               userId: string;
               channelIdentityId: string | null;
             }>(
-              sql`select e.user_id as "userId",(select min(ci.id) from channel_identities ci where ci.user_id=e.user_id) as "channelIdentityId" from experts e where e.id=${prospectiveReferral.rows[0].inviterExpertId}::uuid`,
+              sql`select e.user_id as "userId",(select ci.id from channel_identities ci where ci.user_id=e.user_id order by ci.id limit 1) as "channelIdentityId" from experts e where e.id=${prospectiveReferral.rows[0].inviterExpertId}::uuid`,
             )
           : { rows: [] };
         const attempted = await tx.execute<{ id: string }>(
@@ -427,7 +449,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
             "EXPERT_RESIDENCY_REVERSAL_PAYMENT_MISMATCH",
           );
         if (claimed.status === "processed") {
-          const priorResult = reversalResultFromPayload(claimed.resultPayload);
+          const priorResult = reversalResultFromPayload(
+            claimed.resultPayload,
+            input.eventId,
+          );
           if (!priorResult)
             throw new ExpertResidencySettlementError(
               "EXPERT_RESIDENCY_REVERSAL_RESULT_MISSING",
@@ -578,7 +603,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           terminated: terminating,
         };
         await tx.execute(
-          sql`update expert_residency_provider_event_inbox set status='processed',result_code=${terminating ? "terminated" : "partial_refund"},result_payload=${JSON.stringify(reversalResultPayload(result))}::jsonb,processed_at=${now},updated_at=${now} where provider=${input.provider} and external_event_id=${input.eventId}`,
+          sql`update expert_residency_provider_event_inbox set status='processed',result_code=${terminating ? "terminated" : "partial_refund"},result_schema_version=1,result_payload=${JSON.stringify(reversalResultPayload(result, input.eventId))}::jsonb,processed_at=${now},updated_at=${now} where provider=${input.provider} and external_event_id=${input.eventId}`,
         );
         return result;
       }),

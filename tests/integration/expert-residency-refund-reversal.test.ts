@@ -116,10 +116,24 @@ describe("expert residency refund and reversal", () => {
         )
       ).rows[0]!.n,
     ).toBe(1);
-    const persisted = await testDb!.db.execute<{ payload: unknown }>(
-      sql`select result_payload as payload from expert_residency_provider_event_inbox where external_event_id='a2'`,
+    const persisted = await testDb!.db.execute<{
+      payload: unknown;
+      version: number;
+    }>(
+      sql`select result_payload as payload,result_schema_version as version from expert_residency_provider_event_inbox where external_event_id='a2'`,
     );
     expect(persisted.rows[0]!.payload).toMatchObject({ debtMinor: "0" });
+    expect(persisted.rows[0]!.version).toBe(1);
+    await expect(
+      testDb!.db.execute(
+        sql`update expert_residency_provider_event_inbox set result_payload='{}'::jsonb where external_event_id='a2'`,
+      ),
+    ).rejects.toThrow(/expert_provider_reversal_result_immutable/u);
+    await expect(
+      testDb!.db.execute(
+        sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status,processed_at) select provider,'missing_result',payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,'verify_missing_result',verifier_key_version,verified_at,'processed',transaction_timestamp() from expert_residency_provider_event_inbox where external_event_id='a2'`,
+      ),
+    ).rejects.toThrow(/expert_provider_reversal_result/u);
   });
   it("turns historically spent reward into debt exactly once", async () => {
     const inviter = await testDb!.createExpertIdentity();

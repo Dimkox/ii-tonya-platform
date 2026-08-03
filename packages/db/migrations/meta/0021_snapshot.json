@@ -6223,6 +6223,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "result_schema_version": {
+          "name": "result_schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_legacy_exempt": {
+          "name": "result_legacy_exempt",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "received_at": {
           "name": "received_at",
           "type": "timestamp with time zone",
@@ -6329,6 +6342,10 @@
         "expert_provider_event_processing_state": {
           "name": "expert_provider_event_processing_state",
           "value": "\n        (\"expert_residency_provider_event_inbox\".\"status\" in ('received', 'processing', 'reconciliation_required') and \"expert_residency_provider_event_inbox\".\"processed_at\" is null)\n        or (\"expert_residency_provider_event_inbox\".\"status\" in ('processed', 'rejected') and \"expert_residency_provider_event_inbox\".\"processed_at\" is not null)\n      "
+        },
+        "expert_provider_reversal_result_shape": {
+          "name": "expert_provider_reversal_result_shape",
+          "value": "\"expert_residency_provider_event_inbox\".\"event_kind\" not in ('refunded','charged_back') or \"expert_residency_provider_event_inbox\".\"status\" <> 'processed' or (\"expert_residency_provider_event_inbox\".\"result_legacy_exempt\" and \"expert_residency_provider_event_inbox\".\"result_schema_version\" is null and \"expert_residency_provider_event_inbox\".\"result_payload\" is null) or (\"expert_residency_provider_event_inbox\".\"result_schema_version\"=1 and jsonb_typeof(\"expert_residency_provider_event_inbox\".\"result_payload\")='object' and jsonb_object_length(\"expert_residency_provider_event_inbox\".\"result_payload\")=9 and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'kind'=\"expert_residency_provider_event_inbox\".\"event_kind\" and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'eventId'=\"expert_residency_provider_event_inbox\".\"external_event_id\" and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'paymentId'=\"expert_residency_provider_event_inbox\".\"payment_id\" and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'orderId'=\"expert_residency_provider_event_inbox\".\"order_id\"::text and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'cashRefundedMinor' ~ '^(0|[1-9][0-9]{0,11})$' and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'restoredCreditMinor'='0' and jsonb_typeof(\"expert_residency_provider_event_inbox\".\"result_payload\"->'rewardReversed')='boolean' and \"expert_residency_provider_event_inbox\".\"result_payload\"->>'debtMinor' ~ '^(0|[1-9][0-9]{0,11})$' and jsonb_typeof(\"expert_residency_provider_event_inbox\".\"result_payload\"->'terminated')='boolean')"
         }
       },
       "isRLSEnabled": false

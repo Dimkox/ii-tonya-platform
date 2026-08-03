@@ -444,6 +444,10 @@ export const expertResidencyProviderEventInbox = pgTable(
       .default("received"),
     resultCode: text("result_code"),
     resultPayload: jsonb("result_payload").$type<Record<string, unknown>>(),
+    resultSchemaVersion: integer("result_schema_version"),
+    resultLegacyExempt: boolean("result_legacy_exempt")
+      .notNull()
+      .default(false),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -483,6 +487,10 @@ export const expertResidencyProviderEventInbox = pgTable(
         (${table.status} in ('received', 'processing', 'reconciliation_required') and ${table.processedAt} is null)
         or (${table.status} in ('processed', 'rejected') and ${table.processedAt} is not null)
       `,
+    ),
+    check(
+      "expert_provider_reversal_result_shape",
+      sql`${table.eventKind} not in ('refunded','charged_back') or ${table.status} <> 'processed' or (${table.resultLegacyExempt} and ${table.resultSchemaVersion} is null and ${table.resultPayload} is null) or (${table.resultSchemaVersion}=1 and jsonb_typeof(${table.resultPayload})='object' and jsonb_object_length(${table.resultPayload})=9 and ${table.resultPayload}->>'kind'=${table.eventKind} and ${table.resultPayload}->>'eventId'=${table.externalEventId} and ${table.resultPayload}->>'paymentId'=${table.paymentId} and ${table.resultPayload}->>'orderId'=${table.orderId}::text and ${table.resultPayload}->>'cashRefundedMinor' ~ '^(0|[1-9][0-9]{0,11})$' and ${table.resultPayload}->>'restoredCreditMinor'='0' and jsonb_typeof(${table.resultPayload}->'rewardReversed')='boolean' and ${table.resultPayload}->>'debtMinor' ~ '^(0|[1-9][0-9]{0,11})$' and jsonb_typeof(${table.resultPayload}->'terminated')='boolean')`,
     ),
     index("expert_provider_event_status_received_idx").on(
       table.status,
