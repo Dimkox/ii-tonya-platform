@@ -352,7 +352,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0018_expert_residency_referrals.sql",
-    "7ef92e152e92086f181207311bc3af299b6ee6580156c6a59ffa7721bb8ca2c3",
+    "8ecae37aea385c75659f0dbba2c06f62e5bffabca20ed85dd1b703e7d7a032a4",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

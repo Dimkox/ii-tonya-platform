@@ -454,6 +454,35 @@ CREATE TRIGGER "expert_first_settlement_guard"
   BEFORE UPDATE OR DELETE ON "expert_first_residency_settlements"
   FOR EACH ROW EXECUTE FUNCTION expert_first_settlement_guard_change();
 --> statement-breakpoint
+CREATE FUNCTION expert_reward_grant_require_eligible_settlement()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  marker_eligibility expert_first_settlement_eligibility;
+BEGIN
+  SELECT eligibility
+    INTO marker_eligibility
+    FROM expert_first_residency_settlements
+    WHERE id = NEW.first_settlement_id
+      AND referral_id = NEW.referral_id
+      AND qualifying_order_id = NEW.qualifying_order_id
+      AND qualifying_payment_attempt_id = NEW.qualifying_payment_attempt_id
+    FOR UPDATE;
+
+  IF NOT FOUND OR marker_eligibility <> 'eligible' THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      CONSTRAINT = 'expert_reward_grants_eligible_settlement',
+      MESSAGE = 'expert_reward_grants_eligible_settlement';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+--> statement-breakpoint
+CREATE TRIGGER "expert_reward_grants_eligible_settlement"
+  BEFORE INSERT ON "expert_referral_reward_grants"
+  FOR EACH ROW EXECUTE FUNCTION expert_reward_grant_require_eligible_settlement();
+--> statement-breakpoint
 CREATE FUNCTION expert_referral_validate_ledger_allocation_total()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE

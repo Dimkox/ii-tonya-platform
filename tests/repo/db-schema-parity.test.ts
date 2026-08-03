@@ -396,9 +396,13 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_provider_event_unique",
       "expert_referral_append_only",
       "expert_first_settlement_guard",
+      "expert_reward_grants_eligible_settlement",
       "expert_ledger_allocations_exact_total",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
+    expect(migration).toMatch(
+      /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
+    );
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

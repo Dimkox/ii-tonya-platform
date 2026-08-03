@@ -195,10 +195,29 @@ async function createReferralGraph(input?: {
 }> {
   const inviterId = input?.inviterId ?? (await createExpert());
   const inviteeId = input?.inviteeId ?? (await createExpert());
+  const { batchId, codeId } = await createReferralCode(inviterId);
+  const referralId = randomUUID();
+  await testDb!.db.execute(sql`
+    update expert_referral_codes
+    set status = 'redeemed', redeemed_at = '2026-08-03T00:30:00.000Z'
+    where id = ${codeId}::uuid;
+    insert into expert_referrals (
+      id, code_id, inviter_expert_id, invitee_expert_id
+    ) values (
+      ${referralId}::uuid, ${codeId}::uuid, ${inviterId}::uuid,
+      ${inviteeId}::uuid
+    )
+  `);
+  return { inviterId, inviteeId, batchId, codeId, referralId };
+}
+
+async function createReferralCode(inviterId: string): Promise<{
+  batchId: string;
+  codeId: string;
+}> {
   const { adminId, approvalId, sessionIdHash } = await createAdminApproval();
   const batchId = randomUUID();
   const codeId = randomUUID();
-  const referralId = randomUUID();
   const codeHash = randomUUID().replaceAll("-", "").repeat(2);
   await testDb!.db.execute(sql`
     insert into expert_referral_code_batches (
@@ -210,23 +229,21 @@ async function createReferralGraph(input?: {
     );
     insert into expert_referral_codes (
       id, batch_id, inviter_expert_id, code_hash, key_version,
-      masked_suffix, status, redeemed_at
+      masked_suffix
     ) values (
       ${codeId}::uuid, ${batchId}::uuid, ${inviterId}::uuid,
-      ${codeHash}, 1, 'abcdef', 'redeemed', '2026-08-03T00:30:00.000Z'
-    );
-    insert into expert_referrals (
-      id, code_id, inviter_expert_id, invitee_expert_id
-    ) values (
-      ${referralId}::uuid, ${codeId}::uuid, ${inviterId}::uuid,
-      ${inviteeId}::uuid
+      ${codeHash}, 1, 'abcdef'
     )
   `);
-  return { inviterId, inviteeId, batchId, codeId, referralId };
+  return { batchId, codeId };
 }
 
 async function createSettlementFixture(
-  eligibility: "eligible" | "pending_feature_hold" = "eligible",
+  eligibility:
+    | "eligible"
+    | "pending_feature_hold"
+    | "permanently_ineligible"
+    | "cancelled_by_refund" = "eligible",
 ): Promise<{
   inviterId: string;
   inviteeId: string;
@@ -319,9 +336,12 @@ async function insertOrder(input: {
   priceMinor: bigint;
   creditMinor: bigint;
   cashMinor: bigint;
+  tariffPriceMinor?: bigint;
 }): Promise<void> {
   const expertId = await createExpert();
-  const tariffId = await createTariff({ priceMinor: input.priceMinor });
+  const tariffId = await createTariff({
+    priceMinor: input.tariffPriceMinor ?? input.priceMinor,
+  });
   await testDb!.db.execute(sql`
     insert into expert_residency_orders (
       expert_id, tariff_version_id, snapshot_display_name,
@@ -430,6 +450,16 @@ describe("expert referral residency schema", () => {
   it("enforces the exact credit cap and cash remainder", async () => {
     await expectDatabaseError(
       () =>
+        insertOrder({
+          priceMinor: 0n,
+          creditMinor: 0n,
+          cashMinor: 0n,
+          tariffPriceMinor: 1000n,
+        }),
+      { code: "23514", constraint: "expert_order_money_bounds" },
+    );
+    await expectDatabaseError(
+      () =>
         insertOrder({ priceMinor: 999n, creditMinor: 500n, cashMinor: 499n }),
       { code: "23514", constraint: "expert_order_credit_cap" },
     );
@@ -438,6 +468,74 @@ describe("expert referral residency schema", () => {
         insertOrder({ priceMinor: 1000n, creditMinor: 400n, cashMinor: 599n }),
       { code: "23514", constraint: "expert_order_cash_remainder" },
     );
+  });
+
+  it("rejects duplicate referral bindings and self-referrals", async () => {
+    const graph = await createReferralGraph();
+    const secondInvitee = await createExpert();
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referrals (
+            code_id, inviter_expert_id, invitee_expert_id
+          ) values (
+            ${graph.codeId}::uuid, ${graph.inviterId}::uuid,
+            ${secondInvitee}::uuid
+          )
+        `),
+      { code: "23505", constraint: "expert_referrals_code_unique" },
+    );
+
+    const duplicateInviteeCode = await createReferralCode(graph.inviterId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referrals (
+            code_id, inviter_expert_id, invitee_expert_id
+          ) values (
+            ${duplicateInviteeCode.codeId}::uuid, ${graph.inviterId}::uuid,
+            ${graph.inviteeId}::uuid
+          )
+        `),
+      { code: "23505", constraint: "expert_referrals_invitee_unique" },
+    );
+
+    const selfReferralCode = await createReferralCode(graph.inviterId);
+    await expectDatabaseError(
+      () =>
+        testDb!.db.execute(sql`
+          insert into expert_referrals (
+            code_id, inviter_expert_id, invitee_expert_id
+          ) values (
+            ${selfReferralCode.codeId}::uuid, ${graph.inviterId}::uuid,
+            ${graph.inviterId}::uuid
+          )
+        `),
+      { code: "23514", constraint: "expert_referrals_distinct_experts" },
+    );
+  });
+
+  it("grants rewards only from an eligible first-settlement marker", async () => {
+    for (const eligibility of [
+      "pending_feature_hold",
+      "permanently_ineligible",
+      "cancelled_by_refund",
+    ] as const) {
+      const fixture = await createSettlementFixture(eligibility);
+      await expectDatabaseError(() => createRewardGrant(fixture), {
+        code: "23514",
+        constraint: "expert_reward_grants_eligible_settlement",
+      });
+    }
+
+    const eligibleFixture = await createSettlementFixture("eligible");
+    const grantId = await createRewardGrant(eligibleFixture);
+    const result = await testDb!.db.execute<{ count: string }>(sql`
+      select count(*)::text as count
+      from expert_referral_reward_grants
+      where id = ${grantId}::uuid
+    `);
+    expect(result.rows[0]?.count).toBe("1");
   });
 
   it("rejects overlapping active intervals for the same tariff", async () => {
@@ -835,6 +933,29 @@ describe("expert referral residency schema", () => {
       () =>
         testDb!.db.execute(sql`
           update expert_referral_ledger_allocations set amount_minor = 1
+          where ledger_entry_id = ${ledgerEntryId}::uuid
+        `),
+    ]) {
+      await expectDatabaseError(operation, { code: "55000" });
+    }
+
+    for (const operation of [
+      () =>
+        testDb!.db.execute(sql`
+          delete from expert_referrals where id = ${fixture.referralId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          delete from expert_referral_reward_grants where id = ${grantId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          delete from expert_referral_ledger_entries
+          where id = ${ledgerEntryId}::uuid
+        `),
+      () =>
+        testDb!.db.execute(sql`
+          delete from expert_referral_ledger_allocations
           where ledger_entry_id = ${ledgerEntryId}::uuid
         `),
     ]) {
