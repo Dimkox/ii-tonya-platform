@@ -814,7 +814,10 @@ describe("expert referral residency schema", () => {
             ${`wrong-marker:${randomUUID()}`}
           )
         `),
-      { code: "23503", constraint: "expert_reward_grants_first_marker_fk" },
+      {
+        code: "23514",
+        constraint: "expert_reward_grants_eligible_settlement",
+      },
     );
 
     const grantId = await createRewardGrant(fixture);
