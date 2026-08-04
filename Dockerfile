@@ -6,7 +6,14 @@ ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH
 WORKDIR /workspace
 
-RUN npm install --global pnpm@11.9.0 && npm cache clean --force
+RUN npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    install_ok=0; \
+    for attempt in 1 2 3; do \
+      if npm install --global pnpm@11.9.0; then install_ok=1; break; fi; \
+      sleep "$((attempt * 10))"; \
+    done; \
+    test "$install_ok" = 1 && npm cache clean --force
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
@@ -21,7 +28,17 @@ COPY packages/observability/package.json packages/observability/package.json
 COPY packages/worker/package.json packages/worker/package.json
 
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set fetch-timeout 300000 && \
+    pnpm config set fetch-retries 5 && \
+    pnpm config set fetch-retry-mintimeout 10000 && \
+    pnpm config set fetch-retry-maxtimeout 120000 && \
+    install_ok=0; \
+    for attempt in 1 2 3; do \
+      if pnpm install --frozen-lockfile; then install_ok=1; break; fi; \
+      sleep "$((attempt * 10))"; \
+    done; \
+    test "$install_ok" = 1
 
 COPY . .
 

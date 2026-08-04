@@ -50,6 +50,11 @@ describe("release assets", () => {
   it("defines portable non-root API and worker images with the required entrypoints", () => {
     const dockerfile = readFileSync("Dockerfile", "utf8");
     expect(dockerfile).toContain("RUN pnpm build");
+    expect(dockerfile).toContain("npm config set fetch-timeout 300000");
+    expect(dockerfile).toContain("npm config set fetch-retries 5");
+    expect(dockerfile).toContain("pnpm config set fetch-timeout 300000");
+    expect(dockerfile).toContain("pnpm config set fetch-retries 5");
+    expect(dockerfile.match(/for attempt in 1 2 3/g)).toHaveLength(2);
     expect(dockerfile).toContain(
       "RUN pnpm --filter @ii-tonya/api --prod deploy /out/api",
     );
