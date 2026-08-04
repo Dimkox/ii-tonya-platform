@@ -55,6 +55,13 @@ describe("release assets", () => {
     expect(dockerfile).toContain("pnpm config set fetch-timeout 300000");
     expect(dockerfile).toContain("pnpm config set fetch-retries 5");
     expect(dockerfile.match(/for attempt in 1 2 3/g)).toHaveLength(2);
+    expect(dockerfile).toContain("FROM runtime-base AS evidence");
+    expect(dockerfile).toContain(
+      "COPY --chown=10001:10001 tests/provider-stubs/server.mjs /app/tests/provider-stubs/server.mjs",
+    );
+    expect(dockerfile).toContain(
+      "COPY --chown=10001:10001 scripts/smoke.mjs /app/scripts/smoke.mjs",
+    );
     expect(dockerfile).toContain(
       "RUN pnpm --filter @ii-tonya/api --prod deploy /out/api",
     );
@@ -72,7 +79,7 @@ describe("release assets", () => {
     expect(dockerfile).toContain(
       'CMD ["node", "--input-type=module", "--eval", "const s=(await import(\'node:fs/promises\')).stat;',
     );
-    expect(dockerfile.match(/USER 10001:10001/g)).toHaveLength(2);
+    expect(dockerfile.match(/USER 10001:10001/g)).toHaveLength(3);
     expect(dockerfile).toContain(
       "LABEL org.opencontainers.image.revision=$VCS_REF",
     );
@@ -125,6 +132,9 @@ describe("release assets", () => {
     );
     expect(compose).toContain("--base-url=http://api:3000");
     expect(compose).toContain("profiles: [smoke]");
+    expect(compose).toContain("target: evidence");
+    expect(compose).not.toContain("./scripts/smoke.mjs:");
+    expect(compose).not.toContain("./tests/provider-stubs/server.mjs:");
     expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
     expect(smoke).toContain("resolved.includes('/workspace/')");
     expect(smoke.match(/"--input-type=module"/g)).toHaveLength(2);

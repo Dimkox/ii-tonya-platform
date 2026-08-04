@@ -55,6 +55,12 @@ ENV PATH=/nodejs/bin:$PATH
 WORKDIR /app
 ENTRYPOINT []
 
+FROM runtime-base AS evidence
+
+COPY --chown=10001:10001 tests/provider-stubs/server.mjs /app/tests/provider-stubs/server.mjs
+COPY --chown=10001:10001 scripts/smoke.mjs /app/scripts/smoke.mjs
+USER 10001:10001
+
 FROM runtime-base AS api
 
 COPY --from=builder --chown=10001:10001 /out/api/ /app/

@@ -178,11 +178,11 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "dockerfile",
-    "7bf23a28ddaf4aa5e94e10b7ef736009cb6c33662696b95f4c9ea024ca61eb4b",
+    "8fff63e319dfbdde6b7f2ac4710193366f547e51988de345099be04cd0a3830f",
   ],
   [
     "compose.yaml",
-    "4057783a2f1ec3fbcff7687dd295a5f9a123edef2271d8eb3c1c47a27e537b69",
+    "c3f8807c306e73b2319eba730a205959d959b82e52aafd499ad35fd514b660dd",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
