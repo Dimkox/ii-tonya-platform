@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExpertCodeCrypto } from "../../../application/src/expert-code-crypto.js";
+import { expectPostgresErrorCause } from "../../../../tests/support/postgres-error.js";
 import type { DrizzleDb } from "../client.js";
 import {
   startExpertReferralTestDatabase,
@@ -13,6 +14,25 @@ import {
   PostgresExpertReferralRepository,
   type ExpertReferralCodeCrypto,
 } from "./expert-referral-repository.js";
+
+const rejected = async (operation: Promise<unknown>): Promise<unknown> =>
+  operation.then(
+    () => {
+      throw new Error("Expected PostgreSQL rejection");
+    },
+    (error: unknown) => error,
+  );
+
+const expectAdminResultPostgresError = async (
+  operation: Promise<unknown>,
+  code: string,
+  message: string,
+): Promise<void> => {
+  expectPostgresErrorCause(await rejected(operation), code, message);
+};
+
+const checkConstraintMessage = (constraint: string): string =>
+  `new row for relation "expert_referral_admin_execution_results" violates check constraint "${constraint}"`;
 
 describe("PostgresExpertReferralAdminRepository", () => {
   let testDb: ExpertReferralTestDatabase | undefined;
@@ -162,16 +182,16 @@ describe("PostgresExpertReferralAdminRepository", () => {
     const objectId = randomUUID();
     const audit = await testDb!.createAdminAudit({ action: "expert_referral.code_revoke", objectId, objectType: "expert_referral_code" });
     const base = sql`${audit.approvalId}::uuid,'expert_referral.code_revoke',${objectId}::uuid,${`sha256:${"a".repeat(64)}`},${`sha256:${"b".repeat(64)}`},${audit.sessionIdHash}`;
-    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${base},${JSON.stringify({ id: randomUUID(), status: "banana" })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${base},${JSON.stringify({ id: randomUUID(), status: "banana" })}::jsonb)`), "23514", checkConstraintMessage("expert_referral_admin_result_exact_schema"));
     const overrideAudit = await testDb!.createAdminAudit({ action: "expert_referral.issuance_override", objectId, objectType: "expert_referral_issuance_override" });
-    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"c".repeat(64)}`},${`sha256:${"d".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"c".repeat(64)}`},${`sha256:${"d".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`), "23514", checkConstraintMessage("expert_referral_admin_result_second_binding"));
     const featureAudit = await testDb!.createAdminAudit({ action: "expert_referral.feature_switch", objectId: "00000000-0000-0000-0000-000000000041", objectType: "expert_referral_feature_control" });
-    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${featureAudit.approvalId}::uuid,'expert_referral.feature_switch','00000000-0000-0000-0000-000000000041'::uuid,${`sha256:${"e".repeat(64)}`},${`sha256:${"f".repeat(64)}`},${featureAudit.sessionIdHash},2,${JSON.stringify({ version: 9 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,expected_version,safe_result) values (${featureAudit.approvalId}::uuid,'expert_referral.feature_switch','00000000-0000-0000-0000-000000000041'::uuid,${`sha256:${"e".repeat(64)}`},${`sha256:${"f".repeat(64)}`},${featureAudit.sessionIdHash},2,${JSON.stringify({ version: 9 })}::jsonb)`), "23514", checkConstraintMessage("expert_referral_admin_result_exact_schema"));
     const batchAudit = await testDb!.createAdminAudit({ action: "expert_referral.batch_generate", objectId, objectType: "expert" });
-    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${batchAudit.approvalId}::uuid,'expert_referral.batch_generate',${objectId}::uuid,${`sha256:${"1".repeat(64)}`},${`sha256:${"2".repeat(64)}`},${batchAudit.sessionIdHash},${JSON.stringify({ batchId: { plaintext: "secret" }, count: 1 })}::jsonb)`)).rejects.toMatchObject({ code: "23514" });
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${batchAudit.approvalId}::uuid,'expert_referral.batch_generate',${objectId}::uuid,${`sha256:${"1".repeat(64)}`},${`sha256:${"2".repeat(64)}`},${batchAudit.sessionIdHash},${JSON.stringify({ batchId: { plaintext: "secret" }, count: 1 })}::jsonb)`), "23514", checkConstraintMessage("expert_referral_admin_result_exact_schema"));
     await testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,action,object_id,payload_hash,nonce_hash,requester_session_id_hash,safe_result) values (${audit.approvalId}::uuid,'expert_referral.code_revoke',${objectId}::uuid,${`sha256:${"3".repeat(64)}`},${`sha256:${"4".repeat(64)}`},${audit.sessionIdHash},${JSON.stringify({ id: objectId, status: "revoked" })}::jsonb)`);
-    await expect(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,${audit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"5".repeat(64)}`},${`sha256:${"6".repeat(64)}`},${`sha256:${"7".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`)).rejects.toMatchObject({ code: "23505" });
-    await expect(testDb!.db.execute(sql`truncate table expert_referral_admin_execution_results`)).rejects.toMatchObject({ code: "55000" });
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`insert into expert_referral_admin_execution_results (approval_id,second_approval_id,action,object_id,payload_hash,nonce_hash,second_nonce_hash,requester_session_id_hash,safe_result) values (${overrideAudit.approvalId}::uuid,${audit.approvalId}::uuid,'expert_referral.issuance_override',${objectId}::uuid,${`sha256:${"5".repeat(64)}`},${`sha256:${"6".repeat(64)}`},${`sha256:${"7".repeat(64)}`},${overrideAudit.sessionIdHash},${JSON.stringify({ overrideId: objectId })}::jsonb)`), "23505", "expert_referral_admin_approval_global_unique");
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`truncate table expert_referral_admin_execution_results`), "55000", "expert_referral_admin_result_immutable");
   });
 
   it("serializes swapped cross-column approval bindings so only one insert commits", async () => {
@@ -271,9 +291,9 @@ describe("PostgresExpertReferralAdminRepository", () => {
     `);
     expect(committed.rows[0]).toMatchObject({ batches: 1, consumed: 1, audits: 1, results: 1 });
     expect(JSON.stringify(committed.rows[0]?.safeResult)).not.toMatch(/codes|plaintext|digest|hash/iu);
-    await expect(testDb!.db.execute(sql`
+    await expectAdminResultPostgresError(testDb!.db.execute(sql`
       update expert_referral_admin_execution_results set safe_result='{}'::jsonb
       where approval_id=${approval.approvalId}::uuid
-    `)).rejects.toMatchObject({ code: "55000" });
+    `), "55000", "expert_referral_admin_result_immutable");
   });
 });
