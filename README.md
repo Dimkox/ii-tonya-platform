@@ -5,8 +5,13 @@ authoritative ии-Тоня source document.
 
 ## Status
 
-Pre-production. The source document is preserved, normalized, and converted into
-testable requirements before any live customer traffic is enabled.
+Pre-production. The client platform foundation is implemented, while live-provider,
+staging, and production gates remain closed. The expert residency referral extension
+has completed implementation tasks 1–9; its expert-facing API, Telegram/prompt adapters,
+worker operations, final traceability, and release evidence (tasks 10–12) are still
+pending. The authoritative checkpoint is `.superpowers/sdd/progress.md`.
+Resume instructions and exact verification evidence are recorded in
+`docs/handoffs/2026-08-04-expert-residency-referrals.md`.
 
 ## Authoritative source
 
@@ -24,6 +29,35 @@ Selarti serves the client channel, Telegram serves the expert channel, and Plane
 provides scheduling integration. A transactional backend owns booking, billing, coupon,
 consent, and audit state. Make and Google Sheets are limited to non-critical automation
 and projections.
+
+## Expert residency referral program
+
+Expert referral codes are a separate product and persistence boundary from the existing
+client coupon program. They must never share tables, balances, code namespaces, or
+redemption paths with client coupons.
+
+- An expert may invite another expert with an expert-only referral code.
+- After the invited expert's first eligible residency payment settles, the inviter
+  receives exactly 1,000 RUB (`100000` kopecks) of internal residency credit.
+- Each reward grant expires exactly 365 days after it is granted.
+- Credit may cover at most 50% of a residency tariff. The remaining amount is paid in
+  money; a lower credit share is allowed when the spendable balance is insufficient.
+- Credit allocation is FIFO by expiry. Settlement, expiry, refund, reversal, debt,
+  idempotency, and abuse holds are owned by PostgreSQL transactions and append-only
+  financial records, not by prompts, Telegram, Make, or Google Sheets.
+- Expert codes are stored as non-reversible digests. Plaintext batch codes are returned
+  once to an approved administrator; inventory exposes masked values only.
+- Batch issuance, revocation, bounded quota overrides, tariffs, abuse holds, replay, and
+  feature switches require authenticated approved admin workflows. Sensitive overrides
+  require two distinct approvers.
+
+Current durable implementation includes the domain rules, database schema and
+migrations, referral lifecycle, residency quoting and checkout, provider-neutral
+settlement/refund/reversal flows, disabled-by-default services and feature controls, and
+approved admin workflows. See
+`docs/superpowers/specs/2026-08-02-expert-residency-referrals-design.md` and
+`docs/superpowers/plans/2026-08-03-expert-residency-referrals.md` for requirements and
+the remaining task sequence.
 
 ## Safety boundary
 
