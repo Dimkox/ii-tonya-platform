@@ -29,6 +29,7 @@ RUN --mount=type=cache,id=ii-tonya-claw-pnpm-store,target=/pnpm/store,sharing=lo
       sleep "$((attempt * 10))"; \
     done; \
     test "$install_ok" = 1 && \
+    cp -a --no-preserve=ownership /pnpm/store /seed/.pnpm-store && \
     printf '%s\n' "$II_TONYA_SOURCE_SHA" > /seed/.source-sha && \
     chmod 0555 /seed/scripts/run-claw-container-tests.sh
 USER node

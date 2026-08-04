@@ -9,7 +9,7 @@ if [[ ! -f "$workspace/.source-sha" ]] || [[ "$(cat "$workspace/.source-sha")" !
   cp -a --no-preserve=ownership /seed/. "$workspace/"
 fi
 cd "$workspace"
-export PNPM_HOME=/workspace/.pnpm DOCKER_CONFIG=/workspace/.docker PATH="/workspace/.pnpm:$PATH"
+export CI=true PNPM_HOME=/workspace/.pnpm DOCKER_CONFIG=/workspace/.docker PATH="/workspace/.pnpm:$PATH"
 proxy_ip="$(getent ahostsv4 proxy-gateway | awk 'NR == 1 { print $1 }')"
 [[ -n "$proxy_ip" ]] || { printf 'proxy-gateway did not resolve\n' >&2; exit 2; }
 proxy_config=/workspace/.proxychains4.conf
@@ -33,7 +33,7 @@ run_step() {
   printf 'memory_max=%s\ncpu_max=%s\npids_max=%s\n' "$(cat /sys/fs/cgroup/memory.max)" "$(cat /sys/fs/cgroup/cpu.max)" "$(cat /sys/fs/cgroup/pids.max)"
   df -B1 /workspace
 } > "$result_root/environment.txt"
-run_step frozen-install pnpm install --offline --frozen-lockfile
+run_step frozen-install pnpm install --offline --frozen-lockfile --store-dir "$workspace/.pnpm-store"
 run_step build pnpm build
 run_step format pnpm format:check
 run_step deploy-contract pnpm verify:deploy
