@@ -27,3 +27,5 @@ file or application credential, and resolves the app-stack proxy to a numeric ad
 before creating its runtime-only proxy configuration. Evidence is
 written to `/home/pall/app-stack/ii-tonya-test-workspace/results/<source-sha>/` and only
 sanitized summaries/checksums are committed to `docs/test-evidence/`.
+
+Latest committed evidence: [`7d71646347d560ff2b5d8ebc4c0aad5b48230254`](../test-evidence/claw/7d71646347d560ff2b5d8ebc4c0aad5b48230254/verification.md).

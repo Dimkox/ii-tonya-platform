@@ -1,0 +1,11 @@
+source_sha=7d71646347d560ff2b5d8ebc4c0aad5b48230254
+node=v24.18.0
+pnpm=11.9.0
+docker=Docker version 29.7.0, build c1eba93
+memory_max=1073741824
+cpu_max=100000 100000
+pids_max=18966
+Filesystem                           1B-blocks        Used    Available Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv 500243513344 83944480768 394837180416  18% /workspace
+finished_at=2026-08-04T05:17:30Z
+exit_code=0
