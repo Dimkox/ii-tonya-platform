@@ -20,7 +20,18 @@ COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 WORKDIR /seed
 COPY . .
-RUN pnpm install --frozen-lockfile && \
+RUN --mount=type=cache,id=ii-tonya-claw-pnpm-store,target=/pnpm/store,sharing=locked \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set fetch-timeout 300000 && \
+    pnpm config set fetch-retries 5 && \
+    pnpm config set fetch-retry-mintimeout 10000 && \
+    pnpm config set fetch-retry-maxtimeout 120000 && \
+    install_ok=0; \
+    for attempt in 1 2 3; do \
+      if pnpm install --frozen-lockfile; then install_ok=1; break; fi; \
+      sleep "$((attempt * 10))"; \
+    done; \
+    test "$install_ok" = 1 && \
     printf '%s\n' "$II_TONYA_SOURCE_SHA" > /seed/.source-sha && \
     chmod 0555 /seed/scripts/run-claw-container-tests.sh
 USER node
