@@ -9,8 +9,8 @@ docker compose --profile test run --rm --no-deps ii-tonya-test
 ```
 
 The service is excluded from normal Compose startup and is limited to one CPU, 1 GiB
-RAM, 256 PIDs, a read-only root filesystem, and a 256-MiB `/tmp`. Filesystem capacity is
-not capped. PostgreSQL tests use a dedicated `CREATEDB` test role in the existing Claw
+RAM, a read-only root filesystem, and a 256-MiB `/tmp`. Filesystem capacity is not
+capped. PostgreSQL tests use a dedicated `CREATEDB` test role in the existing Claw
 PostgreSQL service. Every testkit instance creates and drops its own isolated database;
 production tables and credentials are never exposed to the test process.
 

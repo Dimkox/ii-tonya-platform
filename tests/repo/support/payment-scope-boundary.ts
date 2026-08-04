@@ -153,12 +153,24 @@ const approvedAutomationArtifactHashes = new Map([
     "770925eae581bbd1fea73d4d52e526cbf26d7c28cfa241585b29ae38c37d4f17",
   ],
   [
+    "deploy/claw/dockerfile.test",
+    "0888f25b6407a7dab485f824dbab58753dc2f6e5264838f925f80541f5159913",
+  ],
+  [
+    "deploy/claw/dockerfile.test.dockerignore",
+    "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
+  ],
+  [
     "scripts/deploy-compose-remote.sh",
     "3448eb38e5b561534bfdfda3d8edc0af58becf271cd0899a3b6d93fbe58a4f7e",
   ],
   [
     "scripts/validate-runtime-env.sh",
     "0fd73553ddf968063e9539c26444b64c512f20546faaf8be2f1fa5f90e3c539b",
+  ],
+  [
+    "scripts/run-claw-container-tests.sh",
+    "1ef6001fd2e26714566468ac7ec7bebc9046e68c68c80a2b0868430a268f86d7",
   ],
   [
     "dockerfile",
