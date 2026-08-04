@@ -1,6 +1,6 @@
 # Expert residency referrals handoff
 
-Date: 2026-08-04  
+Date: 2026-08-04
 Status: implementation in progress; not released
 
 ## Repository checkpoint
