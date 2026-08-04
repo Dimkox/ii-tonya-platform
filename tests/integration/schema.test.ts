@@ -158,6 +158,30 @@ beforeAll(async () => {
 afterAll(async () => testDb?.stop(), 60_000);
 
 describe("MVP schema", () => {
+  it("resets the migrated schema without weakening replay-ledger triggers", async () => {
+    await testDb!.reset();
+    const triggers = await testDb!.db.execute<{
+      name: string;
+      enabled: string;
+    }>(sql`
+      select tgname as name, tgenabled as enabled
+      from pg_trigger
+      where tgrelid = 'expert_referral_admin_execution_results'::regclass
+        and tgname in (
+          'expert_referral_admin_results_immutable',
+          'expert_referral_admin_results_truncate_immutable'
+        )
+      order by tgname
+    `);
+    expect(triggers.rows).toEqual([
+      { name: "expert_referral_admin_results_immutable", enabled: "O" },
+      {
+        name: "expert_referral_admin_results_truncate_immutable",
+        enabled: "O",
+      },
+    ]);
+  });
+
   it("creates the authoritative MVP and operational-support tables", async () => {
     const rows = await testDb!.db.execute<{ table_name: string }>(sql`
       select table_name from information_schema.tables

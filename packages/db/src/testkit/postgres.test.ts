@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "../client.js";
 import {
   PostgresClientClosureTimeoutError,
+  resetWithImmutableExpertReferralAdminResults,
   startTestPostgres,
   trackPoolClientClosures,
   type TestPostgresDependencies,
@@ -15,6 +16,52 @@ const container = () => ({
 });
 
 describe("PostgreSQL testkit lifecycle", () => {
+  it("wraps replay-ledger reset and trigger verification in one transaction", async () => {
+    const events: string[] = [];
+    let executeCount = 0;
+    const execute = vi.fn(async () => {
+      events.push(`sql-${++executeCount}`);
+      return executeCount === 5
+        ? {
+            rows: [
+              { name: "expert_referral_admin_results_immutable", enabled: "O" },
+              {
+                name: "expert_referral_admin_results_truncate_immutable",
+                enabled: "O",
+              },
+            ],
+          }
+        : { rows: [] };
+    });
+    const db = {
+      transaction: vi.fn(
+        async (
+          operation: (tx: { execute: typeof execute }) => Promise<unknown>,
+        ) => {
+          events.push("transaction-start");
+          const result = await operation({ execute });
+          events.push("transaction-commit");
+          return result;
+        },
+      ),
+    } as unknown as DrizzleDb;
+
+    await resetWithImmutableExpertReferralAdminResults(db, async () => {
+      events.push("reset");
+    });
+
+    expect(events).toEqual([
+      "transaction-start",
+      "sql-1",
+      "sql-2",
+      "reset",
+      "sql-3",
+      "sql-4",
+      "sql-5",
+      "transaction-commit",
+    ]);
+  });
+
   it("does not stop the container until tracked client shutdown settles", async () => {
     const startedContainer = container();
     let settleClient: (() => void) | undefined;
