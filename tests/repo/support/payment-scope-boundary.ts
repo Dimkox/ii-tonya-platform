@@ -173,6 +173,10 @@ const approvedAutomationArtifactHashes = new Map([
     "1ef6001fd2e26714566468ac7ec7bebc9046e68c68c80a2b0868430a268f86d7",
   ],
   [
+    "scripts/check-development-environment.ps1",
+    "696975e2a494294e670d125d604c1d92d925866150fac557ec50f12bfef73365",
+  ],
+  [
     "dockerfile",
     "264dac837c1b3b81f07605b825be994f8ce7a1c7865eb243ced4ec81b3e3baca",
   ],

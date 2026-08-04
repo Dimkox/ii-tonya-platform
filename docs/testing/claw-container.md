@@ -5,8 +5,16 @@ Tests run through direct SSH on the profiled `ii-tonya-test` service in
 
 ```bash
 install -d -m 0750 -o 1000 -g 1000 /home/pall/app-stack/ii-tonya-test-workspace
+docker exec postgres-db sh -lc \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "GRANT SET ON PARAMETER session_replication_role TO ii_tonya_test_runner"'
 docker compose --profile test run --rm --no-deps ii-tonya-test
 ```
+
+The host Compose service adds the numeric group owner of `/var/run/docker.sock`
+to the container so its non-root UID 1000 can run the packaged-image smoke test.
+The PostgreSQL grant is limited to the one test-only parameter needed by fixture
+cleanup; the test role remains non-superuser.
 
 The service is excluded from normal Compose startup and is limited to one CPU, 1 GiB
 RAM, a read-only root filesystem, and a 256-MiB `/tmp`. Filesystem capacity is not
