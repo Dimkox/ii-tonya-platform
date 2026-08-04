@@ -6,10 +6,15 @@ result_root="/workspace/results/$source_sha"
 mkdir -p "$workspace" "$result_root" /workspace/.pnpm /workspace/.docker
 if [[ ! -f "$workspace/.source-sha" ]] || [[ "$(cat "$workspace/.source-sha")" != "$source_sha" ]]; then
   find "$workspace" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-  cp -a /seed/. "$workspace/"
+  cp -a --no-preserve=ownership /seed/. "$workspace/"
 fi
 cd "$workspace"
 export PNPM_HOME=/workspace/.pnpm DOCKER_CONFIG=/workspace/.docker PATH="/workspace/.pnpm:$PATH"
+proxy_ip="$(getent ahostsv4 proxy-gateway | awk 'NR == 1 { print $1 }')"
+[[ -n "$proxy_ip" ]] || { printf 'proxy-gateway did not resolve\n' >&2; exit 2; }
+proxy_config=/workspace/.proxychains4.conf
+printf '%s\n' strict_chain proxy_dns 'tcp_read_time_out 15000' \
+  'tcp_connect_time_out 8000' '[ProxyList]' "socks5 $proxy_ip 1080" > "$proxy_config"
 summary="$result_root/summary.tsv"
 : > "$summary"
 failed=0
@@ -40,7 +45,7 @@ run_step integration pnpm exec vitest run tests/integration tests/support tests/
 run_step contract pnpm exec vitest run tests/contract --maxWorkers=1
 run_step security pnpm exec vitest run tests/repo/env-policy.test.ts tests/repo/scope-boundary.test.ts packages/application/src/prompt-safety.test.ts packages/observability/src/logger.test.ts apps/api/src/rate-limit.test.ts --maxWorkers=1
 run_step e2e pnpm exec vitest run tests/e2e --maxWorkers=1
-run_step audit proxychains4 -q pnpm audit --prod --audit-level high
+run_step audit proxychains4 -q -f "$proxy_config" pnpm audit --prod --audit-level high
 run_step container pnpm test:container
 printf 'finished_at=%s\nexit_code=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$failed" >> "$result_root/environment.txt"
 (cd "$result_root" && sha256sum ./*.log environment.txt summary.tsv > SHA256SUMS)
