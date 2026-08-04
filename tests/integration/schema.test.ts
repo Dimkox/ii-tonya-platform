@@ -180,6 +180,7 @@ describe("MVP schema", () => {
       "delivery_attempts",
       "expert_first_residency_settlements",
       "expert_referral_abuse_holds",
+      "expert_referral_admin_execution_results",
       "expert_referral_balances",
       "expert_referral_code_batches",
       "expert_referral_codes",
