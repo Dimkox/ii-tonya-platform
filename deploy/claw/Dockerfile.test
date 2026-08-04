@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG DOCKER_CLI_IMAGE=docker.io/library/docker:29.7.1-cli@sha256:eb37f58646a901dc7727cf448cae36daaefaba79de33b5058dab79aa4c04aefb
+ARG DOCKER_CLI_IMAGE=docker.io/library/docker:29.7-cli@sha256:206ae9cc405101ab0cf97d4b515d21bf6aae961f98f7f9d8de6c111718fef335
 ARG NODE_IMAGE=docker.io/library/node:24.18.0-bookworm-slim
 FROM ${DOCKER_CLI_IMAGE} AS docker-cli
 FROM ${NODE_IMAGE}
