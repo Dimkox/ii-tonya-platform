@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
+import { startExternalPostgresDatabase } from "../../packages/db/src/testkit/external-postgres.js";
 
 interface SqlExecutor {
   query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -97,9 +98,10 @@ describe("expert referral migration 0018 upgrade guard", () => {
   });
 
   it("fails preflight and migration before creating any 0018 relation", async () => {
-    const container = await new PostgreSqlContainer(
-      "postgres:16-alpine",
-    ).start();
+    const adminUrl = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+    const container = adminUrl
+      ? await startExternalPostgresDatabase(adminUrl)
+      : await new PostgreSqlContainer("postgres:16-alpine").start();
     const connectionString = container.getConnectionUri();
     const pool = new Pool({ connectionString });
     try {

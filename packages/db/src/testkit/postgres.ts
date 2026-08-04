@@ -10,6 +10,7 @@ import {
   normalizeNullableBookingTimestamp,
   type ReserveSlotCommand,
 } from "../repositories/booking-repository.js";
+import { startExternalPostgresDatabase } from "./external-postgres.js";
 
 type LedgerKind = "debit" | "free";
 type ConfirmEligibilityCase =
@@ -337,9 +338,7 @@ export function trackPoolClientClosures(
       }
 
       const errors =
-        waitError === undefined
-          ? closureErrors
-          : [...closureErrors, waitError];
+        waitError === undefined ? closureErrors : [...closureErrors, waitError];
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
         throw new AggregateError(
@@ -352,8 +351,12 @@ export function trackPoolClientClosures(
 }
 
 const defaultDependencies: TestPostgresDependencies = {
-  startContainer: async () =>
-    new PostgreSqlContainer("postgres:16-alpine").start(),
+  startContainer: async () => {
+    const adminUrl = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+    return adminUrl
+      ? startExternalPostgresDatabase(adminUrl)
+      : new PostgreSqlContainer("postgres:16-alpine").start();
+  },
   createPool: (connectionString) =>
     trackPoolClientClosures(new Pool({ connectionString })),
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
@@ -395,12 +398,23 @@ export async function resetWithImmutableExpertReferralAdminResults(
 ): Promise<void> {
   await db.transaction(async (transaction) => {
     const tx = transaction as unknown as DrizzleDb;
-    await tx.execute(sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_immutable`);
-    await tx.execute(sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_truncate_immutable`);
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_immutable`,
+    );
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_truncate_immutable`,
+    );
     await reset(tx);
-    await tx.execute(sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_immutable`);
-    await tx.execute(sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_truncate_immutable`);
-    const triggerStates = await tx.execute<{ name: string; enabled: string }>(sql`
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_immutable`,
+    );
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_truncate_immutable`,
+    );
+    const triggerStates = await tx.execute<{
+      name: string;
+      enabled: string;
+    }>(sql`
       select tgname as name, tgenabled as enabled
       from pg_trigger
       where tgrelid = 'expert_referral_admin_execution_results'::regclass
