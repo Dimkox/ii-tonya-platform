@@ -28,6 +28,14 @@ gh pr view 4 --repo Dimkox/ii-tonya-platform
 Do not use the Obsidian mirror, another checkout, or `openclaw-airgap-farm` as the
 source repository for this work.
 
+The receiving machine must not be assumed to match the source workstation. Run
+`pwsh -File scripts/check-development-environment.ps1` before installing dependencies
+and use `-RequireDocker` before PostgreSQL/container verification. The committed
+environment manifest records required versions, the observed source-machine drift,
+clean bootstrap steps, workspace modules, container topology, CI tools, and Serena
+scope. The repository-contained `AGENTS.md` and `docs/agents` roles replace any missing
+global Codex profiles, skills, agents, or memory.
+
 ## Product contract
 
 Expert referral codes are strictly separate from client coupons. A referred expert's
@@ -44,6 +52,9 @@ are stored as non-reversible digests.
 
 Authoritative documents:
 
+- `AGENTS.md`
+- `docs/agents/expert-residency-team.md`
+- `docs/handoffs/environment-manifest.md`
 - `docs/superpowers/specs/2026-08-02-expert-residency-referrals-design.md`
 - `docs/superpowers/plans/2026-08-03-expert-residency-referrals.md`
 - `.superpowers/sdd/progress.md`

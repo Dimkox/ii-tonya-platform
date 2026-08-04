@@ -13,6 +13,18 @@ pending. The authoritative checkpoint is `.superpowers/sdd/progress.md`.
 Resume instructions and exact verification evidence are recorded in
 `docs/handoffs/2026-08-04-expert-residency-referrals.md`.
 
+For a clean machine, start with `AGENTS.md`,
+`docs/handoffs/environment-manifest.md`, and
+`docs/agents/expert-residency-team.md`. Validate the active toolchain before installing
+dependencies:
+
+```powershell
+pwsh -File scripts/check-development-environment.ps1
+```
+
+The lockfile is the complete dependency graph; do not copy `node_modules` or caches from
+another machine.
+
 ## Authoritative source
 
 - Snapshot: `docs/source/ii-tonya-expert-full-source-2026-07-28.txt`
