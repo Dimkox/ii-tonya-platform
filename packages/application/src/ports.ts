@@ -14,11 +14,18 @@ export interface IntentInput {
   readonly authorization: IntentAuthorizationScope;
 }
 
+export type ExpertIntentProposal =
+  | { readonly kind: "redeem_expert_referral"; readonly code: string }
+  | { readonly kind: "view_referral_summary" }
+  | { readonly kind: "quote_residency"; readonly tariffVersionId: string }
+  | { readonly kind: "start_residency_checkout"; readonly orderId: string };
+
 export type IntentProposal =
   | { readonly kind: "answer"; readonly text: string }
   | { readonly kind: "show_catalog"; readonly serviceCode?: string }
   | { readonly kind: "start_booking"; readonly expertId: string }
-  | { readonly kind: "human_handoff"; readonly reasonCode: string };
+  | { readonly kind: "human_handoff"; readonly reasonCode: string }
+  | ExpertIntentProposal;
 
 export interface IntentEngine {
   propose(input: IntentInput): Promise<IntentProposal>;
