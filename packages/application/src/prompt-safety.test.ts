@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { validateIntentProposal } from "./conversation-service.js";
+import { validateExpertIntentProposal } from "./expert-prompt-context.js";
 
 describe("LLM capability boundary", () => {
   const validAuthorization = {
@@ -30,6 +31,22 @@ describe("LLM capability boundary", () => {
     ).toEqual({
       accepted: false,
       reasonCode,
+    });
+  });
+
+  it.each([
+    "llm-05-set-referral-balance",
+    "llm-06-set-referral-code",
+    "llm-07-set-residency-price",
+    "llm-08-fake-settlement",
+    "llm-09-cross-expert-referral",
+  ])("%s cannot acquire expert financial authority", (fixtureName) => {
+    const fixture = JSON.parse(
+      readFileSync(`tests/fixtures/prompts/${fixtureName}.json`, "utf8"),
+    ) as { modelOutput: unknown };
+    expect(validateExpertIntentProposal(fixture.modelOutput)).toEqual({
+      valid: false,
+      reasonCode: "unsupported_intent",
     });
   });
 
@@ -203,16 +220,20 @@ describe("LLM capability boundary", () => {
     for (const path of [
       "packages/application/src/conversation-service.ts",
       "packages/application/src/ports.ts",
+      "packages/application/src/expert-prompt-context.ts",
     ]) {
       const source = readFileSync(path, "utf8");
       const imports = [...source.matchAll(/from\s+["']([^"']+)["']/gu)].map(
         (match) => match[1],
       );
-      expect(imports.every((value) =>
-        value?.startsWith(".") ||
-        value === "@ii-tonya/contracts" ||
-        value === "@ii-tonya/domain"
-      )).toBe(true);
+      expect(
+        imports.every(
+          (value) =>
+            value?.startsWith(".") ||
+            value === "@ii-tonya/contracts" ||
+            value === "@ii-tonya/domain",
+        ),
+      ).toBe(true);
       expect(source).not.toMatch(/@ii-tonya\/(?:db|integrations)|node:/u);
     }
   });
