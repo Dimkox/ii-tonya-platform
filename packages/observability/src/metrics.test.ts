@@ -1,8 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { referralMetricLabels } from "./metrics.js";
+import { operationalMetrics, referralMetricLabels } from "./metrics.js";
 
 describe("expert referral metric labels", () => {
+  it("exposes bounded instruments for the full referral lifecycle", () => {
+    expect(Object.keys(operationalMetrics)).toEqual(
+      expect.arrayContaining([
+        "expertReferralCodeLifecycle",
+        "expertReferralRedemption",
+        "expertReferralRewardOutcome",
+        "expertResidencyCreditSpend",
+        "expertResidencyCreditExpiry",
+        "expertReferralDebt",
+        "expertReferralDuplicateEvents",
+        "expertReferralHeldReplay",
+        "expertResidencyRefundReversal",
+        "expertResidencyReconciliationMismatch",
+        "expertResidencyJobDurationMs",
+      ]),
+    );
+  });
+
   it("accepts only bounded low-cardinality dimensions", () => {
     expect(
       referralMetricLabels({
