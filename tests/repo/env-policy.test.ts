@@ -22,11 +22,20 @@ describe("environment credential policy", () => {
       "LLM_ENABLED",
       "GOOGLE_SHEETS_PROJECTION_ENABLED",
       "MINOR_ONBOARDING_ENABLED",
+      "EXPERT_REFERRAL_ENABLED",
+      "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "PAYMENTS_ENABLED",
     ]));
     expect(liveFlags.map((key) => example[key])).toEqual(liveFlags.map(() => "false"));
 
+    expect(example.EXPERT_REFERRAL_ENABLED).toBe("false");
+    expect(example.EXPERT_RESIDENCY_BILLING_ENABLED).toBe("false");
     expect(example.PAYMENT_PROVIDER).toBe("disabled");
     expect(example.LLM_PROVIDER).toBe("disabled");
+
+    expect(example.EXPERT_REFERRAL_HMAC_KEY_VERSION).toContain("__PLACEHOLDER_");
+    expect(example.EXPERT_REFERRAL_HMAC_KEY_REF).toContain("__PLACEHOLDER_");
+    expect(example.EXPERT_REFERRAL_HMAC_KEYS_JSON).toContain("__PLACEHOLDER_");
 
     const secretKeys = Object.keys(example).filter((key) =>
       /(PASSWORD|TOKEN|SECRET|API_KEY|HMAC_KEY)$/.test(key) || key === "DATABASE_URL");

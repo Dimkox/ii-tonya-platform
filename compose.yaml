@@ -2,6 +2,8 @@ name: ii-tonya-local-evidence
 
 x-disabled-runtime: &disabled-runtime
   MINOR_ONBOARDING_ENABLED: "false"
+  EXPERT_REFERRAL_ENABLED: "false"
+  EXPERT_RESIDENCY_BILLING_ENABLED: "false"
   SELARTI_ENABLED: "false"
   SELARTI_OUTBOUND_BILLING_MODE: disabled
   PLANERKA_ENABLED: "false"
@@ -65,15 +67,17 @@ services:
     restart: "no"
 
   provider-stubs:
-    image: node:24.18.0-bookworm-slim
+    image: ii-tonya-evidence:local
+    build:
+      context: .
+      target: evidence
+      args:
+        VCS_REF: ${VCS_REF:-local}
     user: "10001:10001"
-    working_dir: /fixtures
-    command: ["node", "server.mjs"]
+    command: ["node", "tests/provider-stubs/server.mjs"]
     environment:
       PROVIDER_STUB_HOST: 0.0.0.0
       PROVIDER_STUB_PORT: "4010"
-    volumes:
-      - ./tests/provider-stubs/server.mjs:/fixtures/server.mjs:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -141,13 +145,15 @@ services:
     networks: [backend]
 
   smoke:
-    image: node:24.18.0-bookworm-slim
+    image: ii-tonya-evidence:local
+    build:
+      context: .
+      target: evidence
+      args:
+        VCS_REF: ${VCS_REF:-local}
     user: "10001:10001"
     profiles: [smoke]
-    working_dir: /workspace
     command: ["node", "scripts/smoke.mjs", "--base-url=http://api:3000"]
-    volumes:
-      - ./scripts/smoke.mjs:/workspace/scripts/smoke.mjs:ro
     depends_on:
       api:
         condition: service_healthy

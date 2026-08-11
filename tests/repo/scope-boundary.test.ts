@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  EXPERT_RESIDENCY_ALLOWED_PATHS,
   classifyApprovedTrackedScopeContent,
   classifyPaymentScopeProbe,
   isPaymentScopeInspectionPath,
@@ -75,6 +76,15 @@ describe("MVP scope boundary", () => {
     ];
 
     expect(forbidden.filter(existsSync)).toEqual([]);
+  });
+
+  it("keeps the expert residency payment boundary explicitly allowlisted", () => {
+    expect([...EXPERT_RESIDENCY_ALLOWED_PATHS]).toEqual(
+      expect.arrayContaining([
+        "packages/contracts/src/expert-residency.ts",
+        "packages/integrations/src/expert-residency/payment-port.ts",
+      ]),
+    );
   });
 
   it("keeps the payment integration directory limited to the disabled boundary", () => {
@@ -310,6 +320,11 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/meta/0016_snapshot.json",
     "packages/db/migrations/0017_adorable_sinister_six.sql",
     "packages/db/migrations/meta/0017_snapshot.json",
+    "packages/db/migrations/0019_expert_order_provider_deadline.sql",
+    "packages/db/migrations/0021_expert_settlement_snapshot.sql",
+    "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+    "packages/db/migrations/meta/0021_snapshot.json",
+    "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);

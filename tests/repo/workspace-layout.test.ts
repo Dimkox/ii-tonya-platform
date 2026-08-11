@@ -24,4 +24,19 @@ describe("workspace layout", () => {
     });
     expect(missing).toEqual([]);
   });
+
+  it("contains the expert residency worker, release evidence, and recovery artifacts", () => {
+    const required = [
+      "packages/db/src/repositories/expert-referral-worker-repository.ts",
+      "packages/worker/src/expert-residency-expiry.ts",
+      "packages/worker/src/expert-residency-reconciliation.ts",
+      "packages/worker/src/expert-referral-hold-replay.ts",
+      "packages/observability/src/metrics.test.ts",
+      "tests/e2e/expert-residency-referral.test.ts",
+      "docs/spec/expert-residency-referrals-traceability.md",
+      "docs/runbooks/expert-residency-referrals.md",
+      "docs/runbooks/expert-residency-referrals-rollback.md",
+    ];
+    expect(required.filter((path) => !existsSync(path))).toEqual([]);
+  });
 });

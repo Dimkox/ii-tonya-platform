@@ -14,3 +14,6 @@ export * from "./privacy-erasure.js";
 export * from "./reservation-expiry.js";
 export * from "./reconciliation.js";
 export * from "./safety-handoff.js";
+export * from "./expert-residency-expiry.js";
+export * from "./expert-residency-reconciliation.js";
+export * from "./expert-referral-hold-replay.js";

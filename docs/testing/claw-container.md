@@ -1,0 +1,31 @@
+# Claw container test contract
+
+Tests run through direct SSH on the profiled `ii-tonya-test` service in
+`/home/pall/app-stack/docker-compose.yml`; GitHub Actions are not used.
+
+```bash
+install -d -m 0750 -o 1000 -g 1000 /home/pall/app-stack/ii-tonya-test-workspace
+docker exec postgres-db sh -lc \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "GRANT SET ON PARAMETER session_replication_role TO ii_tonya_test_runner"'
+docker compose --profile test run --rm --no-deps ii-tonya-test
+```
+
+The host Compose service adds the numeric group owner of `/var/run/docker.sock`
+to the container so its non-root UID 1000 can run the packaged-image smoke test.
+The PostgreSQL grant is limited to the one test-only parameter needed by fixture
+cleanup; the test role remains non-superuser.
+
+The service is excluded from normal Compose startup and is limited to one CPU, 1 GiB
+RAM, a read-only root filesystem, and a 256-MiB `/tmp`. Filesystem capacity is not
+capped. PostgreSQL tests use a dedicated `CREATEDB` test role in the existing Claw
+PostgreSQL service. Every testkit instance creates and drops its own isolated database;
+production tables and credentials are never exposed to the test process.
+
+The image pins Node 24.18.0, pnpm 11.9.0, and Docker CLI 29.7.0, loads no production env
+file or application credential, and resolves the app-stack proxy to a numeric address
+before creating its runtime-only proxy configuration. Evidence is
+written to `/home/pall/app-stack/ii-tonya-test-workspace/results/<source-sha>/` and only
+sanitized summaries/checksums are committed to `docs/test-evidence/`.
+
+Latest committed evidence: [`7d71646347d560ff2b5d8ebc4c0aad5b48230254`](../test-evidence/claw/7d71646347d560ff2b5d8ebc4c0aad5b48230254/verification.md).

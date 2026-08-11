@@ -1,4 +1,11 @@
-export { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, type DrizzleDb } from "./client.js";
+export {
+  checkDbReadiness,
+  closeDb,
+  createDb,
+  defaultMigrationsFolder,
+  migrateDb,
+  type DrizzleDb,
+} from "./client.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -85,6 +92,7 @@ export {
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
   requiredApprovalObjectType,
+  requiredApprovalRole,
   type AdminPayload,
   type AdminRole,
   type ApprovalAdminAction,
@@ -100,5 +108,69 @@ export {
   type SubmitFeedbackTransactionCommand,
 } from "./repositories/feedback-repository.js";
 export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
-export { PostgresWebhookInboxRepository, WebhookInboxClaimLostError } from "./repositories/webhook-inbox-repository.js";
+export {
+  PostgresWebhookInboxRepository,
+  WebhookInboxClaimLostError,
+} from "./repositories/webhook-inbox-repository.js";
+export {
+  ExpertReferralCommandError,
+  ExpertReferralDataIntegrityError,
+  PostgresExpertReferralRepository,
+  EXPERT_REFERRAL_OVERRIDE_APPROVAL_ACTION,
+  EXPERT_REFERRAL_OVERRIDE_APPROVAL_OBJECT_TYPE,
+  calculateIssuanceOverrideUsage,
+  deriveExpertReferralBatchStatus,
+  expertReferralOverrideApprovalPayload,
+  canonicalAdminInstant,
+  parseExpertCodeKeyVersion,
+  toPublicIssuedExpertReferralCode,
+  type ExpertReferralBinding,
+  type ExpertReferralBatchStatus,
+  type ExpertReferralCodeCrypto,
+  type ExpertReferralIssuedCodeMaterial,
+  type ExpertReferralOverrideApprovalPayloadInput,
+  type IssueExpertReferralBatchCommand,
+  type IssuedExpertReferralBatch,
+  type IssuedExpertReferralCode,
+  type MaskedExpertReferralCode,
+  type RedeemExpertReferralCodeCommand,
+  type RevokeExpertReferralCodeCommand,
+} from "./repositories/expert-referral-repository.js";
+export {
+  ExpertReferralControlError,
+  EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION,
+  EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE,
+  EXPERT_REFERRAL_FEATURE_CONTROL_ID,
+  PostgresExpertReferralControlRepository,
+  effectiveFeatureControl,
+  expertReferralFeatureControlApprovalPayload,
+  nextFeatureControlVersion,
+  type CloseExpertAbuseHoldCommand,
+  type ExpertAbuseHoldResult,
+  type ExpertEligibilityLock,
+  type ExpertReferralFeatureControl,
+  type ExpertReferralTransaction,
+  type OpenExpertAbuseHoldCommand,
+  type SetExpertReferralFeatureControlCommand,
+} from "./repositories/expert-referral-control-repository.js";
+export {
+  ExpertResidencyCommandError,
+  PostgresExpertResidencyRepository,
+  minPaymentDeadline,
+  parseMoneySnapshot,
+  type ResidencyOrder,
+  type ResidencyQuote,
+  type TariffVersionCommand,
+} from "./repositories/expert-residency-repository.js";
+export { ExpertResidencySettlementError, PostgresExpertResidencyProviderInboxRepository, type ExpertResidencySettlementResult } from "./repositories/expert-residency-provider-inbox-repository.js";
+export { PostgresExpertReferralAdminRepository, type ExpertReferralAdminRepositoryCommand } from "./repositories/expert-referral-admin-repository.js";
+export {
+  PostgresExpertReferralWorkerRepository,
+  type ExpertReferralHoldReplayBatchResult,
+  type ExpertReferralWorkerBatchCommand,
+  type ExpertResidencyWorkerBatchResult,
+  type ExpertResidencyWorkerMismatch,
+  type ExpertResidencyWorkerPayment,
+  type ExpertResidencyWorkerPaymentStatus,
+} from "./repositories/expert-referral-worker-repository.js";
 export * from "./schema/index.js";

@@ -8,6 +8,14 @@ describe("worker main", () => {
     expect(module.main).toBeTypeOf("function");
   }, 15_000);
 
+  it("keeps expert residency provider reads disabled by default", async () => {
+    const { disabledExpertResidencyProviderReader } = await import("./main.js");
+
+    await expect(
+      disabledExpertResidencyProviderReader.readPayments(),
+    ).resolves.toEqual({ kind: "disabled" });
+  });
+
   it("finishes the current bounded cycle and closes on a signal", async () => {
     const { runWorkerLoop } = await import("./main.js");
     const controller = new AbortController();

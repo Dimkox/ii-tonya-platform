@@ -158,6 +158,30 @@ beforeAll(async () => {
 afterAll(async () => testDb?.stop(), 60_000);
 
 describe("MVP schema", () => {
+  it("resets the migrated schema without weakening replay-ledger triggers", async () => {
+    await testDb!.reset();
+    const triggers = await testDb!.db.execute<{
+      name: string;
+      enabled: string;
+    }>(sql`
+      select tgname as name, tgenabled as enabled
+      from pg_trigger
+      where tgrelid = 'expert_referral_admin_execution_results'::regclass
+        and tgname in (
+          'expert_referral_admin_results_immutable',
+          'expert_referral_admin_results_truncate_immutable'
+        )
+      order by tgname
+    `);
+    expect(triggers.rows).toEqual([
+      { name: "expert_referral_admin_results_immutable", enabled: "O" },
+      {
+        name: "expert_referral_admin_results_truncate_immutable",
+        enabled: "O",
+      },
+    ]);
+  });
+
   it("creates the authoritative MVP and operational-support tables", async () => {
     const rows = await testDb!.db.execute<{ table_name: string }>(sql`
       select table_name from information_schema.tables
@@ -178,6 +202,22 @@ describe("MVP schema", () => {
       "conversations",
       "dead_letters",
       "delivery_attempts",
+      "expert_first_residency_settlements",
+      "expert_referral_abuse_holds",
+      "expert_referral_admin_execution_results",
+      "expert_referral_balances",
+      "expert_referral_code_batches",
+      "expert_referral_codes",
+      "expert_referral_feature_controls",
+      "expert_referral_issuance_overrides",
+      "expert_referral_ledger_allocations",
+      "expert_referral_ledger_entries",
+      "expert_referral_reward_grants",
+      "expert_referrals",
+      "expert_residency_orders",
+      "expert_residency_payment_attempts",
+      "expert_residency_provider_event_inbox",
+      "expert_residency_tariff_versions",
       "expert_services",
       "experts",
       "feedback",
@@ -325,7 +365,7 @@ describe("MVP schema", () => {
         slotId: "00000000-0000-4000-8000-000000000005",
         expertId: "00000000-0000-4000-8000-000000000003",
         observedAt: null,
-  });
+      });
 
       const columns = await legacyDb.db.execute<{
         columnName: string;

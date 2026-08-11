@@ -127,6 +127,41 @@
       "when": 1785596493950,
       "tag": "0017_adorable_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785728898521,
+      "tag": "0018_expert_residency_referrals",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785745800000,
+      "tag": "0019_expert_order_provider_deadline",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785758400000,
+      "tag": "0020_expert_provider_verification_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785762000000,
+      "tag": "0021_expert_settlement_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785770400000,
+      "tag": "0022_expert_referral_admin_replays",
+      "breakpoints": true
     }
   ]
 }

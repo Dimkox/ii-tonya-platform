@@ -10,6 +10,7 @@ import {
   normalizeNullableBookingTimestamp,
   type ReserveSlotCommand,
 } from "../repositories/booking-repository.js";
+import { startExternalPostgresDatabase } from "./external-postgres.js";
 
 type LedgerKind = "debit" | "free";
 type ConfirmEligibilityCase =
@@ -337,9 +338,7 @@ export function trackPoolClientClosures(
       }
 
       const errors =
-        waitError === undefined
-          ? closureErrors
-          : [...closureErrors, waitError];
+        waitError === undefined ? closureErrors : [...closureErrors, waitError];
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
         throw new AggregateError(
@@ -352,8 +351,12 @@ export function trackPoolClientClosures(
 }
 
 const defaultDependencies: TestPostgresDependencies = {
-  startContainer: async () =>
-    new PostgreSqlContainer("postgres:16-alpine").start(),
+  startContainer: async () => {
+    const adminUrl = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+    return adminUrl
+      ? startExternalPostgresDatabase(adminUrl)
+      : new PostgreSqlContainer("postgres:16-alpine").start();
+  },
   createPool: (connectionString) =>
     trackPoolClientClosures(new Pool({ connectionString })),
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
@@ -382,6 +385,57 @@ async function stopResources(
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1)
     throw new AggregateError(errors, "Failed to stop test database resources");
+}
+
+const immutableExpertReferralAdminResultTriggers = [
+  "expert_referral_admin_results_immutable",
+  "expert_referral_admin_results_truncate_immutable",
+] as const;
+
+export async function resetWithImmutableExpertReferralAdminResults(
+  db: DrizzleDb,
+  reset: (tx: DrizzleDb) => Promise<void>,
+): Promise<void> {
+  await db.transaction(async (transaction) => {
+    const tx = transaction as unknown as DrizzleDb;
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_immutable`,
+    );
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results disable trigger expert_referral_admin_results_truncate_immutable`,
+    );
+    await reset(tx);
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_immutable`,
+    );
+    await tx.execute(
+      sql`alter table expert_referral_admin_execution_results enable trigger expert_referral_admin_results_truncate_immutable`,
+    );
+    const triggerStates = await tx.execute<{
+      name: string;
+      enabled: string;
+    }>(sql`
+      select tgname as name, tgenabled as enabled
+      from pg_trigger
+      where tgrelid = 'expert_referral_admin_execution_results'::regclass
+        and tgname in (
+          'expert_referral_admin_results_immutable',
+          'expert_referral_admin_results_truncate_immutable'
+        )
+      order by tgname
+    `);
+    if (
+      triggerStates.rows.length !==
+        immutableExpertReferralAdminResultTriggers.length ||
+      triggerStates.rows.some(
+        (state, index) =>
+          state.name !== immutableExpertReferralAdminResultTriggers[index] ||
+          state.enabled !== "O",
+      )
+    ) {
+      throw new Error("expert_referral_admin_result_triggers_not_enabled");
+    }
+  });
 }
 
 export async function startTestPostgres(
@@ -560,18 +614,20 @@ export async function startTestPostgres(
       await migrate(db, { migrationsFolder: "packages/db/migrations" });
     },
     async reset() {
-      await db.execute(sql`
-        truncate table admin_case_actions, integration_errors,
-          reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
-          dead_letters, integration_outbox,
-          integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,
-          privacy_processor_attempts, privacy_deletion_jobs, admin_object_assignments,
-          admin_role_assignments, admin_sessions, admin_approvals, audit_events,
-          human_escalations, safety_incidents, prompt_versions, conversation_messages, conversations,
-          feedback, notifications, reservations, message_ledger_entries, message_events,
-          message_packages, slots, expert_services, experts, consents, client_profiles,
-          channel_identities, users cascade
-      `);
+      await resetWithImmutableExpertReferralAdminResults(db, async (tx) => {
+        await tx.execute(sql`
+          truncate table admin_case_actions, integration_errors,
+            reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
+            dead_letters, integration_outbox,
+            integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,
+            privacy_processor_attempts, privacy_deletion_jobs, admin_object_assignments,
+            admin_role_assignments, admin_sessions, admin_approvals, audit_events,
+            human_escalations, safety_incidents, prompt_versions, conversation_messages, conversations,
+            feedback, notifications, reservations, message_ledger_entries, message_events,
+            message_packages, slots, expert_services, experts, consents, client_profiles,
+            channel_identities, users cascade
+        `);
+      });
       primaryPackageId = undefined;
       primaryUserId = undefined;
     },

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
 import {
   createDb,
+  PostgresExpertReferralWorkerRepository,
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
@@ -33,11 +34,19 @@ export interface WorkerMainOptions {
 
 const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
+export const disabledExpertResidencyProviderReader = {
+  async readPayments() {
+    return { kind: "disabled" as const };
+  },
+};
+
 const productionRuntimeFactory: WorkerRuntimeFactory = {
   async create(config) {
     const db = createDb(config.databaseUrl);
     return createProductionWorkerRuntime({
       jobsRepository: new PostgresWorkerJobsRepository(db),
+      expertReferralJobsRepository: new PostgresExpertReferralWorkerRepository(db),
+      expertResidencyProviderReader: disabledExpertResidencyProviderReader,
       outboxRepository: new PostgresOutboxRepository(db),
       closeDatabase: async () => db.$client.end(),
       closeTelemetry: async () => undefined,

@@ -47,3 +47,36 @@ describe("projection architecture boundary", () => {
     })).toEqual([]);
   });
 });
+
+describe("expert residency referral architecture boundary", () => {
+  it("keeps production worker provider reads disabled", () => {
+    const main = readFileSync("apps/worker/src/main.ts", "utf8");
+    expect(main).toContain("disabledExpertResidencyProviderReader");
+    expect(main).toContain('kind: "disabled" as const');
+    expect(main).not.toMatch(/\b(?:fetch|axios|stripe|yookassa|cloudpayments|paypal|adyen)\b/iu);
+  });
+
+  it("keeps expert prompt context read-only and explicitly rejects financial authority fields", () => {
+    const prompt = readFileSync(
+      "packages/application/src/expert-prompt-context.ts",
+      "utf8",
+    );
+    expect(prompt).not.toContain("@ii-tonya/db");
+    expect(prompt).not.toContain("@ii-tonya/integrations");
+    expect(prompt).toContain('"providerPayload"');
+    expect(prompt).toContain('"ledgerEntries"');
+    expect(prompt).toContain("forbiddenAuthorityFields");
+    expect(prompt).toContain("validateExpertIntentProposal");
+  });
+
+  it("keeps expert proposals separate from the client intent engine contract", () => {
+    const ports = readFileSync("packages/application/src/ports.ts", "utf8");
+    const expertStart = ports.indexOf("export type ExpertIntentProposal");
+    const clientStart = ports.indexOf("export type IntentProposal");
+    expect(expertStart).toBeGreaterThanOrEqual(0);
+    expect(clientStart).toBeGreaterThan(expertStart);
+    const clientBlock = ports.slice(clientStart, ports.indexOf("export interface IntentEngine"));
+    expect(clientBlock).not.toContain("redeem_expert_referral");
+    expect(clientBlock).not.toContain("start_residency_checkout");
+  });
+});

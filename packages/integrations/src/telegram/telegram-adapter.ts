@@ -3,6 +3,8 @@ import { TransportFailure } from "../http/transport-failure.js";
 
 const MAX_RETRY_AFTER_SECONDS = 60;
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+const money = /^(?:0|[1-9]\d*)$/u;
+const safeText = /^[^\u0000-\u001F\u007F-\u009F]{1,256}$/u;
 
 const callbackQuerySchema = z
   .object({
@@ -63,6 +65,28 @@ export interface ExpertScheduleView {
   text: string;
 }
 
+export interface ExpertReferralSummaryView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  availableMinor: string;
+  reservedMinor: string;
+  debtMinor: string;
+  nearestExpiry: string | null;
+  maskedCodeStatus?: string;
+}
+
+export interface ExpertResidencyQuoteView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  tariffVersionId: string;
+  displayName: string;
+  priceMinor: string;
+  creditMinor: string;
+  cashMinor: string;
+  currency: "RUB";
+  durationSeconds: number;
+}
+
 export type TelegramSendOutcome =
   | { kind: "applied"; providerOperationId: string }
   | {
@@ -79,6 +103,15 @@ export interface TelegramPort {
     view: ExpertReservationView,
   ): Promise<TelegramSendOutcome>;
   sendSchedule(view: ExpertScheduleView): Promise<TelegramSendOutcome>;
+}
+
+export interface ExpertTelegramViewPort {
+  sendReferralSummary(
+    view: ExpertReferralSummaryView,
+  ): Promise<TelegramSendOutcome>;
+  sendResidencyQuote(
+    view: ExpertResidencyQuoteView,
+  ): Promise<TelegramSendOutcome>;
 }
 
 export interface TelegramTransportRequest {
@@ -114,6 +147,59 @@ export interface TelegramAdapterDeps {
     error(entry: unknown): void;
   };
   maxBodyBytes: number;
+}
+
+const validInstantOrNull = (value: string | null): boolean =>
+  value === null ||
+  (Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
+
+const assertMoney = (...values: string[]): void => {
+  if (!values.every((value) => money.test(value))) {
+    throw new Error("invalid_expert_view");
+  }
+};
+
+export function renderExpertReferralSummary(
+  view: ExpertReferralSummaryView,
+): string {
+  assertMoney(view.availableMinor, view.reservedMinor, view.debtMinor);
+  if (
+    !validInstantOrNull(view.nearestExpiry) ||
+    (view.maskedCodeStatus !== undefined && !safeText.test(view.maskedCodeStatus))
+  ) {
+    throw new Error("invalid_expert_view");
+  }
+  return [
+    `Referral credit: ${view.availableMinor} RUB minor units`,
+    `Reserved: ${view.reservedMinor} RUB minor units`,
+    `Debt: ${view.debtMinor} RUB minor units`,
+    `Nearest expiry: ${view.nearestExpiry ?? "none"}`,
+    ...(view.maskedCodeStatus === undefined
+      ? []
+      : [`Code status: ${view.maskedCodeStatus}`]),
+  ].join("\n");
+}
+
+export function renderExpertResidencyQuote(
+  view: ExpertResidencyQuoteView,
+): string {
+  assertMoney(view.priceMinor, view.creditMinor, view.cashMinor);
+  if (
+    view.currency !== "RUB" ||
+    !safeText.test(view.displayName) ||
+    !Number.isSafeInteger(view.durationSeconds) ||
+    view.durationSeconds < 86_400 ||
+    view.durationSeconds > 315_360_000
+  ) {
+    throw new Error("invalid_expert_view");
+  }
+  return [
+    `Tariff: ${view.displayName}`,
+    `Price: ${view.priceMinor} RUB minor units`,
+    `Referral credit: ${view.creditMinor} RUB minor units`,
+    `Cash due: ${view.cashMinor} RUB minor units`,
+    `Duration: ${view.durationSeconds} seconds`,
+  ].join("\n");
 }
 
 export function buildTelegramMethodUrl(
@@ -164,7 +250,7 @@ const logFailure = (
   });
 };
 
-export class TelegramAdapter implements TelegramPort {
+export class TelegramAdapter implements TelegramPort, ExpertTelegramViewPort {
   private readonly deps: TelegramAdapterDeps;
 
   constructor(deps: TelegramAdapterDeps) {
@@ -214,6 +300,26 @@ export class TelegramAdapter implements TelegramPort {
 
   async sendSchedule(view: ExpertScheduleView): Promise<TelegramSendOutcome> {
     return this.sendText(view);
+  }
+
+  async sendReferralSummary(
+    view: ExpertReferralSummaryView,
+  ): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderExpertReferralSummary(view),
+    });
+  }
+
+  async sendResidencyQuote(
+    view: ExpertResidencyQuoteView,
+  ): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderExpertResidencyQuote(view),
+    });
   }
 
   private async sendText(

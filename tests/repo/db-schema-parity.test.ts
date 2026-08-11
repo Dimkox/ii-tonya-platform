@@ -14,6 +14,7 @@ import {
   adminSessions,
   channelIdentities,
   clientProfiles,
+  experts,
   integrationInbox,
   integrationErrors,
   integrationOutbox,
@@ -47,6 +48,128 @@ const names = (table: AnyPgTable) => {
 };
 
 describe("authoritative Drizzle schema parity", () => {
+  it("exports every reviewed expert referral relation", () => {
+    const expectedExports = [
+      "expertReferralCodeBatches",
+      "expertReferralCodes",
+      "expertReferrals",
+      "expertResidencyTariffVersions",
+      "expertResidencyOrders",
+      "expertResidencyPaymentAttempts",
+      "expertResidencyProviderEventInbox",
+      "expertFirstResidencySettlements",
+      "expertReferralRewardGrants",
+      "expertReferralLedgerEntries",
+      "expertReferralLedgerAllocations",
+      "expertReferralIssuanceOverrides",
+      "expertReferralAbuseHolds",
+      "expertReferralFeatureControls",
+      "expertReferralBalances",
+    ];
+    for (const exportName of expectedExports) {
+      expect(dbSchema, exportName).toHaveProperty(exportName);
+    }
+  });
+
+  it("describes expert referral database invariants in Drizzle metadata", () => {
+    const requiredTable = (
+      exportName: string,
+    ): ReturnType<typeof names> | undefined => {
+      const table = (dbSchema as Record<string, unknown>)[exportName];
+      expect(table, exportName).toBeDefined();
+      if (table === undefined) return undefined;
+      return names(table as AnyPgTable);
+    };
+
+    expect(names(experts).uniques).toEqual(["experts_user_id_unique"]);
+    expect(requiredTable("expertReferralCodeBatches")?.uniques).toContain(
+      "expert_referral_batches_id_inviter_unique",
+    );
+    expect(requiredTable("expertReferralCodes")).toMatchObject({
+      foreignKeys: expect.arrayContaining([
+        "expert_referral_codes_batch_owner_fk",
+      ]),
+      uniques: expect.arrayContaining([
+        "expert_referral_codes_id_inviter_unique",
+      ]),
+    });
+    expect(requiredTable("expertReferrals")).toMatchObject({
+      checks: ["expert_referrals_distinct_experts"],
+      foreignKeys: expect.arrayContaining(["expert_referrals_code_owner_fk"]),
+      uniques: [
+        "expert_referrals_code_unique",
+        "expert_referrals_id_invitee_unique",
+        "expert_referrals_id_inviter_unique",
+        "expert_referrals_invitee_unique",
+      ],
+    });
+    expect(requiredTable("expertResidencyOrders")).toMatchObject({
+      checks: [
+        "expert_order_cash_remainder",
+        "expert_order_credit_cap",
+        "expert_order_currency_rub",
+        "expert_order_deadline_after_creation",
+        "expert_order_deadline_not_after_provider",
+        "expert_order_duration_positive",
+        "expert_order_money_bounds",
+        "expert_order_settlement_interval",
+      ],
+      uniques: [
+        "expert_orders_expert_idempotency_unique",
+        "expert_orders_id_expert_unique",
+      ],
+    });
+    expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
+      "expert_payment_attempt_id_order_unique",
+      "expert_payment_attempt_idempotency_unique",
+      "expert_payment_attempt_provider_request_unique",
+    ]);
+    expect(requiredTable("expertFirstResidencySettlements")).toMatchObject({
+      foreignKeys: expect.arrayContaining([
+        "expert_first_settlement_order_owner_fk",
+        "expert_first_settlement_payment_order_fk",
+        "expert_first_settlement_referral_invitee_fk",
+      ]),
+      uniques: expect.arrayContaining([
+        "expert_first_settlement_identity_unique",
+      ]),
+    });
+    expect(requiredTable("expertReferralRewardGrants")).toMatchObject({
+      checks: [
+        "expert_reward_grant_exact_amount",
+        "expert_reward_grant_expiry_exact",
+      ],
+      foreignKeys: expect.arrayContaining([
+        "expert_reward_grants_first_marker_fk",
+        "expert_reward_grants_referral_inviter_fk",
+      ]),
+      uniques: [
+        "expert_reward_grants_first_settlement_unique",
+        "expert_reward_grants_id_expert_unique",
+        "expert_reward_grants_idempotency_unique",
+        "expert_reward_grants_qualifying_order_unique",
+        "expert_reward_grants_qualifying_payment_unique",
+        "expert_reward_grants_referral_unique",
+      ],
+    });
+    expect(requiredTable("expertReferralLedgerEntries")?.uniques).toContain(
+      "expert_ledger_entries_id_expert_unique",
+    );
+    expect(requiredTable("expertReferralLedgerAllocations")).toMatchObject({
+      checks: ["expert_ledger_allocation_nonzero"],
+      foreignKeys: [
+        "expert_ledger_allocations_entry_owner_fk",
+        "expert_ledger_allocations_grant_owner_fk",
+      ],
+    });
+    expect(requiredTable("expertReferralFeatureControls")).toMatchObject({
+      checks: [
+        "expert_referral_controls_singleton",
+        "expert_referral_controls_version_positive",
+      ],
+    });
+  });
+
   it("describes every named migration constraint and partial index", () => {
     expect(names(channelIdentities).uniques).toEqual([
       "channel_identities_provider_external_unique",
@@ -209,6 +332,10 @@ describe("authoritative Drizzle schema parity", () => {
         "utf8",
       ),
       readFileSync("packages/db/migrations/0015_admin_iam.sql", "utf8"),
+      readFileSync(
+        "packages/db/migrations/0018_expert_residency_referrals.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -256,20 +383,48 @@ describe("authoritative Drizzle schema parity", () => {
       "projection_checkpoints_projection_unique",
       "integration_inbox_message_event_id_message_events_id_fk",
       "notifications_callback_expert_id_experts_id_fk",
+      "experts_user_id_unique",
+      "expert_referrals_code_unique",
+      "expert_referrals_invitee_unique",
+      "expert_referrals_distinct_experts",
+      "expert_tariff_active_interval_exclusion",
+      "expert_order_credit_cap",
+      "expert_order_cash_remainder",
+      "expert_reward_grant_exact_amount",
+      "expert_first_settlement_expert_unique",
+      "expert_abuse_holds_one_open_per_expert",
+      "expert_referral_controls_singleton",
+      "expert_provider_event_unique",
+      "expert_referral_append_only",
+      "expert_first_settlement_guard",
+      "expert_reward_grants_eligible_settlement",
+      "expert_ledger_allocations_exact_total",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
+    expect(migration).toMatch(
+      /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
+    );
   });
 
   it("has a coherent latest Drizzle snapshot", () => {
-    const path = "packages/db/migrations/meta/0015_snapshot.json";
+    const path = "packages/db/migrations/meta/0018_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
       tables?: Record<string, unknown>;
       views?: Record<string, unknown>;
     };
-    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(37);
+    expect(Object.keys(snapshot.tables ?? {})).toHaveLength(54);
     expect(snapshot.views).toHaveProperty("public.package_balances");
+    expect(snapshot.views).toHaveProperty("public.expert_referral_balances");
+    const balanceView = snapshot.views?.["public.expert_referral_balances"] as
+      { definition?: string } | undefined;
+    expect(balanceView?.definition).toContain("having sum(a.amount_minor) > 0");
+    const expertsTable = snapshot.tables?.["public.experts"] as
+      { uniqueConstraints?: Record<string, unknown> } | undefined;
+    expect(expertsTable?.uniqueConstraints).toHaveProperty(
+      "experts_user_id_unique",
+    );
     const notificationsTable = snapshot.tables?.["public.notifications"] as
       | {
           foreignKeys?: Record<string, unknown>;

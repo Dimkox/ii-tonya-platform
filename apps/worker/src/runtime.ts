@@ -1,8 +1,21 @@
+import {
+  expireExpertResidencyOrders,
+  reconcileExpertResidencyPayments,
+  replayHeldRewards,
+  type ExpertResidencyExpiryRepository,
+  type ExpertResidencyProviderReader,
+  type ExpertResidencyReconciliationRepository,
+  type HeldRewardRepository,
+} from "@ii-tonya/worker";
+
 export interface WorkerCycleReport {
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
+  readonly expertResidencyExpiry: unknown;
+  readonly expertResidencyReconciliation: unknown;
+  readonly expertReferralHoldReplay: unknown;
   readonly confirmedOutboxDelivery: unknown;
   readonly processorPrivacy: unknown;
   readonly providerReconciliation: unknown;
@@ -21,6 +34,9 @@ export interface WorkerRuntimeDependencies {
   readonly recoverExpiredLeases: BoundedJob;
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly reservationExpiry: BoundedJob;
+  readonly expertResidencyExpiry: BoundedJob;
+  readonly expertResidencyReconciliation: BoundedJob;
+  readonly expertReferralHoldReplay: BoundedJob;
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
@@ -43,6 +59,10 @@ export interface ProductionWorkerRuntimeDependencies {
     }): Promise<void>;
     deliverSafetyEscalationsBatch(batchSize: number): Promise<unknown>;
   };
+  readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
+    ExpertResidencyReconciliationRepository &
+    HeldRewardRepository;
+  readonly expertResidencyProviderReader: ExpertResidencyProviderReader;
   readonly outboxRepository: {
     recoverExpiredDispatchLeases(limit: number): Promise<number>;
     recoverExpiredReconciliationLeases(limit: number): Promise<number>;
@@ -98,6 +118,9 @@ export function createWorkerRuntime(
       const expiredLeaseRecovery = await deps.recoverExpiredLeases();
       const unknownOutcomeReconciliation = await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
+      const expertResidencyExpiry = await deps.expertResidencyExpiry();
+      const expertResidencyReconciliation = await deps.expertResidencyReconciliation();
+      const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
@@ -106,6 +129,9 @@ export function createWorkerRuntime(
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
         reservationExpiry,
+        expertResidencyExpiry,
+        expertResidencyReconciliation,
+        expertReferralHoldReplay,
         confirmedOutboxDelivery,
         processorPrivacy,
         providerReconciliation,
@@ -172,6 +198,25 @@ export function createProductionWorkerRuntime(
       now: deps.now(),
       batchSize,
     }),
+    expertResidencyExpiry: async () =>
+      expireExpertResidencyOrders(
+        deps.expertReferralJobsRepository,
+        deps.now(),
+        batchSize,
+      ),
+    expertResidencyReconciliation: async () =>
+      reconcileExpertResidencyPayments(
+        deps.expertReferralJobsRepository,
+        deps.expertResidencyProviderReader,
+        deps.now(),
+        batchSize,
+      ),
+    expertReferralHoldReplay: async () =>
+      replayHeldRewards(
+        deps.expertReferralJobsRepository,
+        deps.now(),
+        batchSize,
+      ),
     deliverConfirmedOutbox: async () =>
       deps.jobsRepository.deliverSafetyEscalationsBatch(batchSize),
     processorPrivacy: async () => ({

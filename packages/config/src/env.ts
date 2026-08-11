@@ -51,6 +51,12 @@ const schema = z
     GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
     INTENT_MODEL_ENABLED: z.literal("false").default("false"),
     PAYMENTS_ENABLED: z.literal("false").default("false"),
+    EXPERT_REFERRAL_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_RESIDENCY_BILLING_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
+    EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
     LLM_PROVIDER: z.literal("disabled").default("disabled"),
     MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
@@ -72,6 +78,14 @@ const schema = z
           "DATABASE_URL must be a hierarchical Postgres URL with an unambiguous TLS mode unless explicit local evidence mode is enabled",
       });
     }
+    if (value.EXPERT_REFERRAL_ENABLED === "true") {
+      if (!/^v[1-9]\d*$/u.test(value.EXPERT_REFERRAL_HMAC_KEY_VERSION ?? "")) {
+        context.addIssue({ code: "custom", path: ["EXPERT_REFERRAL_HMAC_KEY_VERSION"], message: "expert_referral_key_unavailable" });
+      }
+      if (value.EXPERT_REFERRAL_HMAC_KEY_REF !== "env://EXPERT_REFERRAL_HMAC_KEYS_JSON") {
+        context.addIssue({ code: "custom", path: ["EXPERT_REFERRAL_HMAC_KEY_REF"], message: "expert_referral_key_unavailable" });
+      }
+    }
   });
 
 export type RuntimeConfig = {
@@ -88,6 +102,14 @@ export type RuntimeConfig = {
   rawConversationLogging: false;
   selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
+  features: {
+    expertReferral: boolean;
+    expertResidencyBilling: boolean;
+  };
+  expertReferralKey?: {
+    currentVersion: string;
+    reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON";
+  };
 };
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
@@ -111,5 +133,17 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     rawConversationLogging: false,
     selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
+    features: {
+      expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
+      expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
+    },
+    ...(value.EXPERT_REFERRAL_ENABLED === "true"
+      ? {
+          expertReferralKey: {
+            currentVersion: value.EXPERT_REFERRAL_HMAC_KEY_VERSION!,
+            reference: value.EXPERT_REFERRAL_HMAC_KEY_REF as "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+          },
+        }
+      : {}),
   };
 }

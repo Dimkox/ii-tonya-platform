@@ -42,6 +42,13 @@ describe("admin approval canonical payload", () => {
 });
 
 describe("admin approval object mappings", () => {
+  it("accepts the exact expert referral and residency action set", async () => {
+    const module = await import("./admin-approval-repository.js");
+    expect(module.requiredApprovalRole("expert_referral.batch_generate")).toBe("security_admin");
+    expect(module.requiredApprovalRole("expert_residency.tariff_create")).toBe("entitlement_admin");
+    expect(module.requiredApprovalRole("expert_referral.feature_switch")).toBe("security_admin");
+  });
+
   it("fixes safety and feedback reads and resolutions to their assignment object types", () => {
     expect(requiredApprovalObjectType("safety.read")).toBe("safety_case");
     expect(requiredApprovalObjectType("safety.resolve")).toBe("safety_case");

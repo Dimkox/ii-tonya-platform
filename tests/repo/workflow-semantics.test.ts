@@ -4,6 +4,12 @@ import { parse } from "yaml";
 
 type WorkflowStep = { name?: string; run?: string; uses?: string };
 
+type WorkflowJob = {
+  if?: string;
+  needs?: string;
+  steps: Array<WorkflowStep & { id?: string; if?: string }>;
+};
+
 describe("CI and release workflow semantics", () => {
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
@@ -228,5 +234,66 @@ describe("CI and release workflow semantics", () => {
       expect(rollback?.run).toContain("smoke.mjs");
       expect(rollback?.run).toContain("rollback-complete");
     }
+  });
+
+  it("runs the mandatory expert residency database gates at CI-only repeat depth", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/db-gate.yml", "utf8"),
+    );
+    const runs = (workflow.jobs["postgres-schema"].steps as WorkflowStep[])
+      .map((step) => step.run ?? "")
+      .join("\n");
+
+    expect(runs).toContain("tests/repo/db-schema-parity.test.ts");
+    for (const path of [
+      "tests/integration/expert-referral-redemption-concurrency.test.ts",
+      "tests/integration/expert-residency-checkout-concurrency.test.ts",
+      "tests/integration/expert-residency-settlement-concurrency.test.ts",
+      "tests/integration/expert-residency-deadline.test.ts",
+      "tests/integration/expert-residency-hold-replay.test.ts",
+    ]) {
+      expect(runs).toContain(`pnpm test:repeat -- 20 ${path}`);
+    }
+    expect(runs).not.toContain("EXPERT_REFERRAL_ENABLED=true");
+    expect(runs).not.toContain("EXPERT_RESIDENCY_BILLING_ENABLED=true");
+  });
+
+  it("limits server control to explicit manual dispatch", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/server-control.yml", "utf8"),
+    );
+    expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(workflow.concurrency).toEqual({
+      group: "ii-tonya-server-control",
+      "cancel-in-progress": true,
+    });
+    expect(Object.keys(workflow.jobs)).toEqual(["command"]);
+    expect((workflow.jobs.command as WorkflowJob).if).toBeUndefined();
+  });
+
+  it("keeps server command failure while publishing only safe metadata", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/server-control.yml", "utf8"),
+    );
+    const command = workflow.jobs.command as WorkflowJob;
+    const execute = command.steps.find((step) => step.id === "execute");
+    const publish = command.steps.find(
+      (step) => step.name === "Publish safe command status",
+    );
+    expect(execute?.run).toContain('exit "$status"');
+    expect(publish?.if).toBe("always()");
+    expect(JSON.stringify(publish)).toContain("steps.execute.outputs.status");
+    expect(publish?.run).not.toContain("server-command-output.txt");
+    expect(publish?.run).not.toContain("head -c");
+    expect(publish?.run).toContain("GITHUB_STEP_SUMMARY");
+    expect(JSON.stringify(workflow)).not.toContain("gh issue comment");
+    expect(JSON.stringify(workflow)).not.toContain("base64");
+
+    const commandScript = readFileSync("ops/server-command.sh", "utf8");
+    expect(commandScript).not.toContain("command=$BASH_COMMAND");
+    expect(commandScript).toContain(
+      "Failed to configure the database role password.",
+    );
   });
 });

@@ -83,3 +83,9 @@ export {
   type TelegramTransportResponse,
   type TelegramUpdate,
 } from "./telegram/telegram-adapter.js";
+export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
+export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
+export { assertVerifiedExpertResidencyPaymentEvent, disabledExpertResidencyPaymentEventVerifier } from "./expert-residency/verified-event.js";
+export type { ExpertResidencyPaymentEventVerifier, ExpertResidencyVerificationEvidence, VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
+export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
+export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";

@@ -1,0 +1,15 @@
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "verification_id" text;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "verifier_key_version" text;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "verified_at" timestamp with time zone;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "payment_id" text;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "order_id" uuid;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "amount_minor" bigint;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "currency" text;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "occurred_at" timestamp with time zone;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD COLUMN "identity_version" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_event_order_fk" FOREIGN KEY ("order_id") REFERENCES "expert_residency_orders"("id");
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_verification_id_bounded" CHECK (char_length("verification_id") BETWEEN 1 AND 200);
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_verifier_key_bounded" CHECK (char_length("verifier_key_version") BETWEEN 1 AND 100);
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_event_amount_bounded" CHECK ("amount_minor" BETWEEN 0 AND 999999999999);
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_event_currency_rub" CHECK ("currency"='RUB');
+ALTER TABLE "expert_residency_provider_event_inbox" ADD CONSTRAINT "expert_provider_event_identity_complete" CHECK (("identity_version"=0 AND "payment_id" IS NULL AND "order_id" IS NULL AND "amount_minor" IS NULL AND "currency" IS NULL AND "occurred_at" IS NULL AND "verification_id" IS NULL AND "verifier_key_version" IS NULL AND "verified_at" IS NULL) OR ("identity_version"=1 AND "payment_id" IS NOT NULL AND "order_id" IS NOT NULL AND "amount_minor" IS NOT NULL AND "currency" IS NOT NULL AND "occurred_at" IS NOT NULL AND "verification_id" IS NOT NULL AND "verifier_key_version" IS NOT NULL AND "verified_at" IS NOT NULL));

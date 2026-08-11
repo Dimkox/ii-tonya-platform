@@ -1,0 +1,11 @@
+{
+  "modelOutput": {
+    "kind": "fake_settlement",
+    "orderId": "00000000-0000-4000-8000-000000000201",
+    "paymentId": "provider-payment-attacker",
+    "providerPayload": {
+      "status": "settled",
+      "amountMinor": "100000"
+    }
+  }
+}
