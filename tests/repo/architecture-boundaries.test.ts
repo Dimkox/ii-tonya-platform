@@ -56,14 +56,16 @@ describe("expert residency referral architecture boundary", () => {
     expect(main).not.toMatch(/\b(?:fetch|axios|stripe|yookassa|cloudpayments|paypal|adyen)\b/iu);
   });
 
-  it("keeps expert prompt context read-only and outside DB/provider layers", () => {
+  it("keeps expert prompt context read-only and explicitly rejects financial authority fields", () => {
     const prompt = readFileSync(
       "packages/application/src/expert-prompt-context.ts",
       "utf8",
     );
     expect(prompt).not.toContain("@ii-tonya/db");
     expect(prompt).not.toContain("@ii-tonya/integrations");
-    expect(prompt).not.toMatch(/providerPayload|ledgerEntries/u);
+    expect(prompt).toContain('"providerPayload"');
+    expect(prompt).toContain('"ledgerEntries"');
+    expect(prompt).toContain("forbiddenAuthorityFields");
     expect(prompt).toContain("validateExpertIntentProposal");
   });
 
