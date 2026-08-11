@@ -13,8 +13,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ack:
+    if: github.event.issue.title == 'ops/server-control'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Acknowledge control event
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "control-event-ack: $GITHUB_RUN_ID"
+
   command:
     if: github.event.issue.title == 'ops/server-control'
+    needs: ack
     runs-on: [self-hosted, linux, x64, ii-tonya-server]
     timeout-minutes: 30
 
