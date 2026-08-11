@@ -4,6 +4,12 @@ import { parse } from "yaml";
 
 type WorkflowStep = { name?: string; run?: string; uses?: string };
 
+type WorkflowJob = {
+  if?: string;
+  needs?: string;
+  steps: Array<WorkflowStep & { id?: string; if?: string }>;
+};
+
 describe("CI and release workflow semantics", () => {
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
@@ -250,5 +256,51 @@ describe("CI and release workflow semantics", () => {
     }
     expect(runs).not.toContain("EXPERT_REFERRAL_ENABLED=true");
     expect(runs).not.toContain("EXPERT_RESIDENCY_BILLING_ENABLED=true");
+  });
+
+  it("limits issue-driven server control to trusted edits of issue 6", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/server-control.yml", "utf8"),
+    );
+    expect(workflow.on.issues.types).toEqual(["edited"]);
+    expect(workflow.concurrency.group).toBe(
+      "ii-tonya-server-control-${{ github.event.issue.number || github.run_id }}",
+    );
+
+    const expectedGate = [
+      "github.event_name == 'workflow_dispatch'",
+      "github.event_name == 'issues'",
+      "github.event.action == 'edited'",
+      "github.event.issue.number == 6",
+      "github.event.issue.title == 'ops/server-control'",
+      "github.event.issue.user.login == github.repository_owner",
+      "github.actor == github.repository_owner",
+    ];
+    for (const jobName of ["ack", "command"]) {
+      const gate = (workflow.jobs[jobName] as WorkflowJob).if ?? "";
+      for (const condition of expectedGate) expect(gate).toContain(condition);
+    }
+  });
+
+  it("keeps server command failure while publishing only safe metadata", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/server-control.yml", "utf8"),
+    );
+    const command = workflow.jobs.command as WorkflowJob;
+    const execute = command.steps.find((step) => step.id === "execute");
+    const publish = command.steps.find(
+      (step) => step.name === "Publish command output",
+    );
+    expect(execute?.run).toContain('exit "$status"');
+    expect(publish?.if).toBe("always()");
+    expect(JSON.stringify(publish)).toContain("steps.execute.outputs.status");
+    expect(publish?.run).not.toContain("server-command-output.txt");
+    expect(publish?.run).not.toContain("head -c");
+
+    const commandScript = readFileSync("ops/server-command.sh", "utf8");
+    expect(commandScript).not.toContain("command=$BASH_COMMAND");
+    expect(commandScript).toContain(
+      "Failed to configure the database role password.",
+    );
   });
 });

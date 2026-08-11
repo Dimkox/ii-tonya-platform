@@ -22,6 +22,13 @@ GitHub-hosted CI/Database Gate jobs at that SHA still fail before their first wo
 step, so they are neither code-test failures nor PASS evidence. Final aggregate verify,
 independent reviews, and human/release approvals remain open.
 
+The current hosted-job annotation identifies the external blocker precisely: GitHub did
+not start the jobs because account payments failed or the Actions spending limit must be
+increased. The separate zero-job `server-control` failure was a YAML parse error and is
+covered by a validated repository fix. That workflow now accepts issue control only from
+the repository owner through issue `#6`, isolates concurrency, and publishes no raw command
+output. Changing Billing remains a human financial action.
+
 The authoritative continuation checkpoint is
 `docs/handoffs/2026-08-11-expert-residency-referrals-full.md`; the older handoff and
 `.superpowers/sdd/progress.md` remain historical evidence.

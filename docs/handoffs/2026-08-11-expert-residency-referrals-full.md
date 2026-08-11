@@ -765,7 +765,40 @@ live payment provider = DISABLED
 release status = NO-GO
 ```
 
-## 23. Minimal continuation summary
+## 23. 2026-08-12 continuation: Claw access and server-control repair
+
+Operational cleanup completed after the test-only API increment:
+
+- `/home/pall/app-stack` origin no longer embeds a GitHub token and remains accessible
+  through credential-free HTTPS plus the existing `gh` credential helper;
+- a dedicated machine-local SSH key restores key-based access for the test operator;
+- the prior `authorized_keys` state was empty and is backed up on the host before the new
+  key entry;
+- no credential or password helper is tracked in this repository;
+- the exposed GitHub token still requires revocation in GitHub account settings.
+
+The zero-job `server-control` push failure had a separate repository root cause: the
+`control-event-ack: ...` text appeared in an unquoted YAML plain scalar. GitHub could not
+parse the workflow and therefore created a path-named failure with zero jobs on each push.
+The repair also closes two security defects found during independent review:
+
+- issue-driven execution now requires an owner edit of owner-controlled issue `#6`, while
+  manual `workflow_dispatch` remains available;
+- unrelated issues have separate concurrency groups and cannot cancel the trusted run;
+- raw command output is no longer posted to GitHub issues;
+- the server command error trap no longer includes `$BASH_COMMAND`, and the database
+  password setup failure emits only a fixed diagnostic.
+
+The self-hosted runner label is declared for actionlint, and the execute step propagates
+its own exit status without a second expression-derived `exit` step. Focused Claw evidence
+is 110/110 PASS across workflow semantics and recursive scope boundaries.
+
+Evidence is recorded under
+`docs/test-evidence/claw/4cfcc32-server-control-validation/verification.md`.
+GitHub-hosted CI and Database Gate remain externally blocked by the account Billing or
+Actions spending-limit annotation. No spending limit was changed.
+
+## 24. Minimal continuation summary
 
 If there is no time to read the entire handoff, do exactly this:
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-trap 'status=$?; echo "ERROR line=$LINENO status=$status command=$BASH_COMMAND" >&2; exit "$status"' ERR
+trap 'status=$?; echo "ERROR line=$LINENO status=$status" >&2; exit "$status"' ERR
 
 DOMAIN="ii-tonya.ru"
 WWW_DOMAIN="www.ii-tonya.ru"
@@ -89,8 +89,13 @@ if [[ "$PROVISIONED" != true ]]; then
 
   if ! sudo test -f /etc/ii-tonya/runtime.env; then
     DB_PASSWORD="$(openssl rand -hex 32)"
-    sudo -u postgres psql -v ON_ERROR_STOP=1 \
-      -c "ALTER ROLE ii_tonya WITH LOGIN PASSWORD '${DB_PASSWORD}';"
+    if ! sudo -u postgres psql -v ON_ERROR_STOP=1 \
+      -c "ALTER ROLE ii_tonya WITH LOGIN PASSWORD '${DB_PASSWORD}';" \
+      >/dev/null 2>&1; then
+      unset DB_PASSWORD
+      echo 'Failed to configure the database role password.' >&2
+      exit 21
+    fi
 
     cat > "$RUNNER_TEMP/ii-tonya-runtime.env" <<EOF
 DATABASE_URL=postgresql://ii_tonya:${DB_PASSWORD}@127.0.0.1:5432/ii_tonya

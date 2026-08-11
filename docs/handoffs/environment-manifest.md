@@ -143,6 +143,33 @@ The placeholder database password in Compose is local-only and is not a producti
 credential. Remote deployment uses `deploy/compose.remote.yml` and separate authenticated
 release evidence; it must not be inferred from the local stack.
 
+## Observed Claw test profile on 2026-08-12
+
+The host containing `/home/pall/app-stack` is a production host. Tests are authorized
+only through its existing `ii-tonya-test` Compose profile:
+
+- the test container is limited to 1 CPU and 1 GiB memory;
+- the root filesystem is read-only and the test workspace is mounted separately;
+- focused tests use `/home/pall/app-stack/ii-tonya-test-workspace`;
+- no disk-size limit is configured;
+- production services and the Compose definition must not be changed merely to run a
+  test;
+- `test:repeat` count greater than 2 is prohibited, and CI-only 20x gates remain in CI.
+- For a genuinely focused Vitest invocation, override the profile's broad default test
+  entrypoint with `docker compose ... run --entrypoint sh ii-tonya-test -lc '<command>'`;
+  otherwise the wrapper performs unrelated build and verification work first.
+
+Machine authentication is not a repository input. The source workstation currently has
+a dedicated machine-local SSH key at
+`C:\Users\Dmitry\.ssh\ii_tonya_claw_ops_ed25519` with public fingerprint
+`SHA256:nQicXxntL9DeOPqHX2tRoBQxpYa2LYoa4Cbxu4bLZtg`. The private key, passwords, GitHub
+tokens, and `gh` host configuration must never be copied into this repository.
+
+The parent `/home/pall/app-stack` Git remote is credential-free HTTPS and uses the
+machine's existing `gh auth setup-git` credential helper. A previously embedded token was
+removed from `.git/config`; because it appeared in diagnostic output, it must still be
+revoked and replaced in GitHub account settings.
+
 ## CI and release tooling
 
 The CI workflows pin their action revisions. They use Node 24, pnpm 11.9.0, Docker,
