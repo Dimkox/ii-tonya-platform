@@ -24,12 +24,18 @@ describe("expert residency referral release readiness", () => {
       expect(cells).toHaveLength(7);
       expect(cells.every((cell) => cell.length > 0)).toBe(true);
     }
+    expect(traceability).not.toContain("pending registration");
+    expect(traceability).toContain("Database Gate 20x settlement concurrency");
+    expect(traceability).toContain("Database Gate 20x held-reward gate");
   });
 
-  it("ships operating and rollback procedures without authorizing activation", () => {
+  it("ships operating, rollback, and security procedures without authorizing activation", () => {
     const operations = read("docs/runbooks/expert-residency-referrals.md");
     const rollback = read(
       "docs/runbooks/expert-residency-referrals-rollback.md",
+    );
+    const security = read(
+      "docs/security/expert-residency-referrals-go-live-gates.md",
     );
     for (const required of [
       "Default state",
@@ -54,8 +60,22 @@ describe("expert residency referral release readiness", () => {
     ]) {
       expect(rollback).toContain(required);
     }
+    for (const required of [
+      "NO-GO by default",
+      "Non-waivable boundaries",
+      "Required release evidence",
+      "Activation boundary",
+      "100000 minor RUB units",
+      "50%",
+      "365 days",
+      "pending_feature_hold",
+      "named human AI spot-check",
+    ]) {
+      expect(security).toContain(required);
+    }
     expect(operations.toLowerCase()).toContain("does not authorize");
     expect(rollback.toLowerCase()).toContain("does not authorize");
+    expect(security.toLowerCase()).toContain("does not authorize");
   });
 
   it("keeps expert referral/residency and payment provider defaults disabled", () => {
