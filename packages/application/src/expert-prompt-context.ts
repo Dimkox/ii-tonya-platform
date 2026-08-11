@@ -76,6 +76,12 @@ export type ExpertIntentProposalValidation =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const isForbiddenResult = (value: unknown): value is { readonly kind: "forbidden" } =>
+  isRecord(value) && value.kind === "forbidden";
+
+const isDisabledResult = (value: unknown): value is { readonly kind: "disabled" } =>
+  isRecord(value) && value.kind === "disabled";
+
 const hasExactKeys = (
   value: Record<string, unknown>,
   keys: readonly string[],
@@ -238,7 +244,7 @@ export async function buildExpertPromptContext(input: {
   readonly tariffVersionId?: string;
 }): Promise<ExpertPromptContextResult> {
   const summary = await input.referrals.summary(input.principal);
-  if ("kind" in summary && summary.kind === "forbidden") {
+  if (isForbiddenResult(summary)) {
     return { kind: "forbidden" };
   }
   const referral = sanitizeSummary(summary);
@@ -252,10 +258,8 @@ export async function buildExpertPromptContext(input: {
     input.principal,
     input.tariffVersionId,
   );
-  if ("kind" in quote) {
-    if (quote.kind === "forbidden") return { kind: "forbidden" };
-    if (quote.kind === "disabled") return { kind: "disabled" };
-  }
+  if (isForbiddenResult(quote)) return { kind: "forbidden" };
+  if (isDisabledResult(quote)) return { kind: "disabled" };
   return {
     kind: "ready",
     context: {
