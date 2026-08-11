@@ -347,5 +347,5 @@ describe("expert residency referral release candidate", () => {
         and reason_code like 'expert_residency%'
     `);
     expect(liveProviderArtifacts.rows[0]?.n).toBe(0);
-  });
-}, 120_000);
+  }, 120_000);
+});
