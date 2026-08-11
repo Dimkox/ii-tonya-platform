@@ -3,7 +3,10 @@ import type {
   ExpertReferralService,
   ExpertResidencyService,
 } from "@ii-tonya/application";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+} from "fastify";
 
 const uuidPattern =
   "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
@@ -58,10 +61,7 @@ const resultKind = (value: unknown): string | undefined =>
       : undefined
     : undefined;
 
-const sendServiceResult = (
-  reply: Parameters<Parameters<FastifyInstance["get"]>[1]>[1],
-  result: unknown,
-) => {
+const sendServiceResult = (reply: FastifyReply, result: unknown) => {
   const kind = resultKind(result);
   if (kind === "forbidden") {
     return reply.code(403).send({ error: "forbidden" });
