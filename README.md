@@ -7,11 +7,17 @@ authoritative ии-Тоня source document.
 
 Pre-production. The client platform foundation is implemented, while live-provider,
 staging, and production gates remain closed. The expert residency referral extension
-has completed implementation tasks 1–9; its expert-facing API, Telegram/prompt adapters,
-worker operations, final traceability, and release evidence (tasks 10–12) are still
-pending. The authoritative checkpoint is `.superpowers/sdd/progress.md`.
-Resume instructions and exact verification evidence are recorded in
-`docs/handoffs/2026-08-04-expert-residency-referrals.md`.
+has implementation for Tasks 1–12 in the active draft PR, including expert API,
+Telegram/prompt boundaries, bounded worker operations, traceability, runbooks,
+release-readiness guards, and mandatory database-gate registration.
+
+Verification is still an explicit release boundary: focused Task 10 verification is
+recorded green; Tasks 11–12 are being re-run at the current exact SHA after the latest
+E2E fixture correction. GitHub-hosted CI/Database Gate jobs currently fail before their
+first workflow step, so they are not treated as code-test evidence.
+
+The authoritative checkpoints are `.superpowers/sdd/progress.md`, PR conversation
+evidence, and `docs/handoffs/2026-08-04-expert-residency-referrals.md`.
 
 For a clean machine, start with `AGENTS.md`,
 `docs/handoffs/environment-manifest.md`, and
@@ -24,6 +30,21 @@ pwsh -File scripts/check-development-environment.ps1
 
 The lockfile is the complete dependency graph; do not copy `node_modules` or caches from
 another machine.
+
+## Architecture graph
+
+The connected repository architecture, including runtime modules, PostgreSQL authority,
+CI/deployment, tests, evidence, disabled capabilities, deferred scope, prohibited paths,
+and orphan/dead-code classifications, is documented in:
+
+- `docs/architecture/project-connectivity-graph.md`
+- `docs/architecture/project-connectivity-inventory.md`
+
+The graph intentionally includes non-live and historical entities instead of hiding
+them. Workspace-level orphan count is currently zero; intentionally disabled,
+test-only, evidence, deferred, prohibited, and legacy entities are marked explicitly.
+File/symbol deletion requires a separate static/dynamic reference review and is never
+inferred merely from lack of a production import.
 
 ## Authoritative source
 
@@ -65,11 +86,13 @@ redemption paths with client coupons.
 
 Current durable implementation includes the domain rules, database schema and
 migrations, referral lifecycle, residency quoting and checkout, provider-neutral
-settlement/refund/reversal flows, disabled-by-default services and feature controls, and
-approved admin workflows. See
-`docs/superpowers/specs/2026-08-02-expert-residency-referrals-design.md` and
-`docs/superpowers/plans/2026-08-03-expert-residency-referrals.md` for requirements and
-the remaining task sequence.
+settlement/refund/reversal flows, disabled-by-default services and feature controls,
+approved admin workflows, expert HTTP/Telegram/prompt-safe boundaries, bounded worker
+expiry/reconciliation/held-replay jobs, bounded telemetry, traceability, release
+runbooks, and release-readiness guards. See
+`docs/superpowers/specs/2026-08-02-expert-residency-referrals-design.md`,
+`docs/superpowers/plans/2026-08-03-expert-residency-referrals.md`, and
+`docs/spec/expert-residency-referrals-traceability.md`.
 
 ## Safety boundary
 
@@ -104,5 +127,5 @@ three distinct evidence classes. None is provider-connected staging evidence.
 Production remains blocked until `docs/runbooks/go-live-evidence.md` records
 `Release status: GO`, `docs/runbooks/provider-staging-evidence.md` records separately
 reviewed `Provider staging status: PASS`, and both tested image digests have approved
-signatures. The committed records intentionally remain `NO-GO` and `BLOCKED`; the
-provider staging and production deployment adapters are not configured.
+signatures. The committed records intentionally remain `NO-GO` and `BLOCKED`; live
+provider composition is not authorized by this branch.
