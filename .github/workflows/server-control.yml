@@ -2,46 +2,16 @@ name: Temporary server control
 
 on:
   workflow_dispatch:
-  issues:
-    types: [edited]
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
-  group: ii-tonya-server-control-${{ github.event.issue.number || github.run_id }}
+  group: ii-tonya-server-control
   cancel-in-progress: true
 
 jobs:
-  ack:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' &&
-      github.event.action == 'edited' &&
-      github.event.issue.number == 6 &&
-      github.event.issue.title == 'ops/server-control' &&
-      github.event.issue.user.login == github.repository_owner &&
-      github.actor == github.repository_owner)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Acknowledge control event
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh issue comment 6 --repo "$GITHUB_REPOSITORY" --body "control-event-ack: $GITHUB_RUN_ID"
-
   command:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' &&
-      github.event.action == 'edited' &&
-      github.event.issue.number == 6 &&
-      github.event.issue.title == 'ops/server-control' &&
-      github.event.issue.user.login == github.repository_owner &&
-      github.actor == github.repository_owner)
-    needs: ack
     runs-on: [self-hosted, linux, x64, ii-tonya-server]
     timeout-minutes: 45
 
@@ -60,27 +30,20 @@ jobs:
           output="$RUNNER_TEMP/server-command-output.txt"
           bash ops/server-command.sh > "$output" 2>&1
           status=$?
-          {
-            printf '\n---\nexit_status=%s\n' "$status"
-            printf 'host=%s\n' "$(hostname -f 2>/dev/null || hostname)"
-            printf 'timestamp=%s\n' "$(date --iso-8601=seconds)"
-          } >> "$output"
           printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
           exit "$status"
 
-      - name: Publish command output
+      - name: Publish safe command status
         if: always()
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
           COMMAND_STATUS: ${{ steps.execute.outputs.status }}
         run: |
           set -Eeuo pipefail
-          comment="$RUNNER_TEMP/server-command-comment.md"
           {
-            printf 'Server control run completed. Raw command output is not published because it may contain secrets.\n\n'
+            printf '## Server control result\n\n'
             printf -- "- exit status: \`%s\`\n" "$COMMAND_STATUS"
             printf -- '- run: [%s](https://github.com/%s/actions/runs/%s)\n' \
               "$GITHUB_RUN_ID" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
-          } > "$comment"
-          gh issue comment 6 --repo "$GITHUB_REPOSITORY" --body-file "$comment"
+            printf '\nRaw command output is not published because it may contain secrets.\n'
+          } >> "$GITHUB_STEP_SUMMARY"

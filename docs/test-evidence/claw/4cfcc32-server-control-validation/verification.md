@@ -26,17 +26,13 @@ expression-derived propagation step could pass an unchecked string to `exit`.
 
 ## Fix
 
-- Use a block scalar for the issue-comment command.
+- Remove issue-driven control entirely; only explicit manual `workflow_dispatch` remains.
+- Keep token permissions at `contents: read` and publish safe exit/run metadata only to
+  the GitHub step summary.
 - Declare `ii-tonya-server` in `.github/actionlint.yaml`.
-- Return the captured process status directly from the execute step.
-- Remove the redundant expression-derived propagation step.
-- Permit issue-driven control only for an edit of issue `#6` made by the repository
-  owner on an issue also owned by that account; manual `workflow_dispatch` remains
-  permitted.
-- Isolate concurrency by issue number so unrelated issue events cannot cancel the
-  trusted control run.
-- Never publish raw command output to an issue. The result comment contains only exit
-  status and the Actions run link.
+- Return the captured process status directly from the execute step and remove the
+  redundant expression-derived propagation step.
+- Never publish or commit raw command output.
 - Remove `$BASH_COMMAND` from the error trap and suppress the secret-bearing PostgreSQL
   password command output on failure.
 
@@ -66,7 +62,7 @@ focused command bypassed its broad default verification entrypoint with
 ```text
 Test Files  2 passed (2)
 Tests       110 passed (110)
-Duration    4.46s
+Duration    4.41s
 ```
 
 Command:
@@ -77,8 +73,8 @@ CI=true ./node_modules/.bin/vitest run \
   tests/repo/scope-boundary.test.ts --maxWorkers=1
 ```
 
-The 7 workflow tests include the trusted issue/manual trigger gate, isolated concurrency,
-nonzero command propagation, always-run safe publication, and absence of raw output or
+The 7 workflow tests include the manual-only trigger, read-only permission, nonzero
+command propagation, always-run safe summary, and absence of raw output or
 `$BASH_COMMAND`. The 103 scope tests confirm the reviewed native automation hashes and
 recursive production-artifact boundary.
 
@@ -87,6 +83,10 @@ the profile's default entrypoint began its own broad build/verification sequence
 an incomplete test workspace. It is not GREEN evidence. No repeat loop was used. The
 workspace was restored from base source after the final run; zero test containers and zero
 focused Vitest processes remained.
+
+After merging current `main`, one focused RED identified a stale pre-fix
+`ops/server-command.sh` in the mounted test workspace. Synchronizing that fixture produced
+the final 110/110 result above; no production service or Compose definition was changed.
 
 ## External hosted-job boundary
 

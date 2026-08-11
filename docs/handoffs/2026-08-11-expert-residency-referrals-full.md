@@ -780,12 +780,14 @@ Operational cleanup completed after the test-only API increment:
 The zero-job `server-control` push failure had a separate repository root cause: the
 `control-event-ack: ...` text appeared in an unquoted YAML plain scalar. GitHub could not
 parse the workflow and therefore created a path-named failure with zero jobs on each push.
-The repair also closes two security defects found during independent review:
+The repair also closes security defects found during independent review and incorporates
+the current `main` control policy:
 
-- issue-driven execution now requires an owner edit of owner-controlled issue `#6`, while
-  manual `workflow_dispatch` remains available;
-- unrelated issues have separate concurrency groups and cannot cancel the trusted run;
-- raw command output is no longer posted to GitHub issues;
+- issue-driven execution is removed entirely; only explicit manual `workflow_dispatch`
+  remains;
+- workflow token access is reduced to `contents: read`;
+- raw command output is neither posted to issues nor committed to a control branch; only
+  safe exit/run metadata is written to the Actions step summary;
 - the server command error trap no longer includes `$BASH_COMMAND`, and the database
   password setup failure emits only a fixed diagnostic.
 
