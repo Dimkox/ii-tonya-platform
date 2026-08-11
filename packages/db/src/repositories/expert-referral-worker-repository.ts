@@ -76,6 +76,13 @@ function money(value: bigint | string | number): string {
   return parsed.toString();
 }
 
+function paymentStatus(value: string): ExpertResidencyWorkerPaymentStatus {
+  if (value !== "settled" && value !== "refunded" && value !== "charged_back") {
+    throw new Error("invalid_expert_residency_worker_status");
+  }
+  return value;
+}
+
 export class PostgresExpertReferralWorkerRepository {
   readonly #residency: ResidencyExpiryPort;
   readonly #heldRewards: HeldRewardReplayPort;
@@ -146,7 +153,7 @@ export class PostgresExpertReferralWorkerRepository {
         paymentId: string;
         amountMinor: bigint | string | number;
         currency: string;
-        status: ExpertResidencyWorkerPaymentStatus;
+        status: string;
       }>(sql`
         select
           a.order_id as "orderId",
@@ -167,13 +174,21 @@ export class PostgresExpertReferralWorkerRepository {
         if (row.currency !== "RUB") {
           throw new Error("invalid_expert_residency_worker_currency");
         }
+        if (
+          row.provider.trim().length === 0 ||
+          row.provider.length > 64 ||
+          row.paymentId.trim().length === 0 ||
+          row.paymentId.length > 256
+        ) {
+          throw new Error("invalid_expert_residency_worker_identity");
+        }
         return {
           orderId: row.orderId,
           provider: row.provider,
           paymentId: row.paymentId,
           amountMinor: money(row.amountMinor),
           currency: "RUB" as const,
-          status: row.status,
+          status: paymentStatus(row.status),
         };
       });
     });
