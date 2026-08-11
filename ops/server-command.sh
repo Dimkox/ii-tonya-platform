@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 trap 'status=$?; echo "ERROR line=$LINENO status=$status command=$BASH_COMMAND" >&2; exit "$status"' ERR
 
+DOMAIN="ii-tonya.ru"
+WWW_DOMAIN="www.ii-tonya.ru"
+SERVER_IP="157.22.187.237"
+
 section() {
   printf '\n===== %s =====\n' "$1"
 }
@@ -53,7 +57,7 @@ if [[ "$PROVISIONED" != true ]]; then
   sudo apt-get update
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates curl gnupg git nginx postgresql postgresql-contrib \
-    rsync openssl ufw
+    rsync openssl ufw certbot python3-certbot-nginx
 
   section node
   current_node_major=''
@@ -171,22 +175,31 @@ EOF
   sudo systemctl daemon-reload
   sudo systemctl enable ii-tonya-api.service ii-tonya-worker.service
 
-  section nginx
-  cat > "$RUNNER_TEMP/ii-tonya-nginx" <<'EOF'
+  sudo touch /etc/ii-tonya/provision-v1
+fi
+
+section domain_nginx
+if [[ "$FULL_SUDO" == true ]]; then
+  if ! command -v certbot >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot-nginx
+  fi
+
+  cat > "$RUNNER_TEMP/ii-tonya-nginx" <<EOF
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
-    server_name _;
+    server_name ${DOMAIN} ${WWW_DOMAIN};
 
     client_max_body_size 10m;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_connect_timeout 10s;
         proxy_read_timeout 60s;
     }
@@ -201,11 +214,11 @@ EOF
 
   section firewall
   sudo ufw allow 22/tcp
-  sudo ufw allow 80/tcp
+  sudo ufw allow 'Nginx Full'
   sudo ufw --force enable
   sudo ufw status verbose
-
-  sudo touch /etc/ii-tonya/provision-v1
+else
+  echo 'Runner does not have full sudo; leaving existing Nginx/domain configuration unchanged.'
 fi
 
 section versions
@@ -244,8 +257,38 @@ section smoke
 pnpm smoke -- --base-url=http://127.0.0.1:3000
 curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
 printf '\n'
-curl --fail --silent --show-error http://127.0.0.1/health/ready
+curl --fail --silent --show-error -H "Host: ${DOMAIN}" http://127.0.0.1/health/ready
 printf '\n'
+
+section dns
+root_ips="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+www_ips="$(getent ahostsv4 "$WWW_DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+printf '%s A=%s\n' "$DOMAIN" "${root_ips:-unresolved}"
+printf '%s A=%s\n' "$WWW_DOMAIN" "${www_ips:-unresolved}"
+
+section tls
+if grep -Fxq "$SERVER_IP" <<< "$root_ips"; then
+  if [[ "$FULL_SUDO" == true ]]; then
+    domains=(-d "$DOMAIN")
+    if grep -Fxq "$SERVER_IP" <<< "$www_ips"; then
+      domains+=(-d "$WWW_DOMAIN")
+    fi
+
+    sudo certbot --nginx --non-interactive --agree-tos \
+      --register-unsafely-without-email --redirect \
+      "${domains[@]}"
+    sudo systemctl enable --now certbot.timer 2>/dev/null || true
+    sudo nginx -t
+    sudo systemctl reload nginx
+  fi
+
+  curl --fail --silent --show-error --max-time 15 "https://${DOMAIN}/health/ready"
+  printf '\n'
+  printf 'tls=PASS\n'
+else
+  echo "${DOMAIN} does not currently resolve to ${SERVER_IP}; HTTPS issuance skipped."
+  printf 'tls=WAITING_FOR_DNS\n'
+fi
 
 section services
 systemctl --no-pager --full status postgresql.service | tail -n 20
@@ -260,4 +303,7 @@ section final
 printf 'native_server_setup=PASS\n'
 printf 'application_path=/opt/ii-tonya-platform\n'
 printf 'api_url=http://127.0.0.1:3000\n'
-printf 'public_http=http://157.22.187.237/\n'
+printf 'public_http=http://%s/\n' "$DOMAIN"
+if grep -Fxq "$SERVER_IP" <<< "$root_ips"; then
+  printf 'public_https=https://%s/\n' "$DOMAIN"
+fi
