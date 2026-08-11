@@ -1,11 +1,31 @@
-import type { ExpertPrincipal, ForbiddenResult } from "./expert-referral-service.js";
+import type {
+  ExpertPrincipal,
+  ForbiddenResult,
+} from "./expert-referral-service.js";
 
-export interface ResidencyQuote { priceMinor: string; creditMinor: string; cashMinor: string; [key: string]: unknown }
-export interface ExpertResidencyCommands {
-  quote(input: { expertId: string; tariffVersionId: string }): Promise<ResidencyQuote>;
-  checkout(input: { expertId: string; tariffVersionId: string; idempotencyKey: string }): Promise<unknown>;
+export interface ResidencyQuote {
+  tariffVersionId?: string;
+  displayName?: string;
+  priceMinor: string;
+  currency?: "RUB";
+  durationSeconds?: number;
+  creditMinor: string;
+  cashMinor: string;
 }
-export interface ExpertResidencyQueries { ownerUserId(expertId: string): Promise<string | undefined> }
+export interface ExpertResidencyCommands {
+  quote(input: {
+    expertId: string;
+    tariffVersionId: string;
+  }): Promise<ResidencyQuote>;
+  checkout(input: {
+    expertId: string;
+    tariffVersionId: string;
+    idempotencyKey: string;
+  }): Promise<unknown>;
+}
+export interface ExpertResidencyQueries {
+  ownerUserId(expertId: string): Promise<string | undefined>;
+}
 export interface ExpertResidencyReconciliation {
   settle(input: unknown): Promise<unknown>;
   reverse(input: unknown): Promise<unknown>;
@@ -13,8 +33,15 @@ export interface ExpertResidencyReconciliation {
   releaseExpiredOrders(limit: number): Promise<unknown>;
 }
 export interface ExpertResidencyService {
-  quote(principal: ExpertPrincipal, tariffVersionId: string): Promise<ResidencyQuote | ForbiddenResult | { kind: "disabled" }>;
-  checkout(principal: ExpertPrincipal, tariffVersionId: string, idempotencyKey: string): Promise<unknown>;
+  quote(
+    principal: ExpertPrincipal,
+    tariffVersionId: string,
+  ): Promise<ResidencyQuote | ForbiddenResult | { kind: "disabled" }>;
+  checkout(
+    principal: ExpertPrincipal,
+    tariffVersionId: string,
+    idempotencyKey: string,
+  ): Promise<unknown>;
   reconciliation: ExpertResidencyReconciliation;
 }
 
@@ -25,17 +52,25 @@ export const createExpertResidencyService = (deps: {
   reconciliation: ExpertResidencyReconciliation;
 }): ExpertResidencyService => {
   const owns = async (principal: ExpertPrincipal) =>
-    principal.authenticated && (await deps.queries.ownerUserId(principal.expertId)) === principal.userId;
+    principal.authenticated &&
+    (await deps.queries.ownerUserId(principal.expertId)) === principal.userId;
   return {
     async quote(principal, tariffVersionId) {
       if (!(await owns(principal))) return { kind: "forbidden" };
       if (!deps.environmentEnabled) return { kind: "disabled" };
-      return deps.commands.quote({ expertId: principal.expertId, tariffVersionId });
+      return deps.commands.quote({
+        expertId: principal.expertId,
+        tariffVersionId,
+      });
     },
     async checkout(principal, tariffVersionId, idempotencyKey) {
       if (!(await owns(principal))) return { kind: "forbidden" };
       if (!deps.environmentEnabled) return { kind: "disabled" };
-      return deps.commands.checkout({ expertId: principal.expertId, tariffVersionId, idempotencyKey });
+      return deps.commands.checkout({
+        expertId: principal.expertId,
+        tariffVersionId,
+        idempotencyKey,
+      });
     },
     reconciliation: deps.reconciliation,
   };
