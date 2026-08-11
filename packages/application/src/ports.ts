@@ -24,8 +24,7 @@ export type IntentProposal =
   | { readonly kind: "answer"; readonly text: string }
   | { readonly kind: "show_catalog"; readonly serviceCode?: string }
   | { readonly kind: "start_booking"; readonly expertId: string }
-  | { readonly kind: "human_handoff"; readonly reasonCode: string }
-  | ExpertIntentProposal;
+  | { readonly kind: "human_handoff"; readonly reasonCode: string };
 
 export interface IntentEngine {
   propose(input: IntentInput): Promise<IntentProposal>;
