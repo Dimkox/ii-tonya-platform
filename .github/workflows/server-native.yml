@@ -28,7 +28,7 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          if sudo test -f /etc/ii-tonya/provision-v1; then
+          if test -f /etc/ii-tonya/provision-v1; then
             echo "Host provisioning already complete"
             exit 0
           fi
@@ -194,16 +194,19 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo systemctl --no-pager --full status ii-tonya-api.service
-          sudo systemctl --no-pager --full status ii-tonya-worker.service
+          systemctl --no-pager --full status ii-tonya-api.service
+          systemctl --no-pager --full status ii-tonya-worker.service
           curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
 
       - name: Restrict runner sudo after first successful deploy
         shell: bash
         run: |
           set -Eeuo pipefail
+          if test ! -f /etc/sudoers.d/ii-tonya-runner-bootstrap; then
+            exit 0
+          fi
           cat > "$RUNNER_TEMP/ii-tonya-runner-sudoers" <<'EOF'
-          tonya ALL=(root) NOPASSWD: /usr/bin/systemctl restart ii-tonya-api.service, /usr/bin/systemctl restart ii-tonya-worker.service, /usr/bin/systemctl status ii-tonya-api.service, /usr/bin/systemctl status ii-tonya-worker.service
+          tonya ALL=(root) NOPASSWD: /usr/bin/systemctl restart ii-tonya-api.service, /usr/bin/systemctl restart ii-tonya-worker.service
           EOF
           sudo install -m 0440 "$RUNNER_TEMP/ii-tonya-runner-sudoers" /etc/sudoers.d/ii-tonya-runner
           sudo rm -f /etc/sudoers.d/ii-tonya-runner-bootstrap
