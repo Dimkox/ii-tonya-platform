@@ -14,6 +14,10 @@ release-readiness guards, and mandatory database-gate registration.
 Verification is still an explicit release boundary. Focused Task 10 evidence is green,
 and the corrected real-PostgreSQL release-candidate E2E is green at exact source
 `c560cbb65e105e1aaeb8d86f544ff95cfd218346` in the constrained Claw container.
+The previously standalone expert HTTP boundary is now composable through the normal API
+application for injected test capabilities; runtime startup fails closed if expert flags
+are enabled without that complete capability. No live authentication or payment provider
+is supplied, and all deployment defaults remain disabled.
 GitHub-hosted CI/Database Gate jobs at that SHA still fail before their first workflow
 step, so they are neither code-test failures nor PASS evidence. Final aggregate verify,
 independent reviews, and human/release approvals remain open.

@@ -721,7 +721,51 @@ live payment provider = DISABLED
 release status = NO-GO
 ```
 
-## 22. Minimal continuation summary
+## 22. 2026-08-12 continuation: test-only expert API composition
+
+The handoff audit found that the Task 10 expert route builder was not reachable from the
+normal API application. The next bounded increment added an optional complete expert API
+capability to `buildApp` and converted the route builder internals into a reusable Fastify
+plugin.
+
+Closed in this increment:
+
+- no capability means the expert routes remain absent;
+- an explicitly injected test capability registers the expert routes in the normal app;
+- referral and residency flags expose only their own two-route groups;
+- enabling either expert feature flag without that capability rejects startup;
+- route body limits remain 8 KiB after plugin composition;
+- additional financial/identity fields are rejected rather than stripped;
+- payload-too-large remains 413, explicit expert command errors map to 409, and
+  unexpected service faults remain 500;
+- server runtime still supplies no expert principal or payment provider capability;
+- live flags, staging, production services, compose, and environment values were not
+  enabled or changed.
+
+Deferred because exact external contracts are unknown:
+
+- real expert bearer/session authentication;
+- Telegram-to-HTTP principal mapping;
+- payment-provider deadline/session creation;
+- LLM proposal runtime dispatch;
+- `start_residency_checkout.orderId` versus HTTP `tariffVersionId` semantics.
+
+Focused RED/GREEN and static evidence is recorded under
+`docs/test-evidence/claw/3f8ed564-expert-api-composition/verification.md`. The test ran
+only in the existing `ii-tonya-test` profile on Claw with 1 CPU and 1 GiB. The underlying
+host is production; only the explicitly isolated test profile is authorized for tests.
+
+This does not change the release decision:
+
+```text
+PR #4 = DRAFT
+expert referral activation = OFF
+expert residency billing activation = OFF
+live payment provider = DISABLED
+release status = NO-GO
+```
+
+## 23. Minimal continuation summary
 
 If there is no time to read the entire handoff, do exactly this:
 

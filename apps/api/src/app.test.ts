@@ -1,5 +1,46 @@
 import { describe, expect, it } from "vitest";
 import { buildTestApp } from "./app.js";
+import type { ExpertReferralApiDependencies } from "./routes/expert-referral.js";
+
+const testExpertApi = (options: {
+  summary?: ExpertReferralApiDependencies["referrals"]["summary"];
+} = {}): ExpertReferralApiDependencies => ({
+  principals: {
+    resolve: async () => ({
+      authenticated: true,
+      userId: "00000000-0000-4000-8000-000000000001",
+      expertId: "00000000-0000-4000-8000-000000000002",
+    }),
+  },
+  referrals: {
+    redeemCode: async () => ({ kind: "redeemed", referralId: "referral-test" }),
+    summary: options.summary ??
+      (async () => ({
+        availableMinor: "100000",
+        reservedMinor: "0",
+        debtMinor: "0",
+        nearestExpiry: "2027-08-12T00:00:00.000Z",
+      })),
+  },
+  residency: {
+    quote: async () => ({
+      tariffVersionId: "00000000-0000-4000-8000-000000000101",
+      priceMinor: "200000",
+      creditMinor: "100000",
+      cashMinor: "100000",
+    }),
+    checkout: async () => ({
+      id: "00000000-0000-4000-8000-000000000201",
+      status: "payment_pending",
+    }),
+    reconciliation: {
+      settle: async () => ({ kind: "disabled" }),
+      reverse: async () => ({ kind: "disabled" }),
+      replayHeldReward: async () => ({ kind: "disabled" }),
+      releaseExpiredOrders: async () => ({ kind: "disabled" }),
+    },
+  },
+});
 
 describe("API boundary", () => {
   it("rejects unverified webhooks before application dispatch", async () => {
@@ -97,6 +138,104 @@ describe("API boundary", () => {
     for (const method of ["PUT", "PATCH", "DELETE"] as const) {
       expect((await app.inject({ method, url: "/v1/admin/commands/client.create/00000000-0000-4000-8000-000000000000", payload: {} })).statusCode).toBe(404);
     }
+    await app.close();
+  });
+
+  it("keeps expert routes absent when no complete capability is injected", async () => {
+    const app = await buildTestApp();
+    expect((await app.inject({
+      method: "GET",
+      url: "/v1/expert/referrals/summary",
+      headers: { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" },
+    })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("registers all four expert routes only when both test capabilities are enabled", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi(),
+      features: { expertReferral: true, expertResidencyBilling: true },
+    });
+    const headers = { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" };
+    const cases = [
+      app.inject({ method: "GET", url: "/v1/expert/referrals/summary", headers }),
+      app.inject({ method: "POST", url: "/v1/expert/referrals/redeem", headers, payload: { code: `EXR_${"A".repeat(22)}`, idempotencyKey: "redeem-0001" } }),
+      app.inject({ method: "POST", url: "/v1/expert/residency/quotes", headers, payload: { tariffVersionId: "00000000-0000-4000-8000-000000000101" } }),
+      app.inject({ method: "POST", url: "/v1/expert/residency/checkouts", headers, payload: { tariffVersionId: "00000000-0000-4000-8000-000000000101", idempotencyKey: "checkout-0001" } }),
+    ];
+    expect((await Promise.all(cases)).map(({ statusCode }) => statusCode)).toEqual([200, 200, 200, 200]);
+    await app.close();
+  });
+
+  it.each([
+    { expertReferral: true, expertResidencyBilling: false },
+    { expertReferral: false, expertResidencyBilling: true },
+  ])("rejects either expert feature activation without a complete runtime capability", async (features) => {
+    await expect(buildTestApp({ features })).rejects.toThrow("Expert API runtime capability is required");
+  });
+
+  it("keeps residency routes absent when only referral is enabled", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi(),
+      features: { expertReferral: true, expertResidencyBilling: false },
+    });
+    expect((await app.inject({ method: "POST", url: "/v1/expert/residency/quotes", payload: {} })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("keeps referral routes absent when only residency billing is enabled", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi(),
+      features: { expertReferral: false, expertResidencyBilling: true },
+    });
+    expect((await app.inject({ method: "GET", url: "/v1/expert/referrals/summary" })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("rejects additional financial authority in the composed quote path", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi(),
+      features: { expertReferral: false, expertResidencyBilling: true },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/expert/residency/quotes",
+      headers: { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" },
+      payload: {
+        tariffVersionId: "00000000-0000-4000-8000-000000000101",
+        priceMinor: "1",
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("preserves payload-too-large as 413 in the composed path", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi(),
+      features: { expertReferral: true, expertResidencyBilling: false },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/expert/referrals/redeem",
+      headers: { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" },
+      payload: { code: `EXR_${"A".repeat(9_000)}`, idempotencyKey: "redeem-0001" },
+    });
+    expect(response.statusCode).toBe(413);
+    await app.close();
+  });
+
+  it("maps unexpected expert service faults to 500 instead of a command conflict", async () => {
+    const app = await buildTestApp({
+      expertApi: testExpertApi({ summary: async () => { throw new Error("unexpected"); } }),
+      features: { expertReferral: true, expertResidencyBilling: false },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/expert/referrals/summary",
+      headers: { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" },
+    });
+    expect(response.statusCode).toBe(500);
     await app.close();
   });
 });

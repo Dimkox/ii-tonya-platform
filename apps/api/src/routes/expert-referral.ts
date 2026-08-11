@@ -54,6 +54,133 @@ export interface ExpertReferralApiDependencies {
   readonly residency: ExpertResidencyService;
 }
 
+interface ExpertReferralRouteOptions extends ExpertReferralApiDependencies {
+  readonly enabled?: {
+    readonly expertReferral: boolean;
+    readonly expertResidencyBilling: boolean;
+  };
+}
+
+const isExpertCommandError = (error: unknown): boolean =>
+  error instanceof Error &&
+  typeof (error as Error & { readonly code?: unknown }).code === "string" &&
+  /^EXPERT_(?:REFERRAL|RESIDENCY)_/u.test(
+    (error as Error & { readonly code: string }).code,
+  );
+
+export async function expertReferralRoutes(
+  app: FastifyInstance,
+  deps: ExpertReferralRouteOptions,
+): Promise<void> {
+  app.setErrorHandler((error, _request, reply) => {
+    const candidate = error as {
+      readonly validation?: unknown;
+      readonly statusCode?: unknown;
+    };
+    if (candidate.validation !== undefined) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    if (candidate.statusCode === 413) {
+      return reply.code(413).send({ error: "payload_too_large" });
+    }
+    if (isExpertCommandError(error)) {
+      return reply.code(409).send({ error: "command_rejected" });
+    }
+    if (
+      typeof candidate.statusCode === "number" &&
+      candidate.statusCode >= 400 &&
+      candidate.statusCode < 500
+    ) {
+      return reply.code(candidate.statusCode).send({ error: "request_rejected" });
+    }
+    return reply.code(500).send({ error: "internal_error" });
+  });
+
+  const enabled = deps.enabled ?? {
+    expertReferral: true,
+    expertResidencyBilling: true,
+  };
+
+  const principalFor = async (
+    authorization: string | undefined,
+  ): Promise<ExpertPrincipal | null> => {
+    const principal = await deps.principals.resolve(authorization);
+    return principal?.authenticated === true ? principal : null;
+  };
+
+  if (enabled.expertReferral) {
+    app.post(
+      "/v1/expert/referrals/redeem",
+      { bodyLimit: 8 * 1024, schema: { body: redeemBodySchema } },
+      async (request, reply) => {
+        const principal = await principalFor(request.headers.authorization);
+        if (principal === null) {
+          return reply.code(401).send({ error: "unauthorized" });
+        }
+        const body = request.body as {
+          code: string;
+          idempotencyKey: string;
+        };
+        const result = await deps.referrals.redeemCode(
+          principal,
+          body.code,
+          body.idempotencyKey,
+        );
+        return sendServiceResult(reply, result);
+      },
+    );
+
+    app.get("/v1/expert/referrals/summary", async (request, reply) => {
+      const principal = await principalFor(request.headers.authorization);
+      if (principal === null) {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+      const result = await deps.referrals.summary(principal);
+      return sendServiceResult(reply, result);
+    });
+  }
+
+  if (enabled.expertResidencyBilling) {
+    app.post(
+      "/v1/expert/residency/quotes",
+      { bodyLimit: 8 * 1024, schema: { body: quoteBodySchema } },
+      async (request, reply) => {
+        const principal = await principalFor(request.headers.authorization);
+        if (principal === null) {
+          return reply.code(401).send({ error: "unauthorized" });
+        }
+        const body = request.body as { tariffVersionId: string };
+        const result = await deps.residency.quote(
+          principal,
+          body.tariffVersionId,
+        );
+        return sendServiceResult(reply, result);
+      },
+    );
+
+    app.post(
+      "/v1/expert/residency/checkouts",
+      { bodyLimit: 8 * 1024, schema: { body: checkoutBodySchema } },
+      async (request, reply) => {
+        const principal = await principalFor(request.headers.authorization);
+        if (principal === null) {
+          return reply.code(401).send({ error: "unauthorized" });
+        }
+        const body = request.body as {
+          tariffVersionId: string;
+          idempotencyKey: string;
+        };
+        const result = await deps.residency.checkout(
+          principal,
+          body.tariffVersionId,
+          body.idempotencyKey,
+        );
+        return sendServiceResult(reply, result);
+      },
+    );
+  }
+}
+
 const resultKind = (value: unknown): string | undefined =>
   typeof value === "object" && value !== null && "kind" in value
     ? typeof (value as { kind?: unknown }).kind === "string"
@@ -80,92 +207,7 @@ export async function buildExpertReferralApi(
     bodyLimit: 8 * 1024,
     ajv: { customOptions: { removeAdditional: false } },
   });
-
-  app.setErrorHandler((error, _request, reply) => {
-    const candidate = error as {
-      readonly validation?: unknown;
-      readonly statusCode?: unknown;
-    };
-    if (candidate.validation !== undefined) {
-      return reply.code(400).send({ error: "invalid_request" });
-    }
-    return reply.code(409).send({ error: "command_rejected" });
-  });
-
-  const principalFor = async (
-    authorization: string | undefined,
-  ): Promise<ExpertPrincipal | null> => {
-    const principal = await deps.principals.resolve(authorization);
-    return principal?.authenticated === true ? principal : null;
-  };
-
-  app.post(
-    "/v1/expert/referrals/redeem",
-    { schema: { body: redeemBodySchema } },
-    async (request, reply) => {
-      const principal = await principalFor(request.headers.authorization);
-      if (principal === null) {
-        return reply.code(401).send({ error: "unauthorized" });
-      }
-      const body = request.body as {
-        code: string;
-        idempotencyKey: string;
-      };
-      const result = await deps.referrals.redeemCode(
-        principal,
-        body.code,
-        body.idempotencyKey,
-      );
-      return sendServiceResult(reply, result);
-    },
-  );
-
-  app.get("/v1/expert/referrals/summary", async (request, reply) => {
-    const principal = await principalFor(request.headers.authorization);
-    if (principal === null) {
-      return reply.code(401).send({ error: "unauthorized" });
-    }
-    const result = await deps.referrals.summary(principal);
-    return sendServiceResult(reply, result);
-  });
-
-  app.post(
-    "/v1/expert/residency/quotes",
-    { schema: { body: quoteBodySchema } },
-    async (request, reply) => {
-      const principal = await principalFor(request.headers.authorization);
-      if (principal === null) {
-        return reply.code(401).send({ error: "unauthorized" });
-      }
-      const body = request.body as { tariffVersionId: string };
-      const result = await deps.residency.quote(
-        principal,
-        body.tariffVersionId,
-      );
-      return sendServiceResult(reply, result);
-    },
-  );
-
-  app.post(
-    "/v1/expert/residency/checkouts",
-    { schema: { body: checkoutBodySchema } },
-    async (request, reply) => {
-      const principal = await principalFor(request.headers.authorization);
-      if (principal === null) {
-        return reply.code(401).send({ error: "unauthorized" });
-      }
-      const body = request.body as {
-        tariffVersionId: string;
-        idempotencyKey: string;
-      };
-      const result = await deps.residency.checkout(
-        principal,
-        body.tariffVersionId,
-        body.idempotencyKey,
-      );
-      return sendServiceResult(reply, result);
-    },
-  );
+  await app.register(expertReferralRoutes, deps);
 
   return app;
 }

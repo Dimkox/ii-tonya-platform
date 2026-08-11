@@ -7,6 +7,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
+import { expertReferralRoutes, type ExpertReferralApiDependencies } from "./routes/expert-referral.js";
 import { healthRoutes, type ReadinessProbe } from "./routes/health.js";
 import { selartiWebhookRoutes, type WebhookInbox } from "./routes/selarti-webhook.js";
 import { telegramWebhookRoutes, type TelegramCallbackService } from "./routes/telegram-webhook.js";
@@ -18,6 +19,7 @@ export interface AppDependencies {
   selarti: SelartiPort; telegramCallbacks: TelegramCallbackService; readiness: ReadinessProbe; logger: Logger;
   inbox: WebhookInbox; rateLimiter: RateLimitGate; telegramWebhookSecret: string; adminApprovals?: ApprovalPort;
   expertReferralAdminService?: ExpertReferralAdminService;
+  expertApi?: ExpertReferralApiDependencies;
   expertCodeKeyring?: ExpertCodeKeyring;
   now?: () => Date;
 }
@@ -26,13 +28,30 @@ const assertDisabled = (config: RuntimeConfig): void => {
 };
 export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
   assertDisabled(deps.config);
-  const app = Fastify({ loggerInstance: deps.logger, bodyLimit: 64_000 });
+  if (
+    (deps.config.features.expertReferral ||
+      deps.config.features.expertResidencyBilling) &&
+    deps.expertApi === undefined
+  ) {
+    throw new Error("Expert API runtime capability is required");
+  }
+  const app = Fastify({
+    loggerInstance: deps.logger,
+    bodyLimit: 64_000,
+    ajv: { customOptions: { removeAdditional: false } },
+  });
   if (deps.expertCodeKeyring !== undefined) {
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
   await app.register(selartiWebhookRoutes, { selarti: deps.selarti, conversation: deps.conversationService, logger: deps.logger, rateLimiter: deps.rateLimiter, ...(deps.now === undefined ? {} : { now: deps.now }) });
   await app.register(telegramWebhookRoutes, { secret: deps.telegramWebhookSecret, callbacks: deps.telegramCallbacks, inbox: deps.inbox, rateLimiter: deps.rateLimiter });
+  if (deps.expertApi !== undefined) {
+    await app.register(expertReferralRoutes, {
+      ...deps.expertApi,
+      enabled: deps.config.features,
+    });
+  }
   if (deps.adminApprovals !== undefined) {
     const admin = await buildAdminApi({ approvals: deps.adminApprovals, admin: deps.adminService });
     const expertAdmin = deps.expertReferralAdminService === undefined ? undefined : await buildExpertReferralAdminApi({ approvals: deps.adminApprovals, admin: deps.expertReferralAdminService, environmentCeilings: { expertReferral: deps.config.features?.expertReferral ?? false, expertResidencyBilling: deps.config.features?.expertResidencyBilling ?? false } });
@@ -69,7 +88,7 @@ const testMock = (implementation: (...args: unknown[]) => Promise<unknown> = asy
 type TestConversation = ConversationService & { handleInbound: TestMockFunction };
 type TestTelegram = TelegramCallbackService & { processedUpdateCount(id: string): number };
 export type TestApp = FastifyInstance & { services: { conversation: TestConversation; telegram: TestTelegram } };
-export async function buildTestApp(options: { callbackVerified?: boolean; authorizedIdentity?: boolean; telegramFailOnce?: boolean; now?: () => number; selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>; selartiFailOnce?: boolean } = {}): Promise<TestApp> {
+export async function buildTestApp(options: { callbackVerified?: boolean; authorizedIdentity?: boolean; telegramFailOnce?: boolean; now?: () => number; selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>; selartiFailOnce?: boolean; expertApi?: ExpertReferralApiDependencies; features?: RuntimeConfig["features"] } = {}): Promise<TestApp> {
   const receipts = new Map<string, "processing" | "complete">(); const counts = new Map<string, number>();
   let selartiFailures = options.selartiFailOnce === true ? 1 : 0;
   const conversation = { handleInbound: testMock(async () => { if (selartiFailures-- > 0) throw new Error("temporary"); return { kind: "answer_queued", chargedMessages: 1 }; }), handleOutboundDelivery: testMock() } as unknown as TestConversation;
@@ -82,7 +101,7 @@ export async function buildTestApp(options: { callbackVerified?: boolean; author
   } satisfies TestTelegram;
   const never = new Proxy({}, { get: () => testMock() });
   const app = await buildApp({
-    config: { databaseUrl: "postgresql://placeholder.invalid/test", integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false }, minorOnboarding: false, rawConversationLogging: false, selartiOutboundBillingMode: "disabled", displayTimezone: "Europe/Moscow", features: { expertReferral: false, expertResidencyBilling: false } },
+    config: { databaseUrl: "postgresql://placeholder.invalid/test", integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false }, minorOnboarding: false, rawConversationLogging: false, selartiOutboundBillingMode: "disabled", displayTimezone: "Europe/Moscow", features: options.features ?? { expertReferral: false, expertResidencyBilling: false } },
     conversationService: conversation, bookingService: never as BookingService, catalogService: never as CatalogService, privacyService: never as PrivacyService, adminService: never as AdminService,
     selarti: { decodeVerifiedWebhook: async () => { if (options.selartiEvent === undefined) throw new Error("unverified"); return options.selartiEvent; }, sendMessage: async () => { throw new Error("disabled"); } }, telegramCallbacks: telegram,
     readiness: { check: async () => ({ postgres: true, migrations: true, workerLease: true, adapters: true }) }, logger: createLogger(),
@@ -91,6 +110,7 @@ export async function buildTestApp(options: { callbackVerified?: boolean; author
       complete: async (id) => { receipts.set(id, "complete"); }, fail: async (id) => { receipts.delete(id); },
     },
     rateLimiter: createWindowedRateLimiter(options.now === undefined ? {} : { now: options.now }), telegramWebhookSecret: "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+    ...(options.expertApi === undefined ? {} : { expertApi: options.expertApi }),
     ...(options.now === undefined ? {} : { now: () => new Date(options.now!()) }),
   });
   return Object.assign(app, { services: { conversation, telegram } });
