@@ -10,21 +10,59 @@ const EXPERT_RESIDENCY_DB_GATE_PATH = ".github/workflows/db-gate.yml";
 const EXPERT_RESIDENCY_DB_GATE_SHA256 =
   "9b6ee77a2e46fe452cf31cfae3111475dd8a1a0fd27307ee24251f2ab728bdf8";
 
+const MAIN_NATIVE_AUTOMATION_BLOB_SHA1 = new Map<string, string>([
+  [
+    ".github/workflows/server-control.yml",
+    "8510460576a572f26b98ee0896fceaf901d59d99",
+  ],
+  [
+    ".github/workflows/server-native.yml",
+    "d31d2fb6e9bd5e8ff8de100fed76946ad29eedf2",
+  ],
+  [
+    "ops/server-command.sh",
+    "59ee50e420dab8ed231fb3357e18280256874e80",
+  ],
+  [
+    "scripts/bootstrap-native-runner.sh",
+    "a4ea7befe66b9eb3dd414b51e5f8f60d783519a6",
+  ],
+]);
+
 const normalizePath = (path: string): string =>
   path.replaceAll("\\", "/").toLowerCase();
+
+function normalizedContent(content: string): string {
+  return content.replace(/\r\n?/gu, "\n");
+}
+
+function gitBlobSha1(content: string): string {
+  const normalized = normalizedContent(content);
+  const body = Buffer.from(normalized, "utf8");
+  const header = Buffer.from(`blob ${body.length}\0`, "utf8");
+  return createHash("sha1").update(header).update(body).digest("hex");
+}
 
 export const classifyApprovedTrackedScopeContent = ({
   path: rawPath,
   content,
 }: PaymentScopeProbe): readonly string[] => {
   const path = normalizePath(rawPath);
+
+  const nativeAutomationSha = MAIN_NATIVE_AUTOMATION_BLOB_SHA1.get(path);
+  if (nativeAutomationSha !== undefined) {
+    const actualBlobSha = gitBlobSha1(content);
+    return actualBlobSha === nativeAutomationSha
+      ? []
+      : [`approved tracked scope hash mismatch: git-blob:${actualBlobSha}`];
+  }
+
   if (path !== EXPERT_RESIDENCY_DB_GATE_PATH) {
     return classifyApprovedTrackedScopeContentCore({ path: rawPath, content });
   }
 
-  const normalizedContent = content.replace(/\r\n?/gu, "\n");
   const actualHash = createHash("sha256")
-    .update(normalizedContent, "utf8")
+    .update(normalizedContent(content), "utf8")
     .digest("hex");
   return actualHash === EXPERT_RESIDENCY_DB_GATE_SHA256
     ? []
