@@ -960,11 +960,26 @@ process.stdout.write(`${JSON.stringify({ childExecutions: outputs.length, output
 // scripts/repeat-vitest.mjs
 import { runPnpm } from "./lib/run-pnpm.mjs";
 
-const [countText, ...testPaths] = process.argv.slice(2);
-const count = Number.parseInt(countText ?? "", 10);
-if (!Number.isInteger(count) || count < 1 || testPaths.length === 0) {
+const forwarded = process.argv.slice(2);
+const [countText, ...testPaths] = forwarded[0] === "--" ? forwarded.slice(1) : forwarded;
+if (!countText || !/^[1-9]\d*$/.test(countText)) {
   throw new Error("Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]");
 }
+const count = Number(countText);
+if (!Number.isSafeInteger(count) || testPaths.length === 0) {
+  throw new Error("Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]");
+}
+
+// High-N repeat gates belong in CI only (see .github/workflows/db-gate.yml).
+const inCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+const maxLocal = Number(process.env.AGENT_MAX_REPEAT || 2);
+if (!inCi && count > maxLocal) {
+  throw new Error(
+    `Refuse to run test:repeat ${count}× outside CI (local max ${maxLocal}). ` +
+      `Run once/twice locally; leave 20× gates to .github/workflows/db-gate.yml.`,
+  );
+}
+
 for (let index = 1; index <= count; index += 1) {
   runPnpm(["exec", "vitest", "run", ...testPaths], {
     env: { ...process.env, TEST_RUN_INDEX: String(index) },
@@ -2029,11 +2044,14 @@ limit 1;
 
 Map PostgreSQL unique violations for the inbox key to the `duplicate` result; propagate every other database error. Compensation locks the original debit’s package, verifies that the debit exists, belongs to that package, and has not already been compensated, then inserts `+1` with `original_entry_id = debit.id`. Revocation in Task 17 locks the package and its grant fact, derives the current balance, and appends one `revocation` fact with `delta = -balance` and `original_entry_id = grant.id`.
 
-- [ ] **Step 4: Run concurrency tests repeatedly**
+- [ ] **Step 4: Verify concurrency test locally (agent)**
 
-Run: `pnpm test:repeat -- 20 tests/integration/message-ledger-concurrency.test.ts && pnpm typecheck`
+Run once (twice only if flaky):
+`pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts && pnpm typecheck`
 
-Expected: PASS in all repetitions with one debit per unique ordinary message and no negative balance.
+Expected: PASS with one debit per unique ordinary message and no negative balance.
+
+Do **not** run `pnpm test:repeat -- 20 ...` in the agent session. The 20× stability gate is enforced only by CI (`.github/workflows/db-gate.yml`). `scripts/repeat-vitest.mjs` refuses count > 2 outside CI.
 
 - [ ] **Step 5: Commit**
 
@@ -2252,11 +2270,14 @@ returning r.id, r.status, r.version;
 
 `installSerializationFailureTrigger` is a PostgreSQL-only test helper: a sequence-backed trigger raises real SQLSTATE `40001` for the configured first N attempts. Sequence increments survive transaction rollback, so the test proves a fresh second transaction succeeds and a three-attempt case terminates; it does not mock a JavaScript exception.
 
-- [ ] **Step 4: Run the concurrency test repeatedly**
+- [ ] **Step 4: Verify concurrency test locally (agent)**
 
-Run: `pnpm test:repeat -- 20 tests/integration/booking-concurrency.test.ts && pnpm typecheck`
+Run once (twice only if flaky):
+`pnpm exec vitest run tests/integration/booking-concurrency.test.ts && pnpm typecheck`
 
-Expected: PASS in all repetitions; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold.
+Expected: PASS; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold.
+
+Do **not** run `pnpm test:repeat -- 20 ...` in the agent session. The 20× stability gate is enforced only by CI (`.github/workflows/db-gate.yml`). `scripts/repeat-vitest.mjs` refuses count > 2 outside CI.
 
 - [ ] **Step 5: Commit**
 
@@ -5323,10 +5344,10 @@ git commit -m "ci: add verified mvp delivery pipeline"
 | P0-01 workspace dependencies absent | Forward remediation in Task 3 assigns every current and planned external/internal dependency to one manifest and tests the workspace graph | `tests/repo/workspace-dependencies.test.ts`; frozen install, typecheck, and build |
 | P0-02 API/worker not executable | Forward implementation in Tasks 19, 20, and 21 creates real entrypoints, start scripts, built targets, health, and runtime inspection | API/worker builds plus `pnpm test:container` |
 | P0-03 mutable balance authority | Tasks 4, 6, and 7 use append-only ledger facts and a rebuildable SQL sum view; update/delete are rejected | property, schema, immutability, and parallel-debit tests |
-| P0-04 invalid or overlapping booking | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation | BOOK-01 through BOOK-04 plus 20-repeat PostgreSQL concurrency |
+| P0-04 invalid or overlapping booking | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation | BOOK-01 through BOOK-04; local agent verifies once, CI runs 20-repeat PostgreSQL concurrency in `db-gate.yml` |
 | P0-05 safety order/directory/handoff weak | Tasks 5, 14, and 19 run deterministic safety first, validate versioned locale contacts, fail safely on classifier outage, and persist SLA lifecycle | SAFE-01 through SAFE-05 and worker SLA tests |
 | P0-06 outbound billing lacks stable event | Tasks 2, 7, 10, 14, and 21 keep runtime billing disabled and define debit only from a stable inbox-deduplicated delivery event | contract-disabled runtime plus test-only synthetic AC-025 delivery; provider gate remains blocked |
-| P1-01 invalid Vitest/CI order | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` and prohibit repository commands before frozen install | repeat runner and parsed workflow-order test |
+| P1-01 invalid Vitest/CI order | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` (CI-only high-N guard) and prohibit repository commands before frozen install | repeat runner (local max 2 / CI unlimited) and parsed workflow-order test |
 | P1-02 ambiguous provider outcomes retried | Tasks 9 through 12 separate `not_applied`, `unknown_outcome`, and reconciliation; local acknowledgement failure is ambiguous | retry, timeout, lease-recovery, reconcile, and dead-letter tests |
 | P1-03 catalog/admin paths absent | Tasks 15 and 17 add eligible search/recommendation plus every FR-015 operation | catalog unit/integration tests and audited admin-ledger integration |
 | P1-04 feedback threshold wrong | Task 17 escalates scores 1–3 or explicit negative text | score table plus negative-text score-4 test |
