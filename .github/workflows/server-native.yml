@@ -36,7 +36,7 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             ca-certificates curl gnupg nginx postgresql postgresql-contrib \
-            rsync openssl ufw
+            rsync openssl ufw certbot python3-certbot-nginx
 
           if ! command -v node >/dev/null 2>&1 || test "$(node -p 'process.versions.node.split(".")[0]')" != "24"; then
             curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
@@ -138,11 +138,20 @@ jobs:
           sudo install -m 0644 "$RUNNER_TEMP/ii-tonya-api.service" /etc/systemd/system/ii-tonya-api.service
           sudo install -m 0644 "$RUNNER_TEMP/ii-tonya-worker.service" /etc/systemd/system/ii-tonya-worker.service
 
+          sudo systemctl daemon-reload
+          sudo systemctl enable ii-tonya-api.service ii-tonya-worker.service
+          sudo touch /etc/ii-tonya/provision-v1
+
+      - name: Configure ii-tonya.ru reverse proxy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
           cat > "$RUNNER_TEMP/ii-tonya-nginx" <<'EOF'
           server {
               listen 80 default_server;
               listen [::]:80 default_server;
-              server_name _;
+              server_name ii-tonya.ru www.ii-tonya.ru;
 
               location / {
                   proxy_pass http://127.0.0.1:3000;
@@ -162,12 +171,8 @@ jobs:
           sudo systemctl reload nginx
 
           sudo ufw allow OpenSSH
-          sudo ufw allow 'Nginx HTTP'
+          sudo ufw allow 'Nginx Full'
           sudo ufw --force enable
-
-          sudo systemctl daemon-reload
-          sudo systemctl enable ii-tonya-api.service ii-tonya-worker.service
-          sudo touch /etc/ii-tonya/provision-v1
 
       - name: Deploy revision
         shell: bash
@@ -190,13 +195,53 @@ jobs:
 
           pnpm smoke -- --base-url=http://127.0.0.1:3000
 
-      - name: Verify services
+      - name: Enable HTTPS when DNS is ready
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          SERVER_IP="157.22.187.237"
+          root_ips="$(getent ahostsv4 ii-tonya.ru 2>/dev/null | awk '{print $1}' | sort -u || true)"
+
+          if ! grep -Fxq "$SERVER_IP" <<< "$root_ips"; then
+            echo "ii-tonya.ru does not resolve to $SERVER_IP yet; keeping HTTP active and skipping certificate issuance"
+            exit 0
+          fi
+
+          domains=(-d ii-tonya.ru)
+          www_ips="$(getent ahostsv4 www.ii-tonya.ru 2>/dev/null | awk '{print $1}' | sort -u || true)"
+          if grep -Fxq "$SERVER_IP" <<< "$www_ips"; then
+            domains+=(-d www.ii-tonya.ru)
+          else
+            echo "www.ii-tonya.ru does not resolve to $SERVER_IP; issuing certificate for apex only"
+          fi
+
+          if ! command -v certbot >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot-nginx
+          fi
+
+          sudo certbot --nginx --non-interactive --agree-tos \
+            --register-unsafely-without-email --redirect \
+            "${domains[@]}"
+
+          sudo systemctl enable --now certbot.timer 2>/dev/null || true
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+      - name: Verify services and domain
         shell: bash
         run: |
           set -Eeuo pipefail
           systemctl --no-pager --full status ii-tonya-api.service
           systemctl --no-pager --full status ii-tonya-worker.service
           curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
+          curl --fail --silent --show-error -H 'Host: ii-tonya.ru' http://127.0.0.1/health/ready
+
+          if getent ahostsv4 ii-tonya.ru 2>/dev/null | awk '{print $1}' | grep -Fxq '157.22.187.237'; then
+            curl --fail --silent --show-error --max-time 15 https://ii-tonya.ru/health/ready || \
+              curl --fail --silent --show-error --max-time 15 http://ii-tonya.ru/health/ready
+          fi
 
       - name: Restrict runner sudo after first successful deploy
         shell: bash
