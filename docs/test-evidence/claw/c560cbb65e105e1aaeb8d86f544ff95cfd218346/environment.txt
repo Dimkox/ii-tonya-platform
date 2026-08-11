@@ -1,0 +1,13 @@
+source_sha=c560cbb65e105e1aaeb8d86f544ff95cfd218346
+branch=codex/task25-expert-referral-implementation
+host=claw
+node=v24.18.0
+pnpm=11.9.0
+cpu_limit=1
+memory_limit_bytes=1073741824
+container_user=node
+capabilities=all_dropped
+security_option=no-new-privileges
+database=existing_isolated_test_postgresql
+live_provider=disabled
+finished_utc=2026-08-11T21:23:40Z

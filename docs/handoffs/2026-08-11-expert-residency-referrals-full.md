@@ -1,7 +1,7 @@
 # Full handoff — expert residency referrals and project release state
 
 Date: 2026-08-11
-Status: implementation substantially complete; final verification and release evidence still open
+Status: corrected focused PostgreSQL E2E green; aggregate and hosted release evidence still open
 Repository: `Dimkox/ii-tonya-platform`
 Feature branch: `codex/task25-expert-referral-implementation`
 Draft PR: `#4` — `Codex/task25 expert referral implementation`
@@ -335,23 +335,33 @@ f65061b3ceb34a17ffc7d347c6f9f38d7306e047
 The fixed fixture sets an expired deadline that remains valid relative to order creation
 instead of bypassing the database invariant.
 
-Critical status: the fixed E2E has NOT yet been rerun and recorded green after that
-commit. The later graph/main-sync commits do not constitute verification evidence.
+The fixed E2E was rerun against current exact source
+`c560cbb65e105e1aaeb8d86f544ff95cfd218346` on Claw in a constrained container:
+
+```text
+Test Files  1 passed (1)
+Tests       1 passed (1)
+```
+
+Committed evidence:
+`docs/test-evidence/claw/c560cbb65e105e1aaeb8d86f544ff95cfd218346/verification.md`.
+This closes the fixture-specific blocker only; it is not aggregate or hosted release
+evidence.
 
 ## 8. Hosted GitHub Actions state
 
 GitHub-hosted CI has an infrastructure/account/runner-start problem independent of code.
 Multiple recent runs terminate before any job step begins.
 
-At code HEAD `9cf5f1974d66b96ea23596e19e3d977551d3cfc7`:
+At current code HEAD `c560cbb65e105e1aaeb8d86f544ff95cfd218346`:
 
-- Database Gate run `31487328808`
-  - job `93765608613`
+- Database Gate run `31501254926`
+  - job `93811519791`
   - conclusion: failure
   - `steps: null`
   - no job log
-- CI run `31487328886`
-  - job `93765609006`
+- CI run `31501254868`
+  - job `93811519205`
   - conclusion: failure
   - `steps: null`
   - no job log
@@ -394,7 +404,7 @@ First update to the exact latest feature branch:
 cd /tmp/ii-tonya-task10 && git fetch origin && git checkout codex/task25-expert-referral-implementation && git pull --ff-only && git rev-parse HEAD
 ```
 
-### Step A — rerun only the previously failing fixed E2E
+### Step A — completed: rerun only the previously failing fixed E2E
 
 Do this first. Do not immediately rerun all 160 focused tests.
 
@@ -402,7 +412,7 @@ Do this first. Do not immediately rerun all 160 focused tests.
 corepack pnpm --workspace-concurrency=1 -r --sort run build && corepack pnpm exec vitest run tests/e2e/expert-residency-referral.test.ts
 ```
 
-If it fails, fix the first causal failure and rerun only this test.
+Result: PASS at `c560cbb65e105e1aaeb8d86f544ff95cfd218346`. No repeat gate was run.
 
 ### Step B — final repository verification
 
@@ -438,7 +448,7 @@ A zero-step failure is not sufficient evidence in either direction.
 
 Before marking Tasks 11–12 and PR #4 complete:
 
-- fixed release-candidate E2E green on current source
+- fixed release-candidate E2E green on current source — PASS at `c560cbb65e105e1aaeb8d86f544ff95cfd218346`
 - one final `pnpm verify` green on current source
 - hosted CI PASS on the exact candidate SHA
 - hosted Database Gate PASS on the exact candidate SHA, including registered 20x expert
@@ -656,6 +666,8 @@ Do not delete these diagnostics from PR history:
   failures
 - latest Task 11/12 local combined run — 159/160 with only the invalid E2E deadline
   fixture failing before commit `f65061b3...`
+- corrected focused E2E at `c560cbb65e105e1aaeb8d86f544ff95cfd218346` — 1/1 PASS;
+  constrained Claw evidence committed under `docs/test-evidence/claw/c560cbb65.../`
 
 Failed precursor evidence is useful because it distinguishes code regressions from
 runner/account failures and documents the fixes that followed.
@@ -685,7 +697,7 @@ runner/account failures and documents the fixes that followed.
 The branch is complete only when all of the following are true at one coherent release
 candidate:
 
-- [ ] latest fixed E2E passes
+- [x] latest fixed E2E passes
 - [ ] full `pnpm verify` passes once at the final source
 - [ ] package build/typechecks are green
 - [ ] scope/architecture/env/release-readiness guards pass

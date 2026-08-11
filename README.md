@@ -11,13 +11,16 @@ has implementation for Tasks 1–12 in the active draft PR, including expert API
 Telegram/prompt boundaries, bounded worker operations, traceability, runbooks,
 release-readiness guards, and mandatory database-gate registration.
 
-Verification is still an explicit release boundary: focused Task 10 verification is
-recorded green; Tasks 11–12 are being re-run at the current exact SHA after the latest
-E2E fixture correction. GitHub-hosted CI/Database Gate jobs currently fail before their
-first workflow step, so they are not treated as code-test evidence.
+Verification is still an explicit release boundary. Focused Task 10 evidence is green,
+and the corrected real-PostgreSQL release-candidate E2E is green at exact source
+`c560cbb65e105e1aaeb8d86f544ff95cfd218346` in the constrained Claw container.
+GitHub-hosted CI/Database Gate jobs at that SHA still fail before their first workflow
+step, so they are neither code-test failures nor PASS evidence. Final aggregate verify,
+independent reviews, and human/release approvals remain open.
 
-The authoritative checkpoints are `.superpowers/sdd/progress.md`, PR conversation
-evidence, and `docs/handoffs/2026-08-04-expert-residency-referrals.md`.
+The authoritative continuation checkpoint is
+`docs/handoffs/2026-08-11-expert-residency-referrals-full.md`; the older handoff and
+`.superpowers/sdd/progress.md` remain historical evidence.
 
 For a clean machine, start with `AGENTS.md`,
 `docs/handoffs/environment-manifest.md`, and
