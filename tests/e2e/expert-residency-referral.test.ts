@@ -205,7 +205,7 @@ describe("expert residency referral release candidate", () => {
       await tx.execute(sql`set local session_replication_role=replica`);
       await tx.execute(sql`
         update expert_residency_orders
-        set payment_deadline=transaction_timestamp()-interval '1 second'
+        set payment_deadline=created_at+interval '1 millisecond'
         where id=${expiringOrder.id}::uuid
       `);
     });
