@@ -58,12 +58,10 @@ export {
   CallbackVerificationError,
   authenticateCallback,
   issueCallback,
-  toExpertCallbackBinding,
   verifyCallback,
   type CallbackClaimsStore,
   type AuthenticatedExpertCallback,
   type ExpertBinding,
-  type ExpertCallbackBinding,
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
 export {
@@ -74,14 +72,9 @@ export {
 export {
   buildTelegramMethodUrl,
   redactTelegramUrl,
-  renderExpertReferralSummary,
-  renderExpertResidencyQuote,
   TelegramAdapter,
-  type ExpertReferralSummaryView,
   type ExpertReservationView,
-  type ExpertResidencyQuoteView,
   type ExpertScheduleView,
-  type ExpertTelegramViewPort,
   type TelegramAdapterDeps,
   type TelegramPort,
   type TelegramSendOutcome,
@@ -92,14 +85,7 @@ export {
 } from "./telegram/telegram-adapter.js";
 export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
 export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
-export {
-  assertVerifiedExpertResidencyPaymentEvent,
-  disabledExpertResidencyPaymentEventVerifier,
-} from "./expert-residency/verified-event.js";
-export type {
-  ExpertResidencyPaymentEventVerifier,
-  ExpertResidencyVerificationEvidence,
-  VerifiedExpertResidencyPaymentEvent,
-} from "./expert-residency/verified-event.js";
+export { assertVerifiedExpertResidencyPaymentEvent, disabledExpertResidencyPaymentEventVerifier } from "./expert-residency/verified-event.js";
+export type { ExpertResidencyPaymentEventVerifier, ExpertResidencyVerificationEvidence, VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
 export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
 export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";
