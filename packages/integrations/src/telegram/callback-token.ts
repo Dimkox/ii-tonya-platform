@@ -39,6 +39,14 @@ export interface AuthenticatedExpertCallback {
   claims: ExpertCallbackClaims;
 }
 
+export interface ExpertCallbackBinding {
+  expertId: string;
+  operation: "confirm" | "cancel";
+  objectId: string;
+  nonceHash: string;
+  expiresAtEpochSeconds: number;
+}
+
 export interface CallbackClaimsStore {
   put(tokenHash: string, claims: ExpertCallbackClaims): Promise<void>;
   peek(tokenHash: string): Promise<ExpertCallbackClaims | null>;
@@ -116,6 +124,22 @@ const parseToken = (
     authenticatedTag: payload.subarray(1 + NONCE_BYTES),
   };
 };
+
+export function toExpertCallbackBinding(
+  authenticated: AuthenticatedExpertCallback,
+): ExpertCallbackBinding {
+  validateClaims(authenticated.claims);
+  if (!/^[0-9a-f]{64}$/u.test(authenticated.tokenHash)) {
+    throw new CallbackVerificationError();
+  }
+  return {
+    expertId: authenticated.claims.expertId,
+    operation: authenticated.claims.action,
+    objectId: authenticated.claims.reservationId,
+    nonceHash: authenticated.tokenHash,
+    expiresAtEpochSeconds: authenticated.claims.expiresAtEpochSeconds,
+  };
+}
 
 export async function issueCallback(
   claims: ExpertCallbackClaims,
