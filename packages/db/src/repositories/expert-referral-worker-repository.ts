@@ -137,7 +137,10 @@ export class PostgresExpertReferralWorkerRepository {
       // replayHeldReward owns the serializable financial recheck and idempotency.
       const result = await this.#heldRewards.replayHeldReward(candidate.expertId);
       if (result.kind === "granted") granted += 1;
-      else cancelled += 1;
+      // A candidate selected as pending can become non-pending before the
+      // serializable replay only through a concurrent terminal/replay path.
+      // Gate-closed and incomplete snapshots remain pending and are retried.
+      else if (result.reason === "not_pending") cancelled += 1;
     }
     return { examined: candidates.length, granted, cancelled };
   }
