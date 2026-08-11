@@ -229,4 +229,26 @@ describe("CI and release workflow semantics", () => {
       expect(rollback?.run).toContain("rollback-complete");
     }
   });
+
+  it("runs the mandatory expert residency database gates at CI-only repeat depth", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/db-gate.yml", "utf8"),
+    );
+    const runs = (workflow.jobs["postgres-schema"].steps as WorkflowStep[])
+      .map((step) => step.run ?? "")
+      .join("\n");
+
+    expect(runs).toContain("tests/repo/db-schema-parity.test.ts");
+    for (const path of [
+      "tests/integration/expert-referral-redemption-concurrency.test.ts",
+      "tests/integration/expert-residency-checkout-concurrency.test.ts",
+      "tests/integration/expert-residency-settlement-concurrency.test.ts",
+      "tests/integration/expert-residency-deadline.test.ts",
+      "tests/integration/expert-residency-hold-replay.test.ts",
+    ]) {
+      expect(runs).toContain(`pnpm test:repeat -- 20 ${path}`);
+    }
+    expect(runs).not.toContain("EXPERT_REFERRAL_ENABLED=true");
+    expect(runs).not.toContain("EXPERT_RESIDENCY_BILLING_ENABLED=true");
+  });
 });
