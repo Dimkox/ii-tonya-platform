@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: ii-tonya-server-control
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   ack:
