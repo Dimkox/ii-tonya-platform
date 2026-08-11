@@ -1,0 +1,209 @@
+name: Native single-server deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ii-tonya-native-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64, ii-tonya-server]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Provision host once
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if sudo test -f /etc/ii-tonya/provision-v1; then
+            echo "Host provisioning already complete"
+            exit 0
+          fi
+
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            ca-certificates curl gnupg nginx postgresql postgresql-contrib \
+            rsync openssl ufw
+
+          if ! command -v node >/dev/null 2>&1 || test "$(node -p 'process.versions.node.split(".")[0]')" != "24"; then
+            curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+          fi
+
+          sudo npm install -g pnpm@11.9.0
+          test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
+          test "$(pnpm --version)" = "11.9.0"
+
+          sudo systemctl enable --now postgresql nginx
+          sudo install -d -m 0750 -o root -g tonya /etc/ii-tonya
+          sudo install -d -m 0755 -o tonya -g tonya /opt/ii-tonya-platform
+
+          if ! sudo test -f /etc/ii-tonya/runtime.env; then
+            DB_PASSWORD="$(openssl rand -hex 32)"
+            sudo -u postgres createuser ii_tonya 2>/dev/null || true
+            sudo -u postgres psql -v ON_ERROR_STOP=1 \
+              -c "ALTER ROLE ii_tonya WITH LOGIN PASSWORD '${DB_PASSWORD}';"
+            sudo -u postgres createdb -O ii_tonya ii_tonya 2>/dev/null || true
+
+            cat > "$RUNNER_TEMP/runtime.env" <<EOF
+          DATABASE_URL=postgresql://ii_tonya:${DB_PASSWORD}@127.0.0.1:5432/ii_tonya
+          ALLOW_INSECURE_LOCAL_DATABASE=true
+          SELARTI_ENABLED=false
+          SELARTI_OUTBOUND_BILLING_MODE=disabled
+          PLANERKA_ENABLED=false
+          TELEGRAM_ENABLED=false
+          LLM_ENABLED=false
+          MAKE_PROJECTION_ENABLED=false
+          GOOGLE_SHEETS_PROJECTION_ENABLED=false
+          INTENT_MODEL_ENABLED=false
+          PAYMENTS_ENABLED=false
+          PAYMENT_PROVIDER=disabled
+          LLM_PROVIDER=disabled
+          MINOR_ONBOARDING_ENABLED=false
+          RAW_CONVERSATION_LOGGING=false
+          DISPLAY_TIMEZONE=Europe/Moscow
+          HOST=127.0.0.1
+          PORT=3000
+          WORKER_POLL_INTERVAL_MS=1000
+          EOF
+            sudo install -m 0640 -o root -g tonya "$RUNNER_TEMP/runtime.env" /etc/ii-tonya/runtime.env
+            rm -f "$RUNNER_TEMP/runtime.env"
+          fi
+
+          PNPM_BIN="$(command -v pnpm)"
+
+          cat > "$RUNNER_TEMP/ii-tonya-api.service" <<EOF
+          [Unit]
+          Description=ii-Tonya API
+          After=network-online.target postgresql.service
+          Wants=network-online.target
+          Requires=postgresql.service
+
+          [Service]
+          Type=simple
+          User=tonya
+          Group=tonya
+          WorkingDirectory=/opt/ii-tonya-platform
+          EnvironmentFile=/etc/ii-tonya/runtime.env
+          ExecStart=${PNPM_BIN} --filter @ii-tonya/api start
+          Restart=on-failure
+          RestartSec=3
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=full
+          ProtectHome=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          cat > "$RUNNER_TEMP/ii-tonya-worker.service" <<EOF
+          [Unit]
+          Description=ii-Tonya Worker
+          After=network-online.target postgresql.service ii-tonya-api.service
+          Wants=network-online.target
+          Requires=postgresql.service
+
+          [Service]
+          Type=simple
+          User=tonya
+          Group=tonya
+          WorkingDirectory=/opt/ii-tonya-platform
+          EnvironmentFile=/etc/ii-tonya/runtime.env
+          ExecStart=${PNPM_BIN} --filter @ii-tonya/app-worker start
+          Restart=on-failure
+          RestartSec=3
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=full
+          ProtectHome=true
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          sudo install -m 0644 "$RUNNER_TEMP/ii-tonya-api.service" /etc/systemd/system/ii-tonya-api.service
+          sudo install -m 0644 "$RUNNER_TEMP/ii-tonya-worker.service" /etc/systemd/system/ii-tonya-worker.service
+
+          cat > "$RUNNER_TEMP/ii-tonya-nginx" <<'EOF'
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+          EOF
+
+          sudo install -m 0644 "$RUNNER_TEMP/ii-tonya-nginx" /etc/nginx/sites-available/ii-tonya
+          sudo ln -sfn /etc/nginx/sites-available/ii-tonya /etc/nginx/sites-enabled/ii-tonya
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          sudo ufw allow OpenSSH
+          sudo ufw allow 'Nginx HTTP'
+          sudo ufw --force enable
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable ii-tonya-api.service ii-tonya-worker.service
+          sudo touch /etc/ii-tonya/provision-v1
+
+      - name: Deploy revision
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            "$GITHUB_WORKSPACE/" /opt/ii-tonya-platform/
+
+          cd /opt/ii-tonya-platform
+          pnpm install --frozen-lockfile
+          pnpm build
+
+          sudo systemctl restart ii-tonya-api.service
+          sudo systemctl restart ii-tonya-worker.service
+
+          pnpm smoke -- --base-url=http://127.0.0.1:3000
+
+      - name: Verify services
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo systemctl --no-pager --full status ii-tonya-api.service
+          sudo systemctl --no-pager --full status ii-tonya-worker.service
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
+
+      - name: Restrict runner sudo after first successful deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat > "$RUNNER_TEMP/ii-tonya-runner-sudoers" <<'EOF'
+          tonya ALL=(root) NOPASSWD: /usr/bin/systemctl restart ii-tonya-api.service, /usr/bin/systemctl restart ii-tonya-worker.service, /usr/bin/systemctl status ii-tonya-api.service, /usr/bin/systemctl status ii-tonya-worker.service
+          EOF
+          sudo install -m 0440 "$RUNNER_TEMP/ii-tonya-runner-sudoers" /etc/sudoers.d/ii-tonya-runner
+          sudo rm -f /etc/sudoers.d/ii-tonya-runner-bootstrap
