@@ -255,6 +255,24 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
+    [
+      "packages/sandbox-payments/src/schema.ts",
+      'export const leak = pgTable("sandbox_expert_residency_shadow", {});',
+    ],
+    [
+      "packages/sandbox-payments/src/repository.ts",
+      "export const leak = sql`select * from sandbox_expert_residency_shadow`;",
+    ],
+  ])(
+    "rejects unknown sandbox relation in approved source %s",
+    (path, content) => {
+      expect(classifyPaymentScopeProbe({ path, content })).toContain(
+        "unknown sandbox relation in approved sandbox source: sandbox_expert_residency_shadow",
+      );
+    },
+  );
+
+  it.each([
     "docs/sandbox-payment-boundary.md",
     "tests/repo/sandbox-payment-evidence.test.ts",
     ".superpowers/sdd/task-1-report.md",
