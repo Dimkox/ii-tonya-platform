@@ -78,3 +78,6 @@
 | 1. Provider-neutral resolver | complete | `80bcfbf` | `8efb458`; report PASS with missing planned tsconfig noted | PASS | PASS; no findings | Claw RED expected missing module; GREEN 16/16; ESLint, Prettier, diff check PASS; remote restored and cleanup 0/0 |
 | 2. Composed API failure semantics | complete | `8efb458` | `93334aa`; report PASS with known tsconfig/legacy Prettier limitations | PASS | PASS; no findings | Claw valid RED 20/21; GREEN 37/37; ESLint/diff check PASS; remote restored and cleanup 0/0 |
 | 3. Traceability and evidence | complete | `93334aa` | `4eb2d40`, remediation `0eea9bf`, durable gate `1a93419` | PASS after three evidence fixes | PASS; no Critical/Important findings | exact source `93334aa`; image `7d71646347d560ff2b5d8ebc4c0aad5b48230254`; Claw 37/37 in 5.00s; restored base; cleanup 0/0 |
+
+- Whole-branch review of `83e20da..9753770`: PASS with no Critical, Important, or Minor findings.
+- Publication: Draft PR #9; merge remains blocked by hosted CI and ERR-AUTH-008 evidence; release/deploy remains NO-GO.
