@@ -150,15 +150,28 @@ describe("release assets", () => {
 
   it("creates and signs digest-bound SBOMs for both release images", () => {
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-    expect(
-      workflow.match(
-        /uses: anchore\/sbom-action@e22c389904149dbc22b58101806040fa8d37a610/g,
-      ),
-    ).toHaveLength(2);
-    expect(workflow).toContain("image: ${{ env.API_IMAGE_REF }}");
-    expect(workflow).toContain("image: ${{ env.WORKER_IMAGE_REF }}");
-    expect(workflow).toContain("output-file: api-sbom.spdx.json");
-    expect(workflow).toContain("output-file: worker-sbom.spdx.json");
+    expect(workflow).not.toContain("anchore/sbom-action");
+    expect(workflow).toContain('syft_version="1.42.3"');
+    expect(workflow).toContain("gh release download");
+    expect(workflow).toContain("--repo anchore/syft");
+    expect(workflow).toContain("sha256sum -c --ignore-missing");
+    expect(workflow).toContain('echo "$syft_dir" >> "$GITHUB_PATH"');
+    expect(workflow).toContain(
+      'syft "$API_IMAGE_REF" -o spdx-json=api-sbom.spdx.json',
+    );
+    expect(workflow).toContain(
+      'syft "$WORKER_IMAGE_REF" -o spdx-json=worker-sbom.spdx.json',
+    );
+    expect(workflow).not.toContain("DOCKER_CONFIG: ${{ runner.temp }}");
+    expect(workflow).toContain(
+      'docker_config="$RUNNER_TEMP/ii-tonya-docker-config"',
+    );
+    expect(workflow).toContain(
+      'echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"',
+    );
+    expect(workflow).toContain("Remove transient CI credentials and artifacts");
+    expect(workflow).toContain('rm -rf "$DOCKER_CONFIG"');
+    expect(workflow).toContain('rm -rf "$RUNNER_TEMP/ii-tonya-syft"');
     expect(workflow).toContain(
       "cosign sign-blob --yes --bundle api-sbom.bundle api-sbom.spdx.json",
     );
