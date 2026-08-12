@@ -207,6 +207,7 @@ describe("PostgresSandboxPaymentRepository transitions", () => {
       version: 1,
     });
     expect(settled.payloadDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(Object.isFrozen(settled)).toBe(true);
 
     const refunded = await repository.transition({
       paymentId: checkout.paymentId,
@@ -227,6 +228,9 @@ describe("PostgresSandboxPaymentRepository transitions", () => {
     await expect(
       repository.nextPendingEvent(checkout.paymentId),
     ).resolves.toEqual(settled);
+    expect(
+      Object.isFrozen(await repository.nextPendingEvent(checkout.paymentId)),
+    ).toBe(true);
     await repository.markEventProcessed(settled.eventId);
     await expect(
       repository.nextPendingEvent(checkout.paymentId),
