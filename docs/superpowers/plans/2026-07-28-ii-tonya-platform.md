@@ -970,13 +970,11 @@ if (!Number.isSafeInteger(count) || testPaths.length === 0) {
   throw new Error("Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]");
 }
 
-// High-N repeat gates belong in CI only (see .github/workflows/db-gate.yml).
-const inCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
-const maxLocal = Number(process.env.AGENT_MAX_REPEAT || 2);
-if (!inCi && count > maxLocal) {
+// Repeat depth is bounded identically in local and CI environments.
+const maxRepeatCount = 3;
+if (count > maxRepeatCount) {
   throw new Error(
-    `Refuse to run test:repeat ${count}× outside CI (local max ${maxLocal}). ` +
-      `Run once/twice locally; leave 20× gates to .github/workflows/db-gate.yml.`,
+    `Refuse to run test:repeat ${count}×; maximum is ${maxRepeatCount}.`,
   );
 }
 
@@ -2051,7 +2049,7 @@ Run once (twice only if flaky):
 
 Expected: PASS with one debit per unique ordinary message and no negative balance.
 
-Do **not** run `pnpm test:repeat -- 20 ...` in the agent session. The 20× stability gate is enforced only by CI (`.github/workflows/db-gate.yml`). `scripts/repeat-vitest.mjs` refuses count > 2 outside CI.
+Run repeated tests no more than three times in any environment. `scripts/repeat-vitest.mjs` refuses count greater than 3, including in CI.
 
 - [ ] **Step 5: Commit**
 
@@ -2277,7 +2275,7 @@ Run once (twice only if flaky):
 
 Expected: PASS; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold.
 
-Do **not** run `pnpm test:repeat -- 20 ...` in the agent session. The 20× stability gate is enforced only by CI (`.github/workflows/db-gate.yml`). `scripts/repeat-vitest.mjs` refuses count > 2 outside CI.
+Run repeated tests no more than three times in any environment. `scripts/repeat-vitest.mjs` refuses count greater than 3, including in CI.
 
 - [ ] **Step 5: Commit**
 

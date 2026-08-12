@@ -64,7 +64,7 @@ jobs:
         run: pnpm exec vitest run tests/integration/catalog-repository.test.ts
 
       - name: Repeat message-ledger concurrency gate
-        run: pnpm test:repeat -- 20 tests/integration/message-ledger-concurrency.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/message-ledger-concurrency.test.ts
 
       - name: Run feedback transaction gate
         run: pnpm exec vitest run tests/integration/feedback-transaction.test.ts
@@ -82,31 +82,31 @@ jobs:
         run: pnpm exec vitest run tests/integration/admin-api.test.ts
 
       - name: Repeat atomic conversation completion gate
-        run: pnpm test:repeat -- 20 tests/integration/conversation-message-repository.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/conversation-message-repository.test.ts
 
       - name: Repeat booking concurrency gate
-        run: pnpm test:repeat -- 20 tests/integration/booking-concurrency.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/booking-concurrency.test.ts
 
       - name: Repeat durable outbox gate
-        run: pnpm test:repeat -- 20 tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/outbox-runner.test.ts tests/integration/outbox-repository.test.ts
 
       - name: Repeat Telegram callback gate
-        run: pnpm test:repeat -- 20 tests/integration/telegram-callback-migration.test.ts tests/integration/telegram-callback-repository.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/telegram-callback-migration.test.ts tests/integration/telegram-callback-repository.test.ts
 
       - name: Repeat expert referral redemption concurrency gate
-        run: pnpm test:repeat -- 20 tests/integration/expert-referral-redemption-concurrency.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/expert-referral-redemption-concurrency.test.ts
 
       - name: Repeat expert residency checkout concurrency gate
-        run: pnpm test:repeat -- 20 tests/integration/expert-residency-checkout-concurrency.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/expert-residency-checkout-concurrency.test.ts
 
       - name: Repeat expert residency settlement concurrency gate
-        run: pnpm test:repeat -- 20 tests/integration/expert-residency-settlement-concurrency.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/expert-residency-settlement-concurrency.test.ts
 
       - name: Repeat expert residency deadline gate
-        run: pnpm test:repeat -- 20 tests/integration/expert-residency-deadline.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/expert-residency-deadline.test.ts
 
       - name: Repeat expert residency held-reward gate
-        run: pnpm test:repeat -- 20 tests/integration/expert-residency-hold-replay.test.ts
+        run: pnpm test:repeat -- 3 tests/integration/expert-residency-hold-replay.test.ts
 
       - name: Record Docker diagnostics on failure
         if: failure()

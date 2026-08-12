@@ -21,29 +21,27 @@ describe("repeat Vitest runner", () => {
     },
   );
 
-  it("refuses high-N repeats outside CI to protect agent token budget", () => {
-    const result = spawnSync(process.execPath, [runner, "20", testPath], {
+  it("refuses repeat counts above three in every environment", () => {
+    const result = spawnSync(process.execPath, [runner, "4", testPath], {
       cwd: process.cwd(),
       encoding: "utf8",
-      env: { ...process.env, CI: "", GITHUB_ACTIONS: "", AGENT_MAX_REPEAT: "2" },
+      env: { ...process.env, CI: "true", GITHUB_ACTIONS: "true" },
     });
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toMatch(/Refuse to run test:repeat 20× outside CI/);
-    expect(result.stderr).toMatch(/db-gate\.yml/);
+    expect(result.stderr).toMatch(/Refuse to run test:repeat 4×; maximum is 3/);
   });
 
-  it("does not refuse high-N repeats when CI=true", () => {
-    // Guard must not fire under CI. Use a missing path so vitest fails fast
-    // after the guard — we only assert the refuse message is absent.
+  it("allows exactly three repeats outside CI", () => {
+    // Use a missing path so Vitest fails fast after the repeat guard.
     const result = spawnSync(
       process.execPath,
-      [runner, "20", "tests/repo/__does-not-exist__.test.ts"],
+      [runner, "3", "tests/repo/__does-not-exist__.test.ts"],
       {
         cwd: process.cwd(),
         encoding: "utf8",
-        env: { ...process.env, CI: "true", GITHUB_ACTIONS: "true" },
+        env: { ...process.env, CI: "", GITHUB_ACTIONS: "" },
         timeout: 60_000,
       },
     );

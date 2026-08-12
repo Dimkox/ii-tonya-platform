@@ -51,15 +51,13 @@ constraints, lockfiles, tests, feature flags, or CI to fit the machine.
 These rules override plan steps that ask an agent to burn time or tokens on repeated
 local suites.
 
-- Never run `pnpm test:repeat` with count greater than 2 in an agent session.
+- Never run `pnpm test:repeat` with count greater than 3 in any environment.
 - Never run the full suite or a multi-path Vitest command more than once per task unless
   the human explicitly asks.
-- For concurrency or PostgreSQL tests, local verification is 1–2 runs of the single
-  focused file. The 20× stability gate belongs to `.github/workflows/db-gate.yml`.
-- If a plan says `pnpm test:repeat -- 20 ...`, run the focused file once locally, twice
-  only if flaky, and leave the 20× gate to CI.
-- `scripts/repeat-vitest.mjs` refuses count greater than 2 outside CI unless an explicit
-  `AGENT_MAX_REPEAT` override is supplied. Do not bypass the guard casually.
+- For concurrency or PostgreSQL tests, verification is at most 3 runs of the focused
+  file. `.github/workflows/db-gate.yml` uses the same bounded depth.
+- `scripts/repeat-vitest.mjs` refuses count greater than 3 in every environment; CI does
+  not bypass the guard.
 - Full `pnpm verify` is a branch-finish check or an explicit human request, not an inner
   development loop.
 

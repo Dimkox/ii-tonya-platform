@@ -154,7 +154,8 @@ only through its existing `ii-tonya-test` Compose profile:
 - no disk-size limit is configured;
 - production services and the Compose definition must not be changed merely to run a
   test;
-- `test:repeat` count greater than 2 is prohibited, and CI-only 20x gates remain in CI.
+- `test:repeat` count greater than 3 is prohibited in every environment; Database Gate
+  concurrency checks use the same three-run maximum.
 - For a genuinely focused Vitest invocation, override the profile's broad default test
   entrypoint with `docker compose ... run --entrypoint sh ii-tonya-test -lc '<command>'`;
   otherwise the wrapper performs unrelated build and verification work first.

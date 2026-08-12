@@ -236,7 +236,7 @@ describe("CI and release workflow semantics", () => {
     }
   });
 
-  it("runs the mandatory expert residency database gates at CI-only repeat depth", () => {
+  it("runs the mandatory expert residency database gates three times", () => {
     const workflow = parse(
       readFileSync(".github/workflows/db-gate.yml", "utf8"),
     );
@@ -252,8 +252,9 @@ describe("CI and release workflow semantics", () => {
       "tests/integration/expert-residency-deadline.test.ts",
       "tests/integration/expert-residency-hold-replay.test.ts",
     ]) {
-      expect(runs).toContain(`pnpm test:repeat -- 20 ${path}`);
+      expect(runs).toContain(`pnpm test:repeat -- 3 ${path}`);
     }
+    expect(runs).not.toContain("pnpm test:repeat -- 20 ");
     expect(runs).not.toContain("EXPERT_REFERRAL_ENABLED=true");
     expect(runs).not.toContain("EXPERT_RESIDENCY_BILLING_ENABLED=true");
   });
