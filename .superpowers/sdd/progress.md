@@ -85,3 +85,21 @@
 - Repeat-policy remediation: hard maximum is now three in every environment; all Database Gate repeats are 3x and 20x is prohibited. Exact Claw source `ce72fa3`; frozen install, build, format, deploy contract, lint, typecheck and audit PASS; full corpus 120 files / 983 tests PASS three times in 310.94s, 316.30s and 314.17s. Source restored to `83e20da`; cleanup 0 containers / 0 processes.
 - GitHub Free branch-control compensation: hosted-runner dependency removed; legacy native deployment reduced to an explicit refusal; gated release moved to `ii-tonya-release` on Claw; squash-only repository merges and main-only deployment environments configured. Exact-SHA CI evidence pending this commit.
 - Release-control remediation: `server-control.yml` is now refusal-only; migration approval binds the exact main CI SHA, squash merge commit, PR-head review commit, exact marker, and write-capable reviewer. Test and release runner identities are separated (`ii-tonya-test` versus `ii-tonya-release`), and transient SSH/provenance/evidence material is removed with `always()` cleanup. Claw TDD RED was 3 expected failures; focused GREEN 10/10; workflow plus recursive scope 113/113; actionlint 5/5; Prettier PASS; independent Critical/Important re-review PASS. Commit and exact-SHA CI evidence remain pending.
+
+## Sandbox payment provider
+
+- Design: `docs/superpowers/specs/2026-08-13-sandbox-payment-provider-design.md`
+- Plan: `docs/superpowers/plans/2026-08-13-sandbox-payment-provider.md`
+- Branch: `codex/sandbox-payment-provider`
+- Baseline: `120368d5b3b439df44d16525f59f4d008b4cffff`
+- Test target: constrained `ii-tonya-test` profile on Claw; maximum three repeats; production smoke once.
+
+| Task | Status | Base | Implementer | Spec review | Quality review | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1. Contracts and database boundary | pending | `6f3410f` | — | — | — | — |
+| 2. Verifier, adapter, reconciliation | pending | — | — | — | — | — |
+| 3. Approved admin transitions | pending | — | — | — | — | — |
+| 4. Separate sandbox API | pending | — | — | — | — | — |
+| 5. Settlement/refund E2E | pending | — | — | — | — | — |
+| 6. Container and image isolation | pending | — | — | — | — | — |
+| 7. Evidence and final gates | pending | — | — | — | — | — |
