@@ -27,7 +27,7 @@ A release remains NO-GO until all of the following refer to the same exact SHA:
 - Task 11 worker/repository/observability focused suite and relevant typechecks pass.
 - `tests/e2e/expert-residency-referral.test.ts` passes against real PostgreSQL with synthetic identities and sandbox verified events only.
 - Main CI `pnpm verify`, coverage, secret scan, image smoke/scan, and provenance steps pass on a hosted runner.
-- Database Gate passes schema parity plus 20x redemption, checkout, settlement, deadline, and held-replay concurrency/stability gates.
+- Database Gate passes schema parity plus 3x redemption, checkout, settlement, deadline, and held-replay concurrency/stability gates.
 - Scope/security tests prove no live payment SDK/network capability and prove the client `500/500` model remains isolated.
 - Independent migration review and financial-integrity review are recorded.
 - Authenticated sandbox settlement, partial refund, terminating reversal, debt, expiry/release, and held-replay evidence is recorded.

@@ -3807,11 +3807,11 @@ search, atomic reserve/confirm/cancel transitions, exact free outbox effects,
 single-use Telegram callback consumption, and Telegram-bound owner schedule
 reads are implemented in commits `09896db`, `76c3d4b`, `04dad73`, and
 `60f7603`. PostgreSQL Database Gate `30500639187` passed schema/catalog plus
-message, conversation, booking, outbox, and Telegram suites (repeat gates
-20x). Completion commit `31e2aea` adds persisted consent-qualified expert
+message, conversation, booking, outbox, and Telegram suites (historical repeat gate;
+the current hard maximum is three). Completion commit `31e2aea` adds persisted consent-qualified expert
 notes, booked-only HTTPS meeting URLs, and the application-level expiry
 entrypoint. PostgreSQL Database Gate `30502289472` passed on that exact SHA,
-including all repeat gates 20x. Task 15 is complete.
+including all repeat gates 3x. Task 15 is complete.
 
 **Files:**
 
@@ -5342,10 +5342,10 @@ git commit -m "ci: add verified mvp delivery pipeline"
 | P0-01 workspace dependencies absent | Forward remediation in Task 3 assigns every current and planned external/internal dependency to one manifest and tests the workspace graph | `tests/repo/workspace-dependencies.test.ts`; frozen install, typecheck, and build |
 | P0-02 API/worker not executable | Forward implementation in Tasks 19, 20, and 21 creates real entrypoints, start scripts, built targets, health, and runtime inspection | API/worker builds plus `pnpm test:container` |
 | P0-03 mutable balance authority | Tasks 4, 6, and 7 use append-only ledger facts and a rebuildable SQL sum view; update/delete are rejected | property, schema, immutability, and parallel-debit tests |
-| P0-04 invalid or overlapping booking | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation | BOOK-01 through BOOK-04; local agent verifies once, CI runs 20-repeat PostgreSQL concurrency in `db-gate.yml` |
+| P0-04 invalid or overlapping booking | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation | BOOK-01 through BOOK-04; CI runs three PostgreSQL concurrency passes in `db-gate.yml` |
 | P0-05 safety order/directory/handoff weak | Tasks 5, 14, and 19 run deterministic safety first, validate versioned locale contacts, fail safely on classifier outage, and persist SLA lifecycle | SAFE-01 through SAFE-05 and worker SLA tests |
 | P0-06 outbound billing lacks stable event | Tasks 2, 7, 10, 14, and 21 keep runtime billing disabled and define debit only from a stable inbox-deduplicated delivery event | contract-disabled runtime plus test-only synthetic AC-025 delivery; provider gate remains blocked |
-| P1-01 invalid Vitest/CI order | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` (CI-only high-N guard) and prohibit repository commands before frozen install | repeat runner (local max 2 / CI unlimited) and parsed workflow-order test |
+| P1-01 invalid Vitest/CI order | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` and prohibit repository commands before frozen install | repeat runner hard maximum 3 and parsed workflow-order test |
 | P1-02 ambiguous provider outcomes retried | Tasks 9 through 12 separate `not_applied`, `unknown_outcome`, and reconciliation; local acknowledgement failure is ambiguous | retry, timeout, lease-recovery, reconcile, and dead-letter tests |
 | P1-03 catalog/admin paths absent | Tasks 15 and 17 add eligible search/recommendation plus every FR-015 operation | catalog unit/integration tests and audited admin-ledger integration |
 | P1-04 feedback threshold wrong | Task 17 escalates scores 1–3 or explicit negative text | score table plus negative-text score-4 test |

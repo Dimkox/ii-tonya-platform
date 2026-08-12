@@ -336,7 +336,7 @@ flowchart TB
     PREFLIGHT["preflight-expert-referral-migration.mjs\nACTIVE RELEASE TOOL"]
     CLAWTEST["run-claw-container-tests.sh\nACTIVE TEST TOOL"]
     ENVVAL["validate-runtime-env.sh\nACTIVE RELEASE TOOL"]
-    REPEAT["repeat-vitest.mjs\nACTIVE TEST TOOL\nlocal <=2 / CI 20x"]
+    REPEAT["repeat-vitest.mjs\nACTIVE TEST TOOL\nhard maximum 3x"]
     REMOTEDEPLOY["deploy-compose-remote.sh\nACTIVE RELEASE TOOL; gated"]
     DEVCHK --> ROOTPKG
     PREFLIGHT --> DBGATE

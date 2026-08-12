@@ -90,3 +90,32 @@ focused_processes=0
 No production, Compose, Billing, database, session-provider, or live composition change
 was made. Hosted CI and Billing/Actions execution remain release boundaries; this evidence
 does not authorize publication, deployment, feature activation, or production use.
+
+## Final three-run branch gate
+
+The repeat policy was reduced from 20 to a hard maximum of three in every environment.
+`scripts/repeat-vitest.mjs` rejects larger counts and every Database Gate invocation now
+uses `pnpm test:repeat -- 3 ...`. All verification below ran only on Claw.
+
+Exact tested source: `ce72fa3d21f5a913ff06f1f8afa0eb883e89fb13`; test image:
+`7d71646347d560ff2b5d8ebc4c0aad5b48230254`; Node `24.18.0`; pnpm `11.9.0`;
+1 CPU; 1 GiB RAM. Frozen install, build, format check, deploy contract, ESLint,
+workspace typecheck and production dependency audit all exited 0. The audit reported no
+known vulnerabilities.
+
+The complete Vitest corpus ran exactly three times with `--maxWorkers=1`:
+
+| Run | Files | Tests | Duration | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 120/120 | 983/983 | 310.94s | 0 |
+| 2 | 120/120 | 983/983 | 316.30s | 0 |
+| 3 | 120/120 | 983/983 | 314.17s | 0 |
+
+The already completed packaged-image smoke remained a single production-like run, as
+required by the policy excluding production smoke from repetition. No production code
+changed afterward; the final changes are test policy, tests and database-test cleanup.
+Raw logs and SHA-256 checksums remain on Claw under
+`/home/pall/app-stack/ii-tonya-test-workspace/results/ce72fa3d21f5a913ff06f1f8afa0eb883e89fb13-three-pass/`.
+After verification, the mounted source was restored to
+`83e20da49de061f278f6a3f9d42920b4cf34d5bc`; cleanup proved zero test containers and
+zero Vitest/repeat processes.

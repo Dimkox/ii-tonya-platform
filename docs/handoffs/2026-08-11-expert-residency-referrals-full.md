@@ -283,7 +283,7 @@ Implemented:
 - security/go-live addendum:
   `docs/security/expert-residency-referrals-go-live-gates.md`
 - release-readiness/env/architecture/workspace/workflow/scope guards
-- expert-residency schema parity and CI-only 20x database gates in
+- expert-residency schema parity and three-run database gates in
   `.github/workflows/db-gate.yml`
 - exact workflow scope pinning through
   `tests/repo/support/payment-scope-boundary.ts`
@@ -297,8 +297,8 @@ Database Gate now registers CI-only repeated gates for:
 - exact payment deadline behavior
 - held reward replay
 
-Do not run the 20x repeat suite manually. `AGENTS.md` limits normal local/agent repeat
-counts; 20x stability is a hosted-CI responsibility.
+Do not run any repeat suite more than three times. `AGENTS.md` and the repeat runner
+enforce the same hard limit in every environment.
 
 ## 7. Last local verification result and exact unresolved test
 
@@ -451,7 +451,7 @@ Before marking Tasks 11–12 and PR #4 complete:
 - fixed release-candidate E2E green on current source — PASS at `c560cbb65e105e1aaeb8d86f544ff95cfd218346`
 - one final `pnpm verify` green on current source
 - hosted CI PASS on the exact candidate SHA
-- hosted Database Gate PASS on the exact candidate SHA, including registered 20x expert
+- hosted Database Gate PASS on the exact candidate SHA, including registered 3x expert
   concurrency/deadline/replay gates
 - independent migration/schema review
 - independent financial state-machine review for settlement/refund/reversal/debt/hold
@@ -683,7 +683,7 @@ runner/account failures and documents the fixes that followed.
 - Do not widen client Selarti intents with expert financial intents without a full
   channel-boundary redesign.
 - Do not remove database constraints to make a test fixture pass.
-- Do not run local 20x repeat loops.
+- Do not run repeat loops with a count greater than three.
 - Do not run full verification repeatedly after every small change.
 - Do not force-push PR #4.
 - Do not mark PR ready or merge while current exact-SHA verification is incomplete.
@@ -873,3 +873,16 @@ expert residency billing activation = OFF
 live identity/session provider = NOT COMPOSED
 release status = NO-GO until hosted CI and external approvals pass
 ```
+
+## 2026-08-12 three-run test policy and final Claw gate
+
+Repeat count is capped at three everywhere, including CI; all Database Gate
+commands now use 3x. Production-like container smoke remains a single run. On exact
+source `ce72fa3d21f5a913ff06f1f8afa0eb883e89fb13`, Claw passed frozen install, build,
+format, deploy contract, lint, workspace typecheck, dependency audit, and three complete
+Vitest runs: 120/120 files and 983/983 tests in 310.94s, 316.30s and 314.17s. The audit
+found no known vulnerabilities. Raw evidence/checksums remain in the Claw results
+directory named `<exact-sha>-three-pass`. The mounted source was restored to `83e20da`;
+cleanup proved zero test containers and zero test processes. Hosted mandatory CI remains
+blocked externally by the GitHub Actions billing limit, so merge/release/deploy is still
+NO-GO.

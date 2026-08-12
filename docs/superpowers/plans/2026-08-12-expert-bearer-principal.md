@@ -28,7 +28,7 @@ Claw test profile.
 - Run tests only in `/home/pall/app-stack` through the existing `ii-tonya-test` profile.
 - Use `--entrypoint sh` for focused tests; do not invoke the profile's broad default
   wrapper.
-- Do not run `test:repeat`; CI-only 20x gates remain in CI.
+- Repeated tests have a hard maximum of three in every environment; production-like smoke runs once.
 - Do not change production services, `/home/pall/app-stack/docker-compose.yml`, Billing,
   or GitHub Actions spending controls.
 

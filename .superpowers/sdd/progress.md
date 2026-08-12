@@ -82,3 +82,4 @@
 - Whole-branch review of `83e20da..9753770`: PASS with no Critical, Important, or Minor findings.
 - ERR-AUTH-008 follow-up: exact source `b1777bd`, image `7d71646347d560ff2b5d8ebc4c0aad5b48230254`; focused Claw logger test 2/2 in 719ms; restored base; cleanup 0/0.
 - Publication: Draft PR #9; merge remains blocked by hosted mandatory CI (jobs cannot start because of Billing/spending limit); release/deploy remains NO-GO.
+- Repeat-policy remediation: hard maximum is now three in every environment; all Database Gate repeats are 3x and 20x is prohibited. Exact Claw source `ce72fa3`; frozen install, build, format, deploy contract, lint, typecheck and audit PASS; full corpus 120 files / 983 tests PASS three times in 310.94s, 316.30s and 314.17s. Source restored to `83e20da`; cleanup 0 containers / 0 processes.

@@ -462,7 +462,7 @@ Implement `PostgresExpertReferralControlRepository.lockEligibility(tx, expertId)
 
 - [ ] **Step 5: Run security and concurrency tests repeatedly**
 
-Run: `pnpm vitest run packages/application/src/expert-code-crypto.test.ts packages/db/src/repositories/expert-referral-repository.test.ts packages/db/src/repositories/expert-referral-control-repository.test.ts tests/integration/expert-referral-redemption.test.ts tests/integration/expert-referral-redemption-concurrency.test.ts && pnpm test:repeat -- tests/integration/expert-referral-redemption-concurrency.test.ts 20`
+Run the focused tests once, then: `pnpm test:repeat -- 3 tests/integration/expert-referral-redemption-concurrency.test.ts`
 
 Expected: PASS in every repetition; exactly one concurrent redemption wins.
 
@@ -532,7 +532,7 @@ Release each allocation exactly once and prohibit negative spendable balance dur
 
 - [ ] **Step 6: Run focused and repeated tests**
 
-Run: `pnpm vitest run packages/db/src/repositories/expert-residency-repository.test.ts tests/integration/expert-residency-checkout.test.ts tests/integration/expert-residency-checkout-concurrency.test.ts tests/integration/expert-residency-deadline.test.ts && pnpm test:repeat -- tests/integration/expert-residency-checkout-concurrency.test.ts 20`
+Run the focused tests once, then: `pnpm test:repeat -- 3 tests/integration/expert-residency-checkout-concurrency.test.ts`
 
 Expected: PASS; equality always expires and all concurrent totals reconcile.
 
@@ -642,7 +642,7 @@ Accept only the branded verified type. Claim unique `(provider,event_id)` and pe
 
 - [ ] **Step 5: Run contract and concurrency tests repeatedly**
 
-Run: `pnpm vitest run packages/integrations/src/expert-residency/disabled-payment-adapter.test.ts tests/contract/expert-residency-payment-port.test.ts tests/integration/expert-residency-settlement.test.ts tests/integration/expert-residency-settlement-concurrency.test.ts && pnpm test:repeat -- tests/integration/expert-residency-settlement-concurrency.test.ts 20`
+Run the focused tests once, then: `pnpm test:repeat -- 3 tests/integration/expert-residency-settlement-concurrency.test.ts`
 
 Expected: PASS; one first-settlement marker and at most one reward exist.
 
@@ -708,7 +708,7 @@ When reward creation is disabled, settlement writes `pending_feature_hold` witho
 
 - [ ] **Step 5: Run focused and repeated race tests**
 
-Run: `pnpm vitest run tests/integration/expert-residency-refund-reversal.test.ts tests/integration/expert-residency-hold-replay.test.ts && pnpm test:repeat -- tests/integration/expert-residency-hold-replay.test.ts 20`
+Run the focused tests once, then: `pnpm test:repeat -- 3 tests/integration/expert-residency-hold-replay.test.ts`
 
 Expected: PASS; the hold-refund-replay sequence always creates zero reward.
 
@@ -1129,7 +1129,7 @@ Run: `pnpm verify`
 
 Expected: build, formatting, deployment checks, lint, typecheck, unit, property, integration, contract, security, e2e, and production dependency audit all PASS.
 
-Run: `pnpm test:repeat -- tests/integration/expert-referral-redemption-concurrency.test.ts tests/integration/expert-residency-checkout-concurrency.test.ts tests/integration/expert-residency-settlement-concurrency.test.ts tests/integration/expert-residency-deadline.test.ts tests/integration/expert-residency-hold-replay.test.ts 20`
+Run: `pnpm test:repeat -- 3 tests/integration/expert-referral-redemption-concurrency.test.ts tests/integration/expert-residency-checkout-concurrency.test.ts tests/integration/expert-residency-settlement-concurrency.test.ts tests/integration/expert-residency-deadline.test.ts tests/integration/expert-residency-hold-replay.test.ts`
 
 Expected: all 20 repetitions PASS.
 

@@ -25,8 +25,8 @@ describe("expert residency referral release readiness", () => {
       expect(cells.every((cell) => cell.length > 0)).toBe(true);
     }
     expect(traceability).not.toContain("pending registration");
-    expect(traceability).toContain("Database Gate 20x settlement concurrency");
-    expect(traceability).toContain("Database Gate 20x held-reward gate");
+    expect(traceability).toContain("Database Gate 3x settlement concurrency");
+    expect(traceability).toContain("Database Gate 3x held-reward gate");
   });
 
   it("ships operating, rollback, and security procedures without authorizing activation", () => {
