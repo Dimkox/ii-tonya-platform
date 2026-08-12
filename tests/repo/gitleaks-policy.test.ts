@@ -34,10 +34,17 @@ describe("Gitleaks policy", () => {
     );
 
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    const clawAdapter = readFileSync(
+      "scripts/run-claw-actions-job.sh",
+      "utf8",
+    );
     expect(workflow).toMatch(/fetch-depth:\s*0/);
-    expect(workflow).toContain("--config=/repo/.gitleaks.toml");
-    expect(workflow).toContain("--gitleaks-ignore-path=/repo/.gitleaksignore");
-    expect(workflow).toContain("--redact");
+    expect(workflow).toContain("scripts/run-claw-actions-job.sh ci");
+    expect(clawAdapter).toContain("--config=/repo/.gitleaks.toml");
+    expect(clawAdapter).toContain(
+      "--gitleaks-ignore-path=/repo/.gitleaksignore",
+    );
+    expect(clawAdapter).toContain("--redact");
   });
 
   it("ignores only the reviewed historical fixture fingerprints", () => {
