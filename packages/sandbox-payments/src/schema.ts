@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -92,9 +93,14 @@ export const sandboxExpertResidencyCommands = pgTable(
       sql`${table.payloadDigest} ~ '^sha256:[0-9a-f]{64}$'`,
     ),
     check(
+      "sandbox_command_idempotency_key",
+      sql`length(${table.idempotencyKey}) between 1 and 200 and ${table.idempotencyKey} ~ '^[A-Za-z0-9_.:-]+$'`,
+    ),
+    check(
       "sandbox_command_result_object",
       sql`jsonb_typeof(${table.result}) = 'object'`,
     ),
+    index("sandbox_commands_payment_idx").on(table.paymentId),
   ],
 );
 
@@ -131,5 +137,16 @@ export const sandboxExpertResidencyEvents = pgTable(
       "sandbox_event_payload_object",
       sql`jsonb_typeof(${table.payload}) = 'object'`,
     ),
+    check(
+      "sandbox_event_correlation_id",
+      sql`length(${table.correlationId}) between 1 and 200 and ${table.correlationId} ~ '^[A-Za-z0-9_.:-]+$'`,
+    ),
+    check(
+      "sandbox_event_processed_at",
+      sql`${table.processedAt} is null or ${table.processedAt} >= ${table.occurredAt}`,
+    ),
+    index("sandbox_events_payment_pending_idx")
+      .on(table.paymentId, table.occurredAt, table.eventId)
+      .where(sql`${table.processedAt} is null`),
   ],
 );

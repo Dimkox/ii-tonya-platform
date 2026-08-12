@@ -19,6 +19,11 @@ export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/sandbox-payments/src/schema.ts",
 ]);
 
+export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
+  "packages/sandbox-payments/src/repository.ts",
+  "packages/sandbox-payments/src/schema.ts",
+]);
+
 export const SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
 ]);
@@ -589,6 +594,7 @@ const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;
 const sandboxFinancialAuthorityRelation =
   /\b(?:expert_first_residency_settlements|expert_referral_reward_grants|expert_referral_ledger_entries|expert_referral_ledger_allocations|expert_referral_balances|expert_residency_orders|expert_residency_payment_attempts|expert_residency_provider_event_inbox)\b/u;
+const sandboxRelationToken = /\bsandbox_expert_residency_[a-z0-9_]+\b/iu;
 
 export interface PaymentScopeProbe {
   readonly path: string;
@@ -613,7 +619,8 @@ export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   if (path.endsWith("/package.json") || path === "package.json") return true;
   if (
     /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||
-    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) ||
+    path.endsWith(".sql")
   ) {
     return true;
   }
@@ -759,6 +766,27 @@ const inspectTypeScript = (
     true,
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+
+  if (!SANDBOX_PAYMENT_RELATION_SOURCE_PATHS.has(path)) {
+    const scanner = ts.createScanner(
+      ts.ScriptTarget.Latest,
+      true,
+      ts.LanguageVariant.Standard,
+      content,
+    );
+    for (
+      let token = scanner.scan();
+      token !== ts.SyntaxKind.EndOfFileToken;
+      token = scanner.scan()
+    ) {
+      if (sandboxRelationToken.test(scanner.getTokenText())) {
+        violations.push(
+          "sandbox relation token outside approved sandbox paths",
+        );
+        break;
+      }
+    }
+  }
 
   if (
     EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
@@ -1033,8 +1061,24 @@ const inspectMigration = (
   content: string,
   violations: string[],
 ): void => {
+  const withoutComments = content
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/--[^\r\n]*/gu, "");
+  if (
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) &&
+    sandboxRelationToken.test(withoutComments)
+  ) {
+    violations.push("sandbox relation token outside approved sandbox paths");
+  }
+
   if (paymentDbPath.test(path)) {
     violations.push("commercial database migration path");
+  }
+  if (
+    !path.startsWith("packages/db/migrations/") &&
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+  ) {
+    return;
   }
   if (path.endsWith(".json")) {
     let snapshot: unknown;
@@ -1069,9 +1113,6 @@ const inspectMigration = (
     return;
   }
 
-  const withoutComments = content
-    .replace(/\/\*[\s\S]*?\*\//gu, "")
-    .replace(/--[^\r\n]*/gu, "");
   for (const match of withoutComments.matchAll(
     /\bcreate\s+(?:materialized\s+)?(?:table|view)\s+(?:if\s+not\s+exists\s+)?(?:(?:"?[\w]+"?)\.)?"?([\w]+)"?/giu,
   )) {
@@ -1141,7 +1182,8 @@ export const classifyPaymentScopeProbe = ({
     inspectPackageManifest(path, content, violations);
   } else if (
     /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||
-    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) ||
+    path.endsWith(".sql")
   ) {
     inspectMigration(path, content, violations);
   } else if (/\.[cm]?[jt]sx?$/u.test(path)) {
