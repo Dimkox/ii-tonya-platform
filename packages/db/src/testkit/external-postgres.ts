@@ -31,11 +31,7 @@ export async function startExternalPostgresDatabase(
     stop: async () => {
       const cleanup = new Pool({ connectionString: adminUrl, max: 1 });
       try {
-        await cleanup.query(
-          "select pg_terminate_backend(pid) from pg_stat_activity where datname = $1 and pid <> pg_backend_pid()",
-          [name],
-        );
-        await cleanup.query(`drop database if exists "${name}"`);
+        await cleanup.query(`drop database if exists "${name}" with (force)`);
       } finally {
         await cleanup.end();
       }
