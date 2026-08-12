@@ -28,5 +28,12 @@ export {
   sandboxExpertResidencyEvents,
   sandboxExpertResidencyPayments,
 } from "./schema.js";
-export { SandboxTransitionWorkflow, sandboxAdminActions, sandboxApprovalObjectId } from "./workflow.js";
-export type { SandboxTransitionWorkflowCommand, SandboxTransitionWorkflowResult } from "./workflow.js";
+export {
+  SandboxTransitionWorkflow,
+  sandboxAdminActions,
+  sandboxApprovalObjectId,
+} from "./workflow.js";
+export type {
+  SandboxTransitionWorkflowCommand,
+  SandboxTransitionWorkflowResult,
+} from "./workflow.js";
