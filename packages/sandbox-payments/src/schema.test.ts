@@ -1,4 +1,8 @@
-import { PgDialect, getTableConfig, type AnyPgTable } from "drizzle-orm/pg-core";
+import {
+  PgDialect,
+  getTableConfig,
+  type AnyPgTable,
+} from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
   sandboxExpertResidencyCommands,
@@ -51,9 +55,7 @@ describe("sandbox Drizzle schema parity", () => {
   it("mirrors event identifier, correlation, processing, and pending index constraints", () => {
     const events = metadata(sandboxExpertResidencyEvents);
 
-    expect(events.checks.get("sandbox_event_id_format")).toContain(
-      "{22,128}",
-    );
+    expect(events.checks.get("sandbox_event_id_format")).toContain("{22,128}");
     expect(events.checks.get("sandbox_event_correlation_id")).toMatch(
       /length\(.+\) between 1 and 200.+\^\[A-Za-z0-9_.:-\]\+\$/u,
     );
