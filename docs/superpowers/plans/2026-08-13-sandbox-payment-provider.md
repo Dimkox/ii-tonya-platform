@@ -192,6 +192,7 @@ git commit -m "feat: add sandbox payment persistence"
 - Modify: `packages/sandbox-payments/src/index.ts`
 - Modify: `packages/sandbox-payments/src/repository.ts`
 - Modify: `packages/sandbox-payments/src/repository.test.ts`
+- Modify: `packages/integrations/src/expert-residency/verified-event.ts`
 - Test: `packages/integrations/src/expert-residency/verified-event.test.ts`
 
 **Interfaces:**
@@ -204,6 +205,13 @@ export const SANDBOX_PROVIDER = "ii_tonya_sandbox" as const;
 export interface SandboxEventVerifier {
   verify(event: SandboxProviderEvent): VerifiedExpertResidencyPaymentEvent;
 }
+export interface CanonicalExpertResidencyPaymentEventVerifier {
+  verifyCanonical(
+    event: ExpertResidencyPaymentEvent,
+    evidence: ExpertResidencyVerificationEvidence,
+  ): VerifiedExpertResidencyPaymentEvent;
+}
+export function createCanonicalExpertResidencyPaymentEventVerifier(): CanonicalExpertResidencyPaymentEventVerifier;
 export class SandboxExpertResidencyPaymentAdapter implements ExpertResidencyPaymentPort {
   createCheckout(
     command: ExpertResidencyCheckoutCommand,
@@ -247,9 +255,9 @@ pnpm exec vitest run packages/sandbox-payments/src/verifier.test.ts packages/san
 
 Expected: sandbox imports are missing while existing production-verifier tests remain green.
 
-- [ ] **Step 3: Implement a module-private sandbox brand bridge**
+- [ ] **Step 3: Implement a provider-neutral canonical verifier factory**
 
-Do not export a generic branding function. The verifier accepts only frozen event objects returned by the repository in the same process, validates the strict event schema, attaches fixed verification evidence, and passes through the existing canonical assertion boundary. Verification ID and key version are bounded constants derived from the durable event ID; no secret is used.
+Keep `brand()` private in `@ii-tonya/integrations`. Export a provider-neutral factory whose returned object validates a canonical provider event and bounded verification evidence before delegating to the private brand. It must not mention sandbox, accept raw unchecked HTTP input, read credentials, or make network calls. The sandbox package receives this verifier explicitly at composition and accepts only frozen event objects returned by its repository in the same process. Verification ID and key version are bounded constants derived from the durable event ID; no secret is used. The production runtime must not instantiate the factory.
 
 - [ ] **Step 4: Implement adapter checkout and reconcile**
 
@@ -259,7 +267,7 @@ Checkout delegates to Task 1 and returns only `{kind,paymentId,checkoutUrl}`. Re
 
 ```bash
 pnpm exec vitest run packages/sandbox-payments/src/verifier.test.ts packages/sandbox-payments/src/adapter.test.ts packages/integrations/src/expert-residency/verified-event.test.ts --maxWorkers=1
-git add packages/sandbox-payments packages/integrations/src/expert-residency/verified-event.test.ts
+git add packages/sandbox-payments packages/integrations/src/expert-residency/verified-event.ts packages/integrations/src/expert-residency/verified-event.test.ts
 git commit -m "feat: add sandbox payment adapter"
 ```
 
