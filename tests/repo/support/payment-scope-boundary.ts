@@ -17,7 +17,7 @@ const MAIN_NATIVE_AUTOMATION_BLOB_SHA1 = new Map<string, string>([
   ],
   [
     ".github/workflows/server-native.yml",
-    "d31d2fb6e9bd5e8ff8de100fed76946ad29eedf2",
+    "174cfe711bdb076466c016f15268198cf8e9bb8a",
   ],
   ["ops/server-command.sh", "d2668a5c4acc9dcf1b8068f3ad02d025946a24e9"],
   [

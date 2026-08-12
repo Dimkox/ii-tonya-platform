@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   verify_provenance:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 10
     outputs:
       api_image_ref: ${{ steps.verify.outputs.api_image_ref }}
@@ -155,7 +155,7 @@ jobs:
 
   staging:
     needs: verify_provenance
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 20
     environment: staging
     env:
@@ -266,7 +266,7 @@ jobs:
 
   evidence_gate:
     needs: [verify_provenance, staging]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 10
     steps:
       - name: Checkout evidence records
@@ -326,7 +326,7 @@ jobs:
 
   release:
     needs: [verify_provenance, staging, evidence_gate]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 25
     environment: production
     env:

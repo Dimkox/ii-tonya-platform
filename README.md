@@ -26,6 +26,13 @@ verify, independent reviews, and human/release approvals remain open.
 
 The separate `server-control` workflow is manual-dispatch only, uses read-only repository
 permission, and publishes no raw command output. It is not part of the test runner path.
+GitHub Free does not expose private-repository branch protection or rulesets. The
+repository therefore fails closed at the release perimeter: the legacy native workflow
+contains only an explicit refusal job, and the provenance-bound manual `Gated release` is the sole
+release entrypoint. Its jobs also run on the dedicated `ii-tonya-release` Claw label, so
+the release control plane does not require hosted Actions minutes.
+Repository merge settings allow squash only and delete merged branches; staging and
+production deployment environments accept only `main`.
 
 The authoritative continuation checkpoint is
 `docs/handoffs/2026-08-11-expert-residency-referrals-full.md`; the older handoff and

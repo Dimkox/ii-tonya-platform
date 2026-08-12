@@ -12,6 +12,33 @@ type WorkflowJob = {
 };
 
 describe("CI and release workflow semantics", () => {
+  it("keeps merge and release controls independent of paid hosted runners", () => {
+    const native = parse(
+      readFileSync(".github/workflows/server-native.yml", "utf8"),
+    );
+    const release = parse(
+      readFileSync(".github/workflows/release.yml", "utf8"),
+    );
+
+    expect(native.on.push).toBeUndefined();
+    expect(native.on.workflow_dispatch).toBeDefined();
+    expect(native.jobs.deploy).toBeUndefined();
+    expect(JSON.stringify(native.jobs["legacy-disabled"])).toContain(
+      "Legacy native deployment is disabled",
+    );
+    expect(JSON.stringify(native.jobs["legacy-disabled"])).toContain("exit 1");
+    expect(JSON.stringify(release)).not.toContain("ubuntu-24.04");
+    for (const job of Object.values(release.jobs) as WorkflowJob[]) {
+      expect(job["runs-on"]).toEqual([
+        "self-hosted",
+        "linux",
+        "x64",
+        "claw",
+        "ii-tonya-release",
+      ]);
+    }
+  });
+
   it("runs mandatory pull-request checks on the isolated Claw test profile", () => {
     for (const [file, jobName, mode] of [
       [".github/workflows/ci.yml", "verify", "ci"],

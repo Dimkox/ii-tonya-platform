@@ -620,14 +620,17 @@ Do not deploy/merge merely because implementation Tasks 1–12 exist.
 Current feature state is pre-release. Live activation requires explicit evidence and
 approval beyond code completion.
 
-The synchronized native deploy workflow is operationally significant:
+GitHub Free does not provide private-repository branch protection or rulesets. The
+release perimeter is therefore fail-closed independently of that paid capability:
 
-- `.github/workflows/server-native.yml` triggers on pushes to `main`
-- it deploys to a self-hosted `ii-tonya-server` runner
-- it provisions/builds/restarts API and worker and probes `ii-tonya.ru`
-- its runtime template keeps product/provider integrations disabled
+- `.github/workflows/server-native.yml` has no push trigger or deployment code; a manual
+  dispatch only emits an explicit refusal
+- `.github/workflows/release.yml` is the sole release entrypoint
+- every release job uses the dedicated self-hosted `ii-tonya-release` Claw label
+- release still requires successful exact-main CI provenance, signed artifacts,
+  independent migration approval, staging evidence, and explicit production dispatch
 
-Therefore PR #4 merge is itself a deployment-sensitive action and must remain gated.
+A merge can update `main`, but cannot activate the legacy native deployment path.
 
 ## 18. Claw / environment notes
 
