@@ -595,6 +595,7 @@ const prohibitedCouponOrReferralModel =
 const sandboxFinancialAuthorityRelation =
   /\b(?:expert_first_residency_settlements|expert_referral_reward_grants|expert_referral_ledger_entries|expert_referral_ledger_allocations|expert_referral_balances|expert_residency_orders|expert_residency_payment_attempts|expert_residency_provider_event_inbox)\b/u;
 const sandboxRelationToken = /\bsandbox_expert_residency_[a-z0-9_]+\b/iu;
+const sandboxRelationTokens = /\bsandbox_expert_residency_[a-z0-9_]+\b/giu;
 
 export interface PaymentScopeProbe {
   readonly path: string;
@@ -767,23 +768,31 @@ const inspectTypeScript = (
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
-  if (!SANDBOX_PAYMENT_RELATION_SOURCE_PATHS.has(path)) {
-    const scanner = ts.createScanner(
-      ts.ScriptTarget.Latest,
-      true,
-      ts.LanguageVariant.Standard,
-      content,
-    );
-    for (
-      let token = scanner.scan();
-      token !== ts.SyntaxKind.EndOfFileToken;
-      token = scanner.scan()
-    ) {
-      if (sandboxRelationToken.test(scanner.getTokenText())) {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    true,
+    ts.LanguageVariant.Standard,
+    content,
+  );
+  for (
+    let token = scanner.scan();
+    token !== ts.SyntaxKind.EndOfFileToken;
+    token = scanner.scan()
+  ) {
+    for (const match of scanner
+      .getTokenText()
+      .matchAll(sandboxRelationTokens)) {
+      const relationName = match[0].toLowerCase();
+      if (SANDBOX_PAYMENT_RELATION_SOURCE_PATHS.has(path)) {
+        if (!SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(relationName)) {
+          violations.push(
+            `unknown sandbox relation in approved sandbox source: ${relationName}`,
+          );
+        }
+      } else {
         violations.push(
           "sandbox relation token outside approved sandbox paths",
         );
-        break;
       }
     }
   }
