@@ -19,8 +19,7 @@ const sandboxRelations = [
 ] as const;
 
 let database:
-  | Awaited<ReturnType<typeof startExternalPostgresDatabase>>
-  | undefined;
+  Awaited<ReturnType<typeof startExternalPostgresDatabase>> | undefined;
 let db: DrizzleDb | undefined;
 let repository: PostgresSandboxPaymentRepository;
 
@@ -182,9 +181,9 @@ describe("PostgresSandboxPaymentRepository checkout", () => {
     const results = await Promise.all(
       Array.from({ length: 8 }, () => repository.createCheckout(command)),
     );
-    expect(results.every((result) => result.paymentId === results[0]?.paymentId)).toBe(
-      true,
-    );
+    expect(
+      results.every((result) => result.paymentId === results[0]?.paymentId),
+    ).toBe(true);
     expect(await countRows("sandbox_expert_residency_payments")).toBe(1);
     expect(await countRows("sandbox_expert_residency_commands")).toBe(1);
   });
@@ -225,13 +224,13 @@ describe("PostgresSandboxPaymentRepository transitions", () => {
     });
     expect(await countRows("sandbox_expert_residency_events")).toBe(2);
 
-    await expect(repository.nextPendingEvent(checkout.paymentId)).resolves.toEqual(
-      settled,
-    );
+    await expect(
+      repository.nextPendingEvent(checkout.paymentId),
+    ).resolves.toEqual(settled);
     await repository.markEventProcessed(settled.eventId);
-    await expect(repository.nextPendingEvent(checkout.paymentId)).resolves.toEqual(
-      refunded,
-    );
+    await expect(
+      repository.nextPendingEvent(checkout.paymentId),
+    ).resolves.toEqual(refunded);
   });
 
   it("returns the stored event for an identical transition replay", async () => {
