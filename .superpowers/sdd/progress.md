@@ -96,10 +96,14 @@
 
 | Task | Status | Base | Implementer | Spec review | Quality review | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1. Contracts and database boundary | pending | `6f3410f` | — | — | — | — |
-| 2. Verifier, adapter, reconciliation | pending | — | — | — | — | — |
+| 1. Contracts and database boundary | complete | `5e21170` | `520ad39`..`89dfe66` | PASS after two guard remediations | PASS; no findings | Claw repository 15/15, repeat 45/45, schema 2/2, scope 113/113; build/typecheck/lint/format; cleanup 0 |
+| 2. Verifier, adapter, reconciliation | pending | `89dfe66` | — | — | — | — |
 | 3. Approved admin transitions | pending | — | — | — | — | — |
 | 4. Separate sandbox API | pending | — | — | — | — | — |
 | 5. Settlement/refund E2E | pending | — | — | — | — | — |
 | 6. Container and image isolation | pending | — | — | — | — | — |
 | 7. Evidence and final gates | pending | — | — | — | — | — |
+
+Cross-task gate: Task 6 must inspect the built production image dependency inventory and
+prove `@ii-tonya/sandbox-payments` is absent. The current Dockerfile deploys only the
+`@ii-tonya/api` production closure, and `apps/api/package.json` has no sandbox dependency.
