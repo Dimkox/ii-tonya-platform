@@ -908,3 +908,24 @@ human deployment approval all pass.
   repository write, maintain, or admin permission.
 - Every secret-bearing release job has `always()` cleanup for SSH keys, rollback state,
   provenance, and transient approval/evidence files.
+
+## 2026-08-12 trusted-main SBOM hotfix
+
+PR #9 was squash-merged to `main` as
+`ebd408580a10bd53289f0cd52c186923f7a5d7dd`. Its Database Gate passed, while trusted-main
+CI run `31618873619` failed after tests, publication, and both digest vulnerability scans:
+`anchore/sbom-action` could not download Syft with its plain HTTP installer (`HTTP 000`).
+Signing and provenance upload correctly stayed skipped, so release remained fail-closed.
+
+The follow-up `codex/sbom-provenance-hotfix` branch replaces that runtime installer with
+pinned Syft v1.42.3 fetched through `gh` and verified against Anchore's published SHA-256
+checksums. It also isolates GHCR authentication in `$RUNNER_TEMP` and removes credentials,
+Syft, SBOMs, bundles, and provenance files with `always()` cleanup. Claw evidence is under
+`docs/test-evidence/claw/syft-provenance-hotfix-20260812/verification.md`: 127/127 focused
+semantic/scope assertions, actionlint, Prettier, and real SPDX generation for both exact
+published digests passed. The shared GHCR login left by the failed job was removed without
+reading or printing it.
+
+Release remains NO-GO until this hotfix is reviewed and merged and a new exact-main CI run
+successfully uploads signed provenance. Gated release still additionally requires the
+exact structured migration approval, staging evidence, and explicit human approval.

@@ -28,6 +28,14 @@ jobs:
           # Fingerprint allowlisting relies on the original introducing commit.
           fetch-depth: 0
 
+      - name: Configure isolated Docker credential path
+        run: |
+          set -Eeuo pipefail
+          docker_config="$RUNNER_TEMP/ii-tonya-docker-config"
+          rm -rf "$docker_config"
+          mkdir -m 0700 "$docker_config"
+          echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
+
       - name: Run isolated Claw verification
         run: bash scripts/run-claw-actions-job.sh ci
 
@@ -45,6 +53,29 @@ jobs:
       - name: Install pinned cosign
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Install pinned Syft from verified release assets
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          syft_version="1.42.3"
+          syft_dir="$RUNNER_TEMP/ii-tonya-syft"
+          rm -rf "$syft_dir"
+          mkdir -m 0700 "$syft_dir"
+          gh release download "v$syft_version" \
+            --repo anchore/syft \
+            --pattern "syft_${syft_version}_linux_amd64.tar.gz" \
+            --pattern "syft_${syft_version}_checksums.txt" \
+            --dir "$syft_dir"
+          (
+            cd "$syft_dir"
+            sha256sum -c --ignore-missing "syft_${syft_version}_checksums.txt"
+            tar -xzf "syft_${syft_version}_linux_amd64.tar.gz" syft
+          )
+          test -x "$syft_dir/syft"
+          echo "$syft_dir" >> "$GITHUB_PATH"
 
       - name: Authenticate to GHCR for trusted push provenance
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -83,23 +114,15 @@ jobs:
 
       - name: Generate API image SBOM
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: ${{ env.API_IMAGE_REF }}
-          format: spdx-json
-          output-file: api-sbom.spdx.json
-          upload-artifact: "false"
-          upload-release-assets: "false"
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+        run: syft "$API_IMAGE_REF" -o spdx-json=api-sbom.spdx.json
 
       - name: Generate worker image SBOM
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: ${{ env.WORKER_IMAGE_REF }}
-          format: spdx-json
-          output-file: worker-sbom.spdx.json
-          upload-artifact: "false"
-          upload-release-assets: "false"
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+        run: syft "$WORKER_IMAGE_REF" -o spdx-json=worker-sbom.spdx.json
 
       - name: Sign exact registry images and provenance manifest
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -143,3 +166,14 @@ jobs:
       - name: Tear down containers
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+      - name: Remove transient CI credentials and artifacts
+        if: always()
+        run: |
+          if test -n "${DOCKER_CONFIG:-}"; then
+            rm -rf "$DOCKER_CONFIG"
+          fi
+          rm -rf "$RUNNER_TEMP/ii-tonya-syft"
+          rm -f api-sbom.spdx.json api-sbom.bundle \
+            worker-sbom.spdx.json worker-sbom.bundle \
+            release-provenance.json release-provenance.bundle
