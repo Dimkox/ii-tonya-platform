@@ -25,8 +25,7 @@ import {
 
 const checkoutBaseUrl = new URL("https://sandbox.ii-tonya.invalid/");
 let database:
-  | Awaited<ReturnType<typeof startExternalPostgresDatabase>>
-  | undefined;
+  Awaited<ReturnType<typeof startExternalPostgresDatabase>> | undefined;
 let db: DrizzleDb | undefined;
 let repository: PostgresSandboxPaymentRepository;
 let adapter: SandboxExpertResidencyPaymentAdapter;
@@ -107,7 +106,9 @@ describe("SandboxExpertResidencyPaymentAdapter", () => {
     const first = await adapter.reconcile(checkout.paymentId);
     const retry = await adapter.reconcile(checkout.paymentId);
     expect(retry).toEqual(first);
-    expect(() => assertVerifiedExpertResidencyPaymentEvent(first)).not.toThrow();
+    expect(() =>
+      assertVerifiedExpertResidencyPaymentEvent(first),
+    ).not.toThrow();
 
     await repository.markEventProcessed(event.eventId);
     await expect(adapter.reconcile(checkout.paymentId)).resolves.toBeNull();

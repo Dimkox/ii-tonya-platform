@@ -15,8 +15,7 @@ import {
 
 const checkoutBaseUrl = new URL("https://sandbox.ii-tonya.invalid/");
 let database:
-  | Awaited<ReturnType<typeof startExternalPostgresDatabase>>
-  | undefined;
+  Awaited<ReturnType<typeof startExternalPostgresDatabase>> | undefined;
 let db: DrizzleDb | undefined;
 let repository: PostgresSandboxPaymentRepository;
 

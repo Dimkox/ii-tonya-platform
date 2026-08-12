@@ -14,9 +14,7 @@ type SandboxAdapterRepository = Pick<
   "createCheckout" | "nextPendingEvent"
 >;
 
-export class SandboxExpertResidencyPaymentAdapter
-  implements ExpertResidencyPaymentPort
-{
+export class SandboxExpertResidencyPaymentAdapter implements ExpertResidencyPaymentPort {
   constructor(
     private readonly repository: SandboxAdapterRepository,
     private readonly verifier: SandboxEventVerifier,
