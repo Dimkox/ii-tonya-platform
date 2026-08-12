@@ -1,3 +1,6 @@
 self-hosted-runner:
   labels:
     - ii-tonya-server
+    - claw
+    - ii-tonya-test
+    - ii-tonya-release

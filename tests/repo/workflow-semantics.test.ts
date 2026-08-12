@@ -7,26 +7,74 @@ type WorkflowStep = { name?: string; run?: string; uses?: string };
 type WorkflowJob = {
   if?: string;
   needs?: string;
+  "runs-on"?: string | string[];
   steps: Array<WorkflowStep & { id?: string; if?: string }>;
 };
 
 describe("CI and release workflow semantics", () => {
+  it("keeps merge and release controls independent of paid hosted runners", () => {
+    const native = parse(
+      readFileSync(".github/workflows/server-native.yml", "utf8"),
+    );
+    const release = parse(
+      readFileSync(".github/workflows/release.yml", "utf8"),
+    );
+
+    expect(native.on.push).toBeUndefined();
+    expect(native.on.workflow_dispatch).toBeDefined();
+    expect(native.jobs.deploy).toBeUndefined();
+    expect(JSON.stringify(native.jobs["legacy-disabled"])).toContain(
+      "Legacy native deployment is disabled",
+    );
+    expect(JSON.stringify(native.jobs["legacy-disabled"])).toContain("exit 1");
+    expect(JSON.stringify(release)).not.toContain("ubuntu-24.04");
+    for (const job of Object.values(release.jobs) as WorkflowJob[]) {
+      expect(job["runs-on"]).toEqual([
+        "self-hosted",
+        "linux",
+        "x64",
+        "claw",
+        "ii-tonya-release",
+      ]);
+    }
+  });
+
+  it("runs mandatory pull-request checks on the isolated Claw test profile", () => {
+    for (const [file, jobName, mode] of [
+      [".github/workflows/ci.yml", "verify", "ci"],
+      [".github/workflows/db-gate.yml", "postgres-schema", "database"],
+    ] as const) {
+      const workflow = parse(readFileSync(file, "utf8"));
+      const job = workflow.jobs[jobName] as WorkflowJob;
+      expect(job["runs-on"]).toEqual([
+        "self-hosted",
+        "linux",
+        "x64",
+        "claw",
+        "ii-tonya-test",
+      ]);
+      expect(job.if).toContain("github.repository_owner");
+      expect(job.if).toContain("github.event.pull_request.user.login");
+      expect(JSON.stringify(job)).toContain(
+        `scripts/run-claw-actions-job.sh ${mode}`,
+      );
+      expect(JSON.stringify(job)).not.toContain("ubuntu-24.04");
+    }
+  });
+
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];
-    const install = steps.findIndex((step) =>
-      step.run?.includes("pnpm install --frozen-lockfile"),
-    );
-    const build = steps.findIndex((step) => step.run?.trim() === "pnpm build");
-    const executable = steps
-      .map((step, index) => ({ index, run: step.run ?? "" }))
-      .filter(({ run }) =>
-        /\bpnpm (exec|verify|test|lint|typecheck)\b/.test(run),
-      );
+    const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
+    const install = runner.indexOf("pnpm install --frozen-lockfile");
+    const build = runner.indexOf("pnpm build", install);
+    const verify = runner.indexOf("pnpm exec vitest run --maxWorkers=1", build);
     expect(install).toBeGreaterThanOrEqual(0);
     expect(build).toBeGreaterThan(install);
-    expect(executable.every(({ index }) => index > build)).toBe(true);
-    expect(steps.some((step) => step.run?.includes("pnpm verify"))).toBe(true);
+    expect(verify).toBeGreaterThan(build);
+    expect(
+      steps.some((step) => step.run?.includes("run-claw-actions-job.sh ci")),
+    ).toBe(true);
     expect(JSON.stringify(workflow)).not.toContain("corepack");
   });
 
@@ -82,6 +130,13 @@ describe("CI and release workflow semantics", () => {
     expect(provenanceRun).toContain('test "$GITHUB_REF" = "refs/heads/main"');
     expect(provenanceRun).toContain("MIGRATION-COMPATIBILITY:");
     expect(provenanceRun).toContain(".user.login != $actor");
+    expect(provenanceRun).toContain(".merge_commit_sha == $expected_sha");
+    expect(provenanceRun).toContain(".commit_id == $approval_head_sha");
+    expect(provenanceRun).toContain(
+      "collaborators/$migration_reviewer/permission",
+    );
+    expect(provenanceRun).toContain('.permission == "admin"');
+    expect(provenanceRun).toContain('(.body // "") == $marker');
     expect(JSON.stringify(workflow.on.workflow_dispatch.inputs)).toContain(
       "migration_approval_review_id",
     );
@@ -236,13 +291,8 @@ describe("CI and release workflow semantics", () => {
     }
   });
 
-  it("runs the mandatory expert residency database gates at CI-only repeat depth", () => {
-    const workflow = parse(
-      readFileSync(".github/workflows/db-gate.yml", "utf8"),
-    );
-    const runs = (workflow.jobs["postgres-schema"].steps as WorkflowStep[])
-      .map((step) => step.run ?? "")
-      .join("\n");
+  it("runs the mandatory expert residency database gates three times", () => {
+    const runs = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
 
     expect(runs).toContain("tests/repo/db-schema-parity.test.ts");
     for (const path of [
@@ -252,13 +302,14 @@ describe("CI and release workflow semantics", () => {
       "tests/integration/expert-residency-deadline.test.ts",
       "tests/integration/expert-residency-hold-replay.test.ts",
     ]) {
-      expect(runs).toContain(`pnpm test:repeat -- 20 ${path}`);
+      expect(runs).toContain(`pnpm test:repeat -- 3 ${path}`);
     }
+    expect(runs).not.toContain("pnpm test:repeat -- 20 ");
     expect(runs).not.toContain("EXPERT_REFERRAL_ENABLED=true");
     expect(runs).not.toContain("EXPERT_RESIDENCY_BILLING_ENABLED=true");
   });
 
-  it("limits server control to explicit manual dispatch", () => {
+  it("keeps legacy server control manual and fail-closed", () => {
     const workflow = parse(
       readFileSync(".github/workflows/server-control.yml", "utf8"),
     );
@@ -268,32 +319,43 @@ describe("CI and release workflow semantics", () => {
       group: "ii-tonya-server-control",
       "cancel-in-progress": true,
     });
-    expect(Object.keys(workflow.jobs)).toEqual(["command"]);
-    expect((workflow.jobs.command as WorkflowJob).if).toBeUndefined();
+    expect(Object.keys(workflow.jobs)).toEqual(["legacy-disabled"]);
+    const disabled = workflow.jobs["legacy-disabled"] as WorkflowJob;
+    expect(JSON.stringify(disabled)).toContain(
+      "Legacy server control is disabled",
+    );
+    expect(JSON.stringify(disabled)).toContain("exit 1");
+    expect(JSON.stringify(workflow)).not.toContain("actions/checkout");
+    expect(JSON.stringify(workflow)).not.toContain("ops/server-command.sh");
   });
 
-  it("keeps server command failure while publishing only safe metadata", () => {
-    const workflow = parse(
-      readFileSync(".github/workflows/server-control.yml", "utf8"),
-    );
-    const command = workflow.jobs.command as WorkflowJob;
-    const execute = command.steps.find((step) => step.id === "execute");
-    const publish = command.steps.find(
-      (step) => step.name === "Publish safe command status",
-    );
-    expect(execute?.run).toContain('exit "$status"');
-    expect(publish?.if).toBe("always()");
-    expect(JSON.stringify(publish)).toContain("steps.execute.outputs.status");
-    expect(publish?.run).not.toContain("server-command-output.txt");
-    expect(publish?.run).not.toContain("head -c");
-    expect(publish?.run).toContain("GITHUB_STEP_SUMMARY");
-    expect(JSON.stringify(workflow)).not.toContain("gh issue comment");
-    expect(JSON.stringify(workflow)).not.toContain("base64");
-
+  it("keeps the unused server command script free of secret-bearing diagnostics", () => {
     const commandScript = readFileSync("ops/server-command.sh", "utf8");
     expect(commandScript).not.toContain("command=$BASH_COMMAND");
     expect(commandScript).toContain(
       "Failed to configure the database role password.",
     );
+  });
+
+  it("always removes release credentials and transient approval evidence", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/release.yml", "utf8"),
+    );
+    for (const jobName of [
+      "verify_provenance",
+      "staging",
+      "release",
+    ] as const) {
+      const job = workflow.jobs[jobName] as WorkflowJob;
+      const cleanup = job.steps.find(
+        (step) => step.name === "Remove transient release material",
+      );
+      expect(cleanup?.if).toBe("always()");
+      expect(cleanup?.run).toContain("RUNNER_TEMP");
+      if (jobName !== "verify_provenance") {
+        expect(cleanup?.run).toContain("ii-tonya-ssh");
+        expect(cleanup?.run).toContain("rollback.env");
+      }
+    }
   });
 });

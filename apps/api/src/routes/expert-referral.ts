@@ -3,10 +3,10 @@ import type {
   ExpertReferralService,
   ExpertResidencyService,
 } from "@ii-tonya/application";
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-} from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import type { ExpertPrincipalResolver } from "../expert-principal-resolver.js";
+
+export type { ExpertPrincipalResolver } from "../expert-principal-resolver.js";
 
 const uuidPattern =
   "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
@@ -41,12 +41,6 @@ const checkoutBodySchema = {
     idempotencyKey: { type: "string", pattern: idempotencyPattern },
   },
 } as const;
-
-export interface ExpertPrincipalResolver {
-  resolve(
-    authorization: string | undefined,
-  ): Promise<ExpertPrincipal | null>;
-}
 
 export interface ExpertReferralApiDependencies {
   readonly principals: ExpertPrincipalResolver;
@@ -91,7 +85,9 @@ export async function expertReferralRoutes(
       candidate.statusCode >= 400 &&
       candidate.statusCode < 500
     ) {
-      return reply.code(candidate.statusCode).send({ error: "request_rejected" });
+      return reply
+        .code(candidate.statusCode)
+        .send({ error: "request_rejected" });
     }
     return reply.code(500).send({ error: "internal_error" });
   });

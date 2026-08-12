@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   verify_provenance:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 10
     outputs:
       api_image_ref: ${{ steps.verify.outputs.api_image_ref }}
@@ -65,15 +65,29 @@ jobs:
           expected_sha="$(jq -r .head_sha ci-run.json)"
           gh api "repos/$GITHUB_REPOSITORY/pulls/$APPROVAL_PR" > approval-pr.json
           gh api "repos/$GITHUB_REPOSITORY/pulls/$APPROVAL_PR/reviews/$APPROVAL_REVIEW_ID" > approval-review.json
-          jq -e --arg repository "$GITHUB_REPOSITORY" '
-            .merged == true and .base.ref == "main" and .head.repo.full_name == $repository
+          approval_head_sha="$(jq -r .head.sha approval-pr.json)"
+          migration_reviewer="$(jq -r .user.login approval-review.json)"
+          gh api "repos/$GITHUB_REPOSITORY/collaborators/$migration_reviewer/permission" > reviewer-permission.json
+          jq -e --arg repository "$GITHUB_REPOSITORY" --arg expected_sha "$expected_sha" '
+            .merged == true and .base.ref == "main" and
+            .head.repo.full_name == $repository and
+            .merge_commit_sha == $expected_sha
           ' approval-pr.json
-          jq -e --arg actor "$TRIGGERING_ACTOR" --arg marker "MIGRATION-COMPATIBILITY: $expected_sha" '
+          jq -e \
+            --arg actor "$TRIGGERING_ACTOR" \
+            --arg approval_head_sha "$approval_head_sha" \
+            --arg marker "MIGRATION-COMPATIBILITY: $expected_sha" '
             .state == "APPROVED" and .user.login != $actor and
+            .commit_id == $approval_head_sha and
             (.submitted_at | type == "string") and
-            ((.body // "") | contains($marker))
+            (.body // "") == $marker
           ' approval-review.json
-          echo "migration_reviewer=$(jq -r .user.login approval-review.json)" >> "$GITHUB_OUTPUT"
+          jq -e '
+            .permission == "admin" or
+            .permission == "maintain" or
+            .permission == "write"
+          ' reviewer-permission.json
+          echo "migration_reviewer=$migration_reviewer" >> "$GITHUB_OUTPUT"
           echo "migration_review_id=$(jq -r .id approval-review.json)" >> "$GITHUB_OUTPUT"
 
       - name: Download signed provenance from exact CI run
@@ -153,9 +167,18 @@ jobs:
           echo "api_image_ref=$api_image_ref" >> "$GITHUB_OUTPUT"
           echo "worker_image_ref=$worker_image_ref" >> "$GITHUB_OUTPUT"
 
+      - name: Remove transient release material
+        if: always()
+        run: |
+          rm -f "$GITHUB_WORKSPACE/ci-run.json" \
+            "$GITHUB_WORKSPACE/approval-pr.json" \
+            "$GITHUB_WORKSPACE/approval-review.json" \
+            "$GITHUB_WORKSPACE/reviewer-permission.json"
+          rm -rf "$GITHUB_WORKSPACE/provenance" "$RUNNER_TEMP/ii-tonya-provenance"
+
   staging:
     needs: verify_provenance
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 20
     environment: staging
     env:
@@ -264,9 +287,17 @@ jobs:
             bash scripts/deploy-compose-remote.sh rollback-complete
           fi
 
+      - name: Remove transient release material
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/ii-tonya-ssh"
+          rm -f "$RUNNER_TEMP/rollback.env" \
+            "$GITHUB_WORKSPACE/staging-images.txt" \
+            "$GITHUB_WORKSPACE/staging-evidence.txt"
+
   evidence_gate:
     needs: [verify_provenance, staging]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 10
     steps:
       - name: Checkout evidence records
@@ -324,9 +355,17 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Remove transient release material
+        if: always()
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/staging-evidence"
+          rm -f "$GITHUB_WORKSPACE/release-evidence.txt" \
+            "$GITHUB_WORKSPACE/release-evidence.bundle" \
+            "$RUNNER_TEMP/ii-tonya-evidence"
+
   release:
     needs: [verify_provenance, staging, evidence_gate]
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, claw, ii-tonya-release]
     timeout-minutes: 25
     environment: production
     env:
@@ -420,3 +459,9 @@ jobs:
             node scripts/smoke.mjs "--base-url=$BASE_URL"
             bash scripts/deploy-compose-remote.sh rollback-complete
           fi
+
+      - name: Remove transient release material
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/ii-tonya-ssh"
+          rm -f "$RUNNER_TEMP/rollback.env"

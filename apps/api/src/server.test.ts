@@ -144,7 +144,7 @@ describe("server composition", () => {
     await expect(lifecycle.dependencies(config, fakeDb)).rejects.toThrow("expert_referral_key_unavailable");
   });
 
-  it("passes the single startup-validated keyring into runtime dependencies", async () => {
+  it("passes the startup-validated keyring while public expert routes stay disabled", async () => {
     const keyring = {
       currentVersion: "v1",
       activeVersions: ["v1"],
@@ -169,7 +169,14 @@ describe("server composition", () => {
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertCodeKeyring).toBe(keyring);
     expect(dependencies.expertReferralAdminService).toBeDefined();
-    const app = await (await import("./app.js")).buildApp(dependencies);
+    expect(dependencies.expertApi).toBeUndefined();
+    const app = await (await import("./app.js")).buildApp({
+      ...dependencies,
+      config: {
+        ...dependencies.config,
+        features: { expertReferral: false, expertResidencyBilling: false },
+      },
+    });
     expect((app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring).toBe(keyring);
     await app.close();
   });

@@ -311,18 +311,18 @@ flowchart TB
   PROJECT --> CI
   ROOTPKG --> VERIFY
 
-  subgraph NATIVEOPS["Native single-server control plane from current main"]
-    BOOTSTRAP["scripts/bootstrap-native-runner.sh\nACTIVE OPS\nregister self-hosted runner"]
-    RUNNER["GitHub Actions self-hosted runner\nlabel: ii-tonya-server\nACTIVE OPS"]
-    SERVERCTRL["server-control.yml\nACTIVE OPS\nissue/workflow dispatch command runner"]
-    SERVERCMD["ops/server-command.sh\nACTIVE OPS\nprovision/deploy/smoke/TLS"]
-    NATIVECI["server-native.yml\nACTIVE OPS\npush-main native deploy"]
+  subgraph NATIVEOPS["Native single-server recovery control plane"]
+    BOOTSTRAP["scripts/bootstrap-native-runner.sh\nLEGACY/HISTORICAL\nnative runner bootstrap"]
+    RUNNER["GitHub Actions self-hosted runner\nlabel: ii-tonya-server\nOFFLINE LEGACY"]
+    SERVERCTRL["server-control.yml\nDISABLED LEGACY\nmanual refusal only"]
+    SERVERCMD["ops/server-command.sh\nLEGACY/HISTORICAL\nnot workflow-reachable"]
+    NATIVECI["server-native.yml\nDISABLED LEGACY\nno push or deploy"]
     HOST["single server /opt/ii-tonya-platform\nsystemd + PostgreSQL + nginx\nACTIVE OPS"]
     DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nACTIVE OPS endpoint"]
     BOOTSTRAP --> RUNNER
-    SERVERCTRL --> RUNNER --> SERVERCMD --> HOST
-    NATIVECI --> RUNNER
-    NATIVECI --> HOST
+    SERVERCTRL -. disabled .-> RUNNER
+    RUNNER -. historical .-> SERVERCMD -. historical .-> HOST
+    NATIVECI -. disabled .-> RUNNER
     HOST --> API
     HOST --> APPWORKER
     HOST --> DOMAINLIVE
@@ -336,7 +336,7 @@ flowchart TB
     PREFLIGHT["preflight-expert-referral-migration.mjs\nACTIVE RELEASE TOOL"]
     CLAWTEST["run-claw-container-tests.sh\nACTIVE TEST TOOL"]
     ENVVAL["validate-runtime-env.sh\nACTIVE RELEASE TOOL"]
-    REPEAT["repeat-vitest.mjs\nACTIVE TEST TOOL\nlocal <=2 / CI 20x"]
+    REPEAT["repeat-vitest.mjs\nACTIVE TEST TOOL\nhard maximum 3x"]
     REMOTEDEPLOY["deploy-compose-remote.sh\nACTIVE RELEASE TOOL; gated"]
     DEVCHK --> ROOTPKG
     PREFLIGHT --> DBGATE
@@ -420,53 +420,59 @@ flowchart TB
 
 There are no package-level orphans. Internal dependencies are:
 
-| From | To |
-|---|---|
-| `apps/api` | application, config, db, integrations, observability |
-| `apps/worker` | config, db, integrations, observability, worker |
-| `packages/application` | contracts, domain |
-| `packages/db` | contracts, domain, integrations |
-| `packages/integrations` | contracts |
-| `packages/worker` | application, contracts, db, domain, integrations |
-| `packages/config` | reached from both composition roots |
-| `packages/contracts` | reached by application/db/integrations/worker |
-| `packages/domain` | reached by application/db/worker |
-| `packages/observability` | reached by both composition roots |
+| From                     | To                                                   |
+| ------------------------ | ---------------------------------------------------- |
+| `apps/api`               | application, config, db, integrations, observability |
+| `apps/worker`            | config, db, integrations, observability, worker      |
+| `packages/application`   | contracts, domain                                    |
+| `packages/db`            | contracts, domain, integrations                      |
+| `packages/integrations`  | contracts                                            |
+| `packages/worker`        | application, contracts, db, domain, integrations     |
+| `packages/config`        | reached from both composition roots                  |
+| `packages/contracts`     | reached by application/db/integrations/worker        |
+| `packages/domain`        | reached by application/db/worker                     |
+| `packages/observability` | reached by both composition roots                    |
 
 ### Native server control plane
 
-Current `main` adds a second operational deployment/control path and it is now part of this graph:
+The native server files remain visible in the graph as recovery history, but they are not
+an alternative release path:
 
 - `scripts/bootstrap-native-runner.sh` registers the self-hosted `ii-tonya-server` runner and grants temporary bootstrap sudo.
-- `.github/workflows/server-control.yml` dispatches `ops/server-command.sh` on that runner and publishes command output back to the control issue.
-- `.github/workflows/server-native.yml` provisions and deploys API/worker to the single host on `main` push or workflow dispatch.
+- `.github/workflows/server-control.yml` contains only a manual explicit refusal and never
+  checks out or invokes `ops/server-command.sh`.
+- `.github/workflows/server-native.yml` has no push trigger or deployment code; its only
+  job explicitly refuses a manual legacy dispatch.
 - `ops/server-command.sh` provisions PostgreSQL/nginx/systemd, deploys the exact workspace, runs smoke checks, and configures TLS when DNS is ready.
 - Runtime env written by this ops plane keeps Selarti, Planerka, Telegram, LLM, Make, Sheets, intent model, and payments disabled.
 
-These nodes are `ACTIVE OPS`; they are not classified as dead code and they do not grant business-domain authority to external providers.
+`server-control.yml` and `server-native.yml` are disabled refusal paths.
+`ops/server-command.sh` is retained only as legacy recovery history. The
+provenance-bound `release.yml` is the sole release entrypoint and uses the isolated
+`ii-tonya-release-claw` identity.
 
 ### Intentionally non-live nodes
 
-| Entity | Mark | Reason |
-|---|---|---|
-| Expert residency disabled payment adapter | `DISABLED` | Explicit fail-closed provider boundary. |
-| Expert residency disabled provider reader | `DISABLED` | No reviewed live provider reader. |
-| Unknown-outcome worker placeholder | `DISABLED` | Lifecycle slot retained while providers are disabled. |
-| Processor-privacy worker placeholder | `DISABLED` | Capability not composed yet. |
-| Generic provider reconciliation placeholder | `DISABLED` | No approved provider reader. |
-| Old migrations/snapshots | `LEGACY/HISTORICAL` | Required for replay and schema parity. |
-| Handoffs/test evidence/SDD progress | `EVIDENCE` | Required for exact-SHA recovery/audit; no runtime edge expected. |
+| Entity                                      | Mark                | Reason                                                           |
+| ------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
+| Expert residency disabled payment adapter   | `DISABLED`          | Explicit fail-closed provider boundary.                          |
+| Expert residency disabled provider reader   | `DISABLED`          | No reviewed live provider reader.                                |
+| Unknown-outcome worker placeholder          | `DISABLED`          | Lifecycle slot retained while providers are disabled.            |
+| Processor-privacy worker placeholder        | `DISABLED`          | Capability not composed yet.                                     |
+| Generic provider reconciliation placeholder | `DISABLED`          | No approved provider reader.                                     |
+| Old migrations/snapshots                    | `LEGACY/HISTORICAL` | Required for replay and schema parity.                           |
+| Handoffs/test evidence/SDD progress         | `EVIDENCE`          | Required for exact-SHA recovery/audit; no runtime edge expected. |
 
 ### Deferred / prohibited nodes
 
-| Entity | Mark | Enforcement |
-|---|---|---|
-| Client `500/500` coupon executable model | `DEFERRED` | Separate from expert referral context. |
-| Waitlist runtime | `DEFERRED` | Outside current release. |
-| Expert reschedule composite runtime | `DEFERRED` | Outside current release. |
-| Live expert-residency payment SDK/network adapter | `PROHIBITED` | Scope boundary rejects provider capability. |
-| Make/Sheets authoritative financial/booking writes | `PROHIBITED` | PostgreSQL authority + architecture guards. |
-| LLM direct transactional mutation | `PROHIBITED` | Typed proposal + deterministic server reauthorization. |
+| Entity                                             | Mark         | Enforcement                                            |
+| -------------------------------------------------- | ------------ | ------------------------------------------------------ |
+| Client `500/500` coupon executable model           | `DEFERRED`   | Separate from expert referral context.                 |
+| Waitlist runtime                                   | `DEFERRED`   | Outside current release.                               |
+| Expert reschedule composite runtime                | `DEFERRED`   | Outside current release.                               |
+| Live expert-residency payment SDK/network adapter  | `PROHIBITED` | Scope boundary rejects provider capability.            |
+| Make/Sheets authoritative financial/booking writes | `PROHIBITED` | PostgreSQL authority + architecture guards.            |
+| LLM direct transactional mutation                  | `PROHIBITED` | Typed proposal + deterministic server reauthorization. |
 
 ## Orphan policy
 
@@ -477,11 +483,13 @@ Current architecture-level result:
 - Workspace package orphans: **0**.
 - Composition-root orphans: **0**.
 - Known expert referral/residency module orphans: **0**.
-- Native server-control nodes: connected and `ACTIVE OPS`.
+- Native server-control nodes: retained and classified as disabled or historical.
 - File/symbol-level dead-code deletion: **not automatic**. A definitive removal decision requires static references plus dynamic imports, package exports, Fastify registration, migration/workflow/script references, test entrypoints, and evidence-retention review.
 
 If a future scan finds a true orphan, add it here as `ORPHAN-CANDIDATE` before deleting it. The inventory must expose dead code rather than make it invisible.
 
 ## Release state
 
-This graph does not authorize provider activation. The native server control plane can deploy the application shell, but expert referral/residency and live provider flags remain fail-closed until exact-SHA verification and the documented staging/production approvals are satisfied.
+This graph does not authorize provider activation. Only the gated release workflow can
+deploy, and expert referral/residency plus live provider flags remain fail-closed until
+exact-SHA verification and the documented staging/production approvals are satisfied.

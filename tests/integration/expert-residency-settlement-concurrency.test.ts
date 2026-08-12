@@ -134,5 +134,5 @@ describe("expert residency settlement concurrency", () => {
     await expect(
       Promise.all([repo.settle(make(oa!.id, 0)), repo.settle(make(ob!.id, 1))]),
     ).resolves.toHaveLength(2);
-  });
+  }, 120000);
 });

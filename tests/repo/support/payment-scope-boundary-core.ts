@@ -138,7 +138,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "9f2991da5e1a5721953b467d585a87dbee14a865f98f2481060a09d6c68150fb",
+    "28b2a871d651c29055c2e9949d740d8a9d6fff17545acbc005ca45bf435b2e41",
   ],
   [
     ".github/workflows/db-gate.yml",
@@ -146,7 +146,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/release.yml",
-    "547acbd9a8121c53641636512fe7f7048ec57c448332bd190d84090d06658953",
+    "185f7d06475b6bbcdc756cb74cf47c5927a56d1737a677c990999ccc94895f91",
   ],
   [
     "deploy/compose.remote.yml",
@@ -159,6 +159,10 @@ const approvedAutomationArtifactHashes = new Map([
   [
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
+  ],
+  [
+    "scripts/run-claw-actions-job.sh",
+    "bdc9b13f4dc1d4a1091ec24220aaa42199a1e2887bd26311741ae3e8871c7ffb",
   ],
   [
     "scripts/deploy-compose-remote.sh",

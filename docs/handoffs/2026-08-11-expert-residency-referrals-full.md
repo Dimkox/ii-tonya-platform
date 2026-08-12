@@ -166,7 +166,8 @@ At the latest graph pass:
 - workspace package orphans: none known
 - composition-root orphans: none known
 - known expert-referral/residency orphan modules: none known
-- native server-control assets from current `main` are represented as `ACTIVE OPS`
+- native server-control assets from the historical `main` snapshot are retained as
+  `LEGACY/HISTORICAL`; both entry workflows now refuse deployment
 
 ### 5.3 Native server control from current main
 
@@ -178,8 +179,9 @@ branch:
 - `ops/server-command.sh`
 - `scripts/bootstrap-native-runner.sh`
 
-These are operational deployment/control assets, not product/financial authority.
-They are included in the architecture graph and exact tracked-automation scope pinning.
+These are retained operational history, not product/financial authority. The two
+workflows are fail-closed refusal paths; `ops/server-command.sh` is not workflow-reachable.
+They remain in the architecture graph and exact tracked-automation scope pinning.
 
 Important consequence: after a future merge to `main`, the native deployment workflow
 may run on the self-hosted `ii-tonya-server` runner. Do not merge PR #4 merely to obtain
@@ -283,7 +285,7 @@ Implemented:
 - security/go-live addendum:
   `docs/security/expert-residency-referrals-go-live-gates.md`
 - release-readiness/env/architecture/workspace/workflow/scope guards
-- expert-residency schema parity and CI-only 20x database gates in
+- expert-residency schema parity and three-run database gates in
   `.github/workflows/db-gate.yml`
 - exact workflow scope pinning through
   `tests/repo/support/payment-scope-boundary.ts`
@@ -297,8 +299,8 @@ Database Gate now registers CI-only repeated gates for:
 - exact payment deadline behavior
 - held reward replay
 
-Do not run the 20x repeat suite manually. `AGENTS.md` limits normal local/agent repeat
-counts; 20x stability is a hosted-CI responsibility.
+Do not run any repeat suite more than three times. `AGENTS.md` and the repeat runner
+enforce the same hard limit in every environment.
 
 ## 7. Last local verification result and exact unresolved test
 
@@ -451,7 +453,7 @@ Before marking Tasks 11–12 and PR #4 complete:
 - fixed release-candidate E2E green on current source — PASS at `c560cbb65e105e1aaeb8d86f544ff95cfd218346`
 - one final `pnpm verify` green on current source
 - hosted CI PASS on the exact candidate SHA
-- hosted Database Gate PASS on the exact candidate SHA, including registered 20x expert
+- hosted Database Gate PASS on the exact candidate SHA, including registered 3x expert
   concurrency/deadline/replay gates
 - independent migration/schema review
 - independent financial state-machine review for settlement/refund/reversal/debt/hold
@@ -620,14 +622,21 @@ Do not deploy/merge merely because implementation Tasks 1–12 exist.
 Current feature state is pre-release. Live activation requires explicit evidence and
 approval beyond code completion.
 
-The synchronized native deploy workflow is operationally significant:
+GitHub Free does not provide private-repository branch protection or rulesets. The
+release perimeter is therefore fail-closed independently of that paid capability:
 
-- `.github/workflows/server-native.yml` triggers on pushes to `main`
-- it deploys to a self-hosted `ii-tonya-server` runner
-- it provisions/builds/restarts API and worker and probes `ii-tonya.ru`
-- its runtime template keeps product/provider integrations disabled
+- `.github/workflows/server-native.yml` has no push trigger or deployment code; a manual
+  dispatch only emits an explicit refusal
+- `.github/workflows/server-control.yml` also contains only an explicit refusal and never
+  checks out or invokes `ops/server-command.sh`
+- `.github/workflows/release.yml` is the sole release entrypoint
+- every release job uses the isolated `ii-tonya-release-claw` runner under the locked
+  `ii_tonya_release` OS account; it has no test label or Docker-group access
+- release still requires successful exact-main CI provenance, signed artifacts,
+  independent exact-SHA migration approval by a write-capable reviewer, staging evidence,
+  and explicit production dispatch
 
-Therefore PR #4 merge is itself a deployment-sensitive action and must remain gated.
+A merge can update `main`, but cannot activate the legacy native deployment path.
 
 ## 18. Claw / environment notes
 
@@ -683,7 +692,7 @@ runner/account failures and documents the fixes that followed.
 - Do not widen client Selarti intents with expert financial intents without a full
   channel-boundary redesign.
 - Do not remove database constraints to make a test fixture pass.
-- Do not run local 20x repeat loops.
+- Do not run repeat loops with a count greater than three.
 - Do not run full verification repeatedly after every small change.
 - Do not force-push PR #4.
 - Do not mark PR ready or merge while current exact-SHA verification is incomplete.
@@ -780,14 +789,14 @@ Operational cleanup completed after the test-only API increment:
 The zero-job `server-control` push failure had a separate repository root cause: the
 `control-event-ack: ...` text appeared in an unquoted YAML plain scalar. GitHub could not
 parse the workflow and therefore created a path-named failure with zero jobs on each push.
-The repair also closes security defects found during independent review and incorporates
-the current `main` control policy:
+That historical repair was later superseded by a stricter release review. The current
+control policy is:
 
 - issue-driven execution is removed entirely; only explicit manual `workflow_dispatch`
   remains;
 - workflow token access is reduced to `contents: read`;
-- raw command output is neither posted to issues nor committed to a control branch; only
-  safe exit/run metadata is written to the Actions step summary;
+- `server-control.yml` performs no checkout or command execution and fails explicitly;
+- `ops/server-command.sh` remains inert legacy recovery history;
 - the server command error trap no longer includes `$BASH_COMMAND`, and the database
   password setup failure emits only a fixed diagnostic.
 
@@ -797,8 +806,8 @@ is 110/110 PASS across workflow semantics and recursive scope boundaries.
 
 Evidence is recorded under
 `docs/test-evidence/claw/4cfcc32-server-control-validation/verification.md`.
-GitHub-hosted CI and Database Gate remain externally blocked by the account Billing or
-Actions spending-limit annotation. No spending limit was changed.
+CI and Database Gate now run on the constrained Claw test runner and do not consume
+GitHub-hosted Actions minutes.
 
 ## 24. Minimal continuation summary
 
@@ -815,3 +824,87 @@ If there is no time to read the entire handoff, do exactly this:
 9. update traceability/evidence
 10. keep PR Draft and all live expert payment/referral flags disabled until explicit
     release approval
+
+## 25. 2026-08-12 continuation: expert Bearer principal boundary
+
+The bounded authentication increment adds a provider-neutral Expert Bearer principal
+resolver without composing a live identity/session provider. The resolver accepts only a
+strict Bearer token, passes a SHA-256 token hash to a fresh lookup on every request,
+rejects expired/revoked/malformed session records, and returns only normalized UUID
+principal identifiers. Lookup failure is converted to a fixed internal error; the
+composed API test proves its HTTP response is sanitized `500 internal_error` rather than
+leaking a bearer token.
+
+New implementation and tests:
+
+- `apps/api/src/expert-principal-resolver.ts`
+- `apps/api/src/expert-principal-resolver.test.ts`
+- `apps/api/src/routes/expert-referral.ts`
+- `apps/api/src/index.ts`
+- `apps/api/src/app.test.ts`
+
+Claw focused evidence is retained at
+`docs/test-evidence/claw/83e20da-expert-bearer-principal/verification.md`. A fresh
+authorized run synchronized from exact code commit
+`93334aa487572f305fd612cc4e1eaaa93703bb74`, using `ii-tonya-test` image tag
+`7d71646347d560ff2b5d8ebc4c0aad5b48230254`, passed 2 files and 37 tests in 5.00s
+(resolver 16/16; composed API 21/21). Task 1 separately recorded its resolver-only
+GREEN run as 16/16 in 717ms.
+
+Static evidence is intentionally qualified: the requested API-specific TypeScript command
+is not runnable because `apps/api/tsconfig.json` is absent; no replacement typecheck was
+substituted. Prettier 3.9.6 reports whole-file historical formatting in `app.test.ts`;
+the identical check on unchanged `HEAD` also fails, so broad reformatting was not mixed
+into this increment. See the Claw evidence for exact commands and outcomes.
+
+Task 1 self-review and Task 2 self-review found no scope expansion into a database,
+session provider, configuration, Compose, Billing, production, or deployment path. An
+independent Critical/Important review found three Important evidence issues: conflated
+ERR-AUTH-007/008 verification, no exact final tested SHA/image/duration, and transient
+publication prose. This continuation remediates all three. A clean independent re-review
+is a prerequisite for controller publication; record its result in controller evidence
+and verify identical local and `origin` branch SHAs after push. Hosted CI and external
+approvals remain required before release.
+
+ERR-AUTH-008 now has separate focused Claw evidence at exact branch commit
+`b1777bd8e54fa86c54615b5f50157f7e9a48d34c`: the real Pino serialization test passed
+2/2 in 719ms using test image `7d71646347d560ff2b5d8ebc4c0aad5b48230254`.
+The mounted source was restored to base and the cleanup check returned zero test
+containers and zero focused processes. Hosted CI/security regression is still mandatory;
+the GitHub jobs remain unable to start because of the account Billing/spending-limit gate.
+
+Unchanged boundaries:
+
+```text
+default server expert capability = ABSENT
+expert referral activation = OFF
+expert residency billing activation = OFF
+live identity/session provider = NOT COMPOSED
+release status = NO-GO until hosted CI and external approvals pass
+```
+
+## 2026-08-12 three-run test policy and final Claw gate
+
+Repeat count is capped at three everywhere, including CI; all Database Gate
+commands now use 3x. Production-like container smoke remains a single run. On exact
+source `ce72fa3d21f5a913ff06f1f8afa0eb883e89fb13`, Claw passed frozen install, build,
+format, deploy contract, lint, workspace typecheck, dependency audit, and three complete
+Vitest runs: 120/120 files and 983/983 tests in 310.94s, 316.30s and 314.17s. The audit
+found no known vulnerabilities. Raw evidence/checksums remain in the Claw results
+directory named `<exact-sha>-three-pass`. The mounted source was restored to `83e20da`;
+cleanup proved zero test containers and zero test processes. The later self-hosted CI
+migration removed the hosted Actions/Billing dependency; release remains NO-GO until the
+exact current SHA, independent review, migration approval, staging evidence, and explicit
+human deployment approval all pass.
+
+## 2026-08-12 isolated release-control hardening
+
+- `server-control.yml` and `server-native.yml` are manual refusal workflows only.
+- Test runner `ii-tonya-claw` carries `ii-tonya-test` and no release label.
+- Release runner `ii-tonya-release-claw` carries `ii-tonya-release` and no test label,
+  runs as `ii_tonya_release`, and cannot access the Docker socket through group membership.
+- Migration approval must bind the merged PR merge commit to the exact CI SHA, the review
+  to the PR head SHA, an exact `MIGRATION-COMPATIBILITY: <sha>` body, and a reviewer with
+  repository write, maintain, or admin permission.
+- Every secret-bearing release job has `always()` cleanup for SSH keys, rollback state,
+  provenance, and transient approval/evidence files.

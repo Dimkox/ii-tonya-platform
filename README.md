@@ -18,16 +18,22 @@ The previously standalone expert HTTP boundary is now composable through the nor
 application for injected test capabilities; runtime startup fails closed if expert flags
 are enabled without that complete capability. No live authentication or payment provider
 is supplied, and all deployment defaults remain disabled.
-GitHub-hosted CI/Database Gate jobs at that SHA still fail before their first workflow
-step, so they are neither code-test failures nor PASS evidence. Final aggregate verify,
-independent reviews, and human/release approvals remain open.
+CI and Database Gate run on the repository-scoped self-hosted Claw runner and execute
+inside the constrained `ii-tonya-test` Compose profile. They do not consume GitHub-hosted
+Actions minutes. Pull-request execution is restricted to repository-owner branches;
+external pull requests are not allowed to run untrusted code on Claw. Final aggregate
+verify, independent reviews, and human/release approvals remain open.
 
-The current hosted-job annotation identifies the external blocker precisely: GitHub did
-not start the jobs because account payments failed or the Actions spending limit must be
-increased. The separate zero-job `server-control` failure was a YAML parse error and is
-covered by a validated repository fix. That workflow is now manual-dispatch only, uses
-read-only repository permission, and publishes no raw command output. Changing Billing
-remains a human financial action.
+The separate `server-control` workflow is manual-dispatch only and contains only an
+explicit refusal. It cannot checkout or execute `ops/server-command.sh`.
+GitHub Free does not expose private-repository branch protection or rulesets. The
+repository therefore fails closed at the release perimeter: the legacy native workflow
+contains only an explicit refusal job, and the provenance-bound manual `Gated release` is the sole
+release entrypoint. Its jobs run on the isolated `ii-tonya-release-claw` runner under the
+`ii_tonya_release` OS account, which has neither the test label nor Docker-group access.
+The release control plane does not require hosted Actions minutes.
+Repository merge settings allow squash only and delete merged branches; staging and
+production deployment environments accept only `main`.
 
 The authoritative continuation checkpoint is
 `docs/handoffs/2026-08-11-expert-residency-referrals-full.md`; the older handoff and

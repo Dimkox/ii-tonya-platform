@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildTestApp } from "./app.js";
+import { createExpertBearerPrincipalResolver } from "./expert-principal-resolver.js";
 import type { ExpertReferralApiDependencies } from "./routes/expert-referral.js";
 
 const testExpertApi = (options: {
+  principals?: ExpertReferralApiDependencies["principals"];
   summary?: ExpertReferralApiDependencies["referrals"]["summary"];
 } = {}): ExpertReferralApiDependencies => ({
-  principals: {
+  principals: options.principals ?? {
     resolve: async () => ({
       authenticated: true,
       userId: "00000000-0000-4000-8000-000000000001",
@@ -236,6 +238,32 @@ describe("API boundary", () => {
       headers: { authorization: "Bearer __PLACEHOLDER_EXPERT_SESSION__" },
     });
     expect(response.statusCode).toBe(500);
+    await app.close();
+  });
+
+  it("sanitizes expert session lookup failures in the composed path", async () => {
+    const token = "A".repeat(32);
+    const app = await buildTestApp({
+      expertApi: testExpertApi({
+        principals: createExpertBearerPrincipalResolver({
+          sessions: {
+            findByTokenHash: async () => {
+              throw new Error(`identity backend leaked ${token}`);
+            },
+          },
+        }),
+      }),
+      features: { expertReferral: true, expertResidencyBilling: false },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/expert/referrals/summary",
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "internal_error" });
+    expect(response.body).not.toContain(token);
     await app.close();
   });
 });

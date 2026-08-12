@@ -24,7 +24,7 @@ Duration    7.23s
 ```
 
 The scenario covers the disabled-boundary expert referral financial lifecycle and
-asserts zero live-provider artifacts. No `test:repeat` command was run; 20x gates remain
+asserts zero live-provider artifacts. No `test:repeat` command was run; three-run gates remain
 CI-only.
 
 ## Runtime contract and cleanup
