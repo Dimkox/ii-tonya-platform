@@ -65,3 +65,16 @@
 | 8 | complete | `1569fac` | services/flags `74c2618`, keyring/YAML hardening `fd56d94`, integration fixture fixes `545c6c0`, `68743bc`, supply-chain remediation `4745874`, `ebee01e` | PASS | PASS after YAML, retained-key, runtime-keyring, fixture-isolation, and major-bounded dependency override fix loops; no findings | exact-SHA CI `30853902210` PASS; Database Gate `30853902195` PASS; final Claw run `30855476532` PASS on source `ebee01e`; Task 8 focused gate, migration preflight, non-container baseline, PostgreSQL baseline, redemption/checkout/settlement/hold-refund-replay concurrency 20/20 each, E2E, isolated cleanup PASS; immutable asset `500564058`, SHA-256 `edb1625e425d9b306284abb3f044fee1e75d698025953bdb922e9bce32742d89`; failed precursor CI runs `30819003633`, `30819595217`, `30852063573`, `30852771172` retained as diagnostic evidence |
 | 9 | complete | `ebee01e` | admin workflows `7fbce4d`; approval/replay hardening `9d93a62`..`a121e21` | PASS | PASS after approval ownership, immutable replay, semantic result, deadlock-ordering, and Drizzle error-unwrapping fix loops; no findings | exact-SHA CI `30865251809` PASS; Database Gate `30865251814` PASS; focused tests/typecheck/lint and independent review PASS |
 | 10–12 | pending | — | — | — | — | — |
+
+## Expert Bearer principal boundary
+
+- Plan: `docs/superpowers/plans/2026-08-12-expert-bearer-principal.md`
+- Branch: `codex/expert-bearer-principal`
+- Baseline commit: `80bcfbf07188f8f53e3dd8d6e219a884f866829d`
+- Test target: existing `ii-tonya-test` profile on Claw; focused runs only; production and Compose stay unchanged.
+
+| Task | Status | Base | Implementer report | Spec review | Quality review | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1. Provider-neutral resolver | complete | `80bcfbf` | `8efb458`; report PASS with missing planned tsconfig noted | PASS | PASS; no findings | Claw RED expected missing module; GREEN 16/16; ESLint, Prettier, diff check PASS; remote restored and cleanup 0/0 |
+| 2. Composed API failure semantics | complete | `8efb458` | `93334aa`; report PASS with known tsconfig/legacy Prettier limitations | PASS | PASS; no findings | Claw valid RED 20/21; GREEN 37/37; ESLint/diff check PASS; remote restored and cleanup 0/0 |
+| 3. Traceability and evidence | complete | `93334aa` | `4eb2d40`, remediation `0eea9bf`, durable gate `1a93419` | PASS after three evidence fixes | PASS; no Critical/Important findings | exact source `93334aa`; image `7d71646347d560ff2b5d8ebc4c0aad5b48230254`; Claw 37/37 in 5.00s; restored base; cleanup 0/0 |
