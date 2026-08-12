@@ -31,7 +31,7 @@ export async function startExternalPostgresDatabase(
     stop: async () => {
       const cleanup = new Pool({ connectionString: adminUrl, max: 1 });
       try {
-        await cleanup.query(`drop database if exists "${name}" with (force)`);
+        await cleanup.query(`drop database if exists "${name}"`);
       } finally {
         await cleanup.end();
       }
