@@ -852,9 +852,10 @@ Task 1 self-review and Task 2 self-review found no scope expansion into a databa
 session provider, configuration, Compose, Billing, production, or deployment path. An
 independent Critical/Important review found three Important evidence issues: conflated
 ERR-AUTH-007/008 verification, no exact final tested SHA/image/duration, and transient
-publication prose. This continuation remediates all three; clean re-review remains
-required. After controller publication, verify that local and `origin` branch SHAs are
-identical. Hosted CI and external approvals remain required before release.
+publication prose. This continuation remediates all three. A clean independent re-review
+is a prerequisite for controller publication; record its result in controller evidence
+and verify identical local and `origin` branch SHAs after push. Hosted CI and external
+approvals remain required before release.
 
 Unchanged boundaries:
 
