@@ -911,8 +911,17 @@ const inspectTypeScript = (
       )
     ) {
       const tableName = literalText(node.arguments[0]);
-      if (tableName && !approvedDatabaseRelations.has(tableName)) {
-        violations.push(`unapproved database relation: ${tableName}`);
+      if (tableName) {
+        if (
+          SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(tableName) &&
+          !SANDBOX_PAYMENT_ALLOWED_PATHS.has(path)
+        ) {
+          violations.push(
+            `sandbox relation outside sandbox package: ${tableName}`,
+          );
+        } else if (!approvedDatabaseRelations.has(tableName)) {
+          violations.push(`unapproved database relation: ${tableName}`);
+        }
       }
     }
 
@@ -1067,10 +1076,19 @@ const inspectMigration = (
     /\bcreate\s+(?:materialized\s+)?(?:table|view)\s+(?:if\s+not\s+exists\s+)?(?:(?:"?[\w]+"?)\.)?"?([\w]+)"?/giu,
   )) {
     const relationName = match[1];
-    if (relationName && !approvedDatabaseRelations.has(relationName)) {
-      violations.push(
-        `unapproved database migration relation: ${relationName}`,
-      );
+    if (relationName) {
+      if (
+        SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(relationName) &&
+        !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+      ) {
+        violations.push(
+          `sandbox migration relation outside sandbox package: ${relationName}`,
+        );
+      } else if (!approvedDatabaseRelations.has(relationName)) {
+        violations.push(
+          `unapproved database migration relation: ${relationName}`,
+        );
+      }
     }
   }
 };
