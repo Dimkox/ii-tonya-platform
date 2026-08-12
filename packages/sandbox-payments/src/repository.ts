@@ -17,6 +17,7 @@ import {
 
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 type Executor = Pick<DrizzleDb, "execute"> | Transaction;
+const repositoryEvents = new WeakSet<object>();
 
 type StoredCommandRow = Record<string, unknown> & {
   payloadDigest: string;
@@ -77,6 +78,23 @@ function replayResult<T>(
     throw new SandboxPaymentConflictError();
   }
   return parse(stored.result);
+}
+
+function repositoryEvent(value: unknown): SandboxProviderEvent {
+  const event = Object.freeze(sandboxProviderEventSchema.parse(value));
+  repositoryEvents.add(event);
+  return event;
+}
+
+export function isRepositoryOwnedSandboxEvent(
+  value: unknown,
+): value is SandboxProviderEvent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.isFrozen(value) &&
+    repositoryEvents.has(value)
+  );
 }
 
 export async function migrateSandboxDatabase(db: DrizzleDb): Promise<void> {
@@ -198,8 +216,8 @@ export class PostgresSandboxPaymentRepository {
           parsed.idempotencyKey,
         );
         if (replay) {
-          return replayResult(replay, commandDigest, (value) =>
-            sandboxProviderEventSchema.parse(value),
+          return repositoryEvent(
+            replayResult(replay, commandDigest, (value) => value),
           );
         }
 
@@ -280,7 +298,7 @@ export class PostgresSandboxPaymentRepository {
             ${JSON.stringify(event)}::jsonb, transaction_timestamp()
           )
         `);
-        return event;
+        return repositoryEvent(event);
       }),
     );
   }
@@ -298,7 +316,7 @@ export class PostgresSandboxPaymentRepository {
       limit 1
     `);
     const row = result.rows[0];
-    return row ? sandboxProviderEventSchema.parse(row.payload) : null;
+    return row ? repositoryEvent(row.payload) : null;
   }
 
   async markEventProcessed(eventId: string): Promise<void> {
