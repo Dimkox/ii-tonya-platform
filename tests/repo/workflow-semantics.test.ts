@@ -258,9 +258,6 @@ describe("CI and release workflow semantics", () => {
   });
 
   it("runs the mandatory expert residency database gates three times", () => {
-    const workflow = parse(
-      readFileSync(".github/workflows/db-gate.yml", "utf8"),
-    );
     const runs = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
 
     expect(runs).toContain("tests/repo/db-schema-parity.test.ts");
