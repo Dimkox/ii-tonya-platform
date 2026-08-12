@@ -7,26 +7,47 @@ type WorkflowStep = { name?: string; run?: string; uses?: string };
 type WorkflowJob = {
   if?: string;
   needs?: string;
+  "runs-on"?: string | string[];
   steps: Array<WorkflowStep & { id?: string; if?: string }>;
 };
 
 describe("CI and release workflow semantics", () => {
+  it("runs mandatory pull-request checks on the isolated Claw test profile", () => {
+    for (const [file, jobName, mode] of [
+      [".github/workflows/ci.yml", "verify", "ci"],
+      [".github/workflows/db-gate.yml", "postgres-schema", "database"],
+    ] as const) {
+      const workflow = parse(readFileSync(file, "utf8"));
+      const job = workflow.jobs[jobName] as WorkflowJob;
+      expect(job["runs-on"]).toEqual([
+        "self-hosted",
+        "linux",
+        "x64",
+        "claw",
+        "ii-tonya-test",
+      ]);
+      expect(job.if).toContain("github.repository_owner");
+      expect(job.if).toContain("github.event.pull_request.user.login");
+      expect(JSON.stringify(job)).toContain(
+        `scripts/run-claw-actions-job.sh ${mode}`,
+      );
+      expect(JSON.stringify(job)).not.toContain("ubuntu-24.04");
+    }
+  });
+
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];
-    const install = steps.findIndex((step) =>
-      step.run?.includes("pnpm install --frozen-lockfile"),
-    );
-    const build = steps.findIndex((step) => step.run?.trim() === "pnpm build");
-    const executable = steps
-      .map((step, index) => ({ index, run: step.run ?? "" }))
-      .filter(({ run }) =>
-        /\bpnpm (exec|verify|test|lint|typecheck)\b/.test(run),
-      );
+    const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
+    const install = runner.indexOf("pnpm install --frozen-lockfile");
+    const build = runner.indexOf("pnpm build", install);
+    const verify = runner.indexOf("pnpm exec vitest run --maxWorkers=1", build);
     expect(install).toBeGreaterThanOrEqual(0);
     expect(build).toBeGreaterThan(install);
-    expect(executable.every(({ index }) => index > build)).toBe(true);
-    expect(steps.some((step) => step.run?.includes("pnpm verify"))).toBe(true);
+    expect(verify).toBeGreaterThan(build);
+    expect(
+      steps.some((step) => step.run?.includes("run-claw-actions-job.sh ci")),
+    ).toBe(true);
     expect(JSON.stringify(workflow)).not.toContain("corepack");
   });
 
@@ -240,9 +261,7 @@ describe("CI and release workflow semantics", () => {
     const workflow = parse(
       readFileSync(".github/workflows/db-gate.yml", "utf8"),
     );
-    const runs = (workflow.jobs["postgres-schema"].steps as WorkflowStep[])
-      .map((step) => step.run ?? "")
-      .join("\n");
+    const runs = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
 
     expect(runs).toContain("tests/repo/db-schema-parity.test.ts");
     for (const path of [

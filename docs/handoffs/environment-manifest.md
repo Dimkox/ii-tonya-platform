@@ -15,7 +15,7 @@ Repository pins are authoritative; the observed source workstation is diagnostic
 | Bash                       | required for deployment-policy syntax checks   | `package.json#verify:deploy`              |
 | Docker Engine + Compose v2 | required for container and PostgreSQL evidence | `compose.yaml`, CI                        |
 | PostgreSQL                 | 17.5 Bookworm container for local evidence     | `compose.yaml`                            |
-| CI operating system        | Ubuntu 24.04                                   | `.github/workflows/ci.yml`, `db-gate.yml` |
+| CI execution               | self-hosted Claw, constrained test container   | `.github/workflows/ci.yml`, `db-gate.yml` |
 | Text                       | UTF-8, LF, EditorConfig                        | `.editorconfig`, `.gitattributes`         |
 
 GitHub CLI is recommended for PR/check inspection but is not required to build. Codex,
@@ -46,8 +46,8 @@ Consequences:
   evidence because its Node major is wrong.
 - Full local container/PostgreSQL verification cannot run there until Docker is
   installed and healthy.
-- Exact-SHA GitHub Actions using Node 24 and Ubuntu 24.04 are the current authoritative
-  environment evidence.
+- Exact-SHA GitHub Actions on the self-hosted Claw runner, with execution inside the
+  constrained Node 24 test container, are the current authoritative environment evidence.
 
 ## Clean-machine bootstrap
 
@@ -159,6 +159,11 @@ only through its existing `ii-tonya-test` Compose profile:
 - For a genuinely focused Vitest invocation, override the profile's broad default test
   entrypoint with `docker compose ... run --entrypoint sh ii-tonya-test -lc '<command>'`;
   otherwise the wrapper performs unrelated build and verification work first.
+- The repository-scoped Actions runner lives at `/home/pall/actions-runner-ii-tonya`, is
+  managed by `actions.runner.Dimkox-ii-tonya-platform.ii-tonya-claw.service`, and carries
+  the labels `self-hosted`, `linux`, `x64`, `claw`, and `ii-tonya-test`.
+- CI and Database Gate use `scripts/run-claw-actions-job.sh`; no GitHub-hosted runner or
+  hosted Actions minute is required. Pull-request execution is owner-only.
 
 Machine authentication is not a repository input. The source workstation currently has
 a dedicated machine-local SSH key at
@@ -173,10 +178,11 @@ revoked and replaced in GitHub account settings.
 
 ## CI and release tooling
 
-The CI workflows pin their action revisions. They use Node 24, pnpm 11.9.0, Docker,
-Gitleaks 8.28.0, Trivy 0.65.0, Cosign installer 4.1.2, signed image/provenance evidence,
-and Ubuntu 24.04. Preserve those pins and validate workflow changes; do not replace them
-with whatever versions happen to be installed locally.
+The CI workflows pin their action revisions. Test commands run inside the constrained
+Claw image with Node 24, pnpm 11.9.0, Docker CLI, and Gitleaks 8.28.0. Main-branch
+publication retains pinned Trivy 0.65.0, Cosign installer 4.1.2, and signed
+image/provenance evidence. Preserve those pins and validate workflow changes; do not
+replace them with whatever versions happen to be installed locally.
 
 ## Serena and indexing
 
