@@ -82,7 +82,7 @@ describe("expert residency held reward replay", () => {
     testDb = await startExpertReferralTestDatabase();
   }, 120000);
   afterAll(async () => testDb?.stop());
-  beforeEach(async () => testDb!.reset());
+  beforeEach(async () => testDb!.reset(), 120000);
   it("serializes termination with replay and never grants a cancelled hold", async () => {
     const { inviter, invitee, order } = await setup(false);
     await expect(
