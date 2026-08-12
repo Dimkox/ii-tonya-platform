@@ -13,7 +13,7 @@ import {
   migrateSandboxDatabase,
   PostgresSandboxPaymentRepository,
 } from "./repository.js";
-import { SandboxTransitionWorkflow } from "./workflow.js";
+import { SandboxTransitionWorkflow, sandboxApprovalObjectId } from "./workflow.js";
 
 const checkoutBaseUrl = new URL("https://sandbox.ii-tonya.invalid/");
 let database: Awaited<ReturnType<typeof startExternalPostgresDatabase>> | undefined;
@@ -69,7 +69,7 @@ async function approvedCommand(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   const payload = { paymentId: command.paymentId, transition: "settled", expectedVersion: command.expectedVersion, idempotencyKey: command.idempotencyKey };
-  const requested = await approvals.requestApproval({ sessionIdHash: requester.sessionIdHash, action: command.action, objectType: "sandbox_expert_residency_payment", objectId: command.paymentId, payload, nonce: command.nonce });
+  const requested = await approvals.requestApproval({ sessionIdHash: requester.sessionIdHash, action: command.action, objectType: "sandbox_expert_residency_payment", objectId: sandboxApprovalObjectId(command.paymentId), payload, nonce: command.nonce });
   expect(requested).not.toBeNull();
   command.approvalId = requested!.approvalId;
   expect(await approvals.approveApproval({ approvalId: command.approvalId, sessionIdHash: approver.sessionIdHash })).toBe(true);

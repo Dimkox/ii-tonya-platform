@@ -303,6 +303,29 @@ export class PostgresSandboxPaymentRepository {
     );
   }
 
+  async transitionInTransaction(
+    tx: Transaction,
+    command: TransitionSandboxPaymentCommand,
+  ): Promise<{ event: SandboxProviderEvent; replayed: boolean }> {
+    const parsed = transitionSandboxPaymentCommandSchema.parse(command);
+    const canonicalCommand = { paymentId: parsed.paymentId, transition: parsed.transition, expectedVersion: parsed.expectedVersion, idempotencyKey: parsed.idempotencyKey, correlationId: parsed.correlationId };
+    const commandDigest = payloadDigest(canonicalCommand);
+    const replay = await storedCommand(tx, "transition", parsed.idempotencyKey);
+    if (replay) return { event: repositoryEvent(replayResult(replay, commandDigest, (value) => value)), replayed: true };
+    const paymentResult = await tx.execute<PaymentRow>(sql`select payment_id as "paymentId", order_id as "orderId", amount_minor as "amountMinor", currency, checkout_url as "checkoutUrl", state, version from sandbox_expert_residency_payments where payment_id=${parsed.paymentId} for update`);
+    const payment = paymentResult.rows[0];
+    const expectedState = parsed.transition === "settled" ? "created" : "settled";
+    if (!payment || payment.version !== parsed.expectedVersion || payment.state !== expectedState) throw new SandboxPaymentConflictError();
+    const updated = await tx.execute<{ state: "settled" | "refunded"; version: number; occurredAt: Date | string }>(sql`update sandbox_expert_residency_payments set state=${parsed.transition}, version=version+1, updated_at=transaction_timestamp() where payment_id=${parsed.paymentId} and version=${parsed.expectedVersion} and state=${expectedState} returning state,version,updated_at as "occurredAt"`);
+    const after = required(updated.rows[0], "sandbox_payment_locked_transition_missing");
+    const eventFacts = { provider: "ii_tonya_sandbox" as const, eventId: opaqueId("sandbox_event_"), kind: parsed.transition, paymentId: payment.paymentId, orderId: payment.orderId, amountMinor: payment.amountMinor.toString(), currency: payment.currency, occurredAt: isoInstant(after.occurredAt), correlationId: parsed.correlationId, state: after.state, version: after.version };
+    const event: SandboxProviderEvent = { ...eventFacts, payloadDigest: payloadDigest(eventFacts) };
+    sandboxProviderEventSchema.parse(event);
+    await tx.execute(sql`insert into sandbox_expert_residency_events (event_id,payment_id,transition_kind,payload_digest,payload,correlation_id,occurred_at) values (${event.eventId},${event.paymentId},${event.kind},${event.payloadDigest},${JSON.stringify(event)}::jsonb,${event.correlationId},transaction_timestamp())`);
+    await tx.execute(sql`insert into sandbox_expert_residency_commands (command_id,payment_id,command_kind,idempotency_key,payload_digest,result,created_at) values (${opaqueId("sandbox_command_")},${event.paymentId},'transition',${parsed.idempotencyKey},${commandDigest},${JSON.stringify(event)}::jsonb,transaction_timestamp())`);
+    return { event: repositoryEvent(event), replayed: false };
+  }
+
   async nextPendingEvent(
     paymentId: string,
   ): Promise<SandboxProviderEvent | null> {

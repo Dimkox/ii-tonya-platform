@@ -30,7 +30,9 @@ export type ApprovalAdminAction =
   | "expert_residency.tariff_create"
   | "expert_residency.tariff_retire"
   | "expert_referral.hold_replay"
-  | "expert_referral.feature_switch";
+  | "expert_referral.feature_switch"
+  | "expert_residency.sandbox_settle"
+  | "expert_residency.sandbox_refund";
 
 type JsonScalar = string | number | boolean | null;
 export type AdminPayload =
@@ -99,7 +101,11 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "expert_residency.tariff_retire": "entitlement_admin",
   "expert_referral.hold_replay": "security_admin",
   "expert_referral.feature_switch": "security_admin",
+  "expert_residency.sandbox_settle": "entitlement_admin",
+  "expert_residency.sandbox_refund": "entitlement_admin",
 };
+
+type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 
 export const requiredApprovalRole = (action: ApprovalAdminAction): AdminRole => actionRoles[action];
 
@@ -317,6 +323,20 @@ export class PostgresAdminApprovalRepository {
   async consumeApproval(
     input: ConsumeAdminApproval,
   ): Promise<ConsumedAdminApproval | null> {
+    return this.consumeApprovalWith(this.db, input);
+  }
+
+  async consumeApprovalInTransaction(
+    tx: Transaction,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
+    return this.consumeApprovalWith(tx, input);
+  }
+
+  private async consumeApprovalWith(
+    executor: Pick<DrizzleDb, "execute">,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
     const requiredRole = actionRoles[input.action];
     const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
@@ -331,7 +351,7 @@ export class PostgresAdminApprovalRepository {
               and oa.object_id = ${input.objectId}::uuid
           )
         `;
-    const result = await this.db.execute<ApprovalRow>(sql`
+    const result = await executor.execute<ApprovalRow>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
       ),
@@ -394,6 +414,20 @@ export class PostgresAdminApprovalRepository {
   async validateConsumedApprovalReplay(
     input: ConsumeAdminApproval,
   ): Promise<ConsumedAdminApproval | null> {
+    return this.validateConsumedApprovalReplayWith(this.db, input);
+  }
+
+  async validateConsumedApprovalReplayInTransaction(
+    tx: Transaction,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
+    return this.validateConsumedApprovalReplayWith(tx, input);
+  }
+
+  private async validateConsumedApprovalReplayWith(
+    executor: Pick<DrizzleDb, "execute">,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
     const requiredRole = actionRoles[input.action];
     const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
@@ -408,7 +442,7 @@ export class PostgresAdminApprovalRepository {
               and oa.object_id = ${input.objectId}::uuid
           )
         `;
-    const result = await this.db.execute<ApprovalRow>(sql`
+    const result = await executor.execute<ApprovalRow>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
       ),

@@ -11,6 +11,13 @@ const migration = readFileSync(
 );
 
 describe("Task 17C structural guards", () => {
+  it("keeps sandbox approval and transition under one transaction", () => {
+    const workflow = readFileSync("packages/sandbox-payments/src/workflow.ts", "utf8");
+    expect(workflow).toContain("this.db.transaction");
+    expect(workflow).toContain("consumeApprovalInTransaction");
+    expect(workflow).toContain("transitionInTransaction");
+    expect(workflow.indexOf("this.db.transaction")).toBeLessThan(workflow.indexOf("consumeApprovalInTransaction"));
+  });
   it("exposes exact workflow methods and no generic mutation switch", () => {
     for (const method of [
       "createClient",

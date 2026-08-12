@@ -17,6 +17,7 @@ export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/sandbox-payments/src/index.ts",
   "packages/sandbox-payments/src/repository.ts",
   "packages/sandbox-payments/src/schema.ts",
+  "packages/sandbox-payments/src/workflow.ts",
 ]);
 
 export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
@@ -91,6 +92,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
   "expert_residency.tariff_retire",
+  "expert_residency.sandbox_settle",
+  "expert_residency.sandbox_refund",
 ]);
 
 const approvedPaymentBoundaryPaths = new Set([
