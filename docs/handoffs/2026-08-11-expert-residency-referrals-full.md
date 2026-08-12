@@ -815,3 +815,50 @@ If there is no time to read the entire handoff, do exactly this:
 9. update traceability/evidence
 10. keep PR Draft and all live expert payment/referral flags disabled until explicit
     release approval
+
+## 25. 2026-08-12 continuation: expert Bearer principal boundary
+
+The bounded authentication increment adds a provider-neutral Expert Bearer principal
+resolver without composing a live identity/session provider. The resolver accepts only a
+strict Bearer token, passes a SHA-256 token hash to a fresh lookup on every request,
+rejects expired/revoked/malformed session records, and returns only normalized UUID
+principal identifiers. Lookup failure is converted to a fixed internal error; the
+composed API test proves its HTTP response is sanitized `500 internal_error` rather than
+leaking a bearer token.
+
+New implementation and tests:
+
+- `apps/api/src/expert-principal-resolver.ts`
+- `apps/api/src/expert-principal-resolver.test.ts`
+- `apps/api/src/routes/expert-referral.ts`
+- `apps/api/src/index.ts`
+- `apps/api/src/app.test.ts`
+
+Claw focused evidence is retained at
+`docs/test-evidence/claw/83e20da-expert-bearer-principal/verification.md`. The final
+authorized focused invocation passed 2 files and 37 tests (resolver 16/16; composed API
+21/21). Its aggregate duration was not retained in the supplied Task 2 run report, so no
+duration is asserted here. Task 1 separately recorded its resolver-only GREEN run as
+16/16 in 717ms.
+
+Static evidence is intentionally qualified: the requested API-specific TypeScript command
+is not runnable because `apps/api/tsconfig.json` is absent; no replacement typecheck was
+substituted. Prettier 3.9.6 reports whole-file historical formatting in `app.test.ts`;
+the identical check on unchanged `HEAD` also fails, so broad reformatting was not mixed
+into this increment. See the Claw evidence for exact commands and outcomes.
+
+Task 1 self-review and Task 2 self-review found no scope expansion into a database,
+session provider, configuration, Compose, Billing, production, or deployment path. An
+independent Critical/Important review and hosted CI remain required before publication or
+release. The local documentation commit for this continuation is deliberately not pushed:
+the controller must complete whole-branch review first.
+
+Unchanged boundaries:
+
+```text
+default server expert capability = ABSENT
+expert referral activation = OFF
+expert residency billing activation = OFF
+live identity/session provider = NOT COMPOSED
+release status = NO-GO until hosted CI and external approvals pass
+```

@@ -49,6 +49,15 @@ Source design: `docs/superpowers/specs/2026-08-02-expert-residency-referrals-des
 | ERR-FR-041 | feature control/kill switch + existing-state worker paths | control, settlement, worker tests | Main CI; Database Gate settlement/deadline/held-reward gates | disabled/job outcomes | disable new commands; continue reconciliation/expiry/reversal | Incident commander |
 | ERR-FR-042 | pending hold marker + controlled replay | hold replay integration + worker tests | Main CI; Database Gate 20x held-reward gate | held replay/reward/debt | replay bounded batch after approved re-enable; refund cancellation terminal | Finance + Security |
 
+## Expert Bearer authentication extension
+
+| Requirement       | Implementation                                                                             | Focused verification                                 | Mandatory CI                     | Recovery / rollback                                           | Approval owner        |
+| ----------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------- | -------------------------------- | ------------------------------------------------------------- | --------------------- |
+| ERR-AUTH-001..003 | `apps/api/src/expert-principal-resolver.ts` strict Bearer parser, SHA-256 lookup, no cache | resolver syntax/hash/fresh-lookup tests              | Main CI `pnpm verify`            | remove resolver composition; routes remain capability-gated   | Security              |
+| ERR-AUTH-004..006 | resolver session-state and UUID validation                                                 | expiry/revocation/identifier/minimal-principal tests | Main CI `pnpm verify`            | revoke session or disable expert capability                   | Security              |
+| ERR-AUTH-007..008 | fixed lookup failure plus existing logger authorization redaction                          | resolver failure and composed API 500 tests          | Main CI security/full regression | identity outage returns sanitized 500; no fallback credential | Security + Operations |
+| ERR-AUTH-009      | unchanged default server lifecycle and app capability gate                                 | existing absent-capability and flag-startup tests    | Main CI security/full regression | keep expert flags disabled                                    | Operations            |
+
 ## Release gate
 
 Registration in CI is not a pass result. No requirement is production-approved merely because its row is populated. Release requires all focused tests to pass at one exact SHA, mandatory hosted CI and Database Gate to pass at that SHA, independent migration and financial review, authenticated sandbox settlement/refund/replay evidence, a named AI spot-check for ERR-FR-027/028, and explicit staging authorization. Production requires a separate explicit authorization.
