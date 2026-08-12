@@ -835,11 +835,12 @@ New implementation and tests:
 - `apps/api/src/app.test.ts`
 
 Claw focused evidence is retained at
-`docs/test-evidence/claw/83e20da-expert-bearer-principal/verification.md`. The final
-authorized focused invocation passed 2 files and 37 tests (resolver 16/16; composed API
-21/21). Its aggregate duration was not retained in the supplied Task 2 run report, so no
-duration is asserted here. Task 1 separately recorded its resolver-only GREEN run as
-16/16 in 717ms.
+`docs/test-evidence/claw/83e20da-expert-bearer-principal/verification.md`. A fresh
+authorized run synchronized from exact code commit
+`93334aa487572f305fd612cc4e1eaaa93703bb74`, using `ii-tonya-test` image tag
+`7d71646347d560ff2b5d8ebc4c0aad5b48230254`, passed 2 files and 37 tests in 5.00s
+(resolver 16/16; composed API 21/21). Task 1 separately recorded its resolver-only
+GREEN run as 16/16 in 717ms.
 
 Static evidence is intentionally qualified: the requested API-specific TypeScript command
 is not runnable because `apps/api/tsconfig.json` is absent; no replacement typecheck was
@@ -849,9 +850,11 @@ into this increment. See the Claw evidence for exact commands and outcomes.
 
 Task 1 self-review and Task 2 self-review found no scope expansion into a database,
 session provider, configuration, Compose, Billing, production, or deployment path. An
-independent Critical/Important review and hosted CI remain required before publication or
-release. The local documentation commit for this continuation is deliberately not pushed:
-the controller must complete whole-branch review first.
+independent Critical/Important review found three Important evidence issues: conflated
+ERR-AUTH-007/008 verification, no exact final tested SHA/image/duration, and transient
+publication prose. This continuation remediates all three; clean re-review remains
+required. After controller publication, verify that local and `origin` branch SHAs are
+identical. Hosted CI and external approvals remain required before release.
 
 Unchanged boundaries:
 
