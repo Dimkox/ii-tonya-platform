@@ -97,7 +97,7 @@
 | Task | Status | Base | Implementer | Spec review | Quality review | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1. Contracts and database boundary | complete | `5e21170` | `520ad39`..`89dfe66` | PASS after two guard remediations | PASS; no findings | Claw repository 15/15, repeat 45/45, schema 2/2, scope 113/113; build/typecheck/lint/format; cleanup 0 |
-| 2. Verifier, adapter, reconciliation | pending | `89dfe66` | — | — | — | — |
+| 2. Verifier, adapter, reconciliation | complete | `c7e8a68` | `73c6379`..`e5ef5f1` | PASS | PASS; one cross-task architecture guard recorded | Claw focused 8/8, repository 15/15; build/typecheck/lint/format; cleanup 0 |
 | 3. Approved admin transitions | pending | — | — | — | — | — |
 | 4. Separate sandbox API | pending | — | — | — | — | — |
 | 5. Settlement/refund E2E | pending | — | — | — | — | — |
@@ -107,3 +107,7 @@
 Cross-task gate: Task 6 must inspect the built production image dependency inventory and
 prove `@ii-tonya/sandbox-payments` is absent. The current Dockerfile deploys only the
 `@ii-tonya/api` production closure, and `apps/api/package.json` has no sandbox dependency.
+
+Cross-task gate: Task 4 isolation tests must reject imports or instantiation of
+`createCanonicalExpertResidencyPaymentEventVerifier` from production composition. Its
+root export is a privileged minting capability reserved for sandbox composition/tests.
