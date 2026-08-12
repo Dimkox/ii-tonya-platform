@@ -47,6 +47,8 @@ describe("admin approval object mappings", () => {
     expect(module.requiredApprovalRole("expert_referral.batch_generate")).toBe("security_admin");
     expect(module.requiredApprovalRole("expert_residency.tariff_create")).toBe("entitlement_admin");
     expect(module.requiredApprovalRole("expert_referral.feature_switch")).toBe("security_admin");
+    expect(module.requiredApprovalRole("expert_residency.sandbox_settle")).toBe("entitlement_admin");
+    expect(module.requiredApprovalRole("expert_residency.sandbox_refund")).toBe("entitlement_admin");
   });
 
   it("fixes safety and feedback reads and resolutions to their assignment object types", () => {
