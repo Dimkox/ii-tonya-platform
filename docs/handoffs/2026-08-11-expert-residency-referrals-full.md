@@ -166,7 +166,8 @@ At the latest graph pass:
 - workspace package orphans: none known
 - composition-root orphans: none known
 - known expert-referral/residency orphan modules: none known
-- native server-control assets from current `main` are represented as `ACTIVE OPS`
+- native server-control assets from the historical `main` snapshot are retained as
+  `LEGACY/HISTORICAL`; both entry workflows now refuse deployment
 
 ### 5.3 Native server control from current main
 
@@ -178,8 +179,9 @@ branch:
 - `ops/server-command.sh`
 - `scripts/bootstrap-native-runner.sh`
 
-These are operational deployment/control assets, not product/financial authority.
-They are included in the architecture graph and exact tracked-automation scope pinning.
+These are retained operational history, not product/financial authority. The two
+workflows are fail-closed refusal paths; `ops/server-command.sh` is not workflow-reachable.
+They remain in the architecture graph and exact tracked-automation scope pinning.
 
 Important consequence: after a future merge to `main`, the native deployment workflow
 may run on the self-hosted `ii-tonya-server` runner. Do not merge PR #4 merely to obtain
@@ -625,10 +627,14 @@ release perimeter is therefore fail-closed independently of that paid capability
 
 - `.github/workflows/server-native.yml` has no push trigger or deployment code; a manual
   dispatch only emits an explicit refusal
+- `.github/workflows/server-control.yml` also contains only an explicit refusal and never
+  checks out or invokes `ops/server-command.sh`
 - `.github/workflows/release.yml` is the sole release entrypoint
-- every release job uses the dedicated self-hosted `ii-tonya-release` Claw label
+- every release job uses the isolated `ii-tonya-release-claw` runner under the locked
+  `ii_tonya_release` OS account; it has no test label or Docker-group access
 - release still requires successful exact-main CI provenance, signed artifacts,
-  independent migration approval, staging evidence, and explicit production dispatch
+  independent exact-SHA migration approval by a write-capable reviewer, staging evidence,
+  and explicit production dispatch
 
 A merge can update `main`, but cannot activate the legacy native deployment path.
 
@@ -783,14 +789,14 @@ Operational cleanup completed after the test-only API increment:
 The zero-job `server-control` push failure had a separate repository root cause: the
 `control-event-ack: ...` text appeared in an unquoted YAML plain scalar. GitHub could not
 parse the workflow and therefore created a path-named failure with zero jobs on each push.
-The repair also closes security defects found during independent review and incorporates
-the current `main` control policy:
+That historical repair was later superseded by a stricter release review. The current
+control policy is:
 
 - issue-driven execution is removed entirely; only explicit manual `workflow_dispatch`
   remains;
 - workflow token access is reduced to `contents: read`;
-- raw command output is neither posted to issues nor committed to a control branch; only
-  safe exit/run metadata is written to the Actions step summary;
+- `server-control.yml` performs no checkout or command execution and fails explicitly;
+- `ops/server-command.sh` remains inert legacy recovery history;
 - the server command error trap no longer includes `$BASH_COMMAND`, and the database
   password setup failure emits only a fixed diagnostic.
 
@@ -800,8 +806,8 @@ is 110/110 PASS across workflow semantics and recursive scope boundaries.
 
 Evidence is recorded under
 `docs/test-evidence/claw/4cfcc32-server-control-validation/verification.md`.
-GitHub-hosted CI and Database Gate remain externally blocked by the account Billing or
-Actions spending-limit annotation. No spending limit was changed.
+CI and Database Gate now run on the constrained Claw test runner and do not consume
+GitHub-hosted Actions minutes.
 
 ## 24. Minimal continuation summary
 
@@ -886,6 +892,19 @@ format, deploy contract, lint, workspace typecheck, dependency audit, and three 
 Vitest runs: 120/120 files and 983/983 tests in 310.94s, 316.30s and 314.17s. The audit
 found no known vulnerabilities. Raw evidence/checksums remain in the Claw results
 directory named `<exact-sha>-three-pass`. The mounted source was restored to `83e20da`;
-cleanup proved zero test containers and zero test processes. Hosted mandatory CI remains
-blocked externally by the GitHub Actions billing limit, so merge/release/deploy is still
-NO-GO.
+cleanup proved zero test containers and zero test processes. The later self-hosted CI
+migration removed the hosted Actions/Billing dependency; release remains NO-GO until the
+exact current SHA, independent review, migration approval, staging evidence, and explicit
+human deployment approval all pass.
+
+## 2026-08-12 isolated release-control hardening
+
+- `server-control.yml` and `server-native.yml` are manual refusal workflows only.
+- Test runner `ii-tonya-claw` carries `ii-tonya-test` and no release label.
+- Release runner `ii-tonya-release-claw` carries `ii-tonya-release` and no test label,
+  runs as `ii_tonya_release`, and cannot access the Docker socket through group membership.
+- Migration approval must bind the merged PR merge commit to the exact CI SHA, the review
+  to the PR head SHA, an exact `MIGRATION-COMPATIBILITY: <sha>` body, and a reviewer with
+  repository write, maintain, or admin permission.
+- Every secret-bearing release job has `always()` cleanup for SSH keys, rollback state,
+  provenance, and transient approval/evidence files.

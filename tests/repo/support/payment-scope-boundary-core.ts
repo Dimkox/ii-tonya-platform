@@ -146,7 +146,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/release.yml",
-    "d1f3b7ebcff482e2172f963b320b4e6281bf1f06f21cb63ed11218c1a30a95e6",
+    "185f7d06475b6bbcdc756cb74cf47c5927a56d1737a677c990999ccc94895f91",
   ],
   [
     "deploy/compose.remote.yml",

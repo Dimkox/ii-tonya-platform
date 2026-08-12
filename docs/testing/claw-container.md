@@ -37,4 +37,11 @@ mounts only the checked-out source into the constrained test container. Pull-req
 also require the pull-request author to be the repository owner, so fork code cannot run
 on this machine. Database concurrency tests repeat exactly three times.
 
+Release jobs do not run on that test identity. The separate runner
+`ii-tonya-release-claw` is installed at `/home/ii_tonya_release/actions-runner`, runs as
+the locked `ii_tonya_release` OS account, advertises `claw` and `ii-tonya-release` but not
+`ii-tonya-test`, and is not a member of the Docker group. Release workflows remove SSH
+keys, rollback state, downloaded provenance, and evidence working files with `always()`
+cleanup steps.
+
 Latest committed evidence: [`7d71646347d560ff2b5d8ebc4c0aad5b48230254`](../test-evidence/claw/7d71646347d560ff2b5d8ebc4c0aad5b48230254/verification.md).

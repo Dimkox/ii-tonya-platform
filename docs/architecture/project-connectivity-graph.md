@@ -312,15 +312,16 @@ flowchart TB
   ROOTPKG --> VERIFY
 
   subgraph NATIVEOPS["Native single-server recovery control plane"]
-    BOOTSTRAP["scripts/bootstrap-native-runner.sh\nACTIVE OPS\nregister self-hosted runner"]
-    RUNNER["GitHub Actions self-hosted runner\nlabel: ii-tonya-server\nACTIVE OPS"]
-    SERVERCTRL["server-control.yml\nACTIVE OPS\nissue/workflow dispatch command runner"]
-    SERVERCMD["ops/server-command.sh\nACTIVE OPS\nprovision/deploy/smoke/TLS"]
+    BOOTSTRAP["scripts/bootstrap-native-runner.sh\nLEGACY/HISTORICAL\nnative runner bootstrap"]
+    RUNNER["GitHub Actions self-hosted runner\nlabel: ii-tonya-server\nOFFLINE LEGACY"]
+    SERVERCTRL["server-control.yml\nDISABLED LEGACY\nmanual refusal only"]
+    SERVERCMD["ops/server-command.sh\nLEGACY/HISTORICAL\nnot workflow-reachable"]
     NATIVECI["server-native.yml\nDISABLED LEGACY\nno push or deploy"]
     HOST["single server /opt/ii-tonya-platform\nsystemd + PostgreSQL + nginx\nACTIVE OPS"]
     DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nACTIVE OPS endpoint"]
     BOOTSTRAP --> RUNNER
-    SERVERCTRL --> RUNNER --> SERVERCMD --> HOST
+    SERVERCTRL -. disabled .-> RUNNER
+    RUNNER -. historical .-> SERVERCMD -. historical .-> HOST
     NATIVECI -. disabled .-> RUNNER
     HOST --> API
     HOST --> APPWORKER
@@ -438,15 +439,17 @@ The native server files remain visible in the graph as recovery history, but the
 an alternative release path:
 
 - `scripts/bootstrap-native-runner.sh` registers the self-hosted `ii-tonya-server` runner and grants temporary bootstrap sudo.
-- `.github/workflows/server-control.yml` dispatches `ops/server-command.sh` on that runner and publishes command output back to the control issue.
+- `.github/workflows/server-control.yml` contains only a manual explicit refusal and never
+  checks out or invokes `ops/server-command.sh`.
 - `.github/workflows/server-native.yml` has no push trigger or deployment code; its only
   job explicitly refuses a manual legacy dispatch.
 - `ops/server-command.sh` provisions PostgreSQL/nginx/systemd, deploys the exact workspace, runs smoke checks, and configures TLS when DNS is ready.
 - Runtime env written by this ops plane keeps Selarti, Planerka, Telegram, LLM, Make, Sheets, intent model, and payments disabled.
 
-`server-control.yml` and `ops/server-command.sh` remain manual operations. The legacy
-native workflow is disabled; the provenance-bound `release.yml` is the sole release
-entrypoint and uses the self-hosted `ii-tonya-release` Claw label.
+`server-control.yml` and `server-native.yml` are disabled refusal paths.
+`ops/server-command.sh` is retained only as legacy recovery history. The
+provenance-bound `release.yml` is the sole release entrypoint and uses the isolated
+`ii-tonya-release-claw` identity.
 
 ### Intentionally non-live nodes
 
@@ -480,11 +483,13 @@ Current architecture-level result:
 - Workspace package orphans: **0**.
 - Composition-root orphans: **0**.
 - Known expert referral/residency module orphans: **0**.
-- Native server-control nodes: connected and `ACTIVE OPS`.
+- Native server-control nodes: retained and classified as disabled or historical.
 - File/symbol-level dead-code deletion: **not automatic**. A definitive removal decision requires static references plus dynamic imports, package exports, Fastify registration, migration/workflow/script references, test entrypoints, and evidence-retention review.
 
 If a future scan finds a true orphan, add it here as `ORPHAN-CANDIDATE` before deleting it. The inventory must expose dead code rather than make it invisible.
 
 ## Release state
 
-This graph does not authorize provider activation. The native server control plane can deploy the application shell, but expert referral/residency and live provider flags remain fail-closed until exact-SHA verification and the documented staging/production approvals are satisfied.
+This graph does not authorize provider activation. Only the gated release workflow can
+deploy, and expert referral/residency plus live provider flags remain fail-closed until
+exact-SHA verification and the documented staging/production approvals are satisfied.

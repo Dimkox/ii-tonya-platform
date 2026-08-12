@@ -24,13 +24,14 @@ Actions minutes. Pull-request execution is restricted to repository-owner branch
 external pull requests are not allowed to run untrusted code on Claw. Final aggregate
 verify, independent reviews, and human/release approvals remain open.
 
-The separate `server-control` workflow is manual-dispatch only, uses read-only repository
-permission, and publishes no raw command output. It is not part of the test runner path.
+The separate `server-control` workflow is manual-dispatch only and contains only an
+explicit refusal. It cannot checkout or execute `ops/server-command.sh`.
 GitHub Free does not expose private-repository branch protection or rulesets. The
 repository therefore fails closed at the release perimeter: the legacy native workflow
 contains only an explicit refusal job, and the provenance-bound manual `Gated release` is the sole
-release entrypoint. Its jobs also run on the dedicated `ii-tonya-release` Claw label, so
-the release control plane does not require hosted Actions minutes.
+release entrypoint. Its jobs run on the isolated `ii-tonya-release-claw` runner under the
+`ii_tonya_release` OS account, which has neither the test label nor Docker-group access.
+The release control plane does not require hosted Actions minutes.
 Repository merge settings allow squash only and delete merged branches; staging and
 production deployment environments accept only `main`.
 

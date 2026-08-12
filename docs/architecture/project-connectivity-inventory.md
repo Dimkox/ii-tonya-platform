@@ -23,10 +23,10 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 | `.github/workflows/ci.yml`                        | verification in constrained Claw container, coverage, secret scan, container smoke, provenance | ACTIVE; self-hosted Claw                                           |
 | `.github/workflows/db-gate.yml`                   | migrations/schema + repeated expert financial concurrency/deadline/replay                      | ACTIVE; self-hosted Claw                                           |
 | `.github/workflows/release.yml`                   | signed provenance -> staged release evidence -> release                                        | ACTIVE POLICY; manual, self-hosted Claw; provider activation gated |
-| `.github/workflows/server-control.yml`            | workflow/issue dispatch -> self-hosted runner -> `ops/server-command.sh`                       | ACTIVE OPS                                                         |
+| `.github/workflows/server-control.yml`            | manual explicit refusal; no checkout or command execution                                      | DISABLED; cannot deploy                                            |
 | `.github/workflows/server-native.yml`             | disabled legacy native-deploy recovery reference                                               | DISABLED; cannot deploy                                            |
-| `ops/server-command.sh`                           | provision/deploy/restart/smoke/DNS/TLS -> single host                                          | ACTIVE OPS                                                         |
-| `scripts/bootstrap-native-runner.sh`              | register self-hosted `ii-tonya-server` runner + temporary bootstrap sudo                       | ACTIVE OPS                                                         |
+| `ops/server-command.sh`                           | retained native recovery implementation; not workflow-reachable                                | LEGACY/HISTORICAL                                                  |
+| `scripts/bootstrap-native-runner.sh`              | retained bootstrap history for the offline native runner                                       | LEGACY/HISTORICAL                                                  |
 | `Dockerfile`                                      | packaged runtime -> CI container smoke                                                         | ACTIVE                                                             |
 | `compose.yaml`                                    | local packaged stack -> verification                                                           | ACTIVE                                                             |
 | `deploy/compose.remote.yml`                       | release mechanics                                                                              | ACTIVE but gated                                                   |
@@ -103,7 +103,7 @@ Current architecture-level result:
 - Workspace package orphans: **0**.
 - Composition-root orphans: **0**.
 - Known expert referral/residency subsystem orphan modules: **0**.
-- Native server-control assets: **connected, ACTIVE OPS**.
+- Native server-control assets: **retained and classified; deployment entrypoints disabled**.
 - Intentional non-live nodes: explicitly marked in graph and inventory.
 - File/symbol-level deletion: **never automatic**. A removal decision requires static references plus review of dynamic imports, package exports, Fastify registration, migrations, workflows/scripts, test entrypoints, and evidence retention.
 

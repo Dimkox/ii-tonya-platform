@@ -13,7 +13,7 @@ const EXPERT_RESIDENCY_DB_GATE_SHA256 =
 const MAIN_NATIVE_AUTOMATION_BLOB_SHA1 = new Map<string, string>([
   [
     ".github/workflows/server-control.yml",
-    "b97041e04dced54f36349aca208ac4a0ad7c94b5",
+    "4aabdc39f4e5a19640dd1f71623cf27e643d58d3",
   ],
   [
     ".github/workflows/server-native.yml",

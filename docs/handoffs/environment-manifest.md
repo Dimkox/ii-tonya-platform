@@ -164,9 +164,13 @@ only through its existing `ii-tonya-test` Compose profile:
   the labels `self-hosted`, `linux`, `x64`, `claw`, and `ii-tonya-test`.
 - CI and Database Gate use `scripts/run-claw-actions-job.sh`; no GitHub-hosted runner or
   hosted Actions minute is required. Pull-request execution is owner-only.
-- Gated release jobs use the dedicated `ii-tonya-release` label on the same self-hosted
-  runner. Legacy `server-native.yml` has no push trigger or deployment code and only
-  reports an explicit refusal if manually dispatched.
+- Gated release jobs use the separate `ii-tonya-release-claw` runner at
+  `/home/ii_tonya_release/actions-runner`. Its locked `ii_tonya_release` OS identity has
+  no Docker-group access and the runner has `ii-tonya-release` but not `ii-tonya-test`.
+  The test runner no longer carries the release label.
+- Both `server-native.yml` and `server-control.yml` have no push trigger or deployment
+  code and only report an explicit refusal if manually dispatched. `ops/server-command.sh`
+  is retained as legacy recovery history and is not workflow-reachable.
 - Repository settings permit squash merge only, delete merged branches, and restrict
   both staging and production deployment environments to the `main` branch. These are
   compensating controls, not a claim that paid branch protection is enabled.
