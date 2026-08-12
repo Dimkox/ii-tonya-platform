@@ -857,6 +857,13 @@ is a prerequisite for controller publication; record its result in controller ev
 and verify identical local and `origin` branch SHAs after push. Hosted CI and external
 approvals remain required before release.
 
+ERR-AUTH-008 now has separate focused Claw evidence at exact branch commit
+`b1777bd8e54fa86c54615b5f50157f7e9a48d34c`: the real Pino serialization test passed
+2/2 in 719ms using test image `7d71646347d560ff2b5d8ebc4c0aad5b48230254`.
+The mounted source was restored to base and the cleanup check returned zero test
+containers and zero focused processes. Hosted CI/security regression is still mandatory;
+the GitHub jobs remain unable to start because of the account Billing/spending-limit gate.
+
 Unchanged boundaries:
 
 ```text

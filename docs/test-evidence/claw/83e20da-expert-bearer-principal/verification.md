@@ -54,9 +54,22 @@ environment 1ms, prepare 320ms). Task 1's separate resolver-only GREEN run was 1
 - `git diff --check`: passed for each implementation task before commit.
 
 The 37-test focused run covers ERR-AUTH-007 lookup-failure handling through the composed
-API 500 test. It does not execute the existing logger authorization-redaction behavior
-required by ERR-AUTH-008; that verification remains mandatory CI/security regression
-evidence and is not attributed to this focused run.
+API 500 test.
+
+ERR-AUTH-008 was verified separately after controller publication. The mounted source was
+synchronized from exact branch commit
+`b1777bd8e54fa86c54615b5f50157f7e9a48d34c` and the same resolved image tag
+`7d71646347d560ff2b5d8ebc4c0aad5b48230254` was used for one focused invocation:
+
+```text
+II_TONYA_SOURCE_SHA="$tag" docker compose --profile test run --rm --no-deps --entrypoint sh ii-tonya-test -lc 'CI=true ./node_modules/.bin/vitest run packages/observability/src/logger.test.ts --maxWorkers=1'
+```
+
+Result: exit 0; `packages/observability/src/logger.test.ts` passed 2/2 in one file,
+719ms total (tests 53ms). The test serializes a real Pino log entry containing an
+authorization credential and asserts that the credential is absent from the emitted log.
+Mandatory hosted CI/security regression remains required; this focused evidence does not
+replace it.
 
 The Task 3 documentation rerun also passed ESLint for all five touched API files and
 `git diff --check`. It reproduced TS5058 for the absent API tsconfig. Its combined
@@ -66,7 +79,7 @@ No broad formatting rewrite was added to an evidence-only increment.
 
 ## Restoration and cleanup
 
-After the fresh exact-SHA run, the source mounted into Claw was restored to base
+After each exact-SHA run, including the ERR-AUTH-008 logger run, the source mounted into Claw was restored to base
 `83e20da49de061f278f6a3f9d42920b4cf34d5bc`. A post-restore remote check returned:
 
 ```text
