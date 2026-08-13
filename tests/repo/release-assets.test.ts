@@ -70,8 +70,8 @@ describe("release assets", () => {
     expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain("pnpm --offline --store-dir");
-    expect(builder).toContain('git read-tree "$git_source_sha"');
-    expect(builder).toContain("git checkout-index --all");
+    expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
+    expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
     expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
     expect(builder).toContain(
       "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
