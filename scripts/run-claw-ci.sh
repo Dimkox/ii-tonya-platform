@@ -22,7 +22,9 @@ test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
 
 compose_root=/home/pall/app-stack
+claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
 test_image=7d71646347d560ff2b5d8ebc4c0aad5b48230254
+test -d "$claw_store"
 container_script="$(mktemp)"
 evidence_dir="$source_root/docs/test-evidence/claw/$source_sha"
 release_output="$source_root/.native-release"
@@ -86,6 +88,7 @@ II_TONYA_SOURCE_SHA="$test_image" docker compose --profile test run --rm --no-de
   -e "CLAW_SOURCE_SHA=$source_sha" \
   -e "CLAW_HOST_SOURCE_ROOT=$source_root" \
   -v "$source_root:/workspace/source" \
+  -v "$claw_store:/workspace/.pnpm-store" \
   -v "$release_output:/workspace/release-output" \
   -v "$container_script:/tmp/ii-tonya-claw-gate.sh:ro" \
   --entrypoint bash ii-tonya-test /tmp/ii-tonya-claw-gate.sh

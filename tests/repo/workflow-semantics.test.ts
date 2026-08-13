@@ -29,6 +29,10 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain(
       "docker compose --profile test run --rm --no-deps",
     );
+    expect(runner).toContain(
+      "claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store",
+    );
+    expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
     expect(runner).not.toMatch(/GITHUB_|actions-runner|workflow_dispatch/u);
   });
 
