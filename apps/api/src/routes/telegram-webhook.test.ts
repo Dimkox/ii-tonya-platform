@@ -1,7 +1,11 @@
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
-import { telegramWebhookRoutes } from "./telegram-webhook.js";
+import type { WebhookInbox } from "./selarti-webhook.js";
+import {
+  telegramWebhookRoutes,
+  type TelegramExpertQueryIngress,
+} from "./telegram-webhook.js";
 
 const secret = "telegram-webhook-secret";
 
@@ -11,7 +15,7 @@ const build = async (
     consume?: (key: string, limit: number, windowMs: number) => boolean;
   } = {},
 ) => {
-  const claim = vi.fn(async () => ({
+  const claim = vi.fn<WebhookInbox["claim"]>(async () => ({
     kind: "claimed" as const,
     claimId: "claim-1",
   }));
@@ -20,12 +24,16 @@ const build = async (
   const isAuthorizedIdentity = vi.fn(async () => true);
   const verifyCallback = vi.fn(async () => true);
   const process = vi.fn(async () => undefined);
-  const resolvePrincipal = vi.fn(async (telegramUserId: string) => ({
+  const resolvePrincipal = vi.fn<
+    TelegramExpertQueryIngress["resolvePrincipal"]
+  >(async (telegramUserId: string) => ({
     expertId: "00000000-0000-4000-8000-000000000101",
     telegramUserId,
     timezone: "Europe/Moscow",
   }));
-  const authenticateClientView = vi.fn(async () => ({
+  const authenticateClientView = vi.fn<
+    TelegramExpertQueryIngress["authenticateClientView"]
+  >(async () => ({
     tokenHash: "a".repeat(64),
     claims: {
       reservationId: "00000000-0000-4000-8000-000000000201",
@@ -35,12 +43,18 @@ const build = async (
       expiresAtEpochSeconds: 1_786_000_000,
     },
   }));
-  const processCommand = vi.fn(async () => undefined);
-  const processClientView = vi.fn(async () => ({
+  const processCommand = vi.fn<TelegramExpertQueryIngress["processCommand"]>(
+    async () => ({ kind: "processed", deliveryOutcome: "applied" }),
+  );
+  const processClientView = vi.fn<
+    TelegramExpertQueryIngress["processClientView"]
+  >(async () => ({
     kind: "processed" as const,
     deliveryOutcome: "applied" as const,
   }));
-  const answerCallbackQuery = vi.fn(async () => ({
+  const answerCallbackQuery = vi.fn<
+    TelegramExpertQueryIngress["answerCallbackQuery"]
+  >(async () => ({
     kind: "applied" as const,
     providerOperationId: "answer-1",
   }));

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createExpertCommandProcessor } from "./expert-command-processor.js";
+import type {
+  ExpertTelegramQueryViewPort,
+  TelegramSendOutcome,
+} from "./telegram-adapter.js";
 
 const principal = {
   expertId: "00000000-0000-4000-8000-000000000101",
@@ -14,7 +18,15 @@ const build = (enabled = true) => {
     timezone: principal.timezone,
     appointments: [],
   }));
-  const clientChoices = vi.fn(async () => []);
+  const clientChoices = vi.fn<
+    () => Promise<
+      readonly {
+        startsAt: string;
+        serviceName: string;
+        callbackData: string;
+      }[]
+    >
+  >(async () => []);
   const stats = vi.fn(async () => ({
     upcoming: 1,
     completed: 2,
@@ -27,27 +39,49 @@ const build = (enabled = true) => {
     startsAt: new Date("2026-08-14T09:00:00.000Z"),
     serviceName: "Consultation",
   }));
-  const views = {
-    sendQuerySchedule: vi.fn(async () => ({
-      kind: "applied" as const,
-      providerOperationId: "1",
-    })),
-    sendClientChoices: vi.fn(async () => ({
-      kind: "applied" as const,
-      providerOperationId: "2",
-    })),
-    sendClientView: vi.fn(async () => ({
+  const sendQuerySchedule = vi.fn<
+    ExpertTelegramQueryViewPort["sendQuerySchedule"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "1",
+  }));
+  const sendClientChoices = vi.fn<
+    ExpertTelegramQueryViewPort["sendClientChoices"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "2",
+  }));
+  const sendClientView = vi.fn<ExpertTelegramQueryViewPort["sendClientView"]>(
+    async () => ({
       kind: "applied" as const,
       providerOperationId: "3",
-    })),
-    sendStats: vi.fn(async () => ({
+    }),
+  );
+  const sendStats = vi.fn<ExpertTelegramQueryViewPort["sendStats"]>(
+    async () => ({
       kind: "applied" as const,
       providerOperationId: "4",
-    })),
-    sendUnsupported: vi.fn(async () => ({
+    }),
+  );
+  const sendUnsupported = vi.fn<ExpertTelegramQueryViewPort["sendUnsupported"]>(
+    async () => ({
       kind: "applied" as const,
       providerOperationId: "5",
-    })),
+    }),
+  );
+  const answerCallbackQuery = vi.fn<
+    ExpertTelegramQueryViewPort["answerCallbackQuery"]
+  >(async (): Promise<TelegramSendOutcome> => ({
+    kind: "applied",
+    providerOperationId: "6",
+  }));
+  const views = {
+    sendQuerySchedule,
+    sendClientChoices,
+    sendClientView,
+    sendStats,
+    sendUnsupported,
+    answerCallbackQuery,
   };
   return {
     processor: createExpertCommandProcessor({

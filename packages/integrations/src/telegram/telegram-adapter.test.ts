@@ -73,8 +73,13 @@ describe("expert Telegram views", () => {
     ).resolves.toEqual({ kind: "applied", providerOperationId: "42" });
 
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.body.chat_id).toBe("123456789");
-    expect(requests[0]?.body.text).toContain("Debt: 0 RUB minor units");
+    const body = requests[0]?.body;
+    expect(body && "chat_id" in body ? body.chat_id : undefined).toBe(
+      "123456789",
+    );
+    expect(body && "chat_id" in body ? body.text : undefined).toContain(
+      "Debt: 0 RUB minor units",
+    );
     expect(requests[0]?.context).toEqual({
       idempotencyKey: "summary-0002",
       disableRequestLogging: true,
@@ -140,7 +145,11 @@ describe("expert Telegram views", () => {
       ],
     });
 
-    const button = requests[0]?.body.reply_markup?.inline_keyboard[0]?.[0];
+    const body = requests[0]?.body;
+    const button =
+      body && "chat_id" in body
+        ? body.reply_markup?.inline_keyboard[0]?.[0]
+        : undefined;
     expect(button).toEqual({
       text: "Запись 1 · 14.08.2026 12:00",
       callback_data: "cv1.safe-token",
@@ -153,8 +162,9 @@ describe("expert Telegram views", () => {
       startsAt: `2026-08-${String(14 + (index % 7)).padStart(2, "0")}T09:00:00.000Z`,
       status: index === 0 ? ("booked" as const) : ("reserved" as const),
       clientDisplayName: `Client ${index + 1}`,
-      expertNote:
-        index === 0 ? `Line one\n\t${"note ".repeat(900)}` : undefined,
+      ...(index === 0
+        ? { expertNote: `Line one\n\t${"note ".repeat(900)}` }
+        : {}),
       meetingUrl: `https://meeting.invalid/${index + 1}`,
     }));
 
