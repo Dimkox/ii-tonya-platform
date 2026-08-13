@@ -36,3 +36,11 @@ Consequently these required gates remain unproven:
 - image vulnerability scan.
 
 Production remains `NO-GO`; provider staging remains `BLOCKED`.
+
+## Review remediation checkpoint
+
+- Added causal tests and implementation for a real checkout mutation and DB-marker-backed `/health/ready`.
+- Added an exact `86400` second residency interval assertion.
+- Added a pinned offline builder contract using Claw image ID `sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8`, exact source archive SHA, `--network none`, read-only builder root, and a minimal final artifact context.
+- The single bounded feasibility run reached offline hydration from `/seed/.pnpm-store` but exceeded the 60-second operational checkpoint and was terminated. Cleanup left zero task test containers.
+- True container-driven HTTP lifecycle/bootstrap, deep production filesystem inventory, internal-only runtime network evidence, final sandbox image proof, and the reserved one-time production smoke remain incomplete.
