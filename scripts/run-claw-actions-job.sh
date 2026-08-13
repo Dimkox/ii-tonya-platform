@@ -30,7 +30,12 @@ export CI=true
 proxy_ip="$(getent ahostsv4 proxy-gateway | awk 'NR == 1 { print $1 }')"
 printf '%s\n' strict_chain proxy_dns 'tcp_read_time_out 15000' \
   'tcp_connect_time_out 8000' '[ProxyList]' "socks5 $proxy_ip 1080" > /workspace/.proxychains4.conf
-pnpm install --offline --frozen-lockfile --store-dir /workspace/source/.pnpm-store
+if ! pnpm install --offline --frozen-lockfile --store-dir /workspace/source/.pnpm-store; then
+  timeout --signal=TERM 180 proxychains4 -q -f /workspace/.proxychains4.conf \
+    pnpm install --frozen-lockfile --store-dir /workspace/source/.pnpm-store \
+      --fetch-retries=1 --fetch-retry-mintimeout=1000 \
+      --fetch-retry-maxtimeout=5000 --fetch-timeout=30000
+fi
 pnpm build
 pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
 pnpm format:check

@@ -223,7 +223,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-actions-job.sh",
-    "1eb50c40f8bc5bd7b44f8473f2562b02f0739f7cee1b51d7b9e4ca31695be486",
+    "50cc456e9c95e0b10154f7f6267ddf86534ffa179cbb16868262e3a5a127a3ca",
   ],
   [
     "scripts/deploy-compose-remote.sh",
