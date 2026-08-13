@@ -71,7 +71,7 @@ export interface ExpertCommandProcessor {
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<{
-    readonly kind: "processed" | "disabled" | "unavailable";
+    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
     readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
   }>;
 }
@@ -199,6 +199,12 @@ export const createExpertCommandProcessor = (deps: {
         ? {}
         : { preparationNote: view.preparationNote }),
     });
+    if (outcome.kind === "not_applied") {
+      return { kind: "reissue_client", deliveryOutcome: outcome.kind };
+    }
+    if (outcome.kind === "unknown_outcome") {
+      return { kind: "unavailable", deliveryOutcome: outcome.kind };
+    }
     return { kind: "processed", deliveryOutcome: outcome.kind };
   },
 });

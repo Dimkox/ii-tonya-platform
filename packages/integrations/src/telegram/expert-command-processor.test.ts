@@ -196,9 +196,66 @@ describe("expert Telegram command processor", () => {
           idempotencyKey: "telegram-update-1",
           correlationId: "corr-1",
         }),
-      ).resolves.toEqual({ kind: "processed", deliveryOutcome: kind });
+      ).resolves.toEqual(
+        kind === "not_applied"
+          ? { kind: "reissue_client", deliveryOutcome: kind }
+          : { kind: "unavailable", deliveryOutcome: kind },
+      );
       expect(state.clientView).toHaveBeenCalledTimes(1);
       expect(state.views.sendUnsupported).not.toHaveBeenCalled();
     },
   );
+
+  it("issues a fresh cv1 through a later /client command while the consumed token stays rejected", async () => {
+    const state = build();
+    state.views.sendClientView.mockResolvedValueOnce({
+      kind: "not_applied",
+      retryable: true,
+      reasonCode: "before_write",
+    });
+    state.clientChoices.mockResolvedValueOnce([
+      {
+        startsAt: "2026-08-14T09:00:00.000Z",
+        serviceName: "Consultation",
+        callbackData: "cv1.fresh-token",
+      },
+    ]);
+    const disclosure = {
+      principal,
+      authenticated: {
+        tokenHash: "a".repeat(64),
+        claims: {
+          reservationId: "00000000-0000-4000-8000-000000000201",
+          expertId: principal.expertId,
+          telegramUserId: principal.telegramUserId,
+          version: 1,
+          expiresAtEpochSeconds: 1_786_000_000,
+        },
+      },
+      idempotencyKey: "telegram-update-consumed",
+      correlationId: "corr-consumed",
+    };
+
+    await expect(
+      state.processor.processClientView(disclosure),
+    ).resolves.toEqual({
+      kind: "reissue_client",
+      deliveryOutcome: "not_applied",
+    });
+    state.clientView.mockRejectedValueOnce(new Error("consumed token"));
+    await expect(state.processor.processClientView(disclosure)).rejects.toThrow(
+      "expert_query_unavailable",
+    );
+    await expect(
+      state.processor.processCommand({
+        ...command("/client"),
+        idempotencyKey: "telegram-update-fresh-client",
+      }),
+    ).resolves.toMatchObject({ kind: "processed" });
+    expect(state.views.sendClientChoices).toHaveBeenCalledWith(
+      expect.objectContaining({
+        choices: [expect.objectContaining({ callbackData: "cv1.fresh-token" })],
+      }),
+    );
+  });
 });

@@ -36,7 +36,10 @@ const build = async (
     },
   }));
   const processCommand = vi.fn(async () => undefined);
-  const processClientView = vi.fn(async () => undefined);
+  const processClientView = vi.fn(async () => ({
+    kind: "processed" as const,
+    deliveryOutcome: "applied" as const,
+  }));
   const answerCallbackQuery = vi.fn(async () => ({
     kind: "applied" as const,
     providerOperationId: "answer-1",
@@ -236,7 +239,7 @@ describe("Telegram webhook callback boundary", () => {
     async (kind) => {
       const state = await build({ queriesEnabled: true });
       state.processClientView.mockResolvedValueOnce({
-        kind: "processed",
+        kind: kind === "not_applied" ? "reissue_client" : "unavailable",
         deliveryOutcome: kind,
       });
       try {
@@ -254,6 +257,19 @@ describe("Telegram webhook callback boundary", () => {
           },
         });
         expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual(
+          kind === "not_applied"
+            ? { accepted: true, unavailable: true, reissueClient: true }
+            : { accepted: true, unavailable: true, ambiguous: true },
+        );
+        expect(state.answerCallbackQuery).toHaveBeenCalledWith({
+          callbackQueryId: `client-view-${kind}`,
+          status: "unavailable",
+          idempotencyKey: `telegram:${kind === "not_applied" ? 61 : 62}:client-view:answer`,
+        });
+        expect(state.answerCallbackQuery).not.toHaveBeenCalledWith(
+          expect.objectContaining({ status: "processed" }),
+        );
         expect(state.complete).toHaveBeenCalledWith("claim-1");
         expect(state.fail).not.toHaveBeenCalled();
       } finally {

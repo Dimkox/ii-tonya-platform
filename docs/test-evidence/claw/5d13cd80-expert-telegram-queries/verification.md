@@ -216,3 +216,33 @@ REMOTE_FILES_LINKS_OUTPUTS_REMOVED
 RUNNING_II_TONYA_TEST=0
 FOCUSED_PROCESSES=0
 ```
+
+## Final acknowledgement correction
+
+A narrow follow-up corrected the provider acknowledgement for a consumed client view.
+The causal focused RED was:
+
+```text
+Test Files  2 failed (2)
+Tests       5 failed | 27 passed (32)
+Duration    2.62s
+```
+
+The same processor and webhook files were then GREEN:
+
+```text
+Test Files  2 passed (2)
+Tests       32 passed (32)
+Duration    2.62s
+```
+
+Only an applied disclosure now produces the success acknowledgement. A definite
+not-applied disclosure completes the inbox and returns a sanitized `reissueClient`
+result; an unknown outcome completes the inbox with a terminal ambiguous result. Both
+use bounded unavailable acknowledgement copy instructing the expert to run `/client`
+again and neither retries the consumed token. The recovery case proves replay stays
+rejected while a later `/client` command can issue a fresh `cv1` selector.
+
+Cleanup reported `REMOTE_FOCUSED_FILES_RESTORED`, `RUNNING_II_TONYA_TEST=0`, and
+`FOCUSED_PROCESSES=0`. No database, schema, migration, dependency, PII persistence, app
+composition, or live activation changed in this narrow follow-up.

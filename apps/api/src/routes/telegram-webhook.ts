@@ -45,7 +45,10 @@ export interface TelegramExpertQueryIngress {
     };
     readonly idempotencyKey: string;
     readonly correlationId: string;
-  }): Promise<unknown>;
+  }): Promise<{
+    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
+  }>;
   processClientView(input: {
     readonly principal: {
       readonly expertId: string;
@@ -207,13 +210,25 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
                 correlationId,
               });
             if (authenticated === null) throw new Error("client_view_denied");
-            await deps.expertQueries.processClientView({
+            const processResult = await deps.expertQueries.processClientView({
               principal,
               authenticated,
               idempotencyKey: `telegram:${updateId}:client-view`,
               correlationId,
             });
             await deps.inbox.complete(claim.claimId);
+            if (processResult.deliveryOutcome === "not_applied") {
+              await answerBestEffort("unavailable");
+              return {
+                accepted: true,
+                unavailable: true,
+                reissueClient: true,
+              };
+            }
+            if (processResult.deliveryOutcome === "unknown_outcome") {
+              await answerBestEffort("unavailable");
+              return { accepted: true, unavailable: true, ambiguous: true };
+            }
             await answerBestEffort("processed");
           } catch {
             await deps.inbox.complete(claim.claimId);
