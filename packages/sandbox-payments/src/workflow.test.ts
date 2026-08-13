@@ -112,7 +112,7 @@ async function approvedCommand(overrides: Record<string, unknown> = {}) {
 
 describe("SandboxTransitionWorkflow", () => {
   it("settles only with an exactly bound approval and replays the committed event", async () => {
-    const { command } = await approvedCommand();
+    const { command } = await approvedCommand({ correlationId: "sandbox:run-1" });
     const first = await workflow.execute(command);
     expect(first).toMatchObject({
       allowed: true,
@@ -123,6 +123,41 @@ describe("SandboxTransitionWorkflow", () => {
       ...(first as { allowed: true; event: unknown }),
       replayed: true,
     });
+  });
+
+  it("denies expired, wrong-nonce, and non-identical consumed approvals", async () => {
+    const expired = await approvedCommand();
+    await db!.execute(sql`update admin_approvals set expires_at=transaction_timestamp()-interval '1 second' where id=${expired.command.approvalId}::uuid`);
+    await expect(workflow.execute(expired.command)).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+    const wrongNonce = await approvedCommand();
+    await expect(workflow.execute({ ...wrongNonce.command, nonce: randomUUID() })).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+    const consumed = await approvedCommand(); await workflow.execute(consumed.command);
+    await expect(workflow.execute({ ...consumed.command, idempotencyKey: `${consumed.command.idempotencyKey}:other` })).resolves.toEqual({ allowed: false, reasonCode: "approval_denied" });
+  });
+
+  it("denies requester self-approval", async () => {
+    const prepared = await approvedCommand();
+    const result = await approvals.approveApproval({ approvalId: prepared.command.approvalId, sessionIdHash: prepared.requester.sessionIdHash });
+    expect(result).toBe(false);
+  });
+
+  it("rolls approval consumption back when transition conflicts", async () => {
+    const { command } = await approvedCommand();
+    await db!.execute(sql`update sandbox_expert_residency_payments set version=1 where payment_id=${command.paymentId}`);
+    await expect(workflow.execute(command)).rejects.toBeDefined();
+    const facts = await db!.execute<{ consumed: boolean; events: number; commands: number; audits: number }>(sql`select (select consumed_at is not null from admin_approvals where id=${command.approvalId}::uuid) consumed,(select count(*)::int from sandbox_expert_residency_events) events,(select count(*)::int from sandbox_expert_residency_commands where command_kind='transition') commands,(select count(*)::int from audit_events) audits`);
+    expect(facts.rows[0]).toEqual({ consumed: false, events: 0, commands: 0, audits: 0 });
+  });
+
+  it("refunds a settled payment from version one", async () => {
+    const settled = await approvedCommand(); await workflow.execute(settled.command);
+    const refund = await approvedCommand({ action: "expert_residency.sandbox_refund", paymentId: settled.command.paymentId, expectedVersion: 1 });
+    expect(await workflow.execute(refund.command)).toMatchObject({ allowed: true, event: { kind: "refunded", version: 2 } });
+  });
+
+  it("rejects a runtime-invalid action before database work", async () => {
+    const { command } = await approvedCommand();
+    await expect(workflow.execute({ ...command, action: "expert_residency.sandbox_other" } as never)).rejects.toThrow("sandbox_admin_action_invalid");
   });
 
   it.each([
