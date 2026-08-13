@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const run = (file, args, options = {}) =>
@@ -13,16 +15,12 @@ const run = (file, args, options = {}) =>
 test("sandbox image contains its packaged runtime closure and is hardened", () => {
   const tag = `ii-tonya-sandbox-smoke:${process.env.VCS_REF ?? "local"}`;
   try {
-    run("docker", [
-      "build",
-      "--file",
-      "Dockerfile.sandbox",
-      "--target",
-      "sandbox-api",
-      "--tag",
-      tag,
-      ".",
-    ]);
+    const archive = process.env.SANDBOX_SOURCE_ARCHIVE;
+    assert.ok(archive);
+    const sourceSha = createHash("sha256").update(readFileSync(archive)).digest("hex");
+    run("bash", ["scripts/build-sandbox-image-offline.sh"], {
+      env: { ...process.env, SOURCE_ARCHIVE: archive, SOURCE_SHA: sourceSha },
+    });
     const inspected = JSON.parse(run("docker", ["image", "inspect", tag]))[0];
     assert.equal(inspected.Config.User, "10001:10001");
     assert.deepEqual(inspected.Config.Cmd, ["node", "dist/server.js"]);

@@ -23,6 +23,7 @@ describe("release assets", () => {
       "tests/container/image-smoke.test.mjs",
       "tests/container/sandbox-image-smoke.test.mjs",
       "scripts/run-sandbox-container-smoke.sh",
+      "scripts/build-sandbox-image-offline.sh",
       "tests/provider-stubs/server.mjs",
       "docs/operations/data-retention.md",
       "docs/operations/disaster-recovery.md",
@@ -46,9 +47,10 @@ describe("release assets", () => {
     ) as { services: Record<string, Record<string, unknown>> };
     expect(Object.keys(productionCompose.services)).not.toContain("sandbox-api");
     expect(dockerfile).toContain("AS sandbox-api");
-    expect(dockerfile).toContain(
-      "pnpm --config.force-legacy-deploy=true --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api",
-    );
+    const builder = readFileSync("scripts/build-sandbox-image-offline.sh", "utf8");
+    expect(builder).toContain("--network none");
+    expect(builder).toContain("pnpm --offline");
+    expect(builder).toContain("sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8");
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain("USER 10001:10001");
     const service = sandboxCompose.services["sandbox-api"]!;

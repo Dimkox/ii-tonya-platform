@@ -82,6 +82,17 @@ const transitionBodySchema = {
     correlationId: { type: "string", pattern: opaquePattern },
   },
 } as const;
+const checkoutBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["orderId", "amountMinor", "currency", "idempotencyKey"],
+  properties: {
+    orderId: { type: "string", pattern: uuidPattern },
+    amountMinor: { type: "string", pattern: "^[1-9][0-9]{0,17}$" },
+    currency: { type: "string", enum: ["RUB"] },
+    idempotencyKey: { type: "string", pattern: opaquePattern },
+  },
+} as const;
 
 function bearerToken(value: string | undefined): string | null {
   return /^Bearer ([A-Za-z0-9._~-]{32,512})$/u.exec(value ?? "")?.[1] ?? null;
@@ -141,6 +152,29 @@ export async function buildSandboxRoutes(
     return reply.code(500).send({ error: "internal_error" });
   });
   const adminRateLimit = { max: 30, timeWindow: "1 minute" } as const;
+
+  app.get("/health/ready", async (_request, reply) => {
+    try {
+      await deps.paymentAdapter.assertSandboxDatabase();
+      return reply.code(200).send({ ready: true, mode: "sandbox" });
+    } catch {
+      return reply.code(503).send({ ready: false, mode: "sandbox" });
+    }
+  });
+
+  app.post<{
+    Body: {
+      orderId: string;
+      amountMinor: string;
+      currency: "RUB";
+      idempotencyKey: string;
+    };
+  }>(
+    "/sandbox/v1/checkouts",
+    { bodyLimit: 8 * 1024, schema: { body: checkoutBodySchema } },
+    async (request, reply) =>
+      reply.code(201).send(await deps.paymentAdapter.createCheckout(request.body)),
+  );
 
   app.get<{ Params: { paymentId: string } }>(
     "/sandbox/v1/payments/:paymentId",
