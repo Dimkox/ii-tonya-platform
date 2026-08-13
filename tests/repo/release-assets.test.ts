@@ -73,10 +73,15 @@ describe("release assets", () => {
     expect(builder).toContain("--memory 1g");
     expect(builder).toContain("DOCKER_HOST_SOURCE_ROOT");
     expect(builder).toContain("LOCAL_SOURCE_ROOT");
+    expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
+    expect(builder).toContain("/installed:ro");
+    expect(builder).not.toContain("/seed/.pnpm-store");
+    expect(builder).not.toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain("build:bounded");
-    expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
-    expect(builder).toContain("pnpm --offline --store-dir");
+    expect(builder).toContain(
+      "pnpm --offline --filter @ii-tonya/sandbox-api --prod deploy",
+    );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
     expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
@@ -219,6 +224,7 @@ describe("release assets", () => {
     expect(runner).toContain("SANDBOX_SOURCE_ARCHIVE");
     expect(runner).toContain("SOURCE_BUNDLE");
     expect(runner).toContain("DOCKER_HOST_SOURCE_ROOT");
+    expect(runner).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(runner).toContain("LOCAL_SOURCE_ROOT");
   });
 

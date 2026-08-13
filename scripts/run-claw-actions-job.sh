@@ -52,6 +52,7 @@ export SOURCE_BUNDLE="$sandbox_ci_root/source.bundle"
 export SANDBOX_BUILD_ROOT="$sandbox_ci_root/build"
 export LOCAL_SOURCE_ROOT=/workspace/source
 export DOCKER_HOST_SOURCE_ROOT="$CLAW_HOST_WORKSPACE"
+export DOCKER_HOST_INSTALLED_ROOT="$CLAW_HOST_WORKSPACE"
 mkdir -p "$SANDBOX_BUILD_ROOT"
 git archive --format=tar --output="$SANDBOX_SOURCE_ARCHIVE" "$source_sha"
 git bundle create "$SOURCE_BUNDLE" HEAD
