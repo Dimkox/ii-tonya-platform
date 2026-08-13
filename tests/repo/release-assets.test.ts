@@ -76,6 +76,7 @@ describe("release assets", () => {
     expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(builder).toContain("DOCKER_HOST_STORE_ROOT");
     expect(builder).toContain("/installed-store:ro");
+    expect(builder).toContain('cp -a "$store_root" /work/.pnpm-store');
     expect(builder).toContain("/installed:ro");
     expect(builder).toContain(
       'ln -s "$installed_root/node_modules" /work/node_modules',
@@ -88,7 +89,7 @@ describe("release assets", () => {
     );
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain(
-      'pnpm --offline --store-dir "$store_root" --filter @ii-tonya/sandbox-api --prod deploy',
+      "pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
     );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
