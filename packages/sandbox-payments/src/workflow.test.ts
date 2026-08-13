@@ -133,7 +133,7 @@ describe("SandboxTransitionWorkflow", () => {
   it("denies expired, wrong-nonce, and non-identical consumed approvals", async () => {
     const expired = await approvedCommand();
     await db!.execute(
-      sql`update admin_approvals set approved_at=approved_at-interval '10 minutes', created_at=created_at-interval '10 minutes', expires_at=expires_at-interval '10 minutes' where id=${expired.command.approvalId}::uuid`,
+      sql`update admin_approvals set requester_mfa_verified_at=requester_mfa_verified_at-interval '10 minutes', approver_mfa_verified_at=approver_mfa_verified_at-interval '10 minutes', approved_at=approved_at-interval '10 minutes', created_at=created_at-interval '10 minutes', expires_at=expires_at-interval '10 minutes' where id=${expired.command.approvalId}::uuid`,
     );
     await expect(workflow.execute(expired.command)).resolves.toEqual({
       allowed: false,
