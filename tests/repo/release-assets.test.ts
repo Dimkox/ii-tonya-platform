@@ -24,6 +24,7 @@ describe("release assets", () => {
       "tests/container/sandbox-image-smoke.test.mjs",
       "scripts/run-sandbox-container-smoke.sh",
       "scripts/build-sandbox-image-offline.sh",
+      "scripts/sandbox-container-lifecycle.mjs",
       "tests/provider-stubs/server.mjs",
       "docs/operations/data-retention.md",
       "docs/operations/disaster-recovery.md",
@@ -51,6 +52,14 @@ describe("release assets", () => {
     expect(builder).toContain("--network none");
     expect(builder).toContain("pnpm --offline");
     expect(builder).toContain("sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8");
+    const lifecycle = readFileSync("scripts/sandbox-container-lifecycle.mjs", "utf8");
+    expect(lifecycle).toContain('"/sandbox/v1/checkouts"');
+    expect(lifecycle).toContain("/request");
+    expect(lifecycle).toContain("/approve");
+    expect(lifecycle).toContain("/transitions/${transition}");
+    expect(lifecycle).toContain("expert_residency_provider_event_inbox");
+    expect(lifecycle).toContain("sandbox_expert_residency_events");
+    expect(lifecycle).toContain('interval_seconds: "86400"');
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain("USER 10001:10001");
     const service = sandboxCompose.services["sandbox-api"]!;
@@ -64,13 +73,14 @@ describe("release assets", () => {
     expect(JSON.stringify(service)).not.toContain("docker.sock");
     expect(service.environment).toMatchObject({
       II_TONYA_RUNTIME_MODE: "sandbox",
-      SANDBOX_DATABASE_URL:
-        "${SANDBOX_DATABASE_URL:?SANDBOX_DATABASE_URL is required}",
       PAYMENT_API_KEY: "",
       PAYMENT_TOKEN: "",
       PAYMENT_SECRET: "",
       PAYMENT_WEBHOOK_SECRET: "",
     });
+    expect(sandboxCompose.services["sandbox-postgres"]?.ports).toBeUndefined();
+    expect((sandboxCompose as any).networks["sandbox-db"].internal).toBe(true);
+    expect(service.networks).toEqual(["sandbox-db"]);
   });
 
   it("does not convert local fixtures or container health into provider evidence", () => {

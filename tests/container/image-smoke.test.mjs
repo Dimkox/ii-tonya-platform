@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const run = (file, args) =>
@@ -9,6 +12,38 @@ const run = (file, args) =>
     stdio: ["ignore", "pipe", "pipe"],
   });
 const compose = (args) => run("docker", ["compose", ...args]);
+const forbiddenProductionInventory = [
+  "@ii-tonya/sandbox-api",
+  "@ii-tonya/sandbox-payments",
+  "/sandbox/v1/",
+  "createCanonicalExpertResidencyPaymentEventVerifier",
+];
+
+const assertDeepInventoryClean = (id) => {
+  const root = mkdtempSync(join(tmpdir(), "ii-tonya-production-inventory-"));
+  try {
+    run("docker", ["cp", `${id}:/app/.`, root]);
+    const pending = [root];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      for (const name of readdirSync(current)) {
+        const path = join(current, name);
+        const relative = path.slice(root.length).replaceAll("\\", "/");
+        for (const forbidden of forbiddenProductionInventory)
+          assert.equal(relative.includes(forbidden), false, relative);
+        const stat = statSync(path);
+        if (stat.isDirectory()) pending.push(path);
+        else if (stat.isFile() && stat.size <= 8 * 1024 * 1024) {
+          const content = readFileSync(path).toString("utf8");
+          for (const forbidden of forbiddenProductionInventory)
+            assert.equal(content.includes(forbidden), false, `${relative}: ${forbidden}`);
+        }
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+};
 
 test("boots portable final images and imports emitted internal packages", () => {
   try {
@@ -40,6 +75,7 @@ test("boots portable final images and imports emitted internal packages", () => 
     ]) {
       const id = compose(["ps", "-q", service]).trim();
       assert.notEqual(id, "");
+      assertDeepInventoryClean(id);
       const inspected = JSON.parse(run("docker", ["inspect", id]))[0];
       assert.equal(inspected.Config.User, "10001:10001");
       assert.equal(inspected.HostConfig.ReadonlyRootfs, true);
