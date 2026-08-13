@@ -59,8 +59,8 @@ describe("release assets", () => {
     expect(builder).toContain("git clone --quiet --no-checkout");
     expect(builder).toContain("git_source_sha");
     expect(builder).toContain("source_archive_sha256");
-    expect(builder).toContain(
-      "pnpm --filter @ii-tonya/sandbox-api --prod deploy",
+    expect(builder).toMatch(
+      /pnpm[^\r\n]*--filter @ii-tonya\/sandbox-api --prod deploy/u,
     );
     expect(builder).not.toContain('cp -a "$fixture/source/node_modules"');
     expect(builder).toContain('find "$artifact" -type l');
