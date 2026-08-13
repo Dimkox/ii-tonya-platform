@@ -47,7 +47,7 @@ describe("release assets", () => {
     expect(Object.keys(productionCompose.services)).not.toContain("sandbox-api");
     expect(dockerfile).toContain("AS sandbox-api");
     expect(dockerfile).toContain(
-      "pnpm --offline --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api",
+      "pnpm --config.force-legacy-deploy=true --offline --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api",
     );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain("USER 10001:10001");

@@ -40,7 +40,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     test "$install_ok" = 1
 COPY . .
 RUN pnpm --filter @ii-tonya/sandbox-api... build
-RUN pnpm --offline --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api
+RUN pnpm --config.force-legacy-deploy=true --offline --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS sandbox-api
 ARG VCS_REF=unknown
