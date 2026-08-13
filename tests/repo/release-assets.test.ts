@@ -12,13 +12,17 @@ describe("release assets", () => {
       ".github/workflows/release.yml",
       ".dockerignore",
       "Dockerfile",
+      "Dockerfile.sandbox",
       "compose.yaml",
+      "compose.sandbox.yaml",
       "deploy/compose.remote.yml",
       "deploy/runtime.env.example",
       "scripts/deploy-compose-remote.sh",
       "scripts/validate-runtime-env.sh",
       "scripts/smoke.mjs",
       "tests/container/image-smoke.test.mjs",
+      "tests/container/sandbox-image-smoke.test.mjs",
+      "scripts/run-sandbox-container-smoke.sh",
       "tests/provider-stubs/server.mjs",
       "docs/operations/data-retention.md",
       "docs/operations/disaster-recovery.md",
@@ -30,6 +34,41 @@ describe("release assets", () => {
       "docs/runbooks/rollback.md",
     ];
     expect(required.filter((path) => !existsSync(path))).toEqual([]);
+  });
+
+  it("defines an explicit hardened sandbox image without changing production Compose", () => {
+    const dockerfile = readFileSync("Dockerfile.sandbox", "utf8");
+    const productionCompose = parse(readFileSync("compose.yaml", "utf8")) as {
+      services: Record<string, unknown>;
+    };
+    const sandboxCompose = parse(
+      readFileSync("compose.sandbox.yaml", "utf8"),
+    ) as { services: Record<string, Record<string, unknown>> };
+    expect(Object.keys(productionCompose.services)).not.toContain("sandbox-api");
+    expect(dockerfile).toContain("AS sandbox-api");
+    expect(dockerfile).toContain(
+      "pnpm --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api",
+    );
+    expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
+    expect(dockerfile).toContain("USER 10001:10001");
+    const service = sandboxCompose.services["sandbox-api"]!;
+    expect(service.profiles).toContain("sandbox");
+    expect(service.read_only).toBe(true);
+    expect(service.tmpfs).toContain("/tmp");
+    expect(service.cap_drop).toContain("ALL");
+    expect(service.security_opt).toContain("no-new-privileges:true");
+    expect(service.cpus).toBe(1);
+    expect(service.mem_limit).toBe("1g");
+    expect(JSON.stringify(service)).not.toContain("docker.sock");
+    expect(service.environment).toMatchObject({
+      II_TONYA_RUNTIME_MODE: "sandbox",
+      SANDBOX_DATABASE_URL:
+        "${SANDBOX_DATABASE_URL:?SANDBOX_DATABASE_URL is required}",
+      PAYMENT_API_KEY: "",
+      PAYMENT_TOKEN: "",
+      PAYMENT_SECRET: "",
+      PAYMENT_WEBHOOK_SECRET: "",
+    });
   });
 
   it("does not convert local fixtures or container health into provider evidence", () => {

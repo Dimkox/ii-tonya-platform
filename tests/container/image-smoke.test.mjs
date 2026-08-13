@@ -98,7 +98,34 @@ test("boots portable final images and imports emitted internal packages", () => 
           probe,
         ]);
       }
+      for (const forbidden of [
+        "@ii-tonya/sandbox-api",
+        "@ii-tonya/sandbox-payments",
+      ]) {
+        const probe = `try{import.meta.resolve('${forbidden}');process.exit(43)}catch{}`;
+        run("docker", [
+          "compose",
+          "exec",
+          "-T",
+          service,
+          "node",
+          "--input-type=module",
+          "--eval",
+          probe,
+        ]);
+      }
     }
+    const sandboxRouteStatus = run("docker", [
+      "compose",
+      "exec",
+      "-T",
+      "api",
+      "node",
+      "--input-type=module",
+      "--eval",
+      "const r=await fetch('http://127.0.0.1:3000/sandbox/v1/payments/sandbox_payment_abcdefghijklmnopqrstuv');process.stdout.write(String(r.status))",
+    ]).trim();
+    assert.equal(sandboxRouteStatus, "404");
   } finally {
     compose(["down", "--volumes", "--remove-orphans"]);
   }

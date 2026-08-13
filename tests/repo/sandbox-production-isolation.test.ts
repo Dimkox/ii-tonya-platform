@@ -55,6 +55,15 @@ describe("sandbox production isolation", () => {
     }
   });
 
+  it("keeps the production Docker build and runtime closure sandbox-free", () => {
+    const dockerfile = readFileSync("Dockerfile", "utf8");
+    expect(dockerfile).not.toContain("apps/sandbox-api");
+    expect(dockerfile).not.toContain("packages/sandbox-payments");
+    expect(dockerfile).not.toContain("@ii-tonya/sandbox-api");
+    expect(dockerfile).not.toContain("@ii-tonya/sandbox-payments");
+    expect(dockerfile).not.toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+  });
+
   it("publishes a real executable sandbox entrypoint", () => {
     const manifest = JSON.parse(
       readFileSync("apps/sandbox-api/package.json", "utf8"),
