@@ -41,7 +41,7 @@ cat > "$container_script" <<'SCRIPT'
 set -Eeuo pipefail
 cd /workspace/source
 export CI=true
-pnpm install --offline --frozen-lockfile --store-dir /workspace/.pnpm-store
+pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
 pnpm build
 case "$CLAW_GATE_MODE" in
   ci)

@@ -38,7 +38,9 @@ describe("direct Claw verification semantics", () => {
 
   it("installs the frozen dependency graph before verification", () => {
     const runner = read("scripts/run-claw-ci.sh");
-    const install = runner.indexOf("pnpm install --offline --frozen-lockfile");
+    const install = runner.indexOf(
+      "pnpm install --offline --frozen-lockfile --trust-lockfile",
+    );
     const build = runner.indexOf("pnpm build", install);
     const verify = runner.indexOf("pnpm exec vitest run", build);
     expect(install).toBeGreaterThanOrEqual(0);
