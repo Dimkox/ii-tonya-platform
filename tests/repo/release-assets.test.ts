@@ -81,7 +81,7 @@ describe("release assets", () => {
     expect(builder).toContain("build:bounded");
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain(
-      "pnpm --offline --filter @ii-tonya/sandbox-api --prod deploy",
+      'pnpm --offline --store-dir "$installed_root/.pnpm-store" --filter @ii-tonya/sandbox-api --prod deploy',
     );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);

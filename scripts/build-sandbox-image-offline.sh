@@ -60,7 +60,7 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     cd /work
     npm --prefix apps/sandbox-api run build:bounded
     test -f apps/sandbox-api/dist/server.js
-    pnpm --offline --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
+    pnpm --offline --store-dir "$installed_root/.pnpm-store" --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
     find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
       const fs=require("node:fs");
       for(const path of process.argv.slice(1)) {
