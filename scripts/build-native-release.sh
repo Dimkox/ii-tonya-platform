@@ -17,8 +17,10 @@ mkdir -p "$output_dir" "$work_dir/release"
 git archive --format=tar "$source_sha" > "$work_dir/source.tar"
 source_archive_sha="$(sha256sum "$work_dir/source.tar" | awk '{print $1}')"
 pnpm build
-pnpm --filter @ii-tonya/api --prod deploy "$work_dir/release/api"
-pnpm --filter @ii-tonya/app-worker --prod deploy "$work_dir/release/worker"
+pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/api --prod deploy \
+  "$work_dir/release/api"
+pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/app-worker --prod deploy \
+  "$work_dir/release/worker"
 cp scripts/migrate-native.mjs "$work_dir/release/api/migrate-native.mjs"
 cp -R packages/db/migrations "$work_dir/release/migrations"
 cp -R deploy/systemd "$work_dir/release/systemd"

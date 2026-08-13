@@ -47,9 +47,9 @@ set -Eeuo pipefail
 cd /workspace/source
 export CI=true
 pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
-pnpm build
 case "$CLAW_GATE_MODE" in
   ci)
+    pnpm build
     pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
     pnpm format:check
     pnpm verify:deploy
@@ -61,6 +61,7 @@ case "$CLAW_GATE_MODE" in
       --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
     ;;
   database)
+    pnpm build
     pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
     pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
