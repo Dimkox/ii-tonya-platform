@@ -157,7 +157,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "574386ac642352e3137a25d3a8722982b7a8bd1a73cd371972fd339ec5754b48",
+    "d44bc93073ca4f313b660495a32bacd8c339971798268ff65b6b2726c2991bf0",
   ],
   [
     "packages/application/package.json",
@@ -198,36 +198,48 @@ const approvedPackageManifestHashes = new Map([
 ]);
 const approvedAutomationArtifactHashes = new Map([
   [
-    ".github/workflows/ci.yml",
-    "5baf0eab124103230e3f9748d2d2d58fa4262e9506c94d15ccfa3300cd01ca0f",
+    "scripts/run-claw-ci.sh",
+    "6b7f801cc5c94ceb256f47e31fbe4d17dbe638ae959e5a3ef489348d24c78609",
   ],
   [
-    ".github/workflows/db-gate.yml",
-    "7e057dc2975e1c65994cf802b87bf36cbf443e4fbf85122a957ea9ca3d3466f2",
+    "scripts/build-native-release.sh",
+    "f76650020a7d6edb4e8507f33be916d7c0bf898ae08bb996b599ec39a3abade0",
   ],
   [
-    ".github/workflows/release.yml",
-    "185f7d06475b6bbcdc756cb74cf47c5927a56d1737a677c990999ccc94895f91",
+    "scripts/deploy-native-remote.sh",
+    "88f410b3116016579204dab95312aa7fe752f9e4671620140183da67f73972d3",
   ],
   [
-    "deploy/compose.remote.yml",
-    "770925eae581bbd1fea73d4d52e526cbf26d7c28cfa241585b29ae38c37d4f17",
+    "scripts/provision-claw-syft.sh",
+    "39f638068394485aa621da9f7ed609d1c15ee9bd7574b27d8c29b494481b1470",
+  ],
+  [
+    "scripts/smoke-native-release.sh",
+    "9fd54833375be65f13fadc9203d1bf2d0eccb60439862f3c296e289abb9a9553",
+  ],
+  [
+    "scripts/migrate-native.mjs",
+    "b41b805e9c57cb9d93f296e0e18bc408c9b628e312302d09d197a650c6ffba2d",
+  ],
+  [
+    "deploy/systemd/ii-tonya-api.service",
+    "8623f475796d072125651df917e6b96c0ea9bfc1cb4eb3a8bc90aae648d62785",
+  ],
+  [
+    "deploy/systemd/ii-tonya-worker.service",
+    "c67bc5a7dbe04cdfb743c37ddb712a5084601c2f88d4558218a35320cf71ec5a",
+  ],
+  [
+    "deploy/systemd/ii-tonya-migrate.service",
+    "fb09dbfba550a66abf46cea65cd9348d68c345ef76df8af2ed923ddd0b19176f",
   ],
   [
     "deploy/claw/dockerfile.test",
-    "0888f25b6407a7dab485f824dbab58753dc2f6e5264838f925f80541f5159913",
+    "d69356b4769493c64c69d8f2e7d5dd178d7a408b0fa6b15cdeb856925b874ebe",
   ],
   [
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
-  ],
-  [
-    "scripts/run-claw-actions-job.sh",
-    "21331d707dc7eb06a01d03bbd1b5c783b2a2deef0dd53e983deff2c1b93e85f7",
-  ],
-  [
-    "scripts/deploy-compose-remote.sh",
-    "3448eb38e5b561534bfdfda3d8edc0af58becf271cd0899a3b6d93fbe58a4f7e",
   ],
   [
     "scripts/validate-runtime-env.sh",
@@ -259,7 +271,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "6ffcd1ccea3cb3d9670517b7cfda93e1f2f41f357fdaa02b9c6bb9b69a2f6f61",
+    "4ed71fc1c5ad50617e8fb448eb504780812f3eb9145d1d893b3149a24089142e",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",

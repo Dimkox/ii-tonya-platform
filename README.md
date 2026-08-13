@@ -7,7 +7,7 @@ authoritative ии-Тоня source document.
 
 Pre-production. The client platform foundation is implemented, while live-provider,
 staging, and production gates remain closed. The expert residency referral extension
-has implementation for Tasks 1–12 in the active draft PR, including expert API,
+includes expert API,
 Telegram/prompt boundaries, bounded worker operations, traceability, runbooks,
 release-readiness guards, and mandatory database-gate registration.
 
@@ -16,8 +16,8 @@ and the corrected real-PostgreSQL release-candidate E2E is green at exact source
 `c560cbb65e105e1aaeb8d86f544ff95cfd218346` in the constrained Claw container.
 The previously standalone expert HTTP boundary is now composable through the normal API
 application for injected test capabilities; runtime startup fails closed if expert flags
-are enabled without that complete capability. No live authentication or payment provider
-is supplied, and all deployment defaults remain disabled.
+are enabled without that complete capability. No live authentication or YooKassa
+adapter or credentials are supplied, and all deployment defaults remain disabled.
 The expert Telegram query increment implements private `/schedule`, `/client`, and
 `/stats` reads plus a separate single-use `cv1` client-view callback. It is code-complete
 behind `EXPERT_TELEGRAM_QUERIES_ENABLED=false`; the default server supplies no query
@@ -26,20 +26,24 @@ activation or provider evidence.
 The default server intentionally constructs neither a live query adapter nor callback
 secret; both remain deferred activation inputs. Enabled composition is proven only with
 an injected test capability while the production lifecycle remains closed.
-CI and Database Gate run on the repository-scoped self-hosted Claw runner and execute
-inside the constrained `ii-tonya-test` Compose profile. They do not consume GitHub-hosted
-Actions minutes. Pull-request execution is restricted to repository-owner branches;
-external pull requests are not allowed to run untrusted code on Claw. Final aggregate
-verify, independent reviews, and human/release approvals remain open.
-
-The separate `server-control` workflow is manual-dispatch only and contains only an
-explicit refusal. It cannot checkout or execute `ops/server-command.sh`.
+CI and Database Gate run directly on Claw inside the constrained `ii-tonya-test`
+container, which imitates the dedicated server runtime without becoming a production
+deployment target. GitHub Actions are not used. GitHub stores Git history and pull
+requests only; executable evidence is written under `docs/test-evidence/claw/`.
+Final aggregate verification, independent reviews, and human/release approvals remain
+explicit gates.
 GitHub Free does not expose private-repository branch protection or rulesets. The
-repository therefore fails closed at the release perimeter: the legacy native workflow
-contains only an explicit refusal job, and the provenance-bound manual `Gated release` is the sole
-release entrypoint. Its jobs run on the isolated `ii-tonya-release-claw` runner under the
-`ii_tonya_release` OS account, which has neither the test label nor Docker-group access.
-The release control plane does not require hosted Actions minutes.
+repository therefore fails closed at the release perimeter. The former container-based
+production release path is not authorized by the current architecture. Production must
+run natively on the dedicated Linux server as systemd-managed API and worker processes,
+with system PostgreSQL and nginx. Docker and Compose are development and Claw test tools only.
+The native checksummed-bundle release path is implemented and its exact-SHA Claw assembly,
+offline production closure, SPDX SBOM, checksums, inventory, and packaged-entrypoint
+fail-closed smoke are recorded under `docs/test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/`.
+The same packaged API, migration entrypoint, and worker passed a native service rehearsal
+against the single dedicated Claw smoke database. A production signature, confirmed
+production host/systemd-nginx provisioning, and renewed exact-SHA migration approval
+remain release gates.
 Repository merge settings allow squash only and delete merged branches; staging and
 production deployment environments accept only `main`.
 
@@ -71,8 +75,10 @@ The connected repository architecture, including runtime modules, PostgreSQL aut
 CI/deployment, tests, evidence, disabled capabilities, deferred scope, prohibited paths,
 and orphan/dead-code classifications, is documented in:
 
-- `docs/architecture/project-connectivity-graph.md`
-- `docs/architecture/project-connectivity-inventory.md`
+- **[Open the full project connectivity graph](docs/architecture/project-connectivity-graph.md)**
+- **[Open the companion connectivity inventory](docs/architecture/project-connectivity-inventory.md)**
+- [Open the production architecture](docs/superpowers/specs/2026-07-28-ii-tonya-platform-design.md)
+- [Open the authoritative normalized requirements](docs/spec/normalized-requirements.md)
 
 The graph intentionally includes non-live and historical entities instead of hiding
 them. Workspace-level orphan count is currently zero; intentionally disabled,
@@ -82,20 +88,37 @@ inferred merely from lack of a production import.
 
 ## Authoritative source
 
-- Snapshot: `docs/source/ii-tonya-expert-full-source-2026-07-28.txt`
+- Snapshot: [full immutable source](docs/source/ii-tonya-expert-full-source-2026-07-28.txt)
 - SHA-256: `0439AE1C645E6FDA46F013A66512401F251AA18D35520F5C9A7A3C7C59314EAF`
 - Original Google Doc ID: `14AWYM9jbE0OPU3rKY6_PpPl3REDaqQbISdMB4D2mpUc`
 
 The source contains product intent, prompts, pseudo-JSON, and repeated drafts. It is not
-treated as executable Make configuration. `docs/spec/normalized-requirements.md` is the
-implementation contract; the source remains the traceability baseline.
+treated as executable Make configuration. The
+[normalized requirements](docs/spec/normalized-requirements.md) are the implementation
+contract; the source remains the traceability baseline.
 
 ## System boundary
 
 Selarti serves the client channel, Telegram serves the expert channel, and Planerka
 provides scheduling integration. A transactional backend owns booking, billing, coupon,
 consent, and audit state. Make and Google Sheets are limited to non-critical automation
-and projections.
+and projections. YooKassa by YooMoney is the selected payment provider, but its live
+adapter remains unimplemented and disabled until the provider contract and release gates
+are approved.
+
+## Production topology
+
+Production is a dedicated Linux server for this project. The application is deployed as
+a signed native release bundle and runs as two non-root systemd services: API and worker.
+The host uses its system PostgreSQL instance and nginx/TLS reverse proxy. Application
+containers, Docker Compose, and a container runtime are not part of production or
+staging. Docker remains available only for reproducible development, direct Claw tests, test
+databases, provider stubs, and sandbox evidence.
+
+Approved course corrections:
+
+- [YooKassa provider selection](docs/superpowers/sprint-change-proposal-2026-08-13-yookassa.md)
+- [Native dedicated-server production topology](docs/superpowers/sprint-change-proposal-2026-08-13-native-production.md)
 
 ## Expert residency referral program
 
@@ -139,8 +162,8 @@ The branch `codex/sandbox-payment-provider` adds a separate `apps/sandbox-api` a
 `packages/sandbox-payments` test boundary. It can simulate checkout and independently
 approved settlement/refund against isolated PostgreSQL tables, then submit branded
 events to the existing settlement/reversal pipeline. It has no live-provider SDK,
-network authority, or credential input. The production API, worker, Dockerfile, and
-Compose runtime must not depend on or contain this boundary.
+network authority, or credential input. The native production API/worker bundle and
+systemd runtime must not depend on or contain this boundary.
 
 This work is not release-ready. Tasks 1–4 are approved, Task 5 is conditional, and Task
 6 code/config was approved while its image execution remained blocked by offline pnpm
@@ -160,8 +183,8 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-Build and boot the actual packaged API and worker images, probe readiness, inspect the
-non-root/read-only runtime, and tear the stack down with:
+Build and boot the packaged **test** API and worker images, probe readiness, inspect the
+non-root/read-only test runtime, and tear the stack down with:
 
 ```powershell
 pnpm test:container
@@ -173,10 +196,11 @@ credentials, and keeps every live integration flag set to `false`.
 
 ## Release boundary
 
-Local application tests, sanitized provider fixtures, and built-container health are
-three distinct evidence classes. None is provider-connected staging evidence.
+Local application tests, sanitized provider fixtures, and built test-container health
+are distinct evidence classes. None is native staging or provider-connected evidence.
 Production remains blocked until `docs/runbooks/go-live-evidence.md` records
 `Release status: GO`, `docs/runbooks/provider-staging-evidence.md` records separately
-reviewed `Provider staging status: PASS`, and both tested image digests have approved
-signatures. The committed records intentionally remain `NO-GO` and `BLOCKED`; live
-provider composition is not authorized by this branch.
+reviewed `Provider staging status: PASS`, and the exact native release bundle has passed
+checksum, SBOM, signature, migration, systemd, smoke, reconciliation, and rollback gates.
+The committed records intentionally remain `NO-GO` and `BLOCKED`; live provider
+composition is not authorized by this branch.

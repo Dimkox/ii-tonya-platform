@@ -6,6 +6,20 @@ Repository: `Dimkox/ii-tonya-platform`
 Feature branch: `codex/task25-expert-referral-implementation`
 Draft PR: `#4` — `Codex/task25 expert referral implementation`
 
+## 2026-08-14 authoritative release correction
+
+This section supersedes every later reference in this historical handoff to GitHub
+Actions, release workflows, application images, or production Compose:
+
+- YooKassa by YooMoney is the selected provider; T-Bank is not a target provider.
+- GitHub Actions are not used. GitHub stores Git history and pull requests only.
+- CI, Database Gate, and release assembly run directly on Claw through
+  `scripts/run-claw-ci.sh`, with committed exact-SHA evidence.
+- Claw runs a constrained test container that imitates the dedicated server.
+- Production is container-free: native API/worker systemd services, system PostgreSQL,
+  nginx/TLS, immutable release directories, atomic `current` symlink, and native rollback.
+- `docs/runbooks/native-production-deployment.md` is the current deployment runbook.
+
 This handoff supersedes the continuation instructions in
 `docs/handoffs/2026-08-04-expert-residency-referrals.md` for Tasks 10–12. The older
 handoff remains historical evidence for Tasks 1–9 and the clean-machine bootstrap.

@@ -2,7 +2,7 @@
 
 Status: **TEST-ONLY / NOT RELEASE READY**. Provider-connected staging is `BLOCKED`; production is `NO-GO`.
 
-This entrypoint simulates expert-residency checkout, an approved settlement, and an approved refund without a provider SDK, external network call, or provider credential. It is not a production payment adapter and must never be composed by `apps/api` or included in the production image.
+This entrypoint simulates expert-residency checkout, an approved settlement, and an approved refund without a provider SDK, external network call, or provider credential. It is not a production payment adapter and must never be composed by `apps/api` or included in the native production release closure.
 
 ## Preconditions
 
@@ -41,8 +41,8 @@ Do not substitute mutable tags. `compose.sandbox.yaml` requires `II_TONYA_RUNTIM
 
 On an error, stop immediately, preserve only sanitized IDs/digests and timestamps, and do not retry with real credentials or a shared database. Run the script cleanup/trap and confirm zero task containers and processes. Remove the isolated sandbox Compose project and database volume only after recording the failure evidence. Rollback is removal of the sandbox image/Compose project and reversion of the sandbox-only branch; production API, worker, migrations, and database are not rollback targets because they are not part of this runtime.
 
-If a production package/image inventory contains `@ii-tonya/sandbox-api`, `@ii-tonya/sandbox-payments`, sandbox routes, or `createCanonicalExpertResidencyPaymentEventVerifier`, treat it as a release-blocking isolation incident. Quarantine the image, keep production `NO-GO`, and rebuild only after the static and packaged-image guards pass.
+If a native production bundle inventory contains `@ii-tonya/sandbox-api`, `@ii-tonya/sandbox-payments`, sandbox routes, or `createCanonicalExpertResidencyPaymentEventVerifier`, treat it as a release-blocking isolation incident. Quarantine the bundle, keep production `NO-GO`, and rebuild only after the static and packaged-closure guards pass.
 
 ## Current blocking record (2026-08-13)
 
-At source `7214ae93a04e99993b190dfd881c34bd1eced22a`, no sandbox image was produced. Offline pnpm hydration timed out after 480 seconds and a narrowed attempt after 240 seconds on Claw. Cleanup returned zero containers/processes. `SBX-TST-009`, sandbox packaged-runtime checks, the reserved production image smoke/inventory, vulnerability scan, SBOM, signing, and provenance remain unexecuted. See `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`.
+At source `7214ae93a04e99993b190dfd881c34bd1eced22a`, no sandbox image was produced. Offline pnpm hydration timed out after 480 seconds and a narrowed attempt after 240 seconds on Claw. Cleanup returned zero containers/processes. `SBX-TST-009` and sandbox packaged-runtime checks remain unexecuted. Production has since moved to a native bundle, so the former reserved production-image smoke is obsolete; native release evidence is tracked separately in `docs/test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/release.md`. See `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md` for the historical sandbox checkpoint.

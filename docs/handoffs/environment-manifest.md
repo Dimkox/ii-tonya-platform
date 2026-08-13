@@ -6,19 +6,19 @@ Repository pins are authoritative; the observed source workstation is diagnostic
 
 ## Required baseline
 
-| Component                  | Required contract                              | Authoritative source                      |
-| -------------------------- | ---------------------------------------------- | ----------------------------------------- |
-| Git                        | modern Git with worktree support               | repository workflow                       |
-| Node.js                    | major 24                                       | `.nvmrc`, `package.json#engines`          |
-| pnpm                       | exactly 11.9.0                                 | `package.json#packageManager`             |
-| Dependencies               | frozen committed graph                         | `pnpm-lock.yaml`, `pnpm-workspace.yaml`   |
-| Bash                       | required for deployment-policy syntax checks   | `package.json#verify:deploy`              |
-| Docker Engine + Compose v2 | required for container and PostgreSQL evidence | `compose.yaml`, CI                        |
-| PostgreSQL                 | 17.5 Bookworm container for local evidence     | `compose.yaml`                            |
-| CI execution               | self-hosted Claw, constrained test container   | `.github/workflows/ci.yml`, `db-gate.yml` |
-| Text                       | UTF-8, LF, EditorConfig                        | `.editorconfig`, `.gitattributes`         |
-| BMad Method                | Core + BMM 6.11.0                              | `_bmad/_config/manifest.yaml`             |
-| BMad Python runner         | Python 3.10+ and uv                            | `_bmad/scripts`, official installer       |
+| Component                  | Required contract                              | Authoritative source                    |
+| -------------------------- | ---------------------------------------------- | --------------------------------------- |
+| Git                        | modern Git with worktree support               | repository workflow                     |
+| Node.js                    | major 24                                       | `.nvmrc`, `package.json#engines`        |
+| pnpm                       | exactly 11.9.0                                 | `package.json#packageManager`           |
+| Dependencies               | frozen committed graph                         | `pnpm-lock.yaml`, `pnpm-workspace.yaml` |
+| Bash                       | required for deployment-policy syntax checks   | `package.json#verify:deploy`            |
+| Docker Engine + Compose v2 | required for container and PostgreSQL evidence | `compose.yaml`, CI                      |
+| PostgreSQL                 | 17.5 Bookworm container for local evidence     | `compose.yaml`                          |
+| CI execution               | direct Claw, constrained test container        | `scripts/run-claw-ci.sh`                |
+| Text                       | UTF-8, LF, EditorConfig                        | `.editorconfig`, `.gitattributes`       |
+| BMad Method                | Core + BMM 6.11.0                              | `_bmad/_config/manifest.yaml`           |
+| BMad Python runner         | Python 3.10+ and uv                            | `_bmad/scripts`, official installer     |
 
 GitHub CLI is recommended for PR/check inspection but is not required to build. Codex,
 Serena, Obsidian, and global skills are optional tooling, not runtime dependencies.
@@ -42,7 +42,7 @@ This snapshot explains possible drift; do not reproduce it as the target environ
 | Codex CLI  | 0.146.0-alpha.9.2                                |
 | Git Bash   | 5.3.15                                           |
 | Python     | 3.14.6; optional for this repository             |
-| uv         | 0.12.2; used by the repository BMad scripts       |
+| uv         | 0.12.2; used by the repository BMad scripts      |
 
 Consequences:
 
@@ -50,8 +50,8 @@ Consequences:
   evidence because its Node major is wrong.
 - Full local container/PostgreSQL verification cannot run there until Docker is
   installed and healthy.
-- Exact-SHA GitHub Actions on the self-hosted Claw runner, with execution inside the
-  constrained Node 24 test container, are the current authoritative environment evidence.
+- Direct exact-SHA commands on Claw, with execution inside the constrained Node 24 test
+  container, are the authoritative environment evidence. GitHub Actions are not used.
 
 ## Clean-machine bootstrap
 
@@ -214,13 +214,14 @@ this document.
 - all live integrations and payment/LLM/referral features disabled.
 
 The placeholder database password in Compose is local-only and is not a production
-credential. Remote deployment uses `deploy/compose.remote.yml` and separate authenticated
-release evidence; it must not be inferred from the local stack.
+credential. Production deployment uses a checksummed native bundle and systemd; it must
+not be inferred from the local stack.
 
 ## Observed Claw test profile on 2026-08-12
 
-The host containing `/home/pall/app-stack` is a production host. Tests are authorized
-only through its existing `ii-tonya-test` Compose profile:
+The Claw host containing `/home/pall/app-stack` is the authorized test environment. Tests
+run only through its existing `ii-tonya-test` Compose profile, which imitates the
+dedicated native server without becoming a production deployment:
 
 - the test container is limited to 1 CPU and 1 GiB memory;
 - the root filesystem is read-only and the test workspace is mounted separately;
@@ -233,18 +234,12 @@ only through its existing `ii-tonya-test` Compose profile:
 - For a genuinely focused Vitest invocation, override the profile's broad default test
   entrypoint with `docker compose ... run --entrypoint sh ii-tonya-test -lc '<command>'`;
   otherwise the wrapper performs unrelated build and verification work first.
-- The repository-scoped Actions runner lives at `/home/pall/actions-runner-ii-tonya`, is
-  managed by `actions.runner.Dimkox-ii-tonya-platform.ii-tonya-claw.service`, and carries
-  the labels `self-hosted`, `linux`, `x64`, `claw`, and `ii-tonya-test`.
-- CI and Database Gate use `scripts/run-claw-actions-job.sh`; no GitHub-hosted runner or
-  hosted Actions minute is required. Pull-request execution is owner-only.
-- Gated release jobs use the separate `ii-tonya-release-claw` runner at
-  `/home/ii_tonya_release/actions-runner`. Its locked `ii_tonya_release` OS identity has
-  no Docker-group access and the runner has `ii-tonya-release` but not `ii-tonya-test`.
-  The test runner no longer carries the release label.
-- Both `server-native.yml` and `server-control.yml` have no push trigger or deployment
-  code and only report an explicit refusal if manually dispatched. `ops/server-command.sh`
-  is retained as legacy recovery history and is not workflow-reachable.
+- CI, Database Gate, and native bundle assembly use `scripts/run-claw-ci.sh` directly with
+  explicit `SOURCE_ROOT` and `SOURCE_SHA`. No Actions runner or workflow is used.
+- GitHub is limited to commit and pull-request storage. Evidence is committed under
+  `docs/test-evidence/claw/<sha>/`.
+- The old Actions runner bootstrap and monolithic server command are removed from the
+  working tree and remain available only through Git history.
 - Repository settings permit squash merge only, delete merged branches, and restrict
   both staging and production deployment environments to the `main` branch. These are
   compensating controls, not a claim that paid branch protection is enabled.
@@ -260,13 +255,20 @@ machine's existing `gh auth setup-git` credential helper. A previously embedded 
 removed from `.git/config`; because it appeared in diagnostic output, it must still be
 revoked and replaced in GitHub account settings.
 
-## CI and release tooling
+## Direct Claw and native release tooling
 
-The CI workflows pin their action revisions. Test commands run inside the constrained
-Claw image with Node 24, pnpm 11.9.0, Docker CLI, and Gitleaks 8.28.0. Main-branch
-publication retains pinned Trivy 0.65.0, Cosign installer 4.1.2, and signed
-image/provenance evidence. Preserve those pins and validate workflow changes; do not
-replace them with whatever versions happen to be installed locally.
+GitHub Actions are not used. CI, Database Gate, and release assembly run directly through
+`scripts/run-claw-ci.sh` inside the constrained Claw image with Node 24, pnpm 11.9.0,
+Docker CLI, and Gitleaks 8.28.0. The release output is a checksummed native API/worker
+bundle with an SPDX SBOM and provenance record; production runs it with systemd, system
+PostgreSQL, and nginx rather than an application container.
+
+Claw reuses the PostgreSQL service and machine-local credentials already supplied by
+`/home/pall/app-stack/docker-compose.yml` and `/home/pall/app-stack/.env`. The native
+rehearsal owns exactly one persistent project database, `ii_tonya_native_smoke`, and may
+reset only that database's `public` schema. Repository scripts must never print or copy
+the app-stack `.env` values. The immutable Claw test image is retained between runs and
+is rebuilt only when its pinned source/toolchain changes.
 
 ## Serena and indexing
 

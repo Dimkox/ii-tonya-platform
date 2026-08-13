@@ -2,14 +2,17 @@
 
 Status: canonical architecture inventory for `codex/task25-expert-referral-implementation` after synchronization with current `main`.
 
-Purpose: maintain one connected view of the entire repository. Runtime modules, PostgreSQL authority, workflows, native server control, tests, migrations, deploy assets, documentation/evidence, disabled capabilities, deferred scope, prohibited paths, and orphan/dead candidates are all represented.
+Purpose: maintain one connected view of the entire repository. Runtime modules, PostgreSQL authority, direct Claw gates, native server control, tests, migrations, deploy assets, documentation/evidence, disabled capabilities, deferred scope, prohibited paths, and orphan/dead candidates are all represented.
 
 Sandbox supplement: `apps/sandbox-api`, `packages/sandbox-payments`,
 `Dockerfile.sandbox`, and `compose.sandbox.yaml` form a `TEST-ONLY` branch into the
 existing authoritative expert-residency provider inbox. They have no edge into the
-production API/worker/image closure. Their required built-image evidence is incomplete:
-no sandbox image was produced, so packaged isolation, `SBX-TST-009`, production image
-inventory, scans, SBOM, signing, and provenance are pending. Provider staging remains
+native production API/worker bundle. Their required built-image evidence is incomplete:
+no sandbox image was produced, so packaged sandbox isolation and `SBX-TST-009` are
+pending. Native production bundle, systemd, SBOM, checksums, and provenance assembly are
+proven on Claw at `887c462`; packaged API/worker service rehearsal also passes in the
+server-imitation image. Signing and production host deployment evidence remain pending.
+Provider staging remains
 `BLOCKED`; production remains `NO-GO`.
 
 Legend:
@@ -302,35 +305,38 @@ flowchart TB
   TESTS --> PKGS
   VITEST --> TESTS
 
-  subgraph CI["CI / release"]
-    CIWF[".github/workflows/ci.yml\npnpm verify + coverage + scans + provenance"]
-    DBGATE[".github/workflows/db-gate.yml\nschema + repeated financial concurrency gates"]
-    RELEASE[".github/workflows/release.yml\nsigned provenance + staged release gates"]
+  subgraph CI["Direct Claw verification / release"]
+    CIWF["scripts/run-claw-ci.sh ci\npnpm verify + coverage + secret scan"]
+    DBGATE["scripts/run-claw-ci.sh database\nschema + repeated financial concurrency gates"]
+    RELEASE["scripts/run-claw-ci.sh release\nnative exact-SHA bundle + evidence"]
     VERIFY["pnpm verify"]
-    CONTAINER["Dockerfile / compose / test container assets"]
-    DEPLOY["deploy/* + deploy-compose-remote.sh\nrelease mechanics"]
+    CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
+    BUNDLE["native API/worker bundle + SBOM\nASSEMBLY PROVEN / signature pending"]
+    DEPLOY["systemd native deploy + rollback\nREQUIRED / pending"]
     CIWF --> VERIFY --> TESTS
     VERIFY --> CONTAINER
+    VERIFY --> BUNDLE
     DBGATE --> INTEGRATION
     CIWF --> RELEASE
     DBGATE --> RELEASE
-    RELEASE --> DEPLOY
+    RELEASE --> BUNDLE --> DEPLOY
   end
   PROJECT --> CI
   ROOTPKG --> VERIFY
 
-  subgraph NATIVEOPS["Native single-server recovery control plane"]
-    BOOTSTRAP["scripts/bootstrap-native-runner.sh\nLEGACY/HISTORICAL\nnative runner bootstrap"]
-    RUNNER["GitHub Actions self-hosted runner\nlabel: ii-tonya-server\nOFFLINE LEGACY"]
-    SERVERCTRL["server-control.yml\nDISABLED LEGACY\nmanual refusal only"]
-    SERVERCMD["ops/server-command.sh\nLEGACY/HISTORICAL\nnot workflow-reachable"]
-    NATIVECI["server-native.yml\nDISABLED LEGACY\nno push or deploy"]
-    HOST["single server /opt/ii-tonya-platform\nsystemd + PostgreSQL + nginx\nACTIVE OPS"]
+  subgraph NATIVEOPS["Native dedicated production topology"]
+    BOOTSTRAP["Actions runner bootstrap\nREMOVED; Git history only"]
+    RUNNER["No GitHub Actions runner\nGitHub = Git/PR storage only"]
+    SERVERCTRL["GitHub Actions workflows\nREMOVED"]
+    SERVERCMD["legacy server command\nREMOVED; Git history only"]
+    NATIVECI["direct native deployment\nscripts/deploy-native-remote.sh"]
+    HOST["dedicated server /opt/ii-tonya-platform\nsystemd + system PostgreSQL + nginx\nTARGET PRODUCTION"]
     DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nACTIVE OPS endpoint"]
     BOOTSTRAP --> RUNNER
-    SERVERCTRL -. disabled .-> RUNNER
-    RUNNER -. historical .-> SERVERCMD -. historical .-> HOST
-    NATIVECI -. disabled .-> RUNNER
+    SERVERCTRL -. removed .-> RUNNER
+    BOOTSTRAP -. historical .-> RUNNER
+    SERVERCMD -. historical .-> HOST
+    RELEASE --> NATIVECI --> HOST
     HOST --> API
     HOST --> APPWORKER
     HOST --> DOMAINLIVE
@@ -343,15 +349,19 @@ flowchart TB
     DEVCHK["check-development-environment.ps1\nACTIVE DEV TOOL"]
     PREFLIGHT["preflight-expert-referral-migration.mjs\nACTIVE RELEASE TOOL"]
     CLAWTEST["run-claw-container-tests.sh\nACTIVE TEST TOOL"]
+    CLAWCI["run-claw-ci.sh\nACTIVE DIRECT TEST/RELEASE GATE"]
     ENVVAL["validate-runtime-env.sh\nACTIVE RELEASE TOOL"]
     REPEAT["repeat-vitest.mjs\nACTIVE TEST TOOL\nhard maximum 3x"]
-    REMOTEDEPLOY["deploy-compose-remote.sh\nACTIVE RELEASE TOOL; gated"]
+    NATIVEBUILD["build-native-release.sh\nACTIVE NATIVE BUNDLE TOOL"]
+    NATIVEDEPLOY["deploy-native-remote.sh\nACTIVE SYSTEMD DEPLOY/ROLLBACK"]
     DEVCHK --> ROOTPKG
     PREFLIGHT --> DBGATE
     CLAWTEST --> TESTS
+    CLAWCI --> TESTS
+    CLAWCI --> NATIVEBUILD --> BUNDLE
+    NATIVEDEPLOY --> DEPLOY
     ENVVAL --> ENVEX
     REPEAT --> INTEGRATION
-    REMOTEDEPLOY --> DEPLOY
   end
   PROJECT --> SCRIPTS
 
@@ -441,23 +451,22 @@ There are no package-level orphans. Internal dependencies are:
 | `packages/domain`        | reached by application/db/worker                     |
 | `packages/observability` | reached by both composition roots                    |
 
-### Native server control plane
+### Native dedicated-server production plane
 
-The native server files remain visible in the graph as recovery history, but they are not
-an alternative release path:
+The native server topology is now the only approved production target. Existing native
+files remain visible as incomplete recovery history until the signed-bundle deployment
+path replaces them:
 
-- `scripts/bootstrap-native-runner.sh` registers the self-hosted `ii-tonya-server` runner and grants temporary bootstrap sudo.
-- `.github/workflows/server-control.yml` contains only a manual explicit refusal and never
-  checks out or invokes `ops/server-command.sh`.
-- `.github/workflows/server-native.yml` has no push trigger or deployment code; its only
-  job explicitly refuses a manual legacy dispatch.
-- `ops/server-command.sh` provisions PostgreSQL/nginx/systemd, deploys the exact workspace, runs smoke checks, and configures TLS when DNS is ready.
+- The old Actions runner bootstrap and monolithic server command are removed from the
+  working tree and remain only in Git history.
+- GitHub Actions workflows are absent. GitHub stores commits and pull requests only.
+- `scripts/run-claw-ci.sh` executes exact-SHA gates directly on Claw in a constrained
+  container that imitates the dedicated server.
 - Runtime env written by this ops plane keeps Selarti, Planerka, Telegram, LLM, Make, Sheets, intent model, and payments disabled.
 
-`server-control.yml` and `server-native.yml` are disabled refusal paths.
-`ops/server-command.sh` is retained only as legacy recovery history. The
-provenance-bound `release.yml` is the sole release entrypoint and uses the isolated
-`ii-tonya-release-claw` identity.
+Production Compose release assets, GitHub Actions workflows, runner bootstrap, and the
+legacy monolithic server command are removed.
+The native bundle/systemd path is the only production release path.
 
 ### Intentionally non-live nodes
 
@@ -498,6 +507,6 @@ If a future scan finds a true orphan, add it here as `ORPHAN-CANDIDATE` before d
 
 ## Release state
 
-This graph does not authorize provider activation. Only the gated release workflow can
-deploy, and expert referral/residency plus live provider flags remain fail-closed until
-exact-SHA verification and the documented staging/production approvals are satisfied.
+This graph does not authorize provider activation by itself. Only the direct Claw-gated
+native-bundle process may deploy an exact-SHA candidate to native staging or production,
+and only after exact-SHA verification and documented approvals are satisfied.
