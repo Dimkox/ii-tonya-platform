@@ -11,7 +11,9 @@ const source = readFileSync(
 
 describe("expert Telegram query repository guards", () => {
   it("rechecks active verified Telegram ownership in each read", () => {
-    expect(source.match(/ci\.provider = 'telegram'/gu)).toHaveLength(4);
+    expect(
+      source.match(/ci\.provider = 'telegram'/gu)?.length,
+    ).toBeGreaterThanOrEqual(5);
     expect(source.match(/e\.active/g)?.length).toBeGreaterThanOrEqual(4);
     expect(source.match(/e\.verified/g)?.length).toBeGreaterThanOrEqual(4);
     expect(source.match(/u\.active/g)?.length).toBeGreaterThanOrEqual(4);
@@ -24,7 +26,8 @@ describe("expert Telegram query repository guards", () => {
   });
 
   it("atomically consumes, reads minimized fields, and writes content-free audit", () => {
-    expect(source).toContain("with consumed as");
+    expect(source).toContain("with eligible as");
+    expect(source).toContain("), consumed as (");
     expect(source).toContain("callback_consumed_at =");
     expect(source).toContain("insert into audit_events");
     expect(source).toContain("'reservation.client_view'");

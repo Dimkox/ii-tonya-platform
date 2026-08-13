@@ -69,6 +69,8 @@ describe("expert residency referral scope boundary", () => {
       "expert_referral.feature_switch",
       "expert_referral.hold_replay",
       "expert_referral.issuance_override",
+      "expert_residency.sandbox_refund",
+      "expert_residency.sandbox_settle",
       "expert_residency.tariff_create",
       "expert_residency.tariff_retire",
     ]);

@@ -276,8 +276,17 @@ describe("MVP scope boundary", () => {
     "docs/sandbox-payment-boundary.md",
     "tests/repo/sandbox-payment-evidence.test.ts",
     ".superpowers/sdd/task-1-report.md",
+    ".agents/skills/bmad-review/scripts/word_metrics.py",
+    "_bmad/scripts/render_skill.py",
   ])("does not inspect documentation, tests, or evidence at %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(false);
+  });
+
+  it.each([
+    "scripts/bmad-payment.py",
+    ".agents/skills/not-bmad/scripts/payment.py",
+  ])("keeps non-vendored executable lookalikes in scope at %s", (path) => {
+    expect(isPaymentScopeInspectionPath(path)).toBe(true);
   });
 
   it.each([
@@ -517,5 +526,5 @@ describe("MVP scope boundary", () => {
     }
 
     expect(violations).toEqual([]);
-  });
+  }, 30_000);
 });

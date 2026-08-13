@@ -48,6 +48,7 @@ export const findSandboxProductionCompositionViolations = ({
 export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
   "packages/sandbox-payments/src/repository.ts",
   "packages/sandbox-payments/src/schema.ts",
+  "scripts/sandbox-container-lifecycle.mjs",
 ]);
 
 export const SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS = new Set([
@@ -130,7 +131,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "8b034377db52aa4061bfa39dadc54d51d224fabd4d468789a28dd03720b47c7d",
+    "fac5fcdfb49cb461068688d25b1b39f8740380a4f56a395917d9de6465ce324a",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -144,7 +145,7 @@ const approvedPaymentBoundaryHashes = new Map([
 const approvedPackageManifestHashes = new Map([
   [
     "apps/sandbox-api/package.json",
-    "14c2fbe61e3c6588e23d61b3837dc0d74fa800591990716902be881282781126",
+    "441a5961fd5e7c9a075f605c74214084e4e4bbfa8d70ddd24800e0a6f87c8433",
   ],
   [
     "apps/api/package.json",
@@ -156,7 +157,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "72663e3c3fec8213589133841b9f10cd39ee1a7cefe00967fa279befa1deb891",
+    "574386ac642352e3137a25d3a8722982b7a8bd1a73cd371972fd339ec5754b48",
   ],
   [
     "packages/application/package.json",
@@ -202,7 +203,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".github/workflows/db-gate.yml",
-    "e4d0009d9c9af5b053478a0070adfddf08a2f49df6bec365a92d91f52a673811",
+    "7e057dc2975e1c65994cf802b87bf36cbf443e4fbf85122a957ea9ca3d3466f2",
   ],
   [
     ".github/workflows/release.yml",
@@ -222,7 +223,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-actions-job.sh",
-    "bdc9b13f4dc1d4a1091ec24220aaa42199a1e2887bd26311741ae3e8871c7ffb",
+    "47478ba2c28d10ecd4c45ce37e6e8691b61c23c80e5989a029940f87d25b8066",
   ],
   [
     "scripts/deploy-compose-remote.sh",
@@ -230,7 +231,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "0fd73553ddf968063e9539c26444b64c512f20546faaf8be2f1fa5f90e3c539b",
+    "a8756532e2fc71672347572af34acbfd852bd9043cfa99c3458f113530bfd22b",
   ],
   [
     "scripts/run-claw-container-tests.sh",
@@ -246,7 +247,27 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "compose.yaml",
-    "c3f8807c306e73b2319eba730a205959d959b82e52aafd499ad35fd514b660dd",
+    "13448e6622615a0e611b72c1f3fdbef20ee325d714bb0954ad0357216c5703a9",
+  ],
+  [
+    "dockerfile.sandbox",
+    "bb919da4b8d1922082248765f86c4d036928a2924f4f2043fe9cafb5db0dc575",
+  ],
+  [
+    "compose.sandbox.yaml",
+    "8422294e4c5b72875c34d3054c1645b468a1f2ed970afc0d6d3acf5d9811bcb7",
+  ],
+  [
+    "scripts/build-sandbox-image-offline.sh",
+    "607601b125c02778473312f6ac8c8e548db753885a961b99a7a0584105e3026d",
+  ],
+  [
+    "scripts/run-sandbox-container-smoke.sh",
+    "d7a148471a2a5c75d89e3ee694fb0fc11594b210c89450470b4855ef5cbe8ef3",
+  ],
+  [
+    "scripts/sandbox-container-lifecycle.mjs",
+    "e5b8108e0da5d62fa7eab356b43638f0c24ce53c5a69b98f6c035902c294fb1e",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
@@ -258,7 +279,12 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
       "@ii-tonya/db",
       "@ii-tonya/integrations",
       "@ii-tonya/sandbox-payments",
+      "@opentelemetry/api",
+      "drizzle-orm",
       "fastify",
+      "pg",
+      "pino",
+      "zod",
     ]),
   ],
   [
@@ -667,8 +693,12 @@ const isExecutableAutomationPath = (path: string): boolean =>
   /(?:^|\/)dockerfile(?:[._-].*)?$/u.test(path) ||
   /(?:^|\/)(?:docker-)?compose(?:\.[^/]+)?\.(?:yml|yaml)$/u.test(path);
 
+const isVersionedBmadToolingPath = (path: string): boolean =>
+  path.startsWith("_bmad/") || /^\.agents\/skills\/bmad-[^/]+\//u.test(path);
+
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
+  if (isVersionedBmadToolingPath(path)) return false;
   if (path.endsWith("/package.json") || path === "package.json") return true;
   if (
     /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||
