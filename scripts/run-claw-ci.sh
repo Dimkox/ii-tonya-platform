@@ -23,9 +23,9 @@ test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
 
 compose_root=/home/pall/app-stack
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
-test_image=7d71646347d560ff2b5d8ebc4c0aad5b48230254
+test_image=45750b4d1a8748aedae5e765f11300bc3a63d6cd
 test_image_ref="ii-tonya-test:$test_image"
-expected_test_image_id=sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8
+expected_test_image_id=sha256:587eec47e1e3a9c79a4cbce2981342bded8455e198b5b1aa29316579eb6dab60
 test -d "$claw_store"
 test "$(docker image inspect "$test_image_ref" --format '{{.Id}}')" = "$expected_test_image_id"
 claw_syft=""
