@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertSandboxRuntimeEnvironment, buildSandboxServer } from "./server.js";
+import {
+  assertSandboxRuntimeEnvironment,
+  buildSandboxServer,
+} from "./server.js";
 
 const validEnv = (): NodeJS.ProcessEnv => ({
   II_TONYA_RUNTIME_MODE: "sandbox",
@@ -39,9 +42,18 @@ describe("sandbox runtime guard", () => {
   it.each([
     [{}, "sandbox_runtime_mode_required"],
     [{ II_TONYA_RUNTIME_MODE: "production" }, "sandbox_runtime_mode_required"],
-    [{ ...validEnv(), TELEGRAM_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
-    [{ ...validEnv(), PAYMENT_API_KEY: "present" }, "sandbox_payment_credentials_forbidden"],
-    [{ ...validEnv(), PAYMENTS_PROVIDER: "present" }, "sandbox_payment_credentials_forbidden"],
+    [
+      { ...validEnv(), TELEGRAM_ENABLED: "true" },
+      "sandbox_live_integration_forbidden",
+    ],
+    [
+      { ...validEnv(), PAYMENT_API_KEY: "present" },
+      "sandbox_payment_credentials_forbidden",
+    ],
+    [
+      { ...validEnv(), PAYMENTS_PROVIDER: "present" },
+      "sandbox_payment_credentials_forbidden",
+    ],
   ])("rejects unsafe environment %#", (env, message) => {
     expect(() => assertSandboxRuntimeEnvironment(env)).toThrow(message);
   });

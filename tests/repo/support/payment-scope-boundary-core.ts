@@ -13,12 +13,37 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
+  "apps/sandbox-api/src/routes.ts",
+  "apps/sandbox-api/src/server.ts",
+  "packages/sandbox-payments/src/adapter.ts",
   "packages/sandbox-payments/src/contracts.ts",
   "packages/sandbox-payments/src/index.ts",
   "packages/sandbox-payments/src/repository.ts",
   "packages/sandbox-payments/src/schema.ts",
+  "packages/sandbox-payments/src/verifier.ts",
   "packages/sandbox-payments/src/workflow.ts",
 ]);
+
+const privilegedSandboxVerifierFactory =
+  "createCanonicalExpertResidencyPaymentEventVerifier";
+
+export const findSandboxProductionCompositionViolations = ({
+  path: rawPath,
+  content,
+}: PaymentScopeProbe): readonly string[] => {
+  const path = normalizePath(rawPath);
+  if (!content.includes(privilegedSandboxVerifierFactory)) return [];
+  if (
+    path.startsWith("apps/sandbox-api/") ||
+    /(?:^|\/)tests?\//u.test(path) ||
+    /\.test\.[cm]?[jt]sx?$/u.test(path) ||
+    path === "packages/integrations/src/expert-residency/verified-event.ts" ||
+    path === "packages/integrations/src/index.ts"
+  ) {
+    return [];
+  }
+  return ["privileged sandbox verifier composed outside sandbox runtime"];
+};
 
 export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
   "packages/sandbox-payments/src/repository.ts",
@@ -104,7 +129,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "9b026532b6567301e86916285814995a00c344af7266734cafe229594011705b",
+    "8b034377db52aa4061bfa39dadc54d51d224fabd4d468789a28dd03720b47c7d",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -116,6 +141,10 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
+  [
+    "apps/sandbox-api/package.json",
+    "dab481426753d0bb23956cdf1c6d872ade00f33711fee22847ede04135720e13",
+  ],
   [
     "apps/api/package.json",
     "34edd6b480799b53b8e378fa596586ff3406adb945ef1c48910150bcc55e8449",
@@ -158,7 +187,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/sandbox-payments/package.json",
-    "5d4cbf1f2b236fb27b213129721ee06a000b80aa187ccd2a3c3704f76735fb8e",
+    "52aa74c41d90c56a7e351b85b5906af22ba7a7ca640685bb0ccc2258b0096a09",
   ],
   [
     "packages/worker/package.json",
@@ -220,6 +249,15 @@ const approvedAutomationArtifactHashes = new Map([
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
+  [
+    "apps/sandbox-api/package.json",
+    new Set([
+      "@ii-tonya/api",
+      "@ii-tonya/db",
+      "@ii-tonya/sandbox-payments",
+      "fastify",
+    ]),
+  ],
   [
     "apps/api/package.json",
     new Set([
@@ -291,7 +329,13 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ],
   [
     "packages/sandbox-payments/package.json",
-    new Set(["@ii-tonya/contracts", "@ii-tonya/db", "drizzle-orm", "zod"]),
+    new Set([
+      "@ii-tonya/contracts",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "drizzle-orm",
+      "zod",
+    ]),
   ],
   [
     "packages/worker/package.json",
@@ -310,10 +354,12 @@ const approvedDependencySpecifiers = new Map([
   ["@ii-tonya/application", "workspace:*"],
   ["@ii-tonya/config", "workspace:*"],
   ["@ii-tonya/contracts", "workspace:*"],
+  ["@ii-tonya/api", "workspace:*"],
   ["@ii-tonya/db", "workspace:*"],
   ["@ii-tonya/domain", "workspace:*"],
   ["@ii-tonya/integrations", "workspace:*"],
   ["@ii-tonya/observability", "workspace:*"],
+  ["@ii-tonya/sandbox-payments", "workspace:*"],
   ["@ii-tonya/worker", "workspace:*"],
   ["@opentelemetry/api", "^1.9.0"],
   ["@opentelemetry/sdk-node", "^0.221.0"],
@@ -642,6 +688,19 @@ const hasCommercialDependencySegment = (value: string): boolean =>
 const isCommercialProviderSpecifier = (value: string): boolean =>
   !value.startsWith(".") && hasCommercialDependencySegment(value);
 
+const isApprovedSandboxRuntimeImport = (
+  path: string,
+  specifier: string,
+): boolean =>
+  path.startsWith("apps/sandbox-api/") &&
+  specifier === "@ii-tonya/sandbox-payments";
+
+const sandboxObjectTypePaths = new Set([
+  "apps/sandbox-api/src/routes.ts",
+  "packages/db/src/repositories/admin-repository.ts",
+  "packages/sandbox-payments/src/workflow.ts",
+]);
+
 const literalText = (node: ts.Expression | undefined): string | undefined =>
   node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
     ? node.text
@@ -786,6 +845,12 @@ const inspectTypeScript = (
       .getTokenText()
       .matchAll(sandboxRelationTokens)) {
       const relationName = match[0].toLowerCase();
+      if (
+        relationName === "sandbox_expert_residency_payment" &&
+        sandboxObjectTypePaths.has(path)
+      ) {
+        continue;
+      }
       if (SANDBOX_PAYMENT_RELATION_SOURCE_PATHS.has(path)) {
         if (!SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(relationName)) {
           violations.push(
@@ -880,7 +945,10 @@ const inspectTypeScript = (
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       const specifier = node.moduleSpecifier.text;
-      if (isCommercialProviderSpecifier(specifier)) {
+      if (
+        isCommercialProviderSpecifier(specifier) &&
+        !isApprovedSandboxRuntimeImport(path, specifier)
+      ) {
         violations.push(`provider SDK import: ${specifier}`);
       } else if (
         /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
@@ -895,7 +963,10 @@ const inspectTypeScript = (
     if (ts.isCallExpression(node)) {
       const specifier = moduleSpecifierFromCall(node);
       if (specifier) {
-        if (isCommercialProviderSpecifier(specifier)) {
+        if (
+          isCommercialProviderSpecifier(specifier) &&
+          !isApprovedSandboxRuntimeImport(path, specifier)
+        ) {
           violations.push(`payment provider runtime import: ${specifier}`);
         } else if (
           /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
@@ -1152,7 +1223,12 @@ export const classifyPaymentScopeProbe = ({
 }: PaymentScopeProbe): readonly string[] => {
   const path = normalizePath(rawPath);
 
-  const violations: string[] = [];
+  const violations: string[] = [
+    ...findSandboxProductionCompositionViolations({
+      path: rawPath,
+      content,
+    }),
+  ];
   if (path.startsWith("packages/integrations/")) {
     if (
       !approvedPaymentBoundaryPaths.has(path) &&

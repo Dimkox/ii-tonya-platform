@@ -11,7 +11,7 @@ import type { SandboxEventVerifier } from "./verifier.js";
 
 type SandboxAdapterRepository = Pick<
   PostgresSandboxPaymentRepository,
-  "createCheckout" | "nextPendingEvent"
+  "assertSandboxDatabase" | "createCheckout" | "nextPendingEvent"
 >;
 
 export class SandboxExpertResidencyPaymentAdapter implements ExpertResidencyPaymentPort {
@@ -19,6 +19,10 @@ export class SandboxExpertResidencyPaymentAdapter implements ExpertResidencyPaym
     private readonly repository: SandboxAdapterRepository,
     private readonly verifier: SandboxEventVerifier,
   ) {}
+
+  async assertSandboxDatabase(): Promise<void> {
+    await this.repository.assertSandboxDatabase();
+  }
 
   async createCheckout(
     command: ExpertResidencyCheckoutCommand,

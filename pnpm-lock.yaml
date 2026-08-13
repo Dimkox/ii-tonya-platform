@@ -80,6 +80,21 @@ importers:
         specifier: ^5.5.0
         version: 5.10.0
 
+  apps/sandbox-api:
+    dependencies:
+      '@ii-tonya/api':
+        specifier: workspace:*
+        version: link:../api
+      '@ii-tonya/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@ii-tonya/sandbox-payments':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-payments
+      fastify:
+        specifier: ^5.5.0
+        version: 5.10.0
+
   apps/worker:
     dependencies:
       '@ii-tonya/config':
