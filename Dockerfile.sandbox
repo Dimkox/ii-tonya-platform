@@ -40,7 +40,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     test "$install_ok" = 1
 COPY . .
 RUN pnpm --filter @ii-tonya/sandbox-api... build
-RUN pnpm --config.force-legacy-deploy=true --offline --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api
+RUN deploy_ok=0; \
+    for attempt in 1 2 3; do \
+      if pnpm --config.force-legacy-deploy=true --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api; then deploy_ok=1; break; fi; \
+      rm -rf /out/sandbox-api && sleep "$((attempt * 10))"; \
+    done; \
+    test "$deploy_ok" = 1
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS sandbox-api
 ARG VCS_REF=unknown
