@@ -84,3 +84,25 @@ No local executable test was run.
 Final matching test containers: `0`. Isolated extracted source directories used for RED,
 GREEN, and static checks were removed. The persistent Claw source and production database
 were not modified. The test database helper created and removed dedicated databases.
+
+## Independent-review remediation
+
+Additional commits:
+
+- `e49a93c` — executable RED cases for correlation IDs, approval failure modes,
+  rollback, refund, and invalid runtime actions.
+- `59a43e6` — remove the UUID audit cast, reject unknown actions before DB access,
+  correct refund approval binding, and repair expiry/self-approval fixtures.
+- `b7d3de8` — preserve approval lifecycle ordering in the expired fixture.
+
+The causal Claw RED reached 12 workflow tests: 4 failed and 8 passed. It reproduced the
+non-UUID audit failure, invalid-action DB execution, and refund binding defect; executable
+self-approval and rollback cases already passed. The expiry fixture initially violated an
+existing lifecycle constraint and was corrected by moving all lifecycle timestamps.
+
+Exact post-fix source `b7d3de8` reused the already prepared offline Claw workspace without
+installing dependencies. Focused GREEN passed 3 files / 25 tests (workflow 12/12,
+approval 4/4, guards 9/9). The workflow then passed exactly three bounded repetitions:
+36/36 tests. Prettier and ESLint passed. This run proves non-UUID correlation audit,
+self-approval denial, expiry, wrong nonce, conflicting consumed replay, transactional
+rollback, approved refund, and fail-closed runtime-invalid action behavior.
