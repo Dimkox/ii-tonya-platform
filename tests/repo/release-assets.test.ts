@@ -66,7 +66,7 @@ describe("release assets", () => {
     expect(builder).toContain("--network none");
     expect(builder).toContain("--offline --frozen-lockfile");
     expect(builder).toContain('git archive --format=tar "$git_source_sha"');
-    expect(builder).toContain("expected_archive_sha256");
+    expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
     expect(builder).toContain(
       "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
     );

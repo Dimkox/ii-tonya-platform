@@ -10,15 +10,15 @@ source_archive_sha256="$(sha256sum "$SOURCE_ARCHIVE" | cut -d' ' -f1)"
 [[ "$git_source_sha" =~ ^[0-9a-f]{40}$ ]]
 test "$SOURCE_ARCHIVE_SHA" = "$source_archive_sha256"
 test "$(git rev-parse "$git_source_sha^{commit}")" = "$git_source_sha"
-expected_archive_sha256="$(git archive --format=tar "$git_source_sha" | sha256sum | cut -d' ' -f1)"
-test "$source_archive_sha256" = "$expected_archive_sha256"
 test "$(docker image inspect ii-tonya-test:7d71646347d560ff2b5d8ebc4c0aad5b48230254 --format '{{.Id}}')" = "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8"
 
 fixture="$(mktemp -d)"
 cleanup() { rm -rf "$fixture"; }
 trap cleanup EXIT INT TERM
-mkdir -p "$fixture/source" "$fixture/context/sandbox-api" "$fixture/context/sandbox-migrations"
+mkdir -p "$fixture/source" "$fixture/expected" "$fixture/context/sandbox-api" "$fixture/context/sandbox-migrations"
 tar -xf "$SOURCE_ARCHIVE" -C "$fixture/source"
+git archive --format=tar "$git_source_sha" | tar -xf - -C "$fixture/expected"
+diff -qr "$fixture/expected" "$fixture/source"
 
 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
   --cap-drop ALL --security-opt no-new-privileges \
