@@ -27,6 +27,7 @@ const dependencies = () => ({
       event: { eventId: "sandbox_event_abcdefghijklmnopqrstuv" },
     })),
   },
+  deliverPayment: vi.fn(async () => "settled" as const),
   approvals: {
     resolvePrincipal: vi.fn(async (hash: string) => ({
       id: "00000000-0000-4000-8000-000000000001",
@@ -148,6 +149,33 @@ describe("sandbox payment routes", () => {
       idempotencyKey,
       correlationId,
     });
+    expect(deps.deliverPayment).toHaveBeenCalledOnce();
+    expect(deps.deliverPayment).toHaveBeenCalledWith(paymentId);
+    await app.close();
+  });
+
+  it("keeps committed delivery pending and sanitizes a downstream failure", async () => {
+    deps.deliverPayment.mockRejectedValueOnce(
+      new Error("ledger and sql secret"),
+    );
+    const app = await buildSandboxRoutes(deps as never);
+    const response = await app.inject({
+      method: "POST",
+      url: `/sandbox/v1/admin/payments/${paymentId}/transitions/settled`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        approvalId,
+        nonce,
+        expectedVersion: 0,
+        idempotencyKey,
+        correlationId,
+      },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: "delivery_pending" });
+    expect(deps.transitionWorkflow.execute).toHaveBeenCalledOnce();
+    expect(deps.deliverPayment).toHaveBeenCalledOnce();
+    expect(response.body).not.toContain("secret");
     await app.close();
   });
 
@@ -217,9 +245,23 @@ describe("sandbox payment routes", () => {
   it("limits admin mutations to 30 per minute with a sanitized response", async () => {
     const app = await buildSandboxRoutes(deps as never);
     for (let index = 0; index < 30; index += 1) {
-      expect((await app.inject({ method: "POST", url: `/sandbox/v1/admin/approvals/${approvalId}/approve`, headers: { authorization: `Bearer ${token}` }, payload: {} })).statusCode).toBe(200);
+      expect(
+        (
+          await app.inject({
+            method: "POST",
+            url: `/sandbox/v1/admin/approvals/${approvalId}/approve`,
+            headers: { authorization: `Bearer ${token}` },
+            payload: {},
+          })
+        ).statusCode,
+      ).toBe(200);
     }
-    const limited = await app.inject({ method: "POST", url: `/sandbox/v1/admin/approvals/${approvalId}/approve`, headers: { authorization: `Bearer ${token}` }, payload: {} });
+    const limited = await app.inject({
+      method: "POST",
+      url: `/sandbox/v1/admin/approvals/${approvalId}/approve`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {},
+    });
     expect(limited.statusCode).toBe(429);
     expect(limited.json()).toEqual({ error: "rate_limited" });
     await app.close();

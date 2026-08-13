@@ -251,6 +251,85 @@ describe("PostgresSandboxPaymentRepository transitions", () => {
     expect(await countRows("sandbox_expert_residency_events")).toBe(1);
   });
 
+  it.each([
+    ["event_id", "sandbox_event_" + "z".repeat(24)],
+    ["payment_id", "sandbox_payment_" + "z".repeat(24)],
+    ["transition_kind", "refunded"],
+    ["payload_digest", `sha256:${"0".repeat(64)}`],
+    ["correlation_id", "correlation:tampered"],
+    ["occurred_at", new Date("2026-08-13T00:00:00.000Z")],
+  ])(
+    "fails closed when redundant event column %s is corrupted",
+    async (column, value) => {
+      const checkout = await repository.createCheckout(checkoutCommand());
+      const event = await repository.transition({
+        paymentId: checkout.paymentId,
+        transition: "settled",
+        expectedVersion: 0,
+        idempotencyKey: `transition:${randomUUID()}`,
+        correlationId: `correlation:${randomUUID()}`,
+      });
+      if (column === "payment_id") {
+        await db!.execute(
+          sql`insert into sandbox_expert_residency_payments (payment_id,order_id,amount_minor,currency,checkout_url,state,version) select ${String(value)},${randomUUID()}::uuid,amount_minor,currency,checkout_url,state,version from sandbox_expert_residency_payments where payment_id=${checkout.paymentId}`,
+        );
+      }
+      await db!.transaction(async (tx) => {
+        await tx.execute(sql`set local session_replication_role=replica`);
+        await tx.execute(
+          sql.raw(
+            `update sandbox_expert_residency_events set ${column} = '${value instanceof Date ? value.toISOString() : value}' where event_id = '${event.eventId}'`,
+          ),
+        );
+      });
+      await expect(
+        repository.nextPendingEvent(checkout.paymentId),
+      ).rejects.toThrow("sandbox_event_integrity_failed");
+    },
+  );
+
+  it.each([
+    "orderId",
+    "amountMinor",
+    "currency",
+    "state",
+    "version",
+    "provider",
+    "payloadDigest",
+  ])("fails closed when payload fact %s is corrupted", async (fact) => {
+    const checkout = await repository.createCheckout(checkoutCommand());
+    const event = await repository.transition({
+      paymentId: checkout.paymentId,
+      transition: "settled",
+      expectedVersion: 0,
+      idempotencyKey: `transition:${randomUUID()}`,
+      correlationId: `correlation:${randomUUID()}`,
+    });
+    const replacement =
+      fact === "version"
+        ? 2
+        : fact === "amountMinor"
+          ? "99999"
+          : fact === "currency"
+            ? "USD"
+            : fact === "state"
+              ? "refunded"
+              : fact === "provider"
+                ? "forged"
+                : fact === "payloadDigest"
+                  ? `sha256:${"0".repeat(64)}`
+                  : randomUUID();
+    await db!.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role=replica`);
+      await tx.execute(
+        sql`update sandbox_expert_residency_events set payload=jsonb_set(payload,${`{${fact}}`}::text[],${JSON.stringify(replacement)}::jsonb) where event_id=${event.eventId}`,
+      );
+    });
+    await expect(
+      repository.nextPendingEvent(checkout.paymentId),
+    ).rejects.toThrow("sandbox_event_integrity_failed");
+  });
+
   it("rejects a conflicting transition replay", async () => {
     const checkout = await repository.createCheckout(checkoutCommand());
     const command = {

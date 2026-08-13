@@ -58,10 +58,14 @@ describe("sandbox production isolation", () => {
   it("publishes a real executable sandbox entrypoint", () => {
     const manifest = JSON.parse(
       readFileSync("apps/sandbox-api/package.json", "utf8"),
-    ) as { scripts?: { start?: string; build?: string } };
+    ) as {
+      scripts?: { start?: string; build?: string; "build:bounded"?: string };
+    };
     expect(manifest.scripts?.start).toBe("node dist/server.js");
     expect(manifest.scripts?.build).toBe("tsup --config tsup.config.ts");
-    expect(manifest.scripts?.["build:bounded"]).toBe("tsup --config tsup.config.ts");
+    expect(manifest.scripts?.["build:bounded"]).toBe(
+      "tsup --config tsup.config.ts",
+    );
     const buildConfig = readFileSync("apps/sandbox-api/tsup.config.ts", "utf8");
     expect(buildConfig).toContain("noExternal: [/^@ii-tonya\\//u]");
     expect(buildConfig).toContain("(?!@ii-tonya\\/)");
