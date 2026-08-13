@@ -97,7 +97,7 @@ describe("release assets", () => {
     expect(builder).toContain("timeout --signal=TERM 420 docker build");
     expect(builder).toContain("sandbox_phase=deploy_closure");
     expect(builder).toContain(
-      "pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
+      "pnpm --offline --trust-lockfile --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
     );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);

@@ -75,7 +75,7 @@ timeout --signal=TERM 420 docker run --rm --network none --read-only --tmpfs /tm
     cd /work
     test -f apps/sandbox-api/dist/server.js
     printf "sandbox_phase=deploy_closure\n"
-    pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
+    pnpm --offline --trust-lockfile --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
     printf "sandbox_phase=sanitize_closure\n"
     find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
       const fs=require("node:fs");
