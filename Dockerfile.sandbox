@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24.18.0-bookworm-slim AS builder
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
+WORKDIR /workspace
+RUN npm install --global pnpm@11.9.0 && npm cache clean --force
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/sandbox-api/package.json apps/sandbox-api/package.json
+COPY packages/application/package.json packages/application/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/integrations/package.json packages/integrations/package.json
+COPY packages/observability/package.json packages/observability/package.json
+COPY packages/sandbox-payments/package.json packages/sandbox-payments/package.json
+RUN --mount=type=cache,id=pnpm-sandbox-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm --filter @ii-tonya/sandbox-api... build
+RUN pnpm --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api
+
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS sandbox-api
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.revision=$VCS_REF
+ENV NODE_ENV=production PATH=/nodejs/bin:$PATH
+WORKDIR /app
+ENTRYPOINT []
+COPY --from=builder --chown=10001:10001 /out/sandbox-api/ /app/
+COPY --from=builder --chown=10001:10001 /workspace/packages/sandbox-payments/migrations/ /app/sandbox-migrations/
+USER 10001:10001
+EXPOSE 3001
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 \
+  CMD ["node", "--input-type=module", "--eval", "const r=await fetch('http://127.0.0.1:3001/sandbox/v1/payments/sandbox_payment_abcdefghijklmnopqrstuv');if(!r.ok)process.exit(1)"]
+CMD ["node", "dist/server.js"]

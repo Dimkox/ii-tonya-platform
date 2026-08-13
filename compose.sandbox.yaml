@@ -1,0 +1,34 @@
+name: ii-tonya-sandbox-evidence
+
+services:
+  sandbox-api:
+    profiles: [sandbox]
+    image: ii-tonya-sandbox-api:${VCS_REF:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+      target: sandbox-api
+      args:
+        VCS_REF: ${VCS_REF:-local}
+    environment:
+      II_TONYA_RUNTIME_MODE: sandbox
+      SANDBOX_DATABASE_URL: ${SANDBOX_DATABASE_URL:?SANDBOX_DATABASE_URL is required}
+      SANDBOX_CHECKOUT_BASE_URL: http://127.0.0.1:3001
+      SANDBOX_HOST: 0.0.0.0
+      SANDBOX_PORT: "3001"
+      PAYMENT_API_KEY: ""
+      PAYMENT_TOKEN: ""
+      PAYMENT_SECRET: ""
+      PAYMENT_WEBHOOK_SECRET: ""
+      PAYMENTS_ENABLED: "false"
+      EXPERT_REFERRAL_ENABLED: "false"
+      EXPERT_RESIDENCY_BILLING_ENABLED: "false"
+    ports: ["127.0.0.1:3001:3001"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    cpus: 1
+    mem_limit: 1g
+    restart: "no"

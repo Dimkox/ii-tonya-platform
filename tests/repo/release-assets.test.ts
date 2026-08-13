@@ -176,7 +176,7 @@ describe("release assets", () => {
     expect(compose).not.toContain("./tests/provider-stubs/server.mjs:");
     expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
     expect(smoke).toContain("resolved.includes('/workspace/')");
-    expect(smoke.match(/"--input-type=module"/g)).toHaveLength(2);
+    expect(smoke.match(/"--input-type=module"/g)).toHaveLength(4);
   });
 
   it("fails image scans on every high or critical vulnerability", () => {

@@ -16,7 +16,7 @@ test-results
 .turbo
 .tmp
 *.log
-Dockerfile*
-compose*.yaml
-compose*.yml
+Dockerfile
+compose.yaml
+compose.sandbox.yaml
 docs

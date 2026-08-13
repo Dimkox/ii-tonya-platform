@@ -27,9 +27,11 @@ test("sandbox image contains its packaged runtime closure and is hardened", () =
     assert.equal(inspected.Config.User, "10001:10001");
     assert.deepEqual(inspected.Config.Cmd, ["node", "dist/server.js"]);
     const probe = [
-      "const r=import.meta.resolve('@ii-tonya/sandbox-api');",
+      "await import('/app/dist/server.js');",
+      "for(const p of ['@ii-tonya/db','@ii-tonya/sandbox-payments']){",
+      "const r=import.meta.resolve(p);",
       "if(!r.startsWith('file:///app/node_modules/')||r.includes('/workspace/'))process.exit(41);",
-      "await import('@ii-tonya/sandbox-api');",
+      "await import(p)}",
     ].join("");
     run("docker", [
       "run",
