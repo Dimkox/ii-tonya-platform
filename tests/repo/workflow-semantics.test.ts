@@ -31,6 +31,12 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain(
       "claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store",
     );
+    expect(runner).toContain(
+      "expected_test_image_id=sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
+    );
+    expect(runner).toContain(
+      'test "$(docker image inspect "$test_image_ref" --format \'{{.Id}}\')" = "$expected_test_image_id"',
+    );
     expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
     expect(runner).not.toMatch(/GITHUB_|actions-runner|workflow_dispatch/u);
   });
