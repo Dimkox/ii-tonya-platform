@@ -36,7 +36,11 @@ const assertFileContentClean = (path, relative) => {
       if (count === 0) break;
       const content = carry + buffer.subarray(0, count).toString("utf8");
       for (const forbidden of forbiddenProductionInventory)
-        assert.equal(content.includes(forbidden), false, `${relative}: ${forbidden}`);
+        assert.equal(
+          content.includes(forbidden),
+          false,
+          `${relative}: ${forbidden}`,
+        );
       carry = content.slice(-256);
     }
   } finally {
