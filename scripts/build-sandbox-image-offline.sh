@@ -18,9 +18,12 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
   --entrypoint sh ii-tonya-test:7d71646347d560ff2b5d8ebc4c0aad5b48230254 -lc '
     set -eu
     cp -a /seed/node_modules /work/node_modules
+    cp -a /seed/.pnpm-store /work/.pnpm-store
     for path in apps packages; do find "/seed/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'target=/work/${1#/seed/}; mkdir -p "$(dirname "$target")"; cp -a "$1" "$target"'"'"' sh {} \;; done
     cd /work
-    pnpm --offline --filter @ii-tonya/sandbox-api... build
+    pnpm config set store-dir /work/.pnpm-store
+    pnpm install --offline --frozen-lockfile
+    pnpm --filter @ii-tonya/sandbox-api... build
   '
 cp -a "$fixture/source/apps/sandbox-api/dist/." "$fixture/context/sandbox-api/dist/"
 cp "$fixture/source/apps/sandbox-api/package.json" "$fixture/context/sandbox-api/package.json"
