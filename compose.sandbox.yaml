@@ -18,13 +18,7 @@ services:
 
   sandbox-api:
     profiles: [sandbox]
-    image: ii-tonya-sandbox-api:${VCS_REF:-local}
-    build:
-      context: .
-      dockerfile: Dockerfile.sandbox
-      target: sandbox-api
-      args:
-        VCS_REF: ${VCS_REF:-local}
+    image: ${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}
     environment:
       II_TONYA_RUNTIME_MODE: sandbox
       SANDBOX_DATABASE_URL: postgresql://ii_tonya_sandbox:local-placeholder-only@sandbox-postgres:5432/ii_tonya_sandbox

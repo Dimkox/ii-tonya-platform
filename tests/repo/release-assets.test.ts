@@ -46,20 +46,32 @@ describe("release assets", () => {
     const sandboxCompose = parse(
       readFileSync("compose.sandbox.yaml", "utf8"),
     ) as { services: Record<string, Record<string, unknown>> };
-    expect(Object.keys(productionCompose.services)).not.toContain("sandbox-api");
+    expect(Object.keys(productionCompose.services)).not.toContain(
+      "sandbox-api",
+    );
     expect(dockerfile).toContain("AS sandbox-api");
-    const builder = readFileSync("scripts/build-sandbox-image-offline.sh", "utf8");
-    expect(builder).toContain('SOURCE_ARCHIVE_SHA');
-    expect(builder).toContain('git_source_sha');
-    expect(builder).toContain('source_archive_sha256');
-    expect(builder).toContain('pnpm --filter @ii-tonya/sandbox-api --prod deploy');
+    const builder = readFileSync(
+      "scripts/build-sandbox-image-offline.sh",
+      "utf8",
+    );
+    expect(builder).toContain("SOURCE_ARCHIVE_SHA");
+    expect(builder).toContain("git_source_sha");
+    expect(builder).toContain("source_archive_sha256");
+    expect(builder).toContain(
+      "pnpm --filter @ii-tonya/sandbox-api --prod deploy",
+    );
     expect(builder).not.toContain('cp -a "$fixture/source/node_modules"');
     expect(builder).toContain('find "$artifact" -type l');
-    expect(builder).toContain('devDependencies');
+    expect(builder).toContain("devDependencies");
     expect(builder).toContain("--network none");
     expect(builder).toContain("--offline --frozen-lockfile");
-    expect(builder).toContain("sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8");
-    const lifecycle = readFileSync("scripts/sandbox-container-lifecycle.mjs", "utf8");
+    expect(builder).toContain(
+      "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
+    );
+    const lifecycle = readFileSync(
+      "scripts/sandbox-container-lifecycle.mjs",
+      "utf8",
+    );
     expect(lifecycle).toContain('"/sandbox/v1/checkouts"');
     expect(lifecycle).toContain("/request");
     expect(lifecycle).toContain("/approve");
@@ -110,8 +122,14 @@ describe("release assets", () => {
   });
 
   it("drives the sandbox lifecycle through container HTTP and authoritative database assertions", () => {
-    const smoke = readFileSync("scripts/run-sandbox-container-smoke.sh", "utf8");
-    const lifecycle = readFileSync("scripts/sandbox-container-lifecycle.mjs", "utf8");
+    const smoke = readFileSync(
+      "scripts/run-sandbox-container-smoke.sh",
+      "utf8",
+    );
+    const lifecycle = readFileSync(
+      "scripts/sandbox-container-lifecycle.mjs",
+      "utf8",
+    );
     expect(smoke).toContain("packages/db/migrations/*.sql");
     expect(smoke).toContain("0000_sandbox_expert_residency.sql");
     expect(smoke).toContain("sandbox-container-lifecycle.mjs");
@@ -129,7 +147,8 @@ describe("release assets", () => {
       "audit_events",
       "integration_outbox",
       "result_schema_version",
-    ]) expect(lifecycle).toContain(fragment);
+    ])
+      expect(lifecycle).toContain(fragment);
   });
 
   it("defines portable non-root API and worker images with the required entrypoints", () => {

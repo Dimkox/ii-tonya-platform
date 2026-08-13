@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-project="ii-tonya-sandbox-${VCS_REF:-local}"
+: "${SOURCE_SHA:?SOURCE_SHA is required}"
+: "${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}"
+[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+project="ii-tonya-sandbox-${SOURCE_SHA}"
 cleanup() {
   docker compose --project-name "$project" --file compose.sandbox.yaml --profile sandbox down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
@@ -50,7 +53,7 @@ insert into expert_residency_orders(id,expert_id,tariff_version_id,snapshot_disp
   '00000000-0000-4000-8000-000000000107','Container sandbox',25000,86400,0,25000,
   now()+interval '1 hour',now()+interval '1 hour','container-order-0001');
 SQL
-"${compose[@]}" up --build --wait sandbox-api
+"${compose[@]}" up --wait sandbox-api
 "${compose[@]}" exec -T \
   -e SANDBOX_BASE_URL=http://127.0.0.1:3001 \
   -e SANDBOX_DATABASE_URL=postgresql://ii_tonya_sandbox:local-placeholder-only@sandbox-postgres:5432/ii_tonya_sandbox \
