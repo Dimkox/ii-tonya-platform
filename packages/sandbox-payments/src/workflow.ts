@@ -43,6 +43,9 @@ export class SandboxTransitionWorkflow {
   async execute(
     command: SandboxTransitionWorkflowCommand,
   ): Promise<SandboxTransitionWorkflowResult> {
+    if (!sandboxAdminActions.includes(command.action)) {
+      throw new Error("sandbox_admin_action_invalid");
+    }
     const transition =
       command.action === "expert_residency.sandbox_settle"
         ? "settled"
@@ -86,7 +89,7 @@ export class SandboxTransitionWorkflow {
         });
         if (consumed)
           await tx.execute(
-            sql`insert into audit_events (actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values ('admin',${consumed.requesterId}::uuid,${command.sessionIdHash},${command.action},'sandbox_expert_residency_payment',${objectId}::uuid,'allowed','approved_sandbox_transition',${command.correlationId}::uuid,transaction_timestamp(),${digest(`${command.approvalId}:${command.action}:${command.paymentId}:${command.expectedVersion}:${command.idempotencyKey}`)})`,
+            sql`insert into audit_events (actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values ('admin',${consumed.requesterId}::uuid,${command.sessionIdHash},${command.action},'sandbox_expert_residency_payment',${objectId}::uuid,'allowed','approved_sandbox_transition',${command.correlationId},transaction_timestamp(),${digest(`${command.approvalId}:${command.action}:${command.paymentId}:${command.expectedVersion}:${command.idempotencyKey}`)})`,
           );
         return {
           allowed: true,
