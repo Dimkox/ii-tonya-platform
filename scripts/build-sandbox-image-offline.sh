@@ -56,6 +56,7 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     test ! -d /installed || installed_root=/installed
     cp -a "$installed_root/node_modules" /work/node_modules
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
+    for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name dist -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; rm -rf "$target"; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
     cd /work
     npm --prefix apps/sandbox-api run build:bounded
     test -f apps/sandbox-api/dist/server.js

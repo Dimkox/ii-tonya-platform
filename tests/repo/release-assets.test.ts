@@ -75,6 +75,7 @@ describe("release assets", () => {
     expect(builder).toContain("LOCAL_SOURCE_ROOT");
     expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(builder).toContain("/installed:ro");
+    expect(builder).toContain("-type d -name dist");
     expect(builder).not.toContain("/seed/.pnpm-store");
     expect(builder).not.toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain("build:bounded");
@@ -199,6 +200,9 @@ describe("release assets", () => {
     );
     expect(dockerfile).toContain(
       "/out/worker/pnpm-lock.yaml /out/worker/pnpm-workspace.yaml",
+    );
+    expect(dockerfile).toContain(
+      'find /out/api /out/worker -type f -name "*.d.ts" -delete',
     );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');

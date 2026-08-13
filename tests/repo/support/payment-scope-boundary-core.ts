@@ -243,7 +243,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "dockerfile",
-    "1d613180e752d3f62fb299e91bdf8683858062858803258685b273341fa65ee9",
+    "36932f5fc5347a8892fd42ed86f521824903e7a6e7c165f2bdedb59d7843e25e",
   ],
   [
     "compose.yaml",
@@ -259,7 +259,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "6a17d73e1f1bfbb6425c7c5e968c5f58f0b1fcab7fbe3e3224b19d549e66924f",
+    "f00b364bda97f540edf3ff6d53abad2e7d9f92d4337a4f4266c707850f8bb0ac",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",
