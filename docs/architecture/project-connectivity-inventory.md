@@ -22,7 +22,8 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 | ------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- |
 | `.github/workflows/`                              | GitHub Actions                                                                | ABSENT BY POLICY; GitHub is Git/PR storage only     |
 | `scripts/run-claw-ci.sh`                          | direct exact-SHA CI/database/release gates in constrained Claw test container | ACTIVE                                              |
-| `scripts/build-native-release.sh`                 | exact-SHA native API/worker bundle + checksum/provenance                      | ACTIVE RELEASE TOOL                                 |
+| `scripts/build-native-release.sh`                 | exact-SHA native API/worker bundle + checksum/SBOM/provenance                 | ACTIVE; Claw assembly proven at `887c462`           |
+| `scripts/provision-claw-syft.sh`                  | pinned, dual-SHA-verified SPDX generator for release mode                     | ACTIVE CLAW RELEASE TOOL                            |
 | `scripts/deploy-native-remote.sh`                 | immutable native transfer, migration, systemd restart, readiness, rollback    | ACTIVE; production host confirmation still required |
 | `deploy/systemd/ii-tonya-*.service`               | API, worker, and one-shot migration on dedicated server                       | ACTIVE NATIVE PRODUCTION CONTRACT                   |
 | `Dockerfile`                                      | packaged dev/test runtime -> CI container smoke                               | TEST/EVIDENCE only                                  |

@@ -1,7 +1,8 @@
 # Native dedicated-server deployment
 
-Status: `BLOCKED` until the signed native-bundle tooling and isolated staging rehearsal
-are implemented and verified.
+Status: native bundle assembly is verified; production remains `BLOCKED` until signing,
+an isolated native staging rehearsal, a confirmed production host, and renewed exact-SHA
+migration approval are available.
 
 ## Target topology
 
@@ -36,10 +37,11 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
 
 ## Current blocker
 
-The old production image/Compose and GitHub Actions entrypoints are removed. This runbook
-may move from `BLOCKED` to `READY` only after exact-SHA Claw verification, a native staging
-rehearsal, signed evidence, and a confirmed production host. No container release path is
-authorized for production.
+The old production image/Compose and GitHub Actions entrypoints are removed. Exact-SHA
+Claw CI, Database Gate, and native bundle assembly now have committed evidence. This
+runbook may move from `BLOCKED` to `READY` only after a native staging rehearsal, signed
+evidence, renewed migration approval, and a confirmed production host. No container
+release path is authorized for production.
 
 Migration marker `MIGRATION-COMPATIBILITY: 7428a8d387256df4fe24ba13ae0ab9c02fc76a54`
 was received and the object was verified, but it is a sibling merge rather than an

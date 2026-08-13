@@ -9,8 +9,9 @@ Sandbox supplement: `apps/sandbox-api`, `packages/sandbox-payments`,
 existing authoritative expert-residency provider inbox. They have no edge into the
 native production API/worker bundle. Their required built-image evidence is incomplete:
 no sandbox image was produced, so packaged sandbox isolation and `SBX-TST-009` are
-pending. Native production bundle, systemd, SBOM, signing, and provenance evidence are
-also pending. Provider staging remains
+pending. Native production bundle, systemd, SBOM, checksums, and provenance assembly are
+proven on Claw at `887c462`; signing, native staging service rehearsal, and production
+deployment evidence remain pending. Provider staging remains
 `BLOCKED`; production remains `NO-GO`.
 
 Legend:
@@ -309,7 +310,7 @@ flowchart TB
     RELEASE["scripts/run-claw-ci.sh release\nnative exact-SHA bundle + evidence"]
     VERIFY["pnpm verify"]
     CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
-    BUNDLE["native signed API/worker bundle\nREQUIRED / pending"]
+    BUNDLE["native API/worker bundle + SBOM\nASSEMBLY PROVEN / signature pending"]
     DEPLOY["systemd native deploy + rollback\nREQUIRED / pending"]
     CIWF --> VERIFY --> TESTS
     VERIFY --> CONTAINER

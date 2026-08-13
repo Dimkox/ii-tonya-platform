@@ -37,7 +37,11 @@ repository therefore fails closed at the release perimeter. The former container
 production release path is not authorized by the current architecture. Production must
 run natively on the dedicated Linux server as systemd-managed API and worker processes,
 with system PostgreSQL and nginx. Docker and Compose are development and Claw test tools only.
-The native checksummed-bundle release path remains a required implementation gate.
+The native checksummed-bundle release path is implemented and its exact-SHA Claw assembly,
+offline production closure, SPDX SBOM, checksums, inventory, and packaged-entrypoint
+fail-closed smoke are recorded under `docs/test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/`.
+Signature, native staging service rehearsal, a confirmed production host, and renewed
+exact-SHA migration approval remain release gates.
 Repository merge settings allow squash only and delete merged branches; staging and
 production deployment environments accept only `main`.
 
