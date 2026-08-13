@@ -4,11 +4,13 @@ import {
   closeDb,
   createDb,
   PostgresAdminApprovalRepository,
+  PostgresExpertResidencyProviderInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import { createCanonicalExpertResidencyPaymentEventVerifier } from "@ii-tonya/integrations";
 import {
   createSandboxEventVerifier,
+  deliverSandboxPaymentEvent,
   PostgresSandboxPaymentRepository,
   SandboxExpertResidencyPaymentAdapter,
   SandboxTransitionWorkflow,
@@ -16,64 +18,118 @@ import {
 import type { FastifyInstance } from "fastify";
 import { buildSandboxRoutes } from "./routes.js";
 
-
-type ApprovalPort = Pick<PostgresAdminApprovalRepository, "resolvePrincipal" | "requestApproval" | "approveApproval">;
-type SandboxPaymentAdapter = SandboxExpertResidencyPaymentAdapter & { assertSandboxDatabase(): Promise<void> };
+type ApprovalPort = Pick<
+  PostgresAdminApprovalRepository,
+  "resolvePrincipal" | "requestApproval" | "approveApproval"
+>;
+type SandboxPaymentAdapter = SandboxExpertResidencyPaymentAdapter & {
+  assertSandboxDatabase(): Promise<void>;
+};
 
 export interface SandboxRuntimeDependencies {
   paymentAdapter: SandboxPaymentAdapter;
   transitionWorkflow: SandboxTransitionWorkflow;
   approvals: ApprovalPort;
+  deliverPayment(paymentId: string): Promise<"none" | "settled" | "refunded">;
 }
 
 const allowedEnableFlags = new Set([
-  "SELARTI_ENABLED", "PLANERKA_ENABLED", "TELEGRAM_ENABLED", "LLM_ENABLED",
-  "INTENT_MODEL_ENABLED", "MAKE_PROJECTION_ENABLED", "GOOGLE_SHEETS_PROJECTION_ENABLED",
-  "PAYMENTS_ENABLED", "MINOR_ONBOARDING_ENABLED", "EXPERT_REFERRAL_ENABLED",
+  "SELARTI_ENABLED",
+  "PLANERKA_ENABLED",
+  "TELEGRAM_ENABLED",
+  "LLM_ENABLED",
+  "INTENT_MODEL_ENABLED",
+  "MAKE_PROJECTION_ENABLED",
+  "GOOGLE_SHEETS_PROJECTION_ENABLED",
+  "PAYMENTS_ENABLED",
+  "MINOR_ONBOARDING_ENABLED",
+  "EXPERT_REFERRAL_ENABLED",
   "EXPERT_RESIDENCY_BILLING_ENABLED",
 ]);
-const recognizedPaymentCredential = /^PAYMENTS?_(?:API_?KEY|TOKEN|SECRET|WEBHOOK_SECRET|BASE_URL|PROVIDER)$/u;
-const unknownPaymentCredential = /^PAYMENTS?_.+(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PROVIDER)$/u;
+const recognizedPaymentCredential =
+  /^PAYMENTS?_(?:API_?KEY|TOKEN|SECRET|WEBHOOK_SECRET|BASE_URL|PROVIDER)$/u;
+const unknownPaymentCredential =
+  /^PAYMENTS?_.+(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PROVIDER)$/u;
 
 export function assertSandboxRuntimeEnvironment(env: NodeJS.ProcessEnv): void {
-  if (env.II_TONYA_RUNTIME_MODE !== "sandbox") throw new Error("sandbox_runtime_mode_required");
+  if (env.II_TONYA_RUNTIME_MODE !== "sandbox")
+    throw new Error("sandbox_runtime_mode_required");
   for (const key of Object.keys(env)) {
     if (key.endsWith("_ENABLED")) {
-      if (!allowedEnableFlags.has(key)) throw new Error("sandbox_unsupported_enable_flag");
-      if (env[key] === "true") throw new Error("sandbox_live_integration_forbidden");
+      if (!allowedEnableFlags.has(key))
+        throw new Error("sandbox_unsupported_enable_flag");
+      if (env[key] === "true")
+        throw new Error("sandbox_live_integration_forbidden");
     }
     if (recognizedPaymentCredential.test(key) && env[key] !== "")
       throw new Error("sandbox_payment_credentials_forbidden");
-    if (!recognizedPaymentCredential.test(key) && unknownPaymentCredential.test(key))
+    if (
+      !recognizedPaymentCredential.test(key) &&
+      unknownPaymentCredential.test(key)
+    )
       throw new Error("sandbox_payment_credentials_forbidden");
   }
 }
 
-export async function buildSandboxServer(deps: SandboxRuntimeDependencies, env: NodeJS.ProcessEnv = process.env): Promise<FastifyInstance> {
+export async function buildSandboxServer(
+  deps: SandboxRuntimeDependencies,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<FastifyInstance> {
   assertSandboxRuntimeEnvironment(env);
   await deps.paymentAdapter.assertSandboxDatabase();
   return buildSandboxRoutes(deps);
 }
 
-export interface SandboxRuntime { dependencies: SandboxRuntimeDependencies; close(): Promise<void> }
+export interface SandboxRuntime {
+  dependencies: SandboxRuntimeDependencies;
+  close(): Promise<void>;
+}
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
   const value = env[key];
-  if (value === undefined || value.trim() === "") throw new Error(`sandbox_${key.toLowerCase()}_required`);
+  if (value === undefined || value.trim() === "")
+    throw new Error(`sandbox_${key.toLowerCase()}_required`);
   return value;
 }
 
-export async function createDefaultSandboxRuntime(env: NodeJS.ProcessEnv): Promise<SandboxRuntime> {
+export async function createDefaultSandboxRuntime(
+  env: NodeJS.ProcessEnv,
+): Promise<SandboxRuntime> {
   assertSandboxRuntimeEnvironment(env);
   const db: DrizzleDb = createDb(required(env, "SANDBOX_DATABASE_URL"));
   try {
-    const payments = new PostgresSandboxPaymentRepository(db, new URL(required(env, "SANDBOX_CHECKOUT_BASE_URL")));
+    const payments = new PostgresSandboxPaymentRepository(
+      db,
+      new URL(required(env, "SANDBOX_CHECKOUT_BASE_URL")),
+    );
     const approvals = new PostgresAdminApprovalRepository(db);
-    const verifier = createSandboxEventVerifier(createCanonicalExpertResidencyPaymentEventVerifier());
-    const paymentAdapter = new SandboxExpertResidencyPaymentAdapter(payments, verifier);
+    const verifier = createSandboxEventVerifier(
+      createCanonicalExpertResidencyPaymentEventVerifier(),
+    );
+    const paymentAdapter = new SandboxExpertResidencyPaymentAdapter(
+      payments,
+      verifier,
+    );
+    const inbox = new PostgresExpertResidencyProviderInboxRepository(db);
     await paymentAdapter.assertSandboxDatabase();
     return {
-      dependencies: { paymentAdapter, approvals, transitionWorkflow: new SandboxTransitionWorkflow(db, approvals, payments) },
+      dependencies: {
+        paymentAdapter,
+        approvals,
+        transitionWorkflow: new SandboxTransitionWorkflow(
+          db,
+          approvals,
+          payments,
+        ),
+        deliverPayment: (paymentId) =>
+          deliverSandboxPaymentEvent({
+            paymentId,
+            adapter: paymentAdapter,
+            inbox,
+            acknowledge: (eventId: string) =>
+              payments.markEventProcessed(eventId),
+          }),
+      },
       close: () => closeDb(db),
     };
   } catch (error) {
@@ -85,23 +141,33 @@ export async function createDefaultSandboxRuntime(env: NodeJS.ProcessEnv): Promi
 export interface SandboxMainOptions {
   env?: NodeJS.ProcessEnv;
   runtimeFactory?: (env: NodeJS.ProcessEnv) => Promise<SandboxRuntime>;
-  listen?: (app: FastifyInstance, options: { host: string; port: number }) => Promise<unknown>;
+  listen?: (
+    app: FastifyInstance,
+    options: { host: string; port: number },
+  ) => Promise<unknown>;
   installSignals?: boolean;
 }
 
-export function sandboxListenOptions(env: NodeJS.ProcessEnv): { host: string; port: number } {
+export function sandboxListenOptions(env: NodeJS.ProcessEnv): {
+  host: string;
+  port: number;
+} {
   const raw = env.SANDBOX_PORT ?? "3001";
   const port = Number(raw);
-  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("sandbox_port_invalid");
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535)
+    throw new Error("sandbox_port_invalid");
   const host = env.SANDBOX_HOST === undefined ? "127.0.0.1" : env.SANDBOX_HOST;
-  if (!["127.0.0.1", "0.0.0.0", "::1", "::"].includes(host)) throw new Error("sandbox_host_invalid");
+  if (!["127.0.0.1", "0.0.0.0", "::1", "::"].includes(host))
+    throw new Error("sandbox_host_invalid");
   return { host, port };
 }
 
 export async function main(options: SandboxMainOptions = {}): Promise<void> {
   const env = options.env ?? process.env;
   assertSandboxRuntimeEnvironment(env);
-  const runtime = await (options.runtimeFactory ?? createDefaultSandboxRuntime)(env);
+  const runtime = await (options.runtimeFactory ?? createDefaultSandboxRuntime)(
+    env,
+  );
   let app: FastifyInstance | undefined;
   let closed = false;
   const close = async (): Promise<void> => {
@@ -111,18 +177,28 @@ export async function main(options: SandboxMainOptions = {}): Promise<void> {
       app === undefined ? Promise.resolve() : app.close(),
       runtime.close(),
     ]);
-    const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
     if (failure !== undefined) throw failure.reason;
   };
   try {
     app = await buildSandboxServer(runtime.dependencies, env);
-    await (options.listen ?? ((server, address) => server.listen(address)))(app, sandboxListenOptions(env));
+    await (options.listen ?? ((server, address) => server.listen(address)))(
+      app,
+      sandboxListenOptions(env),
+    );
     if (options.installSignals === false) await close();
     else {
       const stop = (): void => {
         void close().then(
-          () => { process.exitCode = 0; },
-          () => { process.stderr.write("sandbox_shutdown_failed\n"); process.exitCode = 1; },
+          () => {
+            process.exitCode = 0;
+          },
+          () => {
+            process.stderr.write("sandbox_shutdown_failed\n");
+            process.exitCode = 1;
+          },
         );
       };
       process.once("SIGINT", stop);
@@ -134,7 +210,10 @@ export async function main(options: SandboxMainOptions = {}): Promise<void> {
   }
 }
 
-export function isDirectExecution(moduleUrl: string, argv1: string | undefined): boolean {
+export function isDirectExecution(
+  moduleUrl: string,
+  argv1: string | undefined,
+): boolean {
   if (argv1 === undefined) return false;
   return resolve(fileURLToPath(moduleUrl)) === resolve(argv1);
 }

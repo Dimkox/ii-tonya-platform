@@ -16,7 +16,10 @@ export {
   PostgresSandboxPaymentRepository,
   migrateSandboxDatabase,
 } from "./repository.js";
-export { SandboxExpertResidencyPaymentAdapter } from "./adapter.js";
+export {
+  SandboxExpertResidencyPaymentAdapter,
+  deliverSandboxPaymentEvent,
+} from "./adapter.js";
 export {
   SANDBOX_PROVIDER,
   createSandboxEventVerifier,
