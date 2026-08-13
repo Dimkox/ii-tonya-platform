@@ -45,7 +45,7 @@ export interface TelegramExpertQueryIngress {
     };
     readonly idempotencyKey: string;
     readonly correlationId: string;
-  }): Promise<void>;
+  }): Promise<unknown>;
   processClientView(input: {
     readonly principal: {
       readonly expertId: string;
@@ -64,7 +64,7 @@ export interface TelegramExpertQueryIngress {
     };
     readonly idempotencyKey: string;
     readonly correlationId: string;
-  }): Promise<void>;
+  }): Promise<unknown>;
   answerCallbackQuery(input: {
     readonly callbackQueryId: string;
     readonly status: "processed" | "unavailable";
@@ -86,11 +86,6 @@ export interface TelegramExpertQueryIngress {
 
 const numericIdentity = /^[1-9]\d{0,19}$/u;
 const callbackQueryIdPattern = /^[^\u0000-\u001F\u007F-\u009F]{1,256}$/u;
-const requireApplied = (outcome: { readonly kind: string }): void => {
-  if (outcome.kind !== "applied") {
-    throw new Error("telegram_callback_answer_unconfirmed");
-  }
-};
 const secureEqual = (actual: string | undefined, expected: string): boolean => {
   if (actual === undefined) return false;
   const a = Buffer.from(actual);
@@ -181,59 +176,49 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           ) {
             return { accepted: true, unsupported: true };
           }
-          const principal = await deps.expertQueries.resolvePrincipal(
-            String(id),
-          );
-          if (principal === null) {
-            return reply.code(403).send({ error: "unauthorized_expert" });
-          }
-          const authenticated = await deps.expertQueries.authenticateClientView(
-            {
-              data,
-              telegramUserId: String(id),
-              correlationId,
-            },
-          );
-          if (authenticated === null) {
-            requireApplied(
-              await deps.expertQueries.answerCallbackQuery({
-                callbackQueryId,
-                status: "unavailable",
-                idempotencyKey: `telegram:${String(body.update_id)}:client-view:answer`,
-              }),
-            );
-            return { accepted: true, unavailable: true };
-          }
           const updateId = String(body.update_id);
+          const answerBestEffort = async (
+            status: "processed" | "unavailable",
+          ): Promise<void> => {
+            try {
+              await deps.expertQueries?.answerCallbackQuery({
+                callbackQueryId,
+                status,
+                idempotencyKey: `telegram:${updateId}:client-view:answer`,
+              });
+            } catch {
+              // Callback acknowledgement never changes the sensitive operation outcome.
+            }
+          };
           const claim = await deps.inbox.claim("telegram", updateId);
           if (claim.kind !== "claimed") {
-            requireApplied(
-              await deps.expertQueries.answerCallbackQuery({
-                callbackQueryId,
-                status: "unavailable",
-                idempotencyKey: `telegram:${updateId}:client-view:answer`,
-              }),
-            );
-            return { accepted: true, duplicate: true };
+            await answerBestEffort("unavailable");
+            return { accepted: true, unavailable: true };
           }
           try {
+            const principal = await deps.expertQueries.resolvePrincipal(
+              String(id),
+            );
+            if (principal === null) throw new Error("client_view_denied");
+            const authenticated =
+              await deps.expertQueries.authenticateClientView({
+                data,
+                telegramUserId: String(id),
+                correlationId,
+              });
+            if (authenticated === null) throw new Error("client_view_denied");
             await deps.expertQueries.processClientView({
               principal,
               authenticated,
               idempotencyKey: `telegram:${updateId}:client-view`,
               correlationId,
             });
-            requireApplied(
-              await deps.expertQueries.answerCallbackQuery({
-                callbackQueryId,
-                status: "processed",
-                idempotencyKey: `telegram:${updateId}:client-view:answer`,
-              }),
-            );
             await deps.inbox.complete(claim.claimId);
+            await answerBestEffort("processed");
           } catch {
-            await deps.inbox.fail(claim.claimId);
-            return reply.code(500).send({ error: "expert_query_unavailable" });
+            await deps.inbox.complete(claim.claimId);
+            await answerBestEffort("unavailable");
+            return { accepted: true, unavailable: true };
           }
           return { accepted: true };
         }

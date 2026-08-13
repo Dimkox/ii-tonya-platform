@@ -61,6 +61,7 @@ export interface ExpertCommandProcessor {
     readonly correlationId: string;
   }): Promise<{
     readonly kind: "processed" | "unsupported" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "unknown_outcome";
   }>;
   processClientView(command: {
     readonly principal: QueryPrincipal;
@@ -69,20 +70,19 @@ export interface ExpertCommandProcessor {
     >[0]["authenticated"];
     readonly idempotencyKey: string;
     readonly correlationId: string;
-  }): Promise<{ readonly kind: "processed" | "disabled" | "unavailable" }>;
+  }): Promise<{
+    readonly kind: "processed" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
+  }>;
 }
 
-const requireApplied = (
+const ordinaryDeliveryOutcome = (
   outcome: TelegramSendOutcome,
-  clientView = false,
-): void => {
-  if (outcome.kind !== "applied") {
-    throw new Error(
-      clientView
-        ? "telegram_client_view_delivery_unconfirmed"
-        : "telegram_delivery_unconfirmed",
-    );
+): "applied" | "unknown_outcome" => {
+  if (outcome.kind === "not_applied") {
+    throw new Error("telegram_delivery_not_applied");
   }
+  return outcome.kind;
 };
 
 const unavailable = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -131,7 +131,7 @@ export const createExpertCommandProcessor = (deps: {
               : { meetingUrl: appointment.meetingUrl }),
           };
         });
-        requireApplied(
+        const deliveryOutcome = ordinaryDeliveryOutcome(
           await deps.views.sendQuerySchedule({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
@@ -139,13 +139,13 @@ export const createExpertCommandProcessor = (deps: {
             appointments,
           }),
         );
-        return { kind: "processed" };
+        return { kind: "processed", deliveryOutcome };
       }
       case "/client": {
         const choices = await unavailable(() =>
           deps.queries.clientChoices(command.principal),
         );
-        requireApplied(
+        const deliveryOutcome = ordinaryDeliveryOutcome(
           await deps.views.sendClientChoices({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
@@ -153,29 +153,29 @@ export const createExpertCommandProcessor = (deps: {
             choices,
           }),
         );
-        return { kind: "processed" };
+        return { kind: "processed", deliveryOutcome };
       }
       case "/stats": {
         const stats = await unavailable(() =>
           deps.queries.stats(command.principal),
         );
-        requireApplied(
+        const deliveryOutcome = ordinaryDeliveryOutcome(
           await deps.views.sendStats({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
             ...stats,
           }),
         );
-        return { kind: "processed" };
+        return { kind: "processed", deliveryOutcome };
       }
       default:
-        requireApplied(
+        const deliveryOutcome = ordinaryDeliveryOutcome(
           await deps.views.sendUnsupported({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
           }),
         );
-        return { kind: "unsupported" };
+        return { kind: "unsupported", deliveryOutcome };
     }
   },
 
@@ -188,20 +188,17 @@ export const createExpertCommandProcessor = (deps: {
         correlationId: command.correlationId,
       }),
     );
-    requireApplied(
-      await deps.views.sendClientView({
-        idempotencyKey: command.idempotencyKey,
-        telegramUserId: command.principal.telegramUserId,
-        timezone: command.principal.timezone,
-        clientDisplayName: view.clientDisplayName,
-        startsAt: view.startsAt.toISOString(),
-        serviceName: view.serviceName,
-        ...(view.preparationNote === undefined
-          ? {}
-          : { preparationNote: view.preparationNote }),
-      }),
-      true,
-    );
-    return { kind: "processed" };
+    const outcome = await deps.views.sendClientView({
+      idempotencyKey: command.idempotencyKey,
+      telegramUserId: command.principal.telegramUserId,
+      timezone: command.principal.timezone,
+      clientDisplayName: view.clientDisplayName,
+      startsAt: view.startsAt.toISOString(),
+      serviceName: view.serviceName,
+      ...(view.preparationNote === undefined
+        ? {}
+        : { preparationNote: view.preparationNote }),
+    });
+    return { kind: "processed", deliveryOutcome: outcome.kind };
   },
 });

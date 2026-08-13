@@ -125,26 +125,35 @@ describe("expert Telegram command processor", () => {
     expect(state.stats).not.toHaveBeenCalled();
   });
 
-  it.each(["not_applied", "unknown_outcome"] as const)(
-    "propagates a sanitized %s delivery failure instead of completing the inbox",
-    async (kind) => {
-      const state = build();
-      state.views.sendStats.mockResolvedValueOnce(
-        kind === "not_applied"
-          ? { kind, retryable: true, reasonCode: "rate_limited" }
-          : {
-              kind,
-              reconciliationKey: "telegram-update-1",
-              reasonCode: "timeout_after_write",
-            },
-      );
+  it("propagates a definitely not-applied ordinary delivery for inbox retry", async () => {
+    const state = build();
+    state.views.sendStats.mockResolvedValueOnce({
+      kind: "not_applied",
+      retryable: true,
+      reasonCode: "rate_limited",
+    });
 
-      await expect(
-        state.processor.processCommand(command("/stats")),
-      ).rejects.toThrow("telegram_delivery_unconfirmed");
-      expect(state.views.sendUnsupported).not.toHaveBeenCalled();
-    },
-  );
+    await expect(
+      state.processor.processCommand(command("/stats")),
+    ).rejects.toThrow("telegram_delivery_not_applied");
+    expect(state.views.sendUnsupported).not.toHaveBeenCalled();
+  });
+
+  it("returns a bounded at-most-once outcome for an uncertain ordinary delivery", async () => {
+    const state = build();
+    state.views.sendStats.mockResolvedValueOnce({
+      kind: "unknown_outcome",
+      reconciliationKey: "telegram-update-1",
+      reasonCode: "timeout_after_write",
+    });
+
+    await expect(
+      state.processor.processCommand(command("/stats")),
+    ).resolves.toEqual({
+      kind: "processed",
+      deliveryOutcome: "unknown_outcome",
+    });
+  });
 
   it("propagates repository faults without sending help or reporting success", async () => {
     const state = build();
@@ -157,32 +166,39 @@ describe("expert Telegram command processor", () => {
     expect(state.views.sendUnsupported).not.toHaveBeenCalled();
   });
 
-  it("keeps consumed client disclosure at most once when delivery is uncertain", async () => {
-    const state = build();
-    state.views.sendClientView.mockResolvedValueOnce({
-      kind: "unknown_outcome",
-      reconciliationKey: "telegram-update-1",
-      reasonCode: "timeout_after_write",
-    });
+  it.each(["not_applied", "unknown_outcome"] as const)(
+    "completes consumed client disclosure at most once for %s delivery",
+    async (kind) => {
+      const state = build();
+      state.views.sendClientView.mockResolvedValueOnce(
+        kind === "not_applied"
+          ? { kind, retryable: true, reasonCode: "before_write" }
+          : {
+              kind,
+              reconciliationKey: "telegram-update-1",
+              reasonCode: "timeout_after_write",
+            },
+      );
 
-    await expect(
-      state.processor.processClientView({
-        principal,
-        authenticated: {
-          tokenHash: "a".repeat(64),
-          claims: {
-            reservationId: "00000000-0000-4000-8000-000000000201",
-            expertId: principal.expertId,
-            telegramUserId: principal.telegramUserId,
-            version: 1,
-            expiresAtEpochSeconds: 1_786_000_000,
+      await expect(
+        state.processor.processClientView({
+          principal,
+          authenticated: {
+            tokenHash: "a".repeat(64),
+            claims: {
+              reservationId: "00000000-0000-4000-8000-000000000201",
+              expertId: principal.expertId,
+              telegramUserId: principal.telegramUserId,
+              version: 1,
+              expiresAtEpochSeconds: 1_786_000_000,
+            },
           },
-        },
-        idempotencyKey: "telegram-update-1",
-        correlationId: "corr-1",
-      }),
-    ).rejects.toThrow("telegram_client_view_delivery_unconfirmed");
-    expect(state.clientView).toHaveBeenCalledTimes(1);
-    expect(state.views.sendUnsupported).not.toHaveBeenCalled();
-  });
+          idempotencyKey: "telegram-update-1",
+          correlationId: "corr-1",
+        }),
+      ).resolves.toEqual({ kind: "processed", deliveryOutcome: kind });
+      expect(state.clientView).toHaveBeenCalledTimes(1);
+      expect(state.views.sendUnsupported).not.toHaveBeenCalled();
+    },
+  );
 });

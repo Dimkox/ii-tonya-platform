@@ -231,6 +231,63 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
+  it.each(["not_applied", "unknown_outcome"] as const)(
+    "completes the inbox after a consumed client view with %s delivery",
+    async (kind) => {
+      const state = await build({ queriesEnabled: true });
+      state.processClientView.mockResolvedValueOnce({
+        kind: "processed",
+        deliveryOutcome: kind,
+      });
+      try {
+        const response = await state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers,
+          payload: {
+            update_id: kind === "not_applied" ? 61 : 62,
+            callback_query: {
+              id: `client-view-${kind}`,
+              from: { id: 123456789 },
+              data: "cv1.safe-token",
+            },
+          },
+        });
+        expect(response.statusCode).toBe(200);
+        expect(state.complete).toHaveBeenCalledWith("claim-1");
+        expect(state.fail).not.toHaveBeenCalled();
+      } finally {
+        await state.app.close();
+      }
+    },
+  );
+
+  it("treats callback acknowledgement failure as best effort after a successful view", async () => {
+    const state = await build({ queriesEnabled: true });
+    state.answerCallbackQuery.mockRejectedValueOnce(new Error("ack failed"));
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 63,
+          callback_query: {
+            id: "client-view-ack-failed",
+            from: { id: 123456789 },
+            data: "cv1.safe-token",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.processClientView).toHaveBeenCalledTimes(1);
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+      expect(state.fail).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
   it("routes every enabled private slash command through the expert processor", async () => {
     const state = await build({ queriesEnabled: true });
     try {
@@ -316,6 +373,34 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
+  it("completes an ordinary command with unknown delivery outcome without resending", async () => {
+    const state = await build({ queriesEnabled: true });
+    state.processCommand.mockResolvedValueOnce({
+      kind: "processed",
+      deliveryOutcome: "unknown_outcome",
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 64,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/stats",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+      expect(state.fail).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
   it("enforces the per-expert query limit while retaining a reachable 20/min allowance", async () => {
     const keys: string[] = [];
     const state = await build({
@@ -384,32 +469,63 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
-  it("acknowledges invalid cv1 callbacks with bounded generic state", async () => {
-    const state = await build({ queriesEnabled: true });
-    state.authenticateClientView.mockResolvedValueOnce(null);
-    try {
-      const response = await state.app.inject({
-        method: "POST",
-        url: "/v1/webhooks/telegram",
-        headers,
-        payload: {
-          update_id: 33,
-          callback_query: {
-            id: "callback-invalid",
-            from: { id: 123456789 },
-            data: "cv1.invalid",
+  it("makes revoked, malformed, stale, replayed, and acknowledgement-failed cv1 denials equivalent", async () => {
+    const outcomes: { status: number; body: unknown }[] = [];
+    for (const scenario of [
+      "revoked",
+      "malformed",
+      "foreign",
+      "stale",
+      "replayed",
+      "ack_failed",
+    ] as const) {
+      const state = await build({ queriesEnabled: true });
+      if (scenario === "revoked")
+        state.resolvePrincipal.mockResolvedValueOnce(null);
+      if (scenario === "malformed")
+        state.authenticateClientView.mockResolvedValueOnce(null);
+      if (scenario === "foreign")
+        state.authenticateClientView.mockResolvedValueOnce(null);
+      if (scenario === "stale" || scenario === "replayed")
+        state.processClientView.mockRejectedValueOnce(new Error("denied"));
+      if (scenario === "replayed")
+        state.claim.mockResolvedValueOnce({ kind: "duplicate" });
+      if (scenario === "ack_failed")
+        state.authenticateClientView.mockResolvedValueOnce(null);
+      if (scenario === "ack_failed")
+        state.answerCallbackQuery.mockRejectedValueOnce(
+          new Error("ack failed"),
+        );
+      try {
+        const updateId = 70 + outcomes.length;
+        const response = await state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers,
+          payload: {
+            update_id: updateId,
+            callback_query: {
+              id: `callback-${scenario}`,
+              from: { id: 123456789 },
+              data: scenario === "malformed" ? "cv1.invalid" : "cv1.safe-token",
+            },
           },
-        },
-      });
-      expect(response.json()).toEqual({ accepted: true, unavailable: true });
-      expect(state.answerCallbackQuery).toHaveBeenCalledWith({
-        callbackQueryId: "callback-invalid",
-        status: "unavailable",
-        idempotencyKey: "telegram:33:client-view:answer",
-      });
-      expect(state.claim).not.toHaveBeenCalled();
-    } finally {
-      await state.app.close();
+        });
+        outcomes.push({ status: response.statusCode, body: response.json() });
+        expect(state.claim).toHaveBeenCalledWith("telegram", String(updateId));
+        if (scenario !== "replayed") {
+          expect(state.complete).toHaveBeenCalledWith("claim-1");
+          expect(state.fail).not.toHaveBeenCalled();
+        }
+      } finally {
+        await state.app.close();
+      }
     }
+    expect(outcomes).toEqual(
+      Array.from({ length: 6 }, () => ({
+        status: 200,
+        body: { accepted: true, unavailable: true },
+      })),
+    );
   });
 });

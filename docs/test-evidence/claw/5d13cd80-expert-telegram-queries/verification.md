@@ -167,3 +167,52 @@ deferred activation gate.
 
 Final review-cycle cleanup: `REMOTE_FILES_OUTPUTS_REMOVED` and
 `RUNNING_II_TONYA_TEST=0`.
+
+## Final review remediation: consume CAS and delivery outcomes
+
+The final review cycle started with a focused Claw RED. The webhook suite reached six
+causal failures and ten passes; the processor suite failed collection because the prior
+cleanup had restored its production module remotely. After staging the bounded
+production delta, the same focused pair was GREEN:
+
+```text
+Test Files  2 passed (2)
+Tests       31 passed (31)
+Duration    2.43s
+```
+
+The database consume is now a locked compare-and-set: notification, reservation, actor
+binding, service, expiry, action, token, claims, version, and unconsumed state are proven
+before the update, and the consuming update repeats the mutable notification predicates.
+The real-PostgreSQL suite includes two simultaneous consumes and asserts exactly one
+non-null disclosure and exactly one allowed audit. Because concurrency changed, the
+suite was repeated exactly three times:
+
+```text
+PG_CONCURRENCY_RUN=1  Test Files 1 passed; Tests 10 passed; Duration 5.52s
+PG_CONCURRENCY_RUN=2  Test Files 1 passed; Tests 10 passed; Duration 5.44s
+PG_CONCURRENCY_RUN=3  Test Files 1 passed; Tests 10 passed; Duration 5.45s
+```
+
+Ordinary definitely-not-applied sends release the inbox for retry. Ordinary unknown
+outcomes complete the inbox without a blind resend. After a client view is consumed,
+both not-applied and unknown outcomes complete the inbox to preserve at-most-once
+disclosure; the safe recovery remains a fresh `/client`. Callback acknowledgement is
+best effort after the sensitive operation and never reopens or changes its outcome.
+Every `cv1` denial is claimed/deduplicated and returns the same sanitized HTTP 200 plus
+generic provider acknowledgement; the legacy `ct2` path is unchanged.
+
+Prepared app composition did not produce a new passing result in this cycle. All seven
+workspace package JS and declaration builds succeeded, but Vitest failed before test
+collection with `Failed to resolve entry for package "@ii-tonya/observability"` despite
+source-local workspace links. No dependency was installed and no further preparation
+retry was made. The previous prepared default-off/fail-closed app result above remains
+historical evidence, not a fresh result for this remediation.
+
+Final remote cleanup reported:
+
+```text
+REMOTE_FILES_LINKS_OUTPUTS_REMOVED
+RUNNING_II_TONYA_TEST=0
+FOCUSED_PROCESSES=0
+```

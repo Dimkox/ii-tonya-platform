@@ -289,6 +289,43 @@ describe("PostgreSQL expert Telegram queries", () => {
     );
   });
 
+  it("allows exactly one concurrent client view consume and one audit", async () => {
+    const fixture = await seed();
+    const repo = new PostgresExpertTelegramQueryRepository(testDb.db);
+    const tokenHash = "7".repeat(64);
+    const claims = {
+      reservationId: fixture.reservationId,
+      expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
+      version: 3,
+      expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
+    };
+    await repo.put(tokenHash, claims);
+    const command = {
+      tokenHash,
+      reservationId: fixture.reservationId,
+      expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
+      version: 3,
+      now,
+      correlationId: `client-view-concurrent-${crypto.randomUUID()}`,
+    };
+
+    const results = await Promise.all([
+      repo.consumeClientView(command),
+      repo.consumeClientView(command),
+    ]);
+    expect(results.filter((result) => result !== null)).toHaveLength(1);
+    const audit = await testDb.db.execute<{ count: string }>(sql`
+      select count(*)::text as count
+      from audit_events
+      where correlation_id = ${command.correlationId}
+        and action = 'reservation.client_view'
+        and decision = 'allowed'
+    `);
+    expect(audit.rows[0]?.count).toBe("1");
+  });
+
   it("rejects stale and revoked cv1 callbacks without consuming them", async () => {
     const stale = await seed();
     const repo = new PostgresExpertTelegramQueryRepository(testDb.db);

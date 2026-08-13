@@ -371,11 +371,24 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
             'telegramUserId', ${command.telegramUserId}::text,
             'version', r.version
           )
+        for update of n, r, e, u, ci, s, es
       ), consumed as (
         update notifications n
         set callback_consumed_at = ${command.now}, updated_at = ${command.now}
         from eligible e
         where n.id = e.notification_id
+          and n.callback_token_hash = ${command.tokenHash}
+          and n.callback_action = 'view_client'
+          and n.callback_consumed_at is null
+          and n.callback_expires_at > ${command.now}
+          and n.callback_expert_id = ${command.expertId}::uuid
+          and n.callback_version = ${command.version}
+          and n.callback_claims::jsonb @> jsonb_build_object(
+            'reservationId', ${command.reservationId}::text,
+            'expertId', ${command.expertId}::text,
+            'telegramUserId', ${command.telegramUserId}::text,
+            'version', ${command.version}::integer
+          )
         returning
           e.reservation_id as "reservationId",
           e.actor_user_id as "actorUserId",

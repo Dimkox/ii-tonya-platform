@@ -21,6 +21,15 @@ Source design: `docs/superpowers/specs/2026-08-13-expert-telegram-queries-design
 
 Focused evidence is recorded in
 `docs/test-evidence/claw/5d13cd80-expert-telegram-queries/verification.md`.
+
+Final review semantics: the PostgreSQL consume is a locked CAS with update-time
+unconsumed/expiry/action/claims/actor/version checks and a concurrent exactly-once audit
+test. Ordinary `not_applied` releases the inbox, ordinary `unknown_outcome` completes it
+without blind resend, and all already-consumed client-view outcomes complete at most
+once. Callback acknowledgements are best effort after the operation, while all `cv1`
+denials share one claimed, deduplicated, sanitized HTTP 200 response. Fresh prepared app
+composition was blocked before collection by workspace package resolution; live/default
+server activation remains deferred and fail-closed.
 Registration in this matrix is not release approval. A named independent review, green
 mandatory CI at the final commit, Draft PR publication, and explicit human approval are
 still required. Live Telegram credentials, provider staging, merge, and deployment are
