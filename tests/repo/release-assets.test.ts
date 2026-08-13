@@ -66,7 +66,8 @@ describe("release assets", () => {
     expect(builder).toContain('find "$artifact" -type l');
     expect(builder).toContain("devDependencies");
     expect(builder).toContain("--network none");
-    expect(builder).toContain("--offline --frozen-lockfile");
+    expect(builder).toContain("build:bounded");
+    expect(builder).toContain("pnpm --offline --store-dir");
     expect(builder).toContain('git read-tree "$git_source_sha"');
     expect(builder).toContain("git checkout-index --all");
     expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
