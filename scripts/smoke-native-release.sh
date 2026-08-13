@@ -18,7 +18,9 @@ database_created=false
 drop_database() {
   node --input-type=module <<'NODE'
 import { createRequire } from "node:module";
-const require = createRequire(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-tonya/db/package.json`);
+import { realpathSync } from "node:fs";
+const dbRoot = realpathSync(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-tonya/db`);
+const require = createRequire(`${dbRoot}/package.json`);
 const { Client } = require("pg");
 const name = process.env.DB_NAME;
 if (!/^ii_tonya_native_smoke_[0-9a-f]{12}$/u.test(name ?? "")) process.exit(2);
@@ -41,7 +43,9 @@ trap cleanup EXIT
 drop_database
 node --input-type=module <<'NODE'
 import { createRequire } from "node:module";
-const require = createRequire(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-tonya/db/package.json`);
+import { realpathSync } from "node:fs";
+const dbRoot = realpathSync(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-tonya/db`);
+const require = createRequire(`${dbRoot}/package.json`);
 const { Client } = require("pg");
 const name = process.env.DB_NAME;
 if (!/^ii_tonya_native_smoke_[0-9a-f]{12}$/u.test(name ?? "")) process.exit(2);
