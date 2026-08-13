@@ -50,7 +50,7 @@ describe("release assets", () => {
     expect(dockerfile).toContain("AS sandbox-api");
     const builder = readFileSync("scripts/build-sandbox-image-offline.sh", "utf8");
     expect(builder).toContain("--network none");
-    expect(builder).toContain("pnpm --offline");
+    expect(builder).toContain("--offline --frozen-lockfile");
     expect(builder).toContain("sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8");
     const lifecycle = readFileSync("scripts/sandbox-container-lifecycle.mjs", "utf8");
     expect(lifecycle).toContain('"/sandbox/v1/checkouts"');
