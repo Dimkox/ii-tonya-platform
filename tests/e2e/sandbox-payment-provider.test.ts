@@ -13,7 +13,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../packages/integrations/src/index.js";
 import {
   createSandboxEventVerifier,
   deliverSandboxPaymentEvent,

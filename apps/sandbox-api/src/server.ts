@@ -7,7 +7,7 @@ import {
   PostgresExpertResidencyProviderInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../../packages/integrations/src/expert-residency/verified-event.js";
+import { createCanonicalExpertResidencyPaymentEventVerifier } from "@ii-tonya/integrations";
 import {
   createSandboxEventVerifier,
   deliverSandboxPaymentEvent,

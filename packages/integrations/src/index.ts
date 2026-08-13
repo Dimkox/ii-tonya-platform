@@ -103,6 +103,7 @@ export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabl
 export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
 export {
   assertVerifiedExpertResidencyPaymentEvent,
+  createCanonicalExpertResidencyPaymentEventVerifier,
   disabledExpertResidencyPaymentEventVerifier,
 } from "./expert-residency/verified-event.js";
 export type {

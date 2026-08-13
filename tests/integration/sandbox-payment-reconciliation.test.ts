@@ -14,7 +14,7 @@ import {
   createDb,
   type DrizzleDb,
 } from "../../packages/db/src/index.js";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../packages/integrations/src/index.js";
 import { startExternalPostgresDatabase } from "../../packages/db/src/testkit/external-postgres.js";
 import {
   createSandboxEventVerifier,

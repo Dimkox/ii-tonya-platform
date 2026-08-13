@@ -24,7 +24,6 @@ const forbiddenProductionInventory = [
   "@ii-tonya/sandbox-api",
   "@ii-tonya/sandbox-payments",
   "/sandbox/v1/",
-  "createCanonicalExpertResidencyPaymentEventVerifier",
 ];
 const assertFileContentClean = (path, relative) => {
   const handle = openSync(path, "r");

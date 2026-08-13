@@ -225,6 +225,7 @@ describe("release assets", () => {
     const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
     expect(runner).toContain("git archive --format=tar");
     expect(runner).toContain("git bundle create");
+    expect(runner).toContain('git bundle create "$SOURCE_BUNDLE" --all');
     expect(runner).toContain("SANDBOX_SOURCE_ARCHIVE");
     expect(runner).toContain("SOURCE_BUNDLE");
     expect(runner).toContain("DOCKER_HOST_SOURCE_ROOT");

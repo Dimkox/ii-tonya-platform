@@ -11,8 +11,10 @@ import {
   vi,
 } from "vitest";
 import { closeDb, createDb, type DrizzleDb } from "@ii-tonya/db";
-import { assertVerifiedExpertResidencyPaymentEvent } from "@ii-tonya/integrations";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../../integrations/src/expert-residency/verified-event.js";
+import {
+  assertVerifiedExpertResidencyPaymentEvent,
+  createCanonicalExpertResidencyPaymentEventVerifier,
+} from "@ii-tonya/integrations";
 import { startExternalPostgresDatabase } from "../../db/src/testkit/external-postgres.js";
 import {
   createSandboxEventVerifier,
