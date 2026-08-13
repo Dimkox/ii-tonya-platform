@@ -145,6 +145,18 @@ describe("sandbox server composition", () => {
     process.exitCode = previousExitCode;
   });
 
+  it("attempts database cleanup when app cleanup rejects", async () => {
+    const runtimeClose = vi.fn(async () => undefined);
+    const appCloseError = new Error("app close secret");
+    await expect(main({
+      env: validEnv(),
+      runtimeFactory: async () => ({ dependencies: dependencies() as never, close: runtimeClose }),
+      listen: async (app) => { vi.spyOn(app, "close").mockRejectedValueOnce(appCloseError); },
+      installSignals: false,
+    })).rejects.toThrow(appCloseError);
+    expect(runtimeClose).toHaveBeenCalledOnce();
+  });
+
   it("detects only direct execution", () => {
     expect(isDirectExecution(import.meta.url, process.argv[1])).toBe(false);
     expect(isDirectExecution(import.meta.url, new URL(import.meta.url).pathname)).toBe(true);
