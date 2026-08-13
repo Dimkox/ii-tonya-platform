@@ -37,6 +37,24 @@ Consequently these required gates remain unproven:
 
 Production remains `NO-GO`; provider staging remains `BLOCKED`.
 
+## Final code remediation and bounded offline result
+
+- Independent re-review approved the final code/config contract with no remaining
+  Critical, Important, or Minor findings.
+- Claw static evidence: release-assets 16/16; Compose parse, shell/Node syntax, and
+  cleanup passed.
+- The source archive is bound to an exact Git tree through an isolated evidence bundle;
+  OCI revision and immutable image ID are required by the lifecycle.
+- The lifecycle now owns one isolated internal PostgreSQL database, migrations, marker,
+  two-admin HTTP approval/settlement/refund, readiness, and authoritative financial facts.
+- Full offline workspace hydration timed out after 480 seconds. A narrowed target-only
+  offline hydration also timed out after 240 seconds on the 1 CPU / 1 GiB Claw profile.
+  Both were network-disabled and were terminated; cleanup returned to zero containers
+  and processes.
+- No sandbox image was produced. SBX-TST-009, packaged import/hardening, production
+  image smoke/inventory, scan, SBOM, and final provenance remain unexecuted. The single
+  allowed production smoke was not consumed.
+
 ## Review remediation checkpoint
 
 - Added causal tests and implementation for a real checkout mutation and DB-marker-backed `/health/ready`.
