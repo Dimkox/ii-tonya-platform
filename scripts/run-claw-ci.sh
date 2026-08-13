@@ -27,7 +27,7 @@ test_image=7d71646347d560ff2b5d8ebc4c0aad5b48230254
 test -d "$claw_store"
 claw_syft=""
 if [[ "$mode" == release ]]; then
-  claw_syft="$($source_root/scripts/provision-claw-syft.sh)"
+  claw_syft="$(bash "$source_root/scripts/provision-claw-syft.sh")"
   test -x "$claw_syft"
 fi
 container_script="$(mktemp)"

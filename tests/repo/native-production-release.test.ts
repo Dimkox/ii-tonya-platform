@@ -47,7 +47,7 @@ describe("native dedicated-server production release", () => {
     expect(provision).toContain("printf '%s  %s\\n' \"$archive_sha\"");
     expect(provision).toContain("printf '%s  %s\\n' \"$binary_sha\"");
     expect(runner).toContain(
-      'claw_syft="$($source_root/scripts/provision-claw-syft.sh)"',
+      'claw_syft="$(bash "$source_root/scripts/provision-claw-syft.sh")"',
     );
     expect(runner).toContain('-v "$claw_syft:/usr/local/bin/syft:ro"');
   });
