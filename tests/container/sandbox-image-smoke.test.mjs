@@ -17,11 +17,20 @@ test("sandbox image contains its packaged runtime closure and is hardened", () =
   try {
     const archive = process.env.SANDBOX_SOURCE_ARCHIVE;
     assert.ok(archive);
-    const sourceSha = createHash("sha256").update(readFileSync(archive)).digest("hex");
+    const sourceArchiveSha = createHash("sha256").update(readFileSync(archive)).digest("hex");
+    const sourceSha = process.env.VCS_REF;
+    assert.match(sourceSha ?? "", /^[0-9a-f]{40}$/);
     run("bash", ["scripts/build-sandbox-image-offline.sh"], {
-      env: { ...process.env, SOURCE_ARCHIVE: archive, SOURCE_SHA: sourceSha },
+      env: {
+        ...process.env,
+        SOURCE_ARCHIVE: archive,
+        SOURCE_ARCHIVE_SHA: sourceArchiveSha,
+        SOURCE_SHA: sourceSha,
+        SANDBOX_IMAGE_REF: tag,
+      },
     });
     const inspected = JSON.parse(run("docker", ["image", "inspect", tag]))[0];
+    assert.equal(inspected.Config.Labels["org.opencontainers.image.revision"], sourceSha);
     assert.equal(inspected.Config.User, "10001:10001");
     assert.deepEqual(inspected.Config.Cmd, ["node", "dist/server.js"]);
     const probe = [

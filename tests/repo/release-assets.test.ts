@@ -49,6 +49,13 @@ describe("release assets", () => {
     expect(Object.keys(productionCompose.services)).not.toContain("sandbox-api");
     expect(dockerfile).toContain("AS sandbox-api");
     const builder = readFileSync("scripts/build-sandbox-image-offline.sh", "utf8");
+    expect(builder).toContain('SOURCE_ARCHIVE_SHA');
+    expect(builder).toContain('git_source_sha');
+    expect(builder).toContain('source_archive_sha256');
+    expect(builder).toContain('pnpm --filter @ii-tonya/sandbox-api --prod deploy');
+    expect(builder).not.toContain('cp -a "$fixture/source/node_modules"');
+    expect(builder).toContain('find "$artifact" -type l');
+    expect(builder).toContain('devDependencies');
     expect(builder).toContain("--network none");
     expect(builder).toContain("--offline --frozen-lockfile");
     expect(builder).toContain("sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8");
@@ -63,6 +70,10 @@ describe("release assets", () => {
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain("USER 10001:10001");
     const service = sandboxCompose.services["sandbox-api"]!;
+    expect(service.image).toBe(
+      "${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}",
+    );
+    expect(service.build).toBeUndefined();
     expect(service.profiles).toContain("sandbox");
     expect(service.read_only).toBe(true);
     expect(service.tmpfs).toContain("/tmp");
@@ -114,6 +125,10 @@ describe("release assets", () => {
       "86400",
       "expert_residency_provider_event_inbox",
       "sandbox_expert_residency_events",
+      "expert_residency_payment_attempts",
+      "audit_events",
+      "integration_outbox",
+      "result_schema_version",
     ]) expect(lifecycle).toContain(fragment);
   });
 
