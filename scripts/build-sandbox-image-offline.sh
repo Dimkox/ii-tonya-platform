@@ -32,7 +32,9 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     cp -a /seed/.pnpm-store /work/.pnpm-store
     for path in apps packages; do find "/seed/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'target=/work/${1#/seed/}; mkdir -p "$(dirname "$target")"; cp -a "$1" "$target"'"'"' sh {} \;; done
     cd /work
+    CI=true pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api... install --frozen-lockfile
     npm --prefix apps/sandbox-api run build:bounded
+    test -f apps/sandbox-api/dist/server.js
     pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
     find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
       const fs=require("node:fs");

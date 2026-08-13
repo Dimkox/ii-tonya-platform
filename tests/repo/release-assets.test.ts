@@ -67,6 +67,8 @@ describe("release assets", () => {
     expect(builder).toContain("devDependencies");
     expect(builder).toContain("--network none");
     expect(builder).toContain("build:bounded");
+    expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
+    expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain("pnpm --offline --store-dir");
     expect(builder).toContain('git read-tree "$git_source_sha"');
     expect(builder).toContain("git checkout-index --all");
