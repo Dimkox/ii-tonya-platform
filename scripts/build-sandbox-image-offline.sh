@@ -27,6 +27,7 @@ diff -qr "$fixture/expected" "$fixture/source"
 
 docker_source_mount="$fixture/source"
 docker_installed_args=()
+docker_store_args=()
 if [[ -n "${DOCKER_HOST_SOURCE_ROOT:-}" || -n "${LOCAL_SOURCE_ROOT:-}" ]]; then
   : "${DOCKER_HOST_SOURCE_ROOT:?DOCKER_HOST_SOURCE_ROOT and LOCAL_SOURCE_ROOT must be set together}"
   : "${LOCAL_SOURCE_ROOT:?DOCKER_HOST_SOURCE_ROOT and LOCAL_SOURCE_ROOT must be set together}"
@@ -44,16 +45,22 @@ fi
 if [[ -n "${DOCKER_HOST_INSTALLED_ROOT:-}" ]]; then
   docker_installed_args=(--volume "${DOCKER_HOST_INSTALLED_ROOT%/}:/installed:ro")
 fi
+if [[ -n "${DOCKER_HOST_STORE_ROOT:-}" ]]; then
+  docker_store_args=(--volume "${DOCKER_HOST_STORE_ROOT%/}:/installed-store:ro")
+fi
 
 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
   --cpus 1 --memory 1g \
   --cap-drop ALL --security-opt no-new-privileges \
   --volume "$docker_source_mount:/work:rw" \
   "${docker_installed_args[@]}" \
+  "${docker_store_args[@]}" \
   --entrypoint sh ii-tonya-test:7d71646347d560ff2b5d8ebc4c0aad5b48230254 -lc '
     set -eu
     installed_root=/seed
     test ! -d /installed || installed_root=/installed
+    store_root="$installed_root/.pnpm-store"
+    test ! -d /installed-store || store_root=/installed-store
     rm -rf /work/node_modules
     ln -s "$installed_root/node_modules" /work/node_modules
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
@@ -62,7 +69,7 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     /seed/node_modules/.bin/tsup --config tsup.config.ts
     cd /work
     test -f apps/sandbox-api/dist/server.js
-    pnpm --offline --store-dir "$installed_root/.pnpm-store" --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
+    pnpm --offline --store-dir "$store_root" --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
     find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
       const fs=require("node:fs");
       for(const path of process.argv.slice(1)) {

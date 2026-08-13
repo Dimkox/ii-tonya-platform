@@ -74,6 +74,8 @@ describe("release assets", () => {
     expect(builder).toContain("DOCKER_HOST_SOURCE_ROOT");
     expect(builder).toContain("LOCAL_SOURCE_ROOT");
     expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
+    expect(builder).toContain("DOCKER_HOST_STORE_ROOT");
+    expect(builder).toContain("/installed-store:ro");
     expect(builder).toContain("/installed:ro");
     expect(builder).toContain(
       'ln -s "$installed_root/node_modules" /work/node_modules',
@@ -86,7 +88,7 @@ describe("release assets", () => {
     );
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain(
-      'pnpm --offline --store-dir "$installed_root/.pnpm-store" --filter @ii-tonya/sandbox-api --prod deploy',
+      'pnpm --offline --store-dir "$store_root" --filter @ii-tonya/sandbox-api --prod deploy',
     );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
@@ -235,6 +237,7 @@ describe("release assets", () => {
     expect(runner).toContain("SOURCE_BUNDLE");
     expect(runner).toContain("DOCKER_HOST_SOURCE_ROOT");
     expect(runner).toContain("DOCKER_HOST_INSTALLED_ROOT");
+    expect(runner).toContain("DOCKER_HOST_STORE_ROOT");
     expect(runner).toContain(
       "pnpm install --frozen-lockfile --store-dir /workspace/source/.pnpm-store",
     );

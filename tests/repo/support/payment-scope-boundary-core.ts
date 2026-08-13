@@ -223,7 +223,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-actions-job.sh",
-    "0673f8142bebdee1b8c7a08bb4a4afc59c2f0e7ee7336f6e659ebda17fe5cec0",
+    "b4f4d80a523856fb620e2d898af6e862ec5b519382414a25488a83237bb7d6aa",
   ],
   [
     "scripts/deploy-compose-remote.sh",
@@ -259,7 +259,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "d3f1d5cc0624880a103f17e48d20f0b69180b07d005bd17c2d42859408c4aebe",
+    "b7e5ee4cc86bbd5db1d909343aac7a01ec83a3d311876e24e4bdddd89da64cdb",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",
