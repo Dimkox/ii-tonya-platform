@@ -23,6 +23,7 @@ describe("native dedicated-server production release", () => {
     for (const path of [
       "scripts/build-native-release.sh",
       "scripts/provision-claw-syft.sh",
+      "scripts/smoke-native-release.sh",
       "scripts/deploy-native-remote.sh",
       "deploy/systemd/ii-tonya-api.service",
       "deploy/systemd/ii-tonya-worker.service",
@@ -30,6 +31,19 @@ describe("native dedicated-server production release", () => {
     ]) {
       expect(existsSync(path), path).toBe(true);
     }
+  });
+
+  it("rehearses the native bundle against an isolated Claw PostgreSQL database", () => {
+    const smoke = read("scripts/smoke-native-release.sh");
+
+    expect(smoke).toContain("II_TONYA_TEST_POSTGRES_ADMIN_URL");
+    expect(smoke).toContain("ii_tonya_native_smoke_");
+    expect(smoke).toContain("migrate-native.mjs");
+    expect(smoke).toContain("/health/ready");
+    expect(smoke).toContain("ii-tonya-worker-heartbeat");
+    expect(smoke).toContain("DROP DATABASE");
+    expect(smoke).toContain("trap cleanup EXIT");
+    expect(smoke).not.toMatch(/set -x|echo.*DATABASE_URL/iu);
   });
 
   it("pins and verifies the Claw SBOM tool before mounting it read-only", () => {
