@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -18,6 +26,23 @@ const forbiddenProductionInventory = [
   "/sandbox/v1/",
   "createCanonicalExpertResidencyPaymentEventVerifier",
 ];
+const assertFileContentClean = (path, relative) => {
+  const handle = openSync(path, "r");
+  const buffer = Buffer.alloc(64 * 1024);
+  let carry = "";
+  try {
+    for (;;) {
+      const count = readSync(handle, buffer, 0, buffer.length, null);
+      if (count === 0) break;
+      const content = carry + buffer.subarray(0, count).toString("utf8");
+      for (const forbidden of forbiddenProductionInventory)
+        assert.equal(content.includes(forbidden), false, `${relative}: ${forbidden}`);
+      carry = content.slice(-256);
+    }
+  } finally {
+    closeSync(handle);
+  }
+};
 
 const assertDeepInventoryClean = (id) => {
   const root = mkdtempSync(join(tmpdir(), "ii-tonya-production-inventory-"));
@@ -33,11 +58,7 @@ const assertDeepInventoryClean = (id) => {
           assert.equal(relative.includes(forbidden), false, relative);
         const stat = statSync(path);
         if (stat.isDirectory()) pending.push(path);
-        else if (stat.isFile() && stat.size <= 8 * 1024 * 1024) {
-          const content = readFileSync(path).toString("utf8");
-          for (const forbidden of forbiddenProductionInventory)
-            assert.equal(content.includes(forbidden), false, `${relative}: ${forbidden}`);
-        }
+        else if (stat.isFile()) assertFileContentClean(path, relative);
       }
     }
   } finally {

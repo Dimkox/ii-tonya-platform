@@ -39,6 +39,8 @@ services:
       EXPERT_REFERRAL_ENABLED: "false"
       EXPERT_RESIDENCY_BILLING_ENABLED: "false"
     ports: ["127.0.0.1:3001:3001"]
+    volumes:
+      - ./scripts/sandbox-container-lifecycle.mjs:/app/sandbox-container-lifecycle.mjs:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

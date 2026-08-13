@@ -98,6 +98,25 @@ describe("release assets", () => {
     expect(providerEvidence).not.toContain("Provider staging status: PASS");
   });
 
+  it("drives the sandbox lifecycle through container HTTP and authoritative database assertions", () => {
+    const smoke = readFileSync("scripts/run-sandbox-container-smoke.sh", "utf8");
+    const lifecycle = readFileSync("scripts/sandbox-container-lifecycle.mjs", "utf8");
+    expect(smoke).toContain("packages/db/migrations/*.sql");
+    expect(smoke).toContain("0000_sandbox_expert_residency.sql");
+    expect(smoke).toContain("sandbox-container-lifecycle.mjs");
+    for (const fragment of [
+      "/sandbox/v1/checkouts",
+      "/request",
+      "/approve",
+      "/transitions/${transition}",
+      "SANDBOX_REQUESTER_TOKEN",
+      "SANDBOX_APPROVER_TOKEN",
+      "86400",
+      "expert_residency_provider_event_inbox",
+      "sandbox_expert_residency_events",
+    ]) expect(lifecycle).toContain(fragment);
+  });
+
   it("defines portable non-root API and worker images with the required entrypoints", () => {
     const dockerfile = readFileSync("Dockerfile", "utf8");
     expect(dockerfile).toContain("RUN pnpm build");
