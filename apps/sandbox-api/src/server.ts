@@ -3,15 +3,12 @@ import { fileURLToPath } from "node:url";
 import {
   closeDb,
   createDb,
-  defaultMigrationsFolder,
-  migrateDb,
   PostgresAdminApprovalRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import { createCanonicalExpertResidencyPaymentEventVerifier } from "@ii-tonya/integrations";
 import {
   createSandboxEventVerifier,
-  migrateSandboxDatabase,
   PostgresSandboxPaymentRepository,
   SandboxExpertResidencyPaymentAdapter,
   SandboxTransitionWorkflow,
@@ -69,12 +66,11 @@ export async function createDefaultSandboxRuntime(env: NodeJS.ProcessEnv): Promi
   assertSandboxRuntimeEnvironment(env);
   const db: DrizzleDb = createDb(required(env, "SANDBOX_DATABASE_URL"));
   try {
-    await migrateDb(db, defaultMigrationsFolder);
-    await migrateSandboxDatabase(db);
     const payments = new PostgresSandboxPaymentRepository(db, new URL(required(env, "SANDBOX_CHECKOUT_BASE_URL")));
     const approvals = new PostgresAdminApprovalRepository(db);
     const verifier = createSandboxEventVerifier(createCanonicalExpertResidencyPaymentEventVerifier());
     const paymentAdapter = new SandboxExpertResidencyPaymentAdapter(payments, verifier);
+    await paymentAdapter.assertSandboxDatabase();
     return {
       dependencies: { paymentAdapter, approvals, transitionWorkflow: new SandboxTransitionWorkflow(db, approvals, payments) },
       close: () => closeDb(db),
@@ -92,11 +88,13 @@ export interface SandboxMainOptions {
   installSignals?: boolean;
 }
 
-function listenOptions(env: NodeJS.ProcessEnv): { host: string; port: number } {
+export function sandboxListenOptions(env: NodeJS.ProcessEnv): { host: string; port: number } {
   const raw = env.SANDBOX_PORT ?? "3001";
   const port = Number(raw);
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("sandbox_port_invalid");
-  return { host: env.SANDBOX_HOST ?? "127.0.0.1", port };
+  const host = env.SANDBOX_HOST === undefined ? "127.0.0.1" : env.SANDBOX_HOST;
+  if (!["127.0.0.1", "0.0.0.0", "::1", "::"].includes(host)) throw new Error("sandbox_host_invalid");
+  return { host, port };
 }
 
 export async function main(options: SandboxMainOptions = {}): Promise<void> {
@@ -113,10 +111,15 @@ export async function main(options: SandboxMainOptions = {}): Promise<void> {
   };
   try {
     app = await buildSandboxServer(runtime.dependencies, env);
-    await (options.listen ?? ((server, address) => server.listen(address)))(app, listenOptions(env));
+    await (options.listen ?? ((server, address) => server.listen(address)))(app, sandboxListenOptions(env));
     if (options.installSignals === false) await close();
     else {
-      const stop = (): void => { void close().finally(() => { process.exitCode = 0; }); };
+      const stop = (): void => {
+        void close().then(
+          () => { process.exitCode = 0; },
+          () => { process.stderr.write("sandbox_shutdown_failed\n"); process.exitCode = 1; },
+        );
+      };
       process.once("SIGINT", stop);
       process.once("SIGTERM", stop);
     }
