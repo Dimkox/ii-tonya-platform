@@ -188,12 +188,23 @@ function hasCode(error: unknown, code: string): boolean {
 export async function withSerializableRetry<T>(
   operation: () => Promise<T>,
   attempts = 3,
+  retryDelayMs: (attempt: number) => number = (attempt) => {
+    const ceiling = Math.min(250, 25 * 2 ** attempt);
+    return 1 + Math.floor(Math.random() * ceiling);
+  },
 ): Promise<T> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
       if (attempt === attempts - 1 || !hasCode(error, "40001")) throw error;
+      const configuredDelay = retryDelayMs(attempt);
+      const boundedDelay = Number.isFinite(configuredDelay)
+        ? Math.min(250, Math.max(0, configuredDelay))
+        : 0;
+      if (boundedDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, boundedDelay));
+      }
     }
   }
   throw new Error("Unreachable serialization retry state");
@@ -496,11 +507,7 @@ export class PostgresMessageRepository implements MessageRepository {
         let outcome = command.outcome;
         if (outcome.kind === "no_package") {
           if (
-            await this.packageAvailable(
-              tx,
-              command.userId,
-              event.occurredAt,
-            )
+            await this.packageAvailable(tx, command.userId, event.occurredAt)
           ) {
             return {
               kind: "retry" as const,
