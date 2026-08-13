@@ -46,7 +46,11 @@ export interface TelegramExpertQueryIngress {
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<{
-    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
+    readonly kind:
+      | "processed"
+      | "reissue_client"
+      | "disabled"
+      | "unavailable";
     readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
   }>;
   processClientView(input: {
@@ -67,7 +71,10 @@ export interface TelegramExpertQueryIngress {
     };
     readonly idempotencyKey: string;
     readonly correlationId: string;
-  }): Promise<unknown>;
+  }): Promise<{
+    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
+  }>;
   answerCallbackQuery(input: {
     readonly callbackQueryId: string;
     readonly status: "processed" | "unavailable";
