@@ -22,7 +22,7 @@ jobs:
     name: PostgreSQL migration and schema invariants
     if: github.event_name != 'pull_request' || (github.repository_owner == 'Dimkox' && github.event.pull_request.user.login == github.repository_owner)
     runs-on: [self-hosted, linux, x64, claw, ii-tonya-test]
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository

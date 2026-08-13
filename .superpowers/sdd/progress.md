@@ -85,3 +85,32 @@
 - Repeat-policy remediation: hard maximum is now three in every environment; all Database Gate repeats are 3x and 20x is prohibited. Exact Claw source `ce72fa3`; frozen install, build, format, deploy contract, lint, typecheck and audit PASS; full corpus 120 files / 983 tests PASS three times in 310.94s, 316.30s and 314.17s. Source restored to `83e20da`; cleanup 0 containers / 0 processes.
 - GitHub Free branch-control compensation: hosted-runner dependency removed; legacy native deployment reduced to an explicit refusal; gated release moved to `ii-tonya-release` on Claw; squash-only repository merges and main-only deployment environments configured. Exact-SHA CI evidence pending this commit.
 - Release-control remediation: `server-control.yml` is now refusal-only; migration approval binds the exact main CI SHA, squash merge commit, PR-head review commit, exact marker, and write-capable reviewer. Test and release runner identities are separated (`ii-tonya-test` versus `ii-tonya-release`), and transient SSH/provenance/evidence material is removed with `always()` cleanup. Claw TDD RED was 3 expected failures; focused GREEN 10/10; workflow plus recursive scope 113/113; actionlint 5/5; Prettier PASS; independent Critical/Important re-review PASS. Commit and exact-SHA CI evidence remain pending.
+
+## Sandbox payment provider
+
+- Design: `docs/superpowers/specs/2026-08-13-sandbox-payment-provider-design.md`
+- Plan: `docs/superpowers/plans/2026-08-13-sandbox-payment-provider.md`
+- Branch: `codex/sandbox-payment-provider`
+- Baseline: `120368d5b3b439df44d16525f59f4d008b4cffff`
+- Test target: constrained `ii-tonya-test` profile on Claw; maximum three repeats; production smoke once.
+
+| Task | Status | Base | Implementer | Spec review | Quality review | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1. Contracts and database boundary | complete | `5e21170` | `520ad39`..`89dfe66` | PASS after two guard remediations | PASS; no findings | Claw repository 15/15, repeat 45/45, schema 2/2, scope 113/113; build/typecheck/lint/format; cleanup 0 |
+| 2. Verifier, adapter, reconciliation | complete | `c7e8a68` | `73c6379`..`e5ef5f1` | PASS | PASS; one cross-task architecture guard recorded | Claw focused 8/8, repository 15/15; build/typecheck/lint/format; cleanup 0 |
+| 3. Approved admin transitions | complete | `7b8f9de` | `55430cd`..`4a2cc3e` | PASS after remediation | PASS; no findings | Claw focused 25/25, workflow repeat 3x 36/36; static checks; cleanup 0 |
+| 4. Separate sandbox API | complete | `7f9ec00` | `69998e2`..`dc44e42` | PASS after runtime and packaging remediation | PASS; no findings | Claw focused 41/41, isolation 5/5, bounded ESM/DTS build + artifact smoke; cleanup 0 |
+| 5. Settlement/refund E2E | conditional: Task 6 SBX-TST-009 pending | `e64858a` | `3323d1e`..`f4afb8f` | PASS after remediation | PASS conditional; no Critical/Important, one interval assertion Minor | Claw 48/48, reconciliation repeat 3x 6/6; builds/static; cleanup 0 |
+| 6. Container and image isolation | blocked: image execution gate | `b12fb55` | `ff5d196`..`3d86899` | code-contract PASS after remediation | PASS at code level; image evidence pending | Claw static 16/16, Compose/syntax PASS, cleanup 0; offline full install 480s and focused install 240s timed out; production smoke unused |
+| 7. Evidence and final gates | blocked checkpoint: Task 6 image gates pending | `7214ae9` | `4f825f5` | documentation checkpoint PASS | whole-branch code review PASS; release NO-GO | static links/NUL/diff/syntax PASS; exact-head image/CI gates unexecuted |
+
+Cross-task gate: Task 6 must inspect the built production image dependency inventory and
+prove `@ii-tonya/sandbox-payments` is absent. The current Dockerfile deploys only the
+`@ii-tonya/api` production closure, and `apps/api/package.json` has no sandbox dependency.
+
+Cross-task gate: Task 4 isolation tests must reject imports or instantiation of
+`createCanonicalExpertResidencyPaymentEventVerifier` from production composition. Its
+root export is a privileged minting capability reserved for sandbox composition/tests.
+
+Cross-task gate: SBX-TST-009 sandbox-container checkout-to-refund smoke is owned by
+Task 6. Task 5 cannot be marked complete until that exact built-container evidence passes.

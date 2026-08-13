@@ -69,6 +69,8 @@ pnpm test:repeat -- 3 tests/integration/expert-residency-checkout-concurrency.te
 pnpm test:repeat -- 3 tests/integration/expert-residency-settlement-concurrency.test.ts
 pnpm test:repeat -- 3 tests/integration/expert-residency-deadline.test.ts
 pnpm test:repeat -- 3 tests/integration/expert-residency-hold-replay.test.ts
+pnpm exec vitest run packages/sandbox-payments/src/repository.test.ts packages/sandbox-payments/src/workflow.test.ts packages/sandbox-payments/src/verifier.test.ts packages/sandbox-payments/src/adapter.test.ts apps/sandbox-api/src/server.test.ts apps/sandbox-api/src/routes.test.ts tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts tests/repo/sandbox-production-isolation.test.ts --maxWorkers=1
+pnpm test:repeat -- 3 tests/integration/sandbox-payment-reconciliation.test.ts
 SCRIPT
 fi
 

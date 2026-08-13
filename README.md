@@ -133,6 +133,23 @@ runbooks, and release-readiness guards. See
 No real client messages, bookings, balances, payments, or crisis workflows are enabled
 until the staging contract tests and the documented go-live gates pass.
 
+## Test-only sandbox payment runtime
+
+The branch `codex/sandbox-payment-provider` adds a separate `apps/sandbox-api` and
+`packages/sandbox-payments` test boundary. It can simulate checkout and independently
+approved settlement/refund against isolated PostgreSQL tables, then submit branded
+events to the existing settlement/reversal pipeline. It has no live-provider SDK,
+network authority, or credential input. The production API, worker, Dockerfile, and
+Compose runtime must not depend on or contain this boundary.
+
+This work is not release-ready. Tasks 1–4 are approved, Task 5 is conditional, and Task
+6 code/config was approved while its image execution remained blocked by offline pnpm
+hydration timeouts on constrained Claw. No sandbox image was produced. `SBX-TST-009`,
+production packaged-image inventory/smoke, scans, SBOM, signing, provenance, and final
+exact-SHA gates remain unrun. Provider staging remains `BLOCKED`; production remains
+`NO-GO`. See `docs/runbooks/sandbox-payment-provider.md` and
+`docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`.
+
 ## Local verification and container evidence
 
 Use Node 24 and pnpm 11.9.0. After installing the frozen dependency graph, the single

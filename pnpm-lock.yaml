@@ -80,6 +80,42 @@ importers:
         specifier: ^5.5.0
         version: 5.10.0
 
+  apps/sandbox-api:
+    dependencies:
+      '@fastify/rate-limit':
+        specifier: ^10.3.0
+        version: 10.3.0
+      '@ii-tonya/api':
+        specifier: workspace:*
+        version: link:../api
+      '@ii-tonya/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@ii-tonya/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
+      '@ii-tonya/sandbox-payments':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-payments
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      fastify:
+        specifier: ^5.5.0
+        version: 5.10.0
+      pg:
+        specifier: ^8.16.3
+        version: 8.22.0
+      pino:
+        specifier: ^9.7.0
+        version: 9.14.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+
   apps/worker:
     dependencies:
       '@ii-tonya/config':
@@ -173,6 +209,24 @@ importers:
       pino:
         specifier: ^9.7.0
         version: 9.14.0
+
+  packages/sandbox-payments:
+    dependencies:
+      '@ii-tonya/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ii-tonya/db':
+        specifier: workspace:*
+        version: link:../db
+      '@ii-tonya/integrations':
+        specifier: workspace:*
+        version: link:../integrations
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
 
   packages/worker:
     dependencies:

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expertResidencyPaymentEventSchema } from "@ii-tonya/contracts";
 import {
   assertVerifiedExpertResidencyPaymentEvent,
+  createCanonicalExpertResidencyPaymentEventVerifier,
   disabledExpertResidencyPaymentEventVerifier,
   verifiedEventFixture,
 } from "./verified-event.js";
@@ -30,10 +31,31 @@ describe("verified expert residency payment events", () => {
   it("rejects production verification while disabled", async () => {
     await expect(
       disabledExpertResidencyPaymentEventVerifier.verify({
-        rawBody: new Uint8Array(),
-        headers: {},
+        rawBody: new TextEncoder().encode(
+          JSON.stringify({ ...raw, provider: "ii_tonya_sandbox" }),
+        ),
+        headers: { "content-type": "application/json" },
       }),
     ).resolves.toEqual({ kind: "rejected" });
+  });
+  it("brands validated canonical events with bounded evidence", () => {
+    const verifier = createCanonicalExpertResidencyPaymentEventVerifier();
+    const verified = verifier.verifyCanonical(raw, {
+      verificationId: "verify_00000001",
+      verifierKeyVersion: "key-v1",
+      verifiedAt: "2026-08-03T00:00:01.000Z",
+    });
+
+    expect(() =>
+      assertVerifiedExpertResidencyPaymentEvent(verified),
+    ).not.toThrow();
+    expect(() =>
+      verifier.verifyCanonical(raw, {
+        verificationId: "verify_00000001",
+        verifierKeyVersion: "x".repeat(101),
+        verifiedAt: "2026-08-03T00:00:01.000Z",
+      }),
+    ).toThrow("invalid_verification_evidence");
   });
   it("rejects forged, mutated, and malformed verification evidence", () => {
     expect(() =>

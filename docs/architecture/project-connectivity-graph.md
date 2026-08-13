@@ -4,6 +4,14 @@ Status: canonical architecture inventory for `codex/task25-expert-referral-imple
 
 Purpose: maintain one connected view of the entire repository. Runtime modules, PostgreSQL authority, workflows, native server control, tests, migrations, deploy assets, documentation/evidence, disabled capabilities, deferred scope, prohibited paths, and orphan/dead candidates are all represented.
 
+Sandbox supplement: `apps/sandbox-api`, `packages/sandbox-payments`,
+`Dockerfile.sandbox`, and `compose.sandbox.yaml` form a `TEST-ONLY` branch into the
+existing authoritative expert-residency provider inbox. They have no edge into the
+production API/worker/image closure. Their required built-image evidence is incomplete:
+no sandbox image was produced, so packaged isolation, `SBX-TST-009`, production image
+inventory, scans, SBOM, signing, and provenance are pending. Provider staging remains
+`BLOCKED`; production remains `NO-GO`.
+
 Legend:
 
 - `ACTIVE` — executable or authoritative code/path.

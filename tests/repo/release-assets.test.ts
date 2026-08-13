@@ -12,13 +12,19 @@ describe("release assets", () => {
       ".github/workflows/release.yml",
       ".dockerignore",
       "Dockerfile",
+      "Dockerfile.sandbox",
       "compose.yaml",
+      "compose.sandbox.yaml",
       "deploy/compose.remote.yml",
       "deploy/runtime.env.example",
       "scripts/deploy-compose-remote.sh",
       "scripts/validate-runtime-env.sh",
       "scripts/smoke.mjs",
       "tests/container/image-smoke.test.mjs",
+      "tests/container/sandbox-image-smoke.test.mjs",
+      "scripts/run-sandbox-container-smoke.sh",
+      "scripts/build-sandbox-image-offline.sh",
+      "scripts/sandbox-container-lifecycle.mjs",
       "tests/provider-stubs/server.mjs",
       "docs/operations/data-retention.md",
       "docs/operations/disaster-recovery.md",
@@ -30,6 +36,82 @@ describe("release assets", () => {
       "docs/runbooks/rollback.md",
     ];
     expect(required.filter((path) => !existsSync(path))).toEqual([]);
+  });
+
+  it("defines an explicit hardened sandbox image without changing production Compose", () => {
+    const dockerfile = readFileSync("Dockerfile.sandbox", "utf8");
+    const productionCompose = parse(readFileSync("compose.yaml", "utf8")) as {
+      services: Record<string, unknown>;
+    };
+    const sandboxCompose = parse(
+      readFileSync("compose.sandbox.yaml", "utf8"),
+    ) as { services: Record<string, Record<string, unknown>> };
+    expect(Object.keys(productionCompose.services)).not.toContain(
+      "sandbox-api",
+    );
+    expect(dockerfile).toContain("AS sandbox-api");
+    const builder = readFileSync(
+      "scripts/build-sandbox-image-offline.sh",
+      "utf8",
+    );
+    expect(builder).toContain("SOURCE_ARCHIVE_SHA");
+    expect(builder).toContain("SOURCE_BUNDLE");
+    expect(builder).toContain("git clone --quiet --no-checkout");
+    expect(builder).toContain("git_source_sha");
+    expect(builder).toContain("source_archive_sha256");
+    expect(builder).toContain(
+      "pnpm --filter @ii-tonya/sandbox-api --prod deploy",
+    );
+    expect(builder).not.toContain('cp -a "$fixture/source/node_modules"');
+    expect(builder).toContain('find "$artifact" -type l');
+    expect(builder).toContain("devDependencies");
+    expect(builder).toContain("--network none");
+    expect(builder).toContain("build:bounded");
+    expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
+    expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
+    expect(builder).toContain("pnpm --offline --store-dir");
+    expect(builder).toContain('git read-tree "$git_source_sha"');
+    expect(builder).toContain("git checkout-index --all");
+    expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
+    expect(builder).toContain(
+      "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
+    );
+    const lifecycle = readFileSync(
+      "scripts/sandbox-container-lifecycle.mjs",
+      "utf8",
+    );
+    expect(lifecycle).toContain('"/sandbox/v1/checkouts"');
+    expect(lifecycle).toContain("/request");
+    expect(lifecycle).toContain("/approve");
+    expect(lifecycle).toContain("/transitions/${transition}");
+    expect(lifecycle).toContain("expert_residency_provider_event_inbox");
+    expect(lifecycle).toContain("sandbox_expert_residency_events");
+    expect(lifecycle).toContain('interval_seconds: "86400"');
+    expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
+    expect(dockerfile).toContain("USER 10001:10001");
+    const service = sandboxCompose.services["sandbox-api"]!;
+    expect(service.image).toBe(
+      "${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}",
+    );
+    expect(service.build).toBeUndefined();
+    expect(service.profiles).toContain("sandbox");
+    expect(service.read_only).toBe(true);
+    expect(service.tmpfs).toContain("/tmp");
+    expect(service.cap_drop).toContain("ALL");
+    expect(service.security_opt).toContain("no-new-privileges:true");
+    expect(service.cpus).toBe(1);
+    expect(service.mem_limit).toBe("1g");
+    expect(JSON.stringify(service)).not.toContain("docker.sock");
+    expect(service.environment).toMatchObject({
+      II_TONYA_RUNTIME_MODE: "sandbox",
+      PAYMENT_API_KEY: "",
+      PAYMENT_TOKEN: "",
+      PAYMENT_SECRET: "",
+      PAYMENT_WEBHOOK_SECRET: "",
+    });
+    expect(sandboxCompose.services["sandbox-postgres"]?.ports).toBeUndefined();
+    expect((sandboxCompose as any).networks["sandbox-db"].internal).toBe(true);
+    expect(service.networks).toEqual(["sandbox-db"]);
   });
 
   it("does not convert local fixtures or container health into provider evidence", () => {
@@ -45,6 +127,38 @@ describe("release assets", () => {
       "Project-owned authenticated sessions: unavailable",
     );
     expect(providerEvidence).not.toContain("Provider staging status: PASS");
+  });
+
+  it("drives the sandbox lifecycle through container HTTP and authoritative database assertions", () => {
+    const smoke = readFileSync(
+      "scripts/run-sandbox-container-smoke.sh",
+      "utf8",
+    );
+    const lifecycle = readFileSync(
+      "scripts/sandbox-container-lifecycle.mjs",
+      "utf8",
+    );
+    expect(smoke).toContain("packages/db/migrations/*.sql");
+    expect(smoke).toContain("0000_sandbox_expert_residency.sql");
+    expect(smoke).toContain("sandbox-container-lifecycle.mjs");
+    expect(smoke).toContain("org.opencontainers.image.revision");
+    expect(smoke).toContain("sandbox_image_id");
+    for (const fragment of [
+      "/sandbox/v1/checkouts",
+      "/request",
+      "/approve",
+      "/transitions/${transition}",
+      "SANDBOX_REQUESTER_TOKEN",
+      "SANDBOX_APPROVER_TOKEN",
+      "86400",
+      "expert_residency_provider_event_inbox",
+      "sandbox_expert_residency_events",
+      "expert_residency_payment_attempts",
+      "audit_events",
+      "integration_outbox",
+      "result_schema_version",
+    ])
+      expect(lifecycle).toContain(fragment);
   });
 
   it("defines portable non-root API and worker images with the required entrypoints", () => {
@@ -137,7 +251,7 @@ describe("release assets", () => {
     expect(compose).not.toContain("./tests/provider-stubs/server.mjs:");
     expect(smoke).toContain("resolved.startsWith('file:///app/node_modules/')");
     expect(smoke).toContain("resolved.includes('/workspace/')");
-    expect(smoke.match(/"--input-type=module"/g)).toHaveLength(2);
+    expect(smoke.match(/"--input-type=module"/g)).toHaveLength(4);
   });
 
   it("fails image scans on every high or critical vulnerability", () => {
