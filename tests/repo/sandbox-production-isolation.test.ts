@@ -61,7 +61,9 @@ describe("sandbox production isolation", () => {
     expect(dockerfile).not.toContain("packages/sandbox-payments");
     expect(dockerfile).not.toContain("@ii-tonya/sandbox-api");
     expect(dockerfile).not.toContain("@ii-tonya/sandbox-payments");
-    expect(dockerfile).not.toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+    expect(dockerfile).not.toContain(
+      "createCanonicalExpertResidencyPaymentEventVerifier",
+    );
   });
 
   it("publishes a real executable sandbox entrypoint", () => {
@@ -79,6 +81,12 @@ describe("sandbox production isolation", () => {
     expect(buildConfig).toContain("noExternal: [/^@ii-tonya\\//u]");
     expect(buildConfig).toContain("(?!@ii-tonya\\/)");
     const server = readFileSync("apps/sandbox-api/src/server.ts", "utf8");
+    expect(
+      readFileSync("packages/integrations/src/index.ts", "utf8"),
+    ).not.toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+    expect(server).toContain(
+      "packages/integrations/src/expert-residency/verified-event.js",
+    );
     expect(server).toContain(
       "createCanonicalExpertResidencyPaymentEventVerifier",
     );

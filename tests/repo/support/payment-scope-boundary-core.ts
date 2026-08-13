@@ -131,7 +131,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "fac5fcdfb49cb461068688d25b1b39f8740380a4f56a395917d9de6465ce324a",
+    "fb61ab5b1c85c8b731007b1e080915038590cfdaea67ddab17122e6f6e7e995f",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -223,7 +223,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-actions-job.sh",
-    "8062c5f9634e6d4aa5f172db7b6e34c4b0819be843521eb764218756ee672098",
+    "cc257611bd2dd06e47e586c45806255a2cf94cfb976aa7fcebcf903eeb72d01b",
   ],
   [
     "scripts/deploy-compose-remote.sh",

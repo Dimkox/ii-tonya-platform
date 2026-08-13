@@ -55,7 +55,7 @@ export DOCKER_HOST_SOURCE_ROOT="$CLAW_HOST_WORKSPACE"
 export DOCKER_HOST_INSTALLED_ROOT="$CLAW_HOST_WORKSPACE"
 mkdir -p "$SANDBOX_BUILD_ROOT"
 git archive --format=tar --output="$SANDBOX_SOURCE_ARCHIVE" "$source_sha"
-git bundle create "$SOURCE_BUNDLE" HEAD
+git bundle create "$SOURCE_BUNDLE" "HEAD^..HEAD"
 VCS_REF="$source_sha" pnpm test:container
 SCRIPT
 else
