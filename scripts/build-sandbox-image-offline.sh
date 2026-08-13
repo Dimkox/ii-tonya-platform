@@ -21,7 +21,7 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     cp -a /seed/.pnpm-store /work/.pnpm-store
     for path in apps packages; do find "/seed/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'target=/work/${1#/seed/}; mkdir -p "$(dirname "$target")"; cp -a "$1" "$target"'"'"' sh {} \;; done
     cd /work
-    pnpm install --store-dir /work/.pnpm-store --offline --frozen-lockfile
+    CI=true pnpm install --store-dir /work/.pnpm-store --offline --frozen-lockfile
     pnpm --filter @ii-tonya/sandbox-api... build
   '
 cp -a "$fixture/source/apps/sandbox-api/dist/." "$fixture/context/sandbox-api/dist/"
