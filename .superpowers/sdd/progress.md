@@ -102,7 +102,7 @@
 | 4. Separate sandbox API | complete | `7f9ec00` | `69998e2`..`dc44e42` | PASS after runtime and packaging remediation | PASS; no findings | Claw focused 41/41, isolation 5/5, bounded ESM/DTS build + artifact smoke; cleanup 0 |
 | 5. Settlement/refund E2E | conditional: Task 6 SBX-TST-009 pending | `e64858a` | `3323d1e`..`f4afb8f` | PASS after remediation | PASS conditional; no Critical/Important, one interval assertion Minor | Claw 48/48, reconciliation repeat 3x 6/6; builds/static; cleanup 0 |
 | 6. Container and image isolation | blocked: image execution gate | `b12fb55` | `ff5d196`..`3d86899` | code-contract PASS after remediation | PASS at code level; image evidence pending | Claw static 16/16, Compose/syntax PASS, cleanup 0; offline full install 480s and focused install 240s timed out; production smoke unused |
-| 7. Evidence and final gates | pending | — | — | — | — | — |
+| 7. Evidence and final gates | blocked checkpoint: Task 6 image gates pending | `7214ae9` | `4f825f5` | documentation checkpoint PASS | whole-branch code review PASS; release NO-GO | static links/NUL/diff/syntax PASS; exact-head image/CI gates unexecuted |
 
 Cross-task gate: Task 6 must inspect the built production image dependency inventory and
 prove `@ii-tonya/sandbox-payments` is absent. The current Dockerfile deploys only the

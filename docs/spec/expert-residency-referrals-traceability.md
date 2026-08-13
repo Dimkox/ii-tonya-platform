@@ -61,7 +61,7 @@ Source design: `docs/superpowers/specs/2026-08-02-expert-residency-referrals-des
 
 ## Release gate
 
-Registration in CI is not a pass result. No requirement is production-approved merely because its row is populated. Release requires all focused tests to pass at one exact SHA, mandatory hosted CI and Database Gate to pass at that SHA, independent migration and financial review, authenticated sandbox settlement/refund/replay evidence, a named AI spot-check for ERR-FR-027/028, and explicit staging authorization. Production requires a separate explicit authorization.
+Registration in CI is not a pass result. No requirement is production-approved merely because its row is populated. Release requires all focused tests to pass at one exact SHA, mandatory repository-scoped self-hosted Claw CI and Database Gate to pass at that SHA, independent migration and financial review, authenticated sandbox settlement/refund/replay evidence, a named AI spot-check for ERR-FR-027/028, and explicit staging authorization. Production requires a separate explicit authorization.
 
 ## Sandbox payment provider traceability
 

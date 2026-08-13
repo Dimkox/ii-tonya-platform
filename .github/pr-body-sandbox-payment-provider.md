@@ -28,4 +28,3 @@ Tasks 1–4 are approved. Task 5 is conditional. Task 6 code/config passed indep
 - [ ] Both immutable images pass scan; SBOM, signing, and provenance are verified.
 - [ ] Independent review has no unresolved Critical or Important finding.
 - [ ] Named owners separately approve provider staging and production; neither approval is implied here.
-

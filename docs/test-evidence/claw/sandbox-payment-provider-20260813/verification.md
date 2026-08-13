@@ -51,4 +51,3 @@ After sandbox success, run the production packaged-image smoke exactly once, the
 ## Release decision
 
 Provider staging remains `BLOCKED`. Production remains `NO-GO`. This file cannot authorize either environment.
-

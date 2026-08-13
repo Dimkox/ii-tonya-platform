@@ -142,4 +142,3 @@ manifest, route, composition, and recursive static isolation only.
 - A bounded CJS sandbox build command itself completed, but its artifact could not initialize for the reason above; it is not retained or claimed green.
 - Final bounded Claw source gate after reverting packaging was 40/41 because the remote fixture retained the reverted CJS isolation assertion; no further run was made per the stop instruction. Previous source-focused 40/40 and scope/isolation 118/118 evidence remains valid for the read-only runtime; the independent-close test passed within the 40 passing tests.
 - Report NUL was replaced with ASCII 0 and saved as UTF-8.
-

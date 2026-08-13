@@ -46,4 +46,3 @@ If a production package/image inventory contains `@ii-tonya/sandbox-api`, `@ii-t
 ## Current blocking record (2026-08-13)
 
 At source `7214ae93a04e99993b190dfd881c34bd1eced22a`, no sandbox image was produced. Offline pnpm hydration timed out after 480 seconds and a narrowed attempt after 240 seconds on Claw. Cleanup returned zero containers/processes. `SBX-TST-009`, sandbox packaged-runtime checks, the reserved production image smoke/inventory, vulnerability scan, SBOM, signing, and provenance remain unexecuted. See `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`.
-
