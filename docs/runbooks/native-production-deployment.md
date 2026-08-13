@@ -19,6 +19,16 @@ Docker, Docker Compose, GHCR application images, and container digests are not p
 dependencies. They remain development/direct-Claw test evidence only. The Claw test
 container imitates the native server contract; it is not copied to production.
 
+## Production SSH access policy
+
+The approved operator policy is recorded in the ignored local project `.env` as
+`PROD_ROOT_PASSWORD_LOGIN_ENABLED=true` and `PROD_ROOT_PASSWORD_SOURCE=interactive`.
+Interactive password login for `root` remains available and deployment automation must
+not disable it. The root password is entered only at the interactive SSH password prompt;
+it is never stored in project `.env`, Git, logs, release artifacts, handoffs, or memory.
+This access policy does not change the application privilege boundary: API and worker
+services continue to run as the unprivileged `ii_tonya` user.
+
 GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with explicit
 `SOURCE_ROOT` and exact `SOURCE_SHA`. GitHub stores the resulting commit and PR only.
 

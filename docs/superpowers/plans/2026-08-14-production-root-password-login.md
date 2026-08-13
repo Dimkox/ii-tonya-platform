@@ -29,11 +29,11 @@
 - Consumes: `scripts/deploy-native-remote.sh` and the existing `ii_tonya` systemd units.
 - Produces: repository assertions for the SSH policy plus explicit operator configuration.
 
-- [ ] **Step 1: Add the failing repository guard**
+- [x] **Step 1: Add the failing repository guard**
 
 Add an assertion that the runbook contains `PROD_ROOT_PASSWORD_LOGIN_ENABLED=true`, `PROD_ROOT_PASSWORD_SOURCE=interactive`, and the statement that the password is entered only at the SSH prompt. Assert that deployment assets contain none of `PermitRootLogin no`, `PermitRootLogin prohibit-password`, or `PasswordAuthentication no`, and that systemd continues to contain `User=ii_tonya`.
 
-- [ ] **Step 2: Run the focused test to verify RED**
+- [x] **Step 2: Run the focused test to verify RED**
 
 Run on Claw or the repository's prepared test runtime:
 
@@ -43,11 +43,11 @@ pnpm exec vitest run tests/repo/native-production-release.test.ts --maxWorkers=1
 
 Expected: the new runbook assertions fail because the policy is not documented yet.
 
-- [ ] **Step 3: Document the approved policy**
+- [x] **Step 3: Document the approved policy**
 
 Add a production SSH access section to `docs/runbooks/native-production-deployment.md` stating the two exact non-secret variables, interactive-only password handling, preserved root/password login, and unprivileged application runtime.
 
-- [ ] **Step 4: Record the local operator policy**
+- [x] **Step 4: Record the local operator policy**
 
 Add exactly these lines to the ignored local `.env` without adding a password variable:
 
@@ -56,11 +56,11 @@ PROD_ROOT_PASSWORD_LOGIN_ENABLED=true
 PROD_ROOT_PASSWORD_SOURCE=interactive
 ```
 
-- [ ] **Step 5: Run focused verification**
+- [x] **Step 5: Run focused verification**
 
 Run the focused Vitest file and `git diff --check`. Expected: all tests pass, `.env` remains ignored, and a credential-pattern scan finds no newly persisted password.
 
-- [ ] **Step 6: Commit the versioned changes**
+- [x] **Step 6: Commit the versioned changes**
 
 ```bash
 git add tests/repo/native-production-release.test.ts docs/runbooks/native-production-deployment.md
