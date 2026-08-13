@@ -2,7 +2,7 @@
 title: 'Expert Telegram Queries'
 type: 'feature'
 created: '2026-08-13'
-status: 'in-review'
+status: 'done'
 baseline_commit: '5d13cd80acff220ff39c0773a3706d099e67958c'
 review_loop_iteration: 0
 context:
@@ -59,7 +59,7 @@ context:
 - [x] Add isolated `cv1` token/store contracts/tests without booking mutation authority.
 - [x] Add adapter keyboard/views and command processor with exact-command, minimization, and transport tests.
 - [x] Wire webhook/config/app/server with private-ingress, dedupe, rate-limit, and disabled-isolation tests.
-- [ ] Record Claw evidence, traceability, README/handoff, independent review, and Draft PR boundary.
+- [x] Record Claw evidence, traceability, README/handoff, independent review, and Draft PR boundary.
 
 **Acceptance Criteria:**
 - Given an eligible bound expert, when each command arrives privately, then only that expert's minimized facts are rendered once.
@@ -94,7 +94,45 @@ context:
 Claw evidence: `docs/test-evidence/claw/5d13cd80-expert-telegram-queries/verification.md`.
 Traceability: `docs/spec/expert-telegram-queries-traceability.md`.
 
-Execution items 1–4 are complete. Execution item 5 remains open because the independent
-review and Draft PR are not complete; self-review is recorded but is not substituted for
-independent review. Live activation, push, merge, staging, and deployment remain outside
-this implementation commit.
+Execution items 1–5 are complete. Independent review approved the final implementation;
+the Draft PR boundary is recorded here while live activation remains separately gated.
+
+## Suggested Review Order
+
+**Ingress and isolation**
+
+- Start with private command routing, deduplication, denial equivalence, and callback acknowledgement.
+  [`telegram-webhook.ts:99`](../../../apps/api/src/routes/telegram-webhook.ts#L99)
+
+- Confirm default-off composition rejects an enabled feature without an injected capability.
+  [`app.ts:62`](../../../apps/api/src/app.ts#L62)
+
+**Authorization and sensitive reads**
+
+- Follow server-clock windows and minimized query orchestration.
+  [`expert-telegram-query-service.ts:94`](../../../packages/application/src/expert-telegram-query-service.ts#L94)
+
+- Inspect PostgreSQL-embedded binding, ownership, active-hold, consent, and aggregate predicates.
+  [`expert-telegram-query-repository.ts:91`](../../../packages/db/src/repositories/expert-telegram-query-repository.ts#L91)
+
+- Verify CAS consumption and audit commit atomically for the sensitive client view.
+  [`expert-telegram-query-repository.ts:277`](../../../packages/db/src/repositories/expert-telegram-query-repository.ts#L277)
+
+**Token and delivery safety**
+
+- Review the separate Telegram-identity-bound `cv1` MAC domain and clock validation.
+  [`client-view-callback-token.ts:126`](../../../packages/integrations/src/telegram/client-view-callback-token.ts#L126)
+
+- Check explicit applied, before-write, ambiguous, and fresh-token recovery outcomes.
+  [`expert-command-processor.ts:96`](../../../packages/integrations/src/telegram/expert-command-processor.ts#L96)
+
+- Confirm timezone rendering, booked-only URLs, safe whitespace, and Telegram size bounds.
+  [`telegram-adapter.ts:345`](../../../packages/integrations/src/telegram/telegram-adapter.ts#L345)
+
+**Verification and release boundary**
+
+- Read the real-PostgreSQL concurrency proof for exactly one view and audit.
+  [`expert-telegram-queries.test.ts:292`](../../../tests/integration/expert-telegram-queries.test.ts#L292)
+
+- Finish with requirement-to-test, telemetry, recovery, and approval traceability.
+  [`expert-telegram-queries-traceability.md:11`](../../spec/expert-telegram-queries-traceability.md#L11)
