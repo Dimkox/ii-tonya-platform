@@ -5,6 +5,7 @@ import {
   type SandboxTransitionWorkflowCommand,
 } from "@ii-tonya/sandbox-payments";
 import { hashAdminSessionToken } from "@ii-tonya/api";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { SandboxRuntimeDependencies } from "./server.js";
 
@@ -117,6 +118,7 @@ export async function buildSandboxRoutes(
     bodyLimit: 8 * 1024,
     ajv: { customOptions: { removeAdditional: false } },
   });
+  await app.register(rateLimit, { global: false });
   app.setErrorHandler((error, _request, reply) => {
     const safe = error as {
       readonly code?: string;
@@ -127,6 +129,8 @@ export async function buildSandboxRoutes(
       return reply.code(400).send({ error: "invalid_request" });
     if (safe.statusCode === 413 || safe.code === "FST_ERR_CTP_BODY_TOO_LARGE")
       return reply.code(413).send({ error: "payload_too_large" });
+    if (safe.statusCode === 429)
+      return reply.code(429).send({ error: "rate_limited" });
     if (
       error instanceof SandboxPaymentConflictError ||
       safe.code === "SANDBOX_PAYMENT_CONFLICT"
@@ -136,6 +140,7 @@ export async function buildSandboxRoutes(
       return reply.code(503).send({ error: "unavailable" });
     return reply.code(500).send({ error: "internal_error" });
   });
+  const adminRateLimit = { max: 30, timeWindow: "1 minute" } as const;
 
   app.get<{ Params: { paymentId: string } }>(
     "/sandbox/v1/payments/:paymentId",
@@ -154,6 +159,7 @@ export async function buildSandboxRoutes(
     "/sandbox/v1/admin/approvals/:action/:paymentId/request",
     {
       bodyLimit: 8 * 1024,
+      config: { rateLimit: adminRateLimit },
       schema: { params: requestParamsSchema, body: requestBodySchema },
     },
     async (request, reply) => {
@@ -186,6 +192,7 @@ export async function buildSandboxRoutes(
     "/sandbox/v1/admin/approvals/:approvalId/approve",
     {
       bodyLimit: 8 * 1024,
+      config: { rateLimit: adminRateLimit },
       schema: { params: approvalParamsSchema, body: approvalBodySchema },
     },
     async (request, reply) => {
@@ -218,6 +225,7 @@ export async function buildSandboxRoutes(
     "/sandbox/v1/admin/payments/:paymentId/transitions/:transition",
     {
       bodyLimit: 8 * 1024,
+      config: { rateLimit: adminRateLimit },
       schema: { params: transitionParamsSchema, body: transitionBodySchema },
     },
     async (request, reply) => {

@@ -9,6 +9,7 @@ call, credential use, or production smoke occurred.
 
 - `69998e2` — causal RED server, route, and production-isolation tests.
 - `0d8a6e8` — isolated sandbox API runtime and remediated architecture guards.
+- `98ceae4` — causal remediation RED for executable lifecycle and runtime hardening.
 
 Base: `7f9ec000f6d8cd9737779e2e11e1f5ed4661c227`.
 
@@ -93,3 +94,33 @@ The guard now uses narrow path-specific exceptions and exact hashes. The rerun p
 Task 6 still owns the built production-image inventory proof that
 `@ii-tonya/sandbox-payments` and `@ii-tonya/sandbox-api` are absent. Task 4 proves source,
 manifest, route, composition, and recursive static isolation only.
+
+## Final-review remediation (2026-08-13)
+
+- Added a real `node dist/server.js` entrypoint. It constructs and migrates the core and
+  sandbox databases, composes the repository, canonical-to-sandbox verifier, adapter,
+  admin approval repository and transition workflow, listens on a validated address,
+  and closes Fastify plus PostgreSQL exactly once on failure or termination.
+- Environment handling is now default-deny for every unsupported `*_ENABLED` key and
+  explicitly rejects all known live flags when true. Recognized payment placeholders
+  are allowed only as the exact empty string; whitespace/non-empty values and unknown
+  payment credential names are rejected.
+- Reused `@fastify/rate-limit` with the existing admin policy of 30 requests/minute and
+  a sanitized `{ "error": "rate_limited" }` 429 response.
+
+### Remediation TDD and verification on Claw
+
+- Causal RED: the isolation suite rejected the missing `scripts.start`; lifecycle,
+  environment and limiter assertions were introduced in commit `98ceae4` before code.
+- Focused GREEN: 3 files / 32 tests passed.
+- Recursive/static GREEN: 2 files / 118 tests passed (113 scope-boundary plus 5
+  sandbox-production-isolation).
+- Exact direct builds (no package wrapper, install, or loop): integrations, DB,
+  sandbox-payments and sandbox-api ESM+DTS builds all exited 0. The final sandbox API
+  artifact was 5.56 MB ESM with a 1.62 KB declaration file.
+- Executable entrypoint smoke: starting the built artifact in sandbox mode without its
+  required database configuration exited 1 and emitted only
+  `sandbox_startup_failed`, proving direct execution and fail-closed startup without
+  leaking the underlying fault.
+- Commands ran in `ii-tonya-test:7d71646347d560ff2b5d8ebc4c0aad5b48230254`
+  with `--cpus=1 --memory=1g`; no production smoke or external provider call occurred.

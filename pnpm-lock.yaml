@@ -82,12 +82,18 @@ importers:
 
   apps/sandbox-api:
     dependencies:
+      '@fastify/rate-limit':
+        specifier: ^10.3.0
+        version: 10.3.0
       '@ii-tonya/api':
         specifier: workspace:*
         version: link:../api
       '@ii-tonya/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ii-tonya/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@ii-tonya/sandbox-payments':
         specifier: workspace:*
         version: link:../../packages/sandbox-payments

@@ -143,7 +143,7 @@ const approvedPaymentBoundaryHashes = new Map([
 const approvedPackageManifestHashes = new Map([
   [
     "apps/sandbox-api/package.json",
-    "dab481426753d0bb23956cdf1c6d872ade00f33711fee22847ede04135720e13",
+    "14c2fbe61e3c6588e23d61b3837dc0d74fa800591990716902be881282781126",
   ],
   [
     "apps/api/package.json",
@@ -252,8 +252,10 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   [
     "apps/sandbox-api/package.json",
     new Set([
+      "@fastify/rate-limit",
       "@ii-tonya/api",
       "@ii-tonya/db",
+      "@ii-tonya/integrations",
       "@ii-tonya/sandbox-payments",
       "fastify",
     ]),
