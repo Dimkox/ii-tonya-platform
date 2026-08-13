@@ -101,8 +101,9 @@ The repository contains BMad Method 6.11.0 Core + BMM in `_bmad/` and its Codex 
 in `.agents/skills/`. Resolve BMad configuration through
 `uv run _bmad/scripts/resolve_config.py --project-root .`; on Windows set
 `PYTHONUTF8=1` so Unicode agent metadata is emitted reliably. Use BMad for the durable
-story/sprint contract and Superpowers for the implementation plan, TDD execution, and
-independent review. Useful companion skills include `writing-plans`,
+story/sprint contract in `docs/superpowers/implementation-artifacts` and Superpowers
+for the implementation plan, TDD execution, and independent review. Useful companion
+skills include `writing-plans`,
 `test-driven-development`, `systematic-debugging`, `verification-before-completion`,
 `requesting-code-review`, and relevant GitHub Actions/Docker validators. The project
 remains operable through this file and `docs/agents` if an IDE does not load skills.

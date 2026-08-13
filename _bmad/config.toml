@@ -17,7 +17,7 @@ output_folder = "_bmad-output"
 
 [modules.bmm]
 planning_artifacts = "docs/superpowers"
-implementation_artifacts = ".superpowers/sdd"
+implementation_artifacts = "docs/superpowers/implementation-artifacts"
 project_knowledge = "docs"
 
 [agents.bmad-agent-analyst]

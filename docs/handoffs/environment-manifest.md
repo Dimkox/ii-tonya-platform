@@ -120,7 +120,8 @@ machine does not depend on an unrecorded global prompt installation:
 - `_bmad/` — BMad 6.11.0 runtime, configuration, manifests, agents, and shared scripts;
 - `.agents/skills/` — the Codex projection of 49 installed BMad skills;
 - `docs/superpowers/` — durable specifications and implementation plans;
-- `.superpowers/sdd/` — story, progress, and task handoff artifacts.
+- `docs/superpowers/implementation-artifacts/` — versioned story, sprint, and task
+  handoff artifacts.
 
 The installed configuration is:
 
@@ -129,7 +130,7 @@ The installed configuration is:
 - document language `English`;
 - developer level `expert`;
 - planning artifacts `docs/superpowers`;
-- implementation artifacts `.superpowers/sdd`;
+- implementation artifacts `docs/superpowers/implementation-artifacts`;
 - project knowledge `docs`.
 
 Prerequisites are Node 24 (which also satisfies BMad's Node 20.12+ floor), Python 3.10+
@@ -173,7 +174,7 @@ npx --yes bmad-method@latest install `
   --set core.output_folder=_bmad-output `
   --set bmm.user_skill_level=expert `
   --set bmm.planning_artifacts=docs/superpowers `
-  --set bmm.implementation_artifacts=.superpowers/sdd `
+  --set bmm.implementation_artifacts=docs/superpowers/implementation-artifacts `
   --set bmm.project_knowledge=docs
 ```
 
