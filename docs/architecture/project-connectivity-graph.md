@@ -10,8 +10,9 @@ existing authoritative expert-residency provider inbox. They have no edge into t
 native production API/worker bundle. Their required built-image evidence is incomplete:
 no sandbox image was produced, so packaged sandbox isolation and `SBX-TST-009` are
 pending. Native production bundle, systemd, SBOM, checksums, and provenance assembly are
-proven on Claw at `887c462`; signing, native staging service rehearsal, and production
-deployment evidence remain pending. Provider staging remains
+proven on Claw at `887c462`; packaged API/worker service rehearsal also passes in the
+server-imitation image. Signing and production host deployment evidence remain pending.
+Provider staging remains
 `BLOCKED`; production remains `NO-GO`.
 
 Legend:

@@ -23,7 +23,10 @@ if ! verify_binary; then
     exit 1
   }
   temp_dir="$(mktemp -d)"
-  cleanup() { rm -rf "$temp_dir"; }
+  cleanup() {
+    find "$temp_dir" -mindepth 1 -delete
+    rmdir "$temp_dir"
+  }
   trap cleanup EXIT
   gh release download "v$syft_version" \
     --repo anchore/syft \

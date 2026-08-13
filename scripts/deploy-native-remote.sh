@@ -76,7 +76,10 @@ grep -Eq '^[0-9a-f]{64}  native-release\.tar\.gz$' "$checksum"
 cosign verify-blob --key "$signing_public_key" --signature "$signature" "$checksum" >/dev/null
 
 incoming="ii-tonya-$release_sha"
-ssh "${ssh_options[@]}" "$remote" "install -d -m 0700 '$deploy_root/incoming/$incoming'"
+ssh "${ssh_options[@]}" "$remote" bash -s -- "$deploy_root/incoming/$incoming" <<'REMOTE'
+set -Eeuo pipefail
+install -d -m 0700 -- "$1"
+REMOTE
 scp -q -P "$deploy_port" -i "$ssh_key" \
   -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
   -o "UserKnownHostsFile=$known_hosts" \
@@ -130,6 +133,7 @@ curl --retry 20 --retry-delay 2 --fail --silent --show-error \
   http://127.0.0.1:3000/health/ready >/dev/null
 sudo systemctl is-active --quiet ii-tonya-api.service
 sudo systemctl is-active --quiet ii-tonya-worker.service
-rm -rf "$incoming"
+find "$incoming" -mindepth 1 -delete
+rmdir "$incoming"
 trap - ERR
 REMOTE

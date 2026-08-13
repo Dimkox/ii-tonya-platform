@@ -30,6 +30,23 @@ Markdown write did not execute. The facts above were reconstructed only from the
 completed immutable artifacts, their mtimes, checksum manifest, parsed SBOM, provenance,
 entrypoint smokes, and post-run Docker state; no raw secret-bearing logs are committed.
 
-This is native release assembly evidence, not production deployment evidence. Signature,
-confirmed production host, native staging service rehearsal, and renewed exact-SHA
-migration approval remain required before production activation.
+## Native server rehearsal
+
+The packaged release was then mounted read-only into the rebuilt Claw server-imitation
+image `ii-tonya-test:45750b4d1a8748aedae5e765f11300bc3a63d6cd` at immutable image ID
+`sha256:587eec47e1e3a9c79a4cbce2981342bded8455e198b5b1aa29316579eb6dab60`.
+The rehearsal used the single persistent `ii_tonya_native_smoke` database on the
+PostgreSQL service already defined by `/home/pall/app-stack/docker-compose.yml`; its
+credentials came from the existing Compose environment and were neither read into the
+repository nor printed. Only that database's `public` schema was reset.
+
+- native migration: `PASS`
+- packaged API `/health/ready`: `PASS`
+- packaged worker heartbeat and graceful shutdown: `PASS`
+- isolated schema cleanup: `PASS`
+- remaining test containers: `0`
+
+This is native release assembly and Claw server-rehearsal evidence, not production
+deployment evidence. A production signature, confirmed production host, systemd/nginx
+host provisioning, and renewed exact-SHA migration approval remain required before
+production activation.

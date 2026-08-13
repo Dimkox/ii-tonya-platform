@@ -1,8 +1,8 @@
 # Native dedicated-server deployment
 
-Status: native bundle assembly is verified; production remains `BLOCKED` until signing,
-an isolated native staging rehearsal, a confirmed production host, and renewed exact-SHA
-migration approval are available.
+Status: native bundle assembly and the Claw server-imitation rehearsal are verified;
+production remains `BLOCKED` until signing, a confirmed production host with
+systemd/nginx provisioning, and renewed exact-SHA migration approval are available.
 
 ## Target topology
 
@@ -39,9 +39,10 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
 
 The old production image/Compose and GitHub Actions entrypoints are removed. Exact-SHA
 Claw CI, Database Gate, and native bundle assembly now have committed evidence. This
-runbook may move from `BLOCKED` to `READY` only after a native staging rehearsal, signed
-evidence, renewed migration approval, and a confirmed production host. No container
-release path is authorized for production.
+runbook may move from `BLOCKED` to `READY` only after signed evidence, renewed migration
+approval, and a confirmed production host. The Claw rehearsal uses one persistent
+`ii_tonya_native_smoke` database and resets only its `public` schema. No container release
+path is authorized for production.
 
 Migration marker `MIGRATION-COMPATIBILITY: 7428a8d387256df4fe24ba13ae0ab9c02fc76a54`
 was received and the object was verified, but it is a sibling merge rather than an

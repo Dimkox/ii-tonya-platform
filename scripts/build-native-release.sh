@@ -11,7 +11,11 @@ test -z "$(git status --porcelain --untracked-files=no)"
 
 output_dir="$(realpath -m "${OUTPUT_DIR:-.native-release}")"
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
+cleanup() {
+  find "$work_dir" -mindepth 1 -delete
+  rmdir "$work_dir"
+}
+trap cleanup EXIT
 mkdir -p "$output_dir" "$work_dir/release"
 
 git archive --format=tar "$source_sha" > "$work_dir/source.tar"
