@@ -45,7 +45,10 @@ describe("release assets", () => {
     };
     const sandboxCompose = parse(
       readFileSync("compose.sandbox.yaml", "utf8"),
-    ) as { services: Record<string, Record<string, unknown>> };
+    ) as {
+      services: Record<string, Record<string, unknown>>;
+      networks: Record<string, { internal?: boolean }>;
+    };
     expect(Object.keys(productionCompose.services)).not.toContain(
       "sandbox-api",
     );
@@ -110,7 +113,7 @@ describe("release assets", () => {
       PAYMENT_WEBHOOK_SECRET: "",
     });
     expect(sandboxCompose.services["sandbox-postgres"]?.ports).toBeUndefined();
-    expect((sandboxCompose as any).networks["sandbox-db"].internal).toBe(true);
+    expect(sandboxCompose.networks["sandbox-db"]?.internal).toBe(true);
     expect(service.networks).toEqual(["sandbox-db"]);
   });
 
