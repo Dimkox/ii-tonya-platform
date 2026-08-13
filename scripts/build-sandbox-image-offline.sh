@@ -76,13 +76,23 @@ timeout --signal=TERM 420 docker run --rm --network none --read-only --tmpfs /tm
     test -f apps/sandbox-api/dist/server.js
     printf "sandbox_phase=deploy_closure\n"
     pnpm --offline --trust-lockfile --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
+    mkdir /work/.sandbox-artifact.materialized
+    cp -aL /work/.sandbox-artifact/. /work/.sandbox-artifact.materialized/
+    cp -aL /work/.sandbox-artifact/node_modules/.pnpm/node_modules/. /work/.sandbox-artifact.materialized/node_modules/
+    rm -rf /work/.sandbox-artifact
+    mv /work/.sandbox-artifact.materialized /work/.sandbox-artifact
     printf "sandbox_phase=sanitize_closure\n"
-    find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
-      const fs=require("node:fs");
-      for(const path of process.argv.slice(1)) {
-        const manifest=JSON.parse(fs.readFileSync(path,"utf8"));
-        delete manifest.devDependencies;
-        fs.writeFileSync(path, `${JSON.stringify(manifest,null,2)}\n`);
+    find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 -r -n 50 node --max-old-space-size=64 -e '"'"'
+        const fs=require("node:fs");
+        for(const path of process.argv.slice(1)) {
+          const manifest=JSON.parse(fs.readFileSync(path,"utf8"));
+          delete manifest.devDependencies;
+          for(const key of ["dependencies","optionalDependencies","peerDependencies"]) {
+            for(const [name,version] of Object.entries(manifest[key] ?? {})) {
+              if(/^(?:workspace:|file:|link:)/u.test(version)) manifest[key][name]="0.0.0";
+            }
+          }
+          fs.writeFileSync(path, `${JSON.stringify(manifest,null,2)}\n`);
       }
     '"'"'
   '
@@ -98,7 +108,7 @@ if find "$artifact" -type f -name package.json -print0 | xargs -0 node -e '
     if(manifest.devDependencies) process.exit(1);
   }
 '; then :; else echo "sandbox artifact contains devDependencies" >&2; exit 1; fi
-if grep -R -l -E '/workspace/|workspace:' "$artifact" >/dev/null; then
+if find "$artifact" -type f -name package.json -print0 | xargs -0 -r grep -l -E '/workspace/|workspace:' >/dev/null; then
   echo "sandbox artifact contains workspace paths" >&2
   exit 1
 fi

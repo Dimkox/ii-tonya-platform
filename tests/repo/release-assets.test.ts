@@ -99,6 +99,18 @@ describe("release assets", () => {
     expect(builder).toContain(
       "pnpm --offline --trust-lockfile --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
     );
+    expect(builder).toContain(
+      "xargs -0 -r -n 50 node --max-old-space-size=64 -e",
+    );
+    expect(builder).toContain(
+      "cp -aL /work/.sandbox-artifact/. /work/.sandbox-artifact.materialized/",
+    );
+    expect(builder).toContain(
+      "cp -aL /work/.sandbox-artifact/node_modules/.pnpm/node_modules/. /work/.sandbox-artifact.materialized/node_modules/",
+    );
+    expect(builder).toContain(
+      'if(/^(?:workspace:|file:|link:)/u.test(version)) manifest[key][name]="0.0.0"',
+    );
     expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
     expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
     expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
