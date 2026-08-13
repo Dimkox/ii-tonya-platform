@@ -13,14 +13,17 @@ describe("expert residency referral release readiness", () => {
       (_, index) => `ERR-FR-${String(index + 1).padStart(3, "0")}`,
     );
     for (const id of ids) {
-      expect(traceability).toContain(`| ${id} |`);
+      expect(traceability).toMatch(new RegExp(`^\\|\\s*${id}\\s*\\|`, "mu"));
     }
     const requirementRows = traceability
       .split("\n")
-      .filter((line) => /^\| ERR-FR-\d{3} \|/u.test(line));
+      .filter((line) => /^\|\s*ERR-FR-\d{3}\s*\|/u.test(line));
     expect(requirementRows).toHaveLength(42);
     for (const row of requirementRows) {
-      const cells = row.split("|").slice(1, -1).map((cell) => cell.trim());
+      const cells = row
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim());
       expect(cells).toHaveLength(7);
       expect(cells.every((cell) => cell.length > 0)).toBe(true);
     }
@@ -89,7 +92,7 @@ describe("expert residency referral release readiness", () => {
   it("composes the expert residency worker with a disabled provider reader", () => {
     const main = read("apps/worker/src/main.ts");
     expect(main).toContain("disabledExpertResidencyProviderReader");
-    expect(main).toContain("kind: \"disabled\"");
+    expect(main).toContain('kind: "disabled"');
     expect(main).not.toMatch(/\b(?:fetch|axios|stripe|yookassa)\b/u);
   });
 });

@@ -199,15 +199,23 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "569ce40a454f44861e7ca50474406b40bab17ea622eb51c06e3d742d53e11001",
+    "d6158729e90fb73887b0d10a1e477d197cbd6ad53f66b82cd9e7d196ff3faadc",
   ],
   [
     "scripts/build-native-release.sh",
-    "01663eea804e59f5803e6a65d567b472fac8f413562c07af1cc3b4d74408143b",
+    "f76650020a7d6edb4e8507f33be916d7c0bf898ae08bb996b599ec39a3abade0",
   ],
   [
     "scripts/deploy-native-remote.sh",
-    "cf2ea374851a632c120856ec263f16cf2124aa1f5cad4a6bde648ad5f37290c1",
+    "88f410b3116016579204dab95312aa7fe752f9e4671620140183da67f73972d3",
+  ],
+  [
+    "scripts/provision-claw-syft.sh",
+    "39f638068394485aa621da9f7ed609d1c15ee9bd7574b27d8c29b494481b1470",
+  ],
+  [
+    "scripts/smoke-native-release.sh",
+    "9fd54833375be65f13fadc9203d1bf2d0eccb60439862f3c296e289abb9a9553",
   ],
   [
     "scripts/migrate-native.mjs",
@@ -227,7 +235,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/claw/dockerfile.test",
-    "0888f25b6407a7dab485f824dbab58753dc2f6e5264838f925f80541f5159913",
+    "d69356b4769493c64c69d8f2e7d5dd178d7a408b0fa6b15cdeb856925b874ebe",
   ],
   [
     "deploy/claw/dockerfile.test.dockerignore",
@@ -263,7 +271,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "6ffcd1ccea3cb3d9670517b7cfda93e1f2f41f357fdaa02b9c6bb9b69a2f6f61",
+    "4ed71fc1c5ad50617e8fb448eb504780812f3eb9145d1d893b3149a24089142e",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",
