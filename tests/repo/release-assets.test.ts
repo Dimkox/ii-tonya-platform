@@ -69,6 +69,10 @@ describe("release assets", () => {
     expect(builder).toContain('find "$artifact" -type l');
     expect(builder).toContain("devDependencies");
     expect(builder).toContain("--network none");
+    expect(builder).toContain("--cpus 1");
+    expect(builder).toContain("--memory 1g");
+    expect(builder).toContain("DOCKER_HOST_SOURCE_ROOT");
+    expect(builder).toContain("LOCAL_SOURCE_ROOT");
     expect(builder).toContain("build:bounded");
     expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
@@ -185,6 +189,12 @@ describe("release assets", () => {
     expect(dockerfile).toContain(
       "RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker",
     );
+    expect(dockerfile).toContain(
+      "RUN rm -f /out/api/pnpm-lock.yaml /out/api/pnpm-workspace.yaml",
+    );
+    expect(dockerfile).toContain(
+      "/out/worker/pnpm-lock.yaml /out/worker/pnpm-workspace.yaml",
+    );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
     expect(dockerfile).toContain(
@@ -200,6 +210,16 @@ describe("release assets", () => {
     expect(dockerfile).toContain(
       "LABEL org.opencontainers.image.revision=$VCS_REF",
     );
+  });
+
+  it("prepares an exact Git archive and bundle for the sandbox image smoke", () => {
+    const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
+    expect(runner).toContain("git archive --format=tar");
+    expect(runner).toContain("git bundle create");
+    expect(runner).toContain("SANDBOX_SOURCE_ARCHIVE");
+    expect(runner).toContain("SOURCE_BUNDLE");
+    expect(runner).toContain("DOCKER_HOST_SOURCE_ROOT");
+    expect(runner).toContain("LOCAL_SOURCE_ROOT");
   });
 
   it("keeps every live capability disabled in local containers", () => {

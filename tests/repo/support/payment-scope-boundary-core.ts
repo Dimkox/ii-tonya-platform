@@ -223,7 +223,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-actions-job.sh",
-    "47478ba2c28d10ecd4c45ce37e6e8691b61c23c80e5989a029940f87d25b8066",
+    "a57fe69807809d26b6f1899c5ec809cd3ffbbc4cf5edc45fc41848e6110b48ae",
   ],
   [
     "scripts/deploy-compose-remote.sh",
@@ -243,7 +243,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "dockerfile",
-    "8fff63e319dfbdde6b7f2ac4710193366f547e51988de345099be04cd0a3830f",
+    "1d613180e752d3f62fb299e91bdf8683858062858803258685b273341fa65ee9",
   ],
   [
     "compose.yaml",
@@ -259,7 +259,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "607601b125c02778473312f6ac8c8e548db753885a961b99a7a0584105e3026d",
+    "2f10011ad2067271e4c0a216e806f755f2efb89613137713b70179d42f091014",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",

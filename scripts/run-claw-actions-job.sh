@@ -43,7 +43,19 @@ pnpm exec vitest run --coverage --reporter=default --reporter=junit --outputFile
 docker run --rm -v "$CLAW_HOST_WORKSPACE:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 \
   detect --source=/repo --config=/repo/.gitleaks.toml \
   --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
-VCS_REF="$GITHUB_SHA" pnpm test:container
+sandbox_ci_root="$(mktemp -d /workspace/source/.ii-tonya-sandbox-ci.XXXXXX)"
+trap 'rm -rf "$sandbox_ci_root"' EXIT
+source_sha="$(git rev-parse HEAD)"
+test "$source_sha" = "$GITHUB_SHA"
+export SANDBOX_SOURCE_ARCHIVE="$sandbox_ci_root/source.tar"
+export SOURCE_BUNDLE="$sandbox_ci_root/source.bundle"
+export SANDBOX_BUILD_ROOT="$sandbox_ci_root/build"
+export LOCAL_SOURCE_ROOT=/workspace/source
+export DOCKER_HOST_SOURCE_ROOT="$CLAW_HOST_WORKSPACE"
+mkdir -p "$SANDBOX_BUILD_ROOT"
+git archive --format=tar --output="$SANDBOX_SOURCE_ARCHIVE" "$source_sha"
+git bundle create "$SOURCE_BUNDLE" HEAD
+VCS_REF="$source_sha" pnpm test:container
 SCRIPT
 else
   cat > "$container_script" <<'SCRIPT'
