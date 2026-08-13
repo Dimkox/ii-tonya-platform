@@ -105,7 +105,7 @@ describe("API boundary", () => {
     );
     expect(app.services.telegram.processedUpdateCount("1")).toBe(1);
     const responses = await Promise.all(
-      Array.from({ length: 11 }, (_, index) =>
+      Array.from({ length: 101 }, (_, index) =>
         app.inject({
           method: "POST",
           url: "/v1/webhooks/telegram",

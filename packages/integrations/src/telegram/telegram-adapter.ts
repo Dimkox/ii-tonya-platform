@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TransportFailure } from "../http/transport-failure.js";
 
 const MAX_RETRY_AFTER_SECONDS = 60;
+const TELEGRAM_TEXT_LIMIT = 4_096;
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 const money = /^(?:0|[1-9]\d*)$/u;
 const safeText = /^[^\u0000-\u001F\u007F-\u009F]{1,256}$/u;
@@ -81,6 +82,7 @@ export interface TelegramExpertScheduleView {
 export interface TelegramExpertClientChoicesView {
   idempotencyKey: string;
   telegramUserId: string;
+  timezone: string;
   choices: readonly {
     startsAt: string;
     serviceName: string;
@@ -91,6 +93,7 @@ export interface TelegramExpertClientChoicesView {
 export interface TelegramExpertClientView {
   idempotencyKey: string;
   telegramUserId: string;
+  timezone: string;
   clientDisplayName: string;
   startsAt: string;
   serviceName: string;
@@ -168,22 +171,29 @@ export interface ExpertTelegramQueryViewPort {
     idempotencyKey: string;
     telegramUserId: string;
   }): Promise<TelegramSendOutcome>;
+  answerCallbackQuery(view: {
+    idempotencyKey: string;
+    callbackQueryId: string;
+    status: "processed" | "unavailable";
+  }): Promise<TelegramSendOutcome>;
 }
 
 export interface TelegramTransportRequest {
   method: "POST";
   url: URL;
   headers: Readonly<Record<string, string>>;
-  body: {
-    chat_id: string;
-    text: string;
-    reply_markup?: {
-      inline_keyboard: readonly (readonly {
+  body:
+    | {
+        chat_id: string;
         text: string;
-        callback_data: string;
-      }[])[];
-    };
-  };
+        reply_markup?: {
+          inline_keyboard: readonly (readonly {
+            text: string;
+            callback_data: string;
+          }[])[];
+        };
+      }
+    | { callback_query_id: string; text: string; show_alert: false };
   context: {
     idempotencyKey: string;
     disableRequestLogging: true;
@@ -276,6 +286,56 @@ const assertPlainText = (value: string, maximum: number): void => {
   }
 };
 
+const normalizeNote = (value: string): string => {
+  if (value.length > 64 * 1024 || /[\u0000\u007F-\u009F]/u.test(value)) {
+    throw new Error("invalid_expert_view");
+  }
+  const normalized = value.normalize("NFC").replace(/\s+/gu, " ").trim();
+  if (normalized.length === 0) throw new Error("invalid_expert_view");
+  return normalized;
+};
+
+const truncate = (value: string, maximum: number, marker: string): string =>
+  value.length <= maximum
+    ? value
+    : `${value.slice(0, Math.max(0, maximum - marker.length - 1)).trimEnd()} ${marker}`;
+
+const assertTelegramText = (value: string): void => {
+  if (
+    value.length < 1 ||
+    value.length > TELEGRAM_TEXT_LIMIT ||
+    Buffer.from(value, "utf8").toString("utf8") !== value
+  ) {
+    throw new Error("invalid_expert_view");
+  }
+};
+
+const formatInstant = (
+  value: string,
+  timezone: string,
+  includeTimezone: boolean,
+): string => {
+  if (!validInstantOrNull(value)) throw new Error("invalid_expert_view");
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(value));
+  } catch {
+    throw new Error("invalid_expert_view");
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((candidate) => candidate.type === type)?.value ?? "";
+  const formatted = `${part("day")}.${part("month")}.${part("year")} ${part("hour")}:${part("minute")}`;
+  return includeTimezone ? `${formatted} (${timezone})` : formatted;
+};
+
 const assertCount = (value: number): void => {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error("invalid_expert_view");
@@ -285,38 +345,55 @@ const assertCount = (value: number): void => {
 export function renderTelegramExpertSchedule(
   view: TelegramExpertScheduleView,
 ): string {
-  if (!validInstantOrNull(null)) throw new Error("invalid_expert_view");
   if (view.appointments.length === 0) return "Записей на ближайшие 7 дней нет.";
-  return view.appointments
-    .slice(0, 20)
-    .map((appointment) => {
-      if (!validInstantOrNull(appointment.startsAt)) {
-        throw new Error("invalid_expert_view");
-      }
-      assertPlainText(appointment.clientDisplayName, 256);
-      if (appointment.expertNote !== undefined) {
-        assertPlainText(appointment.expertNote, 2_000);
-      }
-      if (
-        appointment.meetingUrl !== undefined &&
-        (!/^https:\/\/[^\s]+$/u.test(appointment.meetingUrl) ||
-          appointment.meetingUrl.length > 2_048)
-      ) {
-        throw new Error("invalid_expert_view");
-      }
-      return [
-        `${appointment.startsAt} — ${appointment.clientDisplayName}`,
-        `Статус: ${appointment.status}`,
-        ...(appointment.expertNote === undefined
-          ? []
-          : [`Заметка: ${appointment.expertNote}`]),
-        ...(appointment.status === "booked" &&
-        appointment.meetingUrl !== undefined
-          ? [`Встреча: ${appointment.meetingUrl}`]
-          : []),
-      ].join("\n");
-    })
-    .join("\n\n");
+  const blocks = view.appointments.map((appointment) => {
+    assertPlainText(appointment.clientDisplayName, 256);
+    const note =
+      appointment.expertNote === undefined
+        ? undefined
+        : truncate(
+            normalizeNote(appointment.expertNote),
+            1_000,
+            "[заметка сокращена]",
+          );
+    if (
+      appointment.meetingUrl !== undefined &&
+      (!/^https:\/\/[^\s]+$/u.test(appointment.meetingUrl) ||
+        appointment.meetingUrl.length > 2_048)
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    return [
+      `${formatInstant(appointment.startsAt, view.timezone, true)} — ${appointment.clientDisplayName}`,
+      `Статус: ${appointment.status}`,
+      ...(note === undefined ? [] : [`Заметка: ${note}`]),
+      ...(appointment.status === "booked" &&
+      appointment.meetingUrl !== undefined
+        ? [`Встреча: ${appointment.meetingUrl}`]
+        : []),
+    ].join("\n");
+  });
+  const selected: string[] = [];
+  for (const block of blocks) {
+    const nextCount = selected.length + 1;
+    const marker = `Показано ${nextCount} из ${blocks.length}.`;
+    const candidate = [
+      ...selected,
+      block,
+      ...(nextCount < blocks.length ? [marker] : []),
+    ].join("\n\n");
+    if (candidate.length > TELEGRAM_TEXT_LIMIT) break;
+    selected.push(block);
+  }
+  if (selected.length === 0) throw new Error("invalid_expert_view");
+  const rendered = [
+    ...selected,
+    ...(selected.length < blocks.length
+      ? [`Показано ${selected.length} из ${blocks.length}.`]
+      : []),
+  ].join("\n\n");
+  assertTelegramText(rendered);
+  return rendered;
 }
 
 export function renderTelegramExpertClient(
@@ -324,19 +401,28 @@ export function renderTelegramExpertClient(
 ): string {
   assertPlainText(view.clientDisplayName, 256);
   assertPlainText(view.serviceName, 256);
-  if (!validInstantOrNull(view.startsAt))
-    throw new Error("invalid_expert_view");
-  if (view.preparationNote !== undefined) {
-    assertPlainText(view.preparationNote, 2_000);
-  }
-  return [
+  const prefix = [
     `Клиент: ${view.clientDisplayName}`,
-    `Время: ${view.startsAt}`,
+    `Время: ${formatInstant(view.startsAt, view.timezone, true)}`,
     `Услуга: ${view.serviceName}`,
-    ...(view.preparationNote === undefined
-      ? []
-      : [`Заметка для подготовки: ${view.preparationNote}`]),
+  ];
+  const notePrefix = "Заметка для подготовки: ";
+  const available =
+    TELEGRAM_TEXT_LIMIT - prefix.join("\n").length - notePrefix.length - 1;
+  const note =
+    view.preparationNote === undefined
+      ? undefined
+      : truncate(
+          normalizeNote(view.preparationNote),
+          available,
+          "[заметка сокращена]",
+        );
+  const rendered = [
+    ...prefix,
+    ...(note === undefined ? [] : [`${notePrefix}${note}`]),
   ].join("\n");
+  assertTelegramText(rendered);
+  return rendered;
 }
 
 export function renderTelegramExpertStats(
@@ -356,7 +442,7 @@ export function renderTelegramExpertStats(
 export function buildTelegramMethodUrl(
   baseUrl: URL,
   botToken: string,
-  method: "sendMessage",
+  method: "sendMessage" | "answerCallbackQuery",
 ): URL {
   if (baseUrl.protocol !== "https:") {
     throw new Error("Telegram base URL must use HTTPS");
@@ -382,9 +468,11 @@ export function redactTelegramUrl(url: URL): string {
   redacted.password = "";
   redacted.search = "";
   redacted.hash = "";
-  redacted.pathname = /^\/bot[^/]+\/sendMessage$/u.test(redacted.pathname)
-    ? "/bot[REDACTED]/sendMessage"
-    : "/[REDACTED]";
+  const method = /^\/bot[^/]+\/(sendMessage|answerCallbackQuery)$/u.exec(
+    redacted.pathname,
+  )?.[1];
+  redacted.pathname =
+    method === undefined ? "/[REDACTED]" : `/bot[REDACTED]/${method}`;
   return redacted.toString();
 }
 
@@ -500,7 +588,7 @@ export class TelegramAdapter
       assertPlainText(choice.serviceName, 256);
       return [
         {
-          text: `Запись ${index + 1} · ${choice.startsAt}`,
+          text: `Запись ${index + 1} · ${formatInstant(choice.startsAt, view.timezone, false)}`,
           callback_data: choice.callbackData,
         },
       ];
@@ -543,11 +631,78 @@ export class TelegramAdapter
     return this.sendText({ ...view, text: "Команда недоступна." });
   }
 
+  async answerCallbackQuery(view: {
+    idempotencyKey: string;
+    callbackQueryId: string;
+    status: "processed" | "unavailable";
+  }): Promise<TelegramSendOutcome> {
+    assertPlainText(view.callbackQueryId, 256);
+    const url = buildTelegramMethodUrl(
+      this.deps.baseUrl,
+      this.deps.botToken,
+      "answerCallbackQuery",
+    );
+    let response: TelegramTransportResponse;
+    try {
+      response = await this.deps.transport.request({
+        method: "POST",
+        url,
+        headers: { "content-type": "application/json" },
+        body: {
+          callback_query_id: view.callbackQueryId,
+          text:
+            view.status === "processed"
+              ? "Готово."
+              : "Запрос недоступен. Откройте /client ещё раз.",
+          show_alert: false,
+        },
+        context: {
+          idempotencyKey: view.idempotencyKey,
+          disableRequestLogging: true,
+        },
+      });
+    } catch (error) {
+      const beforeWrite =
+        error instanceof TransportFailure && error.phase === "before_write";
+      const reasonCode = beforeWrite
+        ? "timeout_before_write"
+        : "callback_answer_outcome_unknown";
+      logFailure(this.deps, url, reasonCode);
+      return beforeWrite
+        ? { kind: "not_applied", retryable: true, reasonCode }
+        : {
+            kind: "unknown_outcome",
+            reconciliationKey: view.idempotencyKey,
+            reasonCode,
+          };
+    }
+    if (
+      response.status === 200 &&
+      response.body !== null &&
+      typeof response.body === "object" &&
+      (response.body as { ok?: unknown }).ok === true
+    ) {
+      return { kind: "applied", providerOperationId: view.callbackQueryId };
+    }
+    return {
+      kind: "not_applied",
+      retryable: response.status === 429,
+      reasonCode:
+        response.status === 429 ? "rate_limited" : "callback_answer_rejected",
+    };
+  }
+
   private async sendText(
     view: (ExpertReservationView | ExpertScheduleView) & {
-      replyMarkup?: TelegramTransportRequest["body"]["reply_markup"];
+      replyMarkup?: {
+        inline_keyboard: readonly (readonly {
+          text: string;
+          callback_data: string;
+        }[])[];
+      };
     },
   ): Promise<TelegramSendOutcome> {
+    assertTelegramText(view.text);
     const url = buildTelegramMethodUrl(
       this.deps.baseUrl,
       this.deps.botToken,

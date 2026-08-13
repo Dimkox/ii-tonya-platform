@@ -25,6 +25,7 @@ const now = new Date("2026-08-13T09:00:00.000Z");
 const claims: ClientViewCallbackClaims = {
   reservationId: "00000000-0000-4000-8000-000000000201",
   expertId: "00000000-0000-4000-8000-000000000101",
+  telegramUserId: "123456789",
   version: 3,
   expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
 };
@@ -76,6 +77,7 @@ describe("cv1 client-view callback token", () => {
     ],
     ["revoked", { ...binding, active: false }, now],
     ["expired", binding, new Date(claims.expiresAtEpochSeconds * 1_000)],
+    ["invalid clock", binding, new Date("invalid")],
   ] as const)(
     "collapses %s callbacks to one verification error",
     async (_case, candidateBinding, at) => {
@@ -93,4 +95,20 @@ describe("cv1 client-view callback token", () => {
       ).rejects.toBeInstanceOf(ClientViewCallbackVerificationError);
     },
   );
+
+  it("binds the authenticated token and stored claims to the exact Telegram identity", async () => {
+    const store = new MemoryStore();
+    const token = await issueClientViewCallback(claims, secret, store);
+
+    await expect(
+      authenticateClientViewCallback(
+        token,
+        "987654321",
+        { ...binding, telegramUserId: "987654321" },
+        secret,
+        store,
+        now,
+      ),
+    ).rejects.toBeInstanceOf(ClientViewCallbackVerificationError);
+  });
 });

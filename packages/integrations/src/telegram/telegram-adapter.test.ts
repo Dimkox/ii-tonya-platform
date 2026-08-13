@@ -4,6 +4,7 @@ import {
   renderExpertReferralSummary,
   renderExpertResidencyQuote,
   renderTelegramExpertClient,
+  renderTelegramExpertSchedule,
   renderTelegramExpertStats,
   TelegramAdapter,
   type TelegramTransportRequest,
@@ -97,12 +98,14 @@ describe("expert Telegram views", () => {
     const rendered = renderTelegramExpertClient({
       idempotencyKey: "client-view-1",
       telegramUserId: "123456789",
+      timezone: "Europe/Moscow",
       clientDisplayName: "Client",
       startsAt: "2026-08-14T09:00:00.000Z",
       serviceName: "Consultation",
       preparationNote: "Bring notes",
     });
     expect(rendered).toContain("Клиент: Client");
+    expect(rendered).toContain("Время: 14.08.2026 12:00 (Europe/Moscow)");
     expect(rendered).toContain("Заметка для подготовки: Bring notes");
     expect(rendered).not.toMatch(/phone|email|balance|payment/iu);
   });
@@ -127,6 +130,7 @@ describe("expert Telegram views", () => {
     await adapter.sendClientChoices({
       idempotencyKey: "client-list-1",
       telegramUserId: "123456789",
+      timezone: "Europe/Moscow",
       choices: [
         {
           startsAt: "2026-08-14T09:00:00.000Z",
@@ -138,9 +142,72 @@ describe("expert Telegram views", () => {
 
     const button = requests[0]?.body.reply_markup?.inline_keyboard[0]?.[0];
     expect(button).toEqual({
-      text: "Запись 1 · 2026-08-14T09:00:00.000Z",
+      text: "Запись 1 · 14.08.2026 12:00",
       callback_data: "cv1.safe-token",
     });
     expect(button?.text).not.toContain("Client");
+  });
+
+  it("renders booked-only meeting URLs in expert timezone and visibly truncates a long schedule", () => {
+    const appointments = Array.from({ length: 60 }, (_, index) => ({
+      startsAt: `2026-08-${String(14 + (index % 7)).padStart(2, "0")}T09:00:00.000Z`,
+      status: index === 0 ? ("booked" as const) : ("reserved" as const),
+      clientDisplayName: `Client ${index + 1}`,
+      expertNote:
+        index === 0 ? `Line one\n\t${"note ".repeat(900)}` : undefined,
+      meetingUrl: `https://meeting.invalid/${index + 1}`,
+    }));
+
+    const rendered = renderTelegramExpertSchedule({
+      idempotencyKey: "schedule-long",
+      telegramUserId: "123456789",
+      timezone: "Europe/Moscow",
+      appointments,
+    });
+
+    expect(rendered).toContain("14.08.2026 12:00 (Europe/Moscow)");
+    expect(rendered).toContain("Встреча: https://meeting.invalid/1");
+    expect(rendered).not.toContain("https://meeting.invalid/2");
+    expect(rendered).toMatch(/Показано \d+ из 60/u);
+    expect(rendered).not.toMatch(/Line one\s{2,}/u);
+    expect(rendered.length).toBeLessThanOrEqual(4096);
+    expect(Buffer.from(rendered, "utf8").toString("utf8")).toBe(rendered);
+  });
+
+  it("normalizes and visibly truncates an oversized preparation note within Telegram bounds", () => {
+    const rendered = renderTelegramExpertClient({
+      idempotencyKey: "client-long-note",
+      telegramUserId: "123456789",
+      timezone: "Europe/Moscow",
+      clientDisplayName: "Client",
+      startsAt: "2026-08-14T09:00:00.000Z",
+      serviceName: "Consultation",
+      preparationNote: `First\n\t${"detail ".repeat(1_000)}`,
+    });
+
+    expect(rendered).toContain("First detail");
+    expect(rendered).toContain("[заметка сокращена]");
+    expect(rendered.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("answers callback queries through a bounded logging-disabled transport call", async () => {
+    const { adapter, requests } = buildAdapter();
+    await expect(
+      adapter.answerCallbackQuery({
+        idempotencyKey: "answer-1",
+        callbackQueryId: "callback-1",
+        status: "unavailable",
+      }),
+    ).resolves.toEqual({
+      kind: "applied",
+      providerOperationId: "callback-1",
+    });
+    expect(requests[0]).toMatchObject({
+      body: {
+        callback_query_id: "callback-1",
+        text: "Запрос недоступен. Откройте /client ещё раз.",
+      },
+      context: { disableRequestLogging: true },
+    });
   });
 });

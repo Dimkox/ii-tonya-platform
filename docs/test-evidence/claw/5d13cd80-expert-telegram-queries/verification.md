@@ -124,3 +124,46 @@ No repeat loop was run because production concurrency behavior did not change. T
 implementation evidence only. Mandatory CI at the final commit, independent review,
 Draft PR publication, staging, merge, live Telegram activation, and deployment remain
 open human-controlled gates.
+
+## Review remediation cycle
+
+Review iteration 1 ran against local source based on
+`c3864d558dc9b25a8cca6f353feb00ce70447f79`. Focused pre-remediation RED:
+
+```text
+Test Files  6 failed (6)
+Tests       25 failed | 30 passed (55)
+Duration    5.10s
+```
+
+The same focused application/token/processor/adapter/webhook/count group was GREEN:
+
+```text
+Test Files  6 passed (6)
+Tests       56 passed (56)
+Duration    5.32s
+```
+
+Expanded real-PostgreSQL verification was GREEN:
+
+```text
+Test Files  1 passed (1)
+Tests       9 passed (9)
+Duration    5.33s
+```
+
+It covers ordering, expired holds across every query path, exact 30-day boundaries,
+absent/latest-revoked consent, Telegram-bound callbacks, eligibility-before-consume,
+audit rollback, and bounded existing-schema cleanup. Prepared default-off/fail-closed
+app composition remained GREEN: `1 passed`, `22/22 tests`, `6.02s`; all seven disposable
+package builds exited `0`.
+
+Unconfirmed Telegram sends fail the inbox instead of completing it. An already-consumed
+client view is not disclosed automatically again after an uncertain outcome; the safe
+recovery is a fresh `/client`, which reauthorizes and issues another short-lived token.
+No PII outbox, schema migration, dependency, live adapter, or live callback secret was
+added. The default server remains intentionally fail-closed and live composition is a
+deferred activation gate.
+
+Final review-cycle cleanup: `REMOTE_FILES_OUTPUTS_REMOVED` and
+`RUNNING_II_TONYA_TEST=0`.

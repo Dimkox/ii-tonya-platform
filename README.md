@@ -23,6 +23,9 @@ The expert Telegram query increment implements private `/schedule`, `/client`, a
 behind `EXPERT_TELEGRAM_QUERIES_ENABLED=false`; the default server supplies no query
 capability, so changing the flag alone fails startup closed. This is not live Telegram
 activation or provider evidence.
+The default server intentionally constructs neither a live query adapter nor callback
+secret; both remain deferred activation inputs. Enabled composition is proven only with
+an injected test capability while the production lifecycle remains closed.
 CI and Database Gate run on the repository-scoped self-hosted Claw runner and execute
 inside the constrained `ii-tonya-test` Compose profile. They do not consume GitHub-hosted
 Actions minutes. Pull-request execution is restricted to repository-owner branches;

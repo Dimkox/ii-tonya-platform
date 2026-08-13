@@ -2,7 +2,7 @@
 title: 'Expert Telegram Queries'
 type: 'feature'
 created: '2026-08-13'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '5d13cd80acff220ff39c0773a3706d099e67958c'
 review_loop_iteration: 0
 context:

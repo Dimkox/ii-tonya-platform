@@ -30,6 +30,7 @@ export interface TelegramExpertQueryIngress {
     readonly claims: {
       readonly reservationId: string;
       readonly expertId: string;
+      readonly telegramUserId: string;
       readonly version: number;
       readonly expiresAtEpochSeconds: number;
     };
@@ -56,6 +57,7 @@ export interface TelegramExpertQueryIngress {
       readonly claims: {
         readonly reservationId: string;
         readonly expertId: string;
+        readonly telegramUserId: string;
         readonly version: number;
         readonly expiresAtEpochSeconds: number;
       };
@@ -63,9 +65,32 @@ export interface TelegramExpertQueryIngress {
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<void>;
+  answerCallbackQuery(input: {
+    readonly callbackQueryId: string;
+    readonly status: "processed" | "unavailable";
+    readonly idempotencyKey: string;
+  }): Promise<
+    | { readonly kind: "applied"; readonly providerOperationId: string }
+    | {
+        readonly kind: "not_applied";
+        readonly retryable: boolean;
+        readonly reasonCode: string;
+      }
+    | {
+        readonly kind: "unknown_outcome";
+        readonly reconciliationKey: string;
+        readonly reasonCode: string;
+      }
+  >;
 }
 
 const numericIdentity = /^[1-9]\d{0,19}$/u;
+const callbackQueryIdPattern = /^[^\u0000-\u001F\u007F-\u009F]{1,256}$/u;
+const requireApplied = (outcome: { readonly kind: string }): void => {
+  if (outcome.kind !== "applied") {
+    throw new Error("telegram_callback_answer_unconfirmed");
+  }
+};
 const secureEqual = (actual: string | undefined, expected: string): boolean => {
   if (actual === undefined) return false;
   const a = Buffer.from(actual);
@@ -115,8 +140,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       }
       if (
         !deps.rateLimiter.consume(
-          `telegram:auth:${request.ip}`,
-          deps.authenticatedLimit ?? 10,
+          "telegram:auth:provider",
+          deps.authenticatedLimit ?? 100,
           60_000,
         )
       ) {
@@ -130,6 +155,7 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       const callback = body.callback_query;
       if (callback && typeof callback === "object") {
         const callbackRecord = callback as Record<string, unknown>;
+        const callbackQueryId = callbackRecord.id;
         const from = callbackRecord.from;
         const id =
           from && typeof from === "object"
@@ -140,6 +166,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         }
         const data = callbackRecord.data;
         if (
+          typeof callbackQueryId !== "string" ||
+          !callbackQueryIdPattern.test(callbackQueryId) ||
           typeof data !== "string" ||
           Buffer.byteLength(data, "utf8") < 1 ||
           Buffer.byteLength(data, "utf8") > 64
@@ -167,11 +195,25 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             },
           );
           if (authenticated === null) {
-            return reply.code(403).send({ error: "invalid_callback" });
+            requireApplied(
+              await deps.expertQueries.answerCallbackQuery({
+                callbackQueryId,
+                status: "unavailable",
+                idempotencyKey: `telegram:${String(body.update_id)}:client-view:answer`,
+              }),
+            );
+            return { accepted: true, unavailable: true };
           }
           const updateId = String(body.update_id);
           const claim = await deps.inbox.claim("telegram", updateId);
           if (claim.kind !== "claimed") {
+            requireApplied(
+              await deps.expertQueries.answerCallbackQuery({
+                callbackQueryId,
+                status: "unavailable",
+                idempotencyKey: `telegram:${updateId}:client-view:answer`,
+              }),
+            );
             return { accepted: true, duplicate: true };
           }
           try {
@@ -181,10 +223,17 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
               idempotencyKey: `telegram:${updateId}:client-view`,
               correlationId,
             });
+            requireApplied(
+              await deps.expertQueries.answerCallbackQuery({
+                callbackQueryId,
+                status: "processed",
+                idempotencyKey: `telegram:${updateId}:client-view:answer`,
+              }),
+            );
             await deps.inbox.complete(claim.claimId);
-          } catch (error) {
+          } catch {
             await deps.inbox.fail(claim.claimId);
-            throw error;
+            return reply.code(500).send({ error: "expert_query_unavailable" });
           }
           return { accepted: true };
         }
@@ -201,7 +250,9 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         const text = record.text;
         if (
           typeof text === "string" &&
-          /^\/(?:schedule|client|stats)(?:\s|$)/u.test(text)
+          (deps.expertQueriesEnabled === true
+            ? text.startsWith("/")
+            : /^\/(?:schedule|client|stats)(?:\s|$)/u.test(text))
         ) {
           if (
             deps.expertQueriesEnabled !== true ||
@@ -254,9 +305,9 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
               correlationId,
             });
             await deps.inbox.complete(claim.claimId);
-          } catch (error) {
+          } catch {
             await deps.inbox.fail(claim.claimId);
-            throw error;
+            return reply.code(500).send({ error: "expert_query_unavailable" });
           }
           return { accepted: true };
         }

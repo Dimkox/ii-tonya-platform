@@ -5,7 +5,12 @@ import { telegramWebhookRoutes } from "./telegram-webhook.js";
 
 const secret = "telegram-webhook-secret";
 
-const build = async (options: { queriesEnabled?: boolean } = {}) => {
+const build = async (
+  options: {
+    queriesEnabled?: boolean;
+    consume?: (key: string, limit: number, windowMs: number) => boolean;
+  } = {},
+) => {
   const claim = vi.fn(async () => ({
     kind: "claimed" as const,
     claimId: "claim-1",
@@ -25,24 +30,30 @@ const build = async (options: { queriesEnabled?: boolean } = {}) => {
     claims: {
       reservationId: "00000000-0000-4000-8000-000000000201",
       expertId: "00000000-0000-4000-8000-000000000101",
+      telegramUserId: "123456789",
       version: 1,
       expiresAtEpochSeconds: 1_786_000_000,
     },
   }));
   const processCommand = vi.fn(async () => undefined);
   const processClientView = vi.fn(async () => undefined);
+  const answerCallbackQuery = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "answer-1",
+  }));
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
     secret,
     callbacks: { isAuthorizedIdentity, verifyCallback, process },
     inbox: { claim, complete, fail },
-    rateLimiter: { consume: () => true },
+    rateLimiter: { consume: options.consume ?? (() => true) },
     expertQueriesEnabled: options.queriesEnabled ?? false,
     expertQueries: {
       resolvePrincipal,
       authenticateClientView,
       processCommand,
       processClientView,
+      answerCallbackQuery,
     },
   });
   return {
@@ -57,6 +68,7 @@ const build = async (options: { queriesEnabled?: boolean } = {}) => {
     authenticateClientView,
     processCommand,
     processClientView,
+    answerCallbackQuery,
   };
 };
 
@@ -207,8 +219,195 @@ describe("Telegram webhook callback boundary", () => {
       expect(state.authenticateClientView).toHaveBeenCalledTimes(1);
       expect(state.claim).toHaveBeenCalledWith("telegram", "6");
       expect(state.processClientView).toHaveBeenCalledTimes(1);
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith({
+        callbackQueryId: "client-view-1",
+        status: "processed",
+        idempotencyKey: "telegram:6:client-view:answer",
+      });
       expect(state.complete).toHaveBeenCalledWith("claim-1");
       expect(state.verifyCallback).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("routes every enabled private slash command through the expert processor", async () => {
+    const state = await build({ queriesEnabled: true });
+    try {
+      for (const [index, text] of ["/schedule", "/unknown"].entries()) {
+        const response = await state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers,
+          payload: {
+            update_id: 20 + index,
+            message: {
+              from: { id: 123456789 },
+              chat: { id: 123456789, type: "private" },
+              text,
+            },
+          },
+        });
+        expect(response.statusCode).toBe(200);
+      }
+      expect(state.processCommand).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ text: "/unknown" }),
+      );
+      expect(state.process).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("deduplicates enabled commands before a second processor call", async () => {
+    const state = await build({ queriesEnabled: true });
+    state.claim
+      .mockResolvedValueOnce({ kind: "claimed", claimId: "claim-1" })
+      .mockResolvedValueOnce({ kind: "duplicate" });
+    try {
+      const request = {
+        method: "POST" as const,
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 30,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/stats",
+          },
+        },
+      };
+      await state.app.inject(request);
+      expect((await state.app.inject(request)).json()).toEqual({
+        accepted: true,
+        duplicate: true,
+      });
+      expect(state.processCommand).toHaveBeenCalledTimes(1);
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("releases the inbox claim and returns sanitized 5xx when command processing fails", async () => {
+    const state = await build({ queriesEnabled: true });
+    state.processCommand.mockRejectedValueOnce(new Error("database details"));
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 31,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/client",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(500);
+      expect(response.body).not.toContain("database details");
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
+      expect(state.complete).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("enforces the per-expert query limit while retaining a reachable 20/min allowance", async () => {
+    const keys: string[] = [];
+    const state = await build({
+      queriesEnabled: true,
+      consume: (key, limit) => {
+        keys.push(`${key}:${limit}`);
+        return key === "telegram:query:123456789" ? false : true;
+      },
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 32,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/stats",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(429);
+      expect(keys).toContain("telegram:auth:provider:100");
+      expect(keys).toContain("telegram:query:123456789:20");
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("keeps two experts' 20/min query budgets independent below the provider defense", async () => {
+    const counts = new Map<string, number>();
+    const state = await build({
+      queriesEnabled: true,
+      consume: (key, limit) => {
+        const next = (counts.get(key) ?? 0) + 1;
+        counts.set(key, next);
+        return next <= limit;
+      },
+    });
+    try {
+      for (const telegramUserId of [123456789, 987654321]) {
+        for (let index = 0; index < 20; index += 1) {
+          const response = await state.app.inject({
+            method: "POST",
+            url: "/v1/webhooks/telegram",
+            headers,
+            payload: {
+              update_id: telegramUserId + index,
+              message: {
+                from: { id: telegramUserId },
+                chat: { id: telegramUserId, type: "private" },
+                text: "/stats",
+              },
+            },
+          });
+          expect(response.statusCode).toBe(200);
+        }
+      }
+      expect(counts.get("telegram:query:123456789")).toBe(20);
+      expect(counts.get("telegram:query:987654321")).toBe(20);
+      expect(counts.get("telegram:auth:provider")).toBe(40);
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("acknowledges invalid cv1 callbacks with bounded generic state", async () => {
+    const state = await build({ queriesEnabled: true });
+    state.authenticateClientView.mockResolvedValueOnce(null);
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 33,
+          callback_query: {
+            id: "callback-invalid",
+            from: { id: 123456789 },
+            data: "cv1.invalid",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, unavailable: true });
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith({
+        callbackQueryId: "callback-invalid",
+        status: "unavailable",
+        idempotencyKey: "telegram:33:client-view:answer",
+      });
+      expect(state.claim).not.toHaveBeenCalled();
     } finally {
       await state.app.close();
     }

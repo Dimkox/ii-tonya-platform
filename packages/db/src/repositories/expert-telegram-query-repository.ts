@@ -39,6 +39,8 @@ const parseClaims = (value: string): ClientViewCallbackClaims => {
     !UUID.test(claims.reservationId) ||
     typeof claims.expertId !== "string" ||
     !UUID.test(claims.expertId) ||
+    typeof claims.telegramUserId !== "string" ||
+    !TELEGRAM_ID.test(claims.telegramUserId) ||
     !Number.isSafeInteger(claims.version) ||
     (claims.version ?? 0) < 1 ||
     !Number.isSafeInteger(claims.expiresAtEpochSeconds) ||
@@ -49,7 +51,7 @@ const parseClaims = (value: string): ClientViewCallbackClaims => {
   return claims as ClientViewCallbackClaims;
 };
 
-const safeCount = (value: string): number => {
+export const parseExpertTelegramCount = (value: string): number => {
   if (!/^(?:0|[1-9]\d*)$/u.test(value)) {
     throw new Error("expert_query_integrity_failure");
   }
@@ -130,6 +132,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
         and e.active
         and e.verified
         and r.status in ('reserved', 'booked')
+        and (r.status = 'booked' or r.reserved_until > ${command.now})
         and s.starts_at >= ${command.now}
       order by s.starts_at, r.id
       limit 20
@@ -164,7 +167,9 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
       select
         count(distinct e.id) > 0 as authorized,
         count(r.id) filter (
-          where r.status in ('reserved', 'booked') and s.starts_at >= ${command.now}
+          where r.status in ('reserved', 'booked')
+            and (r.status = 'booked' or r.reserved_until > ${command.now})
+            and s.starts_at >= ${command.now}
         )::text as upcoming,
         count(r.id) filter (
           where r.status = 'completed'
@@ -196,10 +201,10 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
     const row = result.rows[0];
     if (row?.authorized !== true) return null;
     return {
-      upcoming: safeCount(row.upcoming),
-      completed: safeCount(row.completed),
-      cancelled: safeCount(row.cancelled),
-      noShow: safeCount(row.noShow),
+      upcoming: parseExpertTelegramCount(row.upcoming),
+      completed: parseExpertTelegramCount(row.completed),
+      cancelled: parseExpertTelegramCount(row.cancelled),
+      noShow: parseExpertTelegramCount(row.noShow),
     };
   }
 
@@ -207,9 +212,24 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
     tokenHash: string,
     claims: ClientViewCallbackClaims,
   ): Promise<void> {
-    if (!TOKEN_HASH.test(tokenHash))
+    if (!TOKEN_HASH.test(tokenHash) || !TELEGRAM_ID.test(claims.telegramUserId))
       throw new Error("expert_query_unavailable");
-    const inserted = await this.db.execute(sql`
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        delete from notifications
+        where id in (
+          select id from notifications
+          where callback_action = 'view_client'
+            and (
+              callback_expires_at <= clock_timestamp()
+              or callback_consumed_at is not null
+            )
+          order by coalesce(callback_consumed_at, callback_expires_at), id
+          limit 100
+          for update skip locked
+        )
+      `);
+      const inserted = await tx.execute(sql`
       insert into notifications (
         reservation_id, idempotency_key, callback_token_hash, callback_claims,
         callback_expires_at, callback_expert_id, callback_action, callback_version
@@ -221,18 +241,24 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
       from reservations r
       join experts e on e.id = r.expert_id
       join users u on u.id = e.user_id
+      join channel_identities ci
+        on ci.user_id = e.user_id
+        and ci.provider = 'telegram'
+        and ci.external_id = ${claims.telegramUserId}
       join slots s on s.id = r.slot_id
       where r.id = ${claims.reservationId}::uuid
         and r.expert_id = ${claims.expertId}::uuid
         and r.version = ${claims.version}
         and r.status in ('reserved', 'booked')
+        and (r.status = 'booked' or r.reserved_until > clock_timestamp())
         and s.starts_at >= clock_timestamp()
         and e.active and e.verified and u.active
         and to_timestamp(${claims.expiresAtEpochSeconds}) > clock_timestamp()
         and to_timestamp(${claims.expiresAtEpochSeconds}) <= clock_timestamp() + interval '10 minutes'
       returning id
     `);
-    if (inserted.rowCount !== 1) throw new Error("expert_query_unavailable");
+      if (inserted.rowCount !== 1) throw new Error("expert_query_unavailable");
+    });
   }
 
   async peek(tokenHash: string): Promise<ClientViewCallbackClaims | null> {
@@ -293,10 +319,17 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
       serviceName: string;
       preparationNote: string | null;
     }>(sql`
-      with consumed as (
-        update notifications n
-        set callback_consumed_at = ${command.now}, updated_at = ${command.now}
-        from reservations r
+      with eligible as (
+        select
+          n.id as notification_id,
+          r.id as reservation_id,
+          e.user_id as actor_user_id,
+          coalesce(nullif(cp.display_name, ''), 'Клиент') as client_display_name,
+          s.starts_at,
+          es.name as service_name,
+          case when note_consent.granted then cp.expert_note else null end as preparation_note
+        from notifications n
+        join reservations r on n.reservation_id = r.id
         join experts e on e.id = r.expert_id
         join users u on u.id = e.user_id and u.active
         join channel_identities ci
@@ -304,51 +337,54 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
           and ci.provider = 'telegram'
           and ci.external_id = ${command.telegramUserId}
         join slots s on s.id = r.slot_id
+        join expert_services es
+          on es.id = r.expert_service_id and es.expert_id = r.expert_id
+        left join client_profiles cp on cp.user_id = r.user_id
+        left join lateral (
+          select coalesce(bool_and(latest.decision = 'granted'), false) as granted
+          from consents latest
+          where latest.user_id = r.user_id
+            and latest.consent_type = 'expert_note'
+            and latest.created_at = (
+              select max(candidate.created_at)
+              from consents candidate
+              where candidate.user_id = r.user_id
+                and candidate.consent_type = 'expert_note'
+            )
+        ) note_consent on true
         where n.callback_token_hash = ${command.tokenHash}
           and n.callback_action = 'view_client'
           and n.callback_consumed_at is null
           and n.callback_expires_at > ${command.now}
-          and n.reservation_id = r.id
           and r.id = ${command.reservationId}::uuid
           and r.expert_id = ${command.expertId}::uuid
           and n.callback_expert_id = r.expert_id
           and n.callback_version = ${command.version}
           and r.version = ${command.version}
           and r.status in ('reserved', 'booked')
+          and (r.status = 'booked' or r.reserved_until > ${command.now})
           and s.starts_at >= ${command.now}
           and e.active and e.verified
           and n.callback_claims::jsonb @> jsonb_build_object(
             'reservationId', r.id::text,
             'expertId', r.expert_id::text,
+            'telegramUserId', ${command.telegramUserId}::text,
             'version', r.version
           )
-        returning r.id, r.user_id, r.expert_service_id, r.expert_id, e.user_id as actor_user_id
+      ), consumed as (
+        update notifications n
+        set callback_consumed_at = ${command.now}, updated_at = ${command.now}
+        from eligible e
+        where n.id = e.notification_id
+        returning
+          e.reservation_id as "reservationId",
+          e.actor_user_id as "actorUserId",
+          e.client_display_name as "clientDisplayName",
+          e.starts_at as "startsAt",
+          e.service_name as "serviceName",
+          e.preparation_note as "preparationNote"
       )
-      select
-        c.id as "reservationId",
-        c.actor_user_id as "actorUserId",
-        coalesce(nullif(cp.display_name, ''), 'Клиент') as "clientDisplayName",
-        s.starts_at as "startsAt",
-        es.name as "serviceName",
-        case when note_consent.granted then cp.expert_note else null end as "preparationNote"
-      from consumed c
-      join reservations r on r.id = c.id
-      join slots s on s.id = r.slot_id
-      join expert_services es
-        on es.id = c.expert_service_id and es.expert_id = c.expert_id
-      left join client_profiles cp on cp.user_id = c.user_id
-      left join lateral (
-        select coalesce(bool_and(latest.decision = 'granted'), false) as granted
-        from consents latest
-        where latest.user_id = c.user_id
-          and latest.consent_type = 'expert_note'
-          and latest.created_at = (
-            select max(candidate.created_at)
-            from consents candidate
-            where candidate.user_id = c.user_id
-              and candidate.consent_type = 'expert_note'
-          )
-      ) note_consent on true
+      select * from consumed
     `);
     const row = result.rows[0];
     if (row === undefined) return null;

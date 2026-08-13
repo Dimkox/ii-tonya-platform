@@ -21,6 +21,7 @@ const TELEGRAM_ID = /^[1-9]\d{0,19}$/u;
 export interface ClientViewCallbackClaims {
   readonly reservationId: string;
   readonly expertId: string;
+  readonly telegramUserId: string;
   readonly version: number;
   readonly expiresAtEpochSeconds: number;
 }
@@ -50,6 +51,7 @@ const validateClaims = (claims: ClientViewCallbackClaims): void => {
   if (
     !UUID.test(claims.reservationId) ||
     !UUID.test(claims.expertId) ||
+    !TELEGRAM_ID.test(claims.telegramUserId) ||
     !Number.isSafeInteger(claims.version) ||
     claims.version < 1 ||
     !Number.isSafeInteger(claims.expiresAtEpochSeconds) ||
@@ -66,10 +68,16 @@ const requireSecret = (secret: Uint8Array): void => {
 const digest = (nonce: Uint8Array): string =>
   createHash("sha256").update(nonce).digest("hex");
 
-const tag = (nonce: Uint8Array, secret: Uint8Array): Buffer =>
+const tag = (
+  nonce: Uint8Array,
+  telegramUserId: string,
+  secret: Uint8Array,
+): Buffer =>
   createHmac("sha256", secret)
     .update(MAC_DOMAIN)
     .update(Buffer.from([VERSION]))
+    .update(Buffer.from(telegramUserId, "utf8"))
+    .update(Buffer.from([0]))
     .update(nonce)
     .digest()
     .subarray(0, TAG_BYTES);
@@ -105,7 +113,7 @@ export async function issueClientViewCallback(
   const payload = Buffer.concat([
     Buffer.from([VERSION]),
     nonce,
-    tag(nonce, secret),
+    tag(nonce, claims.telegramUserId, secret),
   ]);
   const token = `${PREFIX}${payload.toString("base64url")}`;
   if (Buffer.byteLength(token, "utf8") > 64) {
@@ -125,8 +133,13 @@ export async function authenticateClientViewCallback(
 ): Promise<{ tokenHash: string; claims: ClientViewCallbackClaims }> {
   try {
     requireSecret(secret);
+    if (!TELEGRAM_ID.test(telegramUserId) || !Number.isFinite(now.getTime())) {
+      throw new ClientViewCallbackStateError();
+    }
     const parsed = parse(token);
-    if (!timingSafeEqual(parsed.tag, tag(parsed.nonce, secret))) {
+    if (
+      !timingSafeEqual(parsed.tag, tag(parsed.nonce, telegramUserId, secret))
+    ) {
       throw new ClientViewCallbackStateError();
     }
     const tokenHash = digest(parsed.nonce);
@@ -134,11 +147,11 @@ export async function authenticateClientViewCallback(
     if (claims === null) throw new ClientViewCallbackStateError();
     validateClaims(claims);
     if (
-      !TELEGRAM_ID.test(telegramUserId) ||
       binding.telegramUserId !== telegramUserId ||
       !binding.active ||
       !binding.verified ||
       claims.expertId !== binding.expertId ||
+      claims.telegramUserId !== telegramUserId ||
       claims.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)
     ) {
       throw new ClientViewCallbackStateError();

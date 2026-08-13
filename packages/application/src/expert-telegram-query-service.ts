@@ -14,6 +14,7 @@ export interface ExpertTelegramQueryPrincipal {
 export interface ClientViewClaims {
   readonly reservationId: string;
   readonly expertId: string;
+  readonly telegramUserId: string;
   readonly version: number;
   readonly expiresAtEpochSeconds: number;
 }
@@ -108,6 +109,8 @@ export const createExpertTelegramQueryService = (deps: {
 }): ExpertTelegramQueryService => ({
   async schedule(principal) {
     const now = deps.clock.now();
+    if (!Number.isFinite(now.getTime()))
+      throw new Error("expert_query_unavailable");
     return deps.booking.getExpertSchedule({
       ...principal,
       from: now.toISOString(),
@@ -117,6 +120,8 @@ export const createExpertTelegramQueryService = (deps: {
 
   async clientChoices(principal) {
     const now = deps.clock.now();
+    if (!Number.isFinite(now.getTime()))
+      throw new Error("expert_query_unavailable");
     const records = await deps.repository.listClientCandidates({
       expertId: principal.expertId,
       telegramUserId: principal.telegramUserId,
@@ -129,6 +134,7 @@ export const createExpertTelegramQueryService = (deps: {
         callbackData: await deps.clientViewCallbacks.issue({
           reservationId: record.reservationId,
           expertId: principal.expertId,
+          telegramUserId: principal.telegramUserId,
           version: record.version,
           expiresAtEpochSeconds:
             Math.floor(now.getTime() / 1_000) + CLIENT_VIEW_TTL_SECONDS,
@@ -141,6 +147,8 @@ export const createExpertTelegramQueryService = (deps: {
 
   async stats(principal) {
     const now = deps.clock.now();
+    if (!Number.isFinite(now.getTime()))
+      throw new Error("expert_query_unavailable");
     const result = await deps.repository.readStats({
       expertId: principal.expertId,
       telegramUserId: principal.telegramUserId,
@@ -152,13 +160,20 @@ export const createExpertTelegramQueryService = (deps: {
   },
 
   async clientView(command) {
+    const now = deps.clock.now();
+    if (
+      !Number.isFinite(now.getTime()) ||
+      command.authenticated.claims.telegramUserId !==
+        command.principal.telegramUserId
+    )
+      throw new Error("expert_query_unavailable");
     const result = await deps.repository.consumeClientView({
       tokenHash: command.authenticated.tokenHash,
       reservationId: command.authenticated.claims.reservationId,
       expertId: command.principal.expertId,
       telegramUserId: command.principal.telegramUserId,
       version: command.authenticated.claims.version,
-      now: deps.clock.now(),
+      now,
       correlationId: command.correlationId,
     });
     if (result === null) throw new Error("expert_query_unavailable");

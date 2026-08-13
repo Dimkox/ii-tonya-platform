@@ -1,4 +1,5 @@
 import type { ExpertTelegramQueryViewPort } from "./telegram-adapter.js";
+import type { TelegramSendOutcome } from "./telegram-adapter.js";
 
 interface QueryPrincipal {
   readonly expertId: string;
@@ -37,6 +38,7 @@ interface QueryService {
       readonly claims: {
         readonly reservationId: string;
         readonly expertId: string;
+        readonly telegramUserId: string;
         readonly version: number;
         readonly expiresAtEpochSeconds: number;
       };
@@ -70,6 +72,27 @@ export interface ExpertCommandProcessor {
   }): Promise<{ readonly kind: "processed" | "disabled" | "unavailable" }>;
 }
 
+const requireApplied = (
+  outcome: TelegramSendOutcome,
+  clientView = false,
+): void => {
+  if (outcome.kind !== "applied") {
+    throw new Error(
+      clientView
+        ? "telegram_client_view_delivery_unconfirmed"
+        : "telegram_delivery_unconfirmed",
+    );
+  }
+};
+
+const unavailable = async <T>(operation: () => Promise<T>): Promise<T> => {
+  try {
+    return await operation();
+  } catch {
+    throw new Error("expert_query_unavailable");
+  }
+};
+
 export const createExpertCommandProcessor = (deps: {
   readonly enabled: boolean;
   readonly queries: QueryService;
@@ -78,102 +101,107 @@ export const createExpertCommandProcessor = (deps: {
   async processCommand(command) {
     if (!deps.enabled) return { kind: "disabled" };
     if (command.chatType !== "private") return { kind: "unavailable" };
-    try {
-      switch (command.text) {
-        case "/schedule": {
-          const schedule = await deps.queries.schedule(command.principal);
-          const appointments: {
-            startsAt: string;
-            status: "reserved" | "booked";
-            clientDisplayName: string;
-            expertNote?: string;
-            meetingUrl?: string;
-          }[] = schedule.appointments.map((appointment) => {
-            if (
-              appointment.status !== "reserved" &&
-              appointment.status !== "booked"
-            ) {
-              throw new Error("expert_query_unavailable");
-            }
-            return {
-              startsAt: appointment.startsAt,
-              status: appointment.status,
-              clientDisplayName: appointment.clientDisplayName,
-              ...(appointment.expertNote === undefined
-                ? {}
-                : { expertNote: appointment.expertNote }),
-              ...(appointment.meetingUrl === undefined
-                ? {}
-                : { meetingUrl: appointment.meetingUrl }),
-            };
-          });
+    switch (command.text) {
+      case "/schedule": {
+        const schedule = await unavailable(() =>
+          deps.queries.schedule(command.principal),
+        );
+        const appointments: {
+          startsAt: string;
+          status: "reserved" | "booked";
+          clientDisplayName: string;
+          expertNote?: string;
+          meetingUrl?: string;
+        }[] = schedule.appointments.map((appointment) => {
+          if (
+            appointment.status !== "reserved" &&
+            appointment.status !== "booked"
+          ) {
+            throw new Error("expert_query_unavailable");
+          }
+          return {
+            startsAt: appointment.startsAt,
+            status: appointment.status,
+            clientDisplayName: appointment.clientDisplayName,
+            ...(appointment.expertNote === undefined
+              ? {}
+              : { expertNote: appointment.expertNote }),
+            ...(appointment.meetingUrl === undefined
+              ? {}
+              : { meetingUrl: appointment.meetingUrl }),
+          };
+        });
+        requireApplied(
           await deps.views.sendQuerySchedule({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
             timezone: schedule.timezone,
             appointments,
-          });
-          return { kind: "processed" };
-        }
-        case "/client": {
-          const choices = await deps.queries.clientChoices(command.principal);
+          }),
+        );
+        return { kind: "processed" };
+      }
+      case "/client": {
+        const choices = await unavailable(() =>
+          deps.queries.clientChoices(command.principal),
+        );
+        requireApplied(
           await deps.views.sendClientChoices({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
+            timezone: command.principal.timezone,
             choices,
-          });
-          return { kind: "processed" };
-        }
-        case "/stats": {
-          const stats = await deps.queries.stats(command.principal);
+          }),
+        );
+        return { kind: "processed" };
+      }
+      case "/stats": {
+        const stats = await unavailable(() =>
+          deps.queries.stats(command.principal),
+        );
+        requireApplied(
           await deps.views.sendStats({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
             ...stats,
-          });
-          return { kind: "processed" };
-        }
-        default:
+          }),
+        );
+        return { kind: "processed" };
+      }
+      default:
+        requireApplied(
           await deps.views.sendUnsupported({
             idempotencyKey: command.idempotencyKey,
             telegramUserId: command.principal.telegramUserId,
-          });
-          return { kind: "unsupported" };
-      }
-    } catch {
-      await deps.views.sendUnsupported({
-        idempotencyKey: command.idempotencyKey,
-        telegramUserId: command.principal.telegramUserId,
-      });
-      return { kind: "unavailable" };
+          }),
+        );
+        return { kind: "unsupported" };
     }
   },
 
   async processClientView(command) {
     if (!deps.enabled) return { kind: "disabled" };
-    try {
-      const view = await deps.queries.clientView({
+    const view = await unavailable(() =>
+      deps.queries.clientView({
         principal: command.principal,
         authenticated: command.authenticated,
         correlationId: command.correlationId,
-      });
+      }),
+    );
+    requireApplied(
       await deps.views.sendClientView({
         idempotencyKey: command.idempotencyKey,
         telegramUserId: command.principal.telegramUserId,
+        timezone: command.principal.timezone,
         clientDisplayName: view.clientDisplayName,
         startsAt: view.startsAt.toISOString(),
         serviceName: view.serviceName,
         ...(view.preparationNote === undefined
           ? {}
           : { preparationNote: view.preparationNote }),
-      });
-      return { kind: "processed" };
-    } catch {
-      await deps.views.sendUnsupported({
-        idempotencyKey: command.idempotencyKey,
-        telegramUserId: command.principal.telegramUserId,
-      });
-      return { kind: "unavailable" };
-    }
+      }),
+      true,
+    );
+    return { kind: "processed" };
   },
 });

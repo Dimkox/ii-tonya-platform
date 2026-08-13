@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PostgresExpertTelegramQueryRepository } from "../../packages/db/src/repositories/expert-telegram-query-repository.js";
+import { PostgresBookingRepository } from "../../packages/db/src/repositories/booking-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -20,7 +21,7 @@ const now = new Date();
 const DAY_MS = 24 * 60 * 60 * 1_000;
 let telegramIdentity = 123456780;
 
-const seed = async () => {
+const seed = async (options: { consent?: boolean } = {}) => {
   const telegramUserId = String(++telegramIdentity);
   const fixture = await testDb.createReservableFixture();
   await testDb.db.execute(sql`
@@ -37,7 +38,7 @@ const seed = async () => {
       u.id, s.id, e.id, es.id, 'booked', ${`query-${crypto.randomUUID()}`},
       ${new Date(now.getTime() + DAY_MS - 60 * 60 * 1_000)}, 3, ${now}, ${now}
     from experts e
-    join users u on u.id <> e.user_id
+    join users u on u.id = ${fixture.command.userId}::uuid
     join expert_services es on es.expert_id = e.id
     join slots s on s.expert_service_id = es.id
     where e.id = ${fixture.expertId}::uuid
@@ -58,12 +59,51 @@ const seed = async () => {
       display_name = excluded.display_name,
       expert_note = excluded.expert_note
   `);
-  await testDb.db.execute(sql`
-    insert into consents (user_id, consent_type, decision, policy_version, created_at)
-    select user_id, 'expert_note', 'granted', 'v1', ${now}
-    from reservations where id = ${reservationId}::uuid
-  `);
+  if (options.consent !== false) {
+    await testDb.db.execute(sql`
+      insert into consents (user_id, consent_type, decision, policy_version, created_at)
+      select user_id, 'expert_note', 'granted', 'v1', ${now}
+      from reservations where id = ${reservationId}::uuid
+    `);
+  }
   return { expertId: fixture.expertId, reservationId, telegramUserId };
+};
+
+const insertReservationState = async (
+  fixture: { expertId: string; reservationId: string },
+  input: {
+    status:
+      "reserved" | "booked" | "completed" | "cancelled_by_client" | "no_show";
+    startsAt: Date;
+    updatedAt?: Date;
+    reservedUntil?: Date;
+  },
+) => {
+  await testDb.db.execute(sql`
+    with template as (
+      select user_id, expert_id, expert_service_id
+      from reservations where id = ${fixture.reservationId}::uuid
+    ), inserted_slot as (
+      insert into slots (
+        expert_service_id, provider, external_slot_id, starts_at, ends_at,
+        observed_at, capacity
+      )
+      select expert_service_id, 'test', gen_random_uuid()::text,
+        ${input.startsAt}, ${new Date(input.startsAt.getTime() + 60 * 60 * 1_000)},
+        ${now}, 1
+      from template
+      returning id, expert_service_id
+    )
+    insert into reservations (
+      user_id, slot_id, expert_id, expert_service_id, status,
+      idempotency_key, reserved_until, version, created_at, updated_at
+    )
+    select template.user_id, inserted_slot.id, template.expert_id,
+      inserted_slot.expert_service_id, ${input.status}::reservation_status,
+      gen_random_uuid()::text, ${input.reservedUntil ?? new Date(now.getTime() + DAY_MS)},
+      1, ${new Date(now.getTime() - 31 * DAY_MS)}, ${input.updatedAt ?? now}
+    from template cross join inserted_slot
+  `);
 };
 
 describe("PostgreSQL expert Telegram queries", () => {
@@ -102,7 +142,13 @@ describe("PostgreSQL expert Telegram queries", () => {
       now,
       limit: 20 as const,
     };
-    await expect(repo.listClientCandidates(command)).resolves.toHaveLength(20);
+    const choices = await repo.listClientCandidates(command);
+    expect(choices).toHaveLength(20);
+    expect(choices?.map((choice) => choice.startsAt.getTime())).toEqual(
+      [...(choices ?? [])]
+        .map((choice) => choice.startsAt.getTime())
+        .sort((left, right) => left - right),
+    );
     await expect(
       repo.listClientCandidates({ ...command, telegramUserId: "987654321" }),
     ).resolves.toBeNull();
@@ -133,6 +179,66 @@ describe("PostgreSQL expert Telegram queries", () => {
     await expect(repo.readStats(command)).resolves.toBeNull();
   });
 
+  it("counts stats at the exact 30-day boundaries and excludes outside states", async () => {
+    const fixture = await seed();
+    const from = new Date(now.getTime() - 30 * DAY_MS);
+    await insertReservationState(fixture, {
+      status: "completed",
+      startsAt: from,
+    });
+    await insertReservationState(fixture, {
+      status: "completed",
+      startsAt: new Date(from.getTime() - 1),
+    });
+    await insertReservationState(fixture, {
+      status: "completed",
+      startsAt: new Date(now.getTime() - 1),
+    });
+    await insertReservationState(fixture, {
+      status: "completed",
+      startsAt: now,
+    });
+    await insertReservationState(fixture, {
+      status: "cancelled_by_client",
+      startsAt: from,
+      updatedAt: from,
+    });
+    await insertReservationState(fixture, {
+      status: "cancelled_by_client",
+      startsAt: from,
+      updatedAt: new Date(from.getTime() - 1),
+    });
+    await insertReservationState(fixture, {
+      status: "cancelled_by_client",
+      startsAt: from,
+      updatedAt: now,
+    });
+    await insertReservationState(fixture, {
+      status: "no_show",
+      startsAt: from,
+    });
+    await insertReservationState(fixture, { status: "no_show", startsAt: now });
+    await insertReservationState(fixture, {
+      status: "reserved",
+      startsAt: new Date(now.getTime() + DAY_MS),
+      reservedUntil: now,
+    });
+
+    await expect(
+      new PostgresExpertTelegramQueryRepository(testDb.db).readStats({
+        expertId: fixture.expertId,
+        telegramUserId: fixture.telegramUserId,
+        from: from.toISOString(),
+        now,
+      }),
+    ).resolves.toEqual({
+      upcoming: 1,
+      completed: 2,
+      cancelled: 1,
+      noShow: 1,
+    });
+  });
+
   it("consumes once, returns only consented preparation data, and writes content-free audit", async () => {
     const fixture = await seed();
     const repo = new PostgresExpertTelegramQueryRepository(testDb.db);
@@ -140,6 +246,7 @@ describe("PostgreSQL expert Telegram queries", () => {
     const claims = {
       reservationId: fixture.reservationId,
       expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
       version: 3,
       expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
     };
@@ -189,6 +296,7 @@ describe("PostgreSQL expert Telegram queries", () => {
     const staleClaims = {
       reservationId: stale.reservationId,
       expertId: stale.expertId,
+      telegramUserId: stale.telegramUserId,
       version: 3,
       expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
     };
@@ -215,6 +323,7 @@ describe("PostgreSQL expert Telegram queries", () => {
     const revokedClaims = {
       reservationId: revoked.reservationId,
       expertId: revoked.expertId,
+      telegramUserId: revoked.telegramUserId,
       version: 3,
       expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
     };
@@ -247,6 +356,7 @@ describe("PostgreSQL expert Telegram queries", () => {
     const claims = {
       reservationId: fixture.reservationId,
       expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
       version: 3,
       expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
     };
@@ -266,5 +376,110 @@ describe("PostgreSQL expert Telegram queries", () => {
     await expect(
       new PostgresExpertTelegramQueryRepository(testDb.db).peek(tokenHash),
     ).resolves.toEqual(claims);
+  });
+
+  it("excludes expired reserved holds from schedule, choices, upcoming stats, issuance, and view", async () => {
+    const fixture = await seed();
+    const expiredAt = new Date(now.getTime() + 2);
+    await testDb.db.execute(sql`
+      update reservations
+      set status = 'reserved', reserved_until = ${new Date(now.getTime() + 1)}
+      where id = ${fixture.reservationId}::uuid
+    `);
+    const queries = new PostgresExpertTelegramQueryRepository(testDb.db);
+    const actor = {
+      expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
+      now: expiredAt,
+    };
+    await expect(
+      queries.listClientCandidates({ ...actor, limit: 20 }),
+    ).resolves.toEqual([]);
+    await expect(
+      queries.readStats({
+        ...actor,
+        from: new Date(expiredAt.getTime() - 30 * DAY_MS).toISOString(),
+      }),
+    ).resolves.toMatchObject({ upcoming: 0 });
+    await expect(
+      new PostgresBookingRepository(testDb.db).listAuthorizedExpertSchedule({
+        expertId: fixture.expertId,
+        telegramUserId: fixture.telegramUserId,
+        from: expiredAt,
+        to: new Date(expiredAt.getTime() + 7 * DAY_MS),
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      queries.put("e".repeat(64), {
+        reservationId: fixture.reservationId,
+        expertId: fixture.expertId,
+        telegramUserId: fixture.telegramUserId,
+        version: 3,
+        expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
+      }),
+    ).rejects.toThrow("expert_query_unavailable");
+  });
+
+  it("omits absent and latest-revoked preparation consent", async () => {
+    for (const decision of ["absent", "revoked"] as const) {
+      const fixture = await seed({ consent: decision !== "absent" });
+      if (decision === "revoked") {
+        await testDb.db.execute(sql`
+          insert into consents (user_id, consent_type, decision, policy_version, created_at)
+          select user_id, 'expert_note', 'revoked', 'v2', ${new Date(now.getTime() + 1)}
+          from reservations where id = ${fixture.reservationId}::uuid
+        `);
+      }
+      const repo = new PostgresExpertTelegramQueryRepository(testDb.db);
+      const tokenHash = (decision === "absent" ? "f" : "9").repeat(64);
+      const claims = {
+        reservationId: fixture.reservationId,
+        expertId: fixture.expertId,
+        telegramUserId: fixture.telegramUserId,
+        version: 3,
+        expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
+      };
+      await repo.put(tokenHash, claims);
+      await expect(
+        repo.consumeClientView({
+          tokenHash,
+          reservationId: fixture.reservationId,
+          expertId: fixture.expertId,
+          telegramUserId: fixture.telegramUserId,
+          version: 3,
+          now,
+          correlationId: `client-view-consent-${decision}`,
+        }),
+      ).resolves.not.toHaveProperty("preparationNote");
+    }
+  });
+
+  it("bounds existing-schema cleanup of expired view-client notifications", async () => {
+    const fixture = await seed();
+    await testDb.db.execute(sql`
+      insert into notifications (
+        reservation_id, idempotency_key, callback_token_hash, callback_claims,
+        callback_expires_at, callback_expert_id, callback_action, callback_version
+      )
+      select ${fixture.reservationId}::uuid, 'expired-view-' || series.n,
+        lpad(to_hex(series.n), 64, '0'), '{}',
+        ${new Date(now.getTime() - 1)}, ${fixture.expertId}::uuid,
+        'view_client', 3
+      from generate_series(1, 105) as series(n)
+    `);
+    const repo = new PostgresExpertTelegramQueryRepository(testDb.db);
+    await repo.put("8".repeat(64), {
+      reservationId: fixture.reservationId,
+      expertId: fixture.expertId,
+      telegramUserId: fixture.telegramUserId,
+      version: 3,
+      expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
+    });
+    const remaining = await testDb.db.execute<{ count: string }>(sql`
+      select count(*)::text as count from notifications
+      where callback_action = 'view_client'
+        and callback_expires_at <= ${now}
+    `);
+    expect(remaining.rows[0]?.count).toBe("5");
   });
 });

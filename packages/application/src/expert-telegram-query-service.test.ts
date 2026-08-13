@@ -91,10 +91,39 @@ describe("expert Telegram query service", () => {
     expect(state.issue).toHaveBeenCalledWith({
       reservationId: "00000000-0000-4000-8000-000000000201",
       expertId: principal.expertId,
+      telegramUserId: principal.telegramUserId,
       version: 4,
       expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
     });
   });
+
+  it.each(["schedule", "clientChoices", "stats"] as const)(
+    "rejects an invalid authoritative clock before %s access",
+    async (operation) => {
+      const state = build();
+      const invalidService = createExpertTelegramQueryService({
+        booking: { getExpertSchedule: state.getExpertSchedule },
+        repository: {
+          listClientCandidates: state.listClientCandidates,
+          readStats: state.readStats,
+          consumeClientView: state.consumeClientView,
+        },
+        clientViewCallbacks: { issue: state.issue },
+        clock: { now: () => new Date("invalid") },
+      });
+
+      const result =
+        operation === "schedule"
+          ? invalidService.schedule(principal)
+          : operation === "clientChoices"
+            ? invalidService.clientChoices(principal)
+            : invalidService.stats(principal);
+      await expect(result).rejects.toThrow("expert_query_unavailable");
+      expect(state.getExpertSchedule).not.toHaveBeenCalled();
+      expect(state.listClientCandidates).not.toHaveBeenCalled();
+      expect(state.readStats).not.toHaveBeenCalled();
+    },
+  );
 
   it("uses the preceding thirty days for safe aggregate stats", async () => {
     const state = build();
@@ -120,6 +149,7 @@ describe("expert Telegram query service", () => {
       claims: {
         reservationId: "00000000-0000-4000-8000-000000000201",
         expertId: principal.expertId,
+        telegramUserId: principal.telegramUserId,
         version: 4,
         expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 60,
       },
@@ -159,6 +189,7 @@ describe("expert Telegram query service", () => {
           claims: {
             reservationId: "00000000-0000-4000-8000-000000000201",
             expertId: principal.expertId,
+            telegramUserId: principal.telegramUserId,
             version: 4,
             expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 60,
           },
