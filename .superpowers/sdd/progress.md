@@ -98,7 +98,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 1. Contracts and database boundary | complete | `5e21170` | `520ad39`..`89dfe66` | PASS after two guard remediations | PASS; no findings | Claw repository 15/15, repeat 45/45, schema 2/2, scope 113/113; build/typecheck/lint/format; cleanup 0 |
 | 2. Verifier, adapter, reconciliation | complete | `c7e8a68` | `73c6379`..`e5ef5f1` | PASS | PASS; one cross-task architecture guard recorded | Claw focused 8/8, repository 15/15; build/typecheck/lint/format; cleanup 0 |
-| 3. Approved admin transitions | pending | — | — | — | — | — |
+| 3. Approved admin transitions | complete | `7b8f9de` | `55430cd`..`4a2cc3e` | PASS after remediation | PASS; no findings | Claw focused 25/25, workflow repeat 3x 36/36; static checks; cleanup 0 |
 | 4. Separate sandbox API | pending | — | — | — | — | — |
 | 5. Settlement/refund E2E | pending | — | — | — | — | — |
 | 6. Container and image isolation | pending | — | — | — | — | — |
