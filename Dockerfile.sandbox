@@ -3,7 +3,14 @@
 FROM node:24.18.0-bookworm-slim AS builder
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 WORKDIR /workspace
-RUN npm install --global pnpm@11.9.0 && npm cache clean --force
+RUN npm config set fetch-timeout 300000 && \
+    npm config set fetch-retries 5 && \
+    install_ok=0; \
+    for attempt in 1 2 3; do \
+      if npm install --global pnpm@11.9.0; then install_ok=1; break; fi; \
+      sleep "$((attempt * 10))"; \
+    done; \
+    test "$install_ok" = 1 && npm cache clean --force
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/sandbox-api/package.json apps/sandbox-api/package.json
@@ -16,7 +23,15 @@ COPY packages/integrations/package.json packages/integrations/package.json
 COPY packages/observability/package.json packages/observability/package.json
 COPY packages/sandbox-payments/package.json packages/sandbox-payments/package.json
 RUN --mount=type=cache,id=pnpm-sandbox-store,target=/pnpm/store \
-    pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile
+    pnpm config set store-dir /pnpm/store && \
+    pnpm config set fetch-timeout 300000 && \
+    pnpm config set fetch-retries 5 && \
+    install_ok=0; \
+    for attempt in 1 2 3; do \
+      if pnpm install --frozen-lockfile; then install_ok=1; break; fi; \
+      sleep "$((attempt * 10))"; \
+    done; \
+    test "$install_ok" = 1
 COPY . .
 RUN pnpm --filter @ii-tonya/sandbox-api... build
 RUN pnpm --filter @ii-tonya/sandbox-api --prod deploy /out/sandbox-api
