@@ -97,14 +97,21 @@ must have explicit inputs, owned files, outputs, and verification responsibility
 one implementer may edit a file set at a time. Reviewers do not silently fix their own
 findings; they report exact files, lines, severity, and reproduction evidence.
 
-If optional global skills exist, useful modules include `bmad-spec`, `writing-plans`,
+The repository contains BMad Method 6.11.0 Core + BMM in `_bmad/` and its Codex skills
+in `.agents/skills/`. Resolve BMad configuration through
+`uv run _bmad/scripts/resolve_config.py --project-root .`; on Windows set
+`PYTHONUTF8=1` so Unicode agent metadata is emitted reliably. Use BMad for the durable
+story/sprint contract and Superpowers for the implementation plan, TDD execution, and
+independent review. Useful companion skills include `writing-plans`,
 `test-driven-development`, `systematic-debugging`, `verification-before-completion`,
-`requesting-code-review`, and relevant GitHub Actions/Docker validators. The project must
-remain operable without them; this file and `docs/agents` are the portable fallback.
+`requesting-code-review`, and relevant GitHub Actions/Docker validators. The project
+remains operable through this file and `docs/agents` if an IDE does not load skills.
 
 ## Current continuation point
 
-Tasks 1–9 of the expert residency referral plan are complete. Continue at Task 10:
-expert API, Telegram views and callback binding, prompt-safe typed proposals, and the
-five malicious prompt fixtures. Tasks 11 and 12 remain afterward. Confirm the current
-PR head and checks live; do not rely on a stale SHA copied from documentation.
+Expert residency referral Tasks 1–12 are present on `main`; their live-provider and
+release gates remain separate. The next approved product increment is Story 24.1,
+expert Telegram `/schedule`, `/client`, and `/stats` queries, specified in
+`docs/superpowers/specs/2026-08-13-expert-telegram-queries-design.md`. Confirm the active
+branch, story status, PR head, and checks live; do not rely on a stale SHA copied from
+documentation.

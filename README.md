@@ -51,6 +51,12 @@ pwsh -File scripts/check-development-environment.ps1
 The lockfile is the complete dependency graph; do not copy `node_modules` or caches from
 another machine.
 
+The repository also contains the complete BMad Method 6.11.0 Core + BMM runtime in
+`_bmad/` and its Codex skill projection in `.agents/skills/`. It is project tooling,
+not an application dependency. Installation, Windows UTF-8 setup, configuration,
+verification, and upgrade commands are recorded in
+`docs/handoffs/environment-manifest.md#bmad-method-and-superpowers`.
+
 ## Architecture graph
 
 The connected repository architecture, including runtime modules, PostgreSQL authority,
