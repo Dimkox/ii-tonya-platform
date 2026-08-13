@@ -60,9 +60,11 @@ describe("native dedicated-server production release", () => {
     );
     expect(script).toContain("^[0-9a-f]{40}$");
     expect(script).toContain("git archive");
-    expect(script).toContain("pnpm --filter @ii-tonya/api --prod deploy");
     expect(script).toContain(
-      "pnpm --filter @ii-tonya/app-worker --prod deploy",
+      "pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/api --prod deploy",
+    );
+    expect(script).toContain(
+      "pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/app-worker --prod deploy",
     );
     expect(script).toContain("native-release.tar.gz");
     expect(script).toContain("native-release.sha256");
@@ -119,5 +121,6 @@ describe("native dedicated-server production release", () => {
     expect(claw).not.toMatch(
       /GITHUB_|docker push|API_IMAGE_REF|WORKER_IMAGE_REF/u,
     );
+    expect(claw.match(/^\s*pnpm build$/gmu)).toHaveLength(2);
   });
 });
