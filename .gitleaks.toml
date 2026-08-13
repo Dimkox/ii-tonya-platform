@@ -4,3 +4,7 @@ useDefault = true
 [[allowlists]]
 description = "Canonical non-secret placeholder tokens"
 regexes = ['''^__PLACEHOLDER_[A-Z0-9_]+__$''']
+
+[[allowlists]]
+description = "Versioned BMAD file checksum manifest"
+paths = ['''^_bmad/_config/files-manifest\.csv$''']
