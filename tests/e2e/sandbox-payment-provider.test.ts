@@ -101,25 +101,19 @@ describe("sandbox payment provider end to end", () => {
       approvalId: tariffApproval.approvalId,
       adminSessionIdHash: tariffApproval.sessionIdHash,
     });
-    const order = await residency.createCheckoutOrder({
+    const qualifyingOrder = await residency.createCheckoutOrder({
       expertId: invitee.expertId,
       tariffVersionId: tariff.id,
       providerDeadline: new Date(Date.now() + 3_600_000),
       idempotencyKey: `order:${randomUUID()}`,
     });
-    expect(order).toMatchObject({
-      priceMinor: "50000",
-      creditMinor: "0",
-      cashMinor: "50000",
-    });
-
     const payments = new PostgresSandboxPaymentRepository(
       testDb!.db,
       new URL("https://sandbox.ii-tonya.invalid"),
     );
-    const checkout = await payments.createCheckout({
-      orderId: order.id,
-      amountMinor: order.cashMinor,
+    const qualifyingCheckout = await payments.createCheckout({
+      orderId: qualifyingOrder.id,
+      amountMinor: qualifyingOrder.cashMinor,
       currency: "RUB",
       idempotencyKey: `checkout:${randomUUID()}`,
     });
@@ -142,6 +136,7 @@ describe("sandbox payment provider end to end", () => {
     );
 
     async function approveAndTransition(
+      checkout: { paymentId: string },
       transition: "settled" | "refunded",
       expectedVersion: number,
     ) {
@@ -185,17 +180,17 @@ describe("sandbox payment provider end to end", () => {
       ).resolves.toMatchObject({ allowed: true, event: { kind: transition } });
     }
 
-    await approveAndTransition("settled", 0);
+    await approveAndTransition(qualifyingCheckout, "settled", 0);
     await expect(
       Promise.all([
         deliverSandboxPaymentEvent({
-          paymentId: checkout.paymentId,
+          paymentId: qualifyingCheckout.paymentId,
           adapter,
           inbox,
           acknowledge: (id) => payments.markEventProcessed(id),
         }),
         deliverSandboxPaymentEvent({
-          paymentId: checkout.paymentId,
+          paymentId: qualifyingCheckout.paymentId,
           adapter,
           inbox,
           acknowledge: (id) => payments.markEventProcessed(id),
@@ -204,6 +199,42 @@ describe("sandbox payment provider end to end", () => {
     ).resolves.toEqual(["settled", "settled"]);
     await expect(residency.balance(inviter.expertId)).resolves.toMatchObject({
       availableCreditMinor: "100000",
+      reservedCreditMinor: "0",
+    });
+
+    const order = await residency.createCheckoutOrder({
+      expertId: inviter.expertId,
+      tariffVersionId: tariff.id,
+      providerDeadline: new Date(Date.now() + 3_600_000),
+      idempotencyKey: `capped-order:${randomUUID()}`,
+    });
+    expect(order).toMatchObject({
+      priceMinor: "50000",
+      creditMinor: "25000",
+      cashMinor: "25000",
+    });
+    await expect(residency.balance(inviter.expertId)).resolves.toMatchObject({
+      availableCreditMinor: "75000",
+      reservedCreditMinor: "25000",
+    });
+    const checkout = await payments.createCheckout({
+      orderId: order.id,
+      amountMinor: order.cashMinor,
+      currency: "RUB",
+      idempotencyKey: `capped-checkout:${randomUUID()}`,
+    });
+    await approveAndTransition(checkout, "settled", 0);
+    await expect(
+      deliverSandboxPaymentEvent({
+        paymentId: checkout.paymentId,
+        adapter,
+        inbox,
+        acknowledge: (id) => payments.markEventProcessed(id),
+      }),
+    ).resolves.toBe("settled");
+    await expect(residency.balance(inviter.expertId)).resolves.toMatchObject({
+      availableCreditMinor: "75000",
+      reservedCreditMinor: "0",
     });
     const settledFacts = await testDb!.db.execute<{
       status: string;
@@ -211,7 +242,7 @@ describe("sandbox payment provider end to end", () => {
       firsts: number;
       grants: number;
     }>(
-      sql`select (select status from expert_residency_orders where id=${order.id}::uuid) status,(select count(*)::int from expert_residency_payment_attempts where order_id=${order.id}::uuid) attempts,(select count(*)::int from expert_first_residency_settlements where qualifying_order_id=${order.id}::uuid) firsts,(select count(*)::int from expert_referral_reward_grants where qualifying_order_id=${order.id}::uuid) grants`,
+      sql`select (select status from expert_residency_orders where id=${order.id}::uuid) status,(select count(*)::int from expert_residency_payment_attempts where order_id=${order.id}::uuid) attempts,(select count(*)::int from expert_first_residency_settlements where qualifying_order_id=${qualifyingOrder.id}::uuid) firsts,(select count(*)::int from expert_referral_reward_grants where qualifying_order_id=${qualifyingOrder.id}::uuid) grants`,
     );
     expect(settledFacts.rows[0]).toEqual({
       status: "settled",
@@ -220,7 +251,15 @@ describe("sandbox payment provider end to end", () => {
       grants: 1,
     });
 
-    await approveAndTransition("refunded", 1);
+    const emitted = await testDb!.db.execute<{
+      audits: number;
+      outbox: number;
+    }>(
+      sql`select (select count(*)::int from audit_events where object_id=${order.id}::uuid and action='expert_residency.settle') audits,(select count(*)::int from integration_outbox where reconciliation_key=${`expert-residency:${order.id}`}) outbox`,
+    );
+    expect(emitted.rows[0]).toEqual({ audits: 1, outbox: 1 });
+
+    await approveAndTransition(checkout, "refunded", 1);
     await expect(
       Promise.all([
         deliverSandboxPaymentEvent({
@@ -238,19 +277,24 @@ describe("sandbox payment provider end to end", () => {
       ]),
     ).resolves.toEqual(["refunded", "refunded"]);
     await expect(residency.balance(inviter.expertId)).resolves.toMatchObject({
-      availableCreditMinor: "0",
+      availableCreditMinor: "75000",
+      reservedCreditMinor: "0",
     });
     const finalFacts = await testDb!.db.execute<{
       status: string;
       debt: string;
       sandboxTables: number;
+      reversals: number;
+      sandboxLedgerSources: number;
     }>(
-      sql`select (select status from expert_residency_orders where id=${order.id}::uuid) status,(select debt_minor::text from expert_referral_balances where expert_id=${inviter.expertId}::uuid) debt,(select count(*)::int from information_schema.tables where table_schema='public' and table_name like 'sandbox_expert_residency_%') "sandboxTables"`,
+      sql`select (select status from expert_residency_orders where id=${order.id}::uuid) status,(select debt_minor::text from expert_referral_balances where expert_id=${inviter.expertId}::uuid) debt,(select count(*)::int from information_schema.tables where table_schema='public' and table_name like 'sandbox_expert_residency_%') "sandboxTables",(select count(*)::int from expert_residency_provider_event_inbox where payment_id=${checkout.paymentId} and event_kind='refunded' and status='processed') reversals,(select count(*)::int from expert_referral_ledger_entries where source_type like 'sandbox%') "sandboxLedgerSources"`,
     );
     expect(finalFacts.rows[0]).toMatchObject({
       status: "refunded",
       debt: "0",
       sandboxTables: 4,
+      reversals: 1,
+      sandboxLedgerSources: 0,
     });
   }, 120_000);
 });

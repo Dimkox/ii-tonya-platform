@@ -379,15 +379,62 @@ export class PostgresSandboxPaymentRepository {
   ): Promise<SandboxProviderEvent | null> {
     const parsedPaymentId =
       transitionSandboxPaymentCommandSchema.shape.paymentId.parse(paymentId);
-    const result = await this.db.execute<{ payload: unknown }>(sql`
-      select payload
+    const result = await this.db.execute<{
+      eventId: string;
+      paymentId: string;
+      transitionKind: string;
+      payloadDigest: string;
+      payload: unknown;
+      correlationId: string;
+      occurredAt: Date | string;
+    }>(sql`
+      select event_id as "eventId", payment_id as "paymentId",
+        transition_kind as "transitionKind", payload_digest as "payloadDigest",
+        payload, correlation_id as "correlationId", occurred_at as "occurredAt"
       from sandbox_expert_residency_events
-      where payment_id = ${parsedPaymentId} and processed_at is null
+      where (payment_id = ${parsedPaymentId} or payload->>'paymentId' = ${parsedPaymentId})
+        and processed_at is null
       order by occurred_at, event_id
       limit 1
     `);
     const row = result.rows[0];
-    return row ? repositoryEvent(row.payload) : null;
+    if (!row) return null;
+    try {
+      const event = sandboxProviderEventSchema.parse(row.payload);
+      const eventFacts = {
+        provider: event.provider,
+        eventId: event.eventId,
+        kind: event.kind,
+        paymentId: event.paymentId,
+        orderId: event.orderId,
+        amountMinor: event.amountMinor,
+        currency: event.currency,
+        occurredAt: event.occurredAt,
+        correlationId: event.correlationId,
+        state: event.state,
+        version: event.version,
+      };
+      const occurredAt = isoInstant(row.occurredAt);
+      if (
+        row.eventId !== event.eventId ||
+        row.paymentId !== event.paymentId ||
+        row.transitionKind !== event.kind ||
+        row.payloadDigest !== event.payloadDigest ||
+        row.correlationId !== event.correlationId ||
+        occurredAt !== event.occurredAt ||
+        payloadDigest(eventFacts) !== event.payloadDigest
+      ) {
+        throw new Error("sandbox_event_integrity_failed");
+      }
+      return repositoryEvent(event);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "sandbox_event_integrity_failed"
+      )
+        throw error;
+      throw new Error("sandbox_event_integrity_failed", { cause: error });
+    }
   }
 
   async markEventProcessed(eventId: string): Promise<void> {

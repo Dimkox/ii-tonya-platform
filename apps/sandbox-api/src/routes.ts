@@ -243,6 +243,11 @@ export async function buildSandboxRoutes(
         correlationId: request.body.correlationId,
       });
       if (!result.allowed) return reply.code(403).send({ error: "forbidden" });
+      try {
+        await deps.deliverPayment(request.params.paymentId);
+      } catch {
+        return reply.code(503).send({ error: "delivery_pending" });
+      }
       return reply.code(200).send({
         replayed: result.replayed,
         event: result.event,
