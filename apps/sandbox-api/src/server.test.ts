@@ -133,6 +133,18 @@ describe("sandbox server composition", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("sanitizes signal cleanup rejection and sets a nonzero exit", async () => {
+    const previousExitCode = process.exitCode;
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await main({ env: validEnv(), runtimeFactory: async () => ({ dependencies: dependencies() as never, close: async () => { throw new Error("secret detail"); } }), listen: async () => undefined, installSignals: true });
+    process.emit("SIGTERM");
+    await vi.waitFor(() => expect(process.exitCode).toBe(1));
+    expect(stderr).toHaveBeenCalledWith("sandbox_shutdown_failed\n");
+    expect(stderr.mock.calls.flat().join("")).not.toContain("secret detail");
+    stderr.mockRestore();
+    process.exitCode = previousExitCode;
+  });
+
   it("detects only direct execution", () => {
     expect(isDirectExecution(import.meta.url, process.argv[1])).toBe(false);
     expect(isDirectExecution(import.meta.url, new URL(import.meta.url).pathname)).toBe(true);
