@@ -1,0 +1,22 @@
+[Unit]
+Description=ii-Tonya database migration
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=ii_tonya
+Group=ii_tonya
+WorkingDirectory=/opt/ii-tonya-platform/current/api
+EnvironmentFile=/etc/ii-tonya/runtime.env
+ExecStart=/usr/bin/node migrate-native.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=

@@ -157,7 +157,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "574386ac642352e3137a25d3a8722982b7a8bd1a73cd371972fd339ec5754b48",
+    "d44bc93073ca4f313b660495a32bacd8c339971798268ff65b6b2726c2991bf0",
   ],
   [
     "packages/application/package.json",
@@ -198,20 +198,32 @@ const approvedPackageManifestHashes = new Map([
 ]);
 const approvedAutomationArtifactHashes = new Map([
   [
-    ".github/workflows/ci.yml",
-    "5baf0eab124103230e3f9748d2d2d58fa4262e9506c94d15ccfa3300cd01ca0f",
+    "scripts/run-claw-ci.sh",
+    "a1a7c368701306176a3318fc4a4a3a52ca88f8be23ac4feddc40d190160aa777",
   ],
   [
-    ".github/workflows/db-gate.yml",
-    "7e057dc2975e1c65994cf802b87bf36cbf443e4fbf85122a957ea9ca3d3466f2",
+    "scripts/build-native-release.sh",
+    "01663eea804e59f5803e6a65d567b472fac8f413562c07af1cc3b4d74408143b",
   ],
   [
-    ".github/workflows/release.yml",
-    "185f7d06475b6bbcdc756cb74cf47c5927a56d1737a677c990999ccc94895f91",
+    "scripts/deploy-native-remote.sh",
+    "cf2ea374851a632c120856ec263f16cf2124aa1f5cad4a6bde648ad5f37290c1",
   ],
   [
-    "deploy/compose.remote.yml",
-    "770925eae581bbd1fea73d4d52e526cbf26d7c28cfa241585b29ae38c37d4f17",
+    "scripts/migrate-native.mjs",
+    "b41b805e9c57cb9d93f296e0e18bc408c9b628e312302d09d197a650c6ffba2d",
+  ],
+  [
+    "deploy/systemd/ii-tonya-api.service",
+    "8623f475796d072125651df917e6b96c0ea9bfc1cb4eb3a8bc90aae648d62785",
+  ],
+  [
+    "deploy/systemd/ii-tonya-worker.service",
+    "c67bc5a7dbe04cdfb743c37ddb712a5084601c2f88d4558218a35320cf71ec5a",
+  ],
+  [
+    "deploy/systemd/ii-tonya-migrate.service",
+    "fb09dbfba550a66abf46cea65cd9348d68c345ef76df8af2ed923ddd0b19176f",
   ],
   [
     "deploy/claw/dockerfile.test",
@@ -220,14 +232,6 @@ const approvedAutomationArtifactHashes = new Map([
   [
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
-  ],
-  [
-    "scripts/run-claw-actions-job.sh",
-    "21331d707dc7eb06a01d03bbd1b5c783b2a2deef0dd53e983deff2c1b93e85f7",
-  ],
-  [
-    "scripts/deploy-compose-remote.sh",
-    "3448eb38e5b561534bfdfda3d8edc0af58becf271cd0899a3b6d93fbe58a4f7e",
   ],
   [
     "scripts/validate-runtime-env.sh",

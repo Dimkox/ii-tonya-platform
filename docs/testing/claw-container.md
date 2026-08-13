@@ -1,9 +1,9 @@
 # Claw container test contract
 
 Tests run on the profiled `ii-tonya-test` service in
-`/home/pall/app-stack/docker-compose.yml`. Developers may invoke it through direct SSH;
-the CI and Database Gate workflows invoke the same profile through the repository-scoped
-self-hosted runner. GitHub-hosted runners are not used.
+`/home/pall/app-stack/docker-compose.yml`. CI, Database Gate, and release assembly are
+invoked directly through `scripts/run-claw-ci.sh`; GitHub Actions are not used. The
+container imitates the dedicated native server but is never a production artifact.
 
 ```bash
 install -d -m 0750 -o 1000 -g 1000 /home/pall/app-stack/ii-tonya-test-workspace
@@ -30,18 +30,12 @@ before creating its runtime-only proxy configuration. Evidence is
 written to `/home/pall/app-stack/ii-tonya-test-workspace/results/<source-sha>/` and only
 sanitized summaries/checksums are committed to `docs/test-evidence/`.
 
-The repository runner is installed at `/home/pall/actions-runner-ii-tonya` and advertises
-`self-hosted`, `linux`, `x64`, `claw`, and `ii-tonya-test`. Workflow code calls
-`scripts/run-claw-actions-job.sh`; the wrapper rejects other hosts and workspaces, then
-mounts only the checked-out source into the constrained test container. Pull-request jobs
-also require the pull-request author to be the repository owner, so fork code cannot run
-on this machine. Database concurrency tests repeat exactly three times.
+`scripts/run-claw-ci.sh` rejects non-Claw hosts, requires an explicit source root and full
+Git SHA, verifies the checked-out commit, then mounts only that source into the constrained
+test container. Database concurrency tests repeat exactly three times. GitHub stores the
+resulting commit and PR; sanitized exact-SHA evidence is committed in the repository.
 
-Release jobs do not run on that test identity. The separate runner
-`ii-tonya-release-claw` is installed at `/home/ii_tonya_release/actions-runner`, runs as
-the locked `ii_tonya_release` OS account, advertises `claw` and `ii-tonya-release` but not
-`ii-tonya-test`, and is not a member of the Docker group. Release workflows remove SSH
-keys, rollback state, downloaded provenance, and evidence working files with `always()`
-cleanup steps.
+Production release uses the checksummed native bundle from the release gate and
+`scripts/deploy-native-remote.sh`. It does not reuse this container, Docker, or Compose.
 
 Latest committed evidence: [`7d71646347d560ff2b5d8ebc4c0aad5b48230254`](../test-evidence/claw/7d71646347d560ff2b5d8ebc4c0aad5b48230254/verification.md).

@@ -445,10 +445,12 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
-  it("pins the current approved workflow content", () => {
+  it("rejects GitHub Actions as unapproved executable automation", () => {
     const path = ".github/workflows/db-gate.yml";
-    const content = readFileSync(path, "utf8");
-    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    const content = "jobs: {}\n";
+    expect(classifyApprovedTrackedScopeContent({ path, content })).not.toEqual(
+      [],
+    );
     expect(
       classifyApprovedTrackedScopeContent({
         path,
@@ -475,24 +477,21 @@ describe("MVP scope boundary", () => {
     expect(testkit).toContain("createTestClockAdminRepository");
   });
 
-  it.each([
-    "Dockerfile",
-    "compose.yaml",
-    "deploy/compose.remote.yml",
-    ".github/workflows/ci.yml",
-    ".github/workflows/release.yml",
-    "scripts/deploy-compose-remote.sh",
-    "scripts/validate-runtime-env.sh",
-  ])("pins reviewed Task21/22/23 release automation content for %s", (path) => {
-    const content = readFileSync(path, "utf8");
-    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
-    expect(
-      classifyApprovedTrackedScopeContent({
-        path,
-        content: `${content}\n# unreviewed mutation\n`,
-      }),
-    ).not.toEqual([]);
-  });
+  it.each(["Dockerfile", "compose.yaml", "scripts/validate-runtime-env.sh"])(
+    "pins reviewed Task21/22/23 release automation content for %s",
+    (path) => {
+      const content = readFileSync(path, "utf8");
+      expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual(
+        [],
+      );
+      expect(
+        classifyApprovedTrackedScopeContent({
+          path,
+          content: `${content}\n# unreviewed mutation\n`,
+        }),
+      ).not.toEqual([]);
+    },
+  );
 
   it("recursively rejects forbidden tracked production artifacts", () => {
     const tracked = execFileSync("git", ["ls-files", "-z"], {
@@ -504,7 +503,10 @@ describe("MVP scope boundary", () => {
     expect(tracked.length).toBeLessThanOrEqual(PAYMENT_SCOPE_MAX_TRACKED_FILES);
 
     const violations: string[] = [];
-    for (const path of tracked.filter(isPaymentScopeInspectionPath)) {
+    for (const path of tracked.filter(
+      (candidate) =>
+        existsSync(candidate) && isPaymentScopeInspectionPath(candidate),
+    )) {
       const size = statSync(path).size;
       if (size > PAYMENT_SCOPE_MAX_FILE_BYTES) {
         violations.push(`${path}: exceeds bounded inspection size`);

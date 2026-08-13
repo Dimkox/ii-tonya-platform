@@ -146,22 +146,22 @@ flowchart LR
 
 ## 4. Modules and boundaries
 
-| Module | Owns | May call | Must not own |
-|---|---|---|---|
-| Identity and consent | clients, external identities, contact verification, consent | audit, provider identity resolution | booking or financial balances |
-| Client profile | explicitly collected preferences and request summaries | consent, encryption, LLM context builder | inferred diagnosis or unrestricted dialog history |
-| Catalog | experts, services, formats, prices, eligibility metadata | Planerka reference mapping | live availability |
-| Scheduling | normalized Planerka availability and meeting metadata | Planerka adapter | coupons or package balances |
-| Booking | reservation state machine, capacity, reschedule, waitlist | scheduling, billing authorization, outbox | provider-specific status strings |
-| Messaging packages | package grants and per-message ledger | payment, conversation delivery events | mutable cached balance as truth |
-| Coupons and referrals | coupon grants, expiry, redemption, reversal, referral qualification | payment and booking | payment-provider transaction state |
-| Payments | orders, provider events, settlement, refund, chargeback, reconciliation | package/coupon grant commands | direct client messaging |
-| Conversation | conversations, provider messages, prompt versions, delivery state | LLM, safety, package metering | commercial mutations outside typed commands |
-| Safety | deterministic triage, approved response, human escalation, incident audit | conversation and operator notification | autonomous medical diagnosis |
-| Notification | templates, delivery attempts, reminders, quiet periods | outbox and channel adapters | deciding domain transitions |
-| Integration | inbox, outbox, provider cursors, dead letters, reconciliation | all adapters | product policy |
-| Projection | Make events, Sheets views, analytics extracts | integration outbox | authoritative writes |
-| Audit and operations | actor/action trail, support tools, feature flags, kill switches | all modules | silent data repair |
+| Module                | Owns                                                                      | May call                                  | Must not own                                      |
+| --------------------- | ------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| Identity and consent  | clients, external identities, contact verification, consent               | audit, provider identity resolution       | booking or financial balances                     |
+| Client profile        | explicitly collected preferences and request summaries                    | consent, encryption, LLM context builder  | inferred diagnosis or unrestricted dialog history |
+| Catalog               | experts, services, formats, prices, eligibility metadata                  | Planerka reference mapping                | live availability                                 |
+| Scheduling            | normalized Planerka availability and meeting metadata                     | Planerka adapter                          | coupons or package balances                       |
+| Booking               | reservation state machine, capacity, reschedule, waitlist                 | scheduling, billing authorization, outbox | provider-specific status strings                  |
+| Messaging packages    | package grants and per-message ledger                                     | payment, conversation delivery events     | mutable cached balance as truth                   |
+| Coupons and referrals | coupon grants, expiry, redemption, reversal, referral qualification       | payment and booking                       | payment-provider transaction state                |
+| Payments              | orders, provider events, settlement, refund, chargeback, reconciliation   | package/coupon grant commands             | direct client messaging                           |
+| Conversation          | conversations, provider messages, prompt versions, delivery state         | LLM, safety, package metering             | commercial mutations outside typed commands       |
+| Safety                | deterministic triage, approved response, human escalation, incident audit | conversation and operator notification    | autonomous medical diagnosis                      |
+| Notification          | templates, delivery attempts, reminders, quiet periods                    | outbox and channel adapters               | deciding domain transitions                       |
+| Integration           | inbox, outbox, provider cursors, dead letters, reconciliation             | all adapters                              | product policy                                    |
+| Projection            | Make events, Sheets views, analytics extracts                             | integration outbox                        | authoritative writes                              |
+| Audit and operations  | actor/action trail, support tools, feature flags, kill switches           | all modules                               | silent data repair                                |
 
 Cross-module calls use commands and immutable events. Modules do not update another
 module's tables directly.
@@ -485,16 +485,16 @@ rebuilt from PostgreSQL plus checkpoints.
 
 The following source material must not be copied into deployment:
 
-| Source | Rejection | Reusable portion |
-|---|---|---|
-| “8 ready Make JSON scenarios,” lines 1512–2156 | Valid generic JSON but not Make blueprint schema; no real modules, mappings, routes, connections, or scheduling | workflow names and acceptance intent |
-| Added scenarios, lines 2376–2537 | Same pseudo-schema; coupon block at lines 2490–2537 is not valid JSON because it has two root objects | event fields and coupon decision points |
-| Duplicate expert scenario, lines 4100–4222 | Generic JSON repeated from earlier draft, not importable | expert action cases |
-| “13 scenario ZIP,” lines 2585–3025 | No archive exists; source explicitly says it cannot create one, and prompt files are placeholders | proposed folder naming only |
-| Planerka/Selarti examples, lines 3358–3410 | Unverified domains, endpoints, event names, and Stripe-like placeholder keys | list of required capabilities |
-| Eight-sheet schema, lines 3033–3187 | Missing keys and transactional constraints; duplicates derived balances; stores sensitive dialogs | column vocabulary for projections |
-| Telegram keyboard, lines 4231–4246 | Lacks reservation context and authorization; callback action alone is unsafe | labels and layout |
-| Client/expert prompts | Contain contradictions and high-stakes instructions; cannot mutate data by themselves | tone, prohibited wording, UX templates |
+| Source                                         | Rejection                                                                                                       | Reusable portion                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| “8 ready Make JSON scenarios,” lines 1512–2156 | Valid generic JSON but not Make blueprint schema; no real modules, mappings, routes, connections, or scheduling | workflow names and acceptance intent    |
+| Added scenarios, lines 2376–2537               | Same pseudo-schema; coupon block at lines 2490–2537 is not valid JSON because it has two root objects           | event fields and coupon decision points |
+| Duplicate expert scenario, lines 4100–4222     | Generic JSON repeated from earlier draft, not importable                                                        | expert action cases                     |
+| “13 scenario ZIP,” lines 2585–3025             | No archive exists; source explicitly says it cannot create one, and prompt files are placeholders               | proposed folder naming only             |
+| Planerka/Selarti examples, lines 3358–3410     | Unverified domains, endpoints, event names, and Stripe-like placeholder keys                                    | list of required capabilities           |
+| Eight-sheet schema, lines 3033–3187            | Missing keys and transactional constraints; duplicates derived balances; stores sensitive dialogs               | column vocabulary for projections       |
+| Telegram keyboard, lines 4231–4246             | Lacks reservation context and authorization; callback action alone is unsafe                                    | labels and layout                       |
+| Client/expert prompts                          | Contain contradictions and high-stakes instructions; cannot mutate data by themselves                           | tone, prohibited wording, UX templates  |
 
 Machine validation of the source found 19 fenced JSON blocks: 18 are syntactically valid
 and one, the coupon block, is invalid. Syntactic validity does not make the remaining
@@ -657,6 +657,10 @@ Staging covers:
 
 ## 16. CI/CD
 
+GitHub Actions are not used. All mandatory commands are launched directly on Claw with
+an explicit source root and exact Git SHA; GitHub is only the Git/PR store. The Claw
+container imitates the dedicated server runtime while production remains native.
+
 ### Pull request pipeline
 
 1. formatting, linting, type checking, and documentation link checks;
@@ -664,21 +668,26 @@ Staging covers:
 3. PostgreSQL integration and migration tests;
 4. provider contract tests against fixtures;
 5. API/schema compatibility checks;
-6. secret scanning, SAST, dependency/license checks, SBOM, and container scan;
-7. deterministic container build pinned by lockfile and base-image digest.
+6. secret scanning, SAST, dependency/license checks, and source/dependency SBOM;
+7. deterministic dev/test container build pinned by lockfile and base-image digest;
+8. deterministic native production-bundle build and executable import/start smoke.
 
-### Main branch pipeline
+### Main branch release gate
 
-1. sign and publish immutable API and worker images;
-2. apply migrations to an isolated staging copy;
-3. deploy staging with sandbox providers;
+1. sign and publish one immutable native API/worker release bundle;
+2. apply migrations to an isolated native staging copy;
+3. deploy the bundle to native staging with sandbox providers;
 4. run smoke, end-to-end, reconciliation, backup, and restore tests;
 5. retain evidence and require explicit production approval.
 
 ### Production release
 
+- dedicated Linux server; no application containers or production Docker dependency;
+- Node.js 24 API and worker as separate non-root systemd services;
+- system PostgreSQL and nginx/TLS on the same dedicated host;
+- signed immutable bundle with atomic `releases/<sha>` and `current` symlink switch;
 - expand/contract database migrations;
-- rolling or blue/green deployment;
+- systemd restart with readiness gate and rollback to the prior compatible bundle;
 - migration and adapter kill switches;
 - canary traffic limited to approved internal/test identities;
 - automatic rollback on health, invariant, or reconciliation failure;
@@ -689,20 +698,22 @@ Staging covers:
 
 ### Local
 
-- PostgreSQL plus API and worker;
+- PostgreSQL plus API and worker, optionally under Docker/Compose;
 - deterministic fake clock;
 - mock Selarti, Planerka, Telegram, payment, LLM, Make, and Sheets adapters;
 - synthetic data only.
 
 ### CI
 
-- ephemeral database;
+- direct Claw execution in ephemeral containerized database and test runtimes that
+  imitate the dedicated server;
 - recorded provider fixtures;
 - no network dependency for required tests.
 
 ### Staging
 
-- production-equivalent topology and migrations;
+- production-equivalent native systemd topology and migrations without application
+  containers;
 - provider sandbox or dedicated test accounts;
 - allowlisted Telegram experts and Selarti clients;
 - test payment instruments only;
@@ -768,16 +779,16 @@ All are mandatory:
 
 ## 20. Traceability summary
 
-| Capability | Source | Design owner | Readiness |
-|---|---|---|---|
-| Client assistant and prohibited wording | 20–60, 641–700 | Conversation, prompt versions | draft; safety review required |
-| Gradual profile | 66–86 | Identity/profile/consent | data minimization required |
-| Expert matching | 194–258 | Catalog and deterministic search plus LLM presentation | qualification rules required |
-| Booking and waitlist | 296–395 | Booking/scheduling | 24h/72h conflict blocks live |
-| Message packages | 414–508 | Package/message ledger | zero-balance policy open |
-| Safety | 514–532 | Safety and human escalation | external review blocks live |
-| Expert Telegram bot | 1061–1468 | Telegram adapter and authorized expert API | provider contract required |
-| Make workflows | 711–992, 1472–2584 | Rejected as runtime; retained as acceptance intent | must be rebuilt |
-| Sheets | 717–779, 3033–3187 | Projection/catalog import | not authoritative |
-| Payments and coupons | 130–173, 2292–2301 | Payment/coupon/referral ledgers | provider and rules missing |
-| Reminders and post-visit | 401–408, 538–555 | Durable notification jobs | consent/quiet policy required |
+| Capability                              | Source             | Design owner                                           | Readiness                     |
+| --------------------------------------- | ------------------ | ------------------------------------------------------ | ----------------------------- |
+| Client assistant and prohibited wording | 20–60, 641–700     | Conversation, prompt versions                          | draft; safety review required |
+| Gradual profile                         | 66–86              | Identity/profile/consent                               | data minimization required    |
+| Expert matching                         | 194–258            | Catalog and deterministic search plus LLM presentation | qualification rules required  |
+| Booking and waitlist                    | 296–395            | Booking/scheduling                                     | 24h/72h conflict blocks live  |
+| Message packages                        | 414–508            | Package/message ledger                                 | zero-balance policy open      |
+| Safety                                  | 514–532            | Safety and human escalation                            | external review blocks live   |
+| Expert Telegram bot                     | 1061–1468          | Telegram adapter and authorized expert API             | provider contract required    |
+| Make workflows                          | 711–992, 1472–2584 | Rejected as runtime; retained as acceptance intent     | must be rebuilt               |
+| Sheets                                  | 717–779, 3033–3187 | Projection/catalog import                              | not authoritative             |
+| Payments and coupons                    | 130–173, 2292–2301 | Payment/coupon/referral ledgers                        | provider and rules missing    |
+| Reminders and post-visit                | 401–408, 538–555   | Durable notification jobs                              | consent/quiet policy required |

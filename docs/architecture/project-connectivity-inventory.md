@@ -18,51 +18,51 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 
 ## CI, automation, deployment, and server control
 
-| Entity                                            | Graph connection                                                                               | Status                                                             |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `.github/workflows/ci.yml`                        | verification in constrained Claw container, coverage, secret scan, container smoke, provenance | ACTIVE; self-hosted Claw                                           |
-| `.github/workflows/db-gate.yml`                   | migrations/schema + repeated expert financial concurrency/deadline/replay                      | ACTIVE; self-hosted Claw                                           |
-| `.github/workflows/release.yml`                   | signed provenance -> staged release evidence -> release                                        | ACTIVE POLICY; manual, self-hosted Claw; provider activation gated |
-| `.github/workflows/server-control.yml`            | manual explicit refusal; no checkout or command execution                                      | DISABLED; cannot deploy                                            |
-| `.github/workflows/server-native.yml`             | disabled legacy native-deploy recovery reference                                               | DISABLED; cannot deploy                                            |
-| `ops/server-command.sh`                           | retained native recovery implementation; not workflow-reachable                                | LEGACY/HISTORICAL                                                  |
-| `scripts/bootstrap-native-runner.sh`              | retained bootstrap history for the offline native runner                                       | LEGACY/HISTORICAL                                                  |
-| `Dockerfile`                                      | packaged runtime -> CI container smoke                                                         | ACTIVE                                                             |
-| `compose.yaml`                                    | local packaged stack -> verification                                                           | ACTIVE                                                             |
-| `Dockerfile.sandbox`                              | isolated test-only sandbox API image                                                            | TEST-ONLY; build evidence blocked                                   |
-| `compose.sandbox.yaml`                            | isolated sandbox API + PostgreSQL lifecycle                                                     | TEST-ONLY; not production-connected                                 |
-| `scripts/run-sandbox-container-smoke.sh`          | marker-first lifecycle and cleanup                                                              | TEST TOOL; SBX-TST-009 not run                                      |
-| `deploy/compose.remote.yml`                       | release mechanics                                                                              | ACTIVE but gated                                                   |
-| `deploy/claw/Dockerfile.test`                     | exact test environment                                                                         | TEST/EVIDENCE                                                      |
-| `deploy/claw/Dockerfile.test.dockerignore`        | exact test container build                                                                     | TEST/EVIDENCE                                                      |
-| `deploy/runtime.env.example`                      | deployment env contract                                                                        | ACTIVE POLICY                                                      |
-| `scripts/check-development-environment.ps1`       | clean-machine toolchain validation                                                             | ACTIVE DEV TOOL                                                    |
-| `scripts/preflight-expert-referral-migration.mjs` | migration readiness/preflight                                                                  | ACTIVE RELEASE TOOL                                                |
-| `scripts/run-claw-container-tests.sh`             | remote/container verification                                                                  | ACTIVE TEST TOOL                                                   |
-| `scripts/validate-runtime-env.sh`                 | runtime fail-closed env validation                                                             | ACTIVE RELEASE TOOL                                                |
-| `scripts/repeat-vitest.mjs`                       | bounded local repeats / CI stability gate                                                      | ACTIVE TEST TOOL                                                   |
-| `scripts/deploy-compose-remote.sh`                | migration/deploy/rollback mechanics                                                            | ACTIVE RELEASE TOOL; gated                                         |
+| Entity                                            | Graph connection                                                              | Status                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- |
+| `.github/workflows/`                              | GitHub Actions                                                                | ABSENT BY POLICY; GitHub is Git/PR storage only     |
+| `scripts/run-claw-ci.sh`                          | direct exact-SHA CI/database/release gates in constrained Claw test container | ACTIVE                                              |
+| `scripts/build-native-release.sh`                 | exact-SHA native API/worker bundle + checksum/provenance                      | ACTIVE RELEASE TOOL                                 |
+| `scripts/deploy-native-remote.sh`                 | immutable native transfer, migration, systemd restart, readiness, rollback    | ACTIVE; production host confirmation still required |
+| `deploy/systemd/ii-tonya-*.service`               | API, worker, and one-shot migration on dedicated server                       | ACTIVE NATIVE PRODUCTION CONTRACT                   |
+| `Dockerfile`                                      | packaged dev/test runtime -> CI container smoke                               | TEST/EVIDENCE only                                  |
+| `compose.yaml`                                    | local packaged stack -> verification                                          | DEV/TEST only                                       |
+| `Dockerfile.sandbox`                              | isolated test-only sandbox API image                                          | TEST-ONLY; build evidence blocked                   |
+| `compose.sandbox.yaml`                            | isolated sandbox API + PostgreSQL lifecycle                                   | TEST-ONLY; not production-connected                 |
+| `scripts/run-sandbox-container-smoke.sh`          | marker-first lifecycle and cleanup                                            | TEST TOOL; SBX-TST-009 not run                      |
+| `deploy/claw/Dockerfile.test`                     | exact test environment                                                        | TEST/EVIDENCE                                       |
+| `deploy/claw/Dockerfile.test.dockerignore`        | exact test container build                                                    | TEST/EVIDENCE                                       |
+| `deploy/runtime.env.example`                      | deployment env contract                                                       | ACTIVE POLICY                                       |
+| `scripts/check-development-environment.ps1`       | clean-machine toolchain validation                                            | ACTIVE DEV TOOL                                     |
+| `scripts/preflight-expert-referral-migration.mjs` | migration readiness/preflight                                                 | ACTIVE RELEASE TOOL                                 |
+| `scripts/run-claw-container-tests.sh`             | remote/container verification                                                 | ACTIVE TEST TOOL                                    |
+| `scripts/validate-runtime-env.sh`                 | runtime fail-closed env validation                                            | ACTIVE RELEASE TOOL                                 |
+| `scripts/repeat-vitest.mjs`                       | bounded local repeats / direct Claw stability gate                            | ACTIVE TEST TOOL                                    |
 
-The native server control plane deploys the application shell to a self-hosted server, but its generated runtime environment keeps Selarti, Planerka, Telegram, LLM, Make, Sheets, intent model, and payments disabled. It is therefore `ACTIVE OPS`, not a live-provider business path.
+The old Actions-runner bootstrap and monolithic server command remain in Git history only.
+The approved production target is one dedicated Linux server with native Node.js API and
+worker systemd units, system PostgreSQL, and nginx/TLS. Application containers are
+dev/test-only. Claw uses a constrained container to imitate the server. The native
+bundle/systemd path is the sole production release path; live integrations stay disabled.
 
 ## Application and package roots
 
 All workspace roots are represented in the canonical graph and have containment plus actual dependency edges. Package-level orphan count is zero.
 
-| Root                     | Primary role                              | Production connectivity                                    |
-| ------------------------ | ----------------------------------------- | ---------------------------------------------------------- |
-| `apps/api`               | HTTP/webhook composition                  | application/config/db/integrations/observability           |
-| `apps/worker`            | bounded background lifecycle              | config/db/integrations/observability/worker                |
-| `apps/sandbox-api`       | test-only checkout/admin composition       | sandbox-only; never production                              |
-| `packages/application`   | deterministic use cases + prompt boundary | API/worker -> contracts/domain                             |
-| `packages/config`        | validated environment                     | both apps                                                  |
-| `packages/contracts`     | typed cross-boundary contracts            | application/db/integrations/worker                         |
-| `packages/db`            | PostgreSQL authority                      | both apps + worker/application paths                       |
-| `packages/domain`        | pure rules/properties                     | application/db/worker                                      |
-| `packages/integrations`  | external boundary adapters/contracts      | both apps/db/worker                                        |
-| `packages/observability` | logging/tracing/metrics                   | both apps                                                  |
-| `packages/worker`        | bounded job orchestration                 | app-worker -> application/contracts/db/domain/integrations |
-| `packages/sandbox-payments` | test-only persistence/verifier/adapter/workflow | sandbox-api only; prohibited from production closure    |
+| Root                        | Primary role                                    | Production connectivity                                    |
+| --------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
+| `apps/api`                  | HTTP/webhook composition                        | application/config/db/integrations/observability           |
+| `apps/worker`               | bounded background lifecycle                    | config/db/integrations/observability/worker                |
+| `apps/sandbox-api`          | test-only checkout/admin composition            | sandbox-only; never production                             |
+| `packages/application`      | deterministic use cases + prompt boundary       | API/worker -> contracts/domain                             |
+| `packages/config`           | validated environment                           | both apps                                                  |
+| `packages/contracts`        | typed cross-boundary contracts                  | application/db/integrations/worker                         |
+| `packages/db`               | PostgreSQL authority                            | both apps + worker/application paths                       |
+| `packages/domain`           | pure rules/properties                           | application/db/worker                                      |
+| `packages/integrations`     | external boundary adapters/contracts            | both apps/db/worker                                        |
+| `packages/observability`    | logging/tracing/metrics                         | both apps                                                  |
+| `packages/worker`           | bounded job orchestration                       | app-worker -> application/contracts/db/domain/integrations |
+| `packages/sandbox-payments` | test-only persistence/verifier/adapter/workflow | sandbox-api only; prohibited from production closure       |
 
 ## Expert referral / residency implementation coverage
 
