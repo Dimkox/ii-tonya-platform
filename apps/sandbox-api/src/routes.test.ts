@@ -66,6 +66,38 @@ describe("sandbox payment routes", () => {
     await app.close();
   });
 
+  it("creates a checkout through the packaged sandbox adapter", async () => {
+    deps.paymentAdapter.createCheckout.mockResolvedValueOnce({
+      kind: "redirect",
+      paymentId,
+      checkoutUrl: `http://127.0.0.1:3001/sandbox/v1/payments/${paymentId}`,
+    });
+    const app = await buildSandboxRoutes(deps as never);
+    const response = await app.inject({
+      method: "POST",
+      url: "/sandbox/v1/checkouts",
+      payload: {
+        orderId: "00000000-0000-4000-8000-000000000030",
+        amountMinor: "25000",
+        currency: "RUB",
+        idempotencyKey: "checkout-container-0001",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(deps.paymentAdapter.createCheckout).toHaveBeenCalledOnce();
+    expect(response.json()).toMatchObject({ paymentId });
+    await app.close();
+  });
+
+  it("reports readiness only after the sandbox database marker is readable", async () => {
+    const app = await buildSandboxRoutes(deps as never);
+    expect((await app.inject({ method: "GET", url: "/health/ready" })).statusCode).toBe(200);
+    expect(deps.paymentAdapter.assertSandboxDatabase).toHaveBeenCalled();
+    deps.paymentAdapter.assertSandboxDatabase.mockRejectedValueOnce(new Error("db"));
+    expect((await app.inject({ method: "GET", url: "/health/ready" })).statusCode).toBe(503);
+    await app.close();
+  });
+
   it.each([undefined, "bearer " + token, "Bearer short", `Bearer ${token}!`])(
     "requires the exact admin Bearer boundary: %s",
     async (authorization) => {
