@@ -50,7 +50,6 @@ case "$CLAW_GATE_MODE" in
     pnpm verify:deploy
     pnpm lint
     pnpm typecheck
-    pnpm exec vitest run --maxWorkers=1
     pnpm exec vitest run --coverage --maxWorkers=1
     docker run --rm -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 \
       detect --source=/repo --config=/repo/.gitleaks.toml \
