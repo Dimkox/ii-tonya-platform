@@ -213,4 +213,15 @@ describe("sandbox payment routes", () => {
     expect(fault.json()).toEqual({ error: "internal_error" });
     await app.close();
   });
+
+  it("limits admin mutations to 30 per minute with a sanitized response", async () => {
+    const app = await buildSandboxRoutes(deps as never);
+    for (let index = 0; index < 30; index += 1) {
+      expect((await app.inject({ method: "POST", url: `/sandbox/v1/admin/approvals/${approvalId}/approve`, headers: { authorization: `Bearer ${token}` }, payload: {} })).statusCode).toBe(200);
+    }
+    const limited = await app.inject({ method: "POST", url: `/sandbox/v1/admin/approvals/${approvalId}/approve`, headers: { authorization: `Bearer ${token}` }, payload: {} });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toEqual({ error: "rate_limited" });
+    await app.close();
+  });
 });

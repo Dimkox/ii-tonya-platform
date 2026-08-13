@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertSandboxRuntimeEnvironment,
   buildSandboxServer,
+  isDirectExecution,
+  main,
 } from "./server.js";
 
 const validEnv = (): NodeJS.ProcessEnv => ({
@@ -46,20 +48,25 @@ describe("sandbox runtime guard", () => {
       { ...validEnv(), TELEGRAM_ENABLED: "true" },
       "sandbox_live_integration_forbidden",
     ],
+    [{ ...validEnv(), MINOR_ONBOARDING_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
+    [{ ...validEnv(), EXPERT_REFERRAL_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
+    [{ ...validEnv(), EXPERT_RESIDENCY_BILLING_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
+    [{ ...validEnv(), UNREVIEWED_FEATURE_ENABLED: "false" }, "sandbox_unsupported_enable_flag"],
     [
       { ...validEnv(), PAYMENT_API_KEY: "present" },
       "sandbox_payment_credentials_forbidden",
     ],
     [
-      { ...validEnv(), PAYMENTS_PROVIDER: "present" },
+      { ...validEnv(), PAYMENTS_PROVIDER: " " },
       "sandbox_payment_credentials_forbidden",
     ],
+    [{ ...validEnv(), PAYMENT_MERCHANT_PASSWORD: "present" }, "sandbox_payment_credentials_forbidden"],
   ])("rejects unsafe environment %#", (env, message) => {
     expect(() => assertSandboxRuntimeEnvironment(env)).toThrow(message);
   });
 
   it("accepts only the explicit sandbox fail-closed environment", () => {
-    expect(() => assertSandboxRuntimeEnvironment(validEnv())).not.toThrow();
+    expect(() => assertSandboxRuntimeEnvironment({ ...validEnv(), PAYMENT_API_KEY: "" })).not.toThrow();
   });
 });
 
@@ -93,5 +100,26 @@ describe("sandbox server composition", () => {
     });
     expect(response.statusCode).toBe(200);
     await app.close();
+  });
+
+  it("composes, listens, and closes the real database lifecycle", async () => {
+    const close = vi.fn(async () => undefined);
+    const listen = vi.fn(async () => undefined);
+    const runtimeFactory = vi.fn(async () => ({ dependencies: dependencies() as never, close }));
+    await main({ env: validEnv(), runtimeFactory, listen, installSignals: false });
+    expect(runtimeFactory).toHaveBeenCalledOnce();
+    expect(listen).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("closes the database when listen fails", async () => {
+    const close = vi.fn(async () => undefined);
+    await expect(main({ env: validEnv(), runtimeFactory: async () => ({ dependencies: dependencies() as never, close }), listen: async () => { throw new Error("listen failed"); }, installSignals: false })).rejects.toThrow("listen failed");
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("detects only direct execution", () => {
+    expect(isDirectExecution(import.meta.url, process.argv[1])).toBe(false);
+    expect(isDirectExecution(import.meta.url, new URL(import.meta.url).pathname)).toBe(true);
   });
 });

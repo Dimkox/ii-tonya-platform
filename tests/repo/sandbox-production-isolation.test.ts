@@ -55,6 +55,16 @@ describe("sandbox production isolation", () => {
     }
   });
 
+  it("publishes a real executable sandbox entrypoint", () => {
+    const manifest = JSON.parse(readFileSync("apps/sandbox-api/package.json", "utf8")) as { scripts?: { start?: string } };
+    expect(manifest.scripts?.start).toBe("node dist/server.js");
+    const server = readFileSync("apps/sandbox-api/src/server.ts", "utf8");
+    expect(server).toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+    expect(server).toContain("new PostgresSandboxPaymentRepository");
+    expect(server).toContain("new SandboxTransitionWorkflow");
+    expect(server).toContain("if (isDirectExecution(import.meta.url, process.argv[1]))");
+  });
+
   it("keeps the shared approval object-type map exhaustive without composing sandbox", () => {
     const repository = readFileSync(
       "packages/db/src/repositories/admin-repository.ts",
