@@ -17,7 +17,11 @@ Owner: Release owner. Independent reviewer: unassigned. Production deployment ad
 | Provider-connected staging record                                 | `docs/runbooks/provider-staging-evidence.md` | not executed | Integrations     | unassigned           | blocked                |
 | Rollback drill using prior immutable digest                       | unavailable                                  | not executed | Incident command | unassigned           | blocked                |
 | Manual production environment approval                            | unavailable                                  | not executed | Release          | unassigned           | blocked                |
+| Sandbox payment container lifecycle (`SBX-TST-009`)               | `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md` | not executed | Platform | independent review | blocked: no image |
+| Sandbox/production image inventory, scans, SBOM                   | same record                                  | not executed | Security/Release | unassigned | blocked |
 
 Live payments: disabled
 
 Release status: NO-GO
+
+The sandbox payment implementation does not change this decision. Its code review is not provider-connected staging evidence, its packaged-runtime gates are incomplete, and the reserved one-time production smoke has not been consumed.

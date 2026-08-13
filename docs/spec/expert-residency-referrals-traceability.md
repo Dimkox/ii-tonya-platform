@@ -62,3 +62,33 @@ Source design: `docs/superpowers/specs/2026-08-02-expert-residency-referrals-des
 ## Release gate
 
 Registration in CI is not a pass result. No requirement is production-approved merely because its row is populated. Release requires all focused tests to pass at one exact SHA, mandatory hosted CI and Database Gate to pass at that SHA, independent migration and financial review, authenticated sandbox settlement/refund/replay evidence, a named AI spot-check for ERR-FR-027/028, and explicit staging authorization. Production requires a separate explicit authorization.
+
+## Sandbox payment provider traceability
+
+Status: test-only implementation evidence. Rows point to historical focused evidence; they do not satisfy the final exact-SHA gate.
+
+| Requirement IDs | Implementation | Focused verification | Claw evidence | Rollback / recovery | Owner |
+|---|---|---|---|---|---|
+| SBX-RUN-001, SBX-RUN-002 | `apps/sandbox-api`, `Dockerfile.sandbox`, `compose.sandbox.yaml` | sandbox server/routes and release-assets tests | Tasks 4/6 reports; image execution incomplete | remove sandbox Compose/image and revert sandbox-only branch | Platform |
+| SBX-RUN-003, SBX-RUN-004 | startup validation and DB marker | server tests; lifecycle contract | Tasks 4/6; true container readiness not run | stop runtime; destroy isolated test DB; never use shared DB | Security + Platform |
+| SBX-RUN-005 | production import/Dockerfile/image guards | `sandbox-production-isolation.test.ts` | static pass; production image inventory not run | quarantine image; keep production NO-GO | Security |
+| SBX-PAY-001, SBX-PAY-002 | adapter/contracts/routes | adapter and route tests | Tasks 2/4 | disable sandbox composition | Backend |
+| SBX-PAY-003, SBX-PAY-006 | no-network/empty-credential boundary; inert checkout URL | adapter/routes/isolation tests | Tasks 2/4/6 | contain runtime; inspect forbidden access | Security |
+| SBX-PAY-004, SBX-PAY-005 | serializable checkout/idempotency | repository PostgreSQL tests | Task 1, including historical 3x | preserve rows; investigate conflict | DB owner |
+| SBX-DATA-001, SBX-DATA-002, SBX-DATA-003, SBX-DATA-004 | four allowlisted relations/migration | schema/repository/scope tests | Task 1 | drop only isolated sandbox DB/volume | DB owner |
+| SBX-DATA-005, SBX-DATA-006 | transition/version/event transaction | repository/workflow tests | Tasks 1/3 | replay exact command or restore isolated test DB | DB owner |
+| SBX-DATA-007 | no sandbox financial writes | scope/E2E/isolation tests | Tasks 1/5; Task 5 conditional | reconcile only through authoritative inbox | Finance + Security |
+| SBX-ADM-001, SBX-ADM-005 | sandbox-only management routes/sanitized errors | routes/server tests | Task 4 | remove sandbox route composition | Security |
+| SBX-ADM-002, SBX-ADM-003, SBX-ADM-004 | exact two-admin approval consume/replay | workflow/admin tests | Task 3 | expire approval; no manual row mutation | Security admin |
+| SBX-EVT-001, SBX-EVT-002 | sandbox brand/factory; production rejection | verifier/isolation tests | Task 2; production inventory pending | quarantine production closure containing factory | Security |
+| SBX-EVT-003, SBX-EVT-004 | authoritative settle/reverse and durable reconciliation | E2E/reconciliation tests | Task 5 conditional; historical 3x | leave pending; bounded explicit replay | Finance + Operations |
+| SBX-EVT-005 | canonical digest and redacted evidence | repository/verifier/routes tests | Tasks 2/5 | contain logs and investigate | Security |
+| SBX-TST-001 | causal RED commits | task-specific RED commands | Task reports 1–6 | retain report; rerun focused test | Engineering |
+| SBX-TST-002, SBX-TST-003, SBX-TST-004 | repository, transition, approval suites | repository/workflow/admin tests | Tasks 1/3/4 | fail closed and preserve DB evidence | DB + Security |
+| SBX-TST-005, SBX-TST-006 | real-PG E2E and security suites | E2E/reconciliation/adapter/routes/isolation | Task 5 conditional | stop sandbox; replay durable event only | Finance + Security |
+| SBX-TST-007 | source/packaged production isolation | isolation/image inventory tests | static pass; packaged inventory NOT RUN | quarantine candidate image | Release + Security |
+| SBX-TST-008 | bounded 3x reconciliation and one-time smokes | Database Gate commands | reconciliation historical 3x; smokes incomplete | retain NO-GO; rerun exact head | QA + Platform |
+| SBX-TST-009 | container lifecycle | `run-sandbox-container-smoke.sh` | **NOT RUN: no image produced** | fix offline build; reserve production smoke | Platform |
+| SBX-TST-010 | exact-SHA CI/DB Gate/scans/SBOM/signing/provenance/review | release gates | **NOT RUN / INCOMPLETE** | no merge/deploy | Release owner |
+
+Canonical record: `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`. Provider staging remains `BLOCKED`; production remains `NO-GO`.

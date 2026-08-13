@@ -29,6 +29,9 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 | `scripts/bootstrap-native-runner.sh`              | retained bootstrap history for the offline native runner                                       | LEGACY/HISTORICAL                                                  |
 | `Dockerfile`                                      | packaged runtime -> CI container smoke                                                         | ACTIVE                                                             |
 | `compose.yaml`                                    | local packaged stack -> verification                                                           | ACTIVE                                                             |
+| `Dockerfile.sandbox`                              | isolated test-only sandbox API image                                                            | TEST-ONLY; build evidence blocked                                   |
+| `compose.sandbox.yaml`                            | isolated sandbox API + PostgreSQL lifecycle                                                     | TEST-ONLY; not production-connected                                 |
+| `scripts/run-sandbox-container-smoke.sh`          | marker-first lifecycle and cleanup                                                              | TEST TOOL; SBX-TST-009 not run                                      |
 | `deploy/compose.remote.yml`                       | release mechanics                                                                              | ACTIVE but gated                                                   |
 | `deploy/claw/Dockerfile.test`                     | exact test environment                                                                         | TEST/EVIDENCE                                                      |
 | `deploy/claw/Dockerfile.test.dockerignore`        | exact test container build                                                                     | TEST/EVIDENCE                                                      |
@@ -50,6 +53,7 @@ All workspace roots are represented in the canonical graph and have containment 
 | ------------------------ | ----------------------------------------- | ---------------------------------------------------------- |
 | `apps/api`               | HTTP/webhook composition                  | application/config/db/integrations/observability           |
 | `apps/worker`            | bounded background lifecycle              | config/db/integrations/observability/worker                |
+| `apps/sandbox-api`       | test-only checkout/admin composition       | sandbox-only; never production                              |
 | `packages/application`   | deterministic use cases + prompt boundary | API/worker -> contracts/domain                             |
 | `packages/config`        | validated environment                     | both apps                                                  |
 | `packages/contracts`     | typed cross-boundary contracts            | application/db/integrations/worker                         |
@@ -58,6 +62,7 @@ All workspace roots are represented in the canonical graph and have containment 
 | `packages/integrations`  | external boundary adapters/contracts      | both apps/db/worker                                        |
 | `packages/observability` | logging/tracing/metrics                   | both apps                                                  |
 | `packages/worker`        | bounded job orchestration                 | app-worker -> application/contracts/db/domain/integrations |
+| `packages/sandbox-payments` | test-only persistence/verifier/adapter/workflow | sandbox-api only; prohibited from production closure    |
 
 ## Expert referral / residency implementation coverage
 
