@@ -3,6 +3,7 @@ import {
   assertSandboxRuntimeEnvironment,
   buildSandboxServer,
   isDirectExecution,
+  sandboxListenOptions,
   main,
 } from "./server.js";
 
@@ -68,6 +69,15 @@ describe("sandbox runtime guard", () => {
   it("accepts only the explicit sandbox fail-closed environment", () => {
     expect(() => assertSandboxRuntimeEnvironment({ ...validEnv(), PAYMENT_API_KEY: "" })).not.toThrow();
   });
+
+  it.each(["", "localhost", "example.com", "127.0.0.2", "0.0.0.0 "])("rejects a non-allowlisted sandbox host %j", (host) => {
+    expect(() => sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host })).toThrow("sandbox_host_invalid");
+  });
+
+  it("allows only explicit loopback or container bind hosts", () => {
+    expect(sandboxListenOptions(validEnv()).host).toBe("127.0.0.1");
+    for (const host of ["127.0.0.1", "0.0.0.0", "::1", "::"]) expect(sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host }).host).toBe(host);
+  });
 });
 
 describe("sandbox server composition", () => {
@@ -86,6 +96,11 @@ describe("sandbox server composition", () => {
       "sandbox_database_marker_missing",
     );
     expect(deps.approvals.resolvePrincipal).not.toHaveBeenCalled();
+  });
+
+  it("contains no runtime migration or schema mutation capability", async () => {
+    const source = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("./server.ts", import.meta.url), "utf8"));
+    expect(source).not.toMatch(/migrateDb|migrateSandboxDatabase|defaultMigrationsFolder/u);
   });
 
   it("builds only after the marker succeeds", async () => {
