@@ -3,10 +3,7 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 
 export type AdminRole =
-  | "support"
-  | "catalog_admin"
-  | "entitlement_admin"
-  | "security_admin";
+  "support" | "catalog_admin" | "entitlement_admin" | "security_admin";
 export type ApprovalAdminAction =
   | "client.create"
   | "client.deactivate"
@@ -30,7 +27,9 @@ export type ApprovalAdminAction =
   | "expert_residency.tariff_create"
   | "expert_residency.tariff_retire"
   | "expert_referral.hold_replay"
-  | "expert_referral.feature_switch";
+  | "expert_referral.feature_switch"
+  | "expert_residency.sandbox_settle"
+  | "expert_residency.sandbox_refund";
 
 type JsonScalar = string | number | boolean | null;
 export type AdminPayload =
@@ -99,9 +98,14 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "expert_residency.tariff_retire": "entitlement_admin",
   "expert_referral.hold_replay": "security_admin",
   "expert_referral.feature_switch": "security_admin",
+  "expert_residency.sandbox_settle": "entitlement_admin",
+  "expert_residency.sandbox_refund": "entitlement_admin",
 };
 
-export const requiredApprovalRole = (action: ApprovalAdminAction): AdminRole => actionRoles[action];
+type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
+
+export const requiredApprovalRole = (action: ApprovalAdminAction): AdminRole =>
+  actionRoles[action];
 
 const readObjectTypes: Readonly<
   Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>
@@ -122,7 +126,8 @@ function canonicalize(value: AdminPayload | undefined): string {
     return JSON.stringify(value);
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("Unsupported admin payload number");
+    if (!Number.isFinite(value))
+      throw new Error("Unsupported admin payload number");
     return JSON.stringify(value);
   }
   if (value === undefined) throw new Error("Unsupported admin payload value");
@@ -133,9 +138,10 @@ function canonicalize(value: AdminPayload | undefined): string {
     throw new Error("Unsupported admin payload object");
   }
   const record = value as { readonly [key: string]: AdminPayload | undefined };
-  return `{${Object.keys(record).sort().map((key) =>
-    `${JSON.stringify(key)}:${canonicalize(record[key])}`
-  ).join(",")}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalize(record[key])}`)
+    .join(",")}}`;
 }
 
 export const canonicalAdminPayload = (payload: AdminPayload): string =>
@@ -194,9 +200,10 @@ export class PostgresAdminApprovalRepository {
     const requiredRole = actionRoles[input.action];
     const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
-    const assignmentGate = requiredObjectType === null
-      ? sql`true`
-      : sql`
+    const assignmentGate =
+      requiredObjectType === null
+        ? sql`true`
+        : sql`
           ${input.objectType} = ${requiredObjectType}
           and exists (
             select 1 from admin_object_assignments oa
@@ -205,7 +212,10 @@ export class PostgresAdminApprovalRepository {
               and oa.object_id = ${input.objectId}::uuid
           )
         `;
-    const result = await this.db.execute<{ approvalId: string; expiresAt: Date }>(sql`
+    const result = await this.db.execute<{
+      approvalId: string;
+      expiresAt: Date;
+    }>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
       ),
@@ -274,7 +284,8 @@ export class PostgresAdminApprovalRepository {
       row.payloadHash !== payloadHash ||
       row.requesterSessionIdHash !== input.sessionIdHash ||
       row.requiredRole !== requiredRole
-    ) return null;
+    )
+      return null;
     return { approvalId: row.approvalId, expiresAt: row.expiresAt };
   }
 
@@ -317,12 +328,27 @@ export class PostgresAdminApprovalRepository {
   async consumeApproval(
     input: ConsumeAdminApproval,
   ): Promise<ConsumedAdminApproval | null> {
+    return this.consumeApprovalWith(this.db, input);
+  }
+
+  async consumeApprovalInTransaction(
+    tx: Transaction,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
+    return this.consumeApprovalWith(tx, input);
+  }
+
+  private async consumeApprovalWith(
+    executor: Pick<DrizzleDb, "execute">,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
     const requiredRole = actionRoles[input.action];
     const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
-    const assignmentGate = requiredObjectType === null
-      ? sql`true`
-      : sql`
+    const assignmentGate =
+      requiredObjectType === null
+        ? sql`true`
+        : sql`
           ${input.objectType} = ${requiredObjectType}
           and exists (
             select 1 from admin_object_assignments oa
@@ -331,7 +357,7 @@ export class PostgresAdminApprovalRepository {
               and oa.object_id = ${input.objectId}::uuid
           )
         `;
-    const result = await this.db.execute<ApprovalRow>(sql`
+    const result = await executor.execute<ApprovalRow>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
       ),
@@ -394,12 +420,27 @@ export class PostgresAdminApprovalRepository {
   async validateConsumedApprovalReplay(
     input: ConsumeAdminApproval,
   ): Promise<ConsumedAdminApproval | null> {
+    return this.validateConsumedApprovalReplayWith(this.db, input);
+  }
+
+  async validateConsumedApprovalReplayInTransaction(
+    tx: Transaction,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
+    return this.validateConsumedApprovalReplayWith(tx, input);
+  }
+
+  private async validateConsumedApprovalReplayWith(
+    executor: Pick<DrizzleDb, "execute">,
+    input: ConsumeAdminApproval,
+  ): Promise<ConsumedAdminApproval | null> {
     const requiredRole = actionRoles[input.action];
     const requiredObjectType = requiredApprovalObjectType(input.action);
     const payloadHash = canonicalAdminPayloadHash(input.payload);
-    const assignmentGate = requiredObjectType === null
-      ? sql`true`
-      : sql`
+    const assignmentGate =
+      requiredObjectType === null
+        ? sql`true`
+        : sql`
           ${input.objectType} = ${requiredObjectType}
           and exists (
             select 1 from admin_object_assignments oa
@@ -408,7 +449,7 @@ export class PostgresAdminApprovalRepository {
               and oa.object_id = ${input.objectId}::uuid
           )
         `;
-    const result = await this.db.execute<ApprovalRow>(sql`
+    const result = await executor.execute<ApprovalRow>(sql`
       with db_clock as (
         select clock_timestamp() as db_now
       ),

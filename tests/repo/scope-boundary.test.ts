@@ -228,6 +228,60 @@ describe("MVP scope boundary", () => {
 
   it.each([
     [
+      "apps/worker/src/sandbox-leak.ts",
+      'export const leak = pgTable("sandbox_expert_residency_worker_copy", {});',
+    ],
+    [
+      "apps/api/src/sandbox-leak.ts",
+      "export const leak = sql`select * from sandbox_expert_residency_payments`;",
+    ],
+    [
+      "packages/application/src/sandbox-leak.ts",
+      'export const leak = pgTable("sandbox_expert_residency_package_copy", {});',
+    ],
+    [
+      "packages/worker/src/sandbox-leak.ts",
+      "export const leak = sql`delete from sandbox_expert_residency_events`;",
+    ],
+    [
+      "packages/worker/migrations/0001_sandbox_leak.sql",
+      "create table sandbox_expert_residency_migration_copy (id uuid primary key);",
+    ],
+  ])("rejects sandbox relation escape probe %s", (path, content) => {
+    expect(isPaymentScopeInspectionPath(path)).toBe(true);
+    expect(classifyPaymentScopeProbe({ path, content })).toContain(
+      "sandbox relation token outside approved sandbox paths",
+    );
+  });
+
+  it.each([
+    [
+      "packages/sandbox-payments/src/schema.ts",
+      'export const leak = pgTable("sandbox_expert_residency_shadow", {});',
+    ],
+    [
+      "packages/sandbox-payments/src/repository.ts",
+      "export const leak = sql`select * from sandbox_expert_residency_shadow`;",
+    ],
+  ])(
+    "rejects unknown sandbox relation in approved source %s",
+    (path, content) => {
+      expect(classifyPaymentScopeProbe({ path, content })).toContain(
+        "unknown sandbox relation in approved sandbox source: sandbox_expert_residency_shadow",
+      );
+    },
+  );
+
+  it.each([
+    "docs/sandbox-payment-boundary.md",
+    "tests/repo/sandbox-payment-evidence.test.ts",
+    ".superpowers/sdd/task-1-report.md",
+  ])("does not inspect documentation, tests, or evidence at %s", (path) => {
+    expect(isPaymentScopeInspectionPath(path)).toBe(false);
+  });
+
+  it.each([
+    [
       "packages/integrations/src/payment/payment-port.ts",
       "export interface PaymentPort {}",
     ],

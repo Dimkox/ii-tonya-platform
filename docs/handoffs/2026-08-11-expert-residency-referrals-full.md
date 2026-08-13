@@ -10,6 +10,29 @@ This handoff supersedes the continuation instructions in
 `docs/handoffs/2026-08-04-expert-residency-referrals.md` for Tasks 10–12. The older
 handoff remains historical evidence for Tasks 1–9 and the clean-machine bootstrap.
 
+## 2026-08-13 sandbox payment continuation checkpoint
+
+Branch `codex/sandbox-payment-provider` adds a separate test-only sandbox API and
+payment package. It does not add a live provider and must not enter the production
+API/worker closure. The complete original source remains at
+`docs/source/ii-tonya-expert-full-source-2026-07-28.txt` (SHA-256
+`0439AE1C645E6FDA46F013A66512401F251AA18D35520F5C9A7A3C7C59314EAF`); the sandbox
+design supplements rather than replaces it.
+
+At documentation base `7214ae93a04e99993b190dfd881c34bd1eced22a`, Tasks 1–4 are
+approved, Task 5 is conditional, and Task 6 code/config is independently approved.
+Offline pnpm hydration timed out after 480s and 240s under Claw's 1 CPU/1 GiB limit.
+Cleanup returned zero containers/processes and the reserved production smoke was not
+used. No sandbox image exists; `SBX-TST-009`, packaged isolation/inventory, scans, SBOM,
+signing, provenance, and final exact-SHA gates remain unrun.
+
+Continue from `docs/runbooks/sandbox-payment-provider.md` and
+`docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`. Complete the
+pinned offline store, build the immutable sandbox image, then run the sandbox lifecycle.
+Only after it passes may production image smoke run once. Never exceed three repeats,
+populate credential placeholders, connect providers, merge, stage, or deploy from this
+checkpoint. Provider staging is `BLOCKED`; production is `NO-GO`.
+
 ## 1. Exact repository checkpoint
 
 Functional/code checkpoint immediately before this handoff document was committed:

@@ -26,35 +26,73 @@ export interface ExpertResidencyPaymentEventVerifier {
     | { kind: "rejected" }
   >;
 }
-function brand(
-  event: ExpertResidencyPaymentEvent,
+export interface CanonicalExpertResidencyPaymentEventVerifier {
+  verifyCanonical(
+    event: ExpertResidencyPaymentEvent,
+    evidence: ExpertResidencyVerificationEvidence,
+  ): VerifiedExpertResidencyPaymentEvent;
+}
+
+function canonicalEvidence(
   evidence: ExpertResidencyVerificationEvidence,
-): VerifiedExpertResidencyPaymentEvent {
-  const canonicalEvent = expertResidencyPaymentEventSchema.parse(event);
+): ExpertResidencyVerificationEvidence {
   if (
+    typeof evidence !== "object" ||
+    evidence === null ||
+    Object.keys(evidence).length !== 3 ||
+    !Object.hasOwn(evidence, "verificationId") ||
+    !Object.hasOwn(evidence, "verifierKeyVersion") ||
+    !Object.hasOwn(evidence, "verifiedAt") ||
     !/^[A-Za-z0-9_.:-]{1,200}$/u.test(evidence.verificationId) ||
     !/^[A-Za-z0-9_.:-]{1,100}$/u.test(evidence.verifierKeyVersion)
-  )
+  ) {
     throw new Error("invalid_verification_evidence");
+  }
   const verifiedAt = new Date(evidence.verifiedAt);
   if (
     !Number.isFinite(verifiedAt.getTime()) ||
     verifiedAt.toISOString() !== evidence.verifiedAt
-  )
+  ) {
     throw new Error("invalid_verification_evidence");
+  }
+  return {
+    verificationId: evidence.verificationId,
+    verifierKeyVersion: evidence.verifierKeyVersion,
+    verifiedAt: evidence.verifiedAt,
+  };
+}
+
+function brand(
+  event: ExpertResidencyPaymentEvent,
+  evidence: ExpertResidencyVerificationEvidence,
+): VerifiedExpertResidencyPaymentEvent {
   const value = Object.freeze({
-    ...canonicalEvent,
+    ...event,
     ...evidence,
   }) as VerifiedExpertResidencyPaymentEvent;
   verifiedEvents.add(value);
   return value;
+}
+
+export function createCanonicalExpertResidencyPaymentEventVerifier(): CanonicalExpertResidencyPaymentEventVerifier {
+  return Object.freeze({
+    verifyCanonical(
+      event: ExpertResidencyPaymentEvent,
+      evidence: ExpertResidencyVerificationEvidence,
+    ): VerifiedExpertResidencyPaymentEvent {
+      const canonicalEvent = expertResidencyPaymentEventSchema.parse(event);
+      const boundedEvidence = canonicalEvidence(evidence);
+      return brand(canonicalEvent, boundedEvidence);
+    },
+  });
 }
 /** Test-only deterministic constructor; production code must use a verifier. */
 export function verifiedEventFixture(
   event: ExpertResidencyPaymentEvent,
   evidence: ExpertResidencyVerificationEvidence,
 ): VerifiedExpertResidencyPaymentEvent {
-  return brand(event, evidence);
+  const canonicalEvent = expertResidencyPaymentEventSchema.parse(event);
+  return brand(canonicalEvent, canonicalEvidence(evidence));
 }
 export const disabledExpertResidencyPaymentEventVerifier: ExpertResidencyPaymentEventVerifier =
   {

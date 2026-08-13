@@ -9,7 +9,8 @@ import { canonicalAdminPayloadHash, PostgresAdminApprovalRepository, type AdminP
 import { withSerializableRetry } from "./message-repository.js";
 import { withTrustedExpertReferralTransaction, type TrustedExpertReferralTransaction } from "./expert-referral-transaction-capability.js";
 
-type Action = Extract<ApprovalAdminAction, `expert_${string}`>;
+type SandboxAction = "expert_residency.sandbox_settle" | "expert_residency.sandbox_refund";
+type Action = Exclude<Extract<ApprovalAdminAction, `expert_${string}`>, SandboxAction>;
 type Payload = Readonly<Record<string, string | number | boolean | undefined>>;
 export interface ExpertReferralAdminRepositoryCommand {
   action: Action; objectId: string; approvalId: string; secondApprovalId?: string;

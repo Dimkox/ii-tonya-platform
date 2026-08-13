@@ -12,6 +12,55 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
   "packages/integrations/src/expert-residency/environment-secret-resolver.ts",
 ]);
 
+export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
+  "apps/sandbox-api/src/routes.ts",
+  "apps/sandbox-api/src/server.ts",
+  "packages/sandbox-payments/src/adapter.ts",
+  "packages/sandbox-payments/src/contracts.ts",
+  "packages/sandbox-payments/src/index.ts",
+  "packages/sandbox-payments/src/repository.ts",
+  "packages/sandbox-payments/src/schema.ts",
+  "packages/sandbox-payments/src/verifier.ts",
+  "packages/sandbox-payments/src/workflow.ts",
+]);
+
+const privilegedSandboxVerifierFactory =
+  "createCanonicalExpertResidencyPaymentEventVerifier";
+
+export const findSandboxProductionCompositionViolations = ({
+  path: rawPath,
+  content,
+}: PaymentScopeProbe): readonly string[] => {
+  const path = normalizePath(rawPath);
+  if (!content.includes(privilegedSandboxVerifierFactory)) return [];
+  if (
+    path.startsWith("apps/sandbox-api/") ||
+    /(?:^|\/)tests?\//u.test(path) ||
+    /\.test\.[cm]?[jt]sx?$/u.test(path) ||
+    path === "packages/integrations/src/expert-residency/verified-event.ts" ||
+    path === "packages/integrations/src/index.ts"
+  ) {
+    return [];
+  }
+  return ["privileged sandbox verifier composed outside sandbox runtime"];
+};
+
+export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
+  "packages/sandbox-payments/src/repository.ts",
+  "packages/sandbox-payments/src/schema.ts",
+]);
+
+export const SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
+]);
+
+export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
+  "sandbox_expert_residency_commands",
+  "sandbox_expert_residency_environment",
+  "sandbox_expert_residency_events",
+  "sandbox_expert_residency_payments",
+]);
+
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
@@ -68,6 +117,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
   "expert_residency.tariff_retire",
+  "expert_residency.sandbox_settle",
+  "expert_residency.sandbox_refund",
 ]);
 
 const approvedPaymentBoundaryPaths = new Set([
@@ -78,7 +129,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "9b026532b6567301e86916285814995a00c344af7266734cafe229594011705b",
+    "8b034377db52aa4061bfa39dadc54d51d224fabd4d468789a28dd03720b47c7d",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -90,6 +141,10 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
+  [
+    "apps/sandbox-api/package.json",
+    "14c2fbe61e3c6588e23d61b3837dc0d74fa800591990716902be881282781126",
+  ],
   [
     "apps/api/package.json",
     "34edd6b480799b53b8e378fa596586ff3406adb945ef1c48910150bcc55e8449",
@@ -129,6 +184,10 @@ const approvedPackageManifestHashes = new Map([
   [
     "packages/observability/package.json",
     "74a51f0c482a51b47f47a765619a1ddf35e9e8c1ff4ab1997507663e61f38f0f",
+  ],
+  [
+    "packages/sandbox-payments/package.json",
+    "52aa74c41d90c56a7e351b85b5906af22ba7a7ca640685bb0ccc2258b0096a09",
   ],
   [
     "packages/worker/package.json",
@@ -190,6 +249,17 @@ const approvedAutomationArtifactHashes = new Map([
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
+  [
+    "apps/sandbox-api/package.json",
+    new Set([
+      "@fastify/rate-limit",
+      "@ii-tonya/api",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "@ii-tonya/sandbox-payments",
+      "fastify",
+    ]),
+  ],
   [
     "apps/api/package.json",
     new Set([
@@ -260,6 +330,16 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
     new Set(["@opentelemetry/api", "@opentelemetry/sdk-node", "pino"]),
   ],
   [
+    "packages/sandbox-payments/package.json",
+    new Set([
+      "@ii-tonya/contracts",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "drizzle-orm",
+      "zod",
+    ]),
+  ],
+  [
     "packages/worker/package.json",
     new Set([
       "@ii-tonya/application",
@@ -276,10 +356,12 @@ const approvedDependencySpecifiers = new Map([
   ["@ii-tonya/application", "workspace:*"],
   ["@ii-tonya/config", "workspace:*"],
   ["@ii-tonya/contracts", "workspace:*"],
+  ["@ii-tonya/api", "workspace:*"],
   ["@ii-tonya/db", "workspace:*"],
   ["@ii-tonya/domain", "workspace:*"],
   ["@ii-tonya/integrations", "workspace:*"],
   ["@ii-tonya/observability", "workspace:*"],
+  ["@ii-tonya/sandbox-payments", "workspace:*"],
   ["@ii-tonya/worker", "workspace:*"],
   ["@opentelemetry/api", "^1.9.0"],
   ["@opentelemetry/sdk-node", "^0.221.0"],
@@ -305,6 +387,10 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
+    "495e8b352021c1fb6d0fc027e1621df6137d0d15c4a54cff5ce975cb2c318e0a",
+  ],
   [
     "packages/db/migrations/0000_mvp.sql",
     "067926dd1249fabdc59f91dedd39ebfade05a55a3de38059705092f512139216",
@@ -521,6 +607,7 @@ const approvedDatabaseRelations = new Set([
   "users",
   "webhook_inbox",
   ...EXPERT_RESIDENCY_ALLOWED_RELATIONS,
+  ...SANDBOX_PAYMENT_ALLOWED_RELATIONS,
 ]);
 
 const forbiddenProviderContent =
@@ -556,6 +643,10 @@ const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY)_/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;
+const sandboxFinancialAuthorityRelation =
+  /\b(?:expert_first_residency_settlements|expert_referral_reward_grants|expert_referral_ledger_entries|expert_referral_ledger_allocations|expert_referral_balances|expert_residency_orders|expert_residency_payment_attempts|expert_residency_provider_event_inbox)\b/u;
+const sandboxRelationToken = /\bsandbox_expert_residency_[a-z0-9_]+\b/iu;
+const sandboxRelationTokens = /\bsandbox_expert_residency_[a-z0-9_]+\b/giu;
 
 export interface PaymentScopeProbe {
   readonly path: string;
@@ -578,7 +669,11 @@ const isExecutableAutomationPath = (path: string): boolean =>
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
   if (path.endsWith("/package.json") || path === "package.json") return true;
-  if (/^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path)) {
+  if (
+    /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||
+    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) ||
+    path.endsWith(".sql")
+  ) {
     return true;
   }
   if (isExecutableAutomationPath(path)) return true;
@@ -594,6 +689,19 @@ const hasCommercialDependencySegment = (value: string): boolean =>
 
 const isCommercialProviderSpecifier = (value: string): boolean =>
   !value.startsWith(".") && hasCommercialDependencySegment(value);
+
+const isApprovedSandboxRuntimeImport = (
+  path: string,
+  specifier: string,
+): boolean =>
+  path.startsWith("apps/sandbox-api/") &&
+  specifier === "@ii-tonya/sandbox-payments";
+
+const sandboxObjectTypePaths = new Set([
+  "apps/sandbox-api/src/routes.ts",
+  "packages/db/src/repositories/admin-repository.ts",
+  "packages/sandbox-payments/src/workflow.ts",
+]);
 
 const literalText = (node: ts.Expression | undefined): string | undefined =>
   node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
@@ -724,11 +832,52 @@ const inspectTypeScript = (
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    true,
+    ts.LanguageVariant.Standard,
+    content,
+  );
+  for (
+    let token = scanner.scan();
+    token !== ts.SyntaxKind.EndOfFileToken;
+    token = scanner.scan()
+  ) {
+    for (const match of scanner
+      .getTokenText()
+      .matchAll(sandboxRelationTokens)) {
+      const relationName = match[0].toLowerCase();
+      if (
+        relationName === "sandbox_expert_residency_payment" &&
+        sandboxObjectTypePaths.has(path)
+      ) {
+        continue;
+      }
+      if (SANDBOX_PAYMENT_RELATION_SOURCE_PATHS.has(path)) {
+        if (!SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(relationName)) {
+          violations.push(
+            `unknown sandbox relation in approved sandbox source: ${relationName}`,
+          );
+        }
+      } else {
+        violations.push(
+          "sandbox relation token outside approved sandbox paths",
+        );
+      }
+    }
+  }
+
   if (
     EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
     forbiddenProviderContent.test(content)
   ) {
     violations.push("forbidden provider content in expert residency boundary");
+  }
+  if (
+    SANDBOX_PAYMENT_ALLOWED_PATHS.has(path) &&
+    sandboxFinancialAuthorityRelation.test(content)
+  ) {
+    violations.push("sandbox source references a financial authority relation");
   }
 
   if (path === "packages/integrations/src/index.ts") {
@@ -798,7 +947,10 @@ const inspectTypeScript = (
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       const specifier = node.moduleSpecifier.text;
-      if (isCommercialProviderSpecifier(specifier)) {
+      if (
+        isCommercialProviderSpecifier(specifier) &&
+        !isApprovedSandboxRuntimeImport(path, specifier)
+      ) {
         violations.push(`provider SDK import: ${specifier}`);
       } else if (
         /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
@@ -813,7 +965,10 @@ const inspectTypeScript = (
     if (ts.isCallExpression(node)) {
       const specifier = moduleSpecifierFromCall(node);
       if (specifier) {
-        if (isCommercialProviderSpecifier(specifier)) {
+        if (
+          isCommercialProviderSpecifier(specifier) &&
+          !isApprovedSandboxRuntimeImport(path, specifier)
+        ) {
           violations.push(`payment provider runtime import: ${specifier}`);
         } else if (
           /(?:^|\/)payment(?:\/|[-_])/iu.test(specifier) &&
@@ -869,8 +1024,17 @@ const inspectTypeScript = (
       )
     ) {
       const tableName = literalText(node.arguments[0]);
-      if (tableName && !approvedDatabaseRelations.has(tableName)) {
-        violations.push(`unapproved database relation: ${tableName}`);
+      if (tableName) {
+        if (
+          SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(tableName) &&
+          !SANDBOX_PAYMENT_ALLOWED_PATHS.has(path)
+        ) {
+          violations.push(
+            `sandbox relation outside sandbox package: ${tableName}`,
+          );
+        } else if (!approvedDatabaseRelations.has(tableName)) {
+          violations.push(`unapproved database relation: ${tableName}`);
+        }
       }
     }
 
@@ -982,8 +1146,24 @@ const inspectMigration = (
   content: string,
   violations: string[],
 ): void => {
+  const withoutComments = content
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/--[^\r\n]*/gu, "");
+  if (
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) &&
+    sandboxRelationToken.test(withoutComments)
+  ) {
+    violations.push("sandbox relation token outside approved sandbox paths");
+  }
+
   if (paymentDbPath.test(path)) {
     violations.push("commercial database migration path");
+  }
+  if (
+    !path.startsWith("packages/db/migrations/") &&
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+  ) {
+    return;
   }
   if (path.endsWith(".json")) {
     let snapshot: unknown;
@@ -1018,17 +1198,23 @@ const inspectMigration = (
     return;
   }
 
-  const withoutComments = content
-    .replace(/\/\*[\s\S]*?\*\//gu, "")
-    .replace(/--[^\r\n]*/gu, "");
   for (const match of withoutComments.matchAll(
     /\bcreate\s+(?:materialized\s+)?(?:table|view)\s+(?:if\s+not\s+exists\s+)?(?:(?:"?[\w]+"?)\.)?"?([\w]+)"?/giu,
   )) {
     const relationName = match[1];
-    if (relationName && !approvedDatabaseRelations.has(relationName)) {
-      violations.push(
-        `unapproved database migration relation: ${relationName}`,
-      );
+    if (relationName) {
+      if (
+        SANDBOX_PAYMENT_ALLOWED_RELATIONS.has(relationName) &&
+        !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+      ) {
+        violations.push(
+          `sandbox migration relation outside sandbox package: ${relationName}`,
+        );
+      } else if (!approvedDatabaseRelations.has(relationName)) {
+        violations.push(
+          `unapproved database migration relation: ${relationName}`,
+        );
+      }
     }
   }
 };
@@ -1039,7 +1225,12 @@ export const classifyPaymentScopeProbe = ({
 }: PaymentScopeProbe): readonly string[] => {
   const path = normalizePath(rawPath);
 
-  const violations: string[] = [];
+  const violations: string[] = [
+    ...findSandboxProductionCompositionViolations({
+      path: rawPath,
+      content,
+    }),
+  ];
   if (path.startsWith("packages/integrations/")) {
     if (
       !approvedPaymentBoundaryPaths.has(path) &&
@@ -1063,6 +1254,11 @@ export const classifyPaymentScopeProbe = ({
     violations.push("payment consumer or entitlement path");
   } else if (path.startsWith("packages/db/") && paymentDbPath.test(path)) {
     violations.push("commercial database schema path");
+  } else if (
+    path.startsWith("packages/sandbox-payments/src/") &&
+    !SANDBOX_PAYMENT_ALLOWED_PATHS.has(path)
+  ) {
+    violations.push("unapproved sandbox payment source path");
   }
 
   if (
@@ -1074,7 +1270,11 @@ export const classifyPaymentScopeProbe = ({
 
   if (path.endsWith("/package.json") || path === "package.json") {
     inspectPackageManifest(path, content, violations);
-  } else if (/^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path)) {
+  } else if (
+    /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||
+    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path) ||
+    path.endsWith(".sql")
+  ) {
     inspectMigration(path, content, violations);
   } else if (/\.[cm]?[jt]sx?$/u.test(path)) {
     inspectTypeScript(path, content, violations);
@@ -1090,7 +1290,9 @@ export const classifyApprovedTrackedScopeContent = ({
   const path = normalizePath(rawPath);
   const isPackageManifest =
     path.endsWith("/package.json") || path === "package.json";
-  const isMigration = path.startsWith("packages/db/migrations/");
+  const isMigration =
+    path.startsWith("packages/db/migrations/") ||
+    SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path);
   const expectedHash =
     approvedPaymentBoundaryHashes.get(path) ??
     approvedMigrationHashes.get(path) ??

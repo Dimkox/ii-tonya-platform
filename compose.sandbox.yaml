@@ -1,0 +1,53 @@
+name: ii-tonya-sandbox-evidence
+
+services:
+  sandbox-postgres:
+    profiles: [sandbox]
+    image: postgres:17.5-bookworm
+    environment:
+      POSTGRES_DB: ii_tonya_sandbox
+      POSTGRES_USER: ii_tonya_sandbox
+      POSTGRES_PASSWORD: local-placeholder-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ii_tonya_sandbox -d ii_tonya_sandbox"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [sandbox-db]
+    restart: "no"
+
+  sandbox-api:
+    profiles: [sandbox]
+    image: ${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}
+    environment:
+      II_TONYA_RUNTIME_MODE: sandbox
+      SANDBOX_DATABASE_URL: postgresql://ii_tonya_sandbox:local-placeholder-only@sandbox-postgres:5432/ii_tonya_sandbox
+      SANDBOX_CHECKOUT_BASE_URL: http://127.0.0.1:3001
+      SANDBOX_HOST: 0.0.0.0
+      SANDBOX_PORT: "3001"
+      PAYMENT_API_KEY: ""
+      PAYMENT_TOKEN: ""
+      PAYMENT_SECRET: ""
+      PAYMENT_WEBHOOK_SECRET: ""
+      PAYMENTS_ENABLED: "false"
+      EXPERT_REFERRAL_ENABLED: "false"
+      EXPERT_RESIDENCY_BILLING_ENABLED: "false"
+    ports: ["127.0.0.1:3001:3001"]
+    volumes:
+      - ./scripts/sandbox-container-lifecycle.mjs:/app/sandbox-container-lifecycle.mjs:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    cpus: 1
+    mem_limit: 1g
+    restart: "no"
+    depends_on:
+      sandbox-postgres:
+        condition: service_healthy
+    networks: [sandbox-db]
+
+networks:
+  sandbox-db:
+    internal: true

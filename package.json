@@ -15,7 +15,7 @@
     "test:contract": "vitest run tests/contract",
     "test:security": "vitest run tests/repo/env-policy.test.ts tests/repo/scope-boundary.test.ts packages/application/src/prompt-safety.test.ts packages/observability/src/logger.test.ts apps/api/src/rate-limit.test.ts",
     "test:e2e": "vitest run tests/e2e",
-    "test:container": "node --test tests/container/image-smoke.test.mjs",
+    "test:container": "node --test tests/container/image-smoke.test.mjs tests/container/sandbox-image-smoke.test.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test:repeat": "node scripts/repeat-vitest.mjs",
     "test:pnpm-launcher": "node scripts/pnpm-launcher-self-test.mjs",
