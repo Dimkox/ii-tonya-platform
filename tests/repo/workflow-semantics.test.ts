@@ -53,6 +53,14 @@ describe("direct Claw verification semantics", () => {
     expect(verify).toBeGreaterThan(build);
   });
 
+  it("rebuilds the Claw image only from the offline frozen store", () => {
+    const dockerfile = read("deploy/claw/Dockerfile.test");
+    expect(dockerfile).toContain(
+      "pnpm install --offline --frozen-lockfile --trust-lockfile",
+    );
+    expect(dockerfile).not.toContain("pnpm install --frozen-lockfile;");
+  });
+
   it("runs financial database concurrency gates exactly three times", () => {
     const runner = read("scripts/run-claw-ci.sh");
     for (const path of [
