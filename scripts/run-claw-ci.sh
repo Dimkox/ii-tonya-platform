@@ -25,6 +25,11 @@ compose_root=/home/pall/app-stack
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
 test_image=7d71646347d560ff2b5d8ebc4c0aad5b48230254
 test -d "$claw_store"
+claw_syft=""
+if [[ "$mode" == release ]]; then
+  claw_syft="$($source_root/scripts/provision-claw-syft.sh)"
+  test -x "$claw_syft"
+fi
 container_script="$(mktemp)"
 evidence_dir="$source_root/docs/test-evidence/claw/$source_sha"
 release_output="$source_root/.native-release"
@@ -81,15 +86,22 @@ SCRIPT
 chmod 0700 "$container_script"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cd "$compose_root"
-II_TONYA_SOURCE_SHA="$test_image" docker compose --profile test run --rm --no-deps \
-  -e CI=true \
-  -e "CLAW_GATE_MODE=$mode" \
-  -e "CLAW_SOURCE_SHA=$source_sha" \
-  -e "CLAW_HOST_SOURCE_ROOT=$source_root" \
-  -v "$source_root:/workspace/source" \
-  -v "$claw_store:/workspace/.pnpm-store" \
-  -v "$release_output:/workspace/release-output" \
-  -v "$container_script:/tmp/ii-tonya-claw-gate.sh:ro" \
+compose_args=(
+  --profile test run --rm --no-deps
+  -e CI=true
+  -e "CLAW_GATE_MODE=$mode"
+  -e "CLAW_SOURCE_SHA=$source_sha"
+  -e "CLAW_HOST_SOURCE_ROOT=$source_root"
+  -v "$source_root:/workspace/source"
+  -v "$claw_store:/workspace/.pnpm-store"
+  -v "$release_output:/workspace/release-output"
+  -v "$container_script:/tmp/ii-tonya-claw-gate.sh:ro"
+)
+if [[ -n "$claw_syft" ]]; then
+  compose_args+=( -v "$claw_syft:/usr/local/bin/syft:ro" )
+fi
+
+II_TONYA_SOURCE_SHA="$test_image" docker compose "${compose_args[@]}" \
   --entrypoint bash ii-tonya-test /tmp/ii-tonya-claw-gate.sh
 
 cat > "$evidence_dir/${mode}.md" <<EOF

@@ -44,9 +44,11 @@ describe("native dedicated-server production release", () => {
       'binary_sha="6c1eb5c6f15c177fa3dd727ee186c61a660a3939a4e1dc1bc4b3e00eafec098e"',
     );
     expect(provision).toContain("gh release download");
-    expect(provision).toContain('printf \'%s  %s\\n\' "$archive_sha"');
-    expect(provision).toContain('printf \'%s  %s\\n\' "$binary_sha"');
-    expect(runner).toContain('claw_syft="$($source_root/scripts/provision-claw-syft.sh)"');
+    expect(provision).toContain("printf '%s  %s\\n' \"$archive_sha\"");
+    expect(provision).toContain("printf '%s  %s\\n' \"$binary_sha\"");
+    expect(runner).toContain(
+      'claw_syft="$($source_root/scripts/provision-claw-syft.sh)"',
+    );
     expect(runner).toContain('-v "$claw_syft:/usr/local/bin/syft:ro"');
   });
 

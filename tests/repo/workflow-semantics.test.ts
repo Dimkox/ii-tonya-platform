@@ -26,9 +26,8 @@ describe("direct Claw verification semantics", () => {
       'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
     );
     expect(runner).toContain('[[ "$(hostname -s)" == "claw" ]]');
-    expect(runner).toContain(
-      "docker compose --profile test run --rm --no-deps",
-    );
+    expect(runner).toContain("--profile test run --rm --no-deps");
+    expect(runner).toContain('docker compose "${compose_args[@]}"');
     expect(runner).toContain(
       "claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store",
     );
