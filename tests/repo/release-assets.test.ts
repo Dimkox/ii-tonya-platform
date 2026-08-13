@@ -248,7 +248,7 @@ describe("release assets", () => {
     expect(runner).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(runner).toContain("DOCKER_HOST_STORE_ROOT");
     expect(runner).toContain(
-      "pnpm install --frozen-lockfile --store-dir /workspace/source/.pnpm-store",
+      "pnpm install --offline --frozen-lockfile --store-dir /workspace/source/.pnpm-store",
     );
     expect(runner).toContain("LOCAL_SOURCE_ROOT");
   });
