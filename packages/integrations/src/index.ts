@@ -65,6 +65,14 @@ export {
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
 export {
+  ClientViewCallbackVerificationError,
+  authenticateClientViewCallback,
+  issueClientViewCallback,
+  type ClientViewCallbackClaims,
+  type ClientViewCallbackStore,
+  type ClientViewExpertBinding,
+} from "./telegram/client-view-callback-token.js";
+export {
   CallbackConflictError,
   CallbackDataIntegrityError,
   CallbackInfrastructureError,
@@ -73,6 +81,14 @@ export {
   buildTelegramMethodUrl,
   redactTelegramUrl,
   TelegramAdapter,
+  renderTelegramExpertClient,
+  renderTelegramExpertSchedule,
+  renderTelegramExpertStats,
+  type ExpertTelegramQueryViewPort,
+  type TelegramExpertClientChoicesView,
+  type TelegramExpertClientView,
+  type TelegramExpertScheduleView,
+  type TelegramExpertStatsView,
   type ExpertReservationView,
   type ExpertScheduleView,
   type TelegramAdapterDeps,
@@ -85,7 +101,18 @@ export {
 } from "./telegram/telegram-adapter.js";
 export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
 export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
-export { assertVerifiedExpertResidencyPaymentEvent, disabledExpertResidencyPaymentEventVerifier } from "./expert-residency/verified-event.js";
-export type { ExpertResidencyPaymentEventVerifier, ExpertResidencyVerificationEvidence, VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
+export {
+  assertVerifiedExpertResidencyPaymentEvent,
+  disabledExpertResidencyPaymentEventVerifier,
+} from "./expert-residency/verified-event.js";
+export type {
+  ExpertResidencyPaymentEventVerifier,
+  ExpertResidencyVerificationEvidence,
+  VerifiedExpertResidencyPaymentEvent,
+} from "./expert-residency/verified-event.js";
 export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
 export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";
+export {
+  createExpertCommandProcessor,
+  type ExpertCommandProcessor,
+} from "./telegram/expert-command-processor.js";

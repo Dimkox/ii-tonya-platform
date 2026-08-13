@@ -11,3 +11,4 @@ export * from "./expert-referral-service.js";
 export * from "./expert-residency-service.js";
 export * from "./expert-referral-admin-service.js";
 export * from "./expert-prompt-context.js";
+export * from "./expert-telegram-query-service.js";

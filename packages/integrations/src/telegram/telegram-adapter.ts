@@ -65,6 +65,47 @@ export interface ExpertScheduleView {
   text: string;
 }
 
+export interface TelegramExpertScheduleView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  timezone: string;
+  appointments: readonly {
+    startsAt: string;
+    status: "reserved" | "booked";
+    clientDisplayName: string;
+    expertNote?: string;
+    meetingUrl?: string;
+  }[];
+}
+
+export interface TelegramExpertClientChoicesView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  choices: readonly {
+    startsAt: string;
+    serviceName: string;
+    callbackData: string;
+  }[];
+}
+
+export interface TelegramExpertClientView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  clientDisplayName: string;
+  startsAt: string;
+  serviceName: string;
+  preparationNote?: string;
+}
+
+export interface TelegramExpertStatsView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  upcoming: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+}
+
 export interface ExpertReferralSummaryView {
   idempotencyKey: string;
   telegramUserId: string;
@@ -114,6 +155,21 @@ export interface ExpertTelegramViewPort {
   ): Promise<TelegramSendOutcome>;
 }
 
+export interface ExpertTelegramQueryViewPort {
+  sendQuerySchedule(
+    view: TelegramExpertScheduleView,
+  ): Promise<TelegramSendOutcome>;
+  sendClientChoices(
+    view: TelegramExpertClientChoicesView,
+  ): Promise<TelegramSendOutcome>;
+  sendClientView(view: TelegramExpertClientView): Promise<TelegramSendOutcome>;
+  sendStats(view: TelegramExpertStatsView): Promise<TelegramSendOutcome>;
+  sendUnsupported(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
+}
+
 export interface TelegramTransportRequest {
   method: "POST";
   url: URL;
@@ -121,6 +177,12 @@ export interface TelegramTransportRequest {
   body: {
     chat_id: string;
     text: string;
+    reply_markup?: {
+      inline_keyboard: readonly (readonly {
+        text: string;
+        callback_data: string;
+      }[])[];
+    };
   };
   context: {
     idempotencyKey: string;
@@ -151,7 +213,8 @@ export interface TelegramAdapterDeps {
 
 const validInstantOrNull = (value: string | null): boolean =>
   value === null ||
-  (Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
+  (Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value);
 
 const assertMoney = (...values: string[]): void => {
   if (!values.every((value) => money.test(value))) {
@@ -165,7 +228,8 @@ export function renderExpertReferralSummary(
   assertMoney(view.availableMinor, view.reservedMinor, view.debtMinor);
   if (
     !validInstantOrNull(view.nearestExpiry) ||
-    (view.maskedCodeStatus !== undefined && !safeText.test(view.maskedCodeStatus))
+    (view.maskedCodeStatus !== undefined &&
+      !safeText.test(view.maskedCodeStatus))
   ) {
     throw new Error("invalid_expert_view");
   }
@@ -199,6 +263,93 @@ export function renderExpertResidencyQuote(
     `Referral credit: ${view.creditMinor} RUB minor units`,
     `Cash due: ${view.cashMinor} RUB minor units`,
     `Duration: ${view.durationSeconds} seconds`,
+  ].join("\n");
+}
+
+const assertPlainText = (value: string, maximum: number): void => {
+  if (
+    value.length < 1 ||
+    value.length > maximum ||
+    /[\u0000-\u001F\u007F-\u009F]/u.test(value)
+  ) {
+    throw new Error("invalid_expert_view");
+  }
+};
+
+const assertCount = (value: number): void => {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("invalid_expert_view");
+  }
+};
+
+export function renderTelegramExpertSchedule(
+  view: TelegramExpertScheduleView,
+): string {
+  if (!validInstantOrNull(null)) throw new Error("invalid_expert_view");
+  if (view.appointments.length === 0) return "Записей на ближайшие 7 дней нет.";
+  return view.appointments
+    .slice(0, 20)
+    .map((appointment) => {
+      if (!validInstantOrNull(appointment.startsAt)) {
+        throw new Error("invalid_expert_view");
+      }
+      assertPlainText(appointment.clientDisplayName, 256);
+      if (appointment.expertNote !== undefined) {
+        assertPlainText(appointment.expertNote, 2_000);
+      }
+      if (
+        appointment.meetingUrl !== undefined &&
+        (!/^https:\/\/[^\s]+$/u.test(appointment.meetingUrl) ||
+          appointment.meetingUrl.length > 2_048)
+      ) {
+        throw new Error("invalid_expert_view");
+      }
+      return [
+        `${appointment.startsAt} — ${appointment.clientDisplayName}`,
+        `Статус: ${appointment.status}`,
+        ...(appointment.expertNote === undefined
+          ? []
+          : [`Заметка: ${appointment.expertNote}`]),
+        ...(appointment.status === "booked" &&
+        appointment.meetingUrl !== undefined
+          ? [`Встреча: ${appointment.meetingUrl}`]
+          : []),
+      ].join("\n");
+    })
+    .join("\n\n");
+}
+
+export function renderTelegramExpertClient(
+  view: TelegramExpertClientView,
+): string {
+  assertPlainText(view.clientDisplayName, 256);
+  assertPlainText(view.serviceName, 256);
+  if (!validInstantOrNull(view.startsAt))
+    throw new Error("invalid_expert_view");
+  if (view.preparationNote !== undefined) {
+    assertPlainText(view.preparationNote, 2_000);
+  }
+  return [
+    `Клиент: ${view.clientDisplayName}`,
+    `Время: ${view.startsAt}`,
+    `Услуга: ${view.serviceName}`,
+    ...(view.preparationNote === undefined
+      ? []
+      : [`Заметка для подготовки: ${view.preparationNote}`]),
+  ].join("\n");
+}
+
+export function renderTelegramExpertStats(
+  view: TelegramExpertStatsView,
+): string {
+  [view.upcoming, view.completed, view.cancelled, view.noShow].forEach(
+    assertCount,
+  );
+  return [
+    `Предстоящие: ${view.upcoming}`,
+    `Завершённые за 30 дней: ${view.completed}`,
+    `Отменённые за 30 дней: ${view.cancelled}`,
+    `Неявки за 30 дней: ${view.noShow}`,
   ].join("\n");
 }
 
@@ -250,7 +401,9 @@ const logFailure = (
   });
 };
 
-export class TelegramAdapter implements TelegramPort, ExpertTelegramViewPort {
+export class TelegramAdapter
+  implements TelegramPort, ExpertTelegramViewPort, ExpertTelegramQueryViewPort
+{
   private readonly deps: TelegramAdapterDeps;
 
   constructor(deps: TelegramAdapterDeps) {
@@ -322,8 +475,78 @@ export class TelegramAdapter implements TelegramPort, ExpertTelegramViewPort {
     });
   }
 
+  async sendQuerySchedule(
+    view: TelegramExpertScheduleView,
+  ): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderTelegramExpertSchedule(view),
+    });
+  }
+
+  async sendClientChoices(
+    view: TelegramExpertClientChoicesView,
+  ): Promise<TelegramSendOutcome> {
+    const inlineKeyboard = view.choices.map((choice, index) => {
+      if (
+        !validInstantOrNull(choice.startsAt) ||
+        Buffer.byteLength(choice.callbackData, "utf8") < 1 ||
+        Buffer.byteLength(choice.callbackData, "utf8") > 64 ||
+        !choice.callbackData.startsWith("cv1.")
+      ) {
+        throw new Error("invalid_expert_view");
+      }
+      assertPlainText(choice.serviceName, 256);
+      return [
+        {
+          text: `Запись ${index + 1} · ${choice.startsAt}`,
+          callback_data: choice.callbackData,
+        },
+      ];
+    });
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text:
+        view.choices.length === 0
+          ? "Активных записей нет."
+          : "Выберите запись:",
+      ...(inlineKeyboard.length === 0
+        ? {}
+        : { replyMarkup: { inline_keyboard: inlineKeyboard } }),
+    });
+  }
+
+  async sendClientView(
+    view: TelegramExpertClientView,
+  ): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderTelegramExpertClient(view),
+    });
+  }
+
+  async sendStats(view: TelegramExpertStatsView): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderTelegramExpertStats(view),
+    });
+  }
+
+  async sendUnsupported(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({ ...view, text: "Команда недоступна." });
+  }
+
   private async sendText(
-    view: ExpertReservationView | ExpertScheduleView,
+    view: (ExpertReservationView | ExpertScheduleView) & {
+      replyMarkup?: TelegramTransportRequest["body"]["reply_markup"];
+    },
   ): Promise<TelegramSendOutcome> {
     const url = buildTelegramMethodUrl(
       this.deps.baseUrl,
@@ -339,6 +562,9 @@ export class TelegramAdapter implements TelegramPort, ExpertTelegramViewPort {
         body: {
           chat_id: view.telegramUserId,
           text: view.text,
+          ...(view.replyMarkup === undefined
+            ? {}
+            : { reply_markup: view.replyMarkup }),
         },
         context: {
           idempotencyKey: view.idempotencyKey,

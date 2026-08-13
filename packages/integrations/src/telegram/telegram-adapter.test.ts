@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   renderExpertReferralSummary,
   renderExpertResidencyQuote,
+  renderTelegramExpertClient,
+  renderTelegramExpertStats,
   TelegramAdapter,
   type TelegramTransportRequest,
 } from "./telegram-adapter.js";
@@ -89,5 +91,56 @@ describe("expert Telegram views", () => {
         nearestExpiry: null,
       }),
     ).toThrow("invalid_expert_view");
+  });
+
+  it("renders only the minimized client view fields", () => {
+    const rendered = renderTelegramExpertClient({
+      idempotencyKey: "client-view-1",
+      telegramUserId: "123456789",
+      clientDisplayName: "Client",
+      startsAt: "2026-08-14T09:00:00.000Z",
+      serviceName: "Consultation",
+      preparationNote: "Bring notes",
+    });
+    expect(rendered).toContain("Клиент: Client");
+    expect(rendered).toContain("Заметка для подготовки: Bring notes");
+    expect(rendered).not.toMatch(/phone|email|balance|payment/iu);
+  });
+
+  it("renders safe server aggregate counts without client-level facts", () => {
+    expect(
+      renderTelegramExpertStats({
+        idempotencyKey: "stats-1",
+        telegramUserId: "123456789",
+        upcoming: 2,
+        completed: 3,
+        cancelled: 1,
+        noShow: 0,
+      }),
+    ).toBe(
+      "Предстоящие: 2\nЗавершённые за 30 дней: 3\nОтменённые за 30 дней: 1\nНеявки за 30 дней: 0",
+    );
+  });
+
+  it("builds non-identifying cv1 buttons within Telegram's callback limit", async () => {
+    const { adapter, requests } = buildAdapter();
+    await adapter.sendClientChoices({
+      idempotencyKey: "client-list-1",
+      telegramUserId: "123456789",
+      choices: [
+        {
+          startsAt: "2026-08-14T09:00:00.000Z",
+          serviceName: "Consultation",
+          callbackData: "cv1.safe-token",
+        },
+      ],
+    });
+
+    const button = requests[0]?.body.reply_markup?.inline_keyboard[0]?.[0];
+    expect(button).toEqual({
+      text: "Запись 1 · 2026-08-14T09:00:00.000Z",
+      callback_data: "cv1.safe-token",
+    });
+    expect(button?.text).not.toContain("Client");
   });
 });

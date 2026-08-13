@@ -162,8 +162,22 @@ export {
   type ResidencyQuote,
   type TariffVersionCommand,
 } from "./repositories/expert-residency-repository.js";
-export { ExpertResidencySettlementError, PostgresExpertResidencyProviderInboxRepository, type ExpertResidencySettlementResult } from "./repositories/expert-residency-provider-inbox-repository.js";
-export { PostgresExpertReferralAdminRepository, type ExpertReferralAdminRepositoryCommand } from "./repositories/expert-referral-admin-repository.js";
+export {
+  ExpertResidencySettlementError,
+  PostgresExpertResidencyProviderInboxRepository,
+  type ExpertResidencySettlementResult,
+} from "./repositories/expert-residency-provider-inbox-repository.js";
+export {
+  PostgresExpertReferralAdminRepository,
+  type ExpertReferralAdminRepositoryCommand,
+} from "./repositories/expert-referral-admin-repository.js";
+export {
+  PostgresExpertTelegramQueryRepository,
+  type DbExpertClientChoiceRecord,
+  type DbExpertClientView,
+  type DbExpertTelegramStats,
+  type ExpertTelegramQueryRepositoryOptions,
+} from "./repositories/expert-telegram-query-repository.js";
 export {
   PostgresExpertReferralWorkerRepository,
   type ExpertReferralHoldReplayBatchResult,

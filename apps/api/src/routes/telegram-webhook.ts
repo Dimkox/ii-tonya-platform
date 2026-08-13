@@ -15,6 +15,56 @@ export interface TelegramCallbackService {
   ): Promise<void>;
 }
 
+export interface TelegramExpertQueryIngress {
+  resolvePrincipal(telegramUserId: string): Promise<{
+    readonly expertId: string;
+    readonly telegramUserId: string;
+    readonly timezone: string;
+  } | null>;
+  authenticateClientView(input: {
+    readonly data: string;
+    readonly telegramUserId: string;
+    readonly correlationId: string;
+  }): Promise<{
+    readonly tokenHash: string;
+    readonly claims: {
+      readonly reservationId: string;
+      readonly expertId: string;
+      readonly version: number;
+      readonly expiresAtEpochSeconds: number;
+    };
+  } | null>;
+  processCommand(input: {
+    readonly text: string;
+    readonly chatType: "private";
+    readonly principal: {
+      readonly expertId: string;
+      readonly telegramUserId: string;
+      readonly timezone: string;
+    };
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<void>;
+  processClientView(input: {
+    readonly principal: {
+      readonly expertId: string;
+      readonly telegramUserId: string;
+      readonly timezone: string;
+    };
+    readonly authenticated: {
+      readonly tokenHash: string;
+      readonly claims: {
+        readonly reservationId: string;
+        readonly expertId: string;
+        readonly version: number;
+        readonly expiresAtEpochSeconds: number;
+      };
+    };
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<void>;
+}
+
 const numericIdentity = /^[1-9]\d{0,19}$/u;
 const secureEqual = (actual: string | undefined, expected: string): boolean => {
   if (actual === undefined) return false;
@@ -28,9 +78,14 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   callbacks: TelegramCallbackService;
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
+  expertQueriesEnabled?: boolean;
+  expertQueries?: TelegramExpertQueryIngress;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
 }> = async (app, deps) => {
+  if (deps.expertQueriesEnabled === true && deps.expertQueries === undefined) {
+    throw new Error("Expert Telegram query capability is required");
+  }
   app.post(
     "/v1/webhooks/telegram",
     {
@@ -91,11 +146,119 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         ) {
           return reply.code(403).send({ error: "invalid_callback" });
         }
-        if (!await deps.callbacks.isAuthorizedIdentity(String(id))) {
+        if (data.startsWith("cv1.")) {
+          if (
+            deps.expertQueriesEnabled !== true ||
+            deps.expertQueries === undefined
+          ) {
+            return { accepted: true, unsupported: true };
+          }
+          const principal = await deps.expertQueries.resolvePrincipal(
+            String(id),
+          );
+          if (principal === null) {
+            return reply.code(403).send({ error: "unauthorized_expert" });
+          }
+          const authenticated = await deps.expertQueries.authenticateClientView(
+            {
+              data,
+              telegramUserId: String(id),
+              correlationId,
+            },
+          );
+          if (authenticated === null) {
+            return reply.code(403).send({ error: "invalid_callback" });
+          }
+          const updateId = String(body.update_id);
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed") {
+            return { accepted: true, duplicate: true };
+          }
+          try {
+            await deps.expertQueries.processClientView({
+              principal,
+              authenticated,
+              idempotencyKey: `telegram:${updateId}:client-view`,
+              correlationId,
+            });
+            await deps.inbox.complete(claim.claimId);
+          } catch (error) {
+            await deps.inbox.fail(claim.claimId);
+            throw error;
+          }
+          return { accepted: true };
+        }
+        if (!(await deps.callbacks.isAuthorizedIdentity(String(id)))) {
           return reply.code(403).send({ error: "unauthorized_expert" });
         }
-        if (!await deps.callbacks.verifyCallback(body, correlationId)) {
+        if (!(await deps.callbacks.verifyCallback(body, correlationId))) {
           return reply.code(403).send({ error: "invalid_callback" });
+        }
+      }
+      const message = body.message;
+      if (message && typeof message === "object") {
+        const record = message as Record<string, unknown>;
+        const text = record.text;
+        if (
+          typeof text === "string" &&
+          /^\/(?:schedule|client|stats)(?:\s|$)/u.test(text)
+        ) {
+          if (
+            deps.expertQueriesEnabled !== true ||
+            deps.expertQueries === undefined
+          ) {
+            return { accepted: true, unsupported: true };
+          }
+          const from = record.from;
+          const chat = record.chat;
+          const telegramUserId =
+            from && typeof from === "object"
+              ? String((from as Record<string, unknown>).id ?? "")
+              : "";
+          const chatRecord =
+            chat && typeof chat === "object"
+              ? (chat as Record<string, unknown>)
+              : undefined;
+          if (
+            !numericIdentity.test(telegramUserId) ||
+            chatRecord?.type !== "private" ||
+            String(chatRecord.id ?? "") !== telegramUserId
+          ) {
+            return reply.code(403).send({ error: "unauthorized_expert" });
+          }
+          if (
+            !deps.rateLimiter.consume(
+              `telegram:query:${telegramUserId}`,
+              20,
+              60_000,
+            )
+          ) {
+            return reply.code(429).send({ error: "rate_limited" });
+          }
+          const principal =
+            await deps.expertQueries.resolvePrincipal(telegramUserId);
+          if (principal === null) {
+            return reply.code(403).send({ error: "unauthorized_expert" });
+          }
+          const updateId = String(body.update_id);
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed") {
+            return { accepted: true, duplicate: true };
+          }
+          try {
+            await deps.expertQueries.processCommand({
+              text,
+              chatType: "private",
+              principal,
+              idempotencyKey: `telegram:${updateId}:command`,
+              correlationId,
+            });
+            await deps.inbox.complete(claim.claimId);
+          } catch (error) {
+            await deps.inbox.fail(claim.claimId);
+            throw error;
+          }
+          return { accepted: true };
         }
       }
       const updateId = String(body.update_id);

@@ -59,6 +59,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_REFERRAL_HMAC_KEY_REF",
       "EXPERT_REFERRAL_HMAC_KEY_VERSION",
       "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "EXPERT_TELEGRAM_QUERIES_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
       "expert_referral.abuse_hold_close",
