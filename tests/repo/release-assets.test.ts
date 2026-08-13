@@ -55,6 +55,8 @@ describe("release assets", () => {
       "utf8",
     );
     expect(builder).toContain("SOURCE_ARCHIVE_SHA");
+    expect(builder).toContain("SOURCE_BUNDLE");
+    expect(builder).toContain("git clone --quiet --no-checkout");
     expect(builder).toContain("git_source_sha");
     expect(builder).toContain("source_archive_sha256");
     expect(builder).toContain(

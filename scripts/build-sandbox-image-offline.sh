@@ -3,22 +3,24 @@ set -euo pipefail
 
 : "${SOURCE_ARCHIVE:?SOURCE_ARCHIVE is required}"
 : "${SOURCE_ARCHIVE_SHA:?SOURCE_ARCHIVE_SHA is required}"
+: "${SOURCE_BUNDLE:?SOURCE_BUNDLE is required}"
 : "${SOURCE_SHA:?SOURCE_SHA is required}"
 : "${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}"
 git_source_sha="$SOURCE_SHA"
 source_archive_sha256="$(sha256sum "$SOURCE_ARCHIVE" | cut -d' ' -f1)"
 [[ "$git_source_sha" =~ ^[0-9a-f]{40}$ ]]
 test "$SOURCE_ARCHIVE_SHA" = "$source_archive_sha256"
-test "$(git rev-parse "$git_source_sha^{commit}")" = "$git_source_sha"
 test "$(docker image inspect ii-tonya-test:7d71646347d560ff2b5d8ebc4c0aad5b48230254 --format '{{.Id}}')" = "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8"
 
 fixture="$(mktemp -d)"
 cleanup() { rm -rf "$fixture"; }
 trap cleanup EXIT INT TERM
 mkdir -p "$fixture/source" "$fixture/expected" "$fixture/context/sandbox-api" "$fixture/context/sandbox-migrations"
+git clone --quiet --no-checkout "$SOURCE_BUNDLE" "$fixture/trusted-repo"
+test "$(git -C "$fixture/trusted-repo" rev-parse "$git_source_sha^{commit}")" = "$git_source_sha"
 tar -xf "$SOURCE_ARCHIVE" -C "$fixture/source"
-GIT_INDEX_FILE="$fixture/expected.index" git read-tree "$git_source_sha"
-GIT_INDEX_FILE="$fixture/expected.index" git checkout-index --all --prefix="$fixture/expected/"
+GIT_INDEX_FILE="$fixture/expected.index" git -C "$fixture/trusted-repo" read-tree "$git_source_sha"
+GIT_INDEX_FILE="$fixture/expected.index" git -C "$fixture/trusted-repo" checkout-index --all --prefix="$fixture/expected/"
 diff -qr "$fixture/expected" "$fixture/source"
 
 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
@@ -67,5 +69,6 @@ docker build --network none --file "$fixture/context/Dockerfile.sandbox" --targe
   --build-arg VCS_REF="$git_source_sha" --tag "$SANDBOX_IMAGE_REF" "$fixture/context"
 printf 'git_source_sha=%s\n' "$git_source_sha"
 printf 'source_archive_sha256=%s\n' "$source_archive_sha256"
+printf 'source_bundle_sha256=%s\n' "$(sha256sum "$SOURCE_BUNDLE" | cut -d' ' -f1)"
 printf 'sandbox_artifact_sha256=%s\n' "$(sha256sum "$fixture/context/SHA256SUMS" | cut -d' ' -f1)"
 printf 'sandbox_image_id=%s\n' "$(docker image inspect "$SANDBOX_IMAGE_REF" --format '{{.Id}}')"
