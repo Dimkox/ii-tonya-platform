@@ -49,7 +49,8 @@ if [[ -n "${DOCKER_HOST_STORE_ROOT:-}" ]]; then
   docker_store_args=(--volume "${DOCKER_HOST_STORE_ROOT%/}:/installed-store:ro")
 fi
 
-docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
+printf 'sandbox_phase=prepare_artifact\n'
+timeout --signal=TERM 420 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
   --cpus 1 --memory 1g \
   --cap-drop ALL --security-opt no-new-privileges \
   --volume "$docker_source_mount:/work:rw" \
@@ -69,10 +70,13 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name dist -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; rm -rf "$target"; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
     cd /work/apps/sandbox-api
+    printf "sandbox_phase=build_api\n"
     /seed/node_modules/.bin/tsup --config tsup.config.ts
     cd /work
     test -f apps/sandbox-api/dist/server.js
+    printf "sandbox_phase=deploy_closure\n"
     pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
+    printf "sandbox_phase=sanitize_closure\n"
     find /work/.sandbox-artifact -type f -name package.json -print0 | xargs -0 node -e '"'"'
       const fs=require("node:fs");
       for(const path of process.argv.slice(1)) {
@@ -103,7 +107,8 @@ cp -a "$fixture/source/packages/sandbox-payments/migrations/." "$fixture/context
 cp "$fixture/source/Dockerfile.sandbox" "$fixture/context/Dockerfile.sandbox"
 find "$fixture/context" -type l -exec test -e {} \;
 (cd "$fixture/context" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
-docker build --network none --file "$fixture/context/Dockerfile.sandbox" --target sandbox-api \
+printf 'sandbox_phase=build_image\n'
+timeout --signal=TERM 420 docker build --network none --file "$fixture/context/Dockerfile.sandbox" --target sandbox-api \
   --build-arg VCS_REF="$git_source_sha" --tag "$SANDBOX_IMAGE_REF" "$fixture/context"
 printf 'git_source_sha=%s\n' "$git_source_sha"
 printf 'source_archive_sha256=%s\n' "$source_archive_sha256"

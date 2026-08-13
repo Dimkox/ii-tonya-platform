@@ -93,6 +93,9 @@ describe("release assets", () => {
       "/seed/node_modules/.bin/tsup --config tsup.config.ts",
     );
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
+    expect(builder).toContain("timeout --signal=TERM 420 docker run");
+    expect(builder).toContain("timeout --signal=TERM 420 docker build");
+    expect(builder).toContain("sandbox_phase=deploy_closure");
     expect(builder).toContain(
       "pnpm --offline --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
     );
