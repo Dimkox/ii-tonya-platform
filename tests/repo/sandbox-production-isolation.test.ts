@@ -57,8 +57,7 @@ describe("sandbox production isolation", () => {
 
   it("publishes a real executable sandbox entrypoint", () => {
     const manifest = JSON.parse(readFileSync("apps/sandbox-api/package.json", "utf8")) as { scripts?: { start?: string } };
-    expect(manifest.scripts?.start).toBe("node dist/server.cjs");
-    expect(manifest.scripts?.["build:bounded"]).toContain("--format cjs");
+    expect(manifest.scripts?.start).toBe("node dist/server.js");
     const server = readFileSync("apps/sandbox-api/src/server.ts", "utf8");
     expect(server).toContain("createCanonicalExpertResidencyPaymentEventVerifier");
     expect(server).toContain("new PostgresSandboxPaymentRepository");

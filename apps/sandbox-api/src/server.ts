@@ -107,8 +107,12 @@ export async function main(options: SandboxMainOptions = {}): Promise<void> {
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
-    if (app !== undefined) await app.close();
-    await runtime.close();
+    const results = await Promise.allSettled([
+      app === undefined ? Promise.resolve() : app.close(),
+      runtime.close(),
+    ]);
+    const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failure !== undefined) throw failure.reason;
   };
   try {
     app = await buildSandboxServer(runtime.dependencies, env);
