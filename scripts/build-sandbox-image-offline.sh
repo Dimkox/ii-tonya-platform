@@ -17,7 +17,8 @@ cleanup() { rm -rf "$fixture"; }
 trap cleanup EXIT INT TERM
 mkdir -p "$fixture/source" "$fixture/expected" "$fixture/context/sandbox-api" "$fixture/context/sandbox-migrations"
 tar -xf "$SOURCE_ARCHIVE" -C "$fixture/source"
-git archive --format=tar "$git_source_sha" | tar -xf - -C "$fixture/expected"
+GIT_INDEX_FILE="$fixture/expected.index" git read-tree "$git_source_sha"
+GIT_INDEX_FILE="$fixture/expected.index" git checkout-index --all --prefix="$fixture/expected/"
 diff -qr "$fixture/expected" "$fixture/source"
 
 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
