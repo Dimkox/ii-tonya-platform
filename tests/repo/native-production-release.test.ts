@@ -113,6 +113,29 @@ describe("native dedicated-server production release", () => {
     expect(script).toContain("readlink");
   });
 
+  it("preserves interactive root password access without storing the password", () => {
+    const runbook = read("docs/runbooks/native-production-deployment.md");
+    const deploymentAssets = [
+      read("scripts/deploy-native-remote.sh"),
+      read("deploy/systemd/ii-tonya-api.service"),
+      read("deploy/systemd/ii-tonya-worker.service"),
+    ].join("\n");
+
+    expect(runbook).toContain("PROD_ROOT_PASSWORD_LOGIN_ENABLED=true");
+    expect(runbook).toContain("PROD_ROOT_PASSWORD_SOURCE=interactive");
+    expect(runbook).toContain("only at the interactive SSH password prompt");
+    expect(runbook).toContain("never stored in project `.env`");
+    expect(deploymentAssets).not.toMatch(
+      /PermitRootLogin\s+(?:no|prohibit-password)|PasswordAuthentication\s+no/u,
+    );
+    expect(read("deploy/systemd/ii-tonya-api.service")).toContain(
+      "User=ii_tonya",
+    );
+    expect(read("deploy/systemd/ii-tonya-worker.service")).toContain(
+      "User=ii_tonya",
+    );
+  });
+
   it("runs API and worker directly under hardened systemd units", () => {
     const api = read("deploy/systemd/ii-tonya-api.service");
     const worker = read("deploy/systemd/ii-tonya-worker.service");
