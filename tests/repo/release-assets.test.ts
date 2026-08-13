@@ -76,7 +76,12 @@ describe("release assets", () => {
     expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(builder).toContain("DOCKER_HOST_STORE_ROOT");
     expect(builder).toContain("/installed-store:ro");
-    expect(builder).toContain('cp -a "$store_root" /work/.pnpm-store');
+    expect(builder).toContain(
+      'cp "$store_root/v11/index.db" /work/.pnpm-store/v11/index.db',
+    );
+    expect(builder).toContain(
+      'ln -s "$store_root/v11/files" /work/.pnpm-store/v11/files',
+    );
     expect(builder).toContain("/installed:ro");
     expect(builder).toContain(
       'ln -s "$installed_root/node_modules" /work/node_modules',

@@ -61,7 +61,9 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     test ! -d /installed || installed_root=/installed
     store_root="$installed_root/.pnpm-store"
     test ! -d /installed-store || store_root=/installed-store
-    cp -a "$store_root" /work/.pnpm-store
+    mkdir -p /work/.pnpm-store/v11/projects
+    cp "$store_root/v11/index.db" /work/.pnpm-store/v11/index.db
+    ln -s "$store_root/v11/files" /work/.pnpm-store/v11/files
     rm -rf /work/node_modules
     ln -s "$installed_root/node_modules" /work/node_modules
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done

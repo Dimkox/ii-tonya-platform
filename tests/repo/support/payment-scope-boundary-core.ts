@@ -259,7 +259,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "01a3c9ee27910a22dc3450ad83e0832ce6b81e853a355f303c8a9ba39d4dd762",
+    "31bcb42789a20f0f1b1d625db63d17e9e15304c96cfa955538de886025afee13",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",
