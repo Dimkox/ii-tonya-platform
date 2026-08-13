@@ -20,6 +20,11 @@ source_sha="${SOURCE_SHA:?SOURCE_SHA is required}"
 }
 test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
+missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=print | sed -n '/^?/ { p; q; }')"
+[[ -z "$missing_git_object" ]] || {
+  printf 'Git history is incomplete; refusing security scan.\n' >&2
+  exit 1
+}
 
 compose_root=/home/pall/app-stack
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store

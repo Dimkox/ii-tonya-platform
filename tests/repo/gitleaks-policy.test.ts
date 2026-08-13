@@ -39,6 +39,12 @@ describe("Gitleaks policy", () => {
 
     const clawAdapter = readFileSync("scripts/run-claw-ci.sh", "utf8");
     expect(clawAdapter).toContain('git -C "$source_root" rev-parse HEAD');
+    expect(clawAdapter).toContain(
+      'git -C "$source_root" rev-list --objects --all --missing=print',
+    );
+    expect(clawAdapter).toContain(
+      "Git history is incomplete; refusing security scan",
+    );
     expect(clawAdapter).toContain("--config=/repo/.gitleaks.toml");
     expect(clawAdapter).toContain(
       "--gitleaks-ignore-path=/repo/.gitleaksignore",
