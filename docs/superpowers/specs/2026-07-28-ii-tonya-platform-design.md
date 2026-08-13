@@ -454,7 +454,11 @@ reference and never trusts client-supplied expert or reservation IDs.
 
 ### Payment provider
 
-The adapter is provider-neutral until the merchant selects a provider. It must support:
+The selected payment provider is **YooKassa by YooMoney** (`PAY-PROV-001`). T-Bank is
+not a target provider. Domain contracts remain provider-neutral; a live YooKassa adapter
+must remain disabled until its merchant, fiscal, webhook, refund, chargeback,
+reconciliation, credential, and operational contracts are independently approved. The
+adapter must support:
 
 - checkout/invoice creation;
 - webhook authenticity;
@@ -726,7 +730,8 @@ All are mandatory:
 - live Selarti event/delivery contract documented and tested;
 - live Planerka availability, hold, confirmation, cancellation, reschedule, webhook, and
   reconciliation contract documented and tested;
-- selected payment provider, fiscal flow, refund, and chargeback behavior approved;
+- YooKassa merchant and API contracts, fiscal flow, refund, and chargeback behavior
+  approved;
 - 24-hour visibility versus 72-hour hold contradiction resolved;
 - zero-balance control-message and failed-delivery charging policy resolved;
 - coupon application limits, cancellation, refund, and referral reversal approved;
@@ -744,7 +749,8 @@ All are mandatory:
 - Which exact Selarti webhook and tool/function contracts are enabled for this account?
 - Can Planerka create a provisional hold, and what are its real status and idempotency
   semantics?
-- Which payment provider and legal entity own checkout, receipts, refunds, and disputes?
+- Which legal entity and YooKassa merchant account own checkout, receipts, refunds, and
+  disputes, and which exact YooKassa API/webhook contract version is approved?
 - Is the expert approval SLA 24 hours or 72 hours, and what booking horizon makes it safe?
 - Is a zero-balance blocking message charged, and what happens when no unit remains?
 - What fraction of a service may coupons pay, and how do cancellation/refund/chargeback
