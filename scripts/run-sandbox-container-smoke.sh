@@ -4,6 +4,10 @@ set -euo pipefail
 : "${SOURCE_SHA:?SOURCE_SHA is required}"
 : "${SANDBOX_IMAGE_REF:?SANDBOX_IMAGE_REF is required}"
 [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+test "$(docker image inspect "$SANDBOX_IMAGE_REF" --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}')" = "$SOURCE_SHA"
+image_id="$(docker image inspect "$SANDBOX_IMAGE_REF" --format '{{.Id}}')"
+[[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+printf 'sandbox_image_id=%s\n' "$image_id"
 project="ii-tonya-sandbox-${SOURCE_SHA}"
 cleanup() {
   docker compose --project-name "$project" --file compose.sandbox.yaml --profile sandbox down --volumes --remove-orphans >/dev/null 2>&1 || true
