@@ -255,13 +255,20 @@ machine's existing `gh auth setup-git` credential helper. A previously embedded 
 removed from `.git/config`; because it appeared in diagnostic output, it must still be
 revoked and replaced in GitHub account settings.
 
-## CI and release tooling
+## Direct Claw and native release tooling
 
-The CI workflows pin their action revisions. Test commands run inside the constrained
-Claw image with Node 24, pnpm 11.9.0, Docker CLI, and Gitleaks 8.28.0. Main-branch
-publication retains pinned Trivy 0.65.0, Cosign installer 4.1.2, and signed
-image/provenance evidence. Preserve those pins and validate workflow changes; do not
-replace them with whatever versions happen to be installed locally.
+GitHub Actions are not used. CI, Database Gate, and release assembly run directly through
+`scripts/run-claw-ci.sh` inside the constrained Claw image with Node 24, pnpm 11.9.0,
+Docker CLI, and Gitleaks 8.28.0. The release output is a checksummed native API/worker
+bundle with an SPDX SBOM and provenance record; production runs it with systemd, system
+PostgreSQL, and nginx rather than an application container.
+
+Claw reuses the PostgreSQL service and machine-local credentials already supplied by
+`/home/pall/app-stack/docker-compose.yml` and `/home/pall/app-stack/.env`. The native
+rehearsal owns exactly one persistent project database, `ii_tonya_native_smoke`, and may
+reset only that database's `public` schema. Repository scripts must never print or copy
+the app-stack `.env` values. The immutable Claw test image is retained between runs and
+is rebuilt only when its pinned source/toolchain changes.
 
 ## Serena and indexing
 

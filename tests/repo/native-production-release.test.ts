@@ -7,6 +7,7 @@ describe("native dedicated-server production release", () => {
   it("declares Docker as dev/test-only and links the canonical graph", () => {
     const readme = read("README.md");
     const requirements = read("docs/spec/normalized-requirements.md");
+    const environment = read("docs/handoffs/environment-manifest.md");
 
     expect(readme).toContain(
       "[Open the full project connectivity graph](docs/architecture/project-connectivity-graph.md)",
@@ -15,6 +16,11 @@ describe("native dedicated-server production release", () => {
       "Docker and Compose are development and Claw test tools only",
     );
     expect(readme).toContain("GitHub Actions are not used");
+    expect(environment).toContain("## Direct Claw and native release tooling");
+    expect(environment).toContain("`ii_tonya_native_smoke`");
+    expect(environment).not.toContain(
+      "The CI workflows pin their action revisions",
+    );
     expect(requirements).toContain("OPS-DEPLOY-001");
     expect(requirements).toContain("без контейнеров приложения");
   });
