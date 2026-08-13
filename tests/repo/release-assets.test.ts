@@ -79,7 +79,7 @@ describe("release assets", () => {
     expect(builder).not.toContain("/seed/.pnpm-store");
     expect(builder).not.toContain("--filter @ii-tonya/sandbox-api... install");
     expect(builder).toContain(
-      '"$installed_root/node_modules/.bin/tsup" --config tsup.config.ts',
+      "/seed/node_modules/.bin/tsup --config tsup.config.ts",
     );
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
     expect(builder).toContain(

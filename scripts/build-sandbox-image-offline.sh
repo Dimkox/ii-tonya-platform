@@ -58,7 +58,7 @@ docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name node_modules -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
     for path in apps packages; do find "$installed_root/$path" -mindepth 2 -maxdepth 2 -type d -name dist -exec sh -c '"'"'root=$1; source=$2; target=/work/${source#"$root"/}; rm -rf "$target"; mkdir -p "$(dirname "$target")"; cp -a "$source" "$target"'"'"' sh "$installed_root" {} \;; done
     cd /work/apps/sandbox-api
-    "$installed_root/node_modules/.bin/tsup" --config tsup.config.ts
+    /seed/node_modules/.bin/tsup --config tsup.config.ts
     cd /work
     test -f apps/sandbox-api/dist/server.js
     pnpm --offline --store-dir "$installed_root/.pnpm-store" --filter @ii-tonya/sandbox-api --prod deploy /work/.sandbox-artifact
