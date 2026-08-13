@@ -75,6 +75,9 @@ describe("release assets", () => {
     expect(builder).toContain("LOCAL_SOURCE_ROOT");
     expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
     expect(builder).toContain("/installed:ro");
+    expect(builder).toContain(
+      'ln -s "$installed_root/node_modules" /work/node_modules',
+    );
     expect(builder).toContain("-type d -name dist");
     expect(builder).not.toContain("/seed/.pnpm-store");
     expect(builder).not.toContain("--filter @ii-tonya/sandbox-api... install");
