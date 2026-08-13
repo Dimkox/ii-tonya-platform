@@ -100,7 +100,7 @@
 | 2. Verifier, adapter, reconciliation | complete | `c7e8a68` | `73c6379`..`e5ef5f1` | PASS | PASS; one cross-task architecture guard recorded | Claw focused 8/8, repository 15/15; build/typecheck/lint/format; cleanup 0 |
 | 3. Approved admin transitions | complete | `7b8f9de` | `55430cd`..`4a2cc3e` | PASS after remediation | PASS; no findings | Claw focused 25/25, workflow repeat 3x 36/36; static checks; cleanup 0 |
 | 4. Separate sandbox API | complete | `7f9ec00` | `69998e2`..`dc44e42` | PASS after runtime and packaging remediation | PASS; no findings | Claw focused 41/41, isolation 5/5, bounded ESM/DTS build + artifact smoke; cleanup 0 |
-| 5. Settlement/refund E2E | pending | — | — | — | — | — |
+| 5. Settlement/refund E2E | conditional: Task 6 SBX-TST-009 pending | `e64858a` | `3323d1e`..`f4afb8f` | PASS after remediation | PASS conditional; no Critical/Important, one interval assertion Minor | Claw 48/48, reconciliation repeat 3x 6/6; builds/static; cleanup 0 |
 | 6. Container and image isolation | pending | — | — | — | — | — |
 | 7. Evidence and final gates | pending | — | — | — | — | — |
 
@@ -111,3 +111,6 @@ prove `@ii-tonya/sandbox-payments` is absent. The current Dockerfile deploys onl
 Cross-task gate: Task 4 isolation tests must reject imports or instantiation of
 `createCanonicalExpertResidencyPaymentEventVerifier` from production composition. Its
 root export is a privileged minting capability reserved for sandbox composition/tests.
+
+Cross-task gate: SBX-TST-009 sandbox-container checkout-to-refund smoke is owned by
+Task 6. Task 5 cannot be marked complete until that exact built-container evidence passes.
