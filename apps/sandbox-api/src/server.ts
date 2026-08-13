@@ -16,6 +16,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import { buildSandboxRoutes } from "./routes.js";
 
+
 type ApprovalPort = Pick<PostgresAdminApprovalRepository, "resolvePrincipal" | "requestApproval" | "approveApproval">;
 type SandboxPaymentAdapter = SandboxExpertResidencyPaymentAdapter & { assertSandboxDatabase(): Promise<void> };
 
