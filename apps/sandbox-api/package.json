@@ -17,6 +17,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "build": "tsup --config tsup.config.ts",
+    "build:bounded": "tsup --config tsup.config.ts",
     "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
   },
   "dependencies": {

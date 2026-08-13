@@ -61,6 +61,7 @@ describe("sandbox production isolation", () => {
     ) as { scripts?: { start?: string; build?: string } };
     expect(manifest.scripts?.start).toBe("node dist/server.js");
     expect(manifest.scripts?.build).toBe("tsup --config tsup.config.ts");
+    expect(manifest.scripts?.["build:bounded"]).toBe("tsup --config tsup.config.ts");
     const buildConfig = readFileSync("apps/sandbox-api/tsup.config.ts", "utf8");
     expect(buildConfig).toContain("noExternal: [/^@ii-tonya\\//u]");
     expect(buildConfig).toContain("(?!@ii-tonya\\/)");

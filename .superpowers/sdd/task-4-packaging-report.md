@@ -20,6 +20,8 @@ production manifest, production composition, or API behavior.
 - Focused GREEN: 3 files / 41 tests passed.
 - DB and sandbox-payments prerequisite ESM/DTS builds passed.
 - Sandbox API hybrid ESM/DTS build passed; `dist/server.js` was 136.41 KB.
+- The versioned bounded contract `npm --prefix apps/sandbox-api run build:bounded`
+  completed successfully without invoking pnpm's workspace post-build synchronization.
 - `node dist/server.js` exited nonzero and emitted exactly `sandbox_startup_failed`.
 - Prettier, ESLint, `git diff --check`, and cleanup checks passed; remaining test
   containers were zero.
