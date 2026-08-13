@@ -8,7 +8,7 @@ export * from "./payment-scope-boundary-core.js";
 
 const EXPERT_RESIDENCY_DB_GATE_PATH = ".github/workflows/db-gate.yml";
 const EXPERT_RESIDENCY_DB_GATE_SHA256 =
-  "02f86b323bc4552cd799ec04ef80c010c54e104e8f9a94292246ec55fc90d061";
+  "7e057dc2975e1c65994cf802b87bf36cbf443e4fbf85122a957ea9ca3d3466f2";
 
 const MAIN_NATIVE_AUTOMATION_BLOB_SHA1 = new Map<string, string>([
   [

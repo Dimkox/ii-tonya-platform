@@ -252,7 +252,9 @@ describe("sandbox payment provider end to end", () => {
     });
     const interval = await testDb!.db.execute<{
       seconds: string;
-    }>(sql`select extract(epoch from (residency_ends_at-residency_starts_at))::bigint::text seconds from expert_residency_orders where id=${order.id}::uuid`);
+    }>(
+      sql`select extract(epoch from (residency_ends_at-residency_starts_at))::bigint::text seconds from expert_residency_orders where id=${order.id}::uuid`,
+    );
     expect(interval.rows[0]?.seconds).toBe("86400");
 
     const emitted = await testDb!.db.execute<{

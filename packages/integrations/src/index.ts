@@ -65,6 +65,14 @@ export {
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
 export {
+  ClientViewCallbackVerificationError,
+  authenticateClientViewCallback,
+  issueClientViewCallback,
+  type ClientViewCallbackClaims,
+  type ClientViewCallbackStore,
+  type ClientViewExpertBinding,
+} from "./telegram/client-view-callback-token.js";
+export {
   CallbackConflictError,
   CallbackDataIntegrityError,
   CallbackInfrastructureError,
@@ -73,6 +81,14 @@ export {
   buildTelegramMethodUrl,
   redactTelegramUrl,
   TelegramAdapter,
+  renderTelegramExpertClient,
+  renderTelegramExpertSchedule,
+  renderTelegramExpertStats,
+  type ExpertTelegramQueryViewPort,
+  type TelegramExpertClientChoicesView,
+  type TelegramExpertClientView,
+  type TelegramExpertScheduleView,
+  type TelegramExpertStatsView,
   type ExpertReservationView,
   type ExpertScheduleView,
   type TelegramAdapterDeps,
@@ -98,3 +114,7 @@ export type {
 } from "./expert-residency/verified-event.js";
 export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
 export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";
+export {
+  createExpertCommandProcessor,
+  type ExpertCommandProcessor,
+} from "./telegram/expert-command-processor.js";

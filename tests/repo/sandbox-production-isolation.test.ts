@@ -61,7 +61,9 @@ describe("sandbox production isolation", () => {
     expect(dockerfile).not.toContain("packages/sandbox-payments");
     expect(dockerfile).not.toContain("@ii-tonya/sandbox-api");
     expect(dockerfile).not.toContain("@ii-tonya/sandbox-payments");
-    expect(dockerfile).not.toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+    expect(dockerfile).not.toContain(
+      "createCanonicalExpertResidencyPaymentEventVerifier",
+    );
   });
 
   it("publishes a real executable sandbox entrypoint", () => {

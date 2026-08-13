@@ -66,7 +66,7 @@ describe("CI and release workflow semantics", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];
     const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
-    const install = runner.indexOf("pnpm install --frozen-lockfile");
+    const install = runner.indexOf("pnpm install --offline --frozen-lockfile");
     const build = runner.indexOf("pnpm build", install);
     const verify = runner.indexOf("pnpm exec vitest run --maxWorkers=1", build);
     expect(install).toBeGreaterThanOrEqual(0);

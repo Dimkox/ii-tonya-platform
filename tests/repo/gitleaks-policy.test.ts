@@ -9,6 +9,10 @@ const EXPECTED_CONFIG = [
   'description = "Canonical non-secret placeholder tokens"',
   "regexes = ['''^__PLACEHOLDER_[A-Z0-9_]+__$''']",
   "",
+  "[[allowlists]]",
+  'description = "Versioned BMAD file checksum manifest"',
+  "paths = ['''^_bmad/_config/files-manifest\\.csv$''']",
+  "",
 ].join("\n");
 
 const EXPECTED_HISTORICAL_FIXTURE_FINGERPRINTS = new Set([
@@ -34,10 +38,7 @@ describe("Gitleaks policy", () => {
     );
 
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-    const clawAdapter = readFileSync(
-      "scripts/run-claw-actions-job.sh",
-      "utf8",
-    );
+    const clawAdapter = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
     expect(workflow).toMatch(/fetch-depth:\s*0/);
     expect(workflow).toContain("scripts/run-claw-actions-job.sh ci");
     expect(clawAdapter).toContain("--config=/repo/.gitleaks.toml");
@@ -45,6 +46,13 @@ describe("Gitleaks policy", () => {
       "--gitleaks-ignore-path=/repo/.gitleaksignore",
     );
     expect(clawAdapter).toContain("--redact");
+  });
+
+  it("limits the BMAD scanner exception to its generated checksum manifest", () => {
+    const config = readFileSync(".gitleaks.toml", "utf8");
+    expect(config).toContain("^_bmad/_config/files-manifest\\.csv$");
+    expect(config).not.toContain("_bmad/.*");
+    expect(config).not.toContain(".agents/skills");
   });
 
   it("ignores only the reviewed historical fixture fingerprints", () => {

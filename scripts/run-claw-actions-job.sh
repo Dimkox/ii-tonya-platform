@@ -30,7 +30,12 @@ export CI=true
 proxy_ip="$(getent ahostsv4 proxy-gateway | awk 'NR == 1 { print $1 }')"
 printf '%s\n' strict_chain proxy_dns 'tcp_read_time_out 15000' \
   'tcp_connect_time_out 8000' '[ProxyList]' "socks5 $proxy_ip 1080" > /workspace/.proxychains4.conf
-proxychains4 -q -f /workspace/.proxychains4.conf pnpm install --frozen-lockfile --store-dir /workspace/.pnpm-store
+if ! pnpm install --offline --frozen-lockfile --store-dir /workspace/.pnpm-store; then
+  timeout --signal=TERM 180 proxychains4 -q -f /workspace/.proxychains4.conf \
+    pnpm install --frozen-lockfile --store-dir /workspace/.pnpm-store \
+      --fetch-retries=1 --fetch-retry-mintimeout=1000 \
+      --fetch-retry-maxtimeout=5000 --fetch-timeout=30000
+fi
 pnpm build
 pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
 pnpm format:check
@@ -43,7 +48,21 @@ pnpm exec vitest run --coverage --reporter=default --reporter=junit --outputFile
 docker run --rm -v "$CLAW_HOST_WORKSPACE:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 \
   detect --source=/repo --config=/repo/.gitleaks.toml \
   --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
-VCS_REF="$GITHUB_SHA" pnpm test:container
+sandbox_ci_root="$(mktemp -d /workspace/source/.ii-tonya-sandbox-ci.XXXXXX)"
+trap 'rm -rf "$sandbox_ci_root"' EXIT
+source_sha="$(git rev-parse HEAD)"
+test "$source_sha" = "$GITHUB_SHA"
+export SANDBOX_SOURCE_ARCHIVE="$sandbox_ci_root/source.tar"
+export SOURCE_BUNDLE="$sandbox_ci_root/source.bundle"
+export SANDBOX_BUILD_ROOT="$sandbox_ci_root/build"
+export LOCAL_SOURCE_ROOT=/workspace/source
+export DOCKER_HOST_SOURCE_ROOT="$CLAW_HOST_WORKSPACE"
+export DOCKER_HOST_INSTALLED_ROOT="$CLAW_HOST_WORKSPACE"
+export DOCKER_HOST_STORE_ROOT="$CLAW_HOST_STORE_ROOT"
+mkdir -p "$SANDBOX_BUILD_ROOT"
+git archive --format=tar --output="$SANDBOX_SOURCE_ARCHIVE" "$source_sha"
+git bundle create "$SOURCE_BUNDLE" --all
+VCS_REF="$source_sha" pnpm test:container
 SCRIPT
 else
   cat > "$container_script" <<'SCRIPT'
@@ -76,10 +95,12 @@ fi
 
 chmod 0700 "$container_script"
 cd "$compose_root"
+claw_host_store="$compose_root/ii-tonya-test-workspace/.pnpm-store"
 II_TONYA_SOURCE_SHA="$test_image" docker compose --profile test run --rm --no-deps \
   -e CI=true \
   -e "GITHUB_SHA=${GITHUB_SHA:?GITHUB_SHA is required}" \
   -e "CLAW_HOST_WORKSPACE=$workspace" \
+  -e "CLAW_HOST_STORE_ROOT=$claw_host_store" \
   -v "$workspace:/workspace/source" \
   -v "$container_script:/tmp/ii-tonya-actions-job.sh:ro" \
   --entrypoint bash ii-tonya-test /tmp/ii-tonya-actions-job.sh

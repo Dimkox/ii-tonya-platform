@@ -18,6 +18,14 @@ The previously standalone expert HTTP boundary is now composable through the nor
 application for injected test capabilities; runtime startup fails closed if expert flags
 are enabled without that complete capability. No live authentication or payment provider
 is supplied, and all deployment defaults remain disabled.
+The expert Telegram query increment implements private `/schedule`, `/client`, and
+`/stats` reads plus a separate single-use `cv1` client-view callback. It is code-complete
+behind `EXPERT_TELEGRAM_QUERIES_ENABLED=false`; the default server supplies no query
+capability, so changing the flag alone fails startup closed. This is not live Telegram
+activation or provider evidence.
+The default server intentionally constructs neither a live query adapter nor callback
+secret; both remain deferred activation inputs. Enabled composition is proven only with
+an injected test capability while the production lifecycle remains closed.
 CI and Database Gate run on the repository-scoped self-hosted Claw runner and execute
 inside the constrained `ii-tonya-test` Compose profile. They do not consume GitHub-hosted
 Actions minutes. Pull-request execution is restricted to repository-owner branches;
@@ -50,6 +58,12 @@ pwsh -File scripts/check-development-environment.ps1
 
 The lockfile is the complete dependency graph; do not copy `node_modules` or caches from
 another machine.
+
+The repository also contains the complete BMad Method 6.11.0 Core + BMM runtime in
+`_bmad/` and its Codex skill projection in `.agents/skills/`. It is project tooling,
+not an application dependency. Installation, Windows UTF-8 setup, configuration,
+verification, and upgrade commands are recorded in
+`docs/handoffs/environment-manifest.md#bmad-method-and-superpowers`.
 
 ## Architecture graph
 

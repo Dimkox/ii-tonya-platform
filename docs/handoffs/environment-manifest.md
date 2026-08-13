@@ -17,10 +17,13 @@ Repository pins are authoritative; the observed source workstation is diagnostic
 | PostgreSQL                 | 17.5 Bookworm container for local evidence     | `compose.yaml`                            |
 | CI execution               | self-hosted Claw, constrained test container   | `.github/workflows/ci.yml`, `db-gate.yml` |
 | Text                       | UTF-8, LF, EditorConfig                        | `.editorconfig`, `.gitattributes`         |
+| BMad Method                | Core + BMM 6.11.0                              | `_bmad/_config/manifest.yaml`             |
+| BMad Python runner         | Python 3.10+ and uv                            | `_bmad/scripts`, official installer       |
 
 GitHub CLI is recommended for PR/check inspection but is not required to build. Codex,
-Serena, Python, Obsidian, and global skills are optional tooling, not runtime
-dependencies. Project agent instructions are committed in `AGENTS.md` and `docs/agents`.
+Serena, Obsidian, and global skills are optional tooling, not runtime dependencies.
+Python and uv are required only for the repository-contained BMad tooling. Project
+agent instructions are committed in `AGENTS.md` and `docs/agents`.
 
 ## Observed source workstation on 2026-08-04
 
@@ -39,6 +42,7 @@ This snapshot explains possible drift; do not reproduce it as the target environ
 | Codex CLI  | 0.146.0-alpha.9.2                                |
 | Git Bash   | 5.3.15                                           |
 | Python     | 3.14.6; optional for this repository             |
+| uv         | 0.12.2; used by the repository BMad scripts       |
 
 Consequences:
 
@@ -107,6 +111,76 @@ Consequences:
 7. `pnpm verify` is the aggregate repository gate. It also performs a production
    dependency audit and may require network access. A blocked or cancelled audit is not
    a passing result.
+
+## BMad Method and Superpowers
+
+The repository vendors the official stable BMad Method Core + BMM runtime so a clean
+machine does not depend on an unrecorded global prompt installation:
+
+- `_bmad/` — BMad 6.11.0 runtime, configuration, manifests, agents, and shared scripts;
+- `.agents/skills/` — the Codex projection of 49 installed BMad skills;
+- `docs/superpowers/` — durable specifications and implementation plans;
+- `docs/superpowers/implementation-artifacts/` — versioned story, sprint, and task
+  handoff artifacts.
+
+The installed configuration is:
+
+- project `ii-tonya-platform`;
+- communication language `Russian`;
+- document language `English`;
+- developer level `expert`;
+- planning artifacts `docs/superpowers`;
+- implementation artifacts `docs/superpowers/implementation-artifacts`;
+- project knowledge `docs`.
+
+Prerequisites are Node 24 (which also satisfies BMad's Node 20.12+ floor), Python 3.10+
+and `uv`. On Windows, persist UTF-8 mode once and open a new Codex task so subsequent
+processes inherit it:
+
+```powershell
+[Environment]::SetEnvironmentVariable('PYTHONUTF8', '1', 'User')
+```
+
+For the current shell, set it explicitly before the first BMad command:
+
+```powershell
+$env:PYTHONUTF8 = '1'
+uv run _bmad/scripts/resolve_config.py --project-root .
+```
+
+The resolver must return Core, BMM, and the five software-development agents without a
+traceback. The story workflow merge is checked with:
+
+```powershell
+uv run _bmad/scripts/resolve_customization.py `
+  --skill .agents/skills/bmad-create-story `
+  --key workflow
+```
+
+To reproduce or upgrade the checked-in installation, use the official stable installer
+from the repository root, review the resulting diff, rerun both resolver commands, and
+commit the runtime and skill projection together:
+
+```powershell
+npx --yes bmad-method@latest install `
+  --directory . `
+  --modules bmm `
+  --tools codex `
+  --yes `
+  --set core.user_name=Dmitry `
+  --set core.project_name=ii-tonya-platform `
+  --set core.communication_language=Russian `
+  --set core.document_output_language=English `
+  --set core.output_folder=_bmad-output `
+  --set bmm.user_skill_level=expert `
+  --set bmm.planning_artifacts=docs/superpowers `
+  --set bmm.implementation_artifacts=docs/superpowers/implementation-artifacts `
+  --set bmm.project_knowledge=docs
+```
+
+Do not put credentials in BMad configuration, memlogs, stories, prompts, or generated
+evidence. `_bmad/custom/*.user.toml` remains gitignored for machine-specific overrides.
+No BMad command authorizes provider staging, production mutation, merge, or deployment.
 
 ## Workspace modules
 

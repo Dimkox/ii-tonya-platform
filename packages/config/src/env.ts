@@ -55,6 +55,7 @@ const schema = z
     EXPERT_RESIDENCY_BILLING_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    EXPERT_TELEGRAM_QUERIES_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
@@ -80,10 +81,21 @@ const schema = z
     }
     if (value.EXPERT_REFERRAL_ENABLED === "true") {
       if (!/^v[1-9]\d*$/u.test(value.EXPERT_REFERRAL_HMAC_KEY_VERSION ?? "")) {
-        context.addIssue({ code: "custom", path: ["EXPERT_REFERRAL_HMAC_KEY_VERSION"], message: "expert_referral_key_unavailable" });
+        context.addIssue({
+          code: "custom",
+          path: ["EXPERT_REFERRAL_HMAC_KEY_VERSION"],
+          message: "expert_referral_key_unavailable",
+        });
       }
-      if (value.EXPERT_REFERRAL_HMAC_KEY_REF !== "env://EXPERT_REFERRAL_HMAC_KEYS_JSON") {
-        context.addIssue({ code: "custom", path: ["EXPERT_REFERRAL_HMAC_KEY_REF"], message: "expert_referral_key_unavailable" });
+      if (
+        value.EXPERT_REFERRAL_HMAC_KEY_REF !==
+        "env://EXPERT_REFERRAL_HMAC_KEYS_JSON"
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["EXPERT_REFERRAL_HMAC_KEY_REF"],
+          message: "expert_referral_key_unavailable",
+        });
       }
     }
   });
@@ -105,6 +117,7 @@ export type RuntimeConfig = {
   features: {
     expertReferral: boolean;
     expertResidencyBilling: boolean;
+    expertTelegramQueries?: boolean;
   };
   expertReferralKey?: {
     currentVersion: string;
@@ -136,12 +149,14 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     features: {
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
+      expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
     },
     ...(value.EXPERT_REFERRAL_ENABLED === "true"
       ? {
           expertReferralKey: {
             currentVersion: value.EXPERT_REFERRAL_HMAC_KEY_VERSION!,
-            reference: value.EXPERT_REFERRAL_HMAC_KEY_REF as "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+            reference:
+              value.EXPERT_REFERRAL_HMAC_KEY_REF as "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
           },
         }
       : {}),

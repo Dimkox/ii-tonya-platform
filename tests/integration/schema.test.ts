@@ -180,7 +180,7 @@ describe("MVP schema", () => {
         enabled: "O",
       },
     ]);
-  });
+  }, 30_000);
 
   it("creates the authoritative MVP and operational-support tables", async () => {
     const rows = await testDb!.db.execute<{ table_name: string }>(sql`

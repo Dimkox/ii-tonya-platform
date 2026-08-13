@@ -45,7 +45,10 @@ describe("release assets", () => {
     };
     const sandboxCompose = parse(
       readFileSync("compose.sandbox.yaml", "utf8"),
-    ) as { services: Record<string, Record<string, unknown>> };
+    ) as {
+      services: Record<string, Record<string, unknown>>;
+      networks: Record<string, { internal?: boolean }>;
+    };
     expect(Object.keys(productionCompose.services)).not.toContain(
       "sandbox-api",
     );
@@ -59,19 +62,57 @@ describe("release assets", () => {
     expect(builder).toContain("git clone --quiet --no-checkout");
     expect(builder).toContain("git_source_sha");
     expect(builder).toContain("source_archive_sha256");
-    expect(builder).toContain(
-      "pnpm --filter @ii-tonya/sandbox-api --prod deploy",
+    expect(builder).toMatch(
+      /pnpm[^\r\n]*--filter @ii-tonya\/sandbox-api --prod deploy/u,
     );
     expect(builder).not.toContain('cp -a "$fixture/source/node_modules"');
     expect(builder).toContain('find "$artifact" -type l');
     expect(builder).toContain("devDependencies");
     expect(builder).toContain("--network none");
-    expect(builder).toContain("build:bounded");
-    expect(builder).toContain("--filter @ii-tonya/sandbox-api... install");
+    expect(builder).toContain("--cpus 1");
+    expect(builder).toContain("--memory 1g");
+    expect(builder).toContain("DOCKER_HOST_SOURCE_ROOT");
+    expect(builder).toContain("LOCAL_SOURCE_ROOT");
+    expect(builder).toContain("DOCKER_HOST_INSTALLED_ROOT");
+    expect(builder).toContain("DOCKER_HOST_STORE_ROOT");
+    expect(builder).toContain("/installed-store:ro");
+    expect(builder).toContain(
+      'cp "$store_root/v11/index.db" /work/.pnpm-store/v11/index.db',
+    );
+    expect(builder).toContain(
+      'ln -s "$store_root/v11/files" /work/.pnpm-store/v11/files',
+    );
+    expect(builder).toContain("/installed:ro");
+    expect(builder).toContain(
+      'ln -s "$installed_root/node_modules" /work/node_modules',
+    );
+    expect(builder).toContain("-type d -name dist");
+    expect(builder).not.toContain("/seed/.pnpm-store");
+    expect(builder).not.toContain("--filter @ii-tonya/sandbox-api... install");
+    expect(builder).toContain(
+      "/seed/node_modules/.bin/tsup --config tsup.config.ts",
+    );
     expect(builder).toContain("test -f apps/sandbox-api/dist/server.js");
-    expect(builder).toContain("pnpm --offline --store-dir");
-    expect(builder).toContain('git read-tree "$git_source_sha"');
-    expect(builder).toContain("git checkout-index --all");
+    expect(builder).toContain("timeout --signal=TERM 420 docker run");
+    expect(builder).toContain("timeout --signal=TERM 420 docker build");
+    expect(builder).toContain("sandbox_phase=deploy_closure");
+    expect(builder).toContain(
+      "pnpm --offline --trust-lockfile --store-dir /work/.pnpm-store --filter @ii-tonya/sandbox-api --prod deploy",
+    );
+    expect(builder).toContain(
+      "xargs -0 -r -n 50 node --max-old-space-size=64 -e",
+    );
+    expect(builder).toContain(
+      "cp -aL /work/.sandbox-artifact/. /work/.sandbox-artifact.materialized/",
+    );
+    expect(builder).toContain(
+      "cp -aL /work/.sandbox-artifact/node_modules/.pnpm/node_modules/. /work/.sandbox-artifact.materialized/node_modules/",
+    );
+    expect(builder).toContain(
+      'if(/^(?:workspace:|file:|link:)/u.test(version)) manifest[key][name]="0.0.0"',
+    );
+    expect(builder).toMatch(/git[^\r\n]*read-tree "\$git_source_sha"/u);
+    expect(builder).toMatch(/git[^\r\n]*checkout-index --all/u);
     expect(builder).toContain('diff -qr "$fixture/expected" "$fixture/source"');
     expect(builder).toContain(
       "sha256:a8f8d4bb072b4ef94f5cdf36a077a3be158bc314282c37fe026ffbe468746cb8",
@@ -110,7 +151,7 @@ describe("release assets", () => {
       PAYMENT_WEBHOOK_SECRET: "",
     });
     expect(sandboxCompose.services["sandbox-postgres"]?.ports).toBeUndefined();
-    expect((sandboxCompose as any).networks["sandbox-db"].internal).toBe(true);
+    expect(sandboxCompose.networks["sandbox-db"]?.internal).toBe(true);
     expect(service.networks).toEqual(["sandbox-db"]);
   });
 
@@ -182,6 +223,15 @@ describe("release assets", () => {
     expect(dockerfile).toContain(
       "RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker",
     );
+    expect(dockerfile).toContain(
+      "RUN rm -f /out/api/pnpm-lock.yaml /out/api/pnpm-workspace.yaml",
+    );
+    expect(dockerfile).toContain(
+      "/out/worker/pnpm-lock.yaml /out/worker/pnpm-workspace.yaml",
+    );
+    expect(dockerfile).toContain(
+      'find /out/api /out/worker -type f -name "*.d.ts" -delete',
+    );
     expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
     expect(dockerfile).toContain(
@@ -197,6 +247,26 @@ describe("release assets", () => {
     expect(dockerfile).toContain(
       "LABEL org.opencontainers.image.revision=$VCS_REF",
     );
+  });
+
+  it("prepares an exact Git archive and bundle for the sandbox image smoke", () => {
+    const runner = readFileSync("scripts/run-claw-actions-job.sh", "utf8");
+    expect(runner).toContain("git archive --format=tar");
+    expect(runner).toContain("git bundle create");
+    expect(runner).toContain('git bundle create "$SOURCE_BUNDLE" --all');
+    expect(runner).toContain("SANDBOX_SOURCE_ARCHIVE");
+    expect(runner).toContain("SOURCE_BUNDLE");
+    expect(runner).toContain("DOCKER_HOST_SOURCE_ROOT");
+    expect(runner).toContain("DOCKER_HOST_INSTALLED_ROOT");
+    expect(runner).toContain("DOCKER_HOST_STORE_ROOT");
+    expect(runner).toContain(
+      "pnpm install --offline --frozen-lockfile --store-dir /workspace/.pnpm-store",
+    );
+    expect(runner).toContain('DOCKER_HOST_STORE_ROOT="$CLAW_HOST_STORE_ROOT"');
+    expect(runner).toContain('-e "CLAW_HOST_STORE_ROOT=$claw_host_store"');
+    expect(runner).toContain("timeout --signal=TERM 180 proxychains4");
+    expect(runner).toContain("--fetch-retries=1");
+    expect(runner).toContain("LOCAL_SOURCE_ROOT");
   });
 
   it("keeps every live capability disabled in local containers", () => {

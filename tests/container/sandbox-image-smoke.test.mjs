@@ -23,6 +23,8 @@ test("sandbox image contains its packaged runtime closure and is hardened", () =
     const sourceSha = process.env.VCS_REF;
     assert.match(sourceSha ?? "", /^[0-9a-f]{40}$/);
     run("bash", ["scripts/build-sandbox-image-offline.sh"], {
+      stdio: "inherit",
+      timeout: 480_000,
       env: {
         ...process.env,
         SOURCE_ARCHIVE: archive,

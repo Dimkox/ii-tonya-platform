@@ -45,6 +45,9 @@ COPY . .
 RUN pnpm build
 RUN pnpm --filter @ii-tonya/api --prod deploy /out/api
 RUN pnpm --filter @ii-tonya/app-worker --prod deploy /out/worker
+RUN rm -f /out/api/pnpm-lock.yaml /out/api/pnpm-workspace.yaml \
+    /out/worker/pnpm-lock.yaml /out/worker/pnpm-workspace.yaml
+RUN find /out/api /out/worker -type f -name "*.d.ts" -delete
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS runtime-base
 

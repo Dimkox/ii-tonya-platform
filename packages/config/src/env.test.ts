@@ -23,7 +23,11 @@ describe("loadEnv", () => {
     });
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
-    expect(config.features).toEqual({ expertReferral: false, expertResidencyBilling: false });
+    expect(config.features).toEqual({
+      expertReferral: false,
+      expertResidencyBilling: false,
+      expertTelegramQueries: false,
+    });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(() =>
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
@@ -32,16 +36,23 @@ describe("loadEnv", () => {
   });
 
   it("requires safe key metadata only when expert referrals are enabled", () => {
-    const enabled = loadEnv(localEnv({
-      EXPERT_REFERRAL_ENABLED: "true",
-      EXPERT_REFERRAL_HMAC_KEY_VERSION: "v1",
-      EXPERT_REFERRAL_HMAC_KEY_REF: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
-      EXPERT_REFERRAL_HMAC_KEYS_JSON: '{"v1":"must-not-enter-config"}',
-    }));
+    const enabled = loadEnv(
+      localEnv({
+        EXPERT_REFERRAL_ENABLED: "true",
+        EXPERT_REFERRAL_HMAC_KEY_VERSION: "v1",
+        EXPERT_REFERRAL_HMAC_KEY_REF: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+        EXPERT_REFERRAL_HMAC_KEYS_JSON: '{"v1":"must-not-enter-config"}',
+      }),
+    );
     expect(enabled.features.expertReferral).toBe(true);
-    expect(enabled.expertReferralKey).toEqual({ currentVersion: "v1", reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON" });
+    expect(enabled.expertReferralKey).toEqual({
+      currentVersion: "v1",
+      reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+    });
     expect(JSON.stringify(enabled)).not.toContain("must-not-enter-config");
-    expect(() => loadEnv(localEnv({ EXPERT_REFERRAL_ENABLED: "true" }))).toThrow("expert_referral_key_unavailable");
+    expect(() =>
+      loadEnv(localEnv({ EXPERT_REFERRAL_ENABLED: "true" })),
+    ).toThrow("expert_referral_key_unavailable");
   });
 
   it("tolerates unrelated OS variables while rejecting every owned live flag", () => {
@@ -52,6 +63,14 @@ describe("loadEnv", () => {
       loadEnv(localEnv({ MINOR_ONBOARDING_ENABLED: "true" })),
     ).toThrow();
     expect(() => loadEnv(localEnv({ PAYMENTS_ENABLED: "true" }))).toThrow();
+  });
+
+  it("defaults expert Telegram queries off and exposes only a capability flag", () => {
+    expect(loadEnv(localEnv()).features.expertTelegramQueries).toBe(false);
+    expect(
+      loadEnv(localEnv({ EXPERT_TELEGRAM_QUERIES_ENABLED: "true" })).features
+        .expertTelegramQueries,
+    ).toBe(true);
   });
 
   it("accepts only the exact Postgres URL protocols", () => {

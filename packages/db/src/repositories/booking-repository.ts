@@ -93,8 +93,11 @@ export interface BookingRepositoryOptions {
   beforeCallbackTransition?: () => Promise<void>;
 }
 
-type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends
-  (transaction: infer T) => unknown ? T : never;
+type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
+  transaction: infer T,
+) => unknown
+  ? T
+  : never;
 
 type SlotRow = {
   slotId: string;
@@ -155,9 +158,7 @@ type BookingAuditAction =
   | "reservation.complete"
   | "reservation.mark_no_show";
 
-const outboxTopicsFor = (
-  action: BookingAuditAction,
-): readonly string[] => {
+const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
   switch (action) {
     case "reservation.reserve":
       return ["planerka.reserve", "telegram.reservation_request"];
@@ -215,9 +216,8 @@ export function normalizeBookingTimestamp(
   value: Date | string,
   field: string,
 ): Date {
-  const normalized = value instanceof Date
-    ? new Date(value.getTime())
-    : new Date(value);
+  const normalized =
+    value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (!Number.isFinite(normalized.getTime())) {
     throw new BookingDataIntegrityError(field);
   }
@@ -277,7 +277,11 @@ function hash(value: Record<string, unknown>): string {
 function hasSqlState(error: unknown, code: string): boolean {
   const seen = new Set<unknown>();
   let current = error;
-  while (typeof current === "object" && current !== null && !seen.has(current)) {
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
     seen.add(current);
     if ((current as { code?: unknown }).code === code) return true;
     current = (current as { cause?: unknown }).cause;
@@ -288,7 +292,11 @@ function hasSqlState(error: unknown, code: string): boolean {
 function findSqlStateError(error: unknown, code: string): unknown {
   const seen = new Set<unknown>();
   let current = error;
-  while (typeof current === "object" && current !== null && !seen.has(current)) {
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
     seen.add(current);
     if ((current as { code?: unknown }).code === code) return current;
     current = (current as { cause?: unknown }).cause;
@@ -307,17 +315,24 @@ function finiteDate(date: Date): boolean {
 }
 
 function isFresh(observedAt: Date | null, now: Date): boolean {
-  return observedAt !== null
-    && observedAt.getTime() <= now.getTime()
-    && observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS;
+  return (
+    observedAt !== null &&
+    observedAt.getTime() <= now.getTime() &&
+    observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS
+  );
 }
 
 function hasConstraint(error: unknown, constraint: string): boolean {
   const seen = new Set<unknown>();
   let current = error;
-  while (typeof current === "object" && current !== null && !seen.has(current)) {
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
     seen.add(current);
-    if ((current as { constraint?: unknown }).constraint === constraint) return true;
+    if ((current as { constraint?: unknown }).constraint === constraint)
+      return true;
     current = (current as { cause?: unknown }).cause;
   }
   return false;
@@ -345,28 +360,35 @@ export class PostgresBookingRepository {
     this.maxSerializationAttempts = Number.isFinite(configuredAttempts)
       ? Math.max(1, Math.min(3, Math.floor(configuredAttempts)))
       : 3;
-    this.retryDelayMs = options.retryDelayMs
-      ?? ((attempt) => Math.floor(Math.random() * Math.min(250, 25 * 2 ** attempt)));
-    this.onSerializationExhausted = options.onSerializationExhausted ?? (() => undefined);
+    this.retryDelayMs =
+      options.retryDelayMs ??
+      ((attempt) =>
+        Math.floor(Math.random() * Math.min(250, 25 * 2 ** attempt)));
+    this.onSerializationExhausted =
+      options.onSerializationExhausted ?? (() => undefined);
     this.beforeCallbackTransition =
       options.beforeCallbackTransition ?? (() => Promise.resolve());
   }
 
   async reserve(command: ReserveSlotCommand): Promise<ReserveSlotResult> {
     if (
-      !finiteDate(command.now)
-      || !Number.isFinite(command.minimumLeadMs)
-      || command.minimumLeadMs < 0
-      || !Number.isFinite(command.confirmationBufferMs)
-      || command.confirmationBufferMs < 0
+      !finiteDate(command.now) ||
+      !Number.isFinite(command.minimumLeadMs) ||
+      command.minimumLeadMs < 0 ||
+      !Number.isFinite(command.confirmationBufferMs) ||
+      command.confirmationBufferMs < 0
     ) {
       return { kind: "unavailable", reason: "deadline" };
     }
     try {
-      return await this.runSerializable((tx) => this.reserveInTransaction(tx, command));
+      return await this.runSerializable((tx) =>
+        this.reserveInTransaction(tx, command),
+      );
     } catch (error) {
-      if (!hasSqlState(error, "23505")
-        || !hasConstraint(error, "reservations_idempotency_unique")) {
+      if (
+        !hasSqlState(error, "23505") ||
+        !hasConstraint(error, "reservations_idempotency_unique")
+      ) {
         throw error;
       }
       return this.resolveReservationIdempotency(command);
@@ -380,10 +402,15 @@ export class PostgresBookingRepository {
   transition(
     command: TransitionReservationCommand,
   ): Promise<TransitionReservationResult> {
-    if (!finiteDate(command.now) || !Number.isInteger(command.expectedVersion)) {
+    if (
+      !finiteDate(command.now) ||
+      !Number.isInteger(command.expectedVersion)
+    ) {
       return Promise.reject(new Error("Invalid reservation transition input"));
     }
-    return this.runSerializable((tx) => this.transitionInTransaction(tx, command));
+    return this.runSerializable((tx) =>
+      this.transitionInTransaction(tx, command),
+    );
   }
 
   transitionAndPublish(
@@ -520,6 +547,7 @@ export class PostgresBookingRepository {
           else null
         end as "meetingUrl"
       from experts e
+      join users expert_user on expert_user.id = e.user_id and expert_user.active
       join channel_identities ci
         on ci.user_id = e.user_id
         and ci.provider = 'telegram'
@@ -546,6 +574,7 @@ export class PostgresBookingRepository {
         and e.active
         and e.verified
         and r.status in ('reserved', 'booked')
+        and (r.status = 'booked' or r.reserved_until > ${command.from})
         and s.starts_at >= ${command.from}
         and s.starts_at < ${command.to}
       order by s.starts_at, r.id
@@ -556,6 +585,7 @@ export class PostgresBookingRepository {
         select exists (
           select 1
           from experts e
+          join users expert_user on expert_user.id = e.user_id and expert_user.active
           join channel_identities ci on ci.user_id = e.user_id
           where e.id = ${command.expertId}::uuid
             and e.active
@@ -674,7 +704,11 @@ export class PostgresBookingRepository {
     operation: (tx: Transaction) => Promise<T>,
   ): Promise<T> {
     let finalSerializationError: unknown;
-    for (let attempt = 1; attempt <= this.maxSerializationAttempts; attempt += 1) {
+    for (
+      let attempt = 1;
+      attempt <= this.maxSerializationAttempts;
+      attempt += 1
+    ) {
       try {
         return await this.db.transaction(async (tx) => {
           await tx.execute(sql`set transaction isolation level serializable`);
@@ -685,9 +719,11 @@ export class PostgresBookingRepository {
         finalSerializationError = findSqlStateError(error, "40001");
         if (attempt < this.maxSerializationAttempts) {
           const configuredDelay = this.retryDelayMs(attempt);
-          await sleep(Number.isFinite(configuredDelay)
-            ? Math.min(250, Math.max(0, configuredDelay))
-            : 0);
+          await sleep(
+            Number.isFinite(configuredDelay)
+              ? Math.min(250, Math.max(0, configuredDelay))
+              : 0,
+          );
         }
       }
     }
@@ -721,7 +757,8 @@ export class PostgresBookingRepository {
       ) ordered_locks
     `);
 
-    const rawSlot = (await tx.execute<RawSlotRow>(sql`
+    const rawSlot = (
+      await tx.execute<RawSlotRow>(sql`
       select
         s.id as "slotId",
         e.id as "expertId",
@@ -738,13 +775,15 @@ export class PostgresBookingRepository {
       join experts e on e.id = es.expert_id
       where s.id = ${command.slotId}::uuid
       for update of s, es, e
-    `)).rows[0];
+    `)
+    ).rows[0];
     if (rawSlot === undefined) {
       return { kind: "unavailable", reason: "stale_slot" };
     }
     const slot = normalizeSlotRow(rawSlot);
 
-    const rawDuplicate = (await tx.execute<RawReservationResultRow>(sql`
+    const rawDuplicate = (
+      await tx.execute<RawReservationResultRow>(sql`
       select
         id as "reservationId",
         user_id as "userId",
@@ -753,7 +792,8 @@ export class PostgresBookingRepository {
         version
       from reservations
       where idempotency_key = ${command.idempotencyKey}
-    `)).rows[0];
+    `)
+    ).rows[0];
     if (rawDuplicate !== undefined) {
       return this.classifyDuplicate(
         command,
@@ -767,7 +807,10 @@ export class PostgresBookingRepository {
     if (!slot.expertActive || !slot.expertVerified || !slot.serviceActive) {
       return { kind: "unavailable", reason: "expert_ineligible" };
     }
-    if (slot.startsAt.getTime() < command.now.getTime() + command.minimumLeadMs) {
+    if (
+      slot.startsAt.getTime() <
+      command.now.getTime() + command.minimumLeadMs
+    ) {
       return { kind: "unavailable", reason: "lead_time" };
     }
 
@@ -782,12 +825,17 @@ export class PostgresBookingRepository {
       return { kind: "unavailable", reason: "deadline" };
     }
 
-    const capacity = one((await tx.execute<{ count: number }>(sql`
+    const capacity = one(
+      (
+        await tx.execute<{ count: number }>(sql`
       select count(*)::integer as count
       from reservations
       where slot_id = ${slot.slotId}::uuid
         and status in ('reserved', 'booked')
-    `)).rows, "a slot capacity count");
+    `)
+      ).rows,
+      "a slot capacity count",
+    );
     if (Number(capacity.count) >= slot.capacity) {
       return { kind: "unavailable", reason: "capacity" };
     }
@@ -799,7 +847,9 @@ export class PostgresBookingRepository {
       return { kind: "unavailable", reason: "expert_active_overlap" };
     }
 
-    const rawInserted = one((await tx.execute<RawReservationResultRow>(sql`
+    const rawInserted = one(
+      (
+        await tx.execute<RawReservationResultRow>(sql`
       insert into reservations (
         user_id, slot_id, expert_id, expert_service_id, status, idempotency_key,
         reserved_until, version, created_at, updated_at
@@ -814,7 +864,10 @@ export class PostgresBookingRepository {
         slot_id as "slotId",
         reserved_until as "reservedUntil",
         version
-    `)).rows, "an inserted reservation");
+    `)
+      ).rows,
+      "an inserted reservation",
+    );
     const inserted = normalizeReservationResultRow(rawInserted);
 
     await this.auditAndOutbox(tx, {
@@ -854,7 +907,8 @@ export class PostgresBookingRepository {
   private async resolveReservationIdempotency(
     command: ReserveSlotCommand,
   ): Promise<ReserveSlotResult> {
-    const rawStored = (await this.db.execute<RawReservationResultRow>(sql`
+    const rawStored = (
+      await this.db.execute<RawReservationResultRow>(sql`
       select
         id as "reservationId",
         user_id as "userId",
@@ -863,7 +917,8 @@ export class PostgresBookingRepository {
         version
       from reservations
       where idempotency_key = ${command.idempotencyKey}
-    `)).rows[0];
+    `)
+    ).rows[0];
     if (rawStored === undefined) {
       throw new BookingIdempotencyConflictError(command.idempotencyKey);
     }
@@ -896,7 +951,8 @@ export class PostgresBookingRepository {
         order by lock_key
       ) ordered_locks
     `);
-    const rawReservation = (await tx.execute<RawReservationRow>(sql`
+    const rawReservation = (
+      await tx.execute<RawReservationRow>(sql`
       select
         r.id as "reservationId",
         r.user_id as "userId",
@@ -920,7 +976,8 @@ export class PostgresBookingRepository {
       join expert_services es on es.id = r.expert_service_id
       where r.id = ${command.reservationId}::uuid
       for update of r, s, e, es
-    `)).rows[0];
+    `)
+    ).rows[0];
     if (rawReservation === undefined) throw new Error("Reservation not found");
     const reservation = normalizeReservationRow(rawReservation);
     if (reservation.version !== command.expectedVersion) {
@@ -928,9 +985,18 @@ export class PostgresBookingRepository {
     }
 
     await this.assertTransitionEligibility(tx, reservation, command);
-    const nextStatus = transitionReservation(reservation.status, command.action);
-    const updated = command.action === "expert_confirm"
-      ? (await tx.execute<{ reservationId: string; status: ReservationStatus; version: number }>(sql`
+    const nextStatus = transitionReservation(
+      reservation.status,
+      command.action,
+    );
+    const updated =
+      command.action === "expert_confirm"
+        ? (
+            await tx.execute<{
+              reservationId: string;
+              status: ReservationStatus;
+              version: number;
+            }>(sql`
           update reservations as r
           set status = ${nextStatus}::reservation_status,
               version = r.version + 1,
@@ -950,8 +1016,14 @@ export class PostgresBookingRepository {
             and e.verified = true
             and es.active = true
           returning r.id as "reservationId", r.status, r.version
-        `)).rows[0]
-      : (await tx.execute<{ reservationId: string; status: ReservationStatus; version: number }>(sql`
+        `)
+          ).rows[0]
+        : (
+            await tx.execute<{
+              reservationId: string;
+              status: ReservationStatus;
+              version: number;
+            }>(sql`
           update reservations
           set status = ${nextStatus}::reservation_status,
               version = version + 1,
@@ -960,8 +1032,10 @@ export class PostgresBookingRepository {
             and version = ${command.expectedVersion}
             and status = ${reservation.status}::reservation_status
           returning id as "reservationId", status, version
-        `)).rows[0];
-    if (updated === undefined) throw new Error("Reservation transition predicate failed");
+        `)
+          ).rows[0];
+    if (updated === undefined)
+      throw new Error("Reservation transition predicate failed");
 
     await this.auditAndOutbox(tx, {
       actorType: command.actor.type,
@@ -984,10 +1058,17 @@ export class PostgresBookingRepository {
   ): Promise<void> {
     switch (command.action) {
       case "expert_confirm":
-        if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
+        if (
+          command.actor.type !== "expert" ||
+          command.actor.id !== reservation.expertId
+        ) {
           throw new Error("Expert does not own reservation");
         }
-        if (!reservation.expertActive || !reservation.expertVerified || !reservation.serviceActive) {
+        if (
+          !reservation.expertActive ||
+          !reservation.expertVerified ||
+          !reservation.serviceActive
+        ) {
           throw new Error("Expert is not eligible");
         }
         if (reservation.reservedUntil.getTime() <= command.now.getTime()) {
@@ -999,33 +1080,43 @@ export class PostgresBookingRepository {
         if (!isFresh(reservation.observedAt, command.now)) {
           throw new Error("Slot observation is stale");
         }
-        if (await this.hasOverlap(
-          tx,
-          "client",
-          reservation.userId,
-          reservation,
-          reservation.reservationId,
-        )) {
+        if (
+          await this.hasOverlap(
+            tx,
+            "client",
+            reservation.userId,
+            reservation,
+            reservation.reservationId,
+          )
+        ) {
           throw new Error("Client has an active overlapping reservation");
         }
-        if (await this.hasOverlap(
-          tx,
-          "expert",
-          reservation.expertId,
-          reservation,
-          reservation.reservationId,
-        )) {
+        if (
+          await this.hasOverlap(
+            tx,
+            "expert",
+            reservation.expertId,
+            reservation,
+            reservation.reservationId,
+          )
+        ) {
           throw new Error("Expert has an active overlapping reservation");
         }
         return;
       case "client_cancel":
-        if (command.actor.type !== "client" || command.actor.id !== reservation.userId) {
+        if (
+          command.actor.type !== "client" ||
+          command.actor.id !== reservation.userId
+        ) {
           throw new Error("Client does not own reservation");
         }
         return;
       case "expert_cancel":
       case "mark_no_show":
-        if (command.actor.type !== "expert" || command.actor.id !== reservation.expertId) {
+        if (
+          command.actor.type !== "expert" ||
+          command.actor.id !== reservation.expertId
+        ) {
           throw new Error("Expert does not own reservation");
         }
         return;
@@ -1044,7 +1135,9 @@ export class PostgresBookingRepository {
         return;
       default: {
         const unsupportedAction: never = command.action;
-        throw new Error(`Unsupported reservation action: ${String(unsupportedAction)}`);
+        throw new Error(
+          `Unsupported reservation action: ${String(unsupportedAction)}`,
+        );
       }
     }
   }
@@ -1056,12 +1149,14 @@ export class PostgresBookingRepository {
     slot: Pick<SlotRow, "startsAt" | "endsAt">,
     excludedReservationId?: string,
   ): Promise<boolean> {
-    const excluded = excludedReservationId === undefined
-      ? sql`true`
-      : sql`r.id <> ${excludedReservationId}::uuid`;
-    const actorPredicate = actor === "client"
-      ? sql`r.user_id = ${actorId}::uuid`
-      : sql`r.expert_id = ${actorId}::uuid`;
+    const excluded =
+      excludedReservationId === undefined
+        ? sql`true`
+        : sql`r.id <> ${excludedReservationId}::uuid`;
+    const actorPredicate =
+      actor === "client"
+        ? sql`r.user_id = ${actorId}::uuid`
+        : sql`r.expert_id = ${actorId}::uuid`;
     const result = await tx.execute<{ exists: boolean }>(sql`
       select exists (
         select 1
