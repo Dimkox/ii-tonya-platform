@@ -56,13 +56,23 @@ describe("sandbox production isolation", () => {
   });
 
   it("publishes a real executable sandbox entrypoint", () => {
-    const manifest = JSON.parse(readFileSync("apps/sandbox-api/package.json", "utf8")) as { scripts?: { start?: string } };
+    const manifest = JSON.parse(
+      readFileSync("apps/sandbox-api/package.json", "utf8"),
+    ) as { scripts?: { start?: string; build?: string } };
     expect(manifest.scripts?.start).toBe("node dist/server.js");
+    expect(manifest.scripts?.build).toBe("tsup --config tsup.config.ts");
+    const buildConfig = readFileSync("apps/sandbox-api/tsup.config.ts", "utf8");
+    expect(buildConfig).toContain("noExternal: [/^@ii-tonya\\//u]");
+    expect(buildConfig).toContain("(?!@ii-tonya\\/)");
     const server = readFileSync("apps/sandbox-api/src/server.ts", "utf8");
-    expect(server).toContain("createCanonicalExpertResidencyPaymentEventVerifier");
+    expect(server).toContain(
+      "createCanonicalExpertResidencyPaymentEventVerifier",
+    );
     expect(server).toContain("new PostgresSandboxPaymentRepository");
     expect(server).toContain("new SandboxTransitionWorkflow");
-    expect(server).toContain("if (isDirectExecution(import.meta.url, process.argv[1]))");
+    expect(server).toContain(
+      "if (isDirectExecution(import.meta.url, process.argv[1]))",
+    );
   });
 
   it("keeps the shared approval object-type map exhaustive without composing sandbox", () => {
