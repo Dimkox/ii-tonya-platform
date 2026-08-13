@@ -9,13 +9,13 @@ test "$(cat "$release_root/SOURCE_SHA")" = "$source_sha"
 test -f "$release_root/api/dist/server.js"
 test -f "$release_root/worker/dist/main.js"
 
-db_name="ii_tonya_native_smoke_${source_sha:0:12}"
+db_name="ii_tonya_native_smoke"
 export RELEASE_ROOT="$release_root" ADMIN_URL="$admin_url" DB_NAME="$db_name"
 api_pid=""
 worker_pid=""
-database_created=false
+database_ready=false
 
-drop_database() {
+reset_database() {
   node --input-type=module <<'NODE'
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
@@ -23,10 +23,16 @@ const dbRoot = realpathSync(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-to
 const require = createRequire(`${dbRoot}/package.json`);
 const { Client } = require("pg");
 const name = process.env.DB_NAME;
-if (!/^ii_tonya_native_smoke_[0-9a-f]{12}$/u.test(name ?? "")) process.exit(2);
-const client = new Client({ connectionString: process.env.ADMIN_URL });
+if (name !== "ii_tonya_native_smoke") process.exit(2);
+const url = new URL(process.env.ADMIN_URL);
+url.pathname = `/${name}`;
+url.search = "";
+const client = new Client({ connectionString: url.toString() });
 await client.connect();
-try { await client.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`); }
+try {
+  await client.query("DROP SCHEMA IF EXISTS public CASCADE");
+  await client.query("CREATE SCHEMA public");
+}
 finally { await client.end(); }
 NODE
 }
@@ -35,12 +41,11 @@ cleanup() {
   set +e
   [[ -z "$worker_pid" ]] || { kill -TERM "$worker_pid" 2>/dev/null; wait "$worker_pid" 2>/dev/null; }
   [[ -z "$api_pid" ]] || { kill -TERM "$api_pid" 2>/dev/null; wait "$api_pid" 2>/dev/null; }
-  [[ "$database_created" != true ]] || drop_database >/dev/null 2>&1
+  [[ "$database_ready" != true ]] || reset_database >/dev/null 2>&1
   rm -f /tmp/ii-tonya-worker-heartbeat /tmp/ii-tonya-native-api.log /tmp/ii-tonya-native-worker.log
 }
 trap cleanup EXIT
 
-drop_database
 node --input-type=module <<'NODE'
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
@@ -48,13 +53,16 @@ const dbRoot = realpathSync(`${process.env.RELEASE_ROOT}/api/node_modules/@ii-to
 const require = createRequire(`${dbRoot}/package.json`);
 const { Client } = require("pg");
 const name = process.env.DB_NAME;
-if (!/^ii_tonya_native_smoke_[0-9a-f]{12}$/u.test(name ?? "")) process.exit(2);
+if (name !== "ii_tonya_native_smoke") process.exit(2);
 const client = new Client({ connectionString: process.env.ADMIN_URL });
 await client.connect();
-try { await client.query(`CREATE DATABASE "${name}"`); }
+try {
+  const existing = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
+  if (existing.rowCount === 0) await client.query(`CREATE DATABASE "${name}"`);
+}
 finally { await client.end(); }
 NODE
-database_created=true
+database_ready=true
 
 database_url="$(node --input-type=module <<'NODE'
 const url = new URL(process.env.ADMIN_URL);
@@ -63,6 +71,7 @@ url.search = "";
 process.stdout.write(url.toString());
 NODE
 )"
+reset_database
 
 runtime_env=(
   NODE_ENV=production
@@ -119,6 +128,6 @@ worker_pid=""
 kill -TERM "$api_pid"
 wait "$api_pid"
 api_pid=""
-drop_database
-database_created=false
+reset_database
+database_ready=false
 printf 'native_database_cleanup=PASS\n'

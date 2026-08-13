@@ -37,11 +37,12 @@ describe("native dedicated-server production release", () => {
     const smoke = read("scripts/smoke-native-release.sh");
 
     expect(smoke).toContain("II_TONYA_TEST_POSTGRES_ADMIN_URL");
-    expect(smoke).toContain("ii_tonya_native_smoke_");
+    expect(smoke).toContain('db_name="ii_tonya_native_smoke"');
     expect(smoke).toContain("migrate-native.mjs");
     expect(smoke).toContain("/health/ready");
     expect(smoke).toContain("ii-tonya-worker-heartbeat");
-    expect(smoke).toContain("DROP DATABASE");
+    expect(smoke).toContain("DROP SCHEMA IF EXISTS public CASCADE");
+    expect(smoke).not.toContain("DROP DATABASE");
     expect(smoke).toContain("trap cleanup EXIT");
     expect(smoke).not.toMatch(/set -x|echo.*DATABASE_URL/iu);
   });
