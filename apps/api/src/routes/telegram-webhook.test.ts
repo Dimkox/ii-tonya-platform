@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WebhookInbox } from "./selarti-webhook.js";
 import {
   telegramWebhookRoutes,
+  type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
 } from "./telegram-webhook.js";
 
@@ -12,6 +13,7 @@ const secret = "telegram-webhook-secret";
 const build = async (
   options: {
     queriesEnabled?: boolean;
+    aiEnabled?: boolean;
     consume?: (key: string, limit: number, windowMs: number) => boolean;
   } = {},
 ) => {
@@ -59,6 +61,18 @@ const build = async (
     kind: "applied" as const,
     providerOperationId: "answer-1",
   }));
+  const resolveAiPrincipal = vi.fn<TelegramExpertAiIngress["resolvePrincipal"]>(
+    async () => ({
+      authenticated: true,
+      userId: "00000000-0000-4000-8000-000000000100",
+      expertId: "00000000-0000-4000-8000-000000000101",
+    }),
+  );
+  const handleAi = vi.fn<TelegramExpertAiIngress["handle"]>(async () => ({
+    kind: "completed",
+    proposalKind: "view_referral_summary",
+    result: { private: "not-delivered" },
+  }));
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
     secret,
@@ -73,6 +87,8 @@ const build = async (
       processClientView,
       answerCallbackQuery,
     },
+    expertAiEnabled: options.aiEnabled ?? false,
+    expertAi: { resolvePrincipal: resolveAiPrincipal, handle: handleAi },
   });
   return {
     app,
@@ -87,12 +103,185 @@ const build = async (
     processCommand,
     processClientView,
     answerCallbackQuery,
+    resolveAiPrincipal,
+    handleAi,
   };
 };
 
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
+  it("keeps ordinary private text on the default Telegram lifecycle", async () => {
+    const state = await build();
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 910,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Покажи баланс",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.handleAi).not.toHaveBeenCalled();
+      expect(state.process).toHaveBeenCalledTimes(1);
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("dispatches enabled private non-slash text with a fresh principal and server keys", async () => {
+    const state = await build({ aiEnabled: true });
+    try {
+      const request = (updateId: number) =>
+        state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: { ...headers, "x-correlation-id": "telegram-corr" },
+          payload: {
+            update_id: updateId,
+            message: {
+              from: { id: 123456789 },
+              chat: { id: 123456789, type: "private" },
+              text: "Покажи баланс",
+            },
+          },
+        });
+      expect((await request(911)).json()).toEqual({ accepted: true });
+      expect((await request(912)).statusCode).toBe(200);
+      expect(state.resolveAiPrincipal).toHaveBeenCalledTimes(2);
+      expect(state.handleAi).toHaveBeenNthCalledWith(1, {
+        principal: {
+          authenticated: true,
+          userId: "00000000-0000-4000-8000-000000000100",
+          expertId: "00000000-0000-4000-8000-000000000101",
+        },
+        text: "Покажи баланс",
+        locale: "ru-RU",
+        correlationId: "telegram-corr",
+        idempotencyKey: "telegram:911:expert-ai",
+      });
+      expect(state.process).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("never dispatches slash text or non-private text to expert AI", async () => {
+    const state = await build({ aiEnabled: true, queriesEnabled: true });
+    try {
+      await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 913,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/stats",
+          },
+        },
+      });
+      const group = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 914,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: -1, type: "group" },
+            text: "Покажи баланс",
+          },
+        },
+      });
+      expect(group.statusCode).toBe(403);
+      expect(state.processCommand).toHaveBeenCalledTimes(1);
+      expect(state.handleAi).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("fails retryably on unavailable AI and completes bounded denials", async () => {
+    const unavailable = await build({ aiEnabled: true });
+    unavailable.handleAi.mockResolvedValueOnce({ kind: "unavailable" });
+    try {
+      const response = await unavailable.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 915,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_ai_unavailable" });
+      expect(unavailable.fail).toHaveBeenCalledWith("claim-1");
+    } finally {
+      await unavailable.app.close();
+    }
+
+    const denied = await build({ aiEnabled: true });
+    denied.handleAi.mockResolvedValueOnce({ kind: "forbidden" });
+    try {
+      const response = await denied.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 916,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, unavailable: true });
+      expect(denied.complete).toHaveBeenCalledWith("claim-1");
+      expect(denied.fail).not.toHaveBeenCalled();
+    } finally {
+      await denied.app.close();
+    }
+  });
+
+  it("deduplicates private expert AI text before a second source dispatch", async () => {
+    const state = await build({ aiEnabled: true });
+    state.claim.mockResolvedValueOnce({ kind: "duplicate" });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 917,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, duplicate: true });
+      expect(state.resolveAiPrincipal).toHaveBeenCalledTimes(1);
+      expect(state.handleAi).not.toHaveBeenCalled();
+      expect(state.complete).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
   it("keeps xr1 isolated from ct2/cv1 until checkout readiness is composed", async () => {
     const state = await build({ queriesEnabled: true });
     try {

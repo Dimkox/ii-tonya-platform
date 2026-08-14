@@ -1,4 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
+import type {
+  ExpertAiIngressService,
+  ExpertPrincipal,
+} from "@ii-tonya/application";
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -13,6 +17,11 @@ export interface TelegramCallbackService {
     update: Readonly<Record<string, unknown>>,
     correlationId: string,
   ): Promise<void>;
+}
+
+export interface TelegramExpertAiIngress {
+  resolvePrincipal(telegramUserId: string): Promise<ExpertPrincipal | null>;
+  handle: ExpertAiIngressService["handle"];
 }
 
 export interface TelegramExpertQueryIngress {
@@ -40,6 +49,7 @@ export interface TelegramExpertQueryIngress {
     readonly text: string;
     readonly chatType: "private";
     readonly principal: {
+      readonly userId: string;
       readonly expertId: string;
       readonly telegramUserId: string;
       readonly timezone: string;
@@ -47,11 +57,12 @@ export interface TelegramExpertQueryIngress {
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<{
-    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
-    readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
+    readonly kind: "processed" | "unsupported" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "unknown_outcome";
   }>;
   processClientView(input: {
     readonly principal: {
+      readonly userId: string;
       readonly expertId: string;
       readonly telegramUserId: string;
       readonly timezone: string;
@@ -107,11 +118,16 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   rateLimiter: RateLimitGate;
   expertQueriesEnabled?: boolean;
   expertQueries?: TelegramExpertQueryIngress;
+  expertAiEnabled?: boolean;
+  expertAi?: TelegramExpertAiIngress;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
 }> = async (app, deps) => {
   if (deps.expertQueriesEnabled === true && deps.expertQueries === undefined) {
     throw new Error("Expert Telegram query capability is required");
+  }
+  if (deps.expertAiEnabled === true && deps.expertAi === undefined) {
+    throw new Error("Expert Telegram AI capability is required");
   }
   app.post(
     "/v1/webhooks/telegram",
@@ -326,6 +342,70 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           } catch {
             await deps.inbox.fail(claim.claimId);
             return reply.code(500).send({ error: "expert_query_unavailable" });
+          }
+          return { accepted: true };
+        }
+        if (
+          deps.expertAiEnabled === true &&
+          deps.expertAi !== undefined &&
+          typeof text === "string" &&
+          !text.startsWith("/")
+        ) {
+          const from = record.from;
+          const chat = record.chat;
+          const telegramUserId =
+            from && typeof from === "object"
+              ? String((from as Record<string, unknown>).id ?? "")
+              : "";
+          const chatRecord =
+            chat && typeof chat === "object"
+              ? (chat as Record<string, unknown>)
+              : undefined;
+          if (
+            !numericIdentity.test(telegramUserId) ||
+            chatRecord?.type !== "private" ||
+            String(chatRecord.id ?? "") !== telegramUserId ||
+            text.trim().length === 0 ||
+            text.length > 4_096 ||
+            /[\u0000-\u001F\u007F-\u009F]/u.test(text)
+          ) {
+            return reply.code(403).send({ error: "unauthorized_expert" });
+          }
+          if (
+            !deps.rateLimiter.consume(
+              `telegram:expert-ai:${telegramUserId}`,
+              20,
+              60_000,
+            )
+          ) {
+            return reply.code(429).send({ error: "rate_limited" });
+          }
+          const principal =
+            await deps.expertAi.resolvePrincipal(telegramUserId);
+          if (principal?.authenticated !== true)
+            return reply.code(403).send({ error: "unauthorized_expert" });
+          const updateId = String(body.update_id);
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed")
+            return { accepted: true, duplicate: true };
+          try {
+            const result = await deps.expertAi.handle({
+              principal,
+              text,
+              locale: "ru-RU",
+              idempotencyKey: `telegram:${updateId}:expert-ai`,
+              correlationId,
+            });
+            if (result.kind === "unavailable") {
+              await deps.inbox.fail(claim.claimId);
+              return reply.code(503).send({ error: "expert_ai_unavailable" });
+            }
+            await deps.inbox.complete(claim.claimId);
+            if (result.kind !== "completed")
+              return { accepted: true, unavailable: true };
+          } catch {
+            await deps.inbox.fail(claim.claimId);
+            return reply.code(503).send({ error: "expert_ai_unavailable" });
           }
           return { accepted: true };
         }

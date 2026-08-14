@@ -16,6 +16,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
+import { expertAiIngressRoutes } from "./routes/expert-ai-ingress.js";
 import {
   expertReferralRoutes,
   type ExpertReferralApiDependencies,
@@ -28,12 +29,14 @@ import {
 import {
   telegramWebhookRoutes,
   type TelegramCallbackService,
+  type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
 } from "./routes/telegram-webhook.js";
 import {
   yookassaWebhookRoutes,
   type YooKassaWebhookDependencies,
 } from "./routes/yookassa-webhook.js";
+import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -59,6 +62,8 @@ export interface AppDependencies {
   expertCodeKeyring?: ExpertCodeKeyring;
   expertTelegramQueries?: TelegramExpertQueryIngress;
   expertAiIngress?: ExpertAiIngressService;
+  expertAiPrincipal?: ExpertPrincipalResolver;
+  expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
   now?: () => Date;
 }
@@ -93,7 +98,7 @@ export async function buildApp(
   }
   if (
     deps.config.features.expertAiIngress === true &&
-    deps.expertAiIngress === undefined
+    (deps.expertAiIngress === undefined || deps.expertAiPrincipal === undefined)
   ) {
     throw new Error("Expert AI ingress runtime capability is required");
   }
@@ -136,11 +141,34 @@ export async function buildApp(
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),
+    expertAiEnabled:
+      deps.config.features.expertAiIngress === true &&
+      deps.expertAiIngress !== undefined &&
+      deps.expertAiTelegramPrincipal !== undefined,
+    ...(deps.expertAiIngress === undefined ||
+    deps.expertAiTelegramPrincipal === undefined
+      ? {}
+      : {
+          expertAi: {
+            resolvePrincipal: deps.expertAiTelegramPrincipal.resolvePrincipal,
+            handle: deps.expertAiIngress.handle,
+          },
+        }),
   });
   if (deps.expertApi !== undefined) {
     await app.register(expertReferralRoutes, {
       ...deps.expertApi,
       enabled: deps.config.features,
+    });
+  }
+  if (
+    deps.config.features.expertAiIngress === true &&
+    deps.expertAiIngress !== undefined &&
+    deps.expertAiPrincipal !== undefined
+  ) {
+    await app.register(expertAiIngressRoutes, {
+      ingress: deps.expertAiIngress,
+      principals: deps.expertAiPrincipal,
     });
   }
   if (deps.adminApprovals !== undefined) {
@@ -246,6 +274,11 @@ export async function buildTestApp(
     selartiFailOnce?: boolean;
     expertApi?: ExpertReferralApiDependencies;
     expertAiIngress?: ExpertAiIngressService;
+    expertAiPrincipal?: ExpertPrincipalResolver;
+    expertAiTelegramPrincipal?: Pick<
+      TelegramExpertAiIngress,
+      "resolvePrincipal"
+    >;
     yookassaWebhook?: YooKassaWebhookDependencies;
     features?: RuntimeConfig["features"];
   } = {},
@@ -291,6 +324,7 @@ export async function buildTestApp(
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
       features: options.features ?? {
         expertReferral: false,
         expertResidencyBilling: false,
@@ -365,6 +399,12 @@ export async function buildTestApp(
     ...(options.expertAiIngress === undefined
       ? {}
       : { expertAiIngress: options.expertAiIngress }),
+    ...(options.expertAiPrincipal === undefined
+      ? {}
+      : { expertAiPrincipal: options.expertAiPrincipal }),
+    ...(options.expertAiTelegramPrincipal === undefined
+      ? {}
+      : { expertAiTelegramPrincipal: options.expertAiTelegramPrincipal }),
     ...(options.yookassaWebhook === undefined
       ? {}
       : { yookassaWebhook: options.yookassaWebhook }),

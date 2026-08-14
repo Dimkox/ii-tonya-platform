@@ -121,6 +121,15 @@ describe("server composition", () => {
         })
       ).statusCode,
     ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/expert/assistant/messages",
+          payload: { text: "Баланс", locale: "ru-RU" },
+        })
+      ).statusCode,
+    ).toBe(404);
     await app.close();
     await lifecycle.close(fakeDb);
   });
