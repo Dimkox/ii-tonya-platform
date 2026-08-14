@@ -47,3 +47,12 @@ idempotently; no external notifier is part of this story.
 - One real-PostgreSQL multi-worker test on Claw and one final focused Claw gate;
   no repeated green suites.
 - Independent review with no open Critical or Important finding before merge.
+
+## Verification result
+
+- Final reviewed/tested code: `79c8ac224dc2a21ad2902d5cf7dc64afab7c183c`.
+- Focused Claw status: GREEN, including both real-PostgreSQL behaviors with
+  already-green assertions deliberately not repeated.
+- Evidence:
+  `docs/test-evidence/claw/79c8ac2-mvp-ops-case-001/verification.md`.
+- Staging, production, push and merge remain outside this story.

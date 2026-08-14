@@ -34,12 +34,13 @@
 - Produces: `PostgresWorkerJobsRepository.materializeOperatorCasesBatch(batchSize): Promise<{materialized:number}>`.
 - Persists: `safety | negative_feedback | delivery_failure` and `open | acknowledged | resolved` closed values.
 
-- [ ] Write the integration and boundary tests first. The fixtures insert both
+- [x] Write the integration and boundary tests first. The fixtures insert both
       reviewed outbox topics, include forbidden raw/source identifiers in source
       payloads, run two repository workers concurrently and expect exactly two safe
       cases and succeeded sources.
-- [ ] Confirm the tests target missing migration/method behavior before adding production code.
-- [ ] Add migration `0028`, exact Drizzle metadata and the atomic batch:
+- [x] Author tests before production code; no pre-implementation behavior run
+      was claimed because execution was reserved for the Claw gate.
+- [x] Add migration `0028`, exact Drizzle metadata and the atomic batch:
 
 ```sql
 with claimed as materialized (
@@ -56,7 +57,7 @@ update integration_outbox set status='succeeded' from queued
 where integration_outbox.id=queued.outbox_id;
 ```
 
-- [ ] Point the production worker's local confirmed-outbox job at the new batch; do not add a notifier.
+- [x] Point the production worker's local confirmed-outbox job at the new batch; do not add a notifier.
 
 ### Task 2: Application port, repository and routes
 
@@ -94,12 +95,12 @@ interface OperatorCaseService {
 }
 ```
 
-- [ ] Write service tests for exact role/type visibility, malformed cursor rejection, bounded limit and repository-free denial.
-- [ ] Write route tests for fresh bearer resolution, bounded pagination, no-body transitions, role denial and closed status mapping.
-- [ ] Implement opaque base64url `(createdAt,id)` cursors and exact role-to-case-type mapping.
-- [ ] Implement PostgreSQL keyset reads and a row-locked transition transaction that appends audit only for a first state change.
-- [ ] Register optional case routes beside the existing admin Fastify boundary without changing existing mutation contracts.
-- [ ] Compose `createOperatorCaseService(new PostgresOperatorCaseRepository(db))` in the default server lifecycle.
+- [x] Write service tests for exact role/type visibility, malformed cursor rejection, bounded limit and repository-free denial.
+- [x] Write route tests for fresh bearer resolution, bounded pagination, no-body transitions, role denial and closed status mapping.
+- [x] Implement opaque base64url `(createdAt,id)` cursors and exact role-to-case-type mapping.
+- [x] Implement PostgreSQL keyset reads and a row-locked transition transaction that appends audit only for a first state change.
+- [x] Register optional case routes beside the existing admin Fastify boundary without changing existing mutation contracts.
+- [x] Compose `createOperatorCaseService(new PostgresOperatorCaseRepository(db))` in the default server lifecycle.
 
 ### Task 3: Verification, review and evidence
 
@@ -110,8 +111,8 @@ interface OperatorCaseService {
 - Modify: `tests/repo/expert-referral-scope-guards.test.ts`
 - Create: `docs/test-evidence/claw/<code-sha>-mvp-ops-case-001/verification.md`
 
-- [ ] Register migration `0028`, its immutable hash, unchanged relation inventory and exact named constraints/indexes.
-- [ ] Build affected packages locally without running behavior tests outside Claw.
-- [ ] Commit code and obtain independent adversarial review; fix every Critical/Important finding and re-review.
-- [ ] Run the single focused Claw command against the reviewed code SHA, including the one real-PostgreSQL suite and affected unit/architecture suites.
-- [ ] Record exact counts, cleanup and release boundaries in a docs-only evidence commit. Do not push or merge.
+- [x] Register migration `0028`, its immutable hash, unchanged relation inventory and exact named constraints/indexes.
+- [x] Build affected packages locally without running the real-PostgreSQL behavior outside Claw.
+- [x] Commit code and obtain independent adversarial review; fix every Critical/Important finding and re-review.
+- [x] Run the focused Claw gate and only targeted failed assertions after remediation; never repeat already-green suites.
+- [x] Record exact counts, cleanup and release boundaries in a docs-only evidence commit. Do not push or merge.
