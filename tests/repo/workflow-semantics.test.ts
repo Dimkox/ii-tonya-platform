@@ -61,18 +61,10 @@ describe("direct Claw verification semantics", () => {
     expect(dockerfile).not.toContain("pnpm install --frozen-lockfile;");
   });
 
-  it("runs financial database concurrency gates exactly three times", () => {
+  it("runs every database suite once without a repeat adapter", () => {
     const runner = read("scripts/run-claw-ci.sh");
-    for (const path of [
-      "tests/integration/expert-referral-redemption-concurrency.test.ts",
-      "tests/integration/expert-residency-checkout-concurrency.test.ts",
-      "tests/integration/expert-residency-settlement-concurrency.test.ts",
-      "tests/integration/expert-residency-deadline.test.ts",
-      "tests/integration/expert-residency-hold-replay.test.ts",
-    ]) {
-      expect(runner).toContain(`pnpm test:repeat -- 3 ${path}`);
-    }
-    expect(runner).not.toContain("pnpm test:repeat -- 20 ");
+    expect(runner).not.toContain("pnpm test:repeat");
+    expect(runner).toContain("repeat_limit: 1");
   });
 
   it("writes exact-SHA evidence outside transient test containers", () => {

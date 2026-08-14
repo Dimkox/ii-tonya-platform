@@ -314,7 +314,7 @@ flowchart TB
 
   subgraph CI["Direct Claw verification / release"]
     CIWF["scripts/run-claw-ci.sh ci\npnpm verify + coverage + secret scan"]
-    DBGATE["scripts/run-claw-ci.sh database\nschema + repeated financial concurrency gates"]
+    DBGATE["scripts/run-claw-ci.sh database\nschema + single-run financial concurrency gates"]
     RELEASE["scripts/run-claw-ci.sh release\nnative exact-SHA bundle + evidence"]
     VERIFY["pnpm verify"]
     CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
