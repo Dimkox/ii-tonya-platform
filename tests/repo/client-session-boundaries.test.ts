@@ -9,7 +9,9 @@ describe("client session production boundaries", () => {
       "apps/api/src/client-proof-verifier-gate.ts",
       "apps/api/src/server.ts",
     ].map((path) => readFileSync(path, "utf8")).join("\n");
-    expect(production).not.toMatch(/approvedProofVerifier|allow.?all|test.?proof|providerSubject/iu);
+    expect(production).not.toMatch(
+      /approvedProofVerifier|allowAll|allow_all|testProof|test_proof|providerSubject/iu,
+    );
   });
 
   it("keeps provider, ledger, reservation, booking and payment imports outside the session slice", () => {

@@ -4,6 +4,7 @@ import type {
 } from "@ii-tonya/application";
 import type { FastifyPluginAsync } from "fastify";
 
+import { readExactAuthorization } from "../authorization-header.js";
 import { resolveClientPrincipal } from "../client-principal-resolver.js";
 
 interface RouteOptions {
@@ -67,19 +68,26 @@ export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
     "/v1/client/catalog-requests",
     { bodyLimit: 8 * 1024 },
     async (request, reply) => {
-      const principal = await resolveClientPrincipal(
-        deps.principals,
-        request.headers.authorization,
-      );
-      if (principal === null) {
+      const authorization = readExactAuthorization(request.raw.rawHeaders);
+      if (authorization === null) {
         return reply.code(401).send({ error: "unauthorized" });
+      }
+      const resolution = await resolveClientPrincipal(
+        deps.principals,
+        authorization,
+      );
+      if (resolution.kind === "denied") {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+      if (resolution.kind === "unavailable") {
+        return reply.code(503).send({ error: "temporarily_unavailable" });
       }
       const filters = strictFilters(request.body);
       if (filters === null) {
         return reply.code(400).send({ error: "invalid_request" });
       }
       try {
-        const receipt = await deps.catalog.request(principal, filters);
+        const receipt = await deps.catalog.request(resolution.principal, filters);
         return reply.code(202).send({
           catalogRequestId: receipt.catalogRequestId,
           state: receipt.state,
@@ -99,19 +107,26 @@ export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
   app.get<{ Params: { catalogRequestId: string } }>(
     "/v1/client/catalog-requests/:catalogRequestId",
     async (request, reply) => {
-      const principal = await resolveClientPrincipal(
-        deps.principals,
-        request.headers.authorization,
-      );
-      if (principal === null) {
+      const authorization = readExactAuthorization(request.raw.rawHeaders);
+      if (authorization === null) {
         return reply.code(401).send({ error: "unauthorized" });
+      }
+      const resolution = await resolveClientPrincipal(
+        deps.principals,
+        authorization,
+      );
+      if (resolution.kind === "denied") {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+      if (resolution.kind === "unavailable") {
+        return reply.code(503).send({ error: "temporarily_unavailable" });
       }
       if (!uuidRegex.test(request.params.catalogRequestId)) {
         return reply.code(400).send({ error: "invalid_request" });
       }
       try {
         const snapshot = await deps.catalog.get(
-          principal,
+          resolution.principal,
           request.params.catalogRequestId,
         );
         if (snapshot === null) {

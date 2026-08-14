@@ -284,8 +284,13 @@ export interface ClientPrincipal {
   readonly userId: string;
 }
 
+export type ClientPrincipalResolution =
+  | { readonly kind: "resolved"; readonly principal: ClientPrincipal }
+  | { readonly kind: "denied" }
+  | { readonly kind: "unavailable" };
+
 export interface ClientPrincipalResolver {
-  resolve(authorization: string | undefined): Promise<ClientPrincipal | null>;
+  resolve(authorization: string): Promise<ClientPrincipalResolution>;
 }
 
 export interface CatalogFilters {

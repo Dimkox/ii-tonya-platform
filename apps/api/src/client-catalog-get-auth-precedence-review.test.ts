@@ -5,22 +5,20 @@ import { clientCatalogRoutes } from "./routes/client-catalog.js";
 
 describe("client catalog GET authentication precedence closure", () => {
   it.each([
-    { name: "missing", resolve: async () => null },
+    { name: "missing", resolve: async () => ({ kind: "denied" as const }), status: 401 },
     {
       name: "revoked",
-      resolve: async () => ({
-        authenticated: true,
-        active: false,
-        userId: "00000000-0000-4000-8000-000000000101",
-      }),
+      resolve: async () => ({ kind: "denied" as const }),
+      status: 401,
     },
     {
       name: "resolver error",
       resolve: async () => {
         throw new Error("private resolver detail");
       },
+      status: 503,
     },
-  ])("returns 401 before malformed-id validation for $name authority", async ({ resolve }) => {
+  ])("fails before malformed-id validation for $name authority", async ({ resolve, status }) => {
     const get = vi.fn();
     const app = Fastify();
     await app.register(clientCatalogRoutes, {
@@ -31,11 +29,13 @@ describe("client catalog GET authentication precedence closure", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/client/catalog-requests/not-a-uuid",
-      headers: { authorization: "Bearer test" },
+      headers: { authorization: `Bearer cs1.${"A".repeat(43)}` },
     });
 
-    expect(response.statusCode).toBe(401);
-    expect(response.json()).toEqual({ error: "unauthorized" });
+    expect(response.statusCode).toBe(status);
+    expect(response.json()).toEqual({
+      error: status === 401 ? "unauthorized" : "temporarily_unavailable",
+    });
     expect(get).not.toHaveBeenCalled();
   });
 });

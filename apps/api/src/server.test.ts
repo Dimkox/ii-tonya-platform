@@ -13,12 +13,20 @@ import {
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalExpertKeys = process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
+const originalClientSessionEnabled = process.env.CLIENT_SESSION_ENABLED;
+const originalClientCatalogEnabled = process.env.CLIENT_CATALOG_ENABLED;
 afterEach(() => {
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
   if (originalExpertKeys === undefined)
     delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
   else process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON = originalExpertKeys;
+  if (originalClientSessionEnabled === undefined)
+    delete process.env.CLIENT_SESSION_ENABLED;
+  else process.env.CLIENT_SESSION_ENABLED = originalClientSessionEnabled;
+  if (originalClientCatalogEnabled === undefined)
+    delete process.env.CLIENT_CATALOG_ENABLED;
+  else process.env.CLIENT_CATALOG_ENABLED = originalClientCatalogEnabled;
 });
 const disabled = new Proxy(
   {},
@@ -30,7 +38,7 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
-  it("keeps client catalog absent by default and requires injected authority when enabled", async () => {
+  it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),
       $client: { end: async () => undefined },
@@ -54,6 +62,7 @@ describe("server composition", () => {
       yookassaRecovery: { enabled: false },
       features: {
         workerOutboxDelivery: false,
+        clientSession: false,
         clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
@@ -65,24 +74,48 @@ describe("server composition", () => {
       fakeDb,
     );
     expect(disabledDeps.clientCatalogService).toBeUndefined();
+    expect(disabledDeps.clientSessionService).toBeUndefined();
+    expect(disabledDeps.clientSessionRepository).toBeUndefined();
     expect(disabledDeps.clientPrincipal).toBeUndefined();
 
     const enabled = {
       ...config,
-      features: { ...config.features, clientCatalog: true },
+      features: {
+        ...config.features,
+        clientSession: true,
+        clientCatalog: true,
+      },
     };
     await expect(
-      (await import("./app.js")).buildApp({
-        ...(await createDefaultLifecycle().dependencies(enabled, fakeDb)),
-      }),
-    ).rejects.toThrow("Client catalog runtime capability is required");
+      createDefaultLifecycle().dependencies(enabled, fakeDb),
+    ).rejects.toThrow("Client session verifier capability is required");
 
-    const resolver = { resolve: async () => null };
     const injected = await createDefaultLifecycle({
-      clientCatalogComposition: { principals: resolver },
+      clientSessionComposition: {
+        verifier: { verify: async () => null },
+      },
     }).dependencies(enabled, fakeDb);
     expect(injected.clientCatalogService).toBeDefined();
-    expect(injected.clientPrincipal).toBe(resolver);
+    expect(injected.clientSessionService).toBeDefined();
+    expect(injected.clientSessionRepository).toBeDefined();
+    expect(injected.clientPrincipal).toBeDefined();
+  });
+  it("rejects an invalid client feature combination before migration", async () => {
+    process.env.DATABASE_URL =
+      "postgresql://placeholder.invalid/test?sslmode=require";
+    process.env.CLIENT_SESSION_ENABLED = "false";
+    process.env.CLIENT_CATALOG_ENABLED = "true";
+    const migrate = vi.fn(async () => undefined);
+    const lifecycle: ServerLifecycle = {
+      preflight: createDefaultLifecycle().preflight,
+      migrate,
+      dependencies: async () => disabled as never,
+      close: async () => undefined,
+    };
+    await expect(composeServer(lifecycle, {} as DrizzleDb)).rejects.toThrow(
+      "Client catalog requires client session authority",
+    );
+    expect(migrate).not.toHaveBeenCalled();
   });
   it("composes the durable expert AI receipt store only with an injected source capability", async () => {
     const fakeDb = {

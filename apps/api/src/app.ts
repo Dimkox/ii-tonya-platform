@@ -4,6 +4,7 @@ import type {
   CatalogService,
   ClientCatalogService,
   ClientPrincipalResolver,
+  ClientSessionService,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
@@ -45,11 +46,18 @@ import {
 } from "./routes/yookassa-webhook.js";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { clientCatalogRoutes } from "./routes/client-catalog.js";
+import { clientSessionRoutes } from "./routes/client-sessions.js";
+import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
   "resolvePrincipal" | "requestApproval" | "approveApproval"
 >;
+type ClientSessionRevocation = {
+  revoke(
+    tokenDigest: `sha256:${string}`,
+  ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
+};
 export interface AppDependencies {
   config: RuntimeConfig;
   conversationService: ConversationService;
@@ -76,6 +84,8 @@ export interface AppDependencies {
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
   clientCatalogService?: ClientCatalogService;
+  clientSessionService?: ClientSessionService;
+  clientSessionRepository?: ClientSessionRevocation;
   clientPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
 }
@@ -93,6 +103,13 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  const sessionCapability =
+    deps.clientSessionService !== undefined &&
+    deps.clientSessionRepository !== undefined &&
+    deps.clientPrincipal !== undefined;
+  assertClientCapabilityPreflight(deps.config.features, {
+    identityProofVerifier: sessionCapability,
+  });
   if (
     (deps.config.features.expertReferral ||
       deps.config.features.expertResidencyBilling) &&
@@ -145,6 +162,22 @@ export async function buildApp(
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  if (
+    deps.config.features.clientSession === true &&
+    deps.clientSessionService !== undefined &&
+    deps.clientSessionRepository !== undefined &&
+    deps.clientPrincipal !== undefined
+  ) {
+    await app.register(clientSessionRoutes, {
+      sessions: {
+        issue: (identityProof) =>
+          deps.clientSessionService!.issue(identityProof),
+        revoke: (tokenDigest) =>
+          deps.clientSessionRepository!.revoke(tokenDigest),
+      },
+      principals: deps.clientPrincipal,
+    });
+  }
   if (
     deps.config.features.clientCatalog === true &&
     deps.clientCatalogService !== undefined &&
@@ -328,6 +361,8 @@ export async function buildTestApp(
     >;
     yookassaWebhook?: YooKassaWebhookDependencies;
     clientCatalogService?: ClientCatalogService;
+    clientSessionService?: ClientSessionService;
+    clientSessionRepository?: ClientSessionRevocation;
     clientPrincipal?: ClientPrincipalResolver;
     features?: RuntimeConfig["features"];
   } = {},
@@ -376,6 +411,7 @@ export async function buildTestApp(
       yookassaRecovery: { enabled: false },
       features: options.features ?? {
         workerOutboxDelivery: false,
+        clientSession: false,
         clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
@@ -468,6 +504,12 @@ export async function buildTestApp(
     ...(options.clientCatalogService === undefined
       ? {}
       : { clientCatalogService: options.clientCatalogService }),
+    ...(options.clientSessionService === undefined
+      ? {}
+      : { clientSessionService: options.clientSessionService }),
+    ...(options.clientSessionRepository === undefined
+      ? {}
+      : { clientSessionRepository: options.clientSessionRepository }),
     ...(options.clientPrincipal === undefined
       ? {}
       : { clientPrincipal: options.clientPrincipal }),

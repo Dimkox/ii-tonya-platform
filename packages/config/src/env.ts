@@ -72,6 +72,7 @@ const schema = z
       .enum(["true", "false"])
       .default("false"),
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
@@ -243,6 +244,7 @@ export type RuntimeConfig = {
   displayTimezone: string;
   features: {
     workerOutboxDelivery: boolean;
+    clientSession?: boolean;
     clientCatalog: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
@@ -303,6 +305,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     displayTimezone: value.DISPLAY_TIMEZONE,
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
+      clientSession: value.CLIENT_SESSION_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
