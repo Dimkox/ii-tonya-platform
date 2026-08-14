@@ -6,6 +6,7 @@ import { loadEnv } from "@ii-tonya/config";
 import {
   createDb,
   PostgresCatalogRepository,
+  PostgresBookingRepository,
   PostgresClientCatalogRepository,
   PostgresClientSessionRepository,
   PostgresExpertReferralWorkerRepository,
@@ -36,6 +37,7 @@ import {
   createLocalOperatorCaseOutboxRegistry,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
   runClientCatalogRetention,
+  runClientBookingErasureBatch,
   runClientSessionRetention,
   runOutboxBatch,
   type ExpertResidencyProviderReader,
@@ -75,8 +77,7 @@ const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 export { disabledExpertResidencyProviderReader };
 
 type WorkerOutboxRegistry =
-  | LocalOperatorCaseOutboxRegistry
-  | ClientCatalogOutboxRegistry;
+  LocalOperatorCaseOutboxRegistry | ClientCatalogOutboxRegistry;
 
 export function selectWorkerOutboxRegistry(
   config: RuntimeConfig,
@@ -249,23 +250,38 @@ export function createProductionWorkerRuntimeFactory(
         workerOutboxRegistry === undefined
           ? undefined
           : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
-      const clientCatalogRetention = selectClientCatalogRetention(config, () => {
-        const repository = new PostgresClientCatalogRepository(db);
-        return () =>
-          runClientCatalogRetention(
-            { repository, metrics: { record: recordClientCatalogMetric } },
-            new Date(),
-            100,
-          );
-      });
-      const clientSessionRetention = selectClientSessionRetention(config, () => {
-        const repository = new PostgresClientSessionRepository(db);
-        return () =>
-          runClientSessionRetention(
-            { repository, metrics: { record: recordClientSessionMetric } },
-            100,
-          );
-      });
+      const clientCatalogRetention = selectClientCatalogRetention(
+        config,
+        () => {
+          const repository = new PostgresClientCatalogRepository(db);
+          return () =>
+            runClientCatalogRetention(
+              { repository, metrics: { record: recordClientCatalogMetric } },
+              new Date(),
+              100,
+            );
+        },
+      );
+      const clientSessionRetention = selectClientSessionRetention(
+        config,
+        () => {
+          const repository = new PostgresClientSessionRepository(db);
+          return () =>
+            runClientSessionRetention(
+              { repository, metrics: { record: recordClientSessionMetric } },
+              100,
+            );
+        },
+      );
+      const clientBookingErasure =
+        config.features.clientBooking === true
+          ? () =>
+              runClientBookingErasureBatch({
+                db,
+                bookings: new PostgresBookingRepository(db),
+                limit: 100,
+              })
+          : undefined;
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
@@ -288,6 +304,7 @@ export function createProductionWorkerRuntimeFactory(
         ...(clientSessionRetention === undefined
           ? {}
           : { clientSessionRetention }),
+        ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),
@@ -302,11 +319,14 @@ const productionRuntimeFactory = createProductionWorkerRuntimeFactory({
       new PostgresOperatorCaseOutboxRepository(db),
     );
     if (config.features.clientCatalog !== true) return local;
+    const catalog = new PostgresCatalogRepository(db);
     return createClientCatalogOutboxRegistry({
       local,
       requests: new PostgresClientCatalogRepository(db),
       source: createClientCatalogSourceReader(
-        new PostgresCatalogRepository(db),
+        catalog,
+        config.features.clientBooking === true ? catalog : undefined,
+        config.features.clientBooking === true ? {} : undefined,
       ),
     });
   },

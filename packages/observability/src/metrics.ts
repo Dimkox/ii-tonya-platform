@@ -16,6 +16,7 @@ export const operationalMetrics = {
   workerOutboxDelivery: meter.createCounter("ii_tonya_worker_outbox_delivery"),
   clientCatalog: meter.createCounter("ii_tonya_client_catalog"),
   clientSession: meter.createCounter("ii_tonya_client_session"),
+  clientBooking: meter.createCounter("ii_tonya_client_booking"),
   providerCircuitState: meter.createUpDownCounter(
     "ii_tonya_provider_circuit_state",
   ),
@@ -105,6 +106,64 @@ export function recordClientSessionMetric(
   );
 }
 
+const clientBookingOperations = new Set(["reserve", "cancel"]);
+const clientBookingOutcomes = new Set([
+  "created",
+  "replayed",
+  "cancelled",
+  "not_found",
+  "conflict",
+  "invalid",
+  "disabled",
+  "failed",
+]);
+
+export type ClientBookingMetricLabels = Readonly<{
+  operation: "reserve" | "cancel";
+  outcome:
+    | "created"
+    | "replayed"
+    | "cancelled"
+    | "not_found"
+    | "conflict"
+    | "invalid"
+    | "disabled"
+    | "failed";
+}>;
+
+export function clientBookingMetricLabels(
+  value: unknown,
+): ClientBookingMetricLabels {
+  if (!isRecord(value)) {
+    throw new Error("invalid_client_booking_metric_labels");
+  }
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 2 ||
+    keys.some((key) => key !== "operation" && key !== "outcome") ||
+    typeof value.operation !== "string" ||
+    !clientBookingOperations.has(value.operation) ||
+    typeof value.outcome !== "string" ||
+    !clientBookingOutcomes.has(value.outcome)
+  ) {
+    throw new Error("invalid_client_booking_metric_labels");
+  }
+  return value as ClientBookingMetricLabels;
+}
+
+export function recordClientBookingMetric(
+  labels: ClientBookingMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error("invalid_client_booking_metric_count");
+  }
+  operationalMetrics.clientBooking.add(
+    count,
+    clientBookingMetricLabels(labels),
+  );
+}
+
 export type MetricLabels = Readonly<{
   module: string;
   operation: string;
@@ -142,9 +201,7 @@ const workerOutboxReasonClasses = new Set([
 
 export type WorkerOutboxMetricLabels = Readonly<{
   topic:
-    | "safety_operator_escalation"
-    | "admin_negative_feedback"
-    | "catalog_show";
+    "safety_operator_escalation" | "admin_negative_feedback" | "catalog_show";
   phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
   outcome:
     "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";

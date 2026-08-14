@@ -220,6 +220,18 @@ async function deleteCatalogOutbox(
   );
 }
 
+async function lockCatalogChoices(
+  tx: Transaction,
+  requestId: string,
+): Promise<void> {
+  await tx.execute(sql`
+    select pg_advisory_xact_lock(hashtextextended('choice:' || choice_digest,0))
+    from client_catalog_choices
+    where request_id=${requestId}::uuid
+    order by choice_digest
+  `);
+}
+
 export class PostgresClientCatalogRepository implements ClientCatalogRequestRepository {
   constructor(private readonly db: DrizzleDb) {}
 
@@ -546,6 +558,7 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
       let removed = 0;
 
       for (const candidate of candidates) {
+        await lockCatalogChoices(tx, candidate.requestId);
         const request = (
           await tx.execute<{
             expiresAt: Date | string;
@@ -603,11 +616,20 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
                 and o.topic='catalog.show'
             )
           order by r.expires_at,r.id
-          for update of r skip locked
           limit ${remaining}
         `)
         ).rows;
         for (const request of orphanRequests) {
+          await lockCatalogChoices(tx, request.requestId);
+          const claimed = (
+            await tx.execute<{ requestId: string }>(sql`
+              select id as "requestId" from client_catalog_requests
+              where id=${request.requestId}::uuid
+                and expires_at<=clock_timestamp()
+              for update skip locked
+            `)
+          ).rows[0];
+          if (claimed === undefined) continue;
           await tx.execute(sql`
             insert into client_catalog_tombstones (request_id,expires_at,state)
             values (${request.requestId}::uuid,${request.expiresAt},'expired')

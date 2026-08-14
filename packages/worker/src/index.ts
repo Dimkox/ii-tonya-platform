@@ -19,6 +19,7 @@ export {
 } from "./outbox-runner.js";
 export { CLIENT_CATALOG_OUTBOX_TOPICS } from "@ii-tonya/contracts";
 export * from "./data-retention.js";
+export * from "./client-booking-erasure.js";
 export * from "./privacy-erasure.js";
 export * from "./reservation-expiry.js";
 export * from "./reconciliation.js";

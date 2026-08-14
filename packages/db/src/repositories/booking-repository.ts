@@ -123,6 +123,12 @@ export interface CancelOwnedBookingCommand {
   correlationId: string;
 }
 
+export interface CancelBookingForErasureCommand {
+  userId: string;
+  reservationId: string;
+  correlationId: string;
+}
+
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   transaction: infer T,
 ) => unknown
@@ -912,6 +918,54 @@ export class PostgresBookingRepository {
       return result.status === "cancelled_by_client"
         ? { kind: "cancelled" }
         : { kind: "conflict" };
+    });
+  }
+
+  cancelBookingForErasure(
+    command: CancelBookingForErasureCommand,
+  ): Promise<ProtectedClientBookingCancelResult> {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      !UUID_PATTERN.test(command.reservationId) ||
+      command.correlationId.length < 1
+    ) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    return this.runSerializable(async (tx) => {
+      const owned = (
+        await tx.execute<{ status: ReservationStatus; version: number }>(sql`
+          select status,version from reservations
+          where id=${command.reservationId}::uuid
+            and user_id=${command.userId}::uuid
+        `)
+      ).rows[0];
+      if (owned === undefined) return { kind: "not_found" };
+      if (
+        owned.status === "cancelled_by_client" ||
+        owned.status === "cancelled_by_expert"
+      ) {
+        return { kind: "replayed" };
+      }
+      if (owned.status !== "reserved" && owned.status !== "booked") {
+        return { kind: "conflict" };
+      }
+      const clock = one(
+        (
+          await tx.execute<{ databaseNow: Date | string }>(sql`
+            select clock_timestamp() as "databaseNow"
+          `)
+        ).rows,
+        "the database clock",
+      );
+      await this.transitionInTransaction(tx, {
+        reservationId: command.reservationId,
+        expectedVersion: owned.version,
+        action: "client_cancel",
+        actor: { type: "client", id: command.userId },
+        now: normalizeBookingTimestamp(clock.databaseNow, "clock_timestamp"),
+        correlationId: command.correlationId,
+      });
+      return { kind: "cancelled" };
     });
   }
 

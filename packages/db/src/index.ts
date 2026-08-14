@@ -6,6 +6,7 @@ export {
   migrateDb,
   type DrizzleDb,
 } from "./client.js";
+export { sql } from "drizzle-orm";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -21,6 +22,7 @@ export {
   type BookingRepositoryOptions,
   type BookingExpertScheduleRecord,
   type BookingSlotView,
+  type CancelBookingForErasureCommand,
   type CancelOwnedBookingCommand,
   type ProtectedClientBookingCancelResult,
   type ProtectedClientBookingReserveResult,

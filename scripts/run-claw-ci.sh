@@ -3,8 +3,8 @@ set -Eeuo pipefail
 
 mode="${1:-}"
 case "$mode" in
-  ci | database | release) ;;
-  *) printf 'usage: %s <ci|database|release>\n' "$0" >&2; exit 2 ;;
+  ci | database | release | client-booking) ;;
+  *) printf 'usage: %s <ci|database|release|client-booking>\n' "$0" >&2; exit 2 ;;
 esac
 
 [[ "$(hostname -s)" == "claw" ]] || {
@@ -20,6 +20,10 @@ source_sha="${SOURCE_SHA:?SOURCE_SHA is required}"
 }
 test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
+if [[ "$mode" == client-booking ]]; then
+  test -z "$(git -C "$source_root" status --porcelain --untracked-files=all)"
+  : "${II_TONYA_TEST_POSTGRES_ADMIN_URL:?II_TONYA_TEST_POSTGRES_ADMIN_URL is required}"
+fi
 missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=print | sed -n '/^?/ { p; q; }')"
 [[ -z "$missing_git_object" ]] || {
   printf 'Git history is incomplete; refusing security scan.\n' >&2
@@ -91,6 +95,11 @@ case "$CLAW_GATE_MODE" in
       bash scripts/build-native-release.sh
     test -f /workspace/release-output/native-release.tar.gz
     ;;
+  client-booking)
+    node scripts/assert-client-booking-postgres.mjs
+    pnpm build
+    pnpm exec vitest run tests/integration/client-booking-final-gate.test.ts --maxWorkers=1
+    ;;
 esac
 SCRIPT
 
@@ -110,6 +119,9 @@ compose_args=(
 )
 if [[ -n "$claw_syft" ]]; then
   compose_args+=( -v "$claw_syft:/usr/local/bin/syft:ro" )
+fi
+if [[ "$mode" == client-booking ]]; then
+  compose_args+=( -e II_TONYA_TEST_POSTGRES_ADMIN_URL )
 fi
 
 II_TONYA_SOURCE_SHA="$test_image" docker compose "${compose_args[@]}" \
