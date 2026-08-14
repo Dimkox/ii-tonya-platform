@@ -44,6 +44,7 @@ const payment = {
 };
 
 const operationPort = (): YooKassaOperationPort => ({
+  findByProviderObject: vi.fn(async () => null),
   claim: vi.fn(async () => operation),
   bindProviderObject: vi.fn(async (_id, providerObjectId) => ({
     ...operation,

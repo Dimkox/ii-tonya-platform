@@ -138,6 +138,28 @@ const selectOperation = async (
 export class PostgresYooKassaOperationRepository implements YooKassaOperationPort {
   constructor(private readonly db: DrizzleDb) {}
 
+  async findByProviderObject(
+    providerObjectId: string,
+    kind: "create_payment" | "create_refund",
+  ): Promise<YooKassaOperation | null> {
+    if (!PROVIDER_ID.test(providerObjectId)) {
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    }
+    const result = await this.db.execute<StoredOperation>(sql`
+      select id, order_id as "orderId", payment_attempt_id as "paymentAttemptId",
+        operation_kind as "operationKind", environment_mode as "environmentMode",
+        provider_object_id as "providerObjectId", parent_payment_id as "parentPaymentId",
+        amount_minor::text as "amountMinor", currency,
+        request_digest as "requestDigest", claim_digest as "claimDigest",
+        idempotency_key::text as "idempotencyKey", status
+      from expert_residency_provider_operations
+      where provider='yookassa' and provider_object_id=${providerObjectId}
+        and operation_kind=${kind}
+      limit 1
+    `);
+    return result.rows[0] === undefined ? null : toOperation(result.rows[0]);
+  }
+
   async claim(
     command: ClaimYooKassaOperationCommand,
   ): Promise<YooKassaOperation> {

@@ -2,20 +2,20 @@ import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   yooKassaNotificationSchema,
+  type YooKassaNotification,
   type VerifiedExpertResidencyPaymentEvent,
 } from "@ii-tonya/integrations";
+import type { WebhookInbox } from "./selarti-webhook.js";
 
 export interface YooKassaWebhookDependencies {
   readonly effectivePeerAddress: (request: FastifyRequest) => string;
-  readonly claim: (eventKey: string) => Promise<"claimed" | "duplicate">;
+  readonly inbox: WebhookInbox;
   readonly verify: (
-    notification: unknown,
-  ) => Promise<VerifiedExpertResidencyPaymentEvent>;
+    notification: YooKassaNotification,
+  ) => Promise<VerifiedExpertResidencyPaymentEvent | null>;
   readonly deliver: (
     event: VerifiedExpertResidencyPaymentEvent,
   ) => Promise<void>;
-  readonly complete: (eventKey: string) => Promise<void>;
-  readonly release: (eventKey: string) => Promise<void>;
 }
 
 const ipv4 = (value: string): number | null => {
@@ -69,16 +69,24 @@ export async function yookassaWebhookRoutes(
       const eventKey = createHash("sha256")
         .update(`${parsed.data.event}\0${parsed.data.object.id}`, "utf8")
         .digest("hex");
-      if ((await deps.claim(eventKey)) === "duplicate") {
+      const claim = await deps.inbox.claim("yookassa", eventKey);
+      if (claim.kind === "duplicate") {
         return reply.send({ accepted: true });
+      }
+      if (claim.kind === "busy") {
+        return reply.code(503).send({ error: "delivery_pending" });
       }
       try {
         const event = await deps.verify(parsed.data);
-        await deps.deliver(event);
-        await deps.complete(eventKey);
+        if (event !== null) await deps.deliver(event);
+        await deps.inbox.complete(claim.claimId);
         return reply.send({ accepted: true });
       } catch {
-        await deps.release(eventKey);
+        try {
+          await deps.inbox.fail(claim.claimId);
+        } catch {
+          // The lease may have expired; the provider must still receive a retryable response.
+        }
         return reply.code(503).send({ error: "delivery_pending" });
       }
     },

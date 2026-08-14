@@ -163,6 +163,7 @@ export type {
   YooKassaReconciliationReadCommand,
   YooKassaReconciliationSnapshot,
 } from "./yookassa/reconciliation-reader.js";
+export { YooKassaWebhookCapability } from "./yookassa/webhook-capability.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,

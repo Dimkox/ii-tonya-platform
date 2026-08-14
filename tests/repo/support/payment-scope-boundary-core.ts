@@ -19,6 +19,7 @@ export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/payment-adapter.ts",
   "packages/integrations/src/yookassa/reconciliation-reader.ts",
   "packages/integrations/src/yookassa/verifier.ts",
+  "packages/integrations/src/yookassa/webhook-capability.ts",
 ]);
 
 export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
@@ -144,7 +145,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "c7801f74e19ca1c71cb36ae211cf72698a68a457a88ae45251d8d60dffaae345",
+    "3b8b7f845a84317a898f5c8559ecffd3d042afe6464bbcbf076be1d02b502844",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -164,7 +165,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "22acc3fbf7978a162c262da6555573589a7b913394e251beeb703c2b5069185d",
+    "190bd5aa951f593f84f51d53b07f11c2eeda0f2e73bc595a417492225e6d5f48",
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
@@ -177,6 +178,10 @@ const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/yookassa/verifier.ts",
     "26508ea39566317af7a1ef3355a65162860c0297c270a66c78228ce39e2335fa",
+  ],
+  [
+    "packages/integrations/src/yookassa/webhook-capability.ts",
+    "f1d66bd197ef68cd4c47232c12d011b66df5dcf35337c574dc0da93b2d1d702e",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([

@@ -130,6 +130,12 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       (await repository.bindProviderObject(claimed.id, providerId))
         .providerObjectId,
     ).toBe(providerId);
+    await expect(
+      repository.findByProviderObject(providerId, "create_payment"),
+    ).resolves.toMatchObject({ id: claimed.id, providerObjectId: providerId });
+    await expect(
+      repository.findByProviderObject(providerId, "create_refund"),
+    ).resolves.toBeNull();
     const attempt = await db.execute<{
       providerRequestId: string;
       status: string;

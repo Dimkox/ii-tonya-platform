@@ -37,6 +37,10 @@ export interface ClaimYooKassaOperationCommand {
 }
 
 export interface YooKassaOperationPort {
+  findByProviderObject(
+    providerObjectId: string,
+    kind: YooKassaOperationKind,
+  ): Promise<YooKassaOperation | null>;
   claim(command: ClaimYooKassaOperationCommand): Promise<YooKassaOperation>;
   bindProviderObject(
     operationId: string,
