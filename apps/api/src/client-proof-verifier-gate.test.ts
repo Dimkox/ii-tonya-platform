@@ -28,11 +28,12 @@ describe("client proof verifier gate", () => {
       maximumConcurrent: 32,
     });
     const pending = gate.verify(input());
-    await vi.advanceTimersByTimeAsync(2_000);
-
-    await expect(pending).rejects.toEqual(
+    const rejection = expect(pending).rejects.toEqual(
       new ClientProofUnavailableError(),
     );
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await rejection;
     expect(verifierSignal?.aborted).toBe(true);
     expect(JSON.stringify(await pending.catch((error) => error))).not.toContain(
       "P".repeat(32),
