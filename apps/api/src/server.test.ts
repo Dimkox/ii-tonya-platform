@@ -245,7 +245,10 @@ describe("server composition", () => {
             summary: referralSummary,
             redeemCode: async () => ({ kind: "disabled" as const }),
           },
-          residency: { quote: async () => ({ kind: "disabled" as const }) },
+          residency: {
+            listActiveTariffs: async () => ({ kind: "disabled" as const }),
+            quote: async () => ({ kind: "disabled" as const }),
+          },
           checkout: {
             issue: async () => "xr1.safe",
             process: checkoutProcess,
@@ -254,6 +257,7 @@ describe("server composition", () => {
             sendReferralSummary,
             sendReferralRedeemed: applied,
             sendResidencyQuote: applied,
+            sendResidencyTariffs: applied,
             sendResidencyCheckoutLink: applied,
             sendQuerySchedule: applied,
             sendClientChoices: applied,

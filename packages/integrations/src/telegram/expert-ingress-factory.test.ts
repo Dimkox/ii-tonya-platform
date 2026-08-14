@@ -61,6 +61,10 @@ describe("expert Telegram production ingress factory", () => {
           kind: "applied",
           providerOperationId: "8",
         }),
+        sendResidencyTariffs: async () => ({
+          kind: "applied",
+          providerOperationId: "10",
+        }),
       },
     });
 

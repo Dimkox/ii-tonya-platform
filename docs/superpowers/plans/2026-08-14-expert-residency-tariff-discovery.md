@@ -38,10 +38,10 @@ not changed.
 - Returns: ordered `ResidencyTariff[]` with `tariffVersionId`, `displayName`,
   `priceMinor`, `currency: "RUB"`, and `durationSeconds`.
 
-- [ ] Write application and repository tests that fail because discovery is absent.
-- [ ] Run the focused tests and confirm the missing interface/behavior failure.
-- [ ] Implement the minimal bounded repository query and fresh service authorization.
-- [ ] Run the focused tests and confirm GREEN.
+- [x] Write application and repository tests that fail because discovery is absent.
+- [x] Run the focused tests and confirm the missing interface/behavior failure.
+- [x] Implement the minimal bounded repository query and fresh service authorization.
+- [x] Run the focused tests and confirm GREEN.
 
 ### Task 2: Authenticated HTTP discovery
 
@@ -54,11 +54,11 @@ not changed.
 - Produces: authenticated `GET /v1/expert/residency/tariffs` under the existing
   `expertResidencyBilling` gate.
 
-- [ ] Write route tests for authenticated success, unauthenticated denial, forbidden,
+- [x] Write route tests for authenticated success, unauthenticated denial, forbidden,
   disabled, and absence of request-supplied financial authority.
-- [ ] Run the route test and confirm RED.
-- [ ] Add the minimal GET route using the existing principal resolver/result mapping.
-- [ ] Run the route test and confirm GREEN.
+- [x] Run the route test and confirm RED.
+- [x] Add the minimal GET route using the existing principal resolver/result mapping.
+- [x] Run the route test and confirm GREEN.
 
 ### Task 3: Private Telegram tariff list
 
@@ -73,11 +73,11 @@ not changed.
 - Produces: `ExpertTelegramViewPort.sendResidencyTariffs(view)` and deterministic private
   `/residency` routing without changing `/residency <UUID>`.
 
-- [ ] Write processor and renderer tests for exact command, bounds, empty list,
+- [x] Write processor and renderer tests for exact command, bounds, empty list,
   non-private denial, disabled financial views, and UUID quote compatibility.
-- [ ] Run the focused tests and confirm RED.
-- [ ] Implement the minimal view contract, bounded renderer/send method, and command branch.
-- [ ] Run the focused tests and confirm GREEN.
+- [x] Run the focused tests and confirm RED.
+- [x] Implement the minimal view contract, bounded renderer/send method, and command branch.
+- [x] Run the focused tests and confirm GREEN.
 
 ### Task 4: Traceability, verification, and review
 
@@ -88,7 +88,7 @@ not changed.
 **Interfaces:**
 - Links ER-TG-004-R1 through R6 to code, tests, gate, recovery, and owner.
 
-- [ ] Add truthful traceability without live-provider or release claims.
+- [x] Add truthful traceability without live-provider or release claims.
 - [ ] Run relevant typecheck/lint and `git diff --check` once.
 - [ ] Commit the exact candidate and run one final focused Claw gate.
 - [ ] Record exact evidence, request independent review, fix every Critical/Important

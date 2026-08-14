@@ -131,6 +131,17 @@ export interface ExpertResidencyQuoteView {
   durationSeconds: number;
   checkoutCallbackData?: string;
 }
+export interface ExpertResidencyTariffsView {
+  idempotencyKey: string;
+  telegramUserId: string;
+  tariffs: readonly {
+    tariffVersionId: string;
+    displayName: string;
+    priceMinor: string;
+    currency: "RUB";
+    durationSeconds: number;
+  }[];
+}
 
 export type TelegramSendOutcome =
   | { kind: "applied"; providerOperationId: string }
@@ -160,6 +171,9 @@ export interface ExpertTelegramViewPort {
   ): Promise<TelegramSendOutcome>;
   sendResidencyQuote(
     view: ExpertResidencyQuoteView,
+  ): Promise<TelegramSendOutcome>;
+  sendResidencyTariffs(
+    view: ExpertResidencyTariffsView,
   ): Promise<TelegramSendOutcome>;
   sendResidencyCheckoutLink(view: {
     idempotencyKey: string;
@@ -351,6 +365,63 @@ const assertCount = (value: number): void => {
     throw new Error("invalid_expert_view");
   }
 };
+
+const tariffUuid =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+export function renderExpertResidencyTariffs(
+  view: ExpertResidencyTariffsView,
+): string {
+  if (view.tariffs.length > 20) throw new Error("invalid_expert_view");
+  if (view.tariffs.length === 0) {
+    return "Активных тарифов резидентства сейчас нет.";
+  }
+  const blocks = view.tariffs.map((tariff, index) => {
+    assertPlainText(tariff.displayName, 256);
+    assertMoney(tariff.priceMinor);
+    if (
+      !tariffUuid.test(tariff.tariffVersionId) ||
+      tariff.currency !== "RUB" ||
+      BigInt(tariff.priceMinor) <= 0n ||
+      !Number.isSafeInteger(tariff.durationSeconds) ||
+      tariff.durationSeconds < 86_400 ||
+      tariff.durationSeconds > 315_360_000
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    return [
+      `${index + 1}. ${tariff.displayName}`,
+      `Цена: ${tariff.priceMinor} RUB minor units`,
+      `Срок: ${tariff.durationSeconds} секунд`,
+      `ID: ${tariff.tariffVersionId}`,
+      `Расчёт: /residency ${tariff.tariffVersionId}`,
+    ].join("\n");
+  });
+  const header = "Доступные тарифы резидентства:";
+  const selected: string[] = [];
+  for (const block of blocks) {
+    const nextCount = selected.length + 1;
+    const marker = `Показано ${nextCount} из ${blocks.length}.`;
+    const candidate = [
+      header,
+      ...selected,
+      block,
+      ...(nextCount < blocks.length ? [marker] : []),
+    ].join("\n\n");
+    if (candidate.length > TELEGRAM_TEXT_LIMIT) break;
+    selected.push(block);
+  }
+  if (selected.length === 0) throw new Error("invalid_expert_view");
+  const rendered = [
+    header,
+    ...selected,
+    ...(selected.length < blocks.length
+      ? [`Показано ${selected.length} из ${blocks.length}.`]
+      : []),
+  ].join("\n\n");
+  assertTelegramText(rendered);
+  return rendered;
+}
 
 export function renderTelegramExpertSchedule(
   view: TelegramExpertScheduleView,
@@ -598,6 +669,16 @@ export class TelegramAdapter
               ],
             },
           }),
+    });
+  }
+
+  async sendResidencyTariffs(
+    view: ExpertResidencyTariffsView,
+  ): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: renderExpertResidencyTariffs(view),
     });
   }
 

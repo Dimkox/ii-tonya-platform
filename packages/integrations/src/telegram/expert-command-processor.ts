@@ -38,6 +38,18 @@ interface ReferralQueryService {
 }
 
 interface ResidencyQueryService {
+  listActiveTariffs(
+    principal: FinancialPrincipal,
+  ): Promise<
+    | readonly {
+        readonly tariffVersionId: string;
+        readonly displayName: string;
+        readonly priceMinor: string;
+        readonly currency: "RUB";
+        readonly durationSeconds: number;
+      }[]
+    | { readonly kind: "forbidden" | "disabled" }
+  >;
   quote(
     principal: FinancialPrincipal,
     tariffVersionId: string,
@@ -205,6 +217,33 @@ export const createExpertCommandProcessor = (deps: {
               idempotencyKey: command.idempotencyKey,
               telegramUserId: command.principal.telegramUserId,
               ...summary,
+            }),
+          );
+          return { kind: "processed", deliveryOutcome };
+        }
+        case "/residency": {
+          if (deps.financialViewsEnabled !== true) {
+            const deliveryOutcome = ordinaryDeliveryOutcome(
+              await deps.views.sendUnsupported({
+                idempotencyKey: command.idempotencyKey,
+                telegramUserId: command.principal.telegramUserId,
+              }),
+            );
+            return { kind: "unsupported", deliveryOutcome };
+          }
+          const tariffs = await unavailable(() =>
+            deps.residency!.listActiveTariffs(
+              financialPrincipal(command.principal),
+            ),
+          );
+          if (!Array.isArray(tariffs)) {
+            throw new Error("expert_query_unavailable");
+          }
+          const deliveryOutcome = ordinaryDeliveryOutcome(
+            await deps.views.sendResidencyTariffs({
+              idempotencyKey: command.idempotencyKey,
+              telegramUserId: command.principal.telegramUserId,
+              tariffs,
             }),
           );
           return { kind: "processed", deliveryOutcome };

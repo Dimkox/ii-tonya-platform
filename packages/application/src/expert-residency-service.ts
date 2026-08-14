@@ -16,6 +16,13 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
   id: string;
   status: "payment_pending" | "expired";
 }
+export interface ResidencyTariff {
+  readonly tariffVersionId: string;
+  readonly displayName: string;
+  readonly priceMinor: string;
+  readonly currency: "RUB";
+  readonly durationSeconds: number;
+}
 export interface ResidencyCheckoutProvider {
   createCheckout(input: {
     orderId: string;
@@ -29,6 +36,10 @@ export interface ResidencyCheckoutProvider {
   }>;
 }
 export interface ExpertResidencyCommands {
+  listActiveTariffs(input: {
+    expertId: string;
+    limit: 20;
+  }): Promise<readonly ResidencyTariff[]>;
   quote(input: {
     expertId: string;
     tariffVersionId: string;
@@ -49,6 +60,11 @@ export interface ExpertResidencyReconciliation {
   releaseExpiredOrders(limit: number): Promise<unknown>;
 }
 export interface ExpertResidencyService {
+  listActiveTariffs(
+    principal: ExpertPrincipal,
+  ): Promise<
+    readonly ResidencyTariff[] | ForbiddenResult | { kind: "disabled" }
+  >;
   quote(
     principal: ExpertPrincipal,
     tariffVersionId: string,
@@ -84,6 +100,14 @@ export const createExpertResidencyService = (deps: {
     principal.authenticated &&
     (await deps.queries.ownerUserId(principal.expertId)) === principal.userId;
   return {
+    async listActiveTariffs(principal) {
+      if (!(await owns(principal))) return { kind: "forbidden" };
+      if (!deps.environmentEnabled) return { kind: "disabled" };
+      return deps.commands.listActiveTariffs({
+        expertId: principal.expertId,
+        limit: 20,
+      });
+    },
     async quote(principal, tariffVersionId) {
       if (!(await owns(principal))) return { kind: "forbidden" };
       if (!deps.environmentEnabled) return { kind: "disabled" };
