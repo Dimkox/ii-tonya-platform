@@ -1,0 +1,318 @@
+import { createHash, randomUUID } from "node:crypto";
+
+import { sql } from "drizzle-orm";
+
+import type { DrizzleDb } from "../client.js";
+import { withSerializableRetry } from "./message-repository.js";
+
+export type ClientCatalogSlot = Readonly<{ startsAt: string }>;
+export type ClientCatalogCard = Readonly<{
+  displayName: string;
+  serviceCode: string;
+  language: string;
+  availability: "catalog_only" | "fresh_slots";
+  slots: readonly ClientCatalogSlot[];
+}>;
+export type ClientCatalogSnapshot =
+  | Readonly<{ catalogRequestId: string; state: "pending" }>
+  | Readonly<{
+      catalogRequestId: string;
+      state: "ready";
+      cards: readonly ClientCatalogCard[];
+    }>;
+
+export interface ClientCatalogRequestRepository {
+  createOrReplay(input: {
+    userId: string;
+    requestDigest: string;
+    serviceCode?: string;
+    language?: string;
+    correlationId: string;
+  }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }>;
+  getOwned(input: {
+    userId: string;
+    catalogRequestId: string;
+  }): Promise<ClientCatalogSnapshot | null>;
+  loadPending(catalogRequestId: string): Promise<
+    | Readonly<{
+        catalogRequestId: string;
+        serviceCode?: string;
+        language?: string;
+        databaseNow: Date;
+      }>
+    | "replayed"
+    | null
+  >;
+  materialize(input: {
+    catalogRequestId: string;
+    cards: readonly ClientCatalogCard[];
+  }): Promise<"ready" | "replayed" | "missing">;
+}
+
+type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
+  transaction: infer T,
+) => unknown
+  ? T
+  : never;
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const HASH_PATTERN = /^[0-9a-f]{64}$/u;
+const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
+
+const optionalFilter = (
+  value: string | undefined,
+  maximum: number,
+): string | undefined => {
+  if (value === undefined) return undefined;
+  if (
+    value.length < 1 ||
+    value.length > maximum ||
+    value !== value.trim() ||
+    CONTROL_PATTERN.test(value)
+  ) {
+    throw new Error("client_catalog_request_invalid");
+  }
+  return value;
+};
+
+const canonicalUuid = (value: string): string => {
+  if (!UUID_PATTERN.test(value)) throw new Error("client_catalog_request_invalid");
+  return value;
+};
+
+const finiteInstant = (value: string): boolean => {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value;
+};
+
+const validateCards = (
+  cards: readonly ClientCatalogCard[],
+): readonly ClientCatalogCard[] => {
+  if (!Array.isArray(cards) || cards.length > 20) {
+    throw new Error("client_catalog_snapshot_invalid");
+  }
+  for (const card of cards) {
+    if (
+      typeof card !== "object" ||
+      card === null ||
+      Array.isArray(card) ||
+      Object.keys(card).length !== 5 ||
+      !Object.keys(card).every((key) =>
+        [
+          "displayName",
+          "serviceCode",
+          "language",
+          "availability",
+          "slots",
+        ].includes(key),
+      ) ||
+      typeof card.displayName !== "string" ||
+      card.displayName.length < 1 ||
+      card.displayName.length > 120 ||
+      CONTROL_PATTERN.test(card.displayName) ||
+      typeof card.serviceCode !== "string" ||
+      optionalFilter(card.serviceCode, 64) === undefined ||
+      typeof card.language !== "string" ||
+      optionalFilter(card.language, 32) === undefined ||
+      !["catalog_only", "fresh_slots"].includes(card.availability) ||
+      !Array.isArray(card.slots) ||
+      card.slots.length > 3 ||
+      (card.availability === "catalog_only" && card.slots.length !== 0)
+    ) {
+      throw new Error("client_catalog_snapshot_invalid");
+    }
+    for (const slot of card.slots) {
+      if (
+        typeof slot !== "object" ||
+        slot === null ||
+        Array.isArray(slot) ||
+        Object.keys(slot).length !== 1 ||
+        typeof slot.startsAt !== "string" ||
+        !finiteInstant(slot.startsAt)
+      ) {
+        throw new Error("client_catalog_snapshot_invalid");
+      }
+    }
+  }
+  return cards;
+};
+
+const state = (value: string): "pending" | "ready" => {
+  if (value === "pending" || value === "ready") return value;
+  throw new Error("client_catalog_request_state_invalid");
+};
+
+const canonicalPayload = (catalogRequestId: string): string =>
+  JSON.stringify({ v: 1, catalogRequestId });
+
+export class PostgresClientCatalogRepository
+  implements ClientCatalogRequestRepository
+{
+  constructor(private readonly db: DrizzleDb) {}
+
+  createOrReplay(input: {
+    userId: string;
+    requestDigest: string;
+    serviceCode?: string;
+    language?: string;
+    correlationId: string;
+  }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
+    const userId = canonicalUuid(input.userId);
+    if (!HASH_PATTERN.test(input.requestDigest) || input.correlationId.length < 1) {
+      return Promise.reject(new Error("client_catalog_request_invalid"));
+    }
+    const serviceCode = optionalFilter(input.serviceCode, 64);
+    const language = optionalFilter(input.language, 32);
+    return withSerializableRetry(() =>
+      this.db.transaction(async (tx) => {
+        await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${input.requestDigest}`}, 0))`,
+        );
+        const existing = (
+          await tx.execute<{ catalogRequestId: string; state: string }>(sql`
+            select id as "catalogRequestId",state
+            from client_catalog_requests
+            where user_id=${userId}::uuid and request_digest=${input.requestDigest}
+            for update
+          `)
+        ).rows[0];
+        if (existing !== undefined) {
+          return {
+            catalogRequestId: existing.catalogRequestId,
+            state: state(existing.state),
+          };
+        }
+
+        const catalogRequestId = randomUUID();
+        await tx.execute(sql`
+          insert into client_catalog_requests (
+            id,user_id,request_digest,service_code,language
+          ) values (
+            ${catalogRequestId}::uuid,${userId}::uuid,${input.requestDigest},
+            ${serviceCode ?? null},${language ?? null}
+          )
+        `);
+        const payload = canonicalPayload(catalogRequestId);
+        const payloadHash = createHash("sha256").update(payload).digest("hex");
+        await tx.execute(sql`
+          insert into integration_outbox (
+            idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
+          ) values (
+            ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
+            ${input.correlationId},${`client-catalog:${catalogRequestId}:v1`},${payloadHash}
+          )
+        `);
+        return { catalogRequestId, state: "pending" as const };
+      }),
+    );
+  }
+
+  async getOwned(input: {
+    userId: string;
+    catalogRequestId: string;
+  }): Promise<ClientCatalogSnapshot | null> {
+    const userId = canonicalUuid(input.userId);
+    const catalogRequestId = canonicalUuid(input.catalogRequestId);
+    const row = (
+      await this.db.execute<{
+        state: string;
+        cards: unknown;
+      }>(sql`
+        select r.state,s.cards
+        from client_catalog_requests r
+        left join client_catalog_snapshots s on s.request_id=r.id
+        where r.id=${catalogRequestId}::uuid
+          and r.user_id=${userId}::uuid
+          and r.state in ('pending','ready')
+      `)
+    ).rows[0];
+    if (row === undefined) return null;
+    if (row.state === "pending") return { catalogRequestId, state: "pending" };
+    if (row.state !== "ready" || !Array.isArray(row.cards)) {
+      throw new Error("client_catalog_snapshot_invalid");
+    }
+    return {
+      catalogRequestId,
+      state: "ready",
+      cards: validateCards(row.cards as ClientCatalogCard[]),
+    };
+  }
+
+  async loadPending(catalogRequestIdInput: string): Promise<
+    | Readonly<{
+        catalogRequestId: string;
+        serviceCode?: string;
+        language?: string;
+        databaseNow: Date;
+      }>
+    | "replayed"
+    | null
+  > {
+    const catalogRequestId = canonicalUuid(catalogRequestIdInput);
+    const row = (
+      await this.db.execute<{
+        state: string;
+        serviceCode: string | null;
+        language: string | null;
+        databaseNow: Date | string;
+      }>(sql`
+        select state,service_code as "serviceCode",language,
+          clock_timestamp() as "databaseNow"
+        from client_catalog_requests where id=${catalogRequestId}::uuid
+      `)
+    ).rows[0];
+    if (row === undefined || row.state === "expired") return null;
+    if (row.state === "ready") return "replayed";
+    if (row.state !== "pending") throw new Error("client_catalog_request_state_invalid");
+    const databaseNow =
+      row.databaseNow instanceof Date
+        ? row.databaseNow
+        : new Date(row.databaseNow);
+    if (!Number.isFinite(databaseNow.getTime())) {
+      throw new Error("client_catalog_database_clock_invalid");
+    }
+    return {
+      catalogRequestId,
+      ...(row.serviceCode === null ? {} : { serviceCode: row.serviceCode }),
+      ...(row.language === null ? {} : { language: row.language }),
+      databaseNow,
+    };
+  }
+
+  materialize(input: {
+    catalogRequestId: string;
+    cards: readonly ClientCatalogCard[];
+  }): Promise<"ready" | "replayed" | "missing"> {
+    const catalogRequestId = canonicalUuid(input.catalogRequestId);
+    return this.db.transaction(async (tx: Transaction) => {
+      const request = (
+        await tx.execute<{ state: string; expiresAt: Date | string }>(sql`
+          select state,expires_at as "expiresAt"
+          from client_catalog_requests where id=${catalogRequestId}::uuid
+          for update
+        `)
+      ).rows[0];
+      if (request === undefined || request.state === "expired") return "missing";
+      if (request.state === "ready") return "replayed";
+      if (request.state !== "pending") {
+        throw new Error("client_catalog_request_state_invalid");
+      }
+      const cards = validateCards(input.cards);
+      const expiresAt =
+        request.expiresAt instanceof Date
+          ? request.expiresAt
+          : new Date(request.expiresAt);
+      await tx.execute(sql`
+        insert into client_catalog_snapshots (request_id,cards,expires_at)
+        values (${catalogRequestId}::uuid,${JSON.stringify(cards)}::jsonb,${expiresAt})
+      `);
+      await tx.execute(sql`
+        update client_catalog_requests set state='ready',updated_at=now()
+        where id=${catalogRequestId}::uuid and state='pending'
+      `);
+      return "ready";
+    });
+  }
+}

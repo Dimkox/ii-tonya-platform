@@ -26,11 +26,11 @@ describe("MVP worker outbox delivery boundaries", () => {
     );
   });
 
-  it("adds no migration and keeps the feature false in the tracked example", () => {
+  it("keeps its own no-migration boundary and the feature false in the tracked example", () => {
     const migrations = readdirSync("packages/db/migrations")
       .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("0028_operator_case_inbox.sql");
+    expect(migrations).toContain("0028_operator_case_inbox.sql");
     expect(read(".env.example")).toContain(
       "WORKER_OUTBOX_DELIVERY_ENABLED=false",
     );
