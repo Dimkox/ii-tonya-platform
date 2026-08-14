@@ -6,6 +6,7 @@ import type {
   ExpertAiIngressService,
   ExpertCodeKeyring,
   ExpertReferralAdminService,
+  OperatorCaseService,
   PrivacyService,
 } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
@@ -15,6 +16,7 @@ import { createLogger, type Logger } from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
+import { operatorCaseRoutes } from "./routes/operator-cases.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
 import {
   expertAiIngressRoutes,
@@ -60,6 +62,7 @@ export interface AppDependencies {
   rateLimiter: RateLimitGate;
   telegramWebhookSecret: string;
   adminApprovals?: ApprovalPort;
+  operatorCases?: OperatorCaseService;
   expertReferralAdminService?: ExpertReferralAdminService;
   expertApi?: ExpertReferralApiDependencies;
   expertCodeKeyring?: ExpertCodeKeyring;
@@ -220,6 +223,11 @@ export async function buildApp(
           return reply.send(response.rawPayload);
         },
       );
+    if (deps.operatorCases !== undefined)
+      await app.register(operatorCaseRoutes, {
+        approvals: deps.adminApprovals,
+        cases: deps.operatorCases,
+      });
     app.post("/v1/admin/*", async (request, reply) => {
       const expertAction =
         /^\/v1\/admin\/actions\/(?:expert_referral|expert_residency)\./u.test(

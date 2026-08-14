@@ -154,9 +154,9 @@ describe("server composition", () => {
       displayTimezone: "Europe/Moscow",
       features: { expertReferral: false, expertResidencyBilling: false },
     };
-    const app = await (
-      await import("./app.js")
-    ).buildApp(await lifecycle.dependencies(config, fakeDb));
+    const dependencies = await lifecycle.dependencies(config, fakeDb);
+    expect(dependencies.operatorCases).toBeDefined();
+    const app = await (await import("./app.js")).buildApp(dependencies);
     expect(
       (await app.inject({ method: "GET", url: "/health/live" })).statusCode,
     ).toBe(200);
@@ -178,6 +178,14 @@ describe("server composition", () => {
         })
       ).statusCode,
     ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/v1/admin/operator-cases?limit=10",
+        })
+      ).statusCode,
+    ).toBe(401);
     await app.close();
     await lifecycle.close(fakeDb);
   });

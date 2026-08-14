@@ -197,6 +197,13 @@
       "when": 1786690800000,
       "tag": "0027_expert_ai_request_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786694400000,
+      "tag": "0028_operator_case_inbox",
+      "breakpoints": true
     }
   ]
 }

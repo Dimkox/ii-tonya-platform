@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   createAdminService,
   createExpertReferralAdminService,
+  createOperatorCaseService,
   ExpertCodeCrypto,
   type BookingService,
   type CatalogService,
@@ -23,6 +24,7 @@ import {
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
   PostgresExpertAiRequestReceiptStore,
+  PostgresOperatorCaseRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -150,6 +152,9 @@ export const createDefaultLifecycle = (
       privacyService: disabledService<PrivacyService>("privacy ingress"),
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
+      }),
+      operatorCases: createOperatorCaseService({
+        cases: new PostgresOperatorCaseRepository(db),
       }),
       adminApprovals,
       expertReferralAdminService: createExpertReferralAdminService({

@@ -72,7 +72,7 @@ export interface ProductionWorkerRuntimeDependencies {
       readonly from: string;
       readonly to: string;
     }): Promise<void>;
-    deliverSafetyEscalationsBatch(batchSize: number): Promise<unknown>;
+    materializeOperatorCasesBatch(batchSize: number): Promise<unknown>;
   };
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
@@ -260,7 +260,7 @@ export function createProductionWorkerRuntime(
         batchSize,
       ),
     deliverConfirmedOutbox: async () =>
-      deps.jobsRepository.deliverSafetyEscalationsBatch(batchSize),
+      deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
     processorPrivacy: async () => ({
       processed: 0,
       reason: "privacy_capability_disabled",
