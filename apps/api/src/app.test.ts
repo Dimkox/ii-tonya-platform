@@ -2,6 +2,33 @@ import { describe, expect, it } from "vitest";
 import { buildTestApp } from "./app.js";
 import { createExpertBearerPrincipalResolver } from "./expert-principal-resolver.js";
 import type { ExpertReferralApiDependencies } from "./routes/expert-referral.js";
+import type { TelegramExpertQueryIngress } from "./routes/telegram-webhook.js";
+
+const testTelegramCheckoutIngress = (): TelegramExpertQueryIngress => ({
+  resolvePrincipal: async (telegramUserId) => ({
+    userId: "00000000-0000-4000-8000-000000000100",
+    expertId: "00000000-0000-4000-8000-000000000101",
+    telegramUserId,
+    timezone: "Europe/Moscow",
+  }),
+  authenticateClientView: async () => null,
+  processCommand: async () => ({ kind: "disabled" }),
+  processClientView: async () => ({ kind: "disabled" }),
+  processResidencyCheckout: async () => ({
+    kind: "ready",
+    tokenHash: "b".repeat(64),
+    checkoutUrl: "https://pay.example/checkout",
+    replay: false,
+  }),
+  sendResidencyCheckoutLink: async () => ({
+    kind: "applied",
+    providerOperationId: "checkout-message-1",
+  }),
+  answerCallbackQuery: async () => ({
+    kind: "applied",
+    providerOperationId: "answer-1",
+  }),
+});
 
 const testExpertApi = (
   options: {
@@ -408,6 +435,53 @@ describe("API boundary", () => {
       }),
     ).rejects.toThrow("Expert Telegram query capability is required");
   });
+
+  it("rejects Telegram checkout activation without its complete runtime capability", async () => {
+    await expect(
+      buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertTelegramCheckout: true,
+        },
+      }),
+    ).rejects.toThrow("Expert Telegram checkout capability is required");
+  });
+
+  it.each([
+    { checkoutEnabled: false, expected: { accepted: true, unsupported: true } },
+    { checkoutEnabled: true, expected: { accepted: true } },
+  ])(
+    "derives xr1 exposure from checkout config: $checkoutEnabled",
+    async ({ checkoutEnabled, expected }) => {
+      const app = await buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertTelegramCheckout: checkoutEnabled,
+        },
+        expertTelegramQueries: testTelegramCheckoutIngress(),
+      });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers: {
+          "x-telegram-bot-api-secret-token":
+            "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+        },
+        payload: {
+          update_id: checkoutEnabled ? 702 : 701,
+          callback_query: {
+            id: `xr1-${checkoutEnabled ? "enabled" : "disabled"}`,
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+      expect(response.json()).toEqual(expected);
+      await app.close();
+    },
+  );
 
   it("rejects expert AI activation without its complete runtime capability", async () => {
     await expect(

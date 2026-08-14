@@ -5,6 +5,7 @@ import { loadEnv } from "@ii-tonya/config";
 import {
   createDb,
   PostgresExpertReferralWorkerRepository,
+  PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
@@ -71,6 +72,8 @@ export function createProductionWorkerRuntimeFactory(
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
           new PostgresExpertReferralWorkerRepository(db),
+        expertTelegramCheckoutRepository:
+          new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository: new PostgresOutboxRepository(db),
         closeDatabase: async () => db.$client.end(),

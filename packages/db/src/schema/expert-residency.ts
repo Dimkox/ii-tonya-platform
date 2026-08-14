@@ -368,6 +368,15 @@ export const expertTelegramResidencyCallbacks = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    checkoutStatus: text("checkout_status").notNull().default("issued"),
+    checkoutUrl: varchar("checkout_url", { length: 2048 }),
+    processingFence: uuid("processing_fence"),
+    processingLeaseUntil: timestamp("processing_lease_until", {
+      withTimezone: true,
+    }),
+    outcomeRecordedAt: timestamp("outcome_recorded_at", {
+      withTimezone: true,
+    }),
     createdAt,
   },
   (table) => [
@@ -390,9 +399,27 @@ export const expertTelegramResidencyCallbacks = pgTable(
       "expert_telegram_residency_callbacks_expiry_check",
       sql`${table.expiresAt} > ${table.createdAt}`,
     ),
+    check(
+      "expert_telegram_residency_callbacks_checkout_state_check",
+      sql`(${table.checkoutStatus} = 'issued' and ${table.consumedAt} is null) or (${table.checkoutStatus} <> 'issued' and ${table.consumedAt} is not null)`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_processing_lease_check",
+      sql`(${table.checkoutStatus} = 'processing' and ${table.processingFence} is not null and ${table.processingLeaseUntil} is not null) or (${table.checkoutStatus} <> 'processing' and ${table.processingFence} is null and ${table.processingLeaseUntil} is null)`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_checkout_outcome_check",
+      sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is not null and char_length(${table.checkoutUrl}) between 1 and 2048 and ${table.checkoutUrl} ~* '^https://[^[:space:]]+$')`,
+    ),
     index("expert_telegram_residency_callbacks_expiry_idx")
       .on(table.expiresAt)
       .where(sql`${table.consumedAt} is null`),
+    index("expert_telegram_residency_callbacks_processing_lease_idx")
+      .on(table.processingLeaseUntil)
+      .where(sql`${table.checkoutStatus} = 'processing'`),
+    index("expert_telegram_residency_callbacks_url_cleanup_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.checkoutUrl} is not null`),
   ],
 );
 

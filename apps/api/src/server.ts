@@ -67,6 +67,7 @@ export const createDefaultLifecycle = (
       | "enabled"
       | "financialViewsEnabled"
       | "referralMutationsEnabled"
+      | "checkoutReadiness"
       | "referral"
       | "residency"
     > &
@@ -112,7 +113,8 @@ export const createDefaultLifecycle = (
     const telegramEnabled =
       config.features.expertTelegramQueries === true ||
       config.features.expertTelegramFinancialViews === true ||
-      config.features.expertTelegramReferral === true;
+      config.features.expertTelegramReferral === true ||
+      config.features.expertTelegramCheckout === true;
     const expertTelegramQueries =
       options.expertTelegramComposition === undefined
         ? undefined
@@ -123,6 +125,8 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramFinancialViews === true,
             referralMutationsEnabled:
               config.features.expertTelegramReferral === true,
+            checkoutReadiness:
+              config.features.expertTelegramCheckout === true,
           });
     return {
       config,

@@ -14,6 +14,7 @@ export interface WorkerCycleReport {
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
   readonly expertResidencyExpiry: unknown;
+  readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
   readonly expertReferralHoldReplay: unknown;
   readonly confirmedOutboxDelivery: unknown;
@@ -42,6 +43,7 @@ export interface WorkerRuntimeDependencies {
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly reservationExpiry: BoundedJob;
   readonly expertResidencyExpiry: BoundedJob;
+  readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
   readonly expertReferralHoldReplay: BoundedJob;
   readonly deliverConfirmedOutbox: BoundedJob;
@@ -75,6 +77,9 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
     HeldRewardRepository;
+  readonly expertTelegramCheckoutRepository: {
+    clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number>;
+  };
   readonly expertResidencyProviderReader?: ExpertResidencyProviderReader;
   readonly outboxRepository: {
     recoverExpiredDispatchLeases(limit: number): Promise<number>;
@@ -136,6 +141,8 @@ export function createWorkerRuntime(
         await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
       const expertResidencyExpiry = await deps.expertResidencyExpiry();
+      const expertTelegramCheckoutCleanup =
+        await deps.expertTelegramCheckoutCleanup();
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
@@ -148,6 +155,7 @@ export function createWorkerRuntime(
         unknownOutcomeReconciliation,
         reservationExpiry,
         expertResidencyExpiry,
+        expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
         expertReferralHoldReplay,
         confirmedOutboxDelivery,
@@ -232,6 +240,12 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
+    expertTelegramCheckoutCleanup: async () => ({
+      cleared: await deps.expertTelegramCheckoutRepository.clearExpiredCheckoutUrls(
+        deps.now(),
+        batchSize,
+      ),
+    }),
     expertResidencyReconciliation: async () =>
       reconcileExpertResidencyPayments(
         deps.expertReferralJobsRepository,

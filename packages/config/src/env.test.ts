@@ -30,6 +30,7 @@ describe("loadEnv", () => {
       expertTelegramFinancialViews: false,
       expertAiIngress: false,
       expertTelegramReferral: false,
+      expertTelegramCheckout: false,
       yookassa: false,
     });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
@@ -100,6 +101,14 @@ describe("loadEnv", () => {
     expect(
       loadEnv(localEnv({ EXPERT_TELEGRAM_REFERRAL_ENABLED: "true" })).features
         .expertTelegramReferral,
+    ).toBe(true);
+  });
+
+  it("defaults expert Telegram checkout readiness off", () => {
+    expect(loadEnv(localEnv()).features.expertTelegramCheckout).toBe(false);
+    expect(
+      loadEnv(localEnv({ EXPERT_TELEGRAM_CHECKOUT_ENABLED: "true" })).features
+        .expertTelegramCheckout,
     ).toBe(true);
   });
 

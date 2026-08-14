@@ -18,6 +18,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: job("unknown-reconciliation"),
       reservationExpiry: job("expiry"),
       expertResidencyExpiry: job("expert-residency-expiry"),
+      expertTelegramCheckoutCleanup: job("expert-telegram-checkout-cleanup"),
       expertResidencyReconciliation: job("expert-residency-reconciliation"),
       expertReferralHoldReplay: job("expert-referral-hold-replay"),
       deliverConfirmedOutbox: job("outbox"),
@@ -35,6 +36,7 @@ describe("worker runtime", () => {
       "unknown-reconciliation",
       "expiry",
       "expert-residency-expiry",
+      "expert-telegram-checkout-cleanup",
       "expert-residency-reconciliation",
       "expert-referral-hold-replay",
       "outbox",
@@ -43,6 +45,9 @@ describe("worker runtime", () => {
     ]);
     expect(report.expertResidencyExpiry).toEqual({
       name: "expert-residency-expiry",
+    });
+    expect(report.expertTelegramCheckoutCleanup).toEqual({
+      name: "expert-telegram-checkout-cleanup",
     });
     expect(report.expertResidencyReconciliation).toEqual({
       name: "expert-residency-reconciliation",
@@ -69,6 +74,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: noop,
       reservationExpiry: noop,
       expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
       expertResidencyReconciliation: noop,
       expertReferralHoldReplay: noop,
       deliverConfirmedOutbox: noop,
@@ -102,6 +108,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: noop,
       reservationExpiry: noop,
       expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
       expertResidencyReconciliation: noop,
       expertReferralHoldReplay: noop,
       deliverConfirmedOutbox: noop,
@@ -166,9 +173,13 @@ describe("worker runtime", () => {
       recoverExpiredDispatchLeases: vi.fn(async () => 1),
       recoverExpiredReconciliationLeases: vi.fn(async () => 2),
     };
+    const expertTelegramCheckoutRepository = {
+      clearExpiredCheckoutUrls: vi.fn(async () => 3),
+    };
     const runtime = createProductionWorkerRuntime({
       jobsRepository,
       expertReferralJobsRepository,
+      expertTelegramCheckoutRepository,
       expertResidencyProviderReader,
       outboxRepository,
       closeDatabase: vi.fn(async () => undefined),
@@ -188,6 +199,7 @@ describe("worker runtime", () => {
       changed: 1,
       failed: 0,
     });
+    expect(report.expertTelegramCheckoutCleanup).toEqual({ cleared: 3 });
     expect(report.expertResidencyReconciliation).toEqual({
       examined: 1,
       matched: 0,
@@ -231,6 +243,9 @@ describe("worker runtime", () => {
     const runtime = createProductionWorkerRuntime({
       jobsRepository,
       expertReferralJobsRepository,
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: vi.fn(async () => 0),
+      },
       outboxRepository: {
         recoverExpiredDispatchLeases: vi.fn(async () => 0),
         recoverExpiredReconciliationLeases: vi.fn(async () => 0),

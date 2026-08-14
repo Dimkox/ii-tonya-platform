@@ -17,6 +17,7 @@ const build = (
   enabled = true,
   financialViewsEnabled = false,
   referralMutationsEnabled = false,
+  checkoutReadiness = false,
 ) => {
   const schedule = vi.fn(async () => ({
     expertId: principal.expertId,
@@ -63,6 +64,9 @@ const build = (
     currency: "RUB" as const,
     durationSeconds: 2_592_000,
   }));
+  const issueCheckout = vi.fn(async () =>
+    "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  );
   const sendQuerySchedule = vi.fn<
     ExpertTelegramQueryViewPort["sendQuerySchedule"]
   >(async () => ({
@@ -129,6 +133,8 @@ const build = (
       views,
       financialViewsEnabled,
       referralMutationsEnabled,
+      checkoutReadiness,
+      checkout: { issue: issueCheckout },
       referral: { summary: referralSummary, redeemCode },
       residency: { quote: residencyQuote },
     }),
@@ -139,6 +145,7 @@ const build = (
     referralSummary,
     redeemCode,
     residencyQuote,
+    issueCheckout,
     views,
   };
 };
@@ -253,6 +260,32 @@ describe("expert Telegram command processor", () => {
     }
     expect(state.residencyQuote).toHaveBeenCalledTimes(1);
     expect(state.referralSummary).not.toHaveBeenCalled();
+  });
+
+  it("issues an opaque checkout button only when readiness is composed", async () => {
+    const tariffVersionId = "00000000-0000-4000-8000-000000000301";
+    const disabled = build(true, true, false, false);
+    const enabled = build(true, true, false, true);
+
+    await disabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+    await enabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+
+    expect(disabled.issueCheckout).not.toHaveBeenCalled();
+    expect(enabled.issueCheckout).toHaveBeenCalledWith({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram-update-1:checkout:issue",
+    });
+    expect(enabled.views.sendResidencyQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checkoutCallbackData:
+          "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      }),
+    );
   });
 
   it("keeps financial views independently disabled with no service or view call", async () => {

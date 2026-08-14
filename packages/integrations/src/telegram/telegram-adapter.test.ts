@@ -86,6 +86,56 @@ describe("expert Telegram views", () => {
     });
   });
 
+  it("renders one opaque xr1 checkout button only when supplied", async () => {
+    const { adapter, requests } = buildAdapter();
+    const callbackData =
+      "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    await adapter.sendResidencyQuote({
+      idempotencyKey: "quote-0002",
+      telegramUserId: "123456789",
+      tariffVersionId: "00000000-0000-4000-8000-000000000101",
+      displayName: "30 days",
+      priceMinor: "199999",
+      creditMinor: "12345",
+      cashMinor: "187654",
+      currency: "RUB",
+      durationSeconds: 2_592_000,
+      checkoutCallbackData: callbackData,
+    });
+
+    expect(requests[0]?.body).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [[{ text: "Оплатить", callback_data: callbackData }]],
+      },
+    });
+    expect(Buffer.byteLength(callbackData, "utf8")).toBeLessThanOrEqual(64);
+  });
+
+  it("sends a bounded HTTPS checkout link with request logging disabled", async () => {
+    const { adapter, requests } = buildAdapter();
+
+    await expect(
+      adapter.sendResidencyCheckoutLink({
+        idempotencyKey: `telegram:${"b".repeat(64)}:checkout:delivery`,
+        telegramUserId: "123456789",
+        checkoutUrl: "https://pay.example/checkout",
+      }),
+    ).resolves.toEqual({ kind: "applied", providerOperationId: "42" });
+
+    expect(requests[0]?.body).toMatchObject({
+      chat_id: "123456789",
+      text: "Оплата резидентства: https://pay.example/checkout",
+    });
+    expect(requests[0]?.context).toMatchObject({ disableRequestLogging: true });
+    await expect(
+      adapter.sendResidencyCheckoutLink({
+        idempotencyKey: "bad-link",
+        telegramUserId: "123456789",
+        checkoutUrl: "http://pay.example/checkout",
+      }),
+    ).rejects.toThrow("invalid_expert_view");
+  });
+
   it("rejects malformed server money instead of normalizing it", () => {
     expect(() =>
       renderExpertReferralSummary({

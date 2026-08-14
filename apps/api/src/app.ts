@@ -101,6 +101,12 @@ export async function buildApp(
     throw new Error("Expert Telegram query capability is required");
   }
   if (
+    deps.config.features.expertTelegramCheckout === true &&
+    deps.expertTelegramQueries === undefined
+  ) {
+    throw new Error("Expert Telegram checkout capability is required");
+  }
+  if (
     deps.config.features.expertAiIngress === true &&
     (deps.expertAiIngress === undefined ||
       deps.expertAiPrincipal === undefined ||
@@ -144,6 +150,8 @@ export async function buildApp(
       deps.config.features.expertTelegramQueries === true ||
       deps.config.features.expertTelegramFinancialViews === true ||
       deps.config.features.expertTelegramReferral === true,
+    expertCheckoutEnabled:
+      deps.config.features.expertTelegramCheckout === true,
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),
@@ -281,6 +289,7 @@ export async function buildTestApp(
     selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>;
     selartiFailOnce?: boolean;
     expertApi?: ExpertReferralApiDependencies;
+    expertTelegramQueries?: TelegramExpertQueryIngress;
     expertAiIngress?: ExpertAiIngressService;
     expertAiPrincipal?: ExpertPrincipalResolver;
     expertAiRequests?: ExpertAiRequestLedger;
@@ -405,6 +414,9 @@ export async function buildTestApp(
     ...(options.expertApi === undefined
       ? {}
       : { expertApi: options.expertApi }),
+    ...(options.expertTelegramQueries === undefined
+      ? {}
+      : { expertTelegramQueries: options.expertTelegramQueries }),
     ...(options.expertAiIngress === undefined
       ? {}
       : { expertAiIngress: options.expertAiIngress }),

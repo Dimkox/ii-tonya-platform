@@ -125,7 +125,10 @@ describe("authoritative Drizzle schema parity", () => {
     expect(requiredTable("expertTelegramResidencyCallbacks")).toMatchObject({
       checks: [
         "expert_telegram_residency_callbacks_action_check",
+        "expert_telegram_residency_callbacks_checkout_outcome_check",
+        "expert_telegram_residency_callbacks_checkout_state_check",
         "expert_telegram_residency_callbacks_expiry_check",
+        "expert_telegram_residency_callbacks_processing_lease_check",
         "expert_telegram_residency_callbacks_telegram_id_check",
         "expert_telegram_residency_callbacks_token_hash_check",
       ],
@@ -133,7 +136,11 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_telegram_residency_callbacks_expert_id_experts_id_fk",
         "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
       ],
-      indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
+      indexes: [
+        "expert_telegram_residency_callbacks_expiry_idx",
+        "expert_telegram_residency_callbacks_processing_lease_idx",
+        "expert_telegram_residency_callbacks_url_cleanup_idx",
+      ],
       uniques: ["expert_telegram_residency_callbacks_idempotency_unique"],
     });
     expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
@@ -396,6 +403,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -468,11 +479,34 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_provider_operations_order_kind_idx",
       "expert_provider_operations_unbound_recovery_idx",
       "expert_receipt_contacts_append_only",
+      "expert_telegram_residency_callbacks_checkout_outcome_check",
+      "expert_telegram_residency_callbacks_checkout_state_check",
+      "expert_telegram_residency_callbacks_processing_lease_check",
+      "expert_telegram_residency_callbacks_processing_lease_idx",
+      "expert_telegram_residency_callbacks_url_cleanup_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
+    expect(migration).toContain(
+      'char_length("checkout_url") BETWEEN 1 AND 2048',
+    );
+    expect(migration).toContain('"checkout_url" IS NOT NULL');
+    expect(migration).toContain('"checkout_url" ~* \'^https://');
+    expect(migration).not.toContain("{1,2040}");
     expect(migration).toMatch(
       /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
     );
+  });
+
+  it("registers migration 0026 last in the ordered Drizzle journal", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; when: number; tag: string }> };
+    const latest = journal.entries.at(-1);
+    expect(latest).toMatchObject({
+      idx: 26,
+      tag: "0026_expert_telegram_checkout_outcomes",
+    });
+    expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

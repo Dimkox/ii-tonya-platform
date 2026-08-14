@@ -129,6 +129,7 @@ export interface ExpertResidencyQuoteView {
   cashMinor: string;
   currency: "RUB";
   durationSeconds: number;
+  checkoutCallbackData?: string;
 }
 
 export type TelegramSendOutcome =
@@ -160,6 +161,11 @@ export interface ExpertTelegramViewPort {
   sendResidencyQuote(
     view: ExpertResidencyQuoteView,
   ): Promise<TelegramSendOutcome>;
+  sendResidencyCheckoutLink(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    checkoutUrl: string;
+  }): Promise<TelegramSendOutcome>;
 }
 
 export interface ExpertTelegramQueryViewPort {
@@ -570,10 +576,60 @@ export class TelegramAdapter
   async sendResidencyQuote(
     view: ExpertResidencyQuoteView,
   ): Promise<TelegramSendOutcome> {
+    const callbackData = view.checkoutCallbackData;
+    if (
+      callbackData !== undefined &&
+      (!callbackData.startsWith("xr1.") ||
+        Buffer.byteLength(callbackData, "utf8") > 64 ||
+        Buffer.byteLength(callbackData, "utf8") < 1)
+    ) {
+      throw new Error("invalid_expert_view");
+    }
     return this.sendText({
       idempotencyKey: view.idempotencyKey,
       telegramUserId: view.telegramUserId,
       text: renderExpertResidencyQuote(view),
+      ...(callbackData === undefined
+        ? {}
+        : {
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: "Оплатить", callback_data: callbackData }],
+              ],
+            },
+          }),
+    });
+  }
+
+  async sendResidencyCheckoutLink(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    checkoutUrl: string;
+  }): Promise<TelegramSendOutcome> {
+    if (
+      view.checkoutUrl.length < 1 ||
+      view.checkoutUrl.length > 2_048 ||
+      /\s/u.test(view.checkoutUrl)
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    let checkoutUrl: URL;
+    try {
+      checkoutUrl = new URL(view.checkoutUrl);
+    } catch {
+      throw new Error("invalid_expert_view");
+    }
+    if (
+      checkoutUrl.protocol !== "https:" ||
+      checkoutUrl.username !== "" ||
+      checkoutUrl.password !== ""
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: `Оплата резидентства: ${view.checkoutUrl}`,
     });
   }
 

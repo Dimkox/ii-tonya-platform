@@ -34,6 +34,7 @@ describe("environment credential policy", () => {
         "EXPERT_TELEGRAM_QUERIES_ENABLED",
         "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
         "EXPERT_TELEGRAM_REFERRAL_ENABLED",
+        "EXPERT_TELEGRAM_CHECKOUT_ENABLED",
         "PAYMENTS_ENABLED",
       ]),
     );
@@ -46,6 +47,7 @@ describe("environment credential policy", () => {
     expect(example.EXPERT_TELEGRAM_QUERIES_ENABLED).toBe("false");
     expect(example.EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED).toBe("false");
     expect(example.EXPERT_TELEGRAM_REFERRAL_ENABLED).toBe("false");
+    expect(example.EXPERT_TELEGRAM_CHECKOUT_ENABLED).toBe("false");
     expect(example.PAYMENT_PROVIDER).toBe("disabled");
     expect(example.LLM_PROVIDER).toBe("disabled");
 
