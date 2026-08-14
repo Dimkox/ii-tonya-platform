@@ -20,11 +20,11 @@
 - [x] Add migration/schema tests for hashes, state, fence/version, bounded outcome and retention.
 - [ ] Observe RED before migration/repository exists.
 - [x] Implement migration 0027 plus atomic repository claim/complete/fail/cleanup.
-- [ ] Prove real-PostgreSQL multi-worker claim, replay, conflict, stale-fence rejection and cleanup.
+- [x] Prove real-PostgreSQL multi-worker claim, replay, conflict, stale-fence rejection and cleanup.
 
 ### Task 2: Default-off composition and release evidence
 
 - [x] Test source-absent default lifecycle and injected-source durable composition.
 - [x] Compose the PostgreSQL store only with the complete injected expert-AI capability.
-- [ ] Run one focused Claw gate at the committed code SHA and record evidence.
+- [x] Run one focused Claw gate at the committed code SHA and record evidence.
 - [x] Obtain independent review; keep human approval BLOCKED and do not push or merge.
