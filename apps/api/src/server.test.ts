@@ -30,6 +30,60 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("keeps client catalog absent by default and requires injected authority when enabled", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      $client: { end: async () => undefined },
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
+    };
+
+    const disabledDeps = await createDefaultLifecycle().dependencies(
+      config,
+      fakeDb,
+    );
+    expect(disabledDeps.clientCatalogService).toBeUndefined();
+    expect(disabledDeps.clientPrincipal).toBeUndefined();
+
+    const enabled = {
+      ...config,
+      features: { ...config.features, clientCatalog: true },
+    };
+    await expect(
+      (await import("./app.js")).buildApp({
+        ...(await createDefaultLifecycle().dependencies(enabled, fakeDb)),
+      }),
+    ).rejects.toThrow("Client catalog runtime capability is required");
+
+    const resolver = { resolve: async () => null };
+    const injected = await createDefaultLifecycle({
+      clientCatalogComposition: { principals: resolver },
+    }).dependencies(enabled, fakeDb);
+    expect(injected.clientCatalogService).toBeDefined();
+    expect(injected.clientPrincipal).toBe(resolver);
+  });
   it("composes the durable expert AI receipt store only with an injected source capability", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),

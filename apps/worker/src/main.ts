@@ -5,14 +5,25 @@ import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
 import {
   createDb,
+  PostgresCatalogRepository,
+  PostgresClientCatalogRepository,
   PostgresExpertReferralWorkerRepository,
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
-import { recordWorkerOutboxMetric } from "@ii-tonya/observability";
+import {
+  recordClientCatalogMetric,
+  recordWorkerOutboxMetric,
+} from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
+import {
+  createClientCatalogOutboxRegistry,
+  createClientCatalogSourceReader,
+  CLIENT_CATALOG_OUTBOX_TOPICS,
+  type ClientCatalogOutboxRegistry,
+} from "./client-catalog-outbox.js";
 import {
   createProductionWorkerRuntime,
   disabledExpertResidencyProviderReader,
@@ -22,6 +33,7 @@ import {
   boundedFullJitterDelay,
   createLocalOperatorCaseOutboxRegistry,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  runClientCatalogRetention,
   runOutboxBatch,
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
@@ -29,6 +41,7 @@ import {
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
+type BoundedJob = () => Promise<unknown>;
 
 export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
@@ -37,7 +50,8 @@ export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly workerOutboxRegistryFactory?: (
     db: DrizzleDb,
-  ) => LocalOperatorCaseOutboxRegistry;
+    config: RuntimeConfig,
+  ) => WorkerOutboxRegistry;
 }
 export interface WorkerLoopOptions {
   readonly signal: AbortSignal;
@@ -57,35 +71,76 @@ const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
 export { disabledExpertResidencyProviderReader };
 
-export function selectWorkerOutboxRegistry<T>(
+type WorkerOutboxRegistry =
+  | LocalOperatorCaseOutboxRegistry
+  | ClientCatalogOutboxRegistry;
+
+export function selectWorkerOutboxRegistry(
   config: RuntimeConfig,
-  factory?: () => T,
-): LocalOperatorCaseOutboxRegistry | undefined {
+  factory?: () => unknown,
+): WorkerOutboxRegistry | undefined {
   if (config.features.workerOutboxDelivery !== true) return undefined;
   if (factory === undefined) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
-  return requireWorkerOutboxRegistry(factory());
+  return requireWorkerOutboxRegistry(
+    factory(),
+    config.features.clientCatalog === true
+      ? CLIENT_CATALOG_OUTBOX_TOPICS
+      : LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  );
+}
+
+export function selectClientCatalogRetention(
+  config: RuntimeConfig,
+  factory?: () => BoundedJob,
+): BoundedJob | undefined {
+  if (
+    config.features.workerOutboxDelivery !== true ||
+    config.features.clientCatalog !== true
+  ) {
+    return undefined;
+  }
+  if (factory === undefined) {
+    throw new Error("client_catalog_retention_capability_unavailable");
+  }
+  const job = factory();
+  if (typeof job !== "function") {
+    throw new Error("client_catalog_retention_capability_unavailable");
+  }
+  return job;
 }
 
 function requireWorkerOutboxRegistry(
   value: unknown,
-): LocalOperatorCaseOutboxRegistry {
+  expectedTopics?: readonly string[],
+): WorkerOutboxRegistry {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
-  const registry = value as Partial<LocalOperatorCaseOutboxRegistry>;
+  const registry = value as Partial<WorkerOutboxRegistry>;
+  const topics = registry.topics;
+  const acceptedTopics =
+    topics !== undefined &&
+    [LOCAL_OPERATOR_CASE_OUTBOX_TOPICS, CLIENT_CATALOG_OUTBOX_TOPICS].some(
+      (candidate) =>
+        topics.length === candidate.length &&
+        topics.every((topic, index) => topic === candidate[index]),
+    );
+  const expected =
+    expectedTopics === undefined ||
+    (topics !== undefined &&
+      topics.length === expectedTopics.length &&
+      topics.every((topic, index) => topic === expectedTopics[index]));
   if (
-    registry.topics?.length !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length ||
-    registry.topics.some(
-      (topic, index) => topic !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
-    ) ||
+    !acceptedTopics ||
+    !expected ||
     typeof registry.dispatch !== "function" ||
     typeof registry.reconcile !== "function"
   ) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
-  return registry as LocalOperatorCaseOutboxRegistry;
+  return registry as WorkerOutboxRegistry;
 }
 
 type WorkerOutboxMetricRecorder = (
@@ -170,12 +225,21 @@ export function createProductionWorkerRuntimeFactory(
         config,
         deps.workerOutboxRegistryFactory === undefined
           ? undefined
-          : () => deps.workerOutboxRegistryFactory!(db),
+          : () => deps.workerOutboxRegistryFactory!(db, config),
       );
       const workerOutbox =
         workerOutboxRegistry === undefined
           ? undefined
           : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
+      const clientCatalogRetention = selectClientCatalogRetention(config, () => {
+        const repository = new PostgresClientCatalogRepository(db);
+        return () =>
+          runClientCatalogRetention(
+            { repository, metrics: { record: recordClientCatalogMetric } },
+            new Date(),
+            100,
+          );
+      });
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
@@ -192,6 +256,9 @@ export function createProductionWorkerRuntimeFactory(
               workerOutboxRegistry: workerOutbox.registry,
               workerOutboxRunner: workerOutbox.run,
             }),
+        ...(clientCatalogRetention === undefined
+          ? {}
+          : { clientCatalogRetention }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),
@@ -201,10 +268,19 @@ export function createProductionWorkerRuntimeFactory(
 }
 
 const productionRuntimeFactory = createProductionWorkerRuntimeFactory({
-  workerOutboxRegistryFactory: (db) =>
-    createLocalOperatorCaseOutboxRegistry(
+  workerOutboxRegistryFactory: (db, config) => {
+    const local = createLocalOperatorCaseOutboxRegistry(
       new PostgresOperatorCaseOutboxRepository(db),
-    ),
+    );
+    if (config.features.clientCatalog !== true) return local;
+    return createClientCatalogOutboxRegistry({
+      local,
+      requests: new PostgresClientCatalogRepository(db),
+      source: createClientCatalogSourceReader(
+        new PostgresCatalogRepository(db),
+      ),
+    });
+  },
 });
 
 function waitForNextCycle(

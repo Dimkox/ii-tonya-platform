@@ -72,6 +72,7 @@ const schema = z
       .enum(["true", "false"])
       .default("false"),
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
@@ -242,6 +243,7 @@ export type RuntimeConfig = {
   displayTimezone: string;
   features: {
     workerOutboxDelivery: boolean;
+    clientCatalog: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
@@ -301,6 +303,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     displayTimezone: value.DISPLAY_TIMEZONE,
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
+      clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",

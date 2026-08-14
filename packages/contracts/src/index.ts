@@ -5,7 +5,9 @@ export type { EventEnvelope } from "./events.js";
 export { toUtcIso } from "./time.js";
 export type { Clock } from "./time.js";
 export {
+  CLIENT_CATALOG_OUTBOX_TOPICS,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  type ClientCatalogOutboxTopic,
   type LocalOperatorCaseOutboxTopic,
 } from "./worker-outbox.js";
 export {

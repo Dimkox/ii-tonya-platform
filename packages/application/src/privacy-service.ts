@@ -32,6 +32,11 @@ export interface SubjectExport {
   readonly reservations: readonly { id: string; status: string; startsAt?: string }[];
   readonly feedback: readonly { reservationId: string; rating: number }[];
   readonly messageAccounting: { packageCount: number; eventCount: number; ledgerEntryCount: number };
+  readonly catalogSnapshots: readonly {
+    catalogRequestId: string;
+    expiresAt: string;
+    cards: readonly Record<string, unknown>[];
+  }[];
 }
 
 export interface ErasureJob {

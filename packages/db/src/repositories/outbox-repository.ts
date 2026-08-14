@@ -1,40 +1,51 @@
 import { sql } from "drizzle-orm";
 import {
+  CLIENT_CATALOG_OUTBOX_TOPICS,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
-  type LocalOperatorCaseOutboxTopic,
+  type ClientCatalogOutboxTopic,
 } from "@ii-tonya/contracts";
 import type { DrizzleDb } from "../client.js";
 
 const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
-type LocalOperatorCaseTopics = typeof LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
+type WorkerOutboxTopics =
+  | typeof LOCAL_OPERATOR_CASE_OUTBOX_TOPICS
+  | typeof CLIENT_CATALOG_OUTBOX_TOPICS;
 export interface OutboxRecoveryCount {
-  readonly topic: LocalOperatorCaseOutboxTopic;
+  readonly topic: ClientCatalogOutboxTopic;
   readonly count: number;
 }
 
 function validateTopicAllowlist(
   topics: readonly string[] | undefined,
-): LocalOperatorCaseTopics | undefined {
+): WorkerOutboxTopics | undefined {
   if (topics === undefined) return undefined;
-  if (
-    topics.length !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length ||
-    topics.some(
-      (topic, index) => topic !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
-    )
-  ) {
+  const local =
+    topics.length === LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length &&
+    topics.every(
+      (topic, index) => topic === LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
+    );
+  const clientCatalog =
+    topics.length === CLIENT_CATALOG_OUTBOX_TOPICS.length &&
+    topics.every(
+      (topic, index) => topic === CLIENT_CATALOG_OUTBOX_TOPICS[index],
+    );
+  if (!local && !clientCatalog) {
     throw new Error("worker_outbox_topic_allowlist_invalid");
   }
-  return LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
+  return clientCatalog
+    ? CLIENT_CATALOG_OUTBOX_TOPICS
+    : LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
 }
 
-function topicPredicate(topics: LocalOperatorCaseTopics | undefined) {
-  return topics === undefined
-    ? sql``
+function topicPredicate(topics: WorkerOutboxTopics | undefined) {
+  if (topics === undefined) return sql``;
+  return topics.length === CLIENT_CATALOG_OUTBOX_TOPICS.length
+    ? sql` and topic in (${topics[0]}, ${topics[1]}, ${topics[2]})`
     : sql` and topic in (${topics[0]}, ${topics[1]})`;
 }
 
 function recoveryCounts(
-  topics: LocalOperatorCaseTopics | undefined,
+  topics: WorkerOutboxTopics | undefined,
   rows: readonly { topic: string }[],
 ): readonly OutboxRecoveryCount[] {
   if (topics === undefined) {
@@ -49,7 +60,7 @@ function recoveryCounts(
 }
 
 function recoveryCountAggregates(
-  topics: LocalOperatorCaseTopics,
+  topics: WorkerOutboxTopics,
   rows: readonly { topic: string; count: number | string }[],
 ): readonly OutboxRecoveryCount[] {
   return topics.flatMap((topic) => {
@@ -63,8 +74,8 @@ function recoveryCountAggregates(
 }
 
 function requireRecoveryTopics(
-  topics: LocalOperatorCaseTopics | undefined,
-): LocalOperatorCaseTopics {
+  topics: WorkerOutboxTopics | undefined,
+): WorkerOutboxTopics {
   if (topics === undefined) {
     throw new Error("worker_outbox_topic_allowlist_required");
   }
@@ -226,7 +237,7 @@ function requireReconciliationLease(
 async function terminalizeDispatchExhausted(
   tx: Transaction,
   maxAttempts: number,
-  topics: LocalOperatorCaseTopics | undefined,
+  topics: WorkerOutboxTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -256,7 +267,7 @@ async function terminalizeDispatchExhausted(
 async function terminalizeReconciliationExhausted(
   tx: Transaction,
   maxAttempts: number,
-  topics: LocalOperatorCaseTopics | undefined,
+  topics: WorkerOutboxTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -293,7 +304,7 @@ async function terminalizeReconciliationExhausted(
 async function terminalizeDispatchExhaustedByTopic(
   tx: Transaction,
   maxAttempts: number,
-  topics: LocalOperatorCaseTopics,
+  topics: WorkerOutboxTopics,
   limit: number,
 ): Promise<readonly OutboxRecoveryCount[]> {
   const result = await tx.execute<{
@@ -331,7 +342,7 @@ async function terminalizeDispatchExhaustedByTopic(
 async function terminalizeReconciliationExhaustedByTopic(
   tx: Transaction,
   maxAttempts: number,
-  topics: LocalOperatorCaseTopics,
+  topics: WorkerOutboxTopics,
   limit: number,
 ): Promise<readonly OutboxRecoveryCount[]> {
   const result = await tx.execute<{
@@ -403,7 +414,7 @@ async function writeDeadLetterAndAlert(
 }
 
 export class PostgresOutboxRepository {
-  private readonly topics: LocalOperatorCaseTopics | undefined;
+  private readonly topics: WorkerOutboxTopics | undefined;
 
   constructor(
     private readonly db: DrizzleDb,

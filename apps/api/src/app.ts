@@ -2,6 +2,8 @@ import type {
   AdminService,
   BookingService,
   CatalogService,
+  ClientCatalogService,
+  ClientPrincipalResolver,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
@@ -42,6 +44,7 @@ import {
   type YooKassaWebhookDependencies,
 } from "./routes/yookassa-webhook.js";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
+import { clientCatalogRoutes } from "./routes/client-catalog.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -72,6 +75,8 @@ export interface AppDependencies {
   expertAiRequests?: ExpertAiRequestLedger;
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
+  clientCatalogService?: ClientCatalogService;
+  clientPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -117,6 +122,12 @@ export async function buildApp(
   ) {
     throw new Error("Expert AI ingress runtime capability is required");
   }
+  if (
+    deps.config.features.clientCatalog === true &&
+    (deps.clientCatalogService === undefined || deps.clientPrincipal === undefined)
+  ) {
+    throw new Error("Client catalog runtime capability is required");
+  }
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -134,6 +145,16 @@ export async function buildApp(
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  if (
+    deps.config.features.clientCatalog === true &&
+    deps.clientCatalogService !== undefined &&
+    deps.clientPrincipal !== undefined
+  ) {
+    await app.register(clientCatalogRoutes, {
+      catalog: deps.clientCatalogService,
+      principals: deps.clientPrincipal,
+    });
+  }
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }
@@ -306,6 +327,8 @@ export async function buildTestApp(
       "resolvePrincipal"
     >;
     yookassaWebhook?: YooKassaWebhookDependencies;
+    clientCatalogService?: ClientCatalogService;
+    clientPrincipal?: ClientPrincipalResolver;
     features?: RuntimeConfig["features"];
   } = {},
 ): Promise<TestApp> {
@@ -352,6 +375,8 @@ export async function buildTestApp(
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
       features: options.features ?? {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
       },
@@ -440,6 +465,12 @@ export async function buildTestApp(
     ...(options.yookassaWebhook === undefined
       ? {}
       : { yookassaWebhook: options.yookassaWebhook }),
+    ...(options.clientCatalogService === undefined
+      ? {}
+      : { clientCatalogService: options.clientCatalogService }),
+    ...(options.clientPrincipal === undefined
+      ? {}
+      : { clientPrincipal: options.clientPrincipal }),
     ...(options.now === undefined
       ? {}
       : { now: () => new Date(options.now!()) }),

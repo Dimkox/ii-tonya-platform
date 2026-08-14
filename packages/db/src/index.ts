@@ -32,7 +32,15 @@ export {
   PostgresCatalogRepository,
   type CatalogEligibilityQuery,
   type CatalogExpertRecord,
+  type PublicCatalogServiceRecord,
 } from "./repositories/catalog-repository.js";
+export {
+  PostgresClientCatalogRepository,
+  type ClientCatalogCard,
+  type ClientCatalogRequestRepository,
+  type ClientCatalogSlot,
+  type ClientCatalogSnapshot,
+} from "./repositories/client-catalog-repository.js";
 export {
   CompensationConflictError,
   ConversationCompletionDataError,

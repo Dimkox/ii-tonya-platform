@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { messageEvents } from "./billing.js";
+import { users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -182,6 +183,102 @@ export const integrationOutbox = pgTable(
     index("integration_outbox_reconciliation_lease")
       .on(table.status, table.reconciliationLeaseUntil)
       .where(sql`${table.status} = 'reconciling'`),
+  ],
+);
+
+export const clientCatalogRequests = pgTable(
+  "client_catalog_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestDigest: char("request_digest", { length: 64 }).notNull(),
+    serviceCode: text("service_code"),
+    language: text("language"),
+    state: text("state").notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '24 hours'`),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("client_catalog_requests_user_digest_unique").on(
+      table.userId,
+      table.requestDigest,
+    ),
+    check(
+      "client_catalog_requests_digest_check",
+      sql`${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_catalog_requests_state_check",
+      sql`${table.state} in ('pending','ready')`,
+    ),
+    check(
+      "client_catalog_requests_filters_check",
+      sql`(${table.serviceCode} is null or (char_length(${table.serviceCode}) between 1 and 64 and ${table.serviceCode} !~ '[[:cntrl:]]')) and (${table.language} is null or (char_length(${table.language}) between 1 and 32 and ${table.language} !~ '[[:cntrl:]]'))`,
+    ),
+    check(
+      "client_catalog_requests_time_check",
+      sql`${table.expiresAt} >= ${table.createdAt} and ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+    index("client_catalog_requests_expiry_idx")
+      .on(table.expiresAt, table.id)
+      .where(sql`${table.state} in ('pending','ready')`),
+  ],
+);
+
+export const clientCatalogSnapshots = pgTable(
+  "client_catalog_snapshots",
+  {
+    requestId: uuid("request_id")
+      .primaryKey()
+      .references(() => clientCatalogRequests.id, { onDelete: "cascade" }),
+    cards: jsonb("cards").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    check(
+      "client_catalog_snapshots_cards_check",
+      sql`jsonb_typeof(${table.cards}) = 'array' and jsonb_array_length(${table.cards}) <= 20`,
+    ),
+    check(
+      "client_catalog_snapshots_expiry_check",
+      sql`${table.expiresAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const clientCatalogTombstones = pgTable(
+  "client_catalog_tombstones",
+  {
+    requestId: uuid("request_id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    state: text("state").notNull().default("expired"),
+  },
+  (table) => [
+    check("client_catalog_tombstones_state_check", sql`${table.state} = 'expired'`),
+  ],
+);
+
+export const clientCatalogErasureIndex = pgTable(
+  "client_catalog_erasure_index",
+  {
+    requestId: uuid("request_id").primaryKey(),
+    subjectKey: char("subject_key", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "client_catalog_erasure_index_subject_check",
+      sql`${table.subjectKey} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("client_catalog_erasure_index_subject_idx").on(
+      table.subjectKey,
+      table.requestId,
+    ),
   ],
 );
 export const deliveryAttempts = pgTable("delivery_attempts", {

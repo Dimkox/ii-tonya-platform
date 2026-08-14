@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import {
+  clientCatalogErasureSubjectKey,
+  validateClientCatalogCards,
+  type ClientCatalogCard,
+} from "./client-catalog-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 export interface WithdrawConsentCommand {
@@ -22,6 +27,11 @@ export interface SubjectExport {
   readonly reservations: readonly { id: string; status: string; startsAt?: string }[];
   readonly feedback: readonly { reservationId: string; rating: number }[];
   readonly messageAccounting: { packageCount: number; eventCount: number; ledgerEntryCount: number };
+  readonly catalogSnapshots: readonly {
+    catalogRequestId: string;
+    expiresAt: string;
+    cards: readonly ClientCatalogCard[];
+  }[];
 }
 export interface StartErasureCommand {
   readonly targetUserId: string;
@@ -152,6 +162,23 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     const feedback = (await this.db.execute<{ reservationId: string; rating: number }>(sql`
       select reservation_id as "reservationId", rating from feedback where user_id = ${userId}::uuid order by created_at, id
     `)).rows;
+    const catalogSnapshots = (await this.db.execute<{
+      catalogRequestId: string;
+      expiresAt: Date | string;
+      cards: unknown;
+    }>(sql`
+      select r.id as "catalogRequestId",s.expires_at as "expiresAt",s.cards
+      from client_catalog_requests r
+      join client_catalog_snapshots s on s.request_id=r.id
+      where r.user_id=${userId}::uuid and r.state='ready'
+      order by r.created_at,r.id
+    `)).rows.map((row) => {
+      return {
+        catalogRequestId: row.catalogRequestId,
+        expiresAt: new Date(row.expiresAt).toISOString(),
+        cards: validateClientCatalogCards(row.cards),
+      };
+    });
     const counts = one((await this.db.execute<{ packageCount: number; eventCount: number; ledgerEntryCount: number }>(sql`
       select
         (select count(*)::integer from message_packages where user_id = ${userId}::uuid) as "packageCount",
@@ -171,6 +198,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       messageAccounting: {
         packageCount: Number(counts.packageCount), eventCount: Number(counts.eventCount), ledgerEntryCount: Number(counts.ledgerEntryCount),
       },
+      catalogSnapshots,
     };
   }
 
@@ -189,6 +217,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     captureManifests: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["captureManifests"]>,
     verifyEnvelope: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["verifyEnvelope"]>,
   ): Promise<ErasureJob> {
+    const catalogSubjectKey = clientCatalogErasureSubjectKey(
+      command.targetUserId,
+    );
     const manifests = await captureManifests(command.targetUserId);
     const verified = await Promise.all(manifests.map(async (manifest) => {
       try { return await verifyEnvelope(manifest); } catch { return false; }
@@ -215,6 +246,45 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
         select display_name as "displayName", timezone, expert_note as "expertNote" from client_profiles where user_id = ${command.targetUserId}::uuid for update
       `)).rows[0];
+      await tx.execute(sql`
+        select o.id as "outboxId"
+        from integration_outbox o
+        join client_catalog_erasure_index e
+          on o.idempotency_key='client-catalog:' || e.request_id::text
+        where e.subject_key=${catalogSubjectKey}
+          and o.topic='catalog.show'
+        order by o.id
+        for update of o
+      `);
+      await tx.execute(sql`
+        select id from client_catalog_requests
+        where user_id=${command.targetUserId}::uuid
+        order by id for update
+      `);
+      await tx.execute(sql`
+        select t.request_id from client_catalog_tombstones t
+        join client_catalog_erasure_index e on e.request_id=t.request_id
+        where e.subject_key=${catalogSubjectKey}
+        order by t.request_id for update of t
+      `);
+      await tx.execute(sql`
+        select request_id from client_catalog_erasure_index
+        where subject_key=${catalogSubjectKey}
+        order by request_id for update
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_requests
+        where user_id=${command.targetUserId}::uuid
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_tombstones t
+        using client_catalog_erasure_index e
+        where e.request_id=t.request_id and e.subject_key=${catalogSubjectKey}
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_erasure_index
+        where subject_key=${catalogSubjectKey}
+      `);
       const job = one((await tx.execute<{ id: string }>(sql`
         insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)
         values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}, ${hash({ userId: command.targetUserId, kind: "legacy_provider_identifier_evidence" })}) returning id
