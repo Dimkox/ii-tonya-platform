@@ -23,6 +23,9 @@ WHERE source."id" = alerts."outbox_id"
   AND source."topic" = 'safety.operator_escalation'
   AND alerts."reason_code" = 'safety_operator_escalation';
 --> statement-breakpoint
+UPDATE "outbox_operator_alerts"
+SET "updated_at" = GREATEST("updated_at", "created_at");
+--> statement-breakpoint
 ALTER TABLE "outbox_operator_alerts" ADD CONSTRAINT "outbox_operator_alerts_case_type_check" CHECK ("case_type" IN ('safety','negative_feedback','delivery_failure'));
 --> statement-breakpoint
 ALTER TABLE "outbox_operator_alerts" ADD CONSTRAINT "outbox_operator_alerts_status_check" CHECK ("status" IN ('open','acknowledged','resolved'));

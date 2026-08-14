@@ -26,6 +26,14 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     );
     expect(migration).toContain("'open','acknowledged','resolved'");
     expect(migration).not.toContain('CHECK ("reason_code" ~');
+    expect(migration.indexOf('SET "updated_at" = GREATEST')).toBeGreaterThan(
+      0,
+    );
+    expect(migration.indexOf('SET "updated_at" = GREATEST')).toBeLessThan(
+      migration.indexOf(
+        'ADD CONSTRAINT "outbox_operator_alerts_lifecycle_check"',
+      ),
+    );
   });
 
   it("materializes locally without a network or notifier capability", async () => {

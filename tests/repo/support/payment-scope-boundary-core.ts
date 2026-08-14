@@ -608,7 +608,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0028_operator_case_inbox.sql",
-    "d24250e5a54a3078c48a022e20487819056b72542930d2c3a002900972284044",
+    "ae71d45564466e71f3efa4c3c96227d28ea21af2483ff1c2c14b60210ba22d4c",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
