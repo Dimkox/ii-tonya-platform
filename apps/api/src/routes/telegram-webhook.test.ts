@@ -428,9 +428,10 @@ describe("Telegram webhook callback boundary", () => {
           },
         },
       });
-      expect(response.statusCode).toBe(200);
-      expect(state.complete).toHaveBeenCalledWith("claim-1");
-      expect(state.fail).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_query_unavailable" });
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
     } finally {
       await state.app.close();
     }

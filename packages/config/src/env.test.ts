@@ -27,6 +27,8 @@ describe("loadEnv", () => {
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
+      expertTelegramFinancialViews: false,
+      yookassa: false,
     });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(() =>
@@ -70,6 +72,16 @@ describe("loadEnv", () => {
     expect(
       loadEnv(localEnv({ EXPERT_TELEGRAM_QUERIES_ENABLED: "true" })).features
         .expertTelegramQueries,
+    ).toBe(true);
+  });
+
+  it("defaults expert Telegram financial views off and exposes an independent flag", () => {
+    expect(loadEnv(localEnv()).features.expertTelegramFinancialViews).toBe(
+      false,
+    );
+    expect(
+      loadEnv(localEnv({ EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED: "true" }))
+        .features.expertTelegramFinancialViews,
     ).toBe(true);
   });
 

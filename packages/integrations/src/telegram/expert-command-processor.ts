@@ -4,7 +4,7 @@ import type {
 } from "./telegram-adapter.js";
 import type { TelegramSendOutcome } from "./telegram-adapter.js";
 
-interface QueryPrincipal {
+export interface ExpertTelegramCommandPrincipal {
   readonly userId: string;
   readonly expertId: string;
   readonly telegramUserId: string;
@@ -48,7 +48,7 @@ interface ResidencyQueryService {
 }
 
 interface QueryService {
-  schedule(principal: QueryPrincipal): Promise<{
+  schedule(principal: ExpertTelegramCommandPrincipal): Promise<{
     readonly timezone: string;
     readonly appointments: readonly {
       readonly startsAt: string;
@@ -58,21 +58,21 @@ interface QueryService {
       readonly meetingUrl?: string;
     }[];
   }>;
-  clientChoices(principal: QueryPrincipal): Promise<
+  clientChoices(principal: ExpertTelegramCommandPrincipal): Promise<
     readonly {
       readonly startsAt: string;
       readonly serviceName: string;
       readonly callbackData: string;
     }[]
   >;
-  stats(principal: QueryPrincipal): Promise<{
+  stats(principal: ExpertTelegramCommandPrincipal): Promise<{
     readonly upcoming: number;
     readonly completed: number;
     readonly cancelled: number;
     readonly noShow: number;
   }>;
   clientView(command: {
-    readonly principal: QueryPrincipal;
+    readonly principal: ExpertTelegramCommandPrincipal;
     readonly authenticated: {
       readonly tokenHash: string;
       readonly claims: {
@@ -96,7 +96,7 @@ export interface ExpertCommandProcessor {
   processCommand(command: {
     readonly text: string;
     readonly chatType: string;
-    readonly principal: QueryPrincipal;
+    readonly principal: ExpertTelegramCommandPrincipal;
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<{
@@ -104,7 +104,7 @@ export interface ExpertCommandProcessor {
     readonly deliveryOutcome?: "applied" | "unknown_outcome";
   }>;
   processClientView(command: {
-    readonly principal: QueryPrincipal;
+    readonly principal: ExpertTelegramCommandPrincipal;
     readonly authenticated: Parameters<
       QueryService["clientView"]
     >[0]["authenticated"];
@@ -148,7 +148,7 @@ export const createExpertCommandProcessor = (deps: {
     throw new Error("Expert Telegram financial query capability is required");
   }
   const financialPrincipal = (
-    principal: QueryPrincipal,
+    principal: ExpertTelegramCommandPrincipal,
   ): FinancialPrincipal => ({
     authenticated: true,
     userId: principal.userId,

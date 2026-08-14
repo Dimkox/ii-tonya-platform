@@ -303,13 +303,19 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             return { accepted: true, duplicate: true };
           }
           try {
-            await deps.expertQueries.processCommand({
+            const processResult = await deps.expertQueries.processCommand({
               text,
               chatType: "private",
               principal,
               idempotencyKey: `telegram:${updateId}:command`,
               correlationId,
             });
+            if (processResult.deliveryOutcome === "unknown_outcome") {
+              await deps.inbox.fail(claim.claimId);
+              return reply
+                .code(503)
+                .send({ error: "expert_query_unavailable" });
+            }
             await deps.inbox.complete(claim.claimId);
           } catch {
             await deps.inbox.fail(claim.claimId);

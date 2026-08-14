@@ -187,3 +187,7 @@ export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
 } from "./telegram/expert-command-processor.js";
+export {
+  createExpertTelegramIngress,
+  type ExpertTelegramIngressFactoryDependencies,
+} from "./telegram/expert-ingress-factory.js";
