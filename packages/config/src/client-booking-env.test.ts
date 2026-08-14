@@ -20,6 +20,8 @@ describe("client booking environment", () => {
     expect(
       loadEnv(
         base({
+          CLIENT_SESSION_ENABLED: "true",
+          CLIENT_CATALOG_ENABLED: "true",
           CLIENT_BOOKING_ENABLED: "true",
           CLIENT_BOOKING_RESERVE_ENABLED: "true",
           CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: "30",
