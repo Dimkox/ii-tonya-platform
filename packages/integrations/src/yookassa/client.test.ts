@@ -39,6 +39,7 @@ const payment = {
   amount: { value: "500.00", currency: "RUB" },
   test: true,
   created_at: "2026-08-14T10:00:00.000Z",
+  captured_at: "2026-08-14T10:05:00.000Z",
   metadata: { order_id: "order-7" },
   confirmation: {
     type: "redirect",
@@ -79,6 +80,7 @@ describe("YooKassaClient", () => {
     });
     expect(result).not.toHaveProperty("payment_method");
     expect(result).not.toHaveProperty("recipient");
+    expect(result.capturedAt).toBe("2026-08-14T10:05:00.000Z");
   });
 
   it.each([

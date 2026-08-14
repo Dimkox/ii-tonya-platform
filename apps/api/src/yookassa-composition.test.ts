@@ -14,6 +14,7 @@ const capability = (): YooKassaWebhookDependencies => ({
   },
   verify: vi.fn(async () => ({ verified: true }) as never),
   deliver: vi.fn(async () => undefined),
+  resolveSucceeded: vi.fn(async () => undefined),
 });
 
 const enabledFeatures = {

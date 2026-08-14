@@ -17,6 +17,9 @@ export interface YooKassaWebhookDependencies {
   readonly deliver: (
     event: VerifiedExpertResidencyPaymentEvent,
   ) => Promise<void>;
+  readonly resolveSucceeded: (
+    notification: YooKassaNotification,
+  ) => Promise<void>;
 }
 
 const ipv4 = (value: string): number | null => {
@@ -79,7 +82,10 @@ export async function yookassaWebhookRoutes(
       }
       try {
         const event = await deps.verify(parsed.data);
-        if (event !== null) await deps.deliver(event);
+        if (event !== null) {
+          await deps.deliver(event);
+          await deps.resolveSucceeded(parsed.data);
+        }
         await deps.inbox.complete(claim.claimId);
         return reply.send({ accepted: true });
       } catch {

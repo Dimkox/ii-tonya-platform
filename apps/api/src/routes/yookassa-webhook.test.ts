@@ -4,6 +4,7 @@ import {
   isYooKassaWebhookPeer,
   yookassaWebhookRoutes,
 } from "./yookassa-webhook.js";
+import type { YooKassaWebhookDependencies } from "./yookassa-webhook.js";
 
 const notification = {
   type: "notification",
@@ -15,15 +16,15 @@ const build = async (peer = "185.71.76.4") => {
   const dependencies = {
     effectivePeerAddress: vi.fn(() => peer),
     inbox: {
-      claim: vi.fn(async () => ({
-        kind: "claimed" as const,
-        claimId: "claim-1",
-      })),
+      claim: vi.fn<YooKassaWebhookDependencies["inbox"]["claim"]>(
+        async () => ({ kind: "claimed", claimId: "claim-1" }),
+      ),
       complete: vi.fn(async () => undefined),
       fail: vi.fn(async () => undefined),
     },
     verify: vi.fn(async () => ({ verified: true }) as never),
     deliver: vi.fn(async () => undefined),
+    resolveSucceeded: vi.fn(async () => undefined),
   };
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false } } });
   await app.register(yookassaWebhookRoutes, dependencies);
@@ -46,7 +47,18 @@ describe("YooKassa webhook boundary", () => {
     expect(response.statusCode).toBe(200);
     expect(dependencies.verify).toHaveBeenCalledOnce();
     expect(dependencies.deliver).toHaveBeenCalledOnce();
+    expect(dependencies.resolveSucceeded).toHaveBeenCalledWith({
+      type: notification.type,
+      event: notification.event,
+      object: { id: notification.object.id },
+    });
     expect(dependencies.inbox.complete).toHaveBeenCalledWith("claim-1");
+    expect(dependencies.deliver).toHaveBeenCalledBefore(
+      dependencies.resolveSucceeded,
+    );
+    expect(dependencies.resolveSucceeded).toHaveBeenCalledBefore(
+      dependencies.inbox.complete,
+    );
     await app.close();
   });
 
@@ -73,6 +85,7 @@ describe("YooKassa webhook boundary", () => {
     });
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain("sensitive");
+    expect(dependencies.resolveSucceeded).not.toHaveBeenCalled();
     expect(dependencies.inbox.fail).toHaveBeenCalledWith("claim-1");
     await app.close();
   });
@@ -88,6 +101,35 @@ describe("YooKassa webhook boundary", () => {
     });
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain("stale claim");
+    await app.close();
+  });
+
+  it("retries idempotent delivery after stale inbox completion follows resolution", async () => {
+    const { app, dependencies } = await build();
+    dependencies.inbox.complete
+      .mockRejectedValueOnce(new Error("stale claim"))
+      .mockResolvedValueOnce(undefined);
+    dependencies.inbox.claim
+      .mockResolvedValueOnce({ kind: "claimed", claimId: "claim-1" })
+      .mockResolvedValueOnce({ kind: "claimed", claimId: "claim-2" });
+
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+    const retry = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+
+    expect(first.statusCode).toBe(503);
+    expect(retry.statusCode).toBe(200);
+    expect(dependencies.verify).toHaveBeenCalledTimes(2);
+    expect(dependencies.deliver).toHaveBeenCalledTimes(2);
+    expect(dependencies.resolveSucceeded).toHaveBeenCalledTimes(2);
+    expect(dependencies.inbox.complete).toHaveBeenLastCalledWith("claim-2");
     await app.close();
   });
 

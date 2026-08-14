@@ -30,6 +30,7 @@ export const yooKassaPaymentSchema = z
     amount,
     test: z.boolean(),
     created_at: z.iso.datetime({ offset: true }),
+    captured_at: z.iso.datetime({ offset: true }).optional(),
     metadata,
     confirmation: confirmation.optional(),
     refundable: z.boolean(),
@@ -42,6 +43,9 @@ export const yooKassaPaymentSchema = z
     amount: { value: value.amount.value, currency: value.amount.currency },
     test: value.test,
     createdAt: value.created_at,
+    ...(value.captured_at === undefined
+      ? {}
+      : { capturedAt: value.captured_at }),
     metadata: value.metadata,
     ...(value.confirmation === undefined
       ? {}

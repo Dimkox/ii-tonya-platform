@@ -111,4 +111,47 @@ describe("YooKassa webhook capability", () => {
       }),
     ).resolves.toBe(expected);
   });
+
+  it("resolves success only when explicitly acknowledged after delivery", async () => {
+    const stored = operation("create_payment");
+    const operations = {
+      findByProviderObject: vi.fn(async () => stored),
+      resolve: vi.fn(async () => undefined),
+    };
+    const capability = new YooKassaWebhookCapability(
+      operations as never,
+      { verifyPayment: vi.fn(), verifyRefund: vi.fn() } as never,
+    );
+
+    await capability.resolveSucceeded({
+      type: "notification",
+      event: "payment.succeeded",
+      object: { id: "payment-1" },
+    });
+
+    expect(operations.resolve).toHaveBeenCalledWith(stored.id, "succeeded");
+  });
+
+  it("treats an already succeeded operation as an idempotent acknowledgment", async () => {
+    const stored = { ...operation("create_payment"), status: "succeeded" as const };
+    const operations = {
+      findByProviderObject: vi.fn(async () => stored),
+      resolve: vi.fn(async () => {
+        throw new Error("must not resolve a terminal row again");
+      }),
+    };
+    const capability = new YooKassaWebhookCapability(
+      operations as never,
+      { verifyPayment: vi.fn(), verifyRefund: vi.fn() } as never,
+    );
+
+    await expect(
+      capability.resolveSucceeded({
+        type: "notification",
+        event: "payment.succeeded",
+        object: { id: "payment-1" },
+      }),
+    ).resolves.toBeUndefined();
+    expect(operations.resolve).not.toHaveBeenCalled();
+  });
 });
