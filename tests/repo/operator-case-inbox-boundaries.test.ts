@@ -8,6 +8,7 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     const migration = await readFile(migrationPath, "utf8");
     for (const column of [
       '"case_type"',
+      '"case_reason_code"',
       '"status"',
       '"rating"',
       '"content_hash"',
@@ -24,6 +25,7 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
       "'safety','negative_feedback','delivery_failure'",
     );
     expect(migration).toContain("'open','acknowledged','resolved'");
+    expect(migration).not.toContain('CHECK ("reason_code" ~');
   });
 
   it("materializes locally without a network or notifier capability", async () => {
@@ -43,6 +45,8 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
       "utf8",
     );
     expect(repository).not.toMatch(/as\s+"?(?:outboxId|payload)"?/u);
+    expect(repository).toContain('case_reason_code as "reasonCode"');
+    expect(repository).not.toContain('reason_code as "reasonCode"');
     expect(repository).toContain("for update");
     expect(repository).toContain("operator_case.transitioned");
   });

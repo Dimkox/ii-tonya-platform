@@ -31,6 +31,7 @@ const security = {
 };
 const feedbackId = "00000000-0000-4000-8000-000000000101";
 const handoffId = "00000000-0000-4000-8000-000000000102";
+const absentFeedbackId = "00000000-0000-4000-8000-000000000103";
 
 describe("durable operator case inbox on shared Claw PostgreSQL", () => {
   beforeAll(async () => {
@@ -73,6 +74,20 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
           metadata_hash text not null
         );`),
     );
+    await db.execute(sql`
+      insert into integration_outbox (id,topic,status,payload,created_at)
+      values (
+        '00000000-0000-4000-8000-000000000200','mail.delivery','dead_letter',
+        '{}','2026-08-14T09:58:00Z'
+      )
+    `);
+    await db.execute(sql`
+      insert into outbox_operator_alerts (outbox_id,reason_code,created_at)
+      values (
+        '00000000-0000-4000-8000-000000000200',
+        'Legacy Reason With Spaces / punctuation','2026-08-14T09:58:00Z'
+      )
+    `);
     const migration = await readFile(
       "packages/db/migrations/0028_operator_case_inbox.sql",
       "utf8",
@@ -88,6 +103,12 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
     `);
     await db.execute(sql`
       insert into integration_outbox (id,topic,payload,created_at) values
+      ('00000000-0000-4000-8000-000000000203','admin.negative_feedback',
+       ${JSON.stringify({ feedbackId: "not-a-uuid", rawText: "forbidden malformed feedback" })}::jsonb,
+       '2026-08-14T09:59:00Z'),
+      ('00000000-0000-4000-8000-000000000204','admin.negative_feedback',
+       ${JSON.stringify({ feedbackId: absentFeedbackId, rawText: "forbidden orphan feedback" })}::jsonb,
+       '2026-08-14T09:59:30Z'),
       ('00000000-0000-4000-8000-000000000201','safety.operator_escalation',
        ${JSON.stringify({ handoffId, rawDialogue: "forbidden safety narrative" })}::jsonb,
        '2026-08-14T10:00:00Z'),
@@ -101,7 +122,10 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
     await closeDb(db);
   });
 
-  it("materializes both local topics exactly once across concurrent workers", async () => {
+  it("quarantines invalid feedback sources without starving concurrent workers", async () => {
+    await expect(workerA.materializeOperatorCasesBatch(2)).resolves.toEqual({
+      materialized: 2,
+    });
     const reports = await Promise.all([
       workerA.materializeOperatorCasesBatch(10),
       workerB.materializeOperatorCasesBatch(10),
@@ -122,12 +146,34 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
         (select count(*)::text from integration_outbox where status='succeeded') as succeeded,
         (select string_agg(row_to_json(c)::text,'') from outbox_operator_alerts c) as stored
     `);
-    expect(facts.rows[0]).toMatchObject({ cases: "2", succeeded: "2" });
+    expect(facts.rows[0]).toMatchObject({ cases: "5", succeeded: "4" });
     expect(facts.rows[0]!.stored).not.toMatch(
       new RegExp(
-        `${feedbackId}|${handoffId}|forbidden private|forbidden safety|rawDialogue|rawText`,
+        `${feedbackId}|${handoffId}|${absentFeedbackId}|forbidden private|forbidden safety|forbidden malformed|forbidden orphan|rawDialogue|rawText`,
         "u",
       ),
+    );
+    const safeReasons = await db.execute<{
+      reasonCode: string;
+      caseType: string;
+    }>(sql`
+      select case_reason_code as "reasonCode",case_type as "caseType"
+      from outbox_operator_alerts
+      order by created_at,id
+    `);
+    expect(safeReasons.rows).toEqual(
+      expect.arrayContaining([
+        { reasonCode: "delivery_failure", caseType: "delivery_failure" },
+        {
+          reasonCode: "negative_feedback_source_invalid",
+          caseType: "delivery_failure",
+        },
+        {
+          reasonCode: "negative_feedback_policy",
+          caseType: "negative_feedback",
+        },
+        { reasonCode: "safety_operator_escalation", caseType: "safety" },
+      ]),
     );
   });
 

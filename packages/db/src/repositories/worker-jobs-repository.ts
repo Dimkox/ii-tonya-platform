@@ -297,6 +297,7 @@ export class PostgresWorkerJobsRepository {
             id as outbox_id,
             'safety'::text as case_type,
             'safety_operator_escalation'::text as reason_code,
+            'safety_operator_escalation'::text as case_reason_code,
             null::integer as rating,
             null::text as content_hash,
             null::text as policy_version,
@@ -306,14 +307,20 @@ export class PostgresWorkerJobsRepository {
           union all
           select
             claimed.id,
-            'negative_feedback',
-            'negative_feedback_policy',
+            case when feedback.id is null
+              then 'delivery_failure' else 'negative_feedback' end,
+            case when feedback.id is null
+              then 'negative_feedback_source_invalid'
+              else 'negative_feedback_policy' end,
+            case when feedback.id is null
+              then 'negative_feedback_source_invalid'
+              else 'negative_feedback_policy' end,
             feedback.rating,
             feedback.content_hash,
             feedback.negative_policy_version,
             claimed.created_at
           from claimed
-          join feedback on feedback.id=case
+          left join feedback on feedback.id=case
             when claimed.payload->>'feedbackId' ~
               '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
             then (claimed.payload->>'feedbackId')::uuid
@@ -321,11 +328,11 @@ export class PostgresWorkerJobsRepository {
           where claimed.topic='admin.negative_feedback'
         ), queued as (
           insert into outbox_operator_alerts (
-            outbox_id,reason_code,case_type,status,rating,content_hash,
+            outbox_id,reason_code,case_type,case_reason_code,status,rating,content_hash,
             policy_version,created_at,updated_at
           )
           select
-            outbox_id,reason_code,case_type,'open',rating,content_hash,
+            outbox_id,reason_code,case_type,case_reason_code,'open',rating,content_hash,
             policy_version,created_at,created_at
           from case_rows
           on conflict (outbox_id, reason_code) do update

@@ -18,6 +18,9 @@ idempotently; no external notifier is part of this story.
   timestamps. It never stores or returns feedback text, dialogue, safety
   narrative, user/expert/reservation/handoff/feedback identifiers, payment data
   or an outbox payload.
+  The shared alert relation retains its pre-existing delivery `reason_code`,
+  which may be legacy/unbounded; the inbox exposes only the new bounded
+  `case_reason_code` and never projects that legacy field.
 - **OPS-CASE-001-READ:** authenticated operators list unresolved cases through
   stable `(createdAt,id)` keyset pagination. `limit` is `1..100`; cursors and
   responses are bounded. Acknowledged cases remain unresolved and listable.

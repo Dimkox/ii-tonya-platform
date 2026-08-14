@@ -41,7 +41,7 @@ const projection = sql`
   case_type as type,
   status,
   rating,
-  reason_code as "reasonCode",
+  case_reason_code as "reasonCode",
   content_hash as "contentHash",
   policy_version as "policyVersion",
   created_at as "createdAt",

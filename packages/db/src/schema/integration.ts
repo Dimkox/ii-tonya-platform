@@ -219,6 +219,9 @@ export const outboxOperatorAlerts = pgTable(
       .references(() => integrationOutbox.id),
     reasonCode: text("reason_code").notNull(),
     caseType: text("case_type").notNull().default("delivery_failure"),
+    caseReasonCode: text("case_reason_code")
+      .notNull()
+      .default("delivery_failure"),
     status: text("status").notNull().default("open"),
     rating: integer("rating"),
     contentHash: text("content_hash"),
@@ -244,12 +247,12 @@ export const outboxOperatorAlerts = pgTable(
       sql`${table.status} in ('open','acknowledged','resolved')`,
     ),
     check(
-      "outbox_operator_alerts_reason_check",
-      sql`${table.reasonCode} ~ '^[a-z0-9][a-z0-9._:-]{0,127}$'`,
+      "outbox_operator_alerts_case_reason_check",
+      sql`${table.caseReasonCode} ~ '^[a-z0-9][a-z0-9._:-]{0,127}$'`,
     ),
     check(
       "outbox_operator_alerts_payload_check",
-      sql`(${table.caseType} = 'safety' and ${table.reasonCode} = 'safety_operator_escalation' and ${table.rating} is null and ${table.contentHash} is null and ${table.policyVersion} is null) or (${table.caseType} = 'negative_feedback' and ${table.reasonCode} = 'negative_feedback_policy' and ${table.rating} between 1 and 5 and ${table.contentHash} ~ '^[0-9a-f]{64}$' and ${table.policyVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$') or (${table.caseType} = 'delivery_failure' and ${table.rating} is null and ${table.contentHash} is null and ${table.policyVersion} is null)`,
+      sql`(${table.caseType} = 'safety' and ${table.caseReasonCode} = 'safety_operator_escalation' and ${table.rating} is null and ${table.contentHash} is null and ${table.policyVersion} is null) or (${table.caseType} = 'negative_feedback' and ${table.caseReasonCode} = 'negative_feedback_policy' and ${table.rating} between 1 and 5 and ${table.contentHash} ~ '^[0-9a-f]{64}$' and ${table.policyVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$') or (${table.caseType} = 'delivery_failure' and ${table.caseReasonCode} in ('delivery_failure','negative_feedback_source_invalid') and ${table.rating} is null and ${table.contentHash} is null and ${table.policyVersion} is null)`,
     ),
     check(
       "outbox_operator_alerts_lifecycle_check",
