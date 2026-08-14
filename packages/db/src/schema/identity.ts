@@ -56,9 +56,10 @@ export const clientIdentityProofReceipts = pgTable(
   "client_identity_proof_receipts",
   {
     replayDigest: text("replay_digest").primaryKey(),
-    sessionTokenDigest: char("session_token_digest", { length: 71 })
-      .unique("client_identity_proof_receipts_session_digest_unique")
-      .references(() => clientSessions.tokenDigest, { onDelete: "set null" }),
+    sessionTokenDigest: char("session_token_digest", { length: 71 }).references(
+      () => clientSessions.tokenDigest,
+      { onDelete: "set null" },
+    ),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt,
   },
@@ -74,6 +75,9 @@ export const clientIdentityProofReceipts = pgTable(
     check(
       "client_identity_proof_receipts_expiry_check",
       sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    unique("client_identity_proof_receipts_session_digest_unique").on(
+      table.sessionTokenDigest,
     ),
     index("client_identity_proof_receipts_expiry_idx").on(table.expiresAt),
   ],
