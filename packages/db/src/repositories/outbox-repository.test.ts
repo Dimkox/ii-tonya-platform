@@ -3,6 +3,30 @@ import type { DrizzleDb } from "../client.js";
 import { PostgresOutboxRepository } from "./outbox-repository.js";
 
 describe("PostgreSQL outbox repository", () => {
+  it.each([
+    ["empty", []],
+    [
+      "duplicate",
+      ["safety.operator_escalation", "safety.operator_escalation"],
+    ],
+    [
+      "unknown",
+      ["safety.operator_escalation", "provider.notification"],
+    ],
+    ["incomplete", ["safety.operator_escalation"]],
+  ])("rejects a %s enabled topic allowlist before SQL", (_name, topics) => {
+    const transaction = vi.fn();
+
+    expect(
+      () =>
+        new PostgresOutboxRepository(
+          { transaction } as unknown as DrizzleDb,
+          topics,
+        ),
+    ).toThrow("worker_outbox_topic_allowlist_invalid");
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it.each([0, -1, 1.5, 1_001, Number.NaN])(
     "rejects unsafe recovery limit %s before opening a transaction",
     async (limit) => {
