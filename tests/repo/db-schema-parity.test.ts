@@ -22,6 +22,7 @@ import {
   messageLedgerEntries,
   messagePackages,
   notifications,
+  outboxOperatorAlerts,
   privacyDeletionJobs,
   privacyDeletionManifests,
   privacyProcessorAttempts,
@@ -48,6 +49,20 @@ const names = (table: AnyPgTable) => {
 };
 
 describe("authoritative Drizzle schema parity", () => {
+  it("describes the operator case inbox invariants", () => {
+    expect(names(outboxOperatorAlerts)).toMatchObject({
+      checks: [
+        "outbox_operator_alerts_case_reason_check",
+        "outbox_operator_alerts_case_type_check",
+        "outbox_operator_alerts_lifecycle_check",
+        "outbox_operator_alerts_payload_check",
+        "outbox_operator_alerts_status_check",
+      ],
+      indexes: ["outbox_operator_alerts_unresolved_cursor_idx"],
+      uniques: ["outbox_operator_alerts_outbox_reason_unique"],
+    });
+  });
+
   it("exports every reviewed expert referral relation", () => {
     const expectedExports = [
       "expertReferralCodeBatches",
@@ -411,6 +426,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0027_expert_ai_request_receipts.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0028_operator_case_inbox.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -494,6 +513,12 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_ai_request_receipts_state_check",
       "expert_ai_request_receipts_lease_idx",
       "expert_ai_request_receipts_cleanup_idx",
+      "outbox_operator_alerts_case_type_check",
+      "outbox_operator_alerts_status_check",
+      "outbox_operator_alerts_case_reason_check",
+      "outbox_operator_alerts_payload_check",
+      "outbox_operator_alerts_lifecycle_check",
+      "outbox_operator_alerts_unresolved_cursor_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toContain(
@@ -507,14 +532,14 @@ describe("authoritative Drizzle schema parity", () => {
     );
   });
 
-  it("registers migration 0027 last in the ordered Drizzle journal", () => {
+  it("registers migration 0028 last in the ordered Drizzle journal", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
     const latest = journal.entries.at(-1);
     expect(latest).toMatchObject({
-      idx: 27,
-      tag: "0027_expert_ai_request_receipts",
+      idx: 28,
+      tag: "0028_operator_case_inbox",
     });
     expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
   });

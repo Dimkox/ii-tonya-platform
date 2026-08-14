@@ -29,6 +29,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
       "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
       "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+      "packages/db/migrations/0028_operator_case_inbox.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",

@@ -85,6 +85,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
   "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
   "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+  "packages/db/migrations/0028_operator_case_inbox.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -604,6 +605,10 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0027_expert_ai_request_receipts.sql",
     "67eed73ef55735f94a3b4727bd5bcd8479b678d6b61f0ebb7c2d7d46d3bf9c7e",
+  ],
+  [
+    "packages/db/migrations/0028_operator_case_inbox.sql",
+    "ae71d45564466e71f3efa4c3c96227d28ea21af2483ff1c2c14b60210ba22d4c",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

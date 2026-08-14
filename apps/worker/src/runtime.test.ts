@@ -141,7 +141,7 @@ describe("worker runtime", () => {
       listLocalReservations: vi.fn(async () => []),
       recordObservation: vi.fn(async () => undefined),
       recordProviderUnavailable: vi.fn(async () => undefined),
-      deliverSafetyEscalationsBatch: vi.fn(async () => ({ delivered: 1 })),
+      materializeOperatorCasesBatch: vi.fn(async () => ({ materialized: 2 })),
     };
     const expertReferralJobsRepository = {
       expireDueBatch: vi.fn(async () => ({
@@ -215,7 +215,8 @@ describe("worker runtime", () => {
       dispatch: 1,
       reconciliation: 2,
     });
-    expect(report.confirmedOutboxDelivery).toEqual({ delivered: 1 });
+    expect(jobsRepository.materializeOperatorCasesBatch).toHaveBeenCalledOnce();
+    expect(report.confirmedOutboxDelivery).toEqual({ materialized: 2 });
   });
 
   it("uses the disabled expert residency provider reader when no capability is injected", async () => {
@@ -224,7 +225,7 @@ describe("worker runtime", () => {
       expireDueBatch: vi.fn(async () => ({})),
       listLocalReservations: vi.fn(async () => []),
       recordProviderUnavailable: vi.fn(async () => undefined),
-      deliverSafetyEscalationsBatch: vi.fn(async () => ({})),
+      materializeOperatorCasesBatch: vi.fn(async () => ({})),
     };
     const expertReferralJobsRepository = {
       expireDueBatch: vi.fn(async () => ({

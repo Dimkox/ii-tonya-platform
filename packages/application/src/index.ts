@@ -14,3 +14,4 @@ export * from "./expert-prompt-context.js";
 export * from "./expert-ai-ingress-service.js";
 export * from "./expert-ai-proposal-eval.js";
 export * from "./expert-telegram-query-service.js";
+export * from "./operator-case-service.js";
