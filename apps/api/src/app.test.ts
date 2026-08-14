@@ -409,6 +409,18 @@ describe("API boundary", () => {
     ).rejects.toThrow("Expert Telegram query capability is required");
   });
 
+  it("rejects Telegram checkout activation without its complete runtime capability", async () => {
+    await expect(
+      buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertTelegramCheckout: true,
+        },
+      }),
+    ).rejects.toThrow("Expert Telegram query capability is required");
+  });
+
   it("rejects expert AI activation without its complete runtime capability", async () => {
     await expect(
       buildTestApp({

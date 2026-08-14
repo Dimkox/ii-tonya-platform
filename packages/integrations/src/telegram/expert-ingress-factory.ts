@@ -12,6 +12,8 @@ type AuthenticatedClientView = Parameters<
 >[0]["authenticated"];
 
 export interface ExpertTelegramIngressFactoryDependencies extends ProcessorDependencies {
+  readonly checkoutReadiness?: boolean;
+  readonly checkout?: object;
   resolvePrincipal(telegramUserId: string): Promise<Principal | null>;
   authenticateClientView(input: {
     readonly data: string;
@@ -23,6 +25,9 @@ export interface ExpertTelegramIngressFactoryDependencies extends ProcessorDepen
 export const createExpertTelegramIngress = (
   deps: ExpertTelegramIngressFactoryDependencies,
 ) => {
+  if (deps.checkoutReadiness === true && deps.checkout === undefined) {
+    throw new Error("Expert Telegram checkout capability is required");
+  }
   const processor = createExpertCommandProcessor(deps);
   return {
     resolvePrincipal: deps.resolvePrincipal,

@@ -88,4 +88,17 @@ describe("expert Telegram production ingress factory", () => {
       }),
     ).toThrow("Expert Telegram financial query capability is required");
   });
+
+  it("fails closed when checkout readiness is enabled without its capability", () => {
+    expect(() =>
+      createExpertTelegramIngress({
+        enabled: true,
+        checkoutReadiness: true,
+        resolvePrincipal: async () => null,
+        authenticateClientView: async () => null,
+        queries: {} as never,
+        views: {} as never,
+      }),
+    ).toThrow("Expert Telegram checkout capability is required");
+  });
 });

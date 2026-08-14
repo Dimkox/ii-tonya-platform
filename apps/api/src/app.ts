@@ -95,7 +95,8 @@ export async function buildApp(
   if (
     (deps.config.features.expertTelegramQueries === true ||
       deps.config.features.expertTelegramFinancialViews === true ||
-      deps.config.features.expertTelegramReferral === true) &&
+      deps.config.features.expertTelegramReferral === true ||
+      deps.config.features.expertTelegramCheckout === true) &&
     deps.expertTelegramQueries === undefined
   ) {
     throw new Error("Expert Telegram query capability is required");
@@ -143,7 +144,8 @@ export async function buildApp(
     expertQueriesEnabled:
       deps.config.features.expertTelegramQueries === true ||
       deps.config.features.expertTelegramFinancialViews === true ||
-      deps.config.features.expertTelegramReferral === true,
+      deps.config.features.expertTelegramReferral === true ||
+      deps.config.features.expertTelegramCheckout === true,
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),
