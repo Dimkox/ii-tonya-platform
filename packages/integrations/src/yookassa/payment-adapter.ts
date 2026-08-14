@@ -199,15 +199,10 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       ...request,
       idempotencyKey: operation.idempotencyKey,
     };
-    try {
-      await this.attachRecoverySnapshot(
-        operation,
-        serializeYooKassaPaymentRequest(providerCommand),
-      );
-    } catch (error: unknown) {
-      await this.deps.operations.resolve(operation.id, "failed");
-      throw error;
-    }
+    await this.attachRecoverySnapshot(
+      operation,
+      serializeYooKassaPaymentRequest(providerCommand),
+    );
     try {
       const payment = await this.deps.client.createPayment(providerCommand);
       if (
@@ -292,15 +287,10 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       ...request,
       idempotencyKey: operation.idempotencyKey,
     };
-    try {
-      await this.attachRecoverySnapshot(
-        operation,
-        serializeYooKassaRefundRequest(providerCommand),
-      );
-    } catch (error: unknown) {
-      await this.deps.operations.resolve(operation.id, "failed");
-      throw error;
-    }
+    await this.attachRecoverySnapshot(
+      operation,
+      serializeYooKassaRefundRequest(providerCommand),
+    );
     try {
       const refund = await this.deps.client.createRefund(providerCommand);
       await this.deps.operations.bindProviderObject(operation.id, refund.id);
