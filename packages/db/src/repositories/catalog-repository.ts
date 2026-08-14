@@ -23,6 +23,13 @@ export interface CatalogExpertRecord {
   readonly slotStartsAt: Date;
 }
 
+export interface PublicCatalogServiceRecord extends Record<string, unknown> {
+  readonly sourceKey: string;
+  readonly displayName: string;
+  readonly serviceCode: string;
+  readonly language: string;
+}
+
 type RawCatalogExpertRecord = Omit<CatalogExpertRecord, "slotStartsAt"> & {
   slotStartsAt: Date | string;
 };
@@ -35,6 +42,38 @@ const finiteDate = (value: Date): boolean =>
 
 export class PostgresCatalogRepository {
   constructor(private readonly db: DrizzleDb) {}
+
+  async listPublicServices(input: {
+    serviceCode?: string;
+    language?: string;
+    limit: number;
+  }): Promise<readonly PublicCatalogServiceRecord[]> {
+    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 20) {
+      throw new Error("Invalid public catalog limit");
+    }
+    const serviceCode = input.serviceCode ?? null;
+    const language = input.language ?? null;
+    const result = await this.db.execute<PublicCatalogServiceRecord>(sql`
+      select
+        es.id as "sourceKey",
+        coalesce(nullif(e.public_display_name, ''), 'Эксперт') as "displayName",
+        es.code as "serviceCode",
+        es.language
+      from expert_services es
+      join experts e on e.id = es.expert_id
+      where e.active = true
+        and e.verified = true
+        and es.active = true
+        and es.code is not null
+        and es.language is not null
+        and (${serviceCode}::text is null or es.code = ${serviceCode})
+        and (${language}::text is null or es.language = ${language})
+      order by es.code,es.language,
+        coalesce(nullif(e.public_display_name, ''), 'Эксперт'),e.id,es.id
+      limit ${input.limit}
+    `);
+    return result.rows;
+  }
 
   async findEligible(
     input: CatalogEligibilityQuery,

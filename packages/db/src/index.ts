@@ -32,6 +32,7 @@ export {
   PostgresCatalogRepository,
   type CatalogEligibilityQuery,
   type CatalogExpertRecord,
+  type PublicCatalogServiceRecord,
 } from "./repositories/catalog-repository.js";
 export {
   PostgresClientCatalogRepository,

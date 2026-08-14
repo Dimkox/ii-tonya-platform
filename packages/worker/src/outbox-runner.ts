@@ -141,7 +141,9 @@ export interface OutboxRunnerDeps {
 }
 
 export type OutboxMetricTopic =
-  "safety_operator_escalation" | "admin_negative_feedback";
+  | "safety_operator_escalation"
+  | "admin_negative_feedback"
+  | "catalog_show";
 export type OutboxMetricPhase =
   "claim" | "dispatch" | "reconciliation" | "lease_recovery";
 export type OutboxMetricOutcome =
@@ -163,7 +165,10 @@ export interface OutboxRunnerMetrics {
   record(labels: OutboxRunnerMetricLabels, count?: number): void;
 }
 export interface OutboxRecoveryCount {
-  readonly topic: "safety.operator_escalation" | "admin.negative_feedback";
+  readonly topic:
+    | "safety.operator_escalation"
+    | "admin.negative_feedback"
+    | "catalog.show";
   readonly count: number;
 }
 export interface OutboxClaimBatch {
@@ -224,6 +229,7 @@ function metricTopic(topic: string): OutboxMetricTopic {
     return "safety_operator_escalation";
   }
   if (topic === "admin.negative_feedback") return "admin_negative_feedback";
+  if (topic === "catalog.show") return "catalog_show";
   throw new Error("worker_outbox_metric_topic_unregistered");
 }
 

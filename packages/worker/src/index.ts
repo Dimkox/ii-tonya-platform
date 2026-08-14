@@ -17,6 +17,7 @@ export {
   type OutboxRunnerMetricLabels,
   type OutboxRunnerMetrics,
 } from "./outbox-runner.js";
+export { CLIENT_CATALOG_OUTBOX_TOPICS } from "@ii-tonya/contracts";
 export * from "./data-retention.js";
 export * from "./privacy-erasure.js";
 export * from "./reservation-expiry.js";

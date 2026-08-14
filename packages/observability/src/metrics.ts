@@ -62,6 +62,7 @@ export type MetricLabels = Readonly<{
 const workerOutboxTopics = new Set([
   "safety_operator_escalation",
   "admin_negative_feedback",
+  "catalog_show",
 ]);
 const workerOutboxPhases = new Set([
   "claim",
@@ -87,7 +88,10 @@ const workerOutboxReasonClasses = new Set([
 ]);
 
 export type WorkerOutboxMetricLabels = Readonly<{
-  topic: "safety_operator_escalation" | "admin_negative_feedback";
+  topic:
+    | "safety_operator_escalation"
+    | "admin_negative_feedback"
+    | "catalog_show";
   phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
   outcome:
     "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
