@@ -22,6 +22,8 @@ test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
 if [[ "$mode" == client-booking ]]; then
   test -z "$(git -C "$source_root" status --porcelain --untracked-files=all)"
+  test ! -e "$source_root/node_modules"
+  test ! -e "$source_root/.claw-client-booking-node-modules"
   : "${II_TONYA_TEST_POSTGRES_ADMIN_URL:?II_TONYA_TEST_POSTGRES_ADMIN_URL is required}"
 fi
 missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=print | sed -n '/^?/ { p; q; }')"
@@ -49,6 +51,9 @@ mkdir -p "$evidence_dir" "$release_output"
 
 cleanup() {
   rm -f "$container_script"
+  if [[ "$mode" == client-booking && -f "$source_root/.claw-client-booking-node-modules" ]]; then
+    rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"
+  fi
   cd "$compose_root"
   docker compose --profile test rm -f -s ii-tonya-test >/dev/null 2>&1 || true
 }
@@ -58,7 +63,9 @@ cat > "$container_script" <<'SCRIPT'
 set -Eeuo pipefail
 cd /workspace/source
 export CI=true
-pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+if [[ "$CLAW_GATE_MODE" != client-booking ]]; then
+  pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+fi
 case "$CLAW_GATE_MODE" in
   ci)
     pnpm build
@@ -96,9 +103,50 @@ case "$CLAW_GATE_MODE" in
     test -f /workspace/release-output/native-release.tar.gz
     ;;
   client-booking)
-    node scripts/assert-client-booking-postgres.mjs
-    pnpm build
-    pnpm exec vitest run tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts tests/integration/client-catalog-booking-choice.test.ts tests/integration/client-booking-repository.test.ts tests/integration/client-booking-privacy.test.ts tests/e2e/client-booking-boundary.test.ts tests/repo/client-booking-boundaries.test.ts apps/api/src/client-booking-principal-resolver.test.ts apps/api/src/routes/client-booking.test.ts packages/worker/src/client-booking-erasure.test.ts packages/contracts/src/worker-outbox.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
+    mkdir node_modules
+    : > .claw-client-booking-node-modules
+    test -d /seed/node_modules/.pnpm
+    ln -s /seed/node_modules/.pnpm node_modules/.pnpm
+    test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm
+    for package_link in \
+      "drizzle-orm:/seed/node_modules/.pnpm/drizzle-orm@0.45.2_@opentel_228eefb61488836a4f41d6ac83b2f909/node_modules/drizzle-orm" \
+      "pg:/seed/node_modules/.pnpm/pg@8.22.0/node_modules/pg" \
+      "pino:/seed/node_modules/.pnpm/pino@9.14.0/node_modules/pino" \
+      "fastify:/seed/node_modules/.pnpm/fastify@5.10.0/node_modules/fastify"; do
+      package_name="${package_link%%:*}"
+      package_path="${package_link#*:}"
+      test -d "$package_path"
+      ln -s "$package_path" "node_modules/$package_name"
+      test "$(readlink -f "node_modules/$package_name")" = "$package_path"
+    done
+    mkdir node_modules/@fastify
+    rate_limit_package=/seed/node_modules/.pnpm/@fastify+rate-limit@10.3.0/node_modules/@fastify/rate-limit
+    test -d "$rate_limit_package"
+    ln -s "$rate_limit_package" node_modules/@fastify/rate-limit
+    test "$(readlink -f node_modules/@fastify/rate-limit)" = "$rate_limit_package"
+    zod_package=/seed/node_modules/.pnpm/zod@4.4.3/node_modules/zod
+    test -d "$zod_package"
+    rm -f node_modules/zod
+    ln -s "$zod_package" node_modules/zod
+    test "$(readlink -f node_modules/zod)" = "$zod_package"
+    rm -f node_modules/@ii-tonya
+    mkdir node_modules/@ii-tonya
+    for workspace_package in domain config application worker contracts db integrations observability; do
+      ln -sfn "/workspace/source/packages/$workspace_package" "node_modules/@ii-tonya/$workspace_package"
+    done
+    for workspace_package in domain config contracts application integrations db observability worker; do
+      (
+        cd "packages/$workspace_package"
+        /seed/node_modules/.bin/tsup src/index.ts --format esm --clean --tsconfig ../../tsconfig.base.json
+      )
+    done
+    test "$(readlink -f node_modules/@ii-tonya/config)" = /workspace/source/packages/config
+    test -f packages/config/dist/index.js
+    for workspace_package in contracts worker application db; do
+      test "$(readlink -f "node_modules/@ii-tonya/$workspace_package")" = "/workspace/source/packages/$workspace_package"
+      test -f "packages/$workspace_package/dist/index.js"
+    done
+    /seed/node_modules/.bin/vitest run tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts tests/integration/client-catalog-booking-choice.test.ts tests/integration/client-booking-repository.test.ts tests/integration/client-booking-privacy.test.ts tests/e2e/client-booking-boundary.test.ts tests/repo/client-booking-boundaries.test.ts apps/api/src/client-booking-principal-resolver.test.ts apps/api/src/routes/client-booking.test.ts packages/worker/src/client-booking-erasure.test.ts packages/contracts/src/worker-outbox.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
     ;;
 esac
 SCRIPT

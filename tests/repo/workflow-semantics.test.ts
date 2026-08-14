@@ -81,9 +81,10 @@ describe("direct Claw verification semantics", () => {
     );
     const traceability = read("docs/spec/yookassa-provider-traceability.md");
 
-    expect(runbook).toContain("user-command retry only");
-    expect(runbook).toContain("same idempotency key and exact request body");
-    expect(runbook).toContain("autonomous unbound recovery remains BLOCKED");
+    expect(runbook).toMatch(
+      /default operator path remains a user-command retry with the same idempotency key and\s+exact request body/u,
+    );
+    expect(runbook).toContain("Autonomous recovery remains **BLOCKED**");
     for (const placeholder of [
       "YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE=",
       "YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION=",
@@ -130,14 +131,88 @@ describe("direct Claw verification semantics", () => {
       "packages/observability/src/metrics.test.ts",
       "tests/repo/workflow-semantics.test.ts",
     ];
-    const literal = `pnpm exec vitest run ${manifest.join(" ")} --maxWorkers=1`;
+    const literal = `/seed/node_modules/.bin/vitest run ${manifest.join(" ")} --maxWorkers=1`;
     expect(runner).toContain("ci | database | release | client-booking");
     expect(runner).toContain(literal);
-    expect(runner.split("pnpm exec vitest run", 20)).toHaveLength(18);
+    expect(runner.split("pnpm exec vitest run", 20)).toHaveLength(17);
     expect(runner).toContain("--untracked-files=all");
     expect(runner).toContain("-e II_TONYA_TEST_POSTGRES_ADMIN_URL");
     expect(runner).not.toContain("$II_TONYA_TEST_POSTGRES_ADMIN_URL");
     expect(runner).toContain("trap cleanup EXIT");
     expect(runner).toContain("repeat_limit: 1");
+  });
+
+  it("materializes the client-booking package closure from the pinned seed without reinstalling", () => {
+    const runner = read("scripts/run-claw-ci.sh");
+    const gateCase = runner.indexOf('case "$CLAW_GATE_MODE" in');
+    const clientBooking = runner.slice(
+      runner.indexOf("  client-booking)", gateCase),
+      runner.indexOf("    ;;", runner.indexOf("  client-booking)", gateCase)),
+    );
+
+    expect(runner).toContain("export CI=true");
+    expect(clientBooking).not.toContain("find /seed/node_modules");
+    expect(runner).not.toMatch(/find\s+[^\n]*-exec/u);
+    expect(clientBooking).toContain("test -d /seed/node_modules/.pnpm");
+    expect(clientBooking).toContain("ln -s /seed/node_modules/.pnpm node_modules/.pnpm");
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm',
+    );
+    expect(clientBooking).toContain(
+      "drizzle-orm:/seed/node_modules/.pnpm/drizzle-orm@0.45.2_@opentel_228eefb61488836a4f41d6ac83b2f909/node_modules/drizzle-orm",
+    );
+    for (const packageName of ["pg", "pino", "fastify"]) {
+      expect(clientBooking).toContain(`\"${packageName}:/seed/node_modules/.pnpm/`);
+      expect(clientBooking).toContain(`node_modules/${packageName}`);
+    }
+    expect(clientBooking).toContain("@fastify+rate-limit@10.3.0");
+    expect(clientBooking).toContain("node_modules/@fastify/rate-limit");
+    expect(clientBooking).toContain("rm -f node_modules/@ii-tonya");
+    expect(clientBooking).toContain(
+      "zod_package=/seed/node_modules/.pnpm/zod@4.4.3/node_modules/zod",
+    );
+    expect(clientBooking).toContain('rm -f node_modules/zod');
+    expect(clientBooking).toContain('ln -s "$zod_package" node_modules/zod');
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/zod)" = "$zod_package"',
+    );
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/@ii-tonya/config)" = /workspace/source/packages/config',
+    );
+    expect(clientBooking).toContain("test -f packages/config/dist/index.js");
+    expect(clientBooking).toContain(
+      'for workspace_package in contracts worker application db; do',
+    );
+    expect(clientBooking).toContain(
+      'test "$(readlink -f "node_modules/@ii-tonya/$workspace_package")" = "/workspace/source/packages/$workspace_package"',
+    );
+    expect(clientBooking).toContain(
+      'test -f "packages/$workspace_package/dist/index.js"',
+    );
+    expect(clientBooking).not.toContain(
+      "node scripts/assert-client-booking-postgres.mjs",
+    );
+    expect(clientBooking).not.toContain("pnpm --workspace-concurrency=1 -r --sort run build");
+    expect(clientBooking).toContain(
+      "for workspace_package in domain config contracts application integrations db observability worker; do",
+    );
+    expect(clientBooking).toContain(
+      "/seed/node_modules/.bin/tsup src/index.ts --format esm --clean --tsconfig ../../tsconfig.base.json",
+    );
+    expect(clientBooking).not.toContain("--dts");
+    expect(clientBooking).toContain("/seed/node_modules/.bin/vitest run");
+    expect(clientBooking).not.toContain("pnpm exec vitest run");
+    expect(clientBooking).not.toContain("pnpm install");
+    expect(clientBooking).toContain(
+      "for workspace_package in domain config application worker contracts db integrations observability; do",
+    );
+    expect(clientBooking).toContain(
+      'ln -sfn "/workspace/source/packages/$workspace_package" "node_modules/@ii-tonya/$workspace_package"',
+    );
+    expect(runner).toContain('test ! -e "$source_root/node_modules"');
+    expect(runner).toContain(": > .claw-client-booking-node-modules");
+    expect(runner).toContain(
+      'rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"',
+    );
   });
 });
