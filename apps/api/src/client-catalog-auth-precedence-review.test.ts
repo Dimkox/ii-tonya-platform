@@ -11,7 +11,7 @@ describe("client catalog authentication precedence remediation", () => {
       ajv: { customOptions: { removeAdditional: false } },
     });
     await app.register(clientCatalogRoutes, {
-      principals: { resolve: async () => null },
+      principals: { resolve: async () => ({ kind: "denied" }) },
       catalog: { request, get: vi.fn() } as never,
     });
 

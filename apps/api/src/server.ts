@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   createAdminService,
   createClientCatalogService,
+  createClientSessionService,
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
@@ -12,7 +13,7 @@ import {
   type ExpertCodeKeyring,
   type ExpertAiIngressService,
   type PrivacyService,
-  type ClientPrincipalResolver,
+  type IdentityProofVerifier,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -28,6 +29,7 @@ import {
   PostgresExpertAiRequestReceiptStore,
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
+  PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -37,13 +39,25 @@ import {
   EnvironmentExpertCodeSecretResolver,
   type ExpertTelegramIngressFactoryDependencies,
 } from "@ii-tonya/integrations";
-import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
+import {
+  createLogger,
+  recordClientSessionMetric,
+  shutdownTelemetry,
+} from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
+import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import { createClientPrincipalResolver } from "./client-principal-resolver.js";
+import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
+import {
+  clientSessionTokenHash,
+  createClientSessionToken,
+} from "./client-session-token.js";
 
 export interface ServerLifecycle {
+  preflight(config: ReturnType<typeof loadEnv>): void;
   dependencies(
     config: ReturnType<typeof loadEnv>,
     db: DrizzleDb,
@@ -91,15 +105,25 @@ export const createDefaultLifecycle = (
       Required<
         Pick<ExpertTelegramIngressFactoryDependencies, "referral" | "residency">
       >;
-    clientCatalogComposition?: {
-      readonly principals: ClientPrincipalResolver;
+    clientSessionComposition?: {
+      readonly verifier: IdentityProofVerifier;
     };
   } = {},
 ): ServerLifecycle => ({
+  preflight(config) {
+    assertClientCapabilityPreflight(config.features, {
+      identityProofVerifier:
+        options.clientSessionComposition?.verifier !== undefined,
+    });
+  },
   async migrate(db) {
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    assertClientCapabilityPreflight(config.features, {
+      identityProofVerifier:
+        options.clientSessionComposition?.verifier !== undefined,
+    });
     let expertCodeKeyring: ExpertCodeKeyring | undefined;
     if (config.features?.expertReferral) {
       const keyConfig = config.expertReferralKey;
@@ -147,9 +171,32 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramReferral === true,
             checkoutReadiness: config.features.expertTelegramCheckout === true,
           });
+    const clientSessionRepository =
+      config.features.clientSession === true
+        ? new PostgresClientSessionRepository(db)
+        : undefined;
+    const clientSessionService =
+      clientSessionRepository === undefined ||
+      options.clientSessionComposition === undefined
+        ? undefined
+        : createClientSessionService({
+            verifier: createClientProofVerifierGate(
+              options.clientSessionComposition.verifier,
+            ),
+            sessions: clientSessionRepository,
+            generateToken: createClientSessionToken,
+            digestToken: clientSessionTokenHash,
+          });
+    const clientPrincipal =
+      clientSessionRepository === undefined
+        ? undefined
+        : createClientPrincipalResolver(clientSessionRepository, {
+            record: recordClientSessionMetric,
+          });
     const clientCatalogService =
       config.features.clientCatalog === true &&
-      options.clientCatalogComposition !== undefined
+      clientSessionService !== undefined &&
+      clientPrincipal !== undefined
         ? createClientCatalogService({
             repository: new PostgresClientCatalogRepository(db),
           })
@@ -204,7 +251,15 @@ export const createDefaultLifecycle = (
         ? {}
         : {
             clientCatalogService,
-            clientPrincipal: options.clientCatalogComposition!.principals,
+          }),
+      ...(clientSessionService === undefined ||
+      clientSessionRepository === undefined ||
+      clientPrincipal === undefined
+        ? {}
+        : {
+            clientSessionService,
+            clientSessionRepository,
+            clientPrincipal,
           }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
@@ -232,8 +287,13 @@ export async function composeServer(
   lifecycle: ServerLifecycle,
   db: DrizzleDb,
 ): Promise<FastifyInstance> {
+  const config = loadEnv(process.env);
+  if (typeof lifecycle.preflight !== "function") {
+    throw new Error("server_preflight_capability_unavailable");
+  }
+  lifecycle.preflight(config);
   await lifecycle.migrate(db);
-  return buildApp(await lifecycle.dependencies(loadEnv(process.env), db));
+  return buildApp(await lifecycle.dependencies(config, db));
 }
 
 export async function closeServer(

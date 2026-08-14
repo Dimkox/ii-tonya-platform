@@ -9,6 +9,7 @@ import { clientCatalogRoutes } from "./client-catalog.js";
 
 const userId = "00000000-0000-4000-8000-000000000101";
 const catalogRequestId = "00000000-0000-4000-8000-000000000201";
+const authorization = `Bearer cs1.${"A".repeat(43)}`;
 
 const build = async (overrides: {
   resolver?: ClientPrincipalResolver;
@@ -31,9 +32,8 @@ const build = async (overrides: {
       overrides.resolver ??
       ({
         resolve: async () => ({
-          authenticated: true,
-          active: true,
-          userId,
+          kind: "resolved",
+          principal: { authenticated: true, active: true, userId },
         }),
       } satisfies ClientPrincipalResolver),
     catalog: overrides.service ?? { request, get },
@@ -48,7 +48,7 @@ describe("client catalog HTTP contract", () => {
     const response = await state.app.inject({
       method: "POST",
       url: "/v1/client/catalog-requests",
-      headers: { authorization: "Bearer test" },
+      headers: { authorization },
       payload: { serviceCode: "career", language: "ru" },
     });
 
@@ -72,7 +72,7 @@ describe("client catalog HTTP contract", () => {
     const response = await state.app.inject({
       method: "POST",
       url: "/v1/client/catalog-requests",
-      headers: { authorization: "Bearer test" },
+      headers: { authorization },
       payload,
     });
     expect(response.statusCode).toBe(400);
@@ -86,7 +86,7 @@ describe("client catalog HTTP contract", () => {
       method: "POST",
       url: "/v1/client/catalog-requests",
       headers: {
-        authorization: "Bearer test",
+        authorization,
         "content-type": "application/json",
       },
       payload: JSON.stringify({ serviceCode: "x".repeat(8_193) }),
@@ -97,7 +97,12 @@ describe("client catalog HTTP contract", () => {
   });
 
   it.each([
-    { name: "missing", resolver: { resolve: async () => null } },
+    {
+      name: "denied",
+      resolver: { resolve: async () => ({ kind: "denied" as const }) },
+      status: 401,
+      error: "unauthorized",
+    },
     {
       name: "resolver error",
       resolver: {
@@ -105,17 +110,19 @@ describe("client catalog HTTP contract", () => {
           throw new Error("private lookup detail");
         },
       },
+      status: 503,
+      error: "temporarily_unavailable",
     },
-  ])("returns 401 before service access for $name authority", async ({ resolver }) => {
+  ])("fails before service access for $name authority", async ({ resolver, status, error }) => {
     const state = await build({ resolver });
     const response = await state.app.inject({
       method: "POST",
       url: "/v1/client/catalog-requests",
-      headers: { authorization: "Bearer test" },
+      headers: { authorization },
       payload: {},
     });
-    expect(response.statusCode).toBe(401);
-    expect(response.json()).toEqual({ error: "unauthorized" });
+    expect(response.statusCode).toBe(status);
+    expect(response.json()).toEqual({ error });
     expect(state.request).not.toHaveBeenCalled();
   });
 
@@ -140,7 +147,7 @@ describe("client catalog HTTP contract", () => {
     const response = await state.app.inject({
       method: "GET",
       url: `/v1/client/catalog-requests/${catalogRequestId}`,
-      headers: { authorization: "Bearer test" },
+      headers: { authorization },
     });
 
     expect(response.statusCode).toBe(200);
@@ -171,7 +178,7 @@ describe("client catalog HTTP contract", () => {
       const response = await state.app.inject({
         method: "GET",
         url: `/v1/client/catalog-requests/${catalogRequestId}`,
-        headers: { authorization: "Bearer test" },
+        headers: { authorization },
       });
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "not_found" });

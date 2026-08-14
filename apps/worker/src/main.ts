@@ -7,6 +7,7 @@ import {
   createDb,
   PostgresCatalogRepository,
   PostgresClientCatalogRepository,
+  PostgresClientSessionRepository,
   PostgresExpertReferralWorkerRepository,
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
@@ -15,6 +16,7 @@ import {
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
+  recordClientSessionMetric,
   recordWorkerOutboxMetric,
 } from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
@@ -34,6 +36,7 @@ import {
   createLocalOperatorCaseOutboxRegistry,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
   runClientCatalogRetention,
+  runClientSessionRetention,
   runOutboxBatch,
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
@@ -107,6 +110,21 @@ export function selectClientCatalogRetention(
   const job = factory();
   if (typeof job !== "function") {
     throw new Error("client_catalog_retention_capability_unavailable");
+  }
+  return job;
+}
+
+export function selectClientSessionRetention(
+  config: RuntimeConfig,
+  factory?: () => BoundedJob,
+): BoundedJob | undefined {
+  if (config.features.clientSession !== true) return undefined;
+  if (factory === undefined) {
+    throw new Error("client_session_retention_capability_unavailable");
+  }
+  const job = factory();
+  if (typeof job !== "function") {
+    throw new Error("client_session_retention_capability_unavailable");
   }
   return job;
 }
@@ -240,6 +258,14 @@ export function createProductionWorkerRuntimeFactory(
             100,
           );
       });
+      const clientSessionRetention = selectClientSessionRetention(config, () => {
+        const repository = new PostgresClientSessionRepository(db);
+        return () =>
+          runClientSessionRetention(
+            { repository, metrics: { record: recordClientSessionMetric } },
+            100,
+          );
+      });
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
@@ -259,6 +285,9 @@ export function createProductionWorkerRuntimeFactory(
         ...(clientCatalogRetention === undefined
           ? {}
           : { clientCatalogRetention }),
+        ...(clientSessionRetention === undefined
+          ? {}
+          : { clientSessionRetention }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),

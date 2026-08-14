@@ -42,6 +42,11 @@ export {
   type ClientCatalogSnapshot,
 } from "./repositories/client-catalog-repository.js";
 export {
+  PostgresClientSessionRepository,
+  type ClientSessionResolution,
+  type ClientSessionRevocation,
+} from "./repositories/client-session-repository.js";
+export {
   CompensationConflictError,
   ConversationCompletionDataError,
   PostgresMessageRepository,

@@ -2,9 +2,32 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   operationalMetrics,
+  clientSessionMetricLabels,
   referralMetricLabels,
   workerOutboxMetricLabels,
 } from "./metrics.js";
+
+describe("client session metric labels", () => {
+  it("accepts only fixed operation and outcome labels", () => {
+    expect(
+      clientSessionMetricLabels({ operation: "resolve", outcome: "denied" }),
+    ).toEqual({ operation: "resolve", outcome: "denied" });
+    expect(operationalMetrics).toHaveProperty("clientSession");
+  });
+
+  it("rejects identifiers, reasons, hashes, and credentials", () => {
+    for (const labels of [
+      { operation: "issue", outcome: "allowed", userId: randomUUID() },
+      { operation: "resolve", outcome: "denied", reason: "expired" },
+      { operation: "revoke", outcome: "allowed", tokenHash: "sha256:x" },
+      { operation: "cleanup", outcome: "removed", count: 2 },
+    ]) {
+      expect(() => clientSessionMetricLabels(labels)).toThrow(
+        "invalid_client_session_metric_labels",
+      );
+    }
+  });
+});
 
 describe("expert referral metric labels", () => {
   it("exposes bounded instruments for the full referral lifecycle", () => {
