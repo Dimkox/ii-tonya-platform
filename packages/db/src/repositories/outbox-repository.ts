@@ -29,9 +29,9 @@ function topicPredicate(topics: LocalOperatorCaseTopics | undefined) {
 
 function assertRecoveryLimit(limit: number): void {
   if (
-    !Number.isSafeInteger(limit)
-    || limit < 1
-    || limit > MAX_OUTBOX_RECOVERY_LIMIT
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > MAX_OUTBOX_RECOVERY_LIMIT
   ) {
     throw new RangeError("limit must be a safe integer between 1 and 1000");
   }
@@ -155,7 +155,9 @@ function requireDispatchLease(
     !row.dispatchLeaseValid ||
     row.leaseUntil === null
   ) {
-    throw new OutboxLeaseLostError(`Dispatch lease lost for outbox row ${row.id}`);
+    throw new OutboxLeaseLostError(
+      `Dispatch lease lost for outbox row ${row.id}`,
+    );
   }
 }
 

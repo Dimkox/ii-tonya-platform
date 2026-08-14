@@ -92,9 +92,7 @@ export interface OutboxDispatcher {
 }
 
 export interface OutboxReconciler {
-  reconcile(
-    message: OutboxMessage,
-  ): Promise<
+  reconcile(message: OutboxMessage): Promise<
     | "applied"
     | "not_applied"
     | "still_unknown"
@@ -321,9 +319,9 @@ export async function runOutboxBatch(
   deps: OutboxRunnerDeps,
 ): Promise<OutboxRunResult> {
   if (
-    !Number.isSafeInteger(deps.batchSize)
-    || deps.batchSize < 1
-    || deps.batchSize > MAX_OUTBOX_BATCH_SIZE
+    !Number.isSafeInteger(deps.batchSize) ||
+    deps.batchSize < 1 ||
+    deps.batchSize > MAX_OUTBOX_BATCH_SIZE
   ) {
     throw new RangeError("batchSize must be a safe integer between 1 and 1000");
   }

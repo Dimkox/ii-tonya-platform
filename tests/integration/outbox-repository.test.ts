@@ -134,9 +134,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     );
     await expect(
       repository.claimUnknown(10, "local-reconciler", 30_000, 2),
-    ).resolves.toEqual([
-      expect.objectContaining({ id: localUnknown }),
-    ]);
+    ).resolves.toEqual([expect.objectContaining({ id: localUnknown })]);
     await expect(
       repository.claim(10, "local-dispatcher", 30_000, 3),
     ).resolves.toEqual([
@@ -212,12 +210,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       topic: "planerka.reserve",
       reconciliationKey: "reservation:provider-key-1",
     });
-    const [claimed] = await repository.claim(
-      1,
-      "dispatch-a",
-      30_000,
-      3,
-    );
+    const [claimed] = await repository.claim(1, "dispatch-a", 30_000, 3);
     await repository.recordAttemptStarted(
       id,
       "dispatch-a",
@@ -267,24 +260,12 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       topic: "selarti.send",
       reconciliationKey: "message:provider-key-1",
     });
-    await repository.claim(
-      1,
-      "dispatch-a",
-      30_000,
-      3,
-    );
+    await repository.claim(1, "dispatch-a", 30_000, 3);
 
     await testDb.expireDispatchLease(id);
     expect(await repository.recoverExpiredDispatchLeases()).toBe(1);
     expect(await testDb.outboxStatus(id)).toBe("unknown_outcome");
-    expect(
-      await repository.claim(
-        1,
-        "must-not-resend",
-        30_000,
-        3,
-      ),
-    ).toEqual([]);
+    expect(await repository.claim(1, "must-not-resend", 30_000, 3)).toEqual([]);
   });
 
   it("rejects an outcome reconciliation key that differs from the stable command key", async () => {
@@ -294,12 +275,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       topic: "telegram.send",
       reconciliationKey: "message:stable-key",
     });
-    const [claimed] = await repository.claim(
-      1,
-      "dispatch-a",
-      30_000,
-      3,
-    );
+    const [claimed] = await repository.claim(1, "dispatch-a", 30_000, 3);
     await repository.recordAttemptStarted(
       id,
       "dispatch-a",
@@ -328,12 +304,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       topic: "selarti.send",
       reconciliationKey: "message:lease-key",
     });
-    const [claimed] = await repository.claim(
-      1,
-      "dispatch-owner",
-      30_000,
-      3,
-    );
+    const [claimed] = await repository.claim(1, "dispatch-owner", 30_000, 3);
 
     await expect(
       repository.recordAttemptStarted(
@@ -357,11 +328,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     await testDb.expireDispatchLease(id);
     await repository.recoverExpiredDispatchLeases();
     await expect(
-      repository.succeed(
-        id,
-        "dispatch-owner",
-        claimed!.dispatchClaimToken!,
-      ),
+      repository.succeed(id, "dispatch-owner", claimed!.dispatchClaimToken!),
     ).rejects.toBeInstanceOf(OutboxLeaseLostError);
     expect(await testDb.outboxStatus(id)).toBe("unknown_outcome");
 
@@ -435,7 +402,12 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     const [first] = await repository.claim(1, "same-worker", 60_000, 3);
     await testDb.expireDispatchLease(id);
     expect(await repository.recoverExpiredDispatchLeases()).toBe(1);
-    const [unknown] = await repository.claimUnknown(1, "same-worker", 60_000, 3);
+    const [unknown] = await repository.claimUnknown(
+      1,
+      "same-worker",
+      60_000,
+      3,
+    );
     await repository.retryAfterReconciliation(
       id,
       "same-worker",
@@ -483,12 +455,7 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     });
     reconcile.mockResolvedValueOnce("not_applied");
     await runOutboxBatch(
-      runnerDeps(
-        repository,
-        dispatch,
-        reconcile,
-        new Date(),
-      ),
+      runnerDeps(repository, dispatch, reconcile, new Date()),
     );
     expect(await testDb.outboxStatus(notAppliedId)).toBe("dead_letter");
     expect(await testDb.ownerAlertReasons(notAppliedId)).toEqual([
