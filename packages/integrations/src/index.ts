@@ -115,6 +115,41 @@ export type {
 export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
 export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";
 export {
+  YooKassaTerminalError,
+  YooKassaUnknownOutcomeError,
+  createYooKassaClient,
+  formatRubMinor,
+} from "./yookassa/client.js";
+export type {
+  CreateYooKassaPayment,
+  CreateYooKassaRefund,
+  YooKassaClient,
+  YooKassaClientConfig,
+  YooKassaTransport,
+} from "./yookassa/client.js";
+export {
+  yooKassaNotificationSchema,
+  yooKassaPaymentSchema,
+  yooKassaRefundSchema,
+} from "./yookassa/contracts.js";
+export type {
+  YooKassaMode,
+  YooKassaNotification,
+  YooKassaPayment,
+  YooKassaReceiptInput,
+  YooKassaRefund,
+  YooKassaVatCode,
+} from "./yookassa/contracts.js";
+export type {
+  ClaimYooKassaOperationCommand,
+  YooKassaOperation,
+  YooKassaOperationKind,
+  YooKassaOperationPort,
+  YooKassaOperationStatus,
+  YooKassaReceiptContact,
+  YooKassaReceiptContactPort,
+} from "./yookassa/operation-port.js";
+export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
 } from "./telegram/expert-command-processor.js";

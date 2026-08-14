@@ -12,6 +12,12 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
   "packages/integrations/src/expert-residency/environment-secret-resolver.ts",
 ]);
 
+export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  "packages/integrations/src/yookassa/client.ts",
+  "packages/integrations/src/yookassa/contracts.ts",
+  "packages/integrations/src/yookassa/operation-port.ts",
+]);
+
 export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
   "apps/sandbox-api/src/routes.ts",
   "apps/sandbox-api/src/server.ts",
@@ -127,11 +133,12 @@ const approvedPaymentBoundaryPaths = new Set([
   "packages/integrations/src/index.ts",
   "packages/integrations/src/payment/disabled-payment-adapter.ts",
   "packages/integrations/src/payment/payment-port.ts",
+  ...YOOKASSA_PAYMENT_ALLOWED_PATHS,
 ]);
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "fac5fcdfb49cb461068688d25b1b39f8740380a4f56a395917d9de6465ce324a",
+    "577d837c880813af669c3592c918e77280dd6900dcb30d8ed927a36986b718cd",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -140,6 +147,18 @@ const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/payment/payment-port.ts",
     "84dc621fc5cafdffb64cb42af0fa567cad6560ea41ea46ce393d8aa29cce950f",
+  ],
+  [
+    "packages/integrations/src/yookassa/client.ts",
+    "245fadc877cebd6307a51b3bef99be103eb87972ca1d647765b1c68444d856ba",
+  ],
+  [
+    "packages/integrations/src/yookassa/contracts.ts",
+    "6c73d18e2bf46040c17f7e695c2a449dc8694b032ad2b8e4eba8d7f1406c0d03",
+  ],
+  [
+    "packages/integrations/src/yookassa/operation-port.ts",
+    "83c2c1975cb038949b62e75e3e71b372b07864ad47c8b6c6cd664b2b7275128f",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -800,7 +819,9 @@ const isApprovedPaymentBoundaryImport = (
     specifier === "./payment-port.js") ||
   (path ===
     "packages/integrations/src/expert-residency/disabled-payment-adapter.ts" &&
-    specifier === "./payment-port.js");
+    specifier === "./payment-port.js") ||
+  (path === "packages/integrations/src/index.ts" &&
+    specifier.startsWith("./yookassa/"));
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
   if (ts.isIdentifier(node.expression)) {
@@ -845,7 +866,7 @@ const processEnvKey = (
 const isPaymentCredentialKey = (key: string): boolean =>
   /^PAYMENTS?_(?:API_?KEY|TOKEN|SECRET|WEBHOOK_SECRET|BASE_URL|PROVIDER)$/u.test(
     key,
-  );
+  ) || /^YOOKASSA_(?:SHOP_ID|SECRET_KEY|SECRET_REF)$/u.test(key);
 
 const isCommercialNetworkTarget = (target: string): boolean =>
   /(?:^|[/:._-])(?:pay|payment|payments|checkout|billing|merchant|commerce)(?:[/:._-]|$)/iu.test(
@@ -1083,10 +1104,22 @@ const inspectTypeScript = (
 
     if (ts.isCallExpression(node) && isNetworkCall(node)) {
       const target = literalText(node.arguments[0]);
+      const literalOrigins = [
+        ...content.matchAll(/https?:\/\/[^\s"'`]+/gu),
+      ].map((match) => match[0]);
+      const approvedYooKassaCall =
+        path === "packages/integrations/src/yookassa/client.ts" &&
+        ((target !== undefined &&
+          target.startsWith("https://api.yookassa.ru/v3/")) ||
+          (content.includes('const ORIGIN = "https://api.yookassa.ru"') &&
+            literalOrigins.every(
+              (origin) => origin === "https://api.yookassa.ru",
+            )));
       if (
-        approvedPaymentBoundaryPaths.has(path) ||
-        EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) ||
-        (target && isCommercialNetworkTarget(target))
+        !approvedYooKassaCall &&
+        (approvedPaymentBoundaryPaths.has(path) ||
+          EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) ||
+          (target !== undefined && isCommercialNetworkTarget(target)))
       ) {
         violations.push("payment provider network call");
       }
@@ -1278,6 +1311,7 @@ export const classifyPaymentScopeProbe = ({
     if (
       !approvedPaymentBoundaryPaths.has(path) &&
       !EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
+      !YOOKASSA_PAYMENT_ALLOWED_PATHS.has(path) &&
       (providerPath.test(path) || paymentIntegrationArtifact.test(path))
     ) {
       violations.push("live or deferred payment integration path");
