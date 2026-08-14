@@ -1,8 +1,8 @@
 # ER-TG-004 Expert Residency Tariff Discovery Design
 
-**Status:** approved for implementation  
-**Date:** 2026-08-14  
-**Owner:** Dmitry  
+**Status:** approved for implementation
+**Date:** 2026-08-14
+**Owner:** Dmitry
 **Base:** `3340fc7e706c64ad0a2de185cd9088f2152ebf44`
 
 ## Objective
