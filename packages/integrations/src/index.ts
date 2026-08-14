@@ -157,6 +157,12 @@ export {
   type YooKassaPaymentAdapterDependencies,
 } from "./yookassa/payment-adapter.js";
 export { YooKassaPaymentVerifier } from "./yookassa/verifier.js";
+export { YooKassaExpertResidencyProviderReader } from "./yookassa/reconciliation-reader.js";
+export type {
+  YooKassaLocalReconciliationPayment,
+  YooKassaReconciliationReadCommand,
+  YooKassaReconciliationSnapshot,
+} from "./yookassa/reconciliation-reader.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
