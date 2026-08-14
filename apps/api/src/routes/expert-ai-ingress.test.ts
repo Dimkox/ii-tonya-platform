@@ -150,6 +150,51 @@ describe("expert AI HTTP transport", () => {
     await app.close();
   });
 
+  it("keeps a successful dispatch claimed when durable completion is ambiguous", async () => {
+    let claimed = false;
+    const fail = vi.fn(async () => undefined);
+    const handle = vi.fn(async () => ({
+      kind: "completed" as const,
+      proposalKind: "view_referral_summary" as const,
+      result: {},
+    }));
+    const app = await buildTestApp({
+      features,
+      expertAiIngress: { handle },
+      expertAiPrincipal: { resolve: async () => principal },
+      expertAiRequests: {
+        claim: async () => {
+          if (claimed) return { kind: "busy" as const };
+          claimed = true;
+          return { kind: "claimed" as const, claimId: "claim-ambiguous" };
+        },
+        complete: async () => {
+          throw new Error("receipt completion unavailable");
+        },
+        fail,
+      },
+    });
+    const request = () =>
+      app.inject({
+        method: "POST",
+        url: "/v1/expert/assistant/messages",
+        headers: {
+          authorization: `Bearer ${"A".repeat(32)}`,
+          "idempotency-key": "assistant-request-0005",
+        },
+        payload: { text: "Баланс", locale: "ru-RU" },
+      });
+    const first = await request();
+    const second = await request();
+    expect(first.statusCode).toBe(503);
+    expect(first.json()).toEqual({ error: "unavailable" });
+    expect(second.statusCode).toBe(409);
+    expect(second.json()).toEqual({ error: "request_in_progress" });
+    expect(handle).toHaveBeenCalledTimes(1);
+    expect(fail).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("rejects missing authentication, malformed metadata, and expanded bodies before dispatch", async () => {
     const handle = vi.fn(async () => ({ kind: "unavailable" as const }));
     const app = await buildTestApp({

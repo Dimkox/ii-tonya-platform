@@ -135,8 +135,9 @@ export const expertAiIngressRoutes: FastifyPluginAsync<
       if (claim.kind === "busy")
         return reply.code(409).send({ error: "request_in_progress" });
       if (claim.kind === "replay") return sendOutcome(reply, claim.outcome);
+      let result: Awaited<ReturnType<ExpertAiIngressService["handle"]>>;
       try {
-        const result = await deps.ingress.handle({
+        result = await deps.ingress.handle({
           principal,
           text: body.text,
           locale: body.locale,
@@ -146,15 +147,29 @@ export const expertAiIngressRoutes: FastifyPluginAsync<
             ? {}
             : { tariffVersionId: body.tariffVersionId }),
         });
-        const outcome = outcomeFor(result);
-        if (result.kind === "unavailable")
+      } catch {
+        try {
           await deps.requests.fail(claim.claimId);
-        else await deps.requests.complete(claim.claimId, outcome);
-        return sendOutcome(reply, outcome);
-      } catch (error) {
-        await deps.requests.fail(claim.claimId);
-        throw error;
+        } catch {
+          // An ambiguous release remains claimed; never re-dispatch optimistically.
+        }
+        return reply.code(503).send({ error: "unavailable" });
       }
+      const outcome = outcomeFor(result);
+      if (result.kind === "unavailable") {
+        try {
+          await deps.requests.fail(claim.claimId);
+        } catch {
+          // A failed release safely leaves the request busy for reconciliation.
+        }
+        return sendOutcome(reply, outcome);
+      }
+      try {
+        await deps.requests.complete(claim.claimId, outcome);
+      } catch {
+        return reply.code(503).send({ error: "unavailable" });
+      }
+      return sendOutcome(reply, outcome);
     },
   );
 };
