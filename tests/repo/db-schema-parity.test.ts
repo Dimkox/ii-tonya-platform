@@ -52,10 +52,10 @@ describe("authoritative Drizzle schema parity", () => {
   it("describes the operator case inbox invariants", () => {
     expect(names(outboxOperatorAlerts)).toMatchObject({
       checks: [
+        "outbox_operator_alerts_case_reason_check",
         "outbox_operator_alerts_case_type_check",
         "outbox_operator_alerts_lifecycle_check",
         "outbox_operator_alerts_payload_check",
-        "outbox_operator_alerts_case_reason_check",
         "outbox_operator_alerts_status_check",
       ],
       indexes: ["outbox_operator_alerts_unresolved_cursor_idx"],
