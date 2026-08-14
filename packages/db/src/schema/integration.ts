@@ -191,9 +191,8 @@ export const clientCatalogRequests = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id")
-      .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    requestDigest: char("request_digest", { length: 64 }).notNull(),
+    requestDigest: char("request_digest", { length: 64 }),
     serviceCode: text("service_code"),
     language: text("language"),
     state: text("state").notNull().default("pending"),
@@ -210,11 +209,15 @@ export const clientCatalogRequests = pgTable(
     ),
     check(
       "client_catalog_requests_digest_check",
-      sql`${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
+      sql`${table.requestDigest} is null or ${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
     ),
     check(
       "client_catalog_requests_state_check",
       sql`${table.state} in ('pending','ready','expired')`,
+    ),
+    check(
+      "client_catalog_requests_expiry_check",
+      sql`(${table.state} = 'expired' and ${table.expiredAt} is not null and ${table.userId} is null and ${table.requestDigest} is null and ${table.serviceCode} is null and ${table.language} is null) or (${table.state} in ('pending','ready') and ${table.expiredAt} is null and ${table.userId} is not null and ${table.requestDigest} is not null)`,
     ),
     index("client_catalog_requests_expiry_idx")
       .on(table.expiresAt, table.id)

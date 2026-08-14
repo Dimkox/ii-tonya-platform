@@ -14,6 +14,7 @@ export const operationalMetrics = {
   outboxLagMs: meter.createHistogram("ii_tonya_outbox_lag_ms"),
   outboxDeadLetters: meter.createCounter("ii_tonya_outbox_dead_letters"),
   workerOutboxDelivery: meter.createCounter("ii_tonya_worker_outbox_delivery"),
+  clientCatalog: meter.createCounter("ii_tonya_client_catalog"),
   providerCircuitState: meter.createUpDownCounter(
     "ii_tonya_provider_circuit_state",
   ),
@@ -103,6 +104,72 @@ export type WorkerOutboxMetricLabels = Readonly<{
     | "lease_expired"
     | "internal";
 }>;
+
+const clientCatalogPhases = new Set(["request", "materialize", "cleanup"]);
+const clientCatalogOutcomes = new Set([
+  "applied",
+  "replayed",
+  "missing",
+  "expired",
+  "removed",
+  "no_op",
+  "retry",
+  "unknown",
+  "terminal",
+  "dead_letter",
+  "rejected",
+  "failed",
+]);
+
+export type ClientCatalogMetricLabels = Readonly<{
+  phase: "request" | "materialize" | "cleanup";
+  outcome:
+    | "applied"
+    | "replayed"
+    | "missing"
+    | "expired"
+    | "removed"
+    | "no_op"
+    | "retry"
+    | "unknown"
+    | "terminal"
+    | "dead_letter"
+    | "rejected"
+    | "failed";
+}>;
+
+export function clientCatalogMetricLabels(
+  value: unknown,
+): ClientCatalogMetricLabels {
+  if (!isRecord(value)) {
+    throw new Error("invalid_client_catalog_metric_labels");
+  }
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 2 ||
+    keys.some((key) => key !== "phase" && key !== "outcome") ||
+    typeof value.phase !== "string" ||
+    !clientCatalogPhases.has(value.phase) ||
+    typeof value.outcome !== "string" ||
+    !clientCatalogOutcomes.has(value.outcome)
+  ) {
+    throw new Error("invalid_client_catalog_metric_labels");
+  }
+  return value as ClientCatalogMetricLabels;
+}
+
+export function recordClientCatalogMetric(
+  labels: ClientCatalogMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error("invalid_client_catalog_metric_count");
+  }
+  operationalMetrics.clientCatalog.add(
+    count,
+    clientCatalogMetricLabels(labels),
+  );
+}
 
 const referralModules = new Set(["expert_referral", "expert_residency"]);
 const referralOperations = new Set([
@@ -219,10 +286,19 @@ export function recordWorkerOutboxMetric(
   if (!Number.isSafeInteger(count) || count < 1) {
     throw new Error("invalid_worker_outbox_metric_count");
   }
-  operationalMetrics.workerOutboxDelivery.add(
-    count,
-    workerOutboxMetricLabels(labels),
-  );
+  const normalized = workerOutboxMetricLabels(labels);
+  if (normalized.topic === "catalog_show") {
+    recordClientCatalogMetric(
+      {
+        phase:
+          normalized.phase === "lease_recovery" ? "cleanup" : "materialize",
+        outcome: normalized.outcome,
+      },
+      count,
+    );
+    return;
+  }
+  operationalMetrics.workerOutboxDelivery.add(count, normalized);
 }
 
 export function referralMetricLabels(

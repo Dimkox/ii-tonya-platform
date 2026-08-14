@@ -6,10 +6,13 @@ export {
 } from "./logger.js";
 export {
   operationalMetrics,
+  clientCatalogMetricLabels,
+  recordClientCatalogMetric,
   recordWorkerOutboxMetric,
   referralMetricLabels,
   workerOutboxMetricLabels,
   type ExpertReferralMetricLabels,
+  type ClientCatalogMetricLabels,
   type MetricLabels,
   type WorkerOutboxMetricLabels,
 } from "./metrics.js";

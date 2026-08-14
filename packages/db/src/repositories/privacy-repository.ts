@@ -22,6 +22,11 @@ export interface SubjectExport {
   readonly reservations: readonly { id: string; status: string; startsAt?: string }[];
   readonly feedback: readonly { reservationId: string; rating: number }[];
   readonly messageAccounting: { packageCount: number; eventCount: number; ledgerEntryCount: number };
+  readonly catalogSnapshots: readonly {
+    catalogRequestId: string;
+    expiresAt: string;
+    cards: readonly Record<string, unknown>[];
+  }[];
 }
 export interface StartErasureCommand {
   readonly targetUserId: string;
@@ -152,6 +157,26 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     const feedback = (await this.db.execute<{ reservationId: string; rating: number }>(sql`
       select reservation_id as "reservationId", rating from feedback where user_id = ${userId}::uuid order by created_at, id
     `)).rows;
+    const catalogSnapshots = (await this.db.execute<{
+      catalogRequestId: string;
+      expiresAt: Date | string;
+      cards: unknown;
+    }>(sql`
+      select r.id as "catalogRequestId",s.expires_at as "expiresAt",s.cards
+      from client_catalog_requests r
+      join client_catalog_snapshots s on s.request_id=r.id
+      where r.user_id=${userId}::uuid and r.state='ready'
+      order by r.created_at,r.id
+    `)).rows.map((row) => {
+      if (!Array.isArray(row.cards)) {
+        throw new Error("client_catalog_snapshot_invalid");
+      }
+      return {
+        catalogRequestId: row.catalogRequestId,
+        expiresAt: new Date(row.expiresAt).toISOString(),
+        cards: row.cards as readonly Record<string, unknown>[],
+      };
+    });
     const counts = one((await this.db.execute<{ packageCount: number; eventCount: number; ledgerEntryCount: number }>(sql`
       select
         (select count(*)::integer from message_packages where user_id = ${userId}::uuid) as "packageCount",
@@ -171,6 +196,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       messageAccounting: {
         packageCount: Number(counts.packageCount), eventCount: Number(counts.eventCount), ledgerEntryCount: Number(counts.ledgerEntryCount),
       },
+      catalogSnapshots,
     };
   }
 
@@ -215,6 +241,31 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
         select display_name as "displayName", timezone, expert_note as "expertNote" from client_profiles where user_id = ${command.targetUserId}::uuid for update
       `)).rows[0];
+      const catalogOutboxes = (await tx.execute<{
+        outboxId: string;
+        requestId: string;
+      }>(sql`
+        select o.id as "outboxId",r.id as "requestId"
+        from integration_outbox o
+        join client_catalog_requests r
+          on o.idempotency_key='client-catalog:' || r.id::text
+        where r.user_id=${command.targetUserId}::uuid
+          and o.topic='catalog.show'
+        order by o.id
+        for update of o
+      `)).rows;
+      for (const catalog of catalogOutboxes) {
+        await tx.execute(sql`
+          select id from client_catalog_requests
+          where id=${catalog.requestId}::uuid for update
+        `);
+      }
+      if (catalogOutboxes.length > 0) {
+        await tx.execute(sql`
+          delete from client_catalog_requests
+          where user_id=${command.targetUserId}::uuid
+        `);
+      }
       const job = one((await tx.execute<{ id: string }>(sql`
         insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)
         values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}, ${hash({ userId: command.targetUserId, kind: "legacy_provider_identifier_evidence" })}) returning id

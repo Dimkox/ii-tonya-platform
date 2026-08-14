@@ -271,7 +271,10 @@ export function createClientCatalogSourceReader(
 
 export function createClientCatalogOutboxRegistry(input: {
   local: LocalOperatorCaseOutboxRegistry;
-  requests: ClientCatalogRequestRepository;
+  requests: Pick<
+    ClientCatalogRequestRepository,
+    "loadPending" | "materialize"
+  >;
   source: ClientCatalogSourceReader;
 }): ClientCatalogOutboxRegistry {
   if (

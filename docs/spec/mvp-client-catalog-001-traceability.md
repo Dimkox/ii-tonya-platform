@@ -1,9 +1,9 @@
 # MVP-CLIENT-CATALOG-001 Traceability
 
-Status: planned, not implemented, tested, or activated. Base:
-`0bfb6efc4b2145dfc5f4ba4763fa6264f422f842`.
+Status: implementation checkpoint under independent review; not activated. Exact main
+base: `b6763dd`. Both catalog-related flags remain false by default.
 
-| Requirement | Future implementation boundary | Required verification | Release / recovery owner |
+| Requirement | Implementation boundary | Required verification | Release / recovery owner |
 | --- | --- | --- | --- |
 | CCAT-001 | client resolver, route composition | malformed/revoked/inactive/resolver-error denial before repository call | Security; retain flags false |
 | CCAT-002 | Fastify strict schemas and normalizer | extra-key/type/control/8KiB matrix | API owner; reject request |
@@ -16,5 +16,9 @@ Status: planned, not implemented, tested, or activated. Base:
 | CCAT-009 | retention and privacy repositories | first-write replay, 24h cleanup, export, erasure deletion | Privacy owner; run existing erasure workflow |
 | CCAT-010 | observability definitions | metric label allowlist and focused real-PostgreSQL gate | Operations; no production activation |
 
-No GitHub Actions, live provider, production server, Claw run, image build, or deployment
-evidence exists for this specification.
+Implementation checkpoints are `21e2cca` (durable request/outbox), `85e7809`
+(authority/application), `76b4872` (HTTP/config), and `4b88a2b` (worker/public reader).
+Focused Claw evidence is 2/2 plus PostgreSQL 3/3, 21/21, 10/10 plus 33/33, Task 4
+23/23, and Task 5 9/9. Independent review and one new final focused Claw/PostgreSQL
+gate are still required. No GitHub Actions, live provider, image build, activation,
+deployment, push, or merge is authorized by this checkpoint.

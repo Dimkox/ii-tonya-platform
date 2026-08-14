@@ -47,6 +47,10 @@ export interface ClientCatalogRequestRepository {
     catalogRequestId: string;
     cards: readonly ClientCatalogCard[];
   }): Promise<"ready" | "replayed" | "missing">;
+  expireDue(input: {
+    now: Date;
+    limit: number;
+  }): Promise<{ examined: number; expired: number; removed: number }>;
 }
 
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
@@ -145,6 +149,23 @@ const state = (value: string): "pending" | "ready" => {
 
 const canonicalPayload = (catalogRequestId: string): string =>
   JSON.stringify({ v: 1, catalogRequestId });
+
+const terminalOutboxStatus = (status: string): boolean =>
+  status === "succeeded" || status === "dead_letter";
+
+async function deleteCatalogOutbox(
+  tx: Transaction,
+  outboxId: string,
+): Promise<void> {
+  await tx.execute(sql`delete from delivery_attempts where outbox_id=${outboxId}::uuid`);
+  await tx.execute(sql`delete from dead_letters where outbox_id=${outboxId}::uuid`);
+  await tx.execute(sql`delete from outbox_operator_alerts where outbox_id=${outboxId}::uuid`);
+  await tx.execute(sql`
+    update reconciliation_mismatches set outbox_id=null
+    where outbox_id=${outboxId}::uuid
+  `);
+  await tx.execute(sql`delete from integration_outbox where id=${outboxId}::uuid`);
+}
 
 export class PostgresClientCatalogRepository
   implements ClientCatalogRequestRepository
@@ -313,6 +334,109 @@ export class PostgresClientCatalogRepository
         where id=${catalogRequestId}::uuid and state='pending'
       `);
       return "ready";
+    });
+  }
+
+  expireDue(input: {
+    now: Date;
+    limit: number;
+  }): Promise<{ examined: number; expired: number; removed: number }> {
+    if (
+      !(input.now instanceof Date) ||
+      !Number.isFinite(input.now.getTime()) ||
+      !Number.isSafeInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > 1_000
+    ) {
+      return Promise.reject(new Error("client_catalog_retention_invalid"));
+    }
+    return this.db.transaction(async (tx: Transaction) => {
+      const candidates = (await tx.execute<{ requestId: string }>(sql`
+        select r.id as "requestId"
+        from client_catalog_requests r
+        where (r.state in ('pending','ready') and r.expires_at <= ${input.now})
+          or r.state='expired'
+        order by r.expires_at,r.id
+        limit ${input.limit}
+      `)).rows;
+      let examined = 0;
+      let expired = 0;
+      let removed = 0;
+
+      for (const candidate of candidates) {
+        const outbox = (await tx.execute<{ outboxId: string; status: string }>(sql`
+          select id as "outboxId",status
+          from integration_outbox
+          where idempotency_key=${`client-catalog:${candidate.requestId}`}
+            and topic='catalog.show'
+          for update skip locked
+        `)).rows[0];
+        if (outbox === undefined) continue;
+        const request = (await tx.execute<{
+          state: string;
+          expiresAt: Date | string;
+        }>(sql`
+          select state,expires_at as "expiresAt"
+          from client_catalog_requests
+          where id=${candidate.requestId}::uuid
+          for update skip locked
+        `)).rows[0];
+        if (request === undefined) continue;
+        examined += 1;
+        const expiresAt =
+          request.expiresAt instanceof Date
+            ? request.expiresAt
+            : new Date(request.expiresAt);
+        if (
+          request.state !== "expired" &&
+          expiresAt.getTime() <= input.now.getTime()
+        ) {
+          await tx.execute(sql`
+            delete from client_catalog_snapshots
+            where request_id=${candidate.requestId}::uuid
+          `);
+          await tx.execute(sql`
+            update client_catalog_requests
+            set state='expired',user_id=null,request_digest=null,
+              service_code=null,language=null,expired_at=${input.now},
+              updated_at=${input.now}
+            where id=${candidate.requestId}::uuid
+          `);
+          expired += 1;
+        }
+        if (terminalOutboxStatus(outbox.status)) {
+          await deleteCatalogOutbox(tx, outbox.outboxId);
+          await tx.execute(sql`
+            delete from client_catalog_requests
+            where id=${candidate.requestId}::uuid
+          `);
+          removed += 1;
+        }
+      }
+
+      const remaining = input.limit - examined;
+      if (remaining > 0) {
+        const orphans = (await tx.execute<{ outboxId: string }>(sql`
+          select o.id as "outboxId"
+          from integration_outbox o
+          where o.topic='catalog.show'
+            and o.idempotency_key like 'client-catalog:%'
+            and o.status in ('succeeded','dead_letter')
+            and not exists (
+              select 1 from client_catalog_requests r
+              where o.idempotency_key='client-catalog:' || r.id::text
+            )
+          order by o.updated_at,o.id
+          for update skip locked
+          limit ${remaining}
+        `)).rows;
+        for (const orphan of orphans) {
+          await deleteCatalogOutbox(tx, orphan.outboxId);
+          examined += 1;
+          removed += 1;
+        }
+      }
+      return { examined, expired, removed };
     });
   }
 }
