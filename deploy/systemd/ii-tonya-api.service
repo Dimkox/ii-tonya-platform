@@ -2,6 +2,8 @@
 Description=ii-Tonya API
 After=network-online.target postgresql.service
 Wants=network-online.target
+StartLimitIntervalSec=60s
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -9,10 +11,12 @@ User=ii_tonya
 Group=ii_tonya
 WorkingDirectory=/opt/ii-tonya-platform/current
 EnvironmentFile=/etc/ii-tonya/runtime.env
-Environment=NODE_OPTIONS=--jitless
-ExecStart=/usr/bin/node api/dist/server.js
+ExecStart=/usr/bin/node --jitless api/dist/server.js
 Restart=on-failure
 RestartSec=5s
+OOMPolicy=stop
+MemoryHigh=192M
+MemoryMax=256M
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

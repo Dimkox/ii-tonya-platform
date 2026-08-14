@@ -10,6 +10,9 @@ release `233f3cf72e45e47117948ad5615b603252801e40` runs on the dedicated Ubuntu 
 systemd-managed API and worker services with system PostgreSQL, nginx, and HTTPS for
 `ii-tonya.ru` and `www.ii-tonya.ru`. Deployment evidence is recorded in
 [`docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md`](docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md).
+That first native release required host-only recovery settings and is not accepted as a
+reproducible cold-deploy artifact; a corrected exact-SHA replacement is the active release
+task.
 The client platform foundation is implemented, while live-provider gates remain closed.
 The expert residency referral extension
 includes expert API,

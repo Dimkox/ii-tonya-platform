@@ -9,8 +9,8 @@ fail-closed and requires its own approval.
 - one dedicated Linux server for ii-Тоня;
 - Node.js 24;
 - non-root `ii_tonya` API and worker systemd services;
-- `NODE_OPTIONS=--jitless` preserves Node compatibility with
-  `MemoryDenyWriteExecute=true`;
+- the explicit `node --jitless` service command preserves Node compatibility with
+  `MemoryDenyWriteExecute=true`; runtime env files may not redefine `NODE_OPTIONS`;
 - systemd creates `/var/lib/ii-tonya` and `/var/log/ii-tonya` through
   `StateDirectory` and `LogsDirectory`;
 - system PostgreSQL with a project-scoped role/database;
@@ -46,14 +46,17 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
 6. Run backward-compatible migration preflight and approved migrations.
 7. Install the immutable release directory and atomically switch `current`.
 8. Restart API and worker systemd units; check readiness, smoke, audit, and reconciliation.
-9. On failure, switch `current` to the prior compatible release and restart services.
+9. On failure, restore the prior release's systemd units, run `daemon-reload`, switch
+   `current` to the prior compatible release, and restart services.
    Database rollback is forward-fix unless a separately reviewed reverse migration exists.
 
 ## Current production state
 
-The old production image/Compose and GitHub Actions entrypoints are removed. Exact-SHA
-Claw CI, Database Gate, native bundle assembly, signing, migration, systemd deployment,
-and public HTTPS readiness have recorded evidence for `233f3cf72e45e47117948ad5615b603252801e40`.
+The old production image/Compose and GitHub Actions entrypoints are removed. The first
+native runtime at `233f3cf72e45e47117948ad5615b603252801e40` required host-only recovery
+settings and is operational but not a reproducible release. Its replacement must be
+built and deployed from an exact SHA containing the corrected versioned units before the
+native release gate is complete.
 The Claw rehearsal uses one persistent
 `ii_tonya_native_smoke` database and resets only its `public` schema. No container release
 path is authorized for production.

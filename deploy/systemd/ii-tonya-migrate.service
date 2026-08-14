@@ -8,8 +8,7 @@ User=ii_tonya
 Group=ii_tonya
 WorkingDirectory=/opt/ii-tonya-platform/current/api
 EnvironmentFile=/etc/ii-tonya/runtime.env
-Environment=NODE_OPTIONS=--jitless
-ExecStart=/usr/bin/node migrate-native.mjs
+ExecStart=/usr/bin/node --jitless migrate-native.mjs
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

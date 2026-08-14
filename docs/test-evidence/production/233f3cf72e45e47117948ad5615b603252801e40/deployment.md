@@ -1,4 +1,4 @@
-# Native production deployment evidence
+# Native production deployment evidence (recovered, not reproducible)
 
 - deployed_at: 2026-08-14 MSK
 - release_sha: `233f3cf72e45e47117948ad5615b603252801e40`
@@ -33,14 +33,15 @@ The previous 246 MiB source checkout was stopped and preserved at
 `Result=success`; the resulting database has 55 public tables and 23 Drizzle migration
 records.
 
-The first migration start exposed a reproducible Node/systemd incompatibility:
+The first migration start exposed a Node/systemd incompatibility:
 `MemoryDenyWriteExecute=true` prevented V8 from initializing and produced `SIGTRAP`.
 `NODE_OPTIONS=--jitless` passed under the same W^X control and was installed as a host
 drop-in. The first API/worker start then exposed missing writable state directories and
 failed before Node with `226/NAMESPACE`. Creating `/var/lib/ii-tonya` and
-`/var/log/ii-tonya` for `ii_tonya` resolved it. The versioned systemd assets now encode
-both requirements with `Environment=NODE_OPTIONS=--jitless`, `StateDirectory`, and
-`LogsDirectory`.
+`/var/log/ii-tonya` for `ii_tonya` resolved it. These were host-only remediations: the
+signed `233f3cf72e45e47117948ad5615b603252801e40` artifact does not contain them and must
+not be treated as reproducible cold-deploy or rollback evidence. A later exact-SHA release
+must carry the explicit `node --jitless`, managed-directory, resource, and restart limits.
 
 ## Live verification
 

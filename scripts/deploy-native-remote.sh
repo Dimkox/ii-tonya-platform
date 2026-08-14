@@ -47,6 +47,17 @@ cd "$deploy_root"
 previous="$(cat .previous-release)"
 [[ "$previous" =~ ^releases/[0-9a-f]{40}$ ]]
 test -d "$previous"
+install_release_units() {
+  release_dir="$1"
+  test -f "$release_dir/systemd/ii-tonya-api.service"
+  test -f "$release_dir/systemd/ii-tonya-worker.service"
+  test -f "$release_dir/systemd/ii-tonya-migrate.service"
+  sudo install -m 0644 "$release_dir/systemd/ii-tonya-api.service" /etc/systemd/system/
+  sudo install -m 0644 "$release_dir/systemd/ii-tonya-worker.service" /etc/systemd/system/
+  sudo install -m 0644 "$release_dir/systemd/ii-tonya-migrate.service" /etc/systemd/system/
+  sudo systemctl daemon-reload
+}
+install_release_units "$deploy_root/$previous"
 ln -sfn "$previous" .current.next
 mv -Tf .current.next current
 sudo systemctl restart ii-tonya-api.service
@@ -94,6 +105,16 @@ incoming="$deploy_root/incoming/ii-tonya-$release_sha"
 RELEASE_SHA="$release_sha"
 release_dir="$deploy_root/releases/$RELEASE_SHA"
 previous=""
+install_release_units() {
+  unit_release_dir="$1"
+  test -f "$unit_release_dir/systemd/ii-tonya-api.service"
+  test -f "$unit_release_dir/systemd/ii-tonya-worker.service"
+  test -f "$unit_release_dir/systemd/ii-tonya-migrate.service"
+  sudo install -m 0644 "$unit_release_dir/systemd/ii-tonya-api.service" /etc/systemd/system/
+  sudo install -m 0644 "$unit_release_dir/systemd/ii-tonya-worker.service" /etc/systemd/system/
+  sudo install -m 0644 "$unit_release_dir/systemd/ii-tonya-migrate.service" /etc/systemd/system/
+  sudo systemctl daemon-reload
+}
 if [[ -L "$deploy_root/current" ]]; then
   previous="$(readlink "$deploy_root/current")"
   [[ "$previous" =~ ^releases/[0-9a-f]{40}$ ]]
@@ -105,10 +126,8 @@ test ! -e "$release_dir"
 install -d -m 0750 "$release_dir"
 tar -xzf native-release.tar.gz -C "$release_dir" --no-same-owner --no-same-permissions
 test "$(cat "$release_dir/SOURCE_SHA")" = "$release_sha"
-sudo install -m 0644 "$release_dir/systemd/ii-tonya-api.service" /etc/systemd/system/
-sudo install -m 0644 "$release_dir/systemd/ii-tonya-worker.service" /etc/systemd/system/
-sudo install -m 0644 "$release_dir/systemd/ii-tonya-migrate.service" /etc/systemd/system/
-sudo systemctl daemon-reload
+bash "$release_dir/scripts/validate-runtime-env.sh" /etc/ii-tonya/runtime.env "$release_sha"
+install_release_units "$release_dir"
 
 if [[ -n "$previous" ]]; then
   printf '%s\n' "$previous" > "$deploy_root/.previous-release"
@@ -117,12 +136,16 @@ ln -sfn "releases/$release_sha" "$deploy_root/.current.next"
 mv -Tf "$deploy_root/.current.next" "$deploy_root/current"
 
 rollback_on_error() {
+  original_status="$?"
+  trap - ERR
   if [[ -n "$previous" ]]; then
+    install_release_units "$deploy_root/$previous"
     ln -sfn "$previous" "$deploy_root/.current.next"
     mv -Tf "$deploy_root/.current.next" "$deploy_root/current"
-    sudo systemctl restart ii-tonya-api.service || true
-    sudo systemctl restart ii-tonya-worker.service || true
+    sudo systemctl restart ii-tonya-api.service
+    sudo systemctl restart ii-tonya-worker.service
   fi
+  exit "$original_status"
 }
 trap rollback_on_error ERR
 
