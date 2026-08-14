@@ -47,4 +47,24 @@ describe("client session database-clock review closure", () => {
       maximumTtlMs: 3_600_000,
     })).resolves.toMatchObject({ kind: "issued" });
   });
+
+  it("keeps unexpected check violations classified as infrastructure failure", async () => {
+    const repository = new PostgresClientSessionRepository({
+      transaction: async () => {
+        const error = new Error("private schema detail") as Error & {
+          code: string;
+        };
+        error.code = "23514";
+        throw error;
+      },
+    } as never);
+    await expect(repository.issue({
+      userId: "00000000-0000-4000-8000-000000000101",
+      replayDigest: digest("hmac-sha256:v1", "constraint-replay") as `hmac-sha256:v1:${string}`,
+      proofExpiresAt: new Date(Date.now() + 30 * 60_000),
+      tokenDigest: digest("sha256", "constraint-token") as `sha256:${string}`,
+      scope: "client_catalog:read",
+      maximumTtlMs: 3_600_000,
+    })).rejects.toThrow("client_session_repository_unavailable");
+  });
 });

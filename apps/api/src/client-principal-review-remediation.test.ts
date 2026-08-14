@@ -28,6 +28,32 @@ describe("client principal security review remediation", () => {
     expect(verify.mock.calls[0]?.[0]?.signal).toBe(controller.signal);
   });
 
+  it("does not call the repository when cancellation wins at verifier completion", async () => {
+    const controller = new AbortController();
+    const issue = vi.fn();
+    const service = createClientSessionService({
+      verifier: {
+        async verify() {
+          controller.abort();
+          return {
+            userId: "00000000-0000-4000-8000-000000000101",
+            audience: "ii-tonya-client",
+            scope: "client_session:create",
+            expiresAt: new Date("2026-08-14T13:00:00.000Z"),
+            replayDigest: `hmac-sha256:v1:${"a".repeat(64)}`,
+          };
+        },
+      },
+      sessions: { issue },
+      generateToken: () => `cs1.${"A".repeat(43)}`,
+      digestToken: () => `sha256:${"a".repeat(64)}`,
+    });
+    await expect(
+      service.issue("P".repeat(32), controller.signal),
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(issue).not.toHaveBeenCalled();
+  });
+
   it("aborts issuance at the route deadline and creates no repository work", async () => {
     const repositoryCall = vi.fn();
     let observedSignal: AbortSignal | undefined;
