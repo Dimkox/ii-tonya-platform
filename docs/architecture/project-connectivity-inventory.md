@@ -72,33 +72,37 @@ Connected areas:
 - API: expert referral routes, admin routes, Telegram webhook.
 - Application: referral/residency/admin services, code crypto/key resolver, prompt context and typed proposals.
 - DB: referral/control/admin/residency/provider-inbox/worker repositories and trusted transaction capability.
-- Integrations: Telegram adapter/callback token and provider-neutral residency payment contracts.
-- Worker: residency expiry, reconciliation, held-reward replay.
-- Observability: bounded referral/residency metrics.
-- Database: migrations `0018`–`0022`, snapshots/journal, expert referral/residency relations/views.
+- Integrations: Telegram adapter/callback token; provider-neutral residency payment port;
+  YooKassa fixed-origin client, adapter, verifier, and default-off webhook seam.
+- Worker: residency expiry, reconciliation, held-reward replay; YooKassa reconciliation
+  is an injected, disabled-by-default seam.
+- Observability: bounded referral/residency and provider-outcome metrics.
+- Database: migrations `0018`–`0023`, snapshots/journal, expert referral/residency
+  relations/views, and YooKassa operation mapping.
 - Verification: unit, integration concurrency/deadline/reversal/hold, e2e lifecycle, repo scope/env/workflow guards.
 - Operations: traceability, runbooks, rollback, security addendum, reconciliation policy.
 
 ## Non-runtime, historical, and dead/deferred classification
 
-| Entity class                                  | Classification        | Why it stays connected                                        |
-| --------------------------------------------- | --------------------- | ------------------------------------------------------------- |
-| `docs/test-evidence/claw/*`                   | EVIDENCE              | Exact-SHA environment/results for audit and recovery.         |
-| `.superpowers/sdd/*`                          | EVIDENCE / HISTORICAL | Progress/remediation history.                                 |
-| `docs/handoffs/*`                             | EVIDENCE              | Clean-machine continuation/recovery.                          |
-| completed plans/specs                         | EVIDENCE              | Requirement/decision traceability.                            |
-| old migrations/snapshots                      | LEGACY/HISTORICAL     | Clean migration replay and schema parity.                     |
-| disabled payment adapter                      | DISABLED              | Explicit fail-closed contract.                                |
-| disabled expert payment provider reader       | DISABLED              | Prevents accidental live network authority.                   |
-| worker unknown-outcome placeholder            | DISABLED              | Lifecycle slot retained while providers are off.              |
-| worker privacy placeholder                    | DISABLED              | Capability not composed.                                      |
-| generic provider reconciliation placeholder   | DISABLED              | No approved live provider reader.                             |
-| client `500/500` coupon executable runtime    | DEFERRED              | Separate product scope; must not share expert referral logic. |
-| waitlist runtime                              | DEFERRED              | Outside current release.                                      |
-| expert reschedule composite runtime           | DEFERRED              | Outside current release.                                      |
-| live payment-provider SDK/network composition | PROHIBITED            | Scope guards reject it pending separate approval.             |
-| authoritative Make/Sheets writes              | PROHIBITED            | PostgreSQL is transactional authority.                        |
-| direct LLM DB/financial mutation              | PROHIBITED            | Typed proposal + deterministic reauthorization.               |
+| Entity class                                  | Classification        | Why it stays connected                                                 |
+| --------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| `docs/test-evidence/claw/*`                   | EVIDENCE              | Exact-SHA environment/results for audit and recovery.                  |
+| `.superpowers/sdd/*`                          | EVIDENCE / HISTORICAL | Progress/remediation history.                                          |
+| `docs/handoffs/*`                             | EVIDENCE              | Clean-machine continuation/recovery.                                   |
+| completed plans/specs                         | EVIDENCE              | Requirement/decision traceability.                                     |
+| old migrations/snapshots                      | LEGACY/HISTORICAL     | Clean migration replay and schema parity.                              |
+| disabled payment adapter                      | DISABLED              | Explicit fail-closed contract.                                         |
+| disabled expert payment provider reader       | DISABLED              | Prevents accidental live network authority.                            |
+| worker unknown-outcome placeholder            | DISABLED              | Lifecycle slot retained while providers are off.                       |
+| worker privacy placeholder                    | DISABLED              | Capability not composed.                                               |
+| generic provider reconciliation placeholder   | DISABLED              | No approved live provider reader.                                      |
+| client `500/500` coupon executable runtime    | DEFERRED              | Separate product scope; must not share expert referral logic.          |
+| waitlist runtime                              | DEFERRED              | Outside current release.                                               |
+| expert reschedule composite runtime           | DEFERRED              | Outside current release.                                               |
+| YooKassa Merchant boundary                    | DISABLED              | Code exists, but default composition has no credentials or capability. |
+| personal YooMoney Wallet API / T-Bank adapter | PROHIBITED            | Wrong/out-of-scope provider surface; YooKassa Merchant API only.       |
+| authoritative Make/Sheets writes              | PROHIBITED            | PostgreSQL is transactional authority.                                 |
+| direct LLM DB/financial mutation              | PROHIBITED            | Typed proposal + deterministic reauthorization.                        |
 
 ## Orphan and dead-code rule
 
