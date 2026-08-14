@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  char,
   check,
+  index,
   pgTable,
   text,
   timestamp,
@@ -20,6 +22,62 @@ export const users = pgTable("users", {
   active: boolean("active").notNull().default(true),
   ...mutableTimestamps,
 });
+
+export const clientSessions = pgTable(
+  "client_sessions",
+  {
+    tokenDigest: char("token_digest", { length: 71 }).primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    check(
+      "client_sessions_token_digest_check",
+      sql`${table.tokenDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_sessions_scope_check",
+      sql`${table.scope} = 'client_catalog:read'`,
+    ),
+    check(
+      "client_sessions_lifecycle_check",
+      sql`${table.expiresAt} > ${table.createdAt} and (${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt})`,
+    ),
+    index("client_sessions_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const clientIdentityProofReceipts = pgTable(
+  "client_identity_proof_receipts",
+  {
+    replayDigest: text("replay_digest").primaryKey(),
+    sessionTokenDigest: char("session_token_digest", { length: 71 })
+      .unique("client_identity_proof_receipts_session_digest_unique")
+      .references(() => clientSessions.tokenDigest, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    check(
+      "client_identity_proof_receipts_replay_digest_check",
+      sql`${table.replayDigest} ~ '^hmac-sha256:v[1-9][0-9]*:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_identity_proof_receipts_session_digest_check",
+      sql`${table.sessionTokenDigest} is null or ${table.sessionTokenDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_identity_proof_receipts_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    index("client_identity_proof_receipts_expiry_idx").on(table.expiresAt),
+  ],
+);
 
 export const channelIdentities = pgTable(
   "channel_identities",

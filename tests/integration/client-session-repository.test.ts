@@ -82,7 +82,7 @@ describe("PostgreSQL client session repository", () => {
       repository.issue({ ...issueInput(activeUser, "expired"), proofExpiresAt: future(-1_000) }),
     ).resolves.toEqual({ kind: "denied" });
     await expect(
-      repository.issue({ ...issueInput(activeUser, "long"), proofExpiresAt: future(3_600_001) }),
+      repository.issue({ ...issueInput(activeUser, "long"), proofExpiresAt: future(61 * 60_000) }),
     ).resolves.toEqual({ kind: "denied" });
 
     const counts = await testDb.db.execute<{ receipts: string; sessions: string }>(sql`
