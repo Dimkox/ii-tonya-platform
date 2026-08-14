@@ -20,7 +20,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { adminApprovals, adminSessions } from "./audit.js";
 import { experts } from "./catalog.js";
-import { channelIdentities, users } from "./identity.js";
+import { channelIdentities, consents, users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -527,6 +527,15 @@ export const expertResidencyProviderOperations = pgTable(
     reconciliationClaimedAt: timestamp("reconciliation_claimed_at", {
       withTimezone: true,
     }),
+    replayCiphertext: text("replay_ciphertext"),
+    replayKeyReference: text("replay_key_reference"),
+    replayBodyVersion: integer("replay_body_version"),
+    recoveryAttempt: integer("recovery_attempt").notNull().default(0),
+    recoveryNextAt: timestamp("recovery_next_at", { withTimezone: true }),
+    recoveryLeaseToken: uuid("recovery_lease_token"),
+    recoveryLeaseUntil: timestamp("recovery_lease_until", { withTimezone: true }),
+    recoveryExpiresAt: timestamp("recovery_expires_at", { withTimezone: true }),
+    manualReviewAt: timestamp("manual_review_at", { withTimezone: true }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt,
     updatedAt,
@@ -566,6 +575,9 @@ export const expertResidencyProviderOperations = pgTable(
       table.operationKind,
       table.createdAt,
     ),
+    index("expert_provider_operations_unbound_recovery_idx")
+      .on(table.recoveryNextAt, table.createdAt, table.id)
+      .where(sql`${table.providerObjectId} is null and ${table.status} = 'unknown_outcome' and ${table.replayCiphertext} is not null and ${table.manualReviewAt} is null`),
     check(
       "expert_provider_operations_provider",
       sql`${table.provider} = 'yookassa'`,
@@ -610,6 +622,37 @@ export const expertResidencyProviderOperations = pgTable(
       "expert_provider_operations_resolution",
       sql`(${table.status} in ('claimed','pending','unknown_outcome') and ${table.resolvedAt} is null) or (${table.status} in ('succeeded','canceled','failed') and ${table.resolvedAt} is not null)`,
     ),
+    check("expert_provider_operations_replay_bundle", sql`(${table.replayCiphertext} is null and ${table.replayKeyReference} is null and ${table.replayBodyVersion} is null and ${table.recoveryExpiresAt} is null) or (length(${table.replayCiphertext}) between 1 and 32768 and ${table.replayKeyReference} ~ '^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$' and ${table.replayBodyVersion} between 1 and 2147483647 and ${table.recoveryExpiresAt} is not null)`),
+    check("expert_provider_operations_recovery_attempt", sql`${table.recoveryAttempt} between 0 and 100`),
+    check("expert_provider_operations_recovery_lease", sql`(${table.recoveryLeaseToken} is null) = (${table.recoveryLeaseUntil} is null)`),
+    check("expert_provider_operations_manual_review", sql`${table.manualReviewAt} is null or (${table.providerObjectId} is null and ${table.status} = 'unknown_outcome')`),
+  ],
+);
+
+export const expertResidencyReceiptContacts = pgTable(
+  "expert_residency_receipt_contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    contactKind: text("contact_kind").$type<"email" | "phone">().notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    keyReference: text("key_reference").notNull(),
+    consentId: uuid("consent_id").notNull().references(() => consents.id),
+    consentDecision: text("consent_decision").$type<"granted" | "denied">().notNull(),
+    consentPurpose: text("consent_purpose").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    index("expert_receipt_contacts_authority_idx").on(table.userId, table.consentPurpose, table.policyVersion, table.createdAt, table.id),
+    check("expert_receipt_contacts_kind", sql`${table.contactKind} in ('email','phone')`),
+    check("expert_receipt_contacts_ciphertext", sql`length(${table.ciphertext}) between 1 and 8192`),
+    check("expert_receipt_contacts_key_reference", sql`${table.keyReference} ~ '^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$'`),
+    check("expert_receipt_contacts_consent", sql`${table.consentDecision} in ('granted','denied')`),
+    check("expert_receipt_contacts_verification", sql`(${table.consentDecision} = 'granted' and ${table.verifiedAt} is not null) or (${table.consentDecision} = 'denied' and ${table.verifiedAt} is null)`),
+    check("expert_receipt_contacts_revocation", sql`${table.revokedAt} is null or (${table.verifiedAt} is not null and ${table.revokedAt} >= ${table.verifiedAt})`),
   ],
 );
 

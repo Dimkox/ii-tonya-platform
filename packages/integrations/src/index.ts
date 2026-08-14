@@ -164,6 +164,23 @@ export type {
   YooKassaReconciliationSnapshot,
 } from "./yookassa/reconciliation-reader.js";
 export { YooKassaWebhookCapability } from "./yookassa/webhook-capability.js";
+export { ConsentBoundYooKassaReceiptContactSource } from "./yookassa/receipt-contact-source.js";
+export type {
+  ConsentBoundYooKassaReceiptContactSourceDeps,
+  EncryptedYooKassaReceiptContact,
+  YooKassaReceiptContactAuthority,
+  YooKassaReceiptContactDecryptor,
+  YooKassaReceiptContactKind,
+} from "./yookassa/receipt-contact-source.js";
+export { recoverExactYooKassaOperation } from "./yookassa/exact-body-recovery.js";
+export type {
+  YooKassaExactRecoveryClaim,
+  YooKassaExactRecoveryCompletion,
+  YooKassaExactRecoveryOperationKind,
+  YooKassaExactRecoveryTransport,
+  YooKassaReplayDecryptor,
+  YooKassaReplayProtector,
+} from "./yookassa/exact-body-recovery.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,

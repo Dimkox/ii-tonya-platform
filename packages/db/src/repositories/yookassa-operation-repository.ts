@@ -13,6 +13,7 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const PROVIDER_ID = /^[A-Za-z0-9_-]{1,64}$/u;
+const KEY_REFERENCE = /^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$/u;
 
 export type YooKassaOperationErrorCode =
   | "YOOKASSA_OPERATION_INVALID"
@@ -107,7 +108,14 @@ const validateClaim = (command: ClaimYooKassaOperationCommand): void => {
     (command.kind === "create_payment" &&
       command.parentPaymentId !== undefined) ||
     (command.kind === "create_refund" &&
-      !PROVIDER_ID.test(command.parentPaymentId ?? ""))
+      !PROVIDER_ID.test(command.parentPaymentId ?? "")) ||
+    (command.replaySnapshot !== undefined &&
+      (command.replaySnapshot.ciphertext.length < 1 ||
+        command.replaySnapshot.ciphertext.length > 32_768 ||
+        !KEY_REFERENCE.test(command.replaySnapshot.keyReference) ||
+        !Number.isInteger(command.replaySnapshot.bodyVersion) ||
+        command.replaySnapshot.bodyVersion < 1 ||
+        !Number.isFinite(Date.parse(command.replaySnapshot.expiresAt))))
   ) {
     throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
   }
@@ -315,13 +323,19 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           insert into expert_residency_provider_operations (
             command_id, order_id, payment_attempt_id, operation_kind,
             provider, environment_mode, parent_payment_id, amount_minor,
-            currency, request_digest, claim_digest
+            currency, request_digest, claim_digest, replay_ciphertext,
+            replay_key_reference, replay_body_version, recovery_expires_at,
+            recovery_next_at
           ) values (
             ${command.commandId}::uuid, ${command.orderId}::uuid,
             ${paymentAttemptId}::uuid, ${command.kind}, 'yookassa',
             ${command.mode}, ${command.parentPaymentId ?? null},
             ${command.amountMinor}::bigint, 'RUB', ${command.requestDigest},
-            ${claimDigest}
+            ${claimDigest}, ${command.replaySnapshot?.ciphertext ?? null},
+            ${command.replaySnapshot?.keyReference ?? null},
+            ${command.replaySnapshot?.bodyVersion ?? null},
+            ${command.replaySnapshot?.expiresAt ?? null}::timestamptz,
+            case when ${command.replaySnapshot !== undefined} then transaction_timestamp() else null end
           ) on conflict (provider, command_id) do nothing
         `);
         const selected = await tx.execute<StoredOperation>(sql`
@@ -482,5 +496,63 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         operation.idempotency_key::text as "idempotencyKey", operation.status
     `);
     return result.rows.map(toOperation);
+  }
+
+  async claimUnboundRecoveryBatch(input: {
+    readonly limit: number;
+    readonly leaseSeconds: number;
+    readonly maxAttempts: number;
+  }): Promise<readonly import("@ii-tonya/integrations").YooKassaExactRecoveryClaim[]> {
+    if (
+      !Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100 ||
+      !Number.isInteger(input.leaseSeconds) || input.leaseSeconds < 1 || input.leaseSeconds > 3600 ||
+      !Number.isInteger(input.maxAttempts) || input.maxAttempts < 1 || input.maxAttempts > 100
+    ) throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        update expert_residency_provider_operations
+        set manual_review_at = transaction_timestamp(),
+            recovery_lease_token = null, recovery_lease_until = null,
+            updated_at = transaction_timestamp()
+        where provider_object_id is null and status = 'unknown_outcome'
+          and replay_ciphertext is not null and manual_review_at is null
+          and (recovery_expires_at <= transaction_timestamp()
+            or recovery_attempt >= ${input.maxAttempts})
+      `);
+      const result = await tx.execute<{
+        operationId: string; operationKind: "create_payment" | "create_refund";
+        encryptedBody: string; bodyVersion: number; keyReference: string;
+        idempotencyKey: string; leaseToken: string; status: "unknown_outcome";
+        providerObjectId: null;
+      }>(sql`
+        with candidates as (
+          select id from expert_residency_provider_operations
+          where provider_object_id is null and status = 'unknown_outcome'
+            and replay_ciphertext is not null and manual_review_at is null
+            and recovery_expires_at > transaction_timestamp()
+            and recovery_attempt < ${input.maxAttempts}
+            and (recovery_next_at is null or recovery_next_at <= transaction_timestamp())
+            and (recovery_lease_until is null or recovery_lease_until < transaction_timestamp())
+          order by recovery_next_at nulls first, created_at, id
+          for update skip locked
+          limit ${input.limit}
+        )
+        update expert_residency_provider_operations operation
+        set recovery_lease_token = gen_random_uuid(),
+            recovery_lease_until = transaction_timestamp() + make_interval(secs => ${input.leaseSeconds}),
+            recovery_attempt = recovery_attempt + 1,
+            updated_at = transaction_timestamp()
+        from candidates where operation.id = candidates.id
+        returning operation.id::text as "operationId",
+          operation.operation_kind as "operationKind",
+          operation.replay_ciphertext as "encryptedBody",
+          operation.replay_body_version as "bodyVersion",
+          operation.replay_key_reference as "keyReference",
+          operation.idempotency_key::text as "idempotencyKey",
+          operation.recovery_lease_token::text as "leaseToken",
+          operation.status, operation.provider_object_id as "providerObjectId"
+      `);
+      return result.rows;
+    });
   }
 }

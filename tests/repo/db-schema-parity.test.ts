@@ -57,6 +57,7 @@ describe("authoritative Drizzle schema parity", () => {
       "expertResidencyOrders",
       "expertResidencyPaymentAttempts",
       "expertResidencyProviderOperations",
+      "expertResidencyReceiptContacts",
       "expertResidencyProviderEventInbox",
       "expertFirstResidencySettlements",
       "expertReferralRewardGrants",
@@ -131,10 +132,14 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_provider_operations_claim_digest",
         "expert_provider_operations_currency",
         "expert_provider_operations_kind",
+        "expert_provider_operations_manual_review",
         "expert_provider_operations_mode",
         "expert_provider_operations_parent",
         "expert_provider_operations_provider",
         "expert_provider_operations_provider_id",
+        "expert_provider_operations_recovery_attempt",
+        "expert_provider_operations_recovery_lease",
+        "expert_provider_operations_replay_bundle",
         "expert_provider_operations_request_digest",
         "expert_provider_operations_resolution",
         "expert_provider_operations_status",
@@ -149,6 +154,7 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_provider_operations_object_unique",
         "expert_provider_operations_order_kind_idx",
         "expert_provider_operations_reconcile_idx",
+        "expert_provider_operations_unbound_recovery_idx",
       ],
     });
     expect(requiredTable("expertFirstResidencySettlements")).toMatchObject({
@@ -367,6 +373,7 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0023_yookassa_provider_operations.sql",
         "utf8",
       ),
+      readFileSync("packages/db/migrations/0024_yookassa_encrypted_recovery.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -437,6 +444,8 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_provider_operations_object_unique",
       "expert_provider_operations_reconcile_idx",
       "expert_provider_operations_order_kind_idx",
+      "expert_provider_operations_unbound_recovery_idx",
+      "expert_receipt_contacts_append_only",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toMatch(

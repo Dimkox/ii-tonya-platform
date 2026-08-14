@@ -34,6 +34,13 @@ export interface ClaimYooKassaOperationCommand {
   readonly currency: "RUB";
   readonly requestDigest: string;
   readonly parentPaymentId?: string;
+  /** Produced only by an injected protector; never plaintext request material. */
+  readonly replaySnapshot?: {
+    readonly ciphertext: string;
+    readonly keyReference: string;
+    readonly bodyVersion: number;
+    readonly expiresAt: string;
+  };
 }
 
 export interface YooKassaOperationPort {

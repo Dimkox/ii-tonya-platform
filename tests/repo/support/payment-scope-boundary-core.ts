@@ -15,9 +15,11 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/client.ts",
   "packages/integrations/src/yookassa/contracts.ts",
+  "packages/integrations/src/yookassa/exact-body-recovery.ts",
   "packages/integrations/src/yookassa/operation-port.ts",
   "packages/integrations/src/yookassa/payment-adapter.ts",
   "packages/integrations/src/yookassa/reconciliation-reader.ts",
+  "packages/integrations/src/yookassa/receipt-contact-source.ts",
   "packages/integrations/src/yookassa/verifier.ts",
   "packages/integrations/src/yookassa/webhook-capability.ts",
 ]);
@@ -79,6 +81,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0021_expert_settlement_snapshot.sql",
   "packages/db/migrations/0022_expert_referral_admin_replays.sql",
   "packages/db/migrations/0023_yookassa_provider_operations.sql",
+  "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -93,6 +96,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_residency_orders",
   "expert_residency_payment_attempts",
   "expert_residency_provider_operations",
+  "expert_residency_receipt_contacts",
   "expert_residency_provider_event_inbox",
   "expert_first_residency_settlements",
   "expert_referral_reward_grants",
@@ -145,7 +149,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "3b8b7f845a84317a898f5c8559ecffd3d042afe6464bbcbf076be1d02b502844",
+    "1c77462dfff8850a5cc4edc21efa2409873fbb5eee936d904edc7186c574f0f9",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -164,12 +168,20 @@ const approvedPaymentBoundaryHashes = new Map([
     "499c6f3f16a54ce403ffcb7ae355f48793934ed76af7bdba5185106b0112c376",
   ],
   [
+    "packages/integrations/src/yookassa/exact-body-recovery.ts",
+    "29025c1a4444e555c9695d9027afaf6f3e7e6c3a1006a2bb7ac7c953db56ed9e",
+  ],
+  [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "53ef9ab6f421363082a2f81fbb20bb17672650803d8878c64ce47fa303121f83",
+    "0c653980b187bb46e1bc9b38136b245644cd2ef4742158b7d629d258e66904ed",
+  ],
+  [
+    "packages/integrations/src/yookassa/receipt-contact-source.ts",
+    "13650a98677527e06cf291fac45ffe9173875c8f20c80e913ea4d43dedc152e6",
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
-    "52fa4499a97eb9f24db70e2ddbaf6d9cf7118379c49f1878b567b7fdf798c2ac",
+    "5ba418fe56cee12d0ea429505d61a9fb9bd1d932a8051a60c2d07e01266c0e05",
   ],
   [
     "packages/integrations/src/yookassa/reconciliation-reader.ts",
@@ -177,11 +189,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/verifier.ts",
-    "26508ea39566317af7a1ef3355a65162860c0297c270a66c78228ce39e2335fa",
+    "3414dfe6e335b072180519599b88f9f98ec6522b0e5fdc7eeabf2e75a74373a8",
   ],
   [
     "packages/integrations/src/yookassa/webhook-capability.ts",
-    "f1d66bd197ef68cd4c47232c12d011b66df5dcf35337c574dc0da93b2d1d702e",
+    "fad6e3f8e2f16ab250d2faa68120df4cb5e8483dcc1a24bf07e218ab10bdca1f",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -567,6 +579,10 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0023_yookassa_provider_operations.sql",
     "2c6f04eb2d1e5d019f710e3111d09e6f3ac01be986e3ee8e6e548a551aa9d5fc",
+  ],
+  [
+    "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+    "11b1b50c4ada1ddceb1d6d1f918a2c882fb81d03fb3ceac7fdddb144d6ebab72",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

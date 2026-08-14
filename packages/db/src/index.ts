@@ -193,4 +193,5 @@ export {
   canonicalYooKassaRequestDigest,
   type YooKassaOperationErrorCode,
 } from "./repositories/yookassa-operation-repository.js";
+export { PostgresYooKassaReceiptContactAuthority } from "./repositories/yookassa-receipt-contact-repository.js";
 export * from "./schema/index.js";
