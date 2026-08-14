@@ -87,12 +87,15 @@ describe("YooKassa migration 0023 upgrade compatibility", () => {
         { name: "expert_provider_operations_mode", type: "c" },
         { name: "expert_provider_operations_order_fk", type: "f" },
         { name: "expert_provider_operations_parent", type: "c" },
-        { name: "expert_provider_operations_pkey", type: "p" },
         { name: "expert_provider_operations_provider", type: "c" },
         { name: "expert_provider_operations_provider_id", type: "c" },
         { name: "expert_provider_operations_request_digest", type: "c" },
         { name: "expert_provider_operations_resolution", type: "c" },
         { name: "expert_provider_operations_status", type: "c" },
+        {
+          name: "expert_residency_provider_operations_pkey",
+          type: "p",
+        },
       ]);
 
       const indexes = await pool.query<{ name: string; definition: string }>(`
@@ -107,8 +110,8 @@ describe("YooKassa migration 0023 upgrade compatibility", () => {
         "expert_provider_operations_idempotency_unique",
         "expert_provider_operations_object_unique",
         "expert_provider_operations_order_kind_idx",
-        "expert_provider_operations_pkey",
         "expert_provider_operations_reconcile_idx",
+        "expert_residency_provider_operations_pkey",
       ]);
       expect(
         indexes.rows.find(
