@@ -27,15 +27,17 @@ describe("expert residency active tariff discovery", () => {
   it("returns only the first 20 currently effective tariffs in database order", async () => {
     await testDb!.enableExpertReferralCommands();
     const expert = await testDb!.createExpertIdentity();
-    const audit = await testDb!.createAdminAudit({
-      action: "expert_residency.tariff_create",
-      objectId: randomUUID(),
-    });
     const repository = new PostgresExpertResidencyRepository(testDb!.db);
     const referenceNow = Date.now();
     const active: { id: string; activeFrom: Date }[] = [];
     for (let index = 0; index < 21; index += 1) {
-      const activeFrom = new Date(referenceNow - (120 - index) * 60_000);
+      const audit = await testDb!.createAdminAudit({
+        action: "expert_residency.tariff_create",
+        objectId: randomUUID(),
+      });
+      const activeFrom = new Date(
+        referenceNow - (120 - (index === 11 ? 10 : index)) * 60_000,
+      );
       const tariff = await repository.createTariffVersion({
         tariffKey: `active-${index}`,
         displayName: `Active ${index}`,
@@ -48,6 +50,10 @@ describe("expert residency active tariff discovery", () => {
       });
       active.push({ id: tariff.id, activeFrom });
     }
+    const expiredAudit = await testDb!.createAdminAudit({
+      action: "expert_residency.tariff_create",
+      objectId: randomUUID(),
+    });
     const expired = await repository.createTariffVersion({
       tariffKey: "expired",
       displayName: "Expired",
@@ -55,8 +61,12 @@ describe("expert residency active tariff discovery", () => {
       durationSeconds: 86_400,
       activeFrom: new Date(referenceNow - 172_800_000),
       activeTo: new Date(referenceNow - 86_400_000),
-      approvalId: audit.approvalId,
-      adminSessionIdHash: audit.sessionIdHash,
+      approvalId: expiredAudit.approvalId,
+      adminSessionIdHash: expiredAudit.sessionIdHash,
+    });
+    const futureAudit = await testDb!.createAdminAudit({
+      action: "expert_residency.tariff_create",
+      objectId: randomUUID(),
     });
     const future = await repository.createTariffVersion({
       tariffKey: "future",
@@ -65,8 +75,8 @@ describe("expert residency active tariff discovery", () => {
       durationSeconds: 86_400,
       activeFrom: new Date(referenceNow + 86_400_000),
       activeTo: new Date(referenceNow + 172_800_000),
-      approvalId: audit.approvalId,
-      adminSessionIdHash: audit.sessionIdHash,
+      approvalId: futureAudit.approvalId,
+      adminSessionIdHash: futureAudit.sessionIdHash,
     });
 
     const result = await repository.listActiveTariffs({

@@ -384,8 +384,7 @@ export function renderExpertResidencyTariffs(
       tariff.currency !== "RUB" ||
       BigInt(tariff.priceMinor) <= 0n ||
       !Number.isSafeInteger(tariff.durationSeconds) ||
-      tariff.durationSeconds < 86_400 ||
-      tariff.durationSeconds > 315_360_000
+      tariff.durationSeconds < 1
     ) {
       throw new Error("invalid_expert_view");
     }

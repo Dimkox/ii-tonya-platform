@@ -52,6 +52,26 @@ describe("expert Telegram views", () => {
     expect(rendered).not.toMatch(/credit|cash|checkout|payment/iu);
   });
 
+  it("accepts the authoritative positive safe duration boundary", () => {
+    for (const durationSeconds of [1, Number.MAX_SAFE_INTEGER]) {
+      expect(
+        renderExpertResidencyTariffs({
+          idempotencyKey: `tariffs-duration-${durationSeconds}`,
+          telegramUserId: "123456789",
+          tariffs: [
+            {
+              tariffVersionId: "00000000-0000-4000-8000-000000000101",
+              displayName: "Авторитетный тариф",
+              priceMinor: "200000",
+              currency: "RUB",
+              durationSeconds,
+            },
+          ],
+        }),
+      ).toContain(`Срок: ${durationSeconds} секунд`);
+    }
+  });
+
   it("renders an explicit empty list and visibly bounds a long valid list", () => {
     expect(
       renderExpertResidencyTariffs({
