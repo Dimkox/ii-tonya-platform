@@ -9,6 +9,7 @@ User=ii_tonya
 Group=ii_tonya
 WorkingDirectory=/opt/ii-tonya-platform/current
 EnvironmentFile=/etc/ii-tonya/runtime.env
+Environment=NODE_OPTIONS=--jitless
 ExecStart=/usr/bin/node api/dist/server.js
 Restart=on-failure
 RestartSec=5s
@@ -23,6 +24,10 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 CapabilityBoundingSet=
+StateDirectory=ii-tonya
+StateDirectoryMode=0750
+LogsDirectory=ii-tonya
+LogsDirectoryMode=0750
 ReadWritePaths=/var/lib/ii-tonya /var/log/ii-tonya
 
 [Install]

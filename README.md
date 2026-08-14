@@ -5,8 +5,13 @@ authoritative ии-Тоня source document.
 
 ## Status
 
-Pre-production. The client platform foundation is implemented, while live-provider,
-staging, and production gates remain closed. The expert residency referral extension
+Native production runtime deployed; live-provider activation remains closed. The exact
+release `233f3cf72e45e47117948ad5615b603252801e40` runs on the dedicated Ubuntu server as
+systemd-managed API and worker services with system PostgreSQL, nginx, and HTTPS for
+`ii-tonya.ru` and `www.ii-tonya.ru`. Deployment evidence is recorded in
+[`docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md`](docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md).
+The client platform foundation is implemented, while live-provider gates remain closed.
+The expert residency referral extension
 includes expert API,
 Telegram/prompt boundaries, bounded worker operations, traceability, runbooks,
 release-readiness guards, and mandatory database-gate registration.
@@ -41,9 +46,9 @@ The native checksummed-bundle release path is implemented and its exact-SHA Claw
 offline production closure, SPDX SBOM, checksums, inventory, and packaged-entrypoint
 fail-closed smoke are recorded under `docs/test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/`.
 The same packaged API, migration entrypoint, and worker passed a native service rehearsal
-against the single dedicated Claw smoke database. A production signature, confirmed
-production host/systemd-nginx provisioning, and renewed exact-SHA migration approval
-remain release gates.
+against the single dedicated Claw smoke database. The production bundle is signed, the
+exact-SHA migration is approved and applied, and public HTTPS readiness is live. External
+provider credentials and activation remain separate fail-closed gates.
 Repository merge settings allow squash only and delete merged branches; staging and
 production deployment environments accept only `main`.
 
