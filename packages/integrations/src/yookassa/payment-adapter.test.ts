@@ -103,7 +103,9 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     });
     const protect = vi.fn(async (input) => {
       expect(input.associatedData.operationId).toBe(operation.id);
-      expect(input.associatedData.idempotencyKey).toBe(operation.idempotencyKey);
+      expect(input.associatedData.idempotencyKey).toBe(
+        operation.idempotencyKey,
+      );
       expect(input.body).toContain('"capture":true');
       return {
         ciphertext: "opaque-ciphertext",
@@ -118,7 +120,11 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       contacts: contacts(),
       mode: "test",
       returnUrl: "https://ii-tonya.ru/payments/return",
-      receipt: { vatCode: 1, paymentSubject: "service", paymentMode: "full_payment" },
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
       replayProtector: { protect },
       recoveryExpiresAt: () => "2030-01-01T00:00:00.000Z",
     });
@@ -131,13 +137,62 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     const operations = operationPort();
     operations.attachReplaySnapshot = vi.fn();
     const adapter = new YooKassaExpertResidencyPaymentAdapter({
-      client: client(), operations, contacts: contacts(), mode: "test",
+      client: client(),
+      operations,
+      contacts: contacts(),
+      mode: "test",
       returnUrl: "https://ii-tonya.ru/payments/return",
-      receipt: { vatCode: 1, paymentSubject: "service", paymentMode: "full_payment" },
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
     });
     await adapter.createCheckout(checkout);
     expect(operations.attachReplaySnapshot).not.toHaveBeenCalled();
   });
+
+  it.each(["protect", "attach"] as const)(
+    "fails %s preparation without creating an unknown provider outcome",
+    async (failurePoint) => {
+      const operations = operationPort();
+      operations.attachReplaySnapshot = vi.fn(async () => {
+        if (failurePoint === "attach") throw new Error("snapshot_write_failed");
+      });
+      const provider = client();
+      const adapter = new YooKassaExpertResidencyPaymentAdapter({
+        client: provider,
+        operations,
+        contacts: contacts(),
+        mode: "test",
+        returnUrl: "https://ii-tonya.ru/payments/return",
+        receipt: {
+          vatCode: 1,
+          paymentSubject: "service",
+          paymentMode: "full_payment",
+        },
+        replayProtector: {
+          protect: vi.fn(async () => {
+            if (failurePoint === "protect")
+              throw new Error("snapshot_protection_failed");
+            return {
+              ciphertext: "opaque-ciphertext",
+              keyReference: "kms:test-key",
+              bodyVersion: 1,
+              expiresAt: "2030-01-01T00:00:00.000Z",
+            };
+          }),
+        },
+        recoveryExpiresAt: () => "2030-01-01T00:00:00.000Z",
+      });
+
+      await expect(adapter.createCheckout(checkout)).rejects.toThrow();
+      expect(provider.createPayment).not.toHaveBeenCalled();
+      expect(operations.resolve).toHaveBeenCalledWith(operation.id, "failed");
+      expect(operations.markUnknown).not.toHaveBeenCalled();
+    },
+  );
+
   it("claims before POST and returns only the bound redirect", async () => {
     const operations = operationPort();
     const provider = client();

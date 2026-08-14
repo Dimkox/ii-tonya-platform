@@ -17,6 +17,8 @@ container, production SSH, merchant credential, or provider network call was use
 | migration `0024` full PostgreSQL schema gate  | 7/7                  |
 | default-off recovery runtime focused gate     | 45/45                |
 | lease-fenced recovery PostgreSQL gate         | 5/5                  |
+| pre-provider snapshot failure causal RED      | 2 failed / 14 passed |
+| pre-provider snapshot failure GREEN           | 16/16                |
 | recursive payment scope boundary              | 113/113              |
 | integrations and DB ESM/DTS builds            | PASS                 |
 | targeted Prettier, ESLint, `git diff --check` | PASS                 |

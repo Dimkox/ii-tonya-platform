@@ -195,12 +195,20 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     if (operation.status === "succeeded") {
       throw new Error("yookassa_operation_terminal");
     }
+    const providerCommand = {
+      ...request,
+      idempotencyKey: operation.idempotencyKey,
+    };
     try {
-      const providerCommand = {
-        ...request,
-        idempotencyKey: operation.idempotencyKey,
-      };
-      await this.attachRecoverySnapshot(operation, serializeYooKassaPaymentRequest(providerCommand));
+      await this.attachRecoverySnapshot(
+        operation,
+        serializeYooKassaPaymentRequest(providerCommand),
+      );
+    } catch (error: unknown) {
+      await this.deps.operations.resolve(operation.id, "failed");
+      throw error;
+    }
+    try {
       const payment = await this.deps.client.createPayment(providerCommand);
       if (
         payment.metadata.order_id !== command.orderId ||
@@ -280,12 +288,20 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     if (operation.status === "succeeded") {
       throw new Error("yookassa_operation_terminal");
     }
+    const providerCommand = {
+      ...request,
+      idempotencyKey: operation.idempotencyKey,
+    };
     try {
-      const providerCommand = {
-        ...request,
-        idempotencyKey: operation.idempotencyKey,
-      };
-      await this.attachRecoverySnapshot(operation, serializeYooKassaRefundRequest(providerCommand));
+      await this.attachRecoverySnapshot(
+        operation,
+        serializeYooKassaRefundRequest(providerCommand),
+      );
+    } catch (error: unknown) {
+      await this.deps.operations.resolve(operation.id, "failed");
+      throw error;
+    }
+    try {
       const refund = await this.deps.client.createRefund(providerCommand);
       await this.deps.operations.bindProviderObject(operation.id, refund.id);
       return { kind: "pending", refundId: refund.id };
