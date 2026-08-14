@@ -97,13 +97,13 @@ describe("MVP-WORKER-OUTBOX-001 final reviewed gate", () => {
       where id in (${safetyId}::uuid,${feedbackOutboxId}::uuid,${providerId}::uuid)
       order by id
     `);
-    expect(Object.fromEntries(outboxRows.rows.map((row) => [row.id, row.status]))).toEqual(
-      {
-        [safetyId]: "succeeded",
-        [feedbackOutboxId]: "succeeded",
-        [providerId]: "pending",
-      },
-    );
+    expect(
+      Object.fromEntries(outboxRows.rows.map((row) => [row.id, row.status])),
+    ).toEqual({
+      [safetyId]: "succeeded",
+      [feedbackOutboxId]: "succeeded",
+      [providerId]: "pending",
+    });
 
     const cases = await testDb.db.execute<{ caseType: string }>(sql`
       select case_type as "caseType" from outbox_operator_alerts
