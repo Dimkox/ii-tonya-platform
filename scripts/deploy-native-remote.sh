@@ -120,13 +120,46 @@ if [[ -L "$deploy_root/current" ]]; then
   [[ "$previous" =~ ^releases/[0-9a-f]{40}$ ]]
 fi
 
+release_created="false"
+unit_install_started="false"
+symlink_switched="false"
+rollback_on_error() {
+  original_status="$?"
+  trap - ERR
+  if [[ -n "$previous" ]]; then
+    if [[ "$unit_install_started" == "true" ]]; then
+      install_release_units "$deploy_root/$previous" || true
+    fi
+    if [[ "$symlink_switched" == "true" ]]; then
+      ln -sfn "$previous" "$deploy_root/.current.next" || true
+      mv -Tf "$deploy_root/.current.next" "$deploy_root/current" || true
+    fi
+    if [[ "$unit_install_started" == "true" || "$symlink_switched" == "true" ]]; then
+      sudo systemctl restart ii-tonya-api.service || true
+      sudo systemctl restart ii-tonya-worker.service || true
+    fi
+  fi
+  if [[ "$release_created" == "true" && -d "$release_dir" ]]; then
+    find "$release_dir" -mindepth 1 -delete || true
+    rmdir "$release_dir" || true
+  fi
+  if [[ -d "$incoming" ]]; then
+    find "$incoming" -mindepth 1 -delete || true
+    rmdir "$incoming" || true
+  fi
+  exit "$original_status"
+}
+trap rollback_on_error ERR
+
 cd "$incoming"
 sha256sum -c native-release.sha256
 test ! -e "$release_dir"
 install -d -m 0750 "$release_dir"
+release_created="true"
 tar -xzf native-release.tar.gz -C "$release_dir" --no-same-owner --no-same-permissions
 test "$(cat "$release_dir/SOURCE_SHA")" = "$release_sha"
 bash "$release_dir/scripts/validate-runtime-env.sh" /etc/ii-tonya/runtime.env "$release_sha"
+unit_install_started="true"
 install_release_units "$release_dir"
 
 if [[ -n "$previous" ]]; then
@@ -134,20 +167,7 @@ if [[ -n "$previous" ]]; then
 fi
 ln -sfn "releases/$release_sha" "$deploy_root/.current.next"
 mv -Tf "$deploy_root/.current.next" "$deploy_root/current"
-
-rollback_on_error() {
-  original_status="$?"
-  trap - ERR
-  if [[ -n "$previous" ]]; then
-    install_release_units "$deploy_root/$previous"
-    ln -sfn "$previous" "$deploy_root/.current.next"
-    mv -Tf "$deploy_root/.current.next" "$deploy_root/current"
-    sudo systemctl restart ii-tonya-api.service
-    sudo systemctl restart ii-tonya-worker.service
-  fi
-  exit "$original_status"
-}
-trap rollback_on_error ERR
+symlink_switched="true"
 
 sudo systemctl start ii-tonya-migrate.service
 sudo systemctl restart ii-tonya-api.service

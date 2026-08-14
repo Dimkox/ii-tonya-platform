@@ -121,6 +121,13 @@ describe("native dedicated-server production release", () => {
       script.split('install_release_units "$deploy_root/$previous"').length - 1,
     ).toBe(2);
     expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(2);
+    expect(script.indexOf("trap rollback_on_error ERR")).toBeLessThan(
+      script.indexOf('install_release_units "$release_dir"'),
+    );
+    expect(script).toContain('unit_install_started="true"');
+    expect(script).toContain('symlink_switched="true"');
+    expect(script).toContain('find "$release_dir" -mindepth 1 -delete');
+    expect(script).toContain('find "$incoming" -mindepth 1 -delete');
   });
 
   it("preserves interactive root password access without storing the password", () => {

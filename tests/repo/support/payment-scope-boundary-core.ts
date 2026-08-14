@@ -207,7 +207,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/deploy-native-remote.sh",
-    "1ddf499bb257e2f9de1bcdbee33886ba66cb4959f136d2be54c46c2a9d61c955",
+    "6f0512f6215081b09d17a00853a10797d065cb07aaad3ce9d5d7ecb5104aa5ce",
   ],
   [
     "scripts/provision-claw-syft.sh",

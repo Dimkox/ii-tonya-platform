@@ -68,6 +68,7 @@ as approval for a different release SHA. Exact approval for the deployed product
 release was subsequently received as
 `MIGRATION-COMPATIBILITY: 233f3cf72e45e47117948ad5615b603252801e40`.
 
-The remaining blockers concern product activation, not the native runtime: Telegram,
-YooKassa, Selarti, Planerka, LLM, and other external providers remain disabled until
-their provider-specific implementations, contracts, credentials, and approvals exist.
+The native runtime blocker remains open until the corrected exact-SHA replacement is
+built, signed, deployed, and verified under systemd. Separately, Telegram, YooKassa,
+Selarti, Planerka, LLM, and other external providers remain disabled until their
+provider-specific implementations, contracts, credentials, and approvals exist.
