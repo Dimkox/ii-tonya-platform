@@ -81,6 +81,9 @@ case "$CLAW_GATE_MODE" in
     pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
     pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
     ;;
   release)

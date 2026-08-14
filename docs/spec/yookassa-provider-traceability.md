@@ -22,6 +22,8 @@ product; the personal YooMoney Wallet API and T-Bank are outside this integratio
 | YKP-012     | bounded safe metrics/logging                                         | secret/redaction review          | pending independent review |
 | YKP-013     | explicit test/live mode validation                                   | test-shop evidence               | test shop absent           |
 | YKP-014     | preserved durable mappings                                           | operator rollback/reconciliation | activation blocked         |
+| YKP-015     | consent-bound receipt contact                                        | purpose/policy evidence          | inputs empty; blocked      |
+| YKP-016     | encrypted exact-body unbound recovery                                | bounded replay policy            | inputs empty; blocked      |
 
 Direct Claw CI and Database Gate are the repository’s executable gates; GitHub Actions
 are not used. Claw’s container simulates the server for development/testing and cannot

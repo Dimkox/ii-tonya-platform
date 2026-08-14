@@ -98,6 +98,20 @@ Rejected alternatives:
 - **YKP-014 — Recovery.** Disabling the flag stops new provider calls while existing
   durable unknown outcomes and webhook inbox facts remain available for operator-led
   reconciliation. Rollback never deletes provider mappings or financial audit records.
+- **YKP-015 — Consent-bound receipt contact.** A receipt contact may be selected only
+  from an approved source with a current consent decision matching an explicit purpose
+  and policy version. Missing, revoked, stale, or mismatched consent fails closed before
+  a provider call. Neither a contact source nor consent semantics are invented by code;
+  `YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE=` and
+  `YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION=` remain empty activation inputs.
+- **YKP-016 — Encrypted exact-body unbound recovery.** Autonomous recovery of an unknown
+  POST that has no bound provider object requires encrypted persistence of the exact
+  request body and reuse of its original idempotency key. Recovery is bounded by an
+  approved window and retention rule, never scans payment history, and is disabled when
+  any policy input is empty. The encryption key is reference-only; the empty activation
+  inputs are `YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE=`,
+  `YOOKASSA_RECOVERY_RETENTION_DAYS=`, `YOOKASSA_UNBOUND_RECOVERY_ENABLED=`, and
+  `YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS=`.
 
 ## 4. Components
 
@@ -145,7 +159,9 @@ appropriate.
 The bounded worker claims unresolved provider operations from PostgreSQL, reads exact
 provider objects, resolves applied/not-applied/unknown outcomes, and emits bounded alerts
 for mismatches. It does not poll unbounded payment history or use webhook payloads as
-authority.
+authority. The current reader can reconcile only operations with a durably bound provider
+object ID. It does not autonomously recover an unbound POST outcome; YKP-016 remains an
+activation blocker until exact-body encrypted recovery is implemented and approved.
 
 ## 5. Data flow
 
