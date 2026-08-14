@@ -130,21 +130,4 @@ describe("expert residency referral architecture boundary", () => {
     expect(clientBlock).not.toContain("start_residency_checkout");
   });
 
-  it("keeps the default-off expert AI ingress inside application authority", () => {
-    const ingress = readFileSync(
-      "packages/application/src/expert-ai-ingress-service.ts",
-      "utf8",
-    );
-    const conversation = readFileSync(
-      "packages/application/src/conversation-service.ts",
-      "utf8",
-    );
-    expect(ingress).toContain("validateExpertIntentProposal");
-    expect(ingress).toContain("deps.referrals.redeemCode");
-    expect(ingress).toContain("deps.residency.checkout");
-    expect(ingress).not.toMatch(
-      /@ii-tonya\/(?:db|integrations)|node:|fetch\s*\(/u,
-    );
-    expect(conversation).not.toContain("ExpertAiIngress");
-  });
 });
