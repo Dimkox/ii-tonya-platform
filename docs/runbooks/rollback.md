@@ -8,8 +8,9 @@ Decision owner: Incident commander. Executor: Platform owner. Reviewer: Release 
    outcomes.
 3. Run `bash scripts/deploy-native-remote.sh rollback` with the same pinned SSH key,
    known-hosts file, host, and `/opt/ii-tonya-platform` deployment root.
-4. The adapter restores the previously captured `releases/<sha>` symlink target and
-   restarts `ii-tonya-api.service` and `ii-tonya-worker.service`.
+4. The adapter restores the previous release's three versioned systemd unit files,
+   runs `daemon-reload`, switches the `releases/<sha>` symlink target, and restarts
+   `ii-tonya-api.service` and `ii-tonya-worker.service`.
 5. Database changes are forward-fix only. Never run destructive down migrations.
 6. Run the readiness smoke and `docs/operations/reconciliation.md`; keep traffic stopped
    if either fails.

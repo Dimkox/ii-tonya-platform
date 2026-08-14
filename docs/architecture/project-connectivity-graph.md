@@ -311,8 +311,8 @@ flowchart TB
     RELEASE["scripts/run-claw-ci.sh release\nnative exact-SHA bundle + evidence"]
     VERIFY["pnpm verify"]
     CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
-    BUNDLE["native API/worker bundle + SBOM\nASSEMBLY PROVEN / signature pending"]
-    DEPLOY["systemd native deploy + rollback\nREQUIRED / pending"]
+    BUNDLE["native API/worker bundle + SBOM\nSIGNED / exact SHA proven"]
+    DEPLOY["systemd native deploy + rollback\nACTIVE at 233f3cf"]
     CIWF --> VERIFY --> TESTS
     VERIFY --> CONTAINER
     VERIFY --> BUNDLE
@@ -330,7 +330,7 @@ flowchart TB
     SERVERCTRL["GitHub Actions workflows\nREMOVED"]
     SERVERCMD["legacy server command\nREMOVED; Git history only"]
     NATIVECI["direct native deployment\nscripts/deploy-native-remote.sh"]
-    HOST["dedicated server /opt/ii-tonya-platform\nsystemd + system PostgreSQL + nginx\nTARGET PRODUCTION"]
+    HOST["dedicated server /opt/ii-tonya-platform\nsystemd + system PostgreSQL + nginx\nACTIVE PRODUCTION RUNTIME"]
     DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nACTIVE OPS endpoint"]
     BOOTSTRAP --> RUNNER
     SERVERCTRL -. removed .-> RUNNER

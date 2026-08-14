@@ -172,6 +172,29 @@ describe("release assets", () => {
     ).not.toBe(0);
   });
 
+  it("rejects NODE_OPTIONS from the runtime environment", () => {
+    const fixture = mkdtempSync(join(tmpdir(), "ii-tonya-runtime-env-node-"));
+    const runtimeFile = join(fixture, "runtime.env");
+    writeFileSync(
+      runtimeFile,
+      [
+        "NODE_ENV=production",
+        "NODE_OPTIONS=--no-jitless",
+        "DATABASE_URL=postgresql://u:p@db/app?sslmode=verify-full",
+        "",
+      ].join("\n"),
+    );
+
+    const result = spawnSync(
+      "bash",
+      ["scripts/validate-runtime-env.sh", runtimeFile],
+      { encoding: "utf8" },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("NODE_OPTIONS is reserved by systemd");
+  });
+
   it("keeps direct Claw and native deployment assets in mandatory verification", () => {
     const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
       scripts: Record<string, string>;

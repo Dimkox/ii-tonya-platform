@@ -26,6 +26,8 @@ pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/api --prod 
 pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/app-worker --prod deploy \
   "$work_dir/release/worker"
 cp scripts/migrate-native.mjs "$work_dir/release/api/migrate-native.mjs"
+mkdir -p "$work_dir/release/scripts"
+cp scripts/validate-runtime-env.sh "$work_dir/release/scripts/validate-runtime-env.sh"
 cp -R packages/db/migrations "$work_dir/release/migrations"
 cp -R deploy/systemd "$work_dir/release/systemd"
 printf '%s\n' "$source_sha" > "$work_dir/release/SOURCE_SHA"

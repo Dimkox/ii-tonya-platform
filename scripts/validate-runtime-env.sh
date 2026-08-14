@@ -10,6 +10,9 @@ fail() {
 }
 
 [[ -f "$runtime_env" && ! -L "$runtime_env" ]] || fail "file must be regular and not a symlink"
+if grep -q '^NODE_OPTIONS=' "$runtime_env"; then
+  fail "NODE_OPTIONS is reserved by systemd"
+fi
 [[ "$(grep -c '^NODE_ENV=' "$runtime_env")" -eq 1 ]] || fail "NODE_ENV must occur exactly once"
 grep -Fx 'NODE_ENV=production' "$runtime_env" >/dev/null || fail "NODE_ENV must be production"
 [[ "$(grep -c '^DATABASE_URL=' "$runtime_env")" -eq 1 ]] || fail "DATABASE_URL must occur exactly once"
