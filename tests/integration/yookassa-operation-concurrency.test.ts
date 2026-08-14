@@ -144,4 +144,46 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       repository.bindProviderObject(claimed.id, randomUUID()),
     ).rejects.toMatchObject({ code: "YOOKASSA_PROVIDER_BINDING_CONFLICT" });
   });
+
+  it("rejects cumulative refund claims above captured cash before provider I/O", async () => {
+    const payment = await repository.claim({
+      commandId,
+      orderId,
+      kind: "create_payment",
+      mode: "test",
+      amountMinor: "50000",
+      currency: "RUB",
+      requestDigest,
+    });
+    const paymentId = randomUUID();
+    await repository.bindProviderObject(payment.id, paymentId);
+    await db.execute(
+      sql`update expert_residency_payment_attempts set status='settled',resolved_at=now() where id=${payment.paymentAttemptId}::uuid`,
+    );
+
+    await expect(
+      repository.claim({
+        commandId: "00000000-0000-4000-8000-000000000304",
+        orderId,
+        kind: "create_refund",
+        mode: "test",
+        amountMinor: "40000",
+        currency: "RUB",
+        requestDigest: `sha256:${"d".repeat(64)}`,
+        parentPaymentId: paymentId,
+      }),
+    ).resolves.toMatchObject({ kind: "create_refund" });
+    await expect(
+      repository.claim({
+        commandId: "00000000-0000-4000-8000-000000000305",
+        orderId,
+        kind: "create_refund",
+        mode: "test",
+        amountMinor: "20000",
+        currency: "RUB",
+        requestDigest: `sha256:${"e".repeat(64)}`,
+        parentPaymentId: paymentId,
+      }),
+    ).rejects.toMatchObject({ code: "YOOKASSA_OPERATION_INVALID" });
+  });
 });

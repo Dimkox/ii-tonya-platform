@@ -264,6 +264,26 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         if (parent.rows.length !== 1) {
           throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
         }
+        const parentAttempt = parent.rows[0]!;
+        if (command.kind === "create_refund") {
+          if (parentAttempt.status !== "settled") {
+            throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+          }
+          const claimed = await tx.execute<{ claimedMinor: string }>(sql`
+            select coalesce(sum(amount_minor), 0)::text as "claimedMinor"
+            from expert_residency_provider_operations
+            where payment_attempt_id = ${paymentAttemptId}::uuid
+              and operation_kind = 'create_refund'
+              and status not in ('canceled', 'failed')
+          `);
+          const claimedMinor = BigInt(claimed.rows[0]?.claimedMinor ?? "0");
+          if (
+            claimedMinor + BigInt(command.amountMinor) >
+            BigInt(parentAttempt.expectedAmountMinor)
+          ) {
+            throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+          }
+        }
         const resolvedCommand = { ...command, paymentAttemptId };
         const claimDigest = canonicalYooKassaRequestDigest(resolvedCommand);
         await tx.execute(sql`
