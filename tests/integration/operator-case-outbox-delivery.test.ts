@@ -131,9 +131,7 @@ describe("local operator-case outbox delivery", () => {
         repositoryA.materialize(negative),
         repositoryB.materialize(negative),
       ]),
-    ).resolves.toEqual(
-      expect.arrayContaining(["materialized", "replayed"]),
-    );
+    ).resolves.toEqual(expect.arrayContaining(["materialized", "replayed"]));
     expect(await caseCount(safetyOutboxId)).toBe(1);
     expect(await caseCount(feedbackOutboxId)).toBe(1);
     const stored = await testDb.db.execute<{
@@ -204,7 +202,11 @@ describe("local operator-case outbox delivery", () => {
     ).resolves.toBe("applied");
     const registry = createLocalOperatorCaseOutboxRegistry(repositoryA);
     await expect(
-      registry.reconcile({ id: outboxId, topic: input.topic, payload: input.payload }),
+      registry.reconcile({
+        id: outboxId,
+        topic: input.topic,
+        payload: input.payload,
+      }),
     ).resolves.toEqual({ kind: "applied" });
     await expect(repositoryB.materialize(input)).resolves.toBe("replayed");
     expect(await caseCount(outboxId)).toBe(1);

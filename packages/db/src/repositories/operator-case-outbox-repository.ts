@@ -7,8 +7,7 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const POLICY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
 
 type LocalOutboxTopic =
-  | "safety.operator_escalation"
-  | "admin.negative_feedback";
+  "safety.operator_escalation" | "admin.negative_feedback";
 type SafetyPayload = Readonly<{
   handoffId: string;
   version: number;
@@ -147,7 +146,11 @@ function feedbackPayload(value: unknown): FeedbackPayload {
 function message(input: OperatorCaseOutboxMessage): OperatorCaseOutboxMessage {
   const outboxId = uuid(input?.outboxId);
   if (input?.topic === "safety.operator_escalation") {
-    return { outboxId, topic: input.topic, payload: safetyPayload(input.payload) };
+    return {
+      outboxId,
+      topic: input.topic,
+      payload: safetyPayload(input.payload),
+    };
   }
   if (input?.topic === "admin.negative_feedback") {
     return {
@@ -212,10 +215,7 @@ function isMatchingCase(row: CaseRow, topic: LocalOutboxTopic): boolean {
   );
 }
 
-async function casesFor(
-  tx: Transaction,
-  outboxId: string,
-): Promise<CaseRow[]> {
+async function casesFor(tx: Transaction, outboxId: string): Promise<CaseRow[]> {
   return (
     await tx.execute<CaseRow>(sql`
       select ${caseProjection}
@@ -324,7 +324,8 @@ export class PostgresOperatorCaseOutboxRepository {
       }
       const existing = await casesFor(tx, input.outboxId);
       if (existing.length > 0) {
-        return existing.length === 1 && isMatchingCase(existing[0]!, input.topic)
+        return existing.length === 1 &&
+          isMatchingCase(existing[0]!, input.topic)
           ? "replayed"
           : "source_invalid";
       }
@@ -363,7 +364,8 @@ export class PostgresOperatorCaseOutboxRepository {
       }
       const existing = await casesFor(tx, input.outboxId);
       if (existing.length > 0) {
-        return existing.length === 1 && isMatchingCase(existing[0]!, input.topic)
+        return existing.length === 1 &&
+          isMatchingCase(existing[0]!, input.topic)
           ? "applied"
           : "source_invalid";
       }
