@@ -63,7 +63,7 @@ export interface YooKassaReceiptContact {
   readonly email?: string;
   readonly phone?: string;
   /** Opaque, server-owned consent/contact authority reference; never raw PII. */
-  readonly authorityReference?: string;
+  readonly authorityReference: string;
 }
 
 export interface YooKassaReceiptContactPort {

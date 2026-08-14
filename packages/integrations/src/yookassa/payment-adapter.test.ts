@@ -8,6 +8,7 @@ import {
 import type {
   YooKassaOperation,
   YooKassaOperationPort,
+  YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./operation-port.js";
 import { YooKassaExpertResidencyPaymentAdapter } from "./payment-adapter.js";
@@ -77,9 +78,14 @@ const contacts = (
     readonly email?: string;
     readonly phone?: string;
     readonly authorityReference?: string;
-  } = { email: "fixture@example.invalid" },
+  } = {
+    email: "fixture@example.invalid",
+    authorityReference: "consent:fixture-001",
+  },
 ): YooKassaReceiptContactPort => ({
-  receiptContactForOrder: vi.fn(async () => (available ? contact : null)),
+  receiptContactForOrder: vi.fn(async () =>
+    available ? (contact as YooKassaReceiptContact) : null,
+  ),
 });
 
 describe("YooKassaExpertResidencyPaymentAdapter", () => {
@@ -130,6 +136,29 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     await expect(adapter.createCheckout(checkout)).rejects.toThrow(
       "yookassa_receipt_contact_unavailable",
     );
+    expect(provider.createPayment).not.toHaveBeenCalled();
+  });
+
+  it("fails before claim or network without an opaque contact authority", async () => {
+    const operations = operationPort();
+    const provider = client();
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: provider,
+      operations,
+      contacts: contacts(true, { email: "fixture@example.invalid" }),
+      mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
+    });
+
+    await expect(adapter.createCheckout(checkout)).rejects.toThrow(
+      "yookassa_receipt_authority_reference_invalid",
+    );
+    expect(operations.claim).not.toHaveBeenCalled();
     expect(provider.createPayment).not.toHaveBeenCalled();
   });
 
@@ -252,8 +281,6 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     const emailOperations = operationPort();
     const otherEmailOperations = operationPort();
     const otherAuthorityOperations = operationPort();
-    const fallbackEmailOperations = operationPort();
-    const otherFallbackEmailOperations = operationPort();
     const phoneOperations = operationPort();
     const makeAdapter = (
       operations: YooKassaOperationPort,
@@ -288,12 +315,6 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       email: "first.secret@example.invalid",
       authorityReference: "consent:customer-402",
     }).createCheckout(checkout);
-    await makeAdapter(fallbackEmailOperations, {
-      email: "fallback-one@example.invalid",
-    }).createCheckout(checkout);
-    await makeAdapter(otherFallbackEmailOperations, {
-      email: "fallback-two@example.invalid",
-    }).createCheckout(checkout);
     await makeAdapter(phoneOperations, {
       phone: "+79990000000",
       authorityReference: "consent:customer-401",
@@ -304,11 +325,6 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       .calls[0]?.[0];
     const otherAuthorityClaim = vi.mocked(otherAuthorityOperations.claim).mock
       .calls[0]?.[0];
-    const fallbackEmailClaim = vi.mocked(fallbackEmailOperations.claim).mock
-      .calls[0]?.[0];
-    const otherFallbackEmailClaim = vi.mocked(
-      otherFallbackEmailOperations.claim,
-    ).mock.calls[0]?.[0];
     const phoneClaim = vi.mocked(phoneOperations.claim).mock.calls[0]?.[0];
     expect(emailClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(phoneClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
@@ -319,15 +335,9 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       "other.secret@example.invalid",
     );
     expect(JSON.stringify(phoneClaim)).not.toContain("+79990000000");
-    expect(JSON.stringify(fallbackEmailClaim)).not.toContain(
-      "fallback-one@example.invalid",
-    );
     expect(emailClaim?.requestDigest).toBe(otherEmailClaim?.requestDigest);
     expect(emailClaim?.requestDigest).not.toBe(
       otherAuthorityClaim?.requestDigest,
-    );
-    expect(fallbackEmailClaim?.requestDigest).toBe(
-      otherFallbackEmailClaim?.requestDigest,
     );
     expect(emailClaim?.requestDigest).not.toBe(phoneClaim?.requestDigest);
   });

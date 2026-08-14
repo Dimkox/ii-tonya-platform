@@ -60,14 +60,14 @@ const receiptAuthority = (contact: {
   readonly authorityReference?: string;
 }) => {
   if (
-    contact.authorityReference !== undefined &&
+    contact.authorityReference === undefined ||
     !AUTHORITY_REFERENCE.test(contact.authorityReference)
   ) {
     throw new Error("yookassa_receipt_authority_reference_invalid");
   }
   return {
     contactKind: contact.email === undefined ? "phone" : "email",
-    authorityReference: contact.authorityReference ?? null,
+    authorityReference: contact.authorityReference,
   } as const;
 };
 
