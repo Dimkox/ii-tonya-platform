@@ -31,6 +31,13 @@ const digest = (value: unknown): string =>
     )
     .digest("hex")}`;
 
+const minorFromRub = (value: string): string | null => {
+  const match = /^(0|[1-9]\d*)\.(\d{2})$/u.exec(value);
+  return match === null
+    ? null
+    : (BigInt(match[1]!) * 100n + BigInt(match[2]!)).toString();
+};
+
 const AUTHORITY_REFERENCE = /^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9_-]{1,128}$/u;
 const PRE_REQUEST_TERMINAL_CODES = new Set([
   "yookassa_amount_invalid",
@@ -152,6 +159,33 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         receiptAuthority: receiptAuthority(contact),
       }),
     });
+    if (operation.status === "failed" || operation.status === "canceled") {
+      throw new Error("yookassa_operation_terminal");
+    }
+    if (operation.providerObjectId !== undefined) {
+      const existing = await this.deps.client.getPayment(
+        operation.providerObjectId,
+      );
+      if (
+        existing.id !== operation.providerObjectId ||
+        existing.metadata.order_id !== command.orderId ||
+        existing.amount.currency !== command.currency ||
+        minorFromRub(existing.amount.value) !== command.amountMinor ||
+        existing.test !== (this.deps.mode === "test") ||
+        existing.confirmation === undefined ||
+        new URL(existing.confirmation.url).protocol !== "https:"
+      ) {
+        throw new Error("yookassa_payment_binding_mismatch");
+      }
+      return {
+        kind: "created",
+        paymentId: existing.id,
+        checkoutUrl: existing.confirmation.url,
+      };
+    }
+    if (operation.status === "succeeded") {
+      throw new Error("yookassa_operation_terminal");
+    }
     try {
       const payment = await this.deps.client.createPayment({
         ...request,
@@ -226,6 +260,15 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       }),
       parentPaymentId: command.paymentId,
     });
+    if (operation.status === "failed" || operation.status === "canceled") {
+      throw new Error("yookassa_operation_terminal");
+    }
+    if (operation.providerObjectId !== undefined) {
+      return { kind: "pending", refundId: operation.providerObjectId };
+    }
+    if (operation.status === "succeeded") {
+      throw new Error("yookassa_operation_terminal");
+    }
     try {
       const refund = await this.deps.client.createRefund({
         ...request,

@@ -167,16 +167,17 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       sql`update expert_residency_payment_attempts set status='settled',resolved_at=now() where id=${payment.paymentAttemptId}::uuid`,
     );
 
-    const firstRefund = await repository.claim({
+    const firstRefundCommand = {
       commandId: "00000000-0000-4000-8000-000000000304",
       orderId,
-      kind: "create_refund",
-      mode: "test",
+      kind: "create_refund" as const,
+      mode: "test" as const,
       amountMinor: "40000",
-      currency: "RUB",
+      currency: "RUB" as const,
       requestDigest: `sha256:${"d".repeat(64)}`,
       parentPaymentId: paymentId,
-    });
+    };
+    const firstRefund = await repository.claim(firstRefundCommand);
     expect(firstRefund).toMatchObject({ kind: "create_refund" });
     await expect(
       repository.claim({
@@ -204,6 +205,10 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
         parentPaymentId: paymentId,
       }),
     ).resolves.toMatchObject({ kind: "create_refund", amountMinor: "20000" });
+    await expect(repository.claim(firstRefundCommand)).resolves.toMatchObject({
+      id: firstRefund.id,
+      status: "failed",
+    });
   });
 
   it("binds an explicit refund attempt to the exact parent provider payment", async () => {

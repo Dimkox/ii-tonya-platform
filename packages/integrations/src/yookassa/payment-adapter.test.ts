@@ -199,6 +199,81 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     });
   });
 
+  it.each(["failed", "canceled"] as const)(
+    "never replays a terminal %s refund command to the provider",
+    async (status) => {
+      const operations = operationPort();
+      vi.mocked(operations.claim).mockResolvedValueOnce({
+        ...operation,
+        kind: "create_refund",
+        parentPaymentId: payment.id,
+        status,
+      });
+      const provider = client();
+      const adapter = new YooKassaExpertResidencyPaymentAdapter({
+        client: provider,
+        operations,
+        contacts: contacts(),
+        mode: "test",
+        returnUrl: "https://ii-tonya.ru/payments/return",
+        receipt: {
+          vatCode: 1,
+          paymentSubject: "service",
+          paymentMode: "full_payment",
+        },
+      });
+
+      await expect(
+        adapter.refund({
+          orderId: checkout.orderId,
+          paymentId: payment.id,
+          amountMinor: "10000",
+          currency: "RUB",
+          idempotencyKey: "refund-terminal-replay",
+        }),
+      ).rejects.toThrow("yookassa_operation_terminal");
+      expect(provider.createRefund).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns an already bound refund without another provider POST", async () => {
+    const operations = operationPort();
+    vi.mocked(operations.claim).mockResolvedValueOnce({
+      ...operation,
+      kind: "create_refund",
+      parentPaymentId: payment.id,
+      providerObjectId: "refund-already-bound",
+      status: "succeeded",
+    });
+    const provider = client();
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: provider,
+      operations,
+      contacts: contacts(),
+      mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
+    });
+
+    await expect(
+      adapter.refund({
+        orderId: checkout.orderId,
+        paymentId: payment.id,
+        amountMinor: "10000",
+        currency: "RUB",
+        idempotencyKey: "refund-bound-replay",
+      }),
+    ).resolves.toEqual({
+      kind: "pending",
+      refundId: "refund-already-bound",
+    });
+    expect(provider.createRefund).not.toHaveBeenCalled();
+  });
+
   it("marks terminal refund rejection failed and permits a later refund", async () => {
     const operations = operationPort();
     const provider = client();
