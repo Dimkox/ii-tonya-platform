@@ -100,7 +100,10 @@ export {
   type TelegramUpdate,
 } from "./telegram/telegram-adapter.js";
 export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
-export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
+export type {
+  ExpertResidencyPaymentPort,
+  ExpertResidencyRefundCommand,
+} from "./expert-residency/payment-port.js";
 export {
   assertVerifiedExpertResidencyPaymentEvent,
   createCanonicalExpertResidencyPaymentEventVerifier,
@@ -114,6 +117,72 @@ export type {
 } from "./expert-residency/verified-event.js";
 export { EnvironmentExpertCodeSecretResolver } from "./expert-residency/environment-secret-resolver.js";
 export type { ResolvedEnvironmentExpertCodeKeyring } from "./expert-residency/environment-secret-resolver.js";
+export {
+  YooKassaTerminalError,
+  YooKassaUnknownOutcomeError,
+  createYooKassaClient,
+  formatRubMinor,
+  serializeYooKassaPaymentRequest,
+  serializeYooKassaRefundRequest,
+} from "./yookassa/client.js";
+export type {
+  CreateYooKassaPayment,
+  CreateYooKassaRefund,
+  YooKassaClient,
+  YooKassaClientConfig,
+  YooKassaTransport,
+} from "./yookassa/client.js";
+export {
+  yooKassaNotificationSchema,
+  yooKassaPaymentSchema,
+  yooKassaRefundSchema,
+} from "./yookassa/contracts.js";
+export type {
+  YooKassaMode,
+  YooKassaNotification,
+  YooKassaPayment,
+  YooKassaReceiptInput,
+  YooKassaRefund,
+  YooKassaVatCode,
+} from "./yookassa/contracts.js";
+export type {
+  ClaimYooKassaOperationCommand,
+  YooKassaOperation,
+  YooKassaOperationKind,
+  YooKassaOperationPort,
+  YooKassaOperationStatus,
+  YooKassaReceiptContact,
+  YooKassaReceiptContactPort,
+} from "./yookassa/operation-port.js";
+export {
+  YooKassaExpertResidencyPaymentAdapter,
+  type YooKassaPaymentAdapterDependencies,
+} from "./yookassa/payment-adapter.js";
+export { YooKassaPaymentVerifier } from "./yookassa/verifier.js";
+export { YooKassaExpertResidencyProviderReader } from "./yookassa/reconciliation-reader.js";
+export type {
+  YooKassaLocalReconciliationPayment,
+  YooKassaReconciliationReadCommand,
+  YooKassaReconciliationSnapshot,
+} from "./yookassa/reconciliation-reader.js";
+export { YooKassaWebhookCapability } from "./yookassa/webhook-capability.js";
+export { ConsentBoundYooKassaReceiptContactSource } from "./yookassa/receipt-contact-source.js";
+export type {
+  ConsentBoundYooKassaReceiptContactSourceDeps,
+  EncryptedYooKassaReceiptContact,
+  YooKassaReceiptContactAuthority,
+  YooKassaReceiptContactDecryptor,
+  YooKassaReceiptContactKind,
+} from "./yookassa/receipt-contact-source.js";
+export { recoverExactYooKassaOperation } from "./yookassa/exact-body-recovery.js";
+export type {
+  YooKassaExactRecoveryClaim,
+  YooKassaExactRecoveryCompletion,
+  YooKassaExactRecoveryOperationKind,
+  YooKassaExactRecoveryTransport,
+  YooKassaReplayDecryptor,
+  YooKassaReplayProtector,
+} from "./yookassa/exact-body-recovery.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,

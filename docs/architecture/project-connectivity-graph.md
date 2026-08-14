@@ -154,15 +154,22 @@ flowchart TB
   INTEGRATIONS --> TG
   TGWEB --> CBTOKEN
 
-  subgraph PAYBOUND["Provider-neutral expert residency payment boundary"]
+  subgraph PAYBOUND["Expert residency payment boundary"]
     PAYPORT["payment-port\nACTIVE contract"]
     DISPAY["disabled-payment-adapter\nDISABLED by design"]
     VERIFIED["verified-event\nACTIVE verification evidence"]
     ENVSECRET["environment-secret-resolver\nACTIVE key indirection"]
-    LIVEPAY["live payment provider SDK/network adapter\nPROHIBITED / ABSENT"]
+    YKCLIENT["YooKassa Merchant client\nACTIVE code / fixed origin"]
+    YKADAPTER["YooKassa adapter + verifier\nACTIVE code / default-off"]
+    YKWEBHOOK["YooKassa webhook seam\nDISABLED unless complete injected capability"]
+    YKOPS["YooKassa operation repository\nACTIVE PostgreSQL idempotency"]
     PAYPORT --> DISPAY
+    PAYPORT --> YKADAPTER
+    YKCLIENT --> YKADAPTER --> VERIFIED
+    YKWEBHOOK --> VERIFIED
+    YKADAPTER --> YKOPS
     ENVSECRET --> VERIFIED --> PAYPORT
-    AUDIT -. scope guard .-> LIVEPAY
+    AUDIT -. activation gate .-> YKCLIENT
   end
   INTEGRATIONS --> PAYBOUND
 
@@ -263,14 +270,14 @@ flowchart TB
     LLM["LLM / intent model\nDISABLED by default"]
     MAKE["Make projection/orchestration\nDISABLED by default"]
     SHEETS["Google Sheets projection\nDISABLED by default"]
-    PAYMENT["Live payment provider\nPROHIBITED / not composed"]
+    PAYMENT["YooKassa Merchant API\nDISABLED / not composed by default"]
     SELARTI --> SELWEB
     TELEGRAM --> TGWEB
     PLANERKA --> INTEGRATIONS
     LLM --> PROMPT
     DB --> MAKE
     DB --> SHEETS
-    PAYMENT -. prohibited .-> LIVEPAY
+    PAYMENT -. enabled only after approval .-> YKCLIENT
   end
   PROJECT --> EXT
 
@@ -307,7 +314,7 @@ flowchart TB
 
   subgraph CI["Direct Claw verification / release"]
     CIWF["scripts/run-claw-ci.sh ci\npnpm verify + coverage + secret scan"]
-    DBGATE["scripts/run-claw-ci.sh database\nschema + repeated financial concurrency gates"]
+    DBGATE["scripts/run-claw-ci.sh database\nschema + single-run financial concurrency gates"]
     RELEASE["scripts/run-claw-ci.sh release\nnative exact-SHA bundle + evidence"]
     VERIFY["pnpm verify"]
     CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
@@ -400,7 +407,7 @@ flowchart TB
     CLIENTCOUPON["client 500/500 coupon executable runtime\nDEFERRED"]
     WAITLIST["waitlist runtime\nDEFERRED"]
     RESCHEDULE["expert reschedule composite runtime\nDEFERRED"]
-    LIVEPAYDEAD["live payment provider SDK/network composition\nPROHIBITED"]
+    WALLETAPI["personal YooMoney Wallet API / T-Bank integration\nPROHIBITED / out of scope"]
     MAKEWRITE["Make/Sheets authoritative writes\nPROHIBITED"]
     RAWLLM["LLM direct DB/financial mutation\nPROHIBITED"]
     HISTEVID["old exact-SHA test evidence\nEVIDENCE"]
@@ -408,7 +415,7 @@ flowchart TB
     CLIENTCOUPON -. isolated by scope guards .-> REFDB
     WAITLIST -. intentionally absent .-> BOOK
     RESCHEDULE -. intentionally absent .-> BOOK
-    LIVEPAYDEAD -. rejected by scope guard .-> PAYBOUND
+    WALLETAPI -. rejected by provider scope .-> PAYBOUND
     MAKEWRITE -. rejected architecture .-> MAKE
     MAKEWRITE -. rejected architecture .-> SHEETS
     RAWLLM -. typed proposal boundary .-> PROMPT

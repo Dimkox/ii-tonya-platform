@@ -12,6 +12,18 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
   "packages/integrations/src/expert-residency/environment-secret-resolver.ts",
 ]);
 
+export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  "packages/integrations/src/yookassa/client.ts",
+  "packages/integrations/src/yookassa/contracts.ts",
+  "packages/integrations/src/yookassa/exact-body-recovery.ts",
+  "packages/integrations/src/yookassa/operation-port.ts",
+  "packages/integrations/src/yookassa/payment-adapter.ts",
+  "packages/integrations/src/yookassa/reconciliation-reader.ts",
+  "packages/integrations/src/yookassa/receipt-contact-source.ts",
+  "packages/integrations/src/yookassa/verifier.ts",
+  "packages/integrations/src/yookassa/webhook-capability.ts",
+]);
+
 export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
   "apps/sandbox-api/src/routes.ts",
   "apps/sandbox-api/src/server.ts",
@@ -68,6 +80,8 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
   "packages/db/migrations/0021_expert_settlement_snapshot.sql",
   "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+  "packages/db/migrations/0023_yookassa_provider_operations.sql",
+  "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -81,6 +95,8 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_residency_tariff_versions",
   "expert_residency_orders",
   "expert_residency_payment_attempts",
+  "expert_residency_provider_operations",
+  "expert_residency_receipt_contacts",
   "expert_residency_provider_event_inbox",
   "expert_first_residency_settlements",
   "expert_referral_reward_grants",
@@ -98,6 +114,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/expert/residency/quotes",
   "/v1/expert/residency/checkouts",
   "/v1/admin/expert-referrals/inventory",
+  "/v1/webhooks/yookassa",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
@@ -127,11 +144,12 @@ const approvedPaymentBoundaryPaths = new Set([
   "packages/integrations/src/index.ts",
   "packages/integrations/src/payment/disabled-payment-adapter.ts",
   "packages/integrations/src/payment/payment-port.ts",
+  ...YOOKASSA_PAYMENT_ALLOWED_PATHS,
 ]);
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "fac5fcdfb49cb461068688d25b1b39f8740380a4f56a395917d9de6465ce324a",
+    "bf8544cd0f41b9f787db1465c46b067e4896619c6877fdf7a50784362bcaedc0",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -140,6 +158,42 @@ const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/payment/payment-port.ts",
     "84dc621fc5cafdffb64cb42af0fa567cad6560ea41ea46ce393d8aa29cce950f",
+  ],
+  [
+    "packages/integrations/src/yookassa/client.ts",
+    "89a55569d5170d266f2c416963f26c023a11947917be6a102140f785e2173802",
+  ],
+  [
+    "packages/integrations/src/yookassa/contracts.ts",
+    "499c6f3f16a54ce403ffcb7ae355f48793934ed76af7bdba5185106b0112c376",
+  ],
+  [
+    "packages/integrations/src/yookassa/exact-body-recovery.ts",
+    "f1adc2c5e4d610f8d7977a0e048313ae44b8365ce3fe7247785544c6362e47f3",
+  ],
+  [
+    "packages/integrations/src/yookassa/operation-port.ts",
+    "9da075cd09902befa3c06fc85b8a91e578d6002301653fdeaa17136e6698f5e8",
+  ],
+  [
+    "packages/integrations/src/yookassa/receipt-contact-source.ts",
+    "c41d94f0f85381b0265887e5c510854b3a0ca4a6d9f91b991e7c07d03d9be4dd",
+  ],
+  [
+    "packages/integrations/src/yookassa/payment-adapter.ts",
+    "bc8e8873c6c286514b922b9d526e4cf4c02d14b7cd89d7c85c0c093dddad6dc3",
+  ],
+  [
+    "packages/integrations/src/yookassa/reconciliation-reader.ts",
+    "fd8271da84ee99f25043b1820625daa1cd132d1903a1bd79517e925193777956",
+  ],
+  [
+    "packages/integrations/src/yookassa/verifier.ts",
+    "3414dfe6e335b072180519599b88f9f98ec6522b0e5fdc7eeabf2e75a74373a8",
+  ],
+  [
+    "packages/integrations/src/yookassa/webhook-capability.ts",
+    "56ceea9a45aa7b620528e090dfef549093656e2ec26baa7f799ba5081d752636",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -199,7 +253,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "6b7f801cc5c94ceb256f47e31fbe4d17dbe638ae959e5a3ef489348d24c78609",
+    "f8046f382ca4bbba413d67c4d58435bc3208b148bf822a7d66d3827273728229",
   ],
   [
     "scripts/build-native-release.sh",
@@ -523,6 +577,14 @@ const approvedMigrationHashes = new Map([
     "f4262b0905c945ccec107603106e120875f12ea23d570fc4d90bdddd8bc899cc",
   ],
   [
+    "packages/db/migrations/0023_yookassa_provider_operations.sql",
+    "2c6f04eb2d1e5d019f710e3111d09e6f3ac01be986e3ee8e6e548a551aa9d5fc",
+  ],
+  [
+    "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+    "05c9447c12d75a0b4a8400822a43d9dfd8ed4855fdb3913dd5836923a8c0679c",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -600,7 +662,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "484624c8803e83514177fcfa78994382121a8cb9965c61b98a2188eef376ddcd",
+    "18487f7e5ede990b0010c223afc396366bf5fd899106ba866dbc06328685b2bd",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -800,7 +862,11 @@ const isApprovedPaymentBoundaryImport = (
     specifier === "./payment-port.js") ||
   (path ===
     "packages/integrations/src/expert-residency/disabled-payment-adapter.ts" &&
-    specifier === "./payment-port.js");
+    specifier === "./payment-port.js") ||
+  (path === "packages/integrations/src/yookassa/payment-adapter.ts" &&
+    specifier === "../expert-residency/payment-port.js") ||
+  (path === "packages/integrations/src/index.ts" &&
+    specifier.startsWith("./yookassa/"));
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
   if (ts.isIdentifier(node.expression)) {
@@ -845,7 +911,7 @@ const processEnvKey = (
 const isPaymentCredentialKey = (key: string): boolean =>
   /^PAYMENTS?_(?:API_?KEY|TOKEN|SECRET|WEBHOOK_SECRET|BASE_URL|PROVIDER)$/u.test(
     key,
-  );
+  ) || /^YOOKASSA_(?:SHOP_ID|SECRET_KEY|SECRET_REF)$/u.test(key);
 
 const isCommercialNetworkTarget = (target: string): boolean =>
   /(?:^|[/:._-])(?:pay|payment|payments|checkout|billing|merchant|commerce)(?:[/:._-]|$)/iu.test(
@@ -1042,7 +1108,15 @@ const inspectTypeScript = (
           violations.push(`unapproved expert residency API route: ${route}`);
         }
       }
-      if (ts.isIdentifier(node) && paymentApiIdentifier.test(node.text)) {
+      if (
+        ts.isIdentifier(node) &&
+        paymentApiIdentifier.test(node.text) &&
+        path !== "apps/api/src/routes/yookassa-webhook.ts" &&
+        !(
+          path === "apps/api/src/app.ts" &&
+          node.text === "yookassaWebhookRoutes"
+        )
+      ) {
         violations.push(`commercial API route identifier: ${node.text}`);
       }
     }
@@ -1083,10 +1157,22 @@ const inspectTypeScript = (
 
     if (ts.isCallExpression(node) && isNetworkCall(node)) {
       const target = literalText(node.arguments[0]);
+      const literalOrigins = [
+        ...content.matchAll(/https?:\/\/[^\s"'`]+/gu),
+      ].map((match) => match[0]);
+      const approvedYooKassaCall =
+        path === "packages/integrations/src/yookassa/client.ts" &&
+        ((target !== undefined &&
+          target.startsWith("https://api.yookassa.ru/v3/")) ||
+          (content.includes('const ORIGIN = "https://api.yookassa.ru"') &&
+            literalOrigins.every(
+              (origin) => origin === "https://api.yookassa.ru",
+            )));
       if (
-        approvedPaymentBoundaryPaths.has(path) ||
-        EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) ||
-        (target && isCommercialNetworkTarget(target))
+        !approvedYooKassaCall &&
+        (approvedPaymentBoundaryPaths.has(path) ||
+          EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) ||
+          (target !== undefined && isCommercialNetworkTarget(target)))
       ) {
         violations.push("payment provider network call");
       }
@@ -1278,6 +1364,7 @@ export const classifyPaymentScopeProbe = ({
     if (
       !approvedPaymentBoundaryPaths.has(path) &&
       !EXPERT_RESIDENCY_ALLOWED_PATHS.has(path) &&
+      !YOOKASSA_PAYMENT_ALLOWED_PATHS.has(path) &&
       (providerPath.test(path) || paymentIntegrationArtifact.test(path))
     ) {
       violations.push("live or deferred payment integration path");

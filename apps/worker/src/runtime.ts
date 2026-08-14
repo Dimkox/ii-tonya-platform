@@ -26,6 +26,13 @@ export interface WorkerRuntime {
   close(): Promise<void>;
 }
 
+export const disabledExpertResidencyProviderReader: ExpertResidencyProviderReader =
+  {
+    async readPayments() {
+      return { kind: "disabled" };
+    },
+  };
+
 type BoundedJob = () => Promise<unknown>;
 
 export interface WorkerRuntimeDependencies {
@@ -47,8 +54,14 @@ export interface WorkerRuntimeDependencies {
 
 export interface ProductionWorkerRuntimeDependencies {
   readonly jobsRepository: {
-    processDueBatch(command: { readonly now: Date; readonly batchSize: number }): Promise<unknown>;
-    expireDueBatch(command: { readonly now: Date; readonly batchSize: number }): Promise<unknown>;
+    processDueBatch(command: {
+      readonly now: Date;
+      readonly batchSize: number;
+    }): Promise<unknown>;
+    expireDueBatch(command: {
+      readonly now: Date;
+      readonly batchSize: number;
+    }): Promise<unknown>;
     listLocalReservations(
       window: { readonly from: string; readonly to: string },
       batchSize: number,
@@ -62,7 +75,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
     HeldRewardRepository;
-  readonly expertResidencyProviderReader: ExpertResidencyProviderReader;
+  readonly expertResidencyProviderReader?: ExpertResidencyProviderReader;
   readonly outboxRepository: {
     recoverExpiredDispatchLeases(limit: number): Promise<number>;
     recoverExpiredReconciliationLeases(limit: number): Promise<number>;
@@ -74,12 +87,14 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly shutdownTimeoutMs?: number;
 }
 
-function beforeDeadline<T>(operation: Promise<T>, milliseconds: number): Promise<T> {
+function beforeDeadline<T>(
+  operation: Promise<T>,
+  milliseconds: number,
+): Promise<T> {
   return new Promise((resolveOperation, rejectOperation) => {
-    const timer = setTimeout(
-      () => { rejectOperation(new Error("Worker shutdown deadline exceeded")); },
-      milliseconds,
-    );
+    const timer = setTimeout(() => {
+      rejectOperation(new Error("Worker shutdown deadline exceeded"));
+    }, milliseconds);
     void operation.then(
       (value) => {
         clearTimeout(timer);
@@ -98,10 +113,11 @@ export function createWorkerRuntime(
 ): WorkerRuntime {
   const shutdownTimeoutMs = deps.shutdownTimeoutMs ?? 30_000;
   if (
-    !Number.isSafeInteger(shutdownTimeoutMs)
-    || shutdownTimeoutMs < 1
-    || shutdownTimeoutMs > 60_000
-  ) throw new Error("Invalid worker shutdown timeout");
+    !Number.isSafeInteger(shutdownTimeoutMs) ||
+    shutdownTimeoutMs < 1 ||
+    shutdownTimeoutMs > 60_000
+  )
+    throw new Error("Invalid worker shutdown timeout");
   let acceptingClaims = true;
   let currentCycle: Promise<WorkerCycleReport> | null = null;
   let closePromise: Promise<void> | null = null;
@@ -116,10 +132,12 @@ export function createWorkerRuntime(
     const cycle = (async (): Promise<WorkerCycleReport> => {
       const safetyHandoffs = await deps.safetyHandoffs();
       const expiredLeaseRecovery = await deps.recoverExpiredLeases();
-      const unknownOutcomeReconciliation = await deps.reconcileUnknownOutcomes();
+      const unknownOutcomeReconciliation =
+        await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
       const expertResidencyExpiry = await deps.expertResidencyExpiry();
-      const expertResidencyReconciliation = await deps.expertResidencyReconciliation();
+      const expertResidencyReconciliation =
+        await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
@@ -138,9 +156,11 @@ export function createWorkerRuntime(
       };
     })();
     currentCycle = cycle;
-    void cycle.finally(() => {
-      if (currentCycle === cycle) currentCycle = null;
-    }).catch(() => undefined);
+    void cycle
+      .finally(() => {
+        if (currentCycle === cycle) currentCycle = null;
+      })
+      .catch(() => undefined);
     return cycle;
   };
 
@@ -181,23 +201,31 @@ export function createProductionWorkerRuntime(
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
     throw new Error("Invalid production worker batch size");
   }
+  const expertResidencyProviderReader =
+    deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
   return createWorkerRuntime({
-    safetyHandoffs: async () => deps.jobsRepository.processDueBatch({
-      now: deps.now(),
-      batchSize,
-    }),
+    safetyHandoffs: async () =>
+      deps.jobsRepository.processDueBatch({
+        now: deps.now(),
+        batchSize,
+      }),
     recoverExpiredLeases: async () => ({
-      dispatch: await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
-      reconciliation: await deps.outboxRepository.recoverExpiredReconciliationLeases(batchSize),
+      dispatch:
+        await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
+      reconciliation:
+        await deps.outboxRepository.recoverExpiredReconciliationLeases(
+          batchSize,
+        ),
     }),
     reconcileUnknownOutcomes: async () => ({
       reconciled: 0,
       reason: "providers_disabled",
     }),
-    reservationExpiry: async () => deps.jobsRepository.expireDueBatch({
-      now: deps.now(),
-      batchSize,
-    }),
+    reservationExpiry: async () =>
+      deps.jobsRepository.expireDueBatch({
+        now: deps.now(),
+        batchSize,
+      }),
     expertResidencyExpiry: async () =>
       expireExpertResidencyOrders(
         deps.expertReferralJobsRepository,
@@ -207,7 +235,7 @@ export function createProductionWorkerRuntime(
     expertResidencyReconciliation: async () =>
       reconcileExpertResidencyPayments(
         deps.expertReferralJobsRepository,
-        deps.expertResidencyProviderReader,
+        expertResidencyProviderReader,
         deps.now(),
         batchSize,
       ),

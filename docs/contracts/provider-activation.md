@@ -73,26 +73,26 @@ transaction.
 
 ## Planerka
 
-| Evidence                                         | Status                                       |
-| ------------------------------------------------ | -------------------------------------------- |
-| Official contract version and checksum           | Missing immutable approved snapshot          |
-| Authenticated REST paths and authentication      | Not confirmed                                |
-| Authentication credential owner                  | Not assigned                                 |
-| Webhook authentication and freshness window      | Not confirmed                                |
-| Payload fixtures                                 | Sanitized contract-hypothesis fixtures only  |
-| Sandbox tenant and test identities               | Not available                                |
-| Published and measured rate limits               | Not confirmed                                |
-| `429` no-mutation and retry semantics             | Not confirmed                                |
-| Before-write versus after-write timeout semantics | Not provider-confirmed                       |
-| Reserve idempotency semantics                     | Not confirmed                                |
-| Confirm idempotency semantics                     | Not confirmed                                |
-| Cancel idempotency semantics                      | Not confirmed                                |
-| Authoritative reconciliation endpoint             | Not confirmed                                |
-| Stable booking/event identity                     | Not confirmed                                |
-| Security reviewer                                 | Not assigned                                 |
-| Product approver                                  | Not assigned                                 |
-| Evidence date                                     | 2026-07-29                                   |
-| Expiry/review date                                | Not assigned                                 |
+| Evidence                                          | Status                                      |
+| ------------------------------------------------- | ------------------------------------------- |
+| Official contract version and checksum            | Missing immutable approved snapshot         |
+| Authenticated REST paths and authentication       | Not confirmed                               |
+| Authentication credential owner                   | Not assigned                                |
+| Webhook authentication and freshness window       | Not confirmed                               |
+| Payload fixtures                                  | Sanitized contract-hypothesis fixtures only |
+| Sandbox tenant and test identities                | Not available                               |
+| Published and measured rate limits                | Not confirmed                               |
+| `429` no-mutation and retry semantics             | Not confirmed                               |
+| Before-write versus after-write timeout semantics | Not provider-confirmed                      |
+| Reserve idempotency semantics                     | Not confirmed                               |
+| Confirm idempotency semantics                     | Not confirmed                               |
+| Cancel idempotency semantics                      | Not confirmed                               |
+| Authoritative reconciliation endpoint             | Not confirmed                               |
+| Stable booking/event identity                     | Not confirmed                               |
+| Security reviewer                                 | Not assigned                                |
+| Product approver                                  | Not assigned                                |
+| Evidence date                                     | 2026-07-29                                  |
+| Expiry/review date                                | Not assigned                                |
 
 **Activation status: `NO-GO`.**
 
@@ -117,47 +117,48 @@ Every disabled adapter method throws `Planerka integration is disabled`. Provide
 activation requires a separate reviewed change after every missing evidence field
 above is supplied and approved.
 
-## Payments
+## Payments — YooKassa by YooMoney
 
-| Evidence or commercial decision                 | Status                              |
-| ----------------------------------------------- | ----------------------------------- |
-| Payment provider and immutable contract version | Not selected or approved            |
-| Prices                                          | Not approved                        |
-| Package composition                             | Not approved                        |
-| Refund policy                                   | Not approved                        |
-| Chargeback policy                               | Not approved                        |
-| No-show policy                                  | Not approved                        |
-| Receipt and fiscal requirements                 | Not approved                        |
-| Legal basis and data-processing terms           | Not approved                        |
-| Authenticated webhook contract and replay rules | Not available                       |
-| Idempotency and authoritative reconciliation    | Not available                       |
-| Sandbox tenant and test identities              | Not available                       |
-| Credential owner                                | Not assigned                        |
-| Security and legal reviewers                    | Not assigned                        |
-| Product approver                                | Not assigned                        |
-| Dual-control activation approval                | Not defined or granted              |
-| Evidence date                                   | 2026-07-29                          |
-| Expiry/review date                              | Not assigned                        |
+| Evidence or commercial decision                 | Status                                                                  |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Payment provider and immutable contract version | YooKassa Merchant API selected; merchant contract evidence not approved |
+| Prices                                          | Not approved                                                            |
+| Package composition                             | Not approved                                                            |
+| Refund policy                                   | Not approved                                                            |
+| Chargeback policy                               | Not approved                                                            |
+| No-show policy                                  | Not approved                                                            |
+| Receipt and fiscal requirements                 | Not approved                                                            |
+| Legal basis and data-processing terms           | Not approved                                                            |
+| Authenticated webhook contract and replay rules | Design and code boundary present; merchant evidence not recorded        |
+| Idempotency and authoritative reconciliation    | Local boundary implemented; merchant evidence not recorded              |
+| Test shop and test identities                   | Not available                                                           |
+| Credential owner                                | Not assigned                                                            |
+| Security and legal reviewers                    | Not assigned                                                            |
+| Product approver                                | Not assigned                                                            |
+| Dual-control activation approval                | Not defined or granted                                                  |
+| Evidence date                                   | 2026-07-29                                                              |
+| Expiry/review date                              | Not assigned                                                            |
 
 **Activation status: `NO-GO`.**
 
-`CreateCheckoutCommand`, `PaymentWebhookCommand`, and `RefundCommand` are internal
-type boundaries only. They do not establish prices, currencies, package contents,
-refund eligibility, provider payloads, fiscal treatment, or entitlement rules.
-`DisabledPaymentAdapter` is the only payment binding. Every operation throws a
-`PaymentsDisabledError` whose code is `PAYMENTS_DISABLED`, without inspecting the
-command.
+`CreateCheckoutCommand`, `PaymentWebhookCommand`, and `RefundCommand` remain internal
+boundaries. The repository now also contains a YooKassa Merchant API client, adapter,
+authoritative verifier, PostgreSQL operation relation, and injectable webhook seam. None
+establishes prices, fiscal treatment, merchant entitlement, or a production session.
+The default API and worker still use disabled composition and make no YooKassa call.
 
-No payment route, provider client, codec, webhook mutation handler, database table,
-payment event consumer, entitlement grant, credential lookup, or authenticated
-session is supplied. Runtime configuration remains:
+Runtime defaults remain disabled; credential fields are deliberately empty placeholders:
 
 ```text
 PAYMENTS_ENABLED=false
 PAYMENT_PROVIDER=disabled
-PAYMENT_API_KEY=__PLACEHOLDER_PAYMENT_API_KEY__
-PAYMENT_WEBHOOK_SECRET=__PLACEHOLDER_PAYMENT_WEBHOOK_SECRET__
+YOOKASSA_ENABLED=false
+YOOKASSA_SHOP_ID=
+YOOKASSA_SECRET_KEY=
+YOOKASSA_SECRET_REF=
 ```
 
-Activation requires a separate dual-controlled change after every missing evidence
-and policy item above is supplied, reviewed, and approved.
+See [the YooKassa runbook](../runbooks/yookassa-provider.md) and
+[traceability](../spec/yookassa-provider-traceability.md). Activation requires a separate
+dual-controlled change after every missing evidence and policy item above is supplied,
+reviewed, and approved. It is additionally deferred while hoster maintenance is active.
