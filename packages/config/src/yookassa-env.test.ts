@@ -40,4 +40,25 @@ describe("YooKassa environment contract", () => {
     expect(config.yookassa?.secretReference).toBe("env://YOOKASSA_SECRET_KEY");
     expect(JSON.stringify(config)).not.toContain("synthetic-test-secret");
   });
+
+  it("keeps rollback disabled when stored credentials remain present", () => {
+    const config = loadEnv({
+      ...base(),
+      YOOKASSA_ENABLED: "false",
+      PAYMENTS_ENABLED: "false",
+      PAYMENT_PROVIDER: "disabled",
+      YOOKASSA_MODE: "live",
+      YOOKASSA_SHOP_ID: "123456",
+      YOOKASSA_SECRET_KEY: "stored-but-disabled-secret",
+      YOOKASSA_SECRET_REF: "env://YOOKASSA_SECRET_KEY",
+      YOOKASSA_RETURN_URL: "https://ii-tonya.ru/payments/return",
+      YOOKASSA_RECEIPT_VAT_CODE: "1",
+      YOOKASSA_RECEIPT_PAYMENT_SUBJECT: "service",
+      YOOKASSA_RECEIPT_PAYMENT_MODE: "full_payment",
+    });
+    expect(config.features.yookassa).toBe(false);
+    expect(config.integrations.payments).toBe(false);
+    expect(config.yookassa).toBeUndefined();
+    expect(JSON.stringify(config)).not.toContain("stored-but-disabled-secret");
+  });
 });

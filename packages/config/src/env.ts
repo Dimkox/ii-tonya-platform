@@ -140,21 +140,10 @@ const schema = z
         });
       }
     }
-    const yooKassaFields = [
-      value.YOOKASSA_MODE,
-      value.YOOKASSA_SHOP_ID,
-      value.YOOKASSA_SECRET_KEY,
-      value.YOOKASSA_SECRET_REF,
-      value.YOOKASSA_RETURN_URL,
-      value.YOOKASSA_RECEIPT_VAT_CODE,
-      value.YOOKASSA_RECEIPT_PAYMENT_SUBJECT,
-      value.YOOKASSA_RECEIPT_PAYMENT_MODE,
-    ];
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||
-      value.PAYMENT_PROVIDER === "yookassa" ||
-      yooKassaFields.some((field) => (field ?? "").length > 0);
+      value.PAYMENT_PROVIDER === "yookassa";
     if (activationRequested) {
       let returnUrlValid = false;
       try {
