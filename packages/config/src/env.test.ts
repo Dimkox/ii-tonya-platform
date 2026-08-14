@@ -24,6 +24,7 @@ describe("loadEnv", () => {
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
     expect(config.features).toEqual({
+      workerOutboxDelivery: false,
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
@@ -38,6 +39,24 @@ describe("loadEnv", () => {
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
     ).toThrow("Raw conversation logging is prohibited");
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
+  });
+
+  it("defaults worker outbox delivery off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.workerOutboxDelivery).toBe(false);
+    expect(
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "false" })).features
+        .workerOutboxDelivery,
+    ).toBe(false);
+    expect(
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "true" })).features
+        .workerOutboxDelivery,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "TRUE" })),
+    ).toThrow();
+    expect(() =>
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "1" })),
+    ).toThrow();
   });
 
   it("requires safe key metadata only when expert referrals are enabled", () => {
