@@ -7,7 +7,11 @@ import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 
 export interface WebhookInbox {
-  claim(provider: "telegram", eventId: string): Promise<{ kind: "claimed"; claimId: string } | { kind: "duplicate" | "busy" }>;
+  claim(provider: "telegram" | "yookassa", eventId: string): Promise<
+    | { kind: "claimed"; claimId: string }
+    | { kind: "duplicate" }
+    | { kind: "busy" }
+  >;
   complete(claimId: string): Promise<void>;
   fail(claimId: string): Promise<void>;
 }

@@ -11,11 +11,16 @@ const notification = {
 const build = async (peer = "185.71.76.4") => {
   const dependencies = {
     effectivePeerAddress: vi.fn(() => peer),
-    claim: vi.fn(async () => "claimed" as const),
+    inbox: {
+      claim: vi.fn(async () => ({
+        kind: "claimed" as const,
+        claimId: "claim-1",
+      })),
+      complete: vi.fn(async () => undefined),
+      fail: vi.fn(async () => undefined),
+    },
     verify: vi.fn(async () => ({ verified: true }) as never),
     deliver: vi.fn(async () => undefined),
-    complete: vi.fn(async () => undefined),
-    release: vi.fn(async () => undefined),
   };
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false } } });
   await app.register(yookassaWebhookRoutes, dependencies);
@@ -33,7 +38,7 @@ describe("YooKassa webhook boundary", () => {
     expect(response.statusCode).toBe(200);
     expect(dependencies.verify).toHaveBeenCalledOnce();
     expect(dependencies.deliver).toHaveBeenCalledOnce();
-    expect(dependencies.complete).toHaveBeenCalledOnce();
+    expect(dependencies.inbox.complete).toHaveBeenCalledWith("claim-1");
     await app.close();
   });
 
@@ -60,7 +65,47 @@ describe("YooKassa webhook boundary", () => {
     });
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain("sensitive");
-    expect(dependencies.release).toHaveBeenCalledOnce();
+    expect(dependencies.inbox.fail).toHaveBeenCalledWith("claim-1");
+    await app.close();
+  });
+
+  it("keeps the response retryable when claim release ownership was lost", async () => {
+    const { app, dependencies } = await build();
+    dependencies.deliver.mockRejectedValueOnce(new Error("sensitive"));
+    dependencies.inbox.fail.mockRejectedValueOnce(new Error("stale claim"));
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.body).not.toContain("stale claim");
+    await app.close();
+  });
+
+  it("returns retryable status while another claim owner is processing", async () => {
+    const { app, dependencies } = await build();
+    dependencies.inbox.claim.mockResolvedValueOnce({ kind: "busy" });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+    expect(response.statusCode).toBe(503);
+    expect(dependencies.verify).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("acknowledges a completed duplicate without verification", async () => {
+    const { app, dependencies } = await build();
+    dependencies.inbox.claim.mockResolvedValueOnce({ kind: "duplicate" });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(dependencies.verify).not.toHaveBeenCalled();
     await app.close();
   });
 });

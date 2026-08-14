@@ -4,11 +4,16 @@ import type { YooKassaWebhookDependencies } from "./routes/yookassa-webhook.js";
 
 const capability = (): YooKassaWebhookDependencies => ({
   effectivePeerAddress: () => "185.71.76.4",
-  claim: vi.fn(async () => "claimed" as const),
+  inbox: {
+    claim: vi.fn(async () => ({
+      kind: "claimed" as const,
+      claimId: "claim-1",
+    })),
+    complete: vi.fn(async () => undefined),
+    fail: vi.fn(async () => undefined),
+  },
   verify: vi.fn(async () => ({ verified: true }) as never),
   deliver: vi.fn(async () => undefined),
-  complete: vi.fn(async () => undefined),
-  release: vi.fn(async () => undefined),
 });
 
 const enabledFeatures = {

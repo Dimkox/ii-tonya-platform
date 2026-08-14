@@ -157,6 +157,7 @@ export {
   type YooKassaPaymentAdapterDependencies,
 } from "./yookassa/payment-adapter.js";
 export { YooKassaPaymentVerifier } from "./yookassa/verifier.js";
+export { YooKassaWebhookCapability } from "./yookassa/webhook-capability.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
