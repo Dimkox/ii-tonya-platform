@@ -9,12 +9,15 @@ describe("raw Authorization occurrence guard", () => {
   });
 
   it.each([
-    [],
-    ["Authorization", "Bearer a", "Authorization", "Bearer b"],
-    ["authorization", "Bearer a", "AUTHORIZATION", "Bearer b"],
-    ["authorization", "Bearer a,Bearer b"],
-    ["authorization"],
-  ])("rejects missing, duplicate, folded, or malformed raw header fields", (rawHeaders) => {
-    expect(readExactAuthorization(rawHeaders)).toBeNull();
-  });
+    { rawHeaders: [] },
+    { rawHeaders: ["Authorization", "Bearer a", "Authorization", "Bearer b"] },
+    { rawHeaders: ["authorization", "Bearer a", "AUTHORIZATION", "Bearer b"] },
+    { rawHeaders: ["authorization", "Bearer a,Bearer b"] },
+    { rawHeaders: ["authorization"] },
+  ])(
+    "rejects missing, duplicate, folded, or malformed raw header fields",
+    ({ rawHeaders }) => {
+      expect(readExactAuthorization(rawHeaders)).toBeNull();
+    },
+  );
 });
