@@ -74,6 +74,18 @@ const schema = z
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: z
+      .string()
+      .regex(/^\d+$/u)
+      .default("60")
+      .refine((raw) => {
+        const minutes = Number(raw);
+        return (
+          Number.isSafeInteger(minutes) && minutes >= 1 && minutes <= 4_320
+        );
+      }, "booking confirmation buffer must be between 1 and 4320 minutes"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
@@ -246,6 +258,8 @@ export type RuntimeConfig = {
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
     clientCatalog: boolean;
+    clientBooking?: boolean;
+    clientBookingReserve?: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
@@ -255,6 +269,7 @@ export type RuntimeConfig = {
     expertTelegramCheckout?: boolean;
     yookassa?: boolean;
   };
+  clientBookingConfirmationBufferMs?: number;
   expertReferralKey?: {
     currentVersion: string;
     reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON";
@@ -307,6 +322,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
+      clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
+      clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
@@ -317,6 +334,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       expertTelegramCheckout: value.EXPERT_TELEGRAM_CHECKOUT_ENABLED === "true",
       yookassa: value.YOOKASSA_ENABLED === "true",
     },
+    clientBookingConfirmationBufferMs:
+      Number(value.CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES) * 60 * 1_000,
     yookassaRecovery:
       value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true"
         ? {

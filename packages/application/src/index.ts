@@ -3,6 +3,7 @@ export * from "./admin-service.js";
 export * from "./feedback-service.js";
 export * from "./catalog-service.js";
 export * from "./client-catalog-service.js";
+export * from "./client-booking-service.js";
 export * from "./client-session-service.js";
 export * from "./conversation-service.js";
 export * from "./ports.js";
