@@ -74,6 +74,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
   "packages/db/migrations/0021_expert_settlement_snapshot.sql",
   "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+  "packages/db/migrations/0023_yookassa_provider_operations.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -87,6 +88,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_residency_tariff_versions",
   "expert_residency_orders",
   "expert_residency_payment_attempts",
+  "expert_residency_provider_operations",
   "expert_residency_provider_event_inbox",
   "expert_first_residency_settlements",
   "expert_referral_reward_grants",
@@ -158,7 +160,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "83c2c1975cb038949b62e75e3e71b372b07864ad47c8b6c6cd664b2b7275128f",
+    "a7727399e10c27b968c8ad4acd4242bdde625e8ca3e9c8de1288363f80c050e0",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -542,6 +544,10 @@ const approvedMigrationHashes = new Map([
     "f4262b0905c945ccec107603106e120875f12ea23d570fc4d90bdddd8bc899cc",
   ],
   [
+    "packages/db/migrations/0023_yookassa_provider_operations.sql",
+    "2c6f04eb2d1e5d019f710e3111d09e6f3ac01be986e3ee8e6e548a551aa9d5fc",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -619,7 +625,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "484624c8803e83514177fcfa78994382121a8cb9965c61b98a2188eef376ddcd",
+    "fecdb577436f818303be23754a3bf70e60ac71e7eb2d5833e476d9163d415db2",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

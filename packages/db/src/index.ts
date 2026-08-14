@@ -187,4 +187,10 @@ export {
   type ExpertResidencyWorkerPayment,
   type ExpertResidencyWorkerPaymentStatus,
 } from "./repositories/expert-referral-worker-repository.js";
+export {
+  PostgresYooKassaOperationRepository,
+  YooKassaOperationError,
+  canonicalYooKassaRequestDigest,
+  type YooKassaOperationErrorCode,
+} from "./repositories/yookassa-operation-repository.js";
 export * from "./schema/index.js";

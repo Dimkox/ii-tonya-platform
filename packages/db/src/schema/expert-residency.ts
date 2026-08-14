@@ -32,27 +32,58 @@ const updatedAt = timestamp("updated_at", { withTimezone: true })
 export const expertReferralAdminExecutionResults = pgTable(
   "expert_referral_admin_execution_results",
   {
-    approvalId: uuid("approval_id").primaryKey().references(() => adminApprovals.id),
-    secondApprovalId: uuid("second_approval_id").references(() => adminApprovals.id),
+    approvalId: uuid("approval_id")
+      .primaryKey()
+      .references(() => adminApprovals.id),
+    secondApprovalId: uuid("second_approval_id").references(
+      () => adminApprovals.id,
+    ),
     action: text("action").notNull(),
     objectId: uuid("object_id").notNull(),
     payloadHash: text("payload_hash").notNull(),
     nonceHash: text("nonce_hash").notNull(),
     secondNonceHash: text("second_nonce_hash"),
-    requesterSessionIdHash: text("requester_session_id_hash").notNull().references(() => adminSessions.sessionIdHash),
+    requesterSessionIdHash: text("requester_session_id_hash")
+      .notNull()
+      .references(() => adminSessions.sessionIdHash),
     expectedVersion: integer("expected_version"),
-    safeResult: jsonb("safe_result").$type<Record<string, string | number | boolean>>().notNull(),
+    safeResult: jsonb("safe_result")
+      .$type<Record<string, string | number | boolean>>()
+      .notNull(),
     createdAt,
   },
   (table) => [
-    check("expert_referral_admin_result_action_allowed", sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`),
-    check("expert_referral_admin_result_payload_hash_format", sql`${table.payloadHash} ~ '^sha256:[0-9a-f]{64}$'`),
-    check("expert_referral_admin_result_nonce_hash_format", sql`${table.nonceHash} ~ '^sha256:[0-9a-f]{64}$'`),
-    check("expert_referral_admin_result_second_binding", sql`coalesce((${table.action} <> 'expert_referral.issuance_override' and ${table.secondApprovalId} is null and ${table.secondNonceHash} is null) or (${table.action} = 'expert_referral.issuance_override' and ${table.secondApprovalId} is not null and ${table.secondNonceHash} is not null and ${table.secondNonceHash} ~ '^sha256:[0-9a-f]{64}$' and ${table.secondApprovalId} <> ${table.approvalId}), false)`),
-    check("expert_referral_admin_result_expected_version", sql`coalesce((${table.action} = 'expert_referral.feature_switch' and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} <> 'expert_referral.feature_switch' and ${table.expectedVersion} is null), false)`),
-    check("expert_referral_admin_result_object_only", sql`jsonb_typeof(${table.safeResult}) = 'object'`),
-    check("expert_referral_admin_result_no_secrets", sql`not (${table.safeResult} ?| array['codes','plaintext','digest','hash','nonce']) and ${table.safeResult}::text !~ '"(codes|plaintext|digest|hash|nonce)"[[:space:]]*:'`),
-    check("expert_referral_admin_result_exact_schema", sql`
+    check(
+      "expert_referral_admin_result_action_allowed",
+      sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`,
+    ),
+    check(
+      "expert_referral_admin_result_payload_hash_format",
+      sql`${table.payloadHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_referral_admin_result_nonce_hash_format",
+      sql`${table.nonceHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_referral_admin_result_second_binding",
+      sql`coalesce((${table.action} <> 'expert_referral.issuance_override' and ${table.secondApprovalId} is null and ${table.secondNonceHash} is null) or (${table.action} = 'expert_referral.issuance_override' and ${table.secondApprovalId} is not null and ${table.secondNonceHash} is not null and ${table.secondNonceHash} ~ '^sha256:[0-9a-f]{64}$' and ${table.secondApprovalId} <> ${table.approvalId}), false)`,
+    ),
+    check(
+      "expert_referral_admin_result_expected_version",
+      sql`coalesce((${table.action} = 'expert_referral.feature_switch' and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} <> 'expert_referral.feature_switch' and ${table.expectedVersion} is null), false)`,
+    ),
+    check(
+      "expert_referral_admin_result_object_only",
+      sql`jsonb_typeof(${table.safeResult}) = 'object'`,
+    ),
+    check(
+      "expert_referral_admin_result_no_secrets",
+      sql`not (${table.safeResult} ?| array['codes','plaintext','digest','hash','nonce']) and ${table.safeResult}::text !~ '"(codes|plaintext|digest|hash|nonce)"[[:space:]]*:'`,
+    ),
+    check(
+      "expert_referral_admin_result_exact_schema",
+      sql`
       (${table.action} = 'expert_referral.batch_generate' and ${table.safeResult} ?& array['batchId','count'] and ${table.safeResult} - array['batchId','count'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'batchId')='string' and (${table.safeResult}->>'batchId') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' and jsonb_typeof(${table.safeResult}->'count')='number') or
       (${table.action} = 'expert_referral.code_revoke' and ${table.safeResult} ?& array['id','status'] and ${table.safeResult} - array['id','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
       (${table.action} = 'expert_referral.issuance_override' and ${table.safeResult} ? 'overrideId' and ${table.safeResult} - 'overrideId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'overrideId')='string') or
@@ -61,8 +92,11 @@ export const expertReferralAdminExecutionResults = pgTable(
       (${table.action} = 'expert_residency.tariff_retire' and ${table.safeResult} ?& array['tariffVersionId','activeTo'] and ${table.safeResult} - array['tariffVersionId','activeTo'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string' and jsonb_typeof(${table.safeResult}->'activeTo')='string') or
       (${table.action} = 'expert_referral.hold_replay' and ${table.safeResult} ?& array['kind','reason'] and ${table.safeResult} - array['kind','reason'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'kind')='string' and jsonb_typeof(${table.safeResult}->'reason')='string') or
       (${table.action} = 'expert_referral.feature_switch' and ${table.safeResult} ? 'version' and ${table.safeResult} - 'version' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number')
-    `),
-    uniqueIndex("expert_referral_admin_results_second_approval_unique").on(table.secondApprovalId).where(sql`${table.secondApprovalId} is not null`),
+    `,
+    ),
+    uniqueIndex("expert_referral_admin_results_second_approval_unique")
+      .on(table.secondApprovalId)
+      .where(sql`${table.secondApprovalId} is not null`),
   ],
 );
 
@@ -454,6 +488,124 @@ export const expertResidencyPaymentAttempts = pgTable(
     index("expert_payment_attempt_order_status_idx").on(
       table.orderId,
       table.status,
+    ),
+  ],
+);
+
+export const expertResidencyProviderOperations = pgTable(
+  "expert_residency_provider_operations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    commandId: uuid("command_id").notNull(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => expertResidencyOrders.id),
+    paymentAttemptId: uuid("payment_attempt_id").notNull(),
+    operationKind: text("operation_kind")
+      .$type<"create_payment" | "create_refund">()
+      .notNull(),
+    provider: text("provider").notNull().default("yookassa"),
+    environmentMode: text("environment_mode")
+      .$type<"test" | "live">()
+      .notNull(),
+    providerObjectId: text("provider_object_id"),
+    parentPaymentId: text("parent_payment_id"),
+    amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull(),
+    currency: text("currency").notNull().default("RUB"),
+    requestDigest: text("request_digest").notNull(),
+    claimDigest: text("claim_digest").notNull(),
+    idempotencyKey: uuid("idempotency_key").defaultRandom().notNull(),
+    status: text("status")
+      .$type<
+        | "claimed"
+        | "pending"
+        | "unknown_outcome"
+        | "succeeded"
+        | "canceled"
+        | "failed"
+      >()
+      .notNull()
+      .default("claimed"),
+    reconciliationClaimedAt: timestamp("reconciliation_claimed_at", {
+      withTimezone: true,
+    }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.paymentAttemptId, table.orderId],
+      foreignColumns: [
+        expertResidencyPaymentAttempts.id,
+        expertResidencyPaymentAttempts.orderId,
+      ],
+      name: "expert_provider_operations_attempt_order_fk",
+    }),
+    uniqueIndex("expert_provider_operations_command_unique").on(
+      table.provider,
+      table.commandId,
+    ),
+    uniqueIndex("expert_provider_operations_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    uniqueIndex("expert_provider_operations_object_unique")
+      .on(table.provider, table.providerObjectId)
+      .where(sql`${table.providerObjectId} is not null`),
+    index("expert_provider_operations_reconcile_idx").on(
+      table.status,
+      table.reconciliationClaimedAt,
+      table.createdAt,
+      table.id,
+    ),
+    index("expert_provider_operations_order_kind_idx").on(
+      table.orderId,
+      table.operationKind,
+      table.createdAt,
+    ),
+    check(
+      "expert_provider_operations_provider",
+      sql`${table.provider} = 'yookassa'`,
+    ),
+    check(
+      "expert_provider_operations_kind",
+      sql`${table.operationKind} in ('create_payment','create_refund')`,
+    ),
+    check(
+      "expert_provider_operations_mode",
+      sql`${table.environmentMode} in ('test','live')`,
+    ),
+    check(
+      "expert_provider_operations_amount",
+      sql`${table.amountMinor} > 0 and ${table.amountMinor} <= 999999999999`,
+    ),
+    check(
+      "expert_provider_operations_currency",
+      sql`${table.currency} = 'RUB'`,
+    ),
+    check(
+      "expert_provider_operations_request_digest",
+      sql`${table.requestDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_provider_operations_claim_digest",
+      sql`${table.claimDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_provider_operations_provider_id",
+      sql`${table.providerObjectId} is null or ${table.providerObjectId} ~ '^[A-Za-z0-9_-]{1,64}$'`,
+    ),
+    check(
+      "expert_provider_operations_parent",
+      sql`(${table.operationKind} = 'create_payment' and ${table.parentPaymentId} is null) or (${table.operationKind} = 'create_refund' and ${table.parentPaymentId} ~ '^[A-Za-z0-9_-]{1,64}$')`,
+    ),
+    check(
+      "expert_provider_operations_status",
+      sql`${table.status} in ('claimed','pending','unknown_outcome','succeeded','canceled','failed')`,
+    ),
+    check(
+      "expert_provider_operations_resolution",
+      sql`(${table.status} in ('claimed','pending','unknown_outcome') and ${table.resolvedAt} is null) or (${table.status} in ('succeeded','canceled','failed') and ${table.resolvedAt} is not null)`,
     ),
   ],
 );
