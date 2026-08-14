@@ -4,11 +4,11 @@ import {
   createClientCatalogService,
   createClientSessionService,
   type IdentityProofVerifier,
-} from "@ii-tonya/application";
+} from "../../packages/application/src/index.js";
 import {
   PostgresClientCatalogRepository,
   PostgresClientSessionRepository,
-} from "@ii-tonya/db";
+} from "../../packages/db/src/index.js";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
