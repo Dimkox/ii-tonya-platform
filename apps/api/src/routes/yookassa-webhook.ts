@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   yooKassaNotificationSchema,
@@ -47,7 +48,7 @@ export const isYooKassaWebhookPeer = (address: string): boolean => {
     inCidr(normalized, "77.75.154.128", 25) ||
     normalized === "77.75.156.11" ||
     normalized === "77.75.156.35" ||
-    normalized.startsWith("2a02:5180:")
+    (isIP(normalized) === 6 && normalized.startsWith("2a02:5180:"))
   );
 };
 

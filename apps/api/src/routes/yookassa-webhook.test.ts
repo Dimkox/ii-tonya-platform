@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
-import { yookassaWebhookRoutes } from "./yookassa-webhook.js";
+import {
+  isYooKassaWebhookPeer,
+  yookassaWebhookRoutes,
+} from "./yookassa-webhook.js";
 
 const notification = {
   type: "notification",
@@ -28,6 +31,11 @@ const build = async (peer = "185.71.76.4") => {
 };
 
 describe("YooKassa webhook boundary", () => {
+  it("accepts only syntactically valid addresses from the provider IPv6 range", () => {
+    expect(isYooKassaWebhookPeer("2a02:5180::1")).toBe(true);
+    expect(isYooKassaWebhookPeer("2a02:5180:not-an-ip")).toBe(false);
+  });
+
   it("accepts an allowlisted signal only after verified durable delivery", async () => {
     const { app, dependencies } = await build();
     const response = await app.inject({
