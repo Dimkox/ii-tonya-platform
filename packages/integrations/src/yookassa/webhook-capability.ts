@@ -34,12 +34,30 @@ export class YooKassaWebhookCapability {
     );
     if (operation === null)
       throw new Error("yookassa_webhook_binding_not_found");
+    if (
+      operation.status === "failed" ||
+      (notification.event !== "payment.canceled" &&
+        operation.status === "canceled")
+    ) {
+      throw new Error("yookassa_webhook_binding_mismatch");
+    }
 
     const event =
       kind === "create_refund"
         ? await this.verifier.verifyRefund(operation)
         : await this.verifier.verifyPayment(operation);
-    if (event !== null) return event;
+    if (event !== null) {
+      const expectedKind =
+        notification.event === "payment.succeeded"
+          ? "settled"
+          : notification.event === "refund.succeeded"
+            ? "refunded"
+            : null;
+      if (expectedKind === null || event.kind !== expectedKind) {
+        throw new Error("yookassa_webhook_binding_mismatch");
+      }
+      return event;
+    }
 
     if (notification.event !== "payment.canceled") {
       throw new Error("yookassa_webhook_pending");

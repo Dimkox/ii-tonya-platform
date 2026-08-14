@@ -21,10 +21,61 @@ const operation = (kind: YooKassaOperation["kind"]): YooKassaOperation => ({
 });
 
 describe("YooKassa webhook capability", () => {
+  it.each([
+    ["payment.succeeded", "create_payment", "settled"],
+    ["refund.succeeded", "create_refund", "refunded"],
+  ] as const)(
+    "rejects %s for an already canceled durable operation",
+    async (notificationEvent, operationKind, canonicalKind) => {
+      const stored = {
+        ...operation(operationKind),
+        status: "canceled" as const,
+      };
+      const verifier = {
+        verifyPayment: vi.fn(async () => ({ kind: canonicalKind }) as never),
+        verifyRefund: vi.fn(async () => ({ kind: canonicalKind }) as never),
+      };
+      const capability = new YooKassaWebhookCapability(
+        { findByProviderObject: vi.fn(async () => stored) } as never,
+        verifier as never,
+      );
+
+      await expect(
+        capability.verify({
+          type: "notification",
+          event: notificationEvent,
+          object: { id: stored.providerObjectId! },
+        }),
+      ).rejects.toThrow("yookassa_webhook_binding_mismatch");
+      expect(verifier.verifyPayment).not.toHaveBeenCalled();
+      expect(verifier.verifyRefund).not.toHaveBeenCalled();
+    },
+  );
+
+  it("never returns a settlement event for payment.canceled", async () => {
+    const stored = operation("create_payment");
+    const verifier = {
+      verifyPayment: vi.fn(async () => ({ kind: "settled" }) as never),
+      verifyRefund: vi.fn(),
+    };
+    const capability = new YooKassaWebhookCapability(
+      { findByProviderObject: vi.fn(async () => stored) } as never,
+      verifier as never,
+    );
+
+    await expect(
+      capability.verify({
+        type: "notification",
+        event: "payment.canceled",
+        object: { id: "payment-1" },
+      }),
+    ).rejects.toThrow("yookassa_webhook_binding_mismatch");
+  });
+
   it("looks up the bound payment and returns its authoritative settled event", async () => {
     const stored = operation("create_payment");
     const operations = { findByProviderObject: vi.fn(async () => stored) };
-    const expected = { proof: "verified" } as never;
+    const expected = { kind: "settled", proof: "verified" } as never;
     const verifier = {
       verifyPayment: vi.fn(async () => expected),
       verifyRefund: vi.fn(),
@@ -94,7 +145,7 @@ describe("YooKassa webhook capability", () => {
   it("maps refund.succeeded to the authoritative refund verifier", async () => {
     const stored = operation("create_refund");
     const operations = { findByProviderObject: vi.fn(async () => stored) };
-    const expected = { proof: "refund" } as never;
+    const expected = { kind: "refunded", proof: "refund" } as never;
     const verifier = {
       verifyPayment: vi.fn(),
       verifyRefund: vi.fn(async () => expected),
@@ -133,7 +184,10 @@ describe("YooKassa webhook capability", () => {
   });
 
   it("treats an already succeeded operation as an idempotent acknowledgment", async () => {
-    const stored = { ...operation("create_payment"), status: "succeeded" as const };
+    const stored = {
+      ...operation("create_payment"),
+      status: "succeeded" as const,
+    };
     const operations = {
       findByProviderObject: vi.fn(async () => stored),
       resolve: vi.fn(async () => {

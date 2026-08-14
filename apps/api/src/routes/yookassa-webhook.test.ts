@@ -16,9 +16,10 @@ const build = async (peer = "185.71.76.4") => {
   const dependencies = {
     effectivePeerAddress: vi.fn(() => peer),
     inbox: {
-      claim: vi.fn<YooKassaWebhookDependencies["inbox"]["claim"]>(
-        async () => ({ kind: "claimed", claimId: "claim-1" }),
-      ),
+      claim: vi.fn<YooKassaWebhookDependencies["inbox"]["claim"]>(async () => ({
+        kind: "claimed",
+        claimId: "claim-1",
+      })),
       complete: vi.fn(async () => undefined),
       fail: vi.fn(async () => undefined),
     },
@@ -85,6 +86,24 @@ describe("YooKassa webhook boundary", () => {
     });
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain("sensitive");
+    expect(dependencies.resolveSucceeded).not.toHaveBeenCalled();
+    expect(dependencies.inbox.fail).toHaveBeenCalledWith("claim-1");
+    await app.close();
+  });
+
+  it("does not deliver or resolve a terminal event mismatch", async () => {
+    const { app, dependencies } = await build();
+    dependencies.verify.mockRejectedValueOnce(
+      new Error("yookassa_webhook_binding_mismatch"),
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: notification,
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.body).not.toContain("binding_mismatch");
+    expect(dependencies.deliver).not.toHaveBeenCalled();
     expect(dependencies.resolveSucceeded).not.toHaveBeenCalled();
     expect(dependencies.inbox.fail).toHaveBeenCalledWith("claim-1");
     await app.close();
