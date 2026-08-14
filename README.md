@@ -109,9 +109,10 @@ contract; the source remains the traceability baseline.
 
 The repository contains a narrow YooKassa Merchant API boundary: fixed-origin client,
 durable PostgreSQL operation mapping, authoritative verifier, default-off webhook seam,
-and bounded reconciliation seam. It is **not activated**: all credentials are empty
-placeholders, the default API/worker composition supplies no YooKassa capability, and no
-test-shop or live provider evidence is recorded. YooKassa is the merchant product of
+bounded reconciliation, and encrypted exact-body recovery runtime. It is **not
+activated**: all credentials and recovery-policy inputs are empty placeholders, the
+default API/worker composition supplies no YooKassa key resolver or merchant capability,
+and no test-shop or live provider evidence is recorded. YooKassa is the merchant product of
 YooMoney; the personal YooMoney Wallet API and the former T-Bank proposal are not used.
 
 - [YooKassa design](docs/superpowers/specs/2026-08-14-yookassa-provider-design.md)
@@ -129,9 +130,9 @@ container deployment, credential entry, or feature activation.
 Selarti serves the client channel, Telegram serves the expert channel, and Planerka
 provides scheduling integration. A transactional backend owns booking, billing, coupon,
 consent, and audit state. Make and Google Sheets are limited to non-critical automation
-and projections. YooKassa by YooMoney is the selected payment provider, but its live
-adapter remains unimplemented and disabled until the provider contract and release gates
-are approved.
+and projections. YooKassa by YooMoney is the selected payment provider; its adapter and
+recovery boundaries are implemented but remain disabled and uncomposed until the provider
+contract, key-management boundary, and release gates are approved.
 
 ## Production topology
 
