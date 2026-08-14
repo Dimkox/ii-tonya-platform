@@ -287,13 +287,15 @@ describe("review-remediated production worker outbox composition", () => {
     expect(await status(localDispatchExhausted)).toBe("dead_letter");
     expect(await status(localReconciliationExhausted)).toBe("dead_letter");
     await expect(
-      Promise.all([
-        providerPending,
-        providerProcessing,
-        providerReconciling,
-        providerDispatchExhausted,
-        providerReconciliationExhausted,
-      ].map(status)),
+      Promise.all(
+        [
+          providerPending,
+          providerProcessing,
+          providerReconciling,
+          providerDispatchExhausted,
+          providerReconciliationExhausted,
+        ].map(status),
+      ),
     ).resolves.toEqual([
       "pending",
       "processing",

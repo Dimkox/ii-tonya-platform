@@ -552,11 +552,7 @@ export async function runOutboxBatch(
       deps.maxReconciliationAttempts,
     );
     unknown = batch.messages;
-    recordExhaustion(
-      deps,
-      batch.exhausted,
-      "reconciliation_exhausted",
-    );
+    recordExhaustion(deps, batch.exhausted, "reconciliation_exhausted");
   }
   for (const message of unknown) {
     record(deps, message.topic, "claim", "no_op", "internal");

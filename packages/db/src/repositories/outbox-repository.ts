@@ -295,7 +295,10 @@ async function terminalizeDispatchExhaustedByTopic(
   maxAttempts: number,
   topics: LocalOperatorCaseTopics,
 ): Promise<readonly OutboxRecoveryCount[]> {
-  const result = await tx.execute<{ topic: string; count: number | string }>(sql`
+  const result = await tx.execute<{
+    topic: string;
+    count: number | string;
+  }>(sql`
     with exhausted as (
       update integration_outbox
       set status='dead_letter',next_attempt_at=null,
@@ -323,7 +326,10 @@ async function terminalizeReconciliationExhaustedByTopic(
   maxAttempts: number,
   topics: LocalOperatorCaseTopics,
 ): Promise<readonly OutboxRecoveryCount[]> {
-  const result = await tx.execute<{ topic: string; count: number | string }>(sql`
+  const result = await tx.execute<{
+    topic: string;
+    count: number | string;
+  }>(sql`
     with exhausted as (
       update integration_outbox
       set status='dead_letter',next_reconciliation_at=null,

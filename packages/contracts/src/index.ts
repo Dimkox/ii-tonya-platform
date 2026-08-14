@@ -13,5 +13,12 @@ export {
   CallbackDataIntegrityError,
   CallbackInfrastructureError,
 } from "./errors.js";
-export { expertResidencyCheckoutCommandSchema, expertResidencyPaymentEventSchema } from "./expert-residency.js";
-export type { ExpertResidencyCheckoutCommand, ExpertResidencyCheckoutOutcome, ExpertResidencyPaymentEvent } from "./expert-residency.js";
+export {
+  expertResidencyCheckoutCommandSchema,
+  expertResidencyPaymentEventSchema,
+} from "./expert-residency.js";
+export type {
+  ExpertResidencyCheckoutCommand,
+  ExpertResidencyCheckoutOutcome,
+  ExpertResidencyPaymentEvent,
+} from "./expert-residency.js";
