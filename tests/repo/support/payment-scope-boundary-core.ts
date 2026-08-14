@@ -149,7 +149,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "1c77462dfff8850a5cc4edc21efa2409873fbb5eee936d904edc7186c574f0f9",
+    "bf8544cd0f41b9f787db1465c46b067e4896619c6877fdf7a50784362bcaedc0",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -161,7 +161,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/client.ts",
-    "245fadc877cebd6307a51b3bef99be103eb87972ca1d647765b1c68444d856ba",
+    "89a55569d5170d266f2c416963f26c023a11947917be6a102140f785e2173802",
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
@@ -169,11 +169,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
-    "f5be246cab03659fc3082c1eca1d491223ef60e730f0c762958ff65f01e802e2",
+    "f1adc2c5e4d610f8d7977a0e048313ae44b8365ce3fe7247785544c6362e47f3",
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "0c653980b187bb46e1bc9b38136b245644cd2ef4742158b7d629d258e66904ed",
+    "9da075cd09902befa3c06fc85b8a91e578d6002301653fdeaa17136e6698f5e8",
   ],
   [
     "packages/integrations/src/yookassa/receipt-contact-source.ts",
@@ -181,7 +181,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
-    "6ca76727300f47e8382a522ea10d38256680eb112f7cd21f9fd8968e1b77e92c",
+    "b6ace023a7c3ff63624d3cd6d1695dbea32067a5ce45a844f43044331395b1ca",
   ],
   [
     "packages/integrations/src/yookassa/reconciliation-reader.ts",
