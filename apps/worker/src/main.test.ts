@@ -16,6 +16,40 @@ describe("worker main", () => {
     ).resolves.toEqual({ kind: "disabled" });
   });
 
+  it("accepts an injected YooKassa reader only with complete enabled metadata", async () => {
+    const { selectExpertResidencyProviderReader } = await import("./main.js");
+    const reader = {
+      readPayments: vi.fn(async () => ({ kind: "disabled" as const })),
+    };
+    const enabled = {
+      features: { yookassa: true },
+      yookassa: {
+        mode: "test",
+        shopId: "123",
+        secretReference: "env://YOOKASSA_SECRET_KEY",
+        returnUrl: "https://ii-tonya.ru/return",
+        receipt: {
+          vatCode: 1,
+          paymentSubject: "service",
+          paymentMode: "full_payment",
+        },
+      },
+    };
+
+    expect(selectExpertResidencyProviderReader(enabled as never, reader)).toBe(
+      reader,
+    );
+    expect(() => selectExpertResidencyProviderReader(enabled as never)).toThrow(
+      "yookassa_worker_capability_unavailable",
+    );
+    expect(() =>
+      selectExpertResidencyProviderReader(
+        { features: { yookassa: false } } as never,
+        reader,
+      ),
+    ).toThrow("yookassa_worker_capability_unexpected");
+  });
+
   it("finishes the current bounded cycle and closes on a signal", async () => {
     const { runWorkerLoop } = await import("./main.js");
     const controller = new AbortController();
