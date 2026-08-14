@@ -72,7 +72,7 @@ describe("MVP worker outbox delivery boundaries", () => {
     )) {
       expect(traceability).toContain(`WORKER-OUTBOX-001-R${requirement}`);
     }
-    expect(progress).toContain("Task 5 runtime/metrics | complete");
+    expect(progress).toMatch(/Task 5 runtime\/metrics\s+\| complete/gu);
     expect(report).toContain("No provider activation");
     expect(report).toContain("No production deployment");
     expect(report).not.toMatch(/provider activation[^\n]*PASS/iu);
