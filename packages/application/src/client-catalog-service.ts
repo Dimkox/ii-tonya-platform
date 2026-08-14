@@ -79,7 +79,7 @@ export function createClientCatalogService(deps: {
 }): ClientCatalogService {
   const newCorrelationId = deps.newCorrelationId ?? randomUUID;
   return Object.freeze({
-    async request(principal, filterInput) {
+    async request(principal: ClientPrincipal, filterInput: CatalogFilters) {
       const authority = requirePrincipal(principal);
       const filters = normalizedFilters(filterInput);
       const serviceCode = filters.serviceCode ?? "";
@@ -99,7 +99,7 @@ export function createClientCatalogService(deps: {
         correlationId: newCorrelationId(),
       });
     },
-    async get(principal, catalogRequestId) {
+    async get(principal: ClientPrincipal, catalogRequestId: string) {
       const authority = requirePrincipal(principal);
       if (!UUID_PATTERN.test(catalogRequestId)) {
         throw new Error("client_catalog_request_id_invalid");

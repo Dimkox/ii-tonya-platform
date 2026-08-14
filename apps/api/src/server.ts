@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
   createAdminService,
+  createClientCatalogService,
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
@@ -11,6 +12,7 @@ import {
   type ExpertCodeKeyring,
   type ExpertAiIngressService,
   type PrivacyService,
+  type ClientPrincipalResolver,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -25,6 +27,7 @@ import {
   PostgresExpertReferralControlRepository,
   PostgresExpertAiRequestReceiptStore,
   PostgresOperatorCaseRepository,
+  PostgresClientCatalogRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -88,6 +91,9 @@ export const createDefaultLifecycle = (
       Required<
         Pick<ExpertTelegramIngressFactoryDependencies, "referral" | "residency">
       >;
+    clientCatalogComposition?: {
+      readonly principals: ClientPrincipalResolver;
+    };
   } = {},
 ): ServerLifecycle => ({
   async migrate(db) {
@@ -141,6 +147,13 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramReferral === true,
             checkoutReadiness: config.features.expertTelegramCheckout === true,
           });
+    const clientCatalogService =
+      config.features.clientCatalog === true &&
+      options.clientCatalogComposition !== undefined
+        ? createClientCatalogService({
+            repository: new PostgresClientCatalogRepository(db),
+          })
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -187,6 +200,12 @@ export const createDefaultLifecycle = (
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
       telegramWebhookSecret: randomBytes(32).toString("base64url"),
+      ...(clientCatalogService === undefined
+        ? {}
+        : {
+            clientCatalogService,
+            clientPrincipal: options.clientCatalogComposition!.principals,
+          }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
         ? {}

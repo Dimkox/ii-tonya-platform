@@ -25,6 +25,7 @@ describe("loadEnv", () => {
     expect(config.rawConversationLogging).toBe(false);
     expect(config.features).toEqual({
       workerOutboxDelivery: false,
+      clientCatalog: false,
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
@@ -56,6 +57,24 @@ describe("loadEnv", () => {
     ).toThrow();
     expect(() =>
       loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "1" })),
+    ).toThrow();
+  });
+
+  it("defaults client catalog off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.clientCatalog).toBe(false);
+    expect(
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "false" })).features
+        .clientCatalog,
+    ).toBe(false);
+    expect(
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "true" })).features
+        .clientCatalog,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "TRUE" })),
+    ).toThrow();
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "1" })),
     ).toThrow();
   });
 
