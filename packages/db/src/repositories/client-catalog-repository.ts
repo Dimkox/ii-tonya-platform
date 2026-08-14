@@ -482,9 +482,7 @@ export class PostgresClientCatalogRepository
         }
       }
 
-      let cleanupExamined = 0;
-      remaining = input.limit;
-      if (remaining > 0) {
+      {
         const terminalTombstones = (await tx.execute<{
           requestId: string;
           outboxId: string;
@@ -497,7 +495,7 @@ export class PostgresClientCatalogRepository
           where o.status in ('succeeded','dead_letter')
           order by t.expires_at,t.request_id
           for update of o skip locked
-          limit ${remaining}
+          limit ${input.limit}
         `)).rows;
         for (const tombstone of terminalTombstones) {
           await deleteCatalogOutbox(tx, tombstone.outboxId);
@@ -510,13 +508,38 @@ export class PostgresClientCatalogRepository
             where request_id=${tombstone.requestId}::uuid
           `);
           examined += 1;
-          cleanupExamined += 1;
           removed += 1;
         }
       }
 
-      remaining = input.limit - cleanupExamined;
-      if (remaining > 0) {
+      const orphanTombstones = (await tx.execute<{
+        requestId: string;
+      }>(sql`
+        select t.request_id as "requestId"
+        from client_catalog_tombstones t
+        where not exists (
+          select 1 from integration_outbox o
+          where o.idempotency_key='client-catalog:' || t.request_id::text
+            and o.topic='catalog.show'
+        )
+        order by t.expires_at,t.request_id
+        for update of t skip locked
+        limit ${input.limit}
+      `)).rows;
+      for (const tombstone of orphanTombstones) {
+        await tx.execute(sql`
+          delete from client_catalog_tombstones
+          where request_id=${tombstone.requestId}::uuid
+        `);
+        await tx.execute(sql`
+          delete from client_catalog_erasure_index
+          where request_id=${tombstone.requestId}::uuid
+        `);
+        examined += 1;
+        removed += 1;
+      }
+
+      {
         const orphans = (await tx.execute<{
           outboxId: string;
           idempotencyKey: string;
@@ -536,7 +559,7 @@ export class PostgresClientCatalogRepository
             )
           order by o.updated_at,o.id
           for update skip locked
-          limit ${remaining}
+          limit ${input.limit}
         `)).rows;
         for (const orphan of orphans) {
           await deleteCatalogOutbox(tx, orphan.outboxId);
@@ -545,7 +568,6 @@ export class PostgresClientCatalogRepository
             where ${orphan.idempotencyKey}='client-catalog:' || request_id::text
           `);
           examined += 1;
-          cleanupExamined += 1;
           removed += 1;
         }
       }

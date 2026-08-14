@@ -15,6 +15,7 @@
 | 2026-08-14 | review-pending | Task 5 retention, privacy export/erasure races and two-label metrics are focused GREEN 9/9 with affected builds passed; commit/review/final focused gate remain | Privacy |
 | 2026-08-14 | review-pending | First adversarial review found 1 Critical and 7 Important lifecycle/privacy/composition issues; remediation is focused GREEN 11/11 (including 5 real PostgreSQL) and all six affected builds pass; closure review remains | Engineering + independent reviewer |
 | 2026-08-14 | review-pending | Closure review found 3 Important gaps in retention-first erasure, GET auth precedence and cleanup fairness; a separate remediation gate is GREEN 5/5 (including 2 real PostgreSQL) and DB/API/app-worker builds pass; final closure review remains | Engineering + independent reviewer |
+| 2026-08-14 | review-pending | Final closure pass found 1 Important missing-outbox tombstone lifecycle gap; separate real-PostgreSQL remediation is GREEN 1/1 and DB/app-worker builds pass; reviewer confirmation remains | Engineering + independent reviewer |
 
 This ledger is not activation approval. The only current safe runtime posture is both
 catalog-related flags false.

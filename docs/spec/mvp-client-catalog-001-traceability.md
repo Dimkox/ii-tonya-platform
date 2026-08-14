@@ -20,8 +20,9 @@ Implementation checkpoints are `21e2cca` (durable request/outbox), `85e7809`
 (authority/application), `76b4872` (HTTP/config), and `4b88a2b` (worker/public reader).
 Focused Claw evidence is 2/2 plus PostgreSQL 3/3, 21/21, 10/10 plus 33/33, Task 4
 23/23, Task 5 9/9, and adversarial-remediation 11/11. The first independent review
-found one Critical and seven Important issues; its closure pass found three further
-Important issues. Both remediation gates pass (11/11 and 5/5), and all affected
-builds pass. Final independent closure review and one new focused Claw/PostgreSQL
-gate are still required. No GitHub Actions, live provider, image build, activation,
-deployment, push, or merge is authorized by this checkpoint.
+found one Critical and seven Important issues; its closure passes found three
+Important issues and then one missing-outbox cleanup issue. All remediation gates
+pass (11/11, 5/5, and 1/1), and all affected builds pass. Final independent closure
+confirmation and one new focused Claw/PostgreSQL gate are still required. No GitHub
+Actions, live provider, image build, activation, deployment, push, or merge is
+authorized by this checkpoint.
