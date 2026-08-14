@@ -60,6 +60,7 @@ export interface ProductionWorkerRuntimeDependencies {
   }>;
   readonly workerOutboxRunner?: BoundedJob;
   readonly clientCatalogRetention?: BoundedJob;
+  readonly clientSessionRetention?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -280,11 +281,20 @@ export function createProductionWorkerRuntime(
       : async () =>
           deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
     processorPrivacy:
-      deps.clientCatalogRetention ??
-      (async () => ({
-        processed: 0,
-        reason: "privacy_capability_disabled",
-      })),
+      deps.clientCatalogRetention === undefined &&
+      deps.clientSessionRetention === undefined
+        ? async () => ({
+            processed: 0,
+            reason: "privacy_capability_disabled",
+          })
+        : deps.clientCatalogRetention === undefined
+          ? deps.clientSessionRetention!
+          : deps.clientSessionRetention === undefined
+            ? deps.clientCatalogRetention
+            : async () => ({
+                clientCatalog: await deps.clientCatalogRetention!(),
+                clientSession: await deps.clientSessionRetention!(),
+              }),
     providerReconciliation: async () => ({
       examined: 0,
       matched: 0,

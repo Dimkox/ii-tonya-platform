@@ -35,8 +35,16 @@ export const createClientProofVerifierGate = (
       }
       active += 1;
       const controller = new AbortController();
-      const abort = () => controller.abort();
-      input.signal.addEventListener("abort", abort, { once: true });
+      let rejectCancellation: (reason: unknown) => void = () => undefined;
+      const cancelled = new Promise<never>((_resolve, reject) => {
+        rejectCancellation = reject;
+      });
+      const cancel = () => {
+        controller.abort();
+        rejectCancellation(new ClientProofUnavailableError());
+      };
+      if (input.signal.aborted) cancel();
+      else input.signal.addEventListener("abort", cancel, { once: true });
 
       let timeout: ReturnType<typeof setTimeout> | undefined;
       const deadline = new Promise<never>((_resolve, reject) => {
@@ -45,18 +53,6 @@ export const createClientProofVerifierGate = (
           reject(new ClientProofUnavailableError());
         }, timeoutMs);
         timeout.unref?.();
-      });
-      const cancelled = new Promise<never>((_resolve, reject) => {
-        if (input.signal.aborted) {
-          controller.abort();
-          reject(new ClientProofUnavailableError());
-          return;
-        }
-        input.signal.addEventListener(
-          "abort",
-          () => reject(new ClientProofUnavailableError()),
-          { once: true },
-        );
       });
       const verification = Promise.resolve()
         .then(() =>
@@ -83,7 +79,7 @@ export const createClientProofVerifierGate = (
         return await Promise.race([verification, deadline, cancelled]);
       } finally {
         if (timeout !== undefined) clearTimeout(timeout);
-        input.signal.removeEventListener("abort", abort);
+        input.signal.removeEventListener("abort", cancel);
       }
     },
   });

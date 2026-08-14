@@ -174,8 +174,8 @@ export async function buildApp(
   ) {
     await app.register(clientSessionRoutes, {
       sessions: {
-        issue: (identityProof) =>
-          deps.clientSessionService!.issue(identityProof),
+        issue: (identityProof, signal) =>
+          deps.clientSessionService!.issue(identityProof, signal),
         revoke: (tokenDigest) =>
           deps.clientSessionRepository!.revoke(tokenDigest),
       },

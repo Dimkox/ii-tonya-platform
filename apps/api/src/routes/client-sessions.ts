@@ -73,6 +73,27 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
     "/v1/client/sessions",
     { bodyLimit: 8 * 1024 },
     async (request, reply) => {
+      const controller = new AbortController();
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      function cleanup() {
+        if (deadline !== undefined) clearTimeout(deadline);
+        request.raw.removeListener("aborted", abort);
+        reply.raw.removeListener("close", abortOnClosedResponse);
+        reply.raw.removeListener("finish", cleanup);
+      }
+      function abort() {
+        controller.abort();
+        cleanup();
+      }
+      function abortOnClosedResponse() {
+        if (!reply.raw.writableEnded) abort();
+        else cleanup();
+      }
+      request.raw.once("aborted", abort);
+      reply.raw.once("close", abortOnClosedResponse);
+      reply.raw.once("finish", cleanup);
+      deadline = setTimeout(abort, 3_000);
+      deadline.unref?.();
       reply.header("cache-control", "no-store").header("pragma", "no-cache");
       const contentType = readRawHeader(request.raw.rawHeaders, "content-type");
       const contentEncoding = readRawHeader(
@@ -113,7 +134,10 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
         deps.metrics?.record({ operation: "issue", outcome: "denied" });
         return reply.code(400).send({ error: "invalid_request" });
       }
-      const result = await deps.sessions.issue(parsed.identityProof);
+      const result = await deps.sessions.issue(
+        parsed.identityProof,
+        controller.signal,
+      );
       if (result.kind === "unauthorized") {
         deps.metrics?.record({ operation: "issue", outcome: "denied" });
         return reply.code(401).send({ error: "unauthorized" });

@@ -53,7 +53,10 @@ export function createLogger(destination?: NodeJS.WritableStream): Logger {
     hooks: {
       logMethod(args, method) {
         const invoke = method as unknown as (...values: unknown[]) => void;
-        invoke.apply(this, args.map((argument) => typeof argument === "object" && argument !== null ? sanitizeTelemetry(argument) : argument));
+        invoke.apply(
+          this,
+          args.map((argument) => sanitizeTelemetry(argument)),
+        );
       },
     },
     base: null,

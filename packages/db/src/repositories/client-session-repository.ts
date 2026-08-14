@@ -73,18 +73,24 @@ export class PostgresClientSessionRepository {
     try {
       return await this.db.transaction(async (tx: Transaction) => {
         const authority = (
-          await tx.execute<{ databaseNow: Date | string }>(sql`
-            select clock_timestamp() as "databaseNow"
+          await tx.execute<{ userId: string }>(sql`
+            select id as "userId"
             from users
             where id=${input.userId}::uuid and active=true
             for update
           `)
         ).rows[0];
         if (authority === undefined) return { kind: "denied" } as const;
+        const clock = (
+          await tx.execute<{ databaseNow: Date | string }>(sql`
+            select clock_timestamp() as "databaseNow"
+          `)
+        ).rows[0];
+        if (clock === undefined) throw new Error("client_session_issue_unavailable");
         const databaseNow =
-          authority.databaseNow instanceof Date
-            ? authority.databaseNow
-            : new Date(authority.databaseNow);
+          clock.databaseNow instanceof Date
+            ? clock.databaseNow
+            : new Date(clock.databaseNow);
         const remaining = input.proofExpiresAt.getTime() - databaseNow.getTime();
         if (remaining <= 0 || remaining > input.maximumTtlMs) {
           return { kind: "denied" } as const;
@@ -95,7 +101,7 @@ export class PostgresClientSessionRepository {
               token_digest,user_id,scope,expires_at,created_at
             ) values (
               ${input.tokenDigest},${input.userId}::uuid,
-              'client_catalog:read',${input.proofExpiresAt},clock_timestamp()
+              'client_catalog:read',${input.proofExpiresAt},${databaseNow}
             )
             returning expires_at as "expiresAt"
           `)
@@ -106,7 +112,7 @@ export class PostgresClientSessionRepository {
             replay_digest,session_token_digest,expires_at,created_at
           ) values (
             ${input.replayDigest},${input.tokenDigest},
-            ${input.proofExpiresAt},clock_timestamp()
+            ${input.proofExpiresAt},${databaseNow}
           )
         `);
         const expiresAt =
@@ -119,7 +125,9 @@ export class PostgresClientSessionRepository {
         return { kind: "issued", expiresAt } as const;
       });
     } catch (error) {
-      if (hasSqlState(error, "23505")) return { kind: "denied" };
+      if (hasSqlState(error, "23505") || hasSqlState(error, "23514")) {
+        return { kind: "denied" };
+      }
       throw new Error("client_session_repository_unavailable");
     }
   }

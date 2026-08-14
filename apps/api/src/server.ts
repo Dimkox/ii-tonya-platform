@@ -57,7 +57,7 @@ import {
 } from "./client-session-token.js";
 
 export interface ServerLifecycle {
-  preflight?(config: ReturnType<typeof loadEnv>): void;
+  preflight(config: ReturnType<typeof loadEnv>): void;
   dependencies(
     config: ReturnType<typeof loadEnv>,
     db: DrizzleDb,
@@ -288,7 +288,10 @@ export async function composeServer(
   db: DrizzleDb,
 ): Promise<FastifyInstance> {
   const config = loadEnv(process.env);
-  lifecycle.preflight?.(config);
+  if (typeof lifecycle.preflight !== "function") {
+    throw new Error("server_preflight_capability_unavailable");
+  }
+  lifecycle.preflight(config);
   await lifecycle.migrate(db);
   return buildApp(await lifecycle.dependencies(config, db));
 }

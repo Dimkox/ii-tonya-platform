@@ -170,6 +170,7 @@ describe("server composition", () => {
       "postgresql://placeholder.invalid/test?sslmode=require";
     const order: string[] = [];
     const lifecycle: ServerLifecycle = {
+      preflight() {},
       async migrate() {
         order.push("migrate");
       },
@@ -551,6 +552,7 @@ describe("server composition", () => {
       "postgresql://placeholder.invalid/test?sslmode=require";
     const order: string[] = [];
     const lifecycle: ServerLifecycle = {
+      preflight() {},
       async migrate() {},
       async dependencies(config) {
         return {

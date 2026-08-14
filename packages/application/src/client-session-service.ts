@@ -41,7 +41,10 @@ export type ClientSessionIssueResult =
   | { readonly kind: "unavailable" };
 
 export interface ClientSessionService {
-  issue(identityProof: string): Promise<ClientSessionIssueResult>;
+  issue(
+    identityProof: string,
+    signal?: AbortSignal,
+  ): Promise<ClientSessionIssueResult>;
 }
 
 interface ClientSessionServiceDependencies {
@@ -94,14 +97,17 @@ export const createClientSessionService = (
   dependencies: ClientSessionServiceDependencies,
 ): ClientSessionService => {
   const service: ClientSessionService = {
-    async issue(identityProof: string): Promise<ClientSessionIssueResult> {
+    async issue(
+      identityProof: string,
+      signal = new AbortController().signal,
+    ): Promise<ClientSessionIssueResult> {
       let verified: VerifiedClientIdentityProof | null;
       try {
         verified = await dependencies.verifier.verify({
           identityProof,
           expectedAudience: "ii-tonya-client",
           expectedScope: "client_session:create",
-          signal: new AbortController().signal,
+          signal,
         });
       } catch {
         return { kind: "unavailable" };

@@ -50,7 +50,7 @@ describe("client session HTTP contract", () => {
       scope: "client_catalog:read",
       expiresAt: "2026-08-14T13:00:00.000Z",
     });
-    expect(state.issue).toHaveBeenCalledWith(proof);
+    expect(state.issue).toHaveBeenCalledWith(proof, expect.any(AbortSignal));
   });
 
   it.each([
