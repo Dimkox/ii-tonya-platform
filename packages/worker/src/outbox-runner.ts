@@ -80,12 +80,22 @@ export interface OutboxRepository {
   ): Promise<void>;
   recoverExpiredDispatchLeases(limit?: number): Promise<number>;
   recoverExpiredReconciliationLeases(limit?: number): Promise<number>;
+  recoverExpiredDispatchLeasesByTopic?(
+    limit?: number,
+  ): Promise<readonly OutboxRecoveryCount[]>;
+  recoverExpiredReconciliationLeasesByTopic?(
+    limit?: number,
+  ): Promise<readonly OutboxRecoveryCount[]>;
 }
 
 export type DispatchOutcome =
-  | { kind: "applied"; providerOperationId: string }
+  | { kind: "applied"; providerOperationId?: string }
   | { kind: "not_applied"; retryable: boolean; reasonCode: string }
-  | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
+  | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string }
+  | {
+      kind: "terminal";
+      reasonCode: "invalid_payload" | "local_source_invalid";
+    };
 
 export interface OutboxDispatcher {
   dispatch(message: OutboxMessage): Promise<DispatchOutcome>;
@@ -115,6 +125,43 @@ export interface OutboxRunnerDeps {
   workerId: string;
   newAttemptId(): string;
   leaseDurationMs?: number;
+  metrics?: OutboxRunnerMetrics;
+}
+
+export type OutboxMetricTopic =
+  | "safety_operator_escalation"
+  | "admin_negative_feedback";
+export type OutboxMetricPhase =
+  | "claim"
+  | "dispatch"
+  | "reconciliation"
+  | "lease_recovery";
+export type OutboxMetricOutcome =
+  | "applied"
+  | "retry"
+  | "unknown"
+  | "terminal"
+  | "dead_letter"
+  | "no_op";
+export type OutboxMetricReasonClass =
+  | "invalid_payload"
+  | "local_source_invalid"
+  | "attempts_exhausted"
+  | "reconciliation_exhausted"
+  | "lease_expired"
+  | "internal";
+export interface OutboxRunnerMetricLabels {
+  readonly topic: OutboxMetricTopic;
+  readonly phase: OutboxMetricPhase;
+  readonly outcome: OutboxMetricOutcome;
+  readonly reasonClass: OutboxMetricReasonClass;
+}
+export interface OutboxRunnerMetrics {
+  record(labels: OutboxRunnerMetricLabels, count?: number): void;
+}
+export interface OutboxRecoveryCount {
+  readonly topic: "safety.operator_escalation" | "admin.negative_feedback";
+  readonly count: number;
 }
 
 export interface OutboxRunResult {
@@ -153,16 +200,71 @@ function retryAt(deps: OutboxRunnerDeps, now: Date, attempt: number): Date {
 
 function dispatchToken(message: OutboxMessage): string {
   if (message.dispatchClaimToken === null) {
-    throw new Error(`Dispatch claim token missing for ${message.id}`);
+    throw new Error("outbox_dispatch_claim_token_missing");
   }
   return message.dispatchClaimToken;
 }
 
 function reconciliationToken(message: OutboxMessage): string {
   if (message.reconciliationClaimToken === null) {
-    throw new Error(`Reconciliation claim token missing for ${message.id}`);
+    throw new Error("outbox_reconciliation_claim_token_missing");
   }
   return message.reconciliationClaimToken;
+}
+
+function metricTopic(topic: string): OutboxMetricTopic {
+  if (topic === "safety.operator_escalation") {
+    return "safety_operator_escalation";
+  }
+  if (topic === "admin.negative_feedback") return "admin_negative_feedback";
+  throw new Error("worker_outbox_metric_topic_unregistered");
+}
+
+function reasonClass(reasonCode: string): OutboxMetricReasonClass {
+  if (reasonCode === "invalid_payload") return "invalid_payload";
+  if (reasonCode === "local_source_invalid") return "local_source_invalid";
+  if (reasonCode.includes("reconciliation_exhausted")) {
+    return "reconciliation_exhausted";
+  }
+  if (reasonCode.includes("attempts_exhausted")) {
+    return "attempts_exhausted";
+  }
+  return "internal";
+}
+
+function record(
+  deps: OutboxRunnerDeps,
+  topic: string,
+  phase: OutboxMetricPhase,
+  outcome: OutboxMetricOutcome,
+  metricReason: OutboxMetricReasonClass,
+  count?: number,
+): void {
+  deps.metrics?.record(
+    { topic: metricTopic(topic), phase, outcome, reasonClass: metricReason },
+    count,
+  );
+}
+
+function recordRecovery(
+  deps: OutboxRunnerDeps,
+  counts: readonly OutboxRecoveryCount[],
+): void {
+  for (const item of counts) {
+    if (!Number.isSafeInteger(item.count) || item.count < 0) {
+      throw new Error("worker_outbox_recovery_count_invalid");
+    }
+    if (item.count > 0) {
+      record(
+        deps,
+        item.topic,
+        "lease_recovery",
+        "unknown",
+        "lease_expired",
+        item.count,
+      );
+    }
+  }
 }
 
 async function reconcileUnknown(
@@ -181,6 +283,13 @@ async function reconcileUnknown(
         reconciliationToken(message),
         "reconciliation_exception_exhausted",
       );
+      record(
+        deps,
+        message.topic,
+        "reconciliation",
+        "dead_letter",
+        "reconciliation_exhausted",
+      );
     } else {
       await deps.repository.markStillUnknown(
         message.id,
@@ -188,6 +297,13 @@ async function reconcileUnknown(
         reconciliationToken(message),
         "reconciliation_exception",
         retryAt(deps, now, message.reconciliationAttempt),
+      );
+      record(
+        deps,
+        message.topic,
+        "reconciliation",
+        "unknown",
+        "internal",
       );
     }
     return;
@@ -200,6 +316,13 @@ async function reconcileUnknown(
       reconciliationToken(message),
       resolution.reasonCode,
     );
+    record(
+      deps,
+      message.topic,
+      "reconciliation",
+      "terminal",
+      reasonClass(resolution.reasonCode),
+    );
     return;
   }
 
@@ -209,6 +332,7 @@ async function reconcileUnknown(
       deps.workerId,
       reconciliationToken(message),
     );
+    record(deps, message.topic, "reconciliation", "applied", "internal");
     return;
   }
   if (resolution === "not_applied") {
@@ -219,6 +343,13 @@ async function reconcileUnknown(
         reconciliationToken(message),
         "dispatch_attempts_exhausted_after_reconciliation",
       );
+      record(
+        deps,
+        message.topic,
+        "reconciliation",
+        "dead_letter",
+        "attempts_exhausted",
+      );
     } else {
       await deps.repository.retryAfterReconciliation(
         message.id,
@@ -227,6 +358,7 @@ async function reconcileUnknown(
         retryAt(deps, now, message.attempt),
         "reconciled_not_applied",
       );
+      record(deps, message.topic, "reconciliation", "retry", "internal");
     }
     return;
   }
@@ -237,6 +369,13 @@ async function reconcileUnknown(
       reconciliationToken(message),
       "unknown_outcome_reconciliation_exhausted",
     );
+    record(
+      deps,
+      message.topic,
+      "reconciliation",
+      "dead_letter",
+      "reconciliation_exhausted",
+    );
   } else {
     await deps.repository.markStillUnknown(
       message.id,
@@ -245,6 +384,7 @@ async function reconcileUnknown(
       "still_unknown",
       retryAt(deps, now, message.reconciliationAttempt),
     );
+    record(deps, message.topic, "reconciliation", "unknown", "internal");
   }
 }
 
@@ -275,6 +415,7 @@ async function dispatchPending(
       message.reconciliationKey,
       "dispatch_exception_unknown",
     );
+    record(deps, message.topic, "dispatch", "unknown", "internal");
     return;
   }
 
@@ -283,6 +424,23 @@ async function dispatchPending(
       message.id,
       deps.workerId,
       dispatchToken(message),
+    );
+    record(deps, message.topic, "dispatch", "applied", "internal");
+    return;
+  }
+  if (outcome.kind === "terminal") {
+    await deps.repository.deadLetterAndAlert(
+      message.id,
+      deps.workerId,
+      dispatchToken(message),
+      outcome.reasonCode,
+    );
+    record(
+      deps,
+      message.topic,
+      "dispatch",
+      "terminal",
+      reasonClass(outcome.reasonCode),
     );
     return;
   }
@@ -295,6 +453,7 @@ async function dispatchPending(
       outcome.reconciliationKey,
       outcome.reasonCode,
     );
+    record(deps, message.topic, "dispatch", "unknown", "internal");
     return;
   }
   if (outcome.retryable && message.attempt < deps.maxAttempts) {
@@ -305,6 +464,7 @@ async function dispatchPending(
       retryAt(deps, now, message.attempt),
       outcome.reasonCode,
     );
+    record(deps, message.topic, "dispatch", "retry", "internal");
   } else {
     await deps.repository.deadLetterAndAlert(
       message.id,
@@ -312,6 +472,7 @@ async function dispatchPending(
       dispatchToken(message),
       outcome.reasonCode,
     );
+    record(deps, message.topic, "dispatch", "dead_letter", "internal");
   }
 }
 
@@ -326,8 +487,27 @@ export async function runOutboxBatch(
     throw new RangeError("batchSize must be a safe integer between 1 and 1000");
   }
   const now = deps.now();
-  await deps.repository.recoverExpiredDispatchLeases(deps.batchSize);
-  await deps.repository.recoverExpiredReconciliationLeases(deps.batchSize);
+  if (deps.metrics === undefined) {
+    await deps.repository.recoverExpiredDispatchLeases(deps.batchSize);
+    await deps.repository.recoverExpiredReconciliationLeases(deps.batchSize);
+  } else {
+    if (
+      deps.repository.recoverExpiredDispatchLeasesByTopic === undefined ||
+      deps.repository.recoverExpiredReconciliationLeasesByTopic === undefined
+    ) {
+      throw new Error("worker_outbox_metrics_recovery_capability_unavailable");
+    }
+    recordRecovery(
+      deps,
+      await deps.repository.recoverExpiredDispatchLeasesByTopic(deps.batchSize),
+    );
+    recordRecovery(
+      deps,
+      await deps.repository.recoverExpiredReconciliationLeasesByTopic(
+        deps.batchSize,
+      ),
+    );
+  }
   const leaseDurationMs = deps.leaseDurationMs ?? 30_000;
 
   const unknown = await deps.repository.claimUnknown(
@@ -337,6 +517,7 @@ export async function runOutboxBatch(
     deps.maxReconciliationAttempts,
   );
   for (const message of unknown) {
+    record(deps, message.topic, "claim", "no_op", "internal");
     await reconcileUnknown(deps, message, now);
   }
 
@@ -347,6 +528,7 @@ export async function runOutboxBatch(
     deps.maxAttempts,
   );
   for (const message of messages) {
+    record(deps, message.topic, "claim", "no_op", "internal");
     await dispatchPending(deps, message, now);
   }
 

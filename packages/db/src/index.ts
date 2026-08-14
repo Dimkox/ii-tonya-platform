@@ -54,6 +54,7 @@ export {
   OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
+  type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
 export {
   PostgresTelegramCallbackRepository,

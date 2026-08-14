@@ -4,10 +4,17 @@ export {
   type DispatchOutcome,
   type OutboxDispatcher,
   type OutboxMessage,
+  type OutboxMetricOutcome,
+  type OutboxMetricPhase,
+  type OutboxMetricReasonClass,
+  type OutboxMetricTopic,
   type OutboxReconciler,
+  type OutboxRecoveryCount,
   type OutboxRepository,
   type OutboxRunResult,
   type OutboxRunnerDeps,
+  type OutboxRunnerMetricLabels,
+  type OutboxRunnerMetrics,
 } from "./outbox-runner.js";
 export * from "./data-retention.js";
 export * from "./privacy-erasure.js";

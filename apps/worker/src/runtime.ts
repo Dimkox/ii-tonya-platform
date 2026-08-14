@@ -58,6 +58,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly workerOutboxRegistry?: Readonly<{
     readonly topics: readonly string[];
   }>;
+  readonly workerOutboxRunner?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -214,20 +215,30 @@ export function createProductionWorkerRuntime(
   }
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
+  const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
+  if (workerOutboxEnabled !== (deps.workerOutboxRunner !== undefined)) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
   return createWorkerRuntime({
     safetyHandoffs: async () =>
       deps.jobsRepository.processDueBatch({
         now: deps.now(),
         batchSize,
       }),
-    recoverExpiredLeases: async () => ({
-      dispatch:
-        await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
-      reconciliation:
-        await deps.outboxRepository.recoverExpiredReconciliationLeases(
-          batchSize,
-        ),
-    }),
+    recoverExpiredLeases: workerOutboxEnabled
+      ? async () => ({
+          dispatch: 0,
+          reconciliation: 0,
+          reason: "owned_by_filtered_runner",
+        })
+      : async () => ({
+          dispatch:
+            await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
+          reconciliation:
+            await deps.outboxRepository.recoverExpiredReconciliationLeases(
+              batchSize,
+            ),
+        }),
     reconcileUnknownOutcomes: async () => ({
       reconciled: 0,
       reason: "providers_disabled",
@@ -262,8 +273,9 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
-    deliverConfirmedOutbox: async () =>
-      deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
+    deliverConfirmedOutbox: workerOutboxEnabled
+      ? deps.workerOutboxRunner!
+      : async () => deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
     processorPrivacy: async () => ({
       processed: 0,
       reason: "privacy_capability_disabled",
