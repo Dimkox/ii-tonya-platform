@@ -1,9 +1,7 @@
 # MVP-WORKER-OUTBOX-001 implementation report
 
-Status: implementation and boundary evidence complete; independent review and
-the final exact-SHA Claw gate are pending. The first independent review returned
-five Important findings; re-review found three additional Important findings.
-All eight are remediated and await exact-HEAD approval.
+Status: implementation, independent review and the final exact-SHA Claw gate are
+complete. Release and deployment remain NO-GO pending separate authorization.
 
 ## Identity and scope
 
@@ -31,17 +29,18 @@ All eight are remediated and await exact-HEAD approval.
 
 ## Focused Claw evidence to date
 
-| Task | RED | GREEN exact SHA | GREEN result |
-| --- | --- | --- | --- |
-| 1 | 2 files, 30 tests: 16 pass / 14 fail | `9f0db2a` | 2 files, 30/30 pass |
-| 2 | 1 suite failed at missing module, 0 collected | `5a06de3` | 1 file, 24/24 pass |
-| 3 | 2 files, 19 tests: 13 pass / 6 fail | `c1b8fa4` | 2 files, 19/19 pass |
-| 4 | 2 suites failed at missing module, 0 collected | `7563e13` | 2 files, 7/7 pass |
-| 5 | 3 files, 17 tests: 9 pass / 8 fail | `58d63c7` | 3 files, 17/17 pass |
-| 6 | 2 files, 5 tests: 3 pass / 2 missing-doc failures | `bc935cd` | 2 files, 5/5 pass after one assertion-only fix rerun |
-| Review remediation | 2 failed files: 2 failing tests plus 1 collection failure | `af83fac` | 2 files, 10/10 pass in 11.24s |
-| Metric capability | 1 file, 4/4 causal failures | `44d0955` | 1 file, 4/4 pass in 4.22s |
-| Bounded exhaustion | 1 file, 1 pass / 1 causal failure | `249b4f3` | 1 file, 2/2 pass in 6.27s |
+| Task                | RED                                                       | GREEN exact SHA | GREEN result                                         |
+| ------------------- | --------------------------------------------------------- | --------------- | ---------------------------------------------------- |
+| 1                   | 2 files, 30 tests: 16 pass / 14 fail                      | `9f0db2a`       | 2 files, 30/30 pass                                  |
+| 2                   | 1 suite failed at missing module, 0 collected             | `5a06de3`       | 1 file, 24/24 pass                                   |
+| 3                   | 2 files, 19 tests: 13 pass / 6 fail                       | `c1b8fa4`       | 2 files, 19/19 pass                                  |
+| 4                   | 2 suites failed at missing module, 0 collected            | `7563e13`       | 2 files, 7/7 pass                                    |
+| 5                   | 3 files, 17 tests: 9 pass / 8 fail                        | `58d63c7`       | 3 files, 17/17 pass                                  |
+| 6                   | 2 files, 5 tests: 3 pass / 2 missing-doc failures         | `bc935cd`       | 2 files, 5/5 pass after one assertion-only fix rerun |
+| Review remediation  | 2 failed files: 2 failing tests plus 1 collection failure | `af83fac`       | 2 files, 10/10 pass in 11.24s                        |
+| Metric capability   | 1 file, 4/4 causal failures                               | `44d0955`       | 1 file, 4/4 pass in 4.22s                            |
+| Bounded exhaustion  | 1 file, 1 pass / 1 causal failure                         | `249b4f3`       | 1 file, 2/2 pass in 6.27s                            |
+| Final reviewed gate | verification-only new file                                | `9f5d258`       | 1 file, 1/1 pass in 7.85s; not repeated              |
 
 Successful focused suites were not repeated. Tests ran only inside retained
 Claw container `ii-tonya-test-yookassa` against the single existing PostgreSQL
@@ -78,6 +77,11 @@ passes the runner limit through; its real-PostgreSQL suite was RED 1/2 and GREEN
 owned topics. Post-suite cleanup was zero test databases, sessions and Vitest
 processes.
 
+The independent reviewer then approved exact
+`0bfb6efc..9f5d258bfa578b85781d8eb26410e56725c64b53` with no Critical or
+Important findings. All eight Important findings and the documentation Minor
+were closed.
+
 ## Static evidence and incidents
 
 Claw direct Prettier and bounded tsup builds passed for changed package layers.
@@ -89,16 +93,17 @@ contracts, domain, and integrations ESM/DTS builds themselves passed.
 One unintended local `pnpm exec` invocation hydrated an ignored, store-linked
 `node_modules` directory before any test ran. It changed no tracked file or
 lockfile and executed no test. No further local pnpm/npm/test/build/format
-command was used. The exact ignored directory is scheduled for verified
-worktree-local cleanup before handoff.
+command was used. The exact ignored directory was verified inside the isolated
+worktree and removed before handoff.
 
-## Pending completion gates
+## Completion and release boundary
 
-- Independent adversarial review of exact code/docs HEAD with every Critical or
-  Important finding re-reviewed as closed. All known remediation is implemented;
-  the exact-HEAD verdict is pending.
-- One final focused Claw gate on the reviewed exact SHA, then source/test-process
-  cleanup and truthful evidence update.
+- Independent review: APPROVED at exact `9f5d258`, no Critical or Important.
+- Final one-shot Claw PostgreSQL gate: 1 file, 1/1 pass in 7.85s; not repeated.
+- Cleanup: exact base restored; zero feature files, generated dist, task archives,
+  Vitest processes, test databases and test sessions; retained container Up.
+- Durable evidence:
+  `docs/test-evidence/claw/9f5d258bfa578b85781d8eb26410e56725c64b53-mvp-worker-outbox-001/verification.md`.
 
-Release and deployment remain NO-GO pending these gates and separate human
-authorization.
+No implementation gate remains. Release and deployment remain NO-GO pending
+separate human authorization and target-environment approval.
