@@ -119,6 +119,10 @@ export {
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
 export {
+  PostgresOperatorCaseOutboxRepository,
+  type OperatorCaseOutboxMessage,
+} from "./repositories/operator-case-outbox-repository.js";
+export {
   ExpertReferralCommandError,
   ExpertReferralDataIntegrityError,
   PostgresExpertReferralRepository,
