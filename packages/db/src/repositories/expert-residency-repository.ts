@@ -101,6 +101,13 @@ type TariffRow = {
   currency: "RUB";
   durationSeconds: number;
 };
+export interface ActiveResidencyTariff {
+  readonly tariffVersionId: string;
+  readonly displayName: string;
+  readonly priceMinor: string;
+  readonly currency: "RUB";
+  readonly durationSeconds: number;
+}
 type OrderRow = TariffRow & {
   expertId: string;
   paymentDeadline: Date | string;
@@ -148,6 +155,37 @@ export class PostgresExpertResidencyRepository {
       sql`insert into expert_residency_tariff_versions (tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values (${command.tariffKey},${command.displayName},${command.priceMinor},'RUB',${command.durationSeconds},${command.activeFrom},${command.activeTo},${command.approvalId}::uuid,${command.adminSessionIdHash}) returning id,display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds"`,
     );
     return this.required(result.rows[0], "EXPERT_RESIDENCY_TARIFF_NOT_CREATED");
+  }
+
+  async listActiveTariffs(command: {
+    expertId: string;
+    limit: 20;
+  }): Promise<readonly ActiveResidencyTariff[]> {
+    if (command.limit !== 20) {
+      throw new ExpertResidencyCommandError(
+        "EXPERT_RESIDENCY_INVALID_TARIFF_LIMIT",
+        "Invalid active tariff limit",
+      );
+    }
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set transaction isolation level repeatable read`);
+      await this.assertNewCommandsEnabled(tx);
+      await this.assertEligibleExpert(tx, command.expertId);
+      const result = await tx.execute<TariffRow>(sql`
+        select
+          id,
+          display_name as "displayName",
+          price_minor as "priceMinor",
+          currency,
+          duration_seconds as "durationSeconds"
+        from expert_residency_tariff_versions
+        where active_from <= transaction_timestamp()
+          and transaction_timestamp() < active_to
+        order by active_from, id
+        limit ${command.limit}
+      `);
+      return result.rows.map((row) => this.toActiveTariff(row));
+    });
   }
 
   async retireTariffVersion(command: {
@@ -476,6 +514,30 @@ export class PostgresExpertResidencyRepository {
       ...parseMoneySnapshot({ priceMinor, ...q }),
       currency: "RUB",
       durationSeconds: t.durationSeconds,
+    };
+  }
+  private toActiveTariff(tariff: TariffRow): ActiveResidencyTariff {
+    if (
+      tariff.currency !== "RUB" ||
+      tariff.displayName.trim().length === 0 ||
+      tariff.displayName.length > MAX_DISPLAY_NAME_LENGTH ||
+      !Number.isSafeInteger(tariff.durationSeconds) ||
+      tariff.durationSeconds < 1
+    ) {
+      throw new ExpertResidencyCommandError(
+        "EXPERT_RESIDENCY_INVALID_TARIFF_PROJECTION",
+        "Invalid active tariff projection",
+      );
+    }
+    return {
+      tariffVersionId: tariff.id,
+      displayName: tariff.displayName,
+      priceMinor: normalizeDatabaseMoney(
+        tariff.priceMinor,
+        "tariff.priceMinor",
+      ).toString(),
+      currency: "RUB",
+      durationSeconds: tariff.durationSeconds,
     };
   }
   private async hydrateOrder(

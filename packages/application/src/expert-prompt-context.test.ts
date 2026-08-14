@@ -28,6 +28,7 @@ const reconciliation = {
 const residency = (
   quote: ExpertResidencyService["quote"],
 ): ExpertResidencyService => ({
+  listActiveTariffs: vi.fn(async () => []),
   quote,
   checkout: vi.fn(),
   reconciliation,
