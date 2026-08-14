@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, createDb } from "../../packages/db/src/client.js";
 import { PostgresExpertAiRequestReceiptStore } from "../../packages/db/src/repositories/expert-ai-request-receipt-repository.js";
 
-const schema = "expert_ai_receipts_test";
+const schema = `expert_ai_receipts_${process.pid}_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
 const connectionString =
   process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL ?? process.env.DATABASE_URL;
 if (!connectionString) throw new Error("test_database_unavailable");
