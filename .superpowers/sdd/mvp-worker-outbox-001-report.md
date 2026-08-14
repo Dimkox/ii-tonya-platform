@@ -2,7 +2,8 @@
 
 Status: implementation and boundary evidence complete; independent review and
 the final exact-SHA Claw gate are pending. The first independent review returned
-five Important findings; all five are remediated and await exact-HEAD re-review.
+five Important findings; re-review found three additional Important findings.
+All eight are remediated and await exact-HEAD approval.
 
 ## Identity and scope
 
@@ -39,6 +40,8 @@ five Important findings; all five are remediated and await exact-HEAD re-review.
 | 5 | 3 files, 17 tests: 9 pass / 8 fail | `58d63c7` | 3 files, 17/17 pass |
 | 6 | 2 files, 5 tests: 3 pass / 2 missing-doc failures | `bc935cd` | 2 files, 5/5 pass after one assertion-only fix rerun |
 | Review remediation | 2 failed files: 2 failing tests plus 1 collection failure | `af83fac` | 2 files, 10/10 pass in 11.24s |
+| Metric capability | 1 file, 4/4 causal failures | `44d0955` | 1 file, 4/4 pass in 4.22s |
+| Bounded exhaustion | 1 file, 1 pass / 1 causal failure | `249b4f3` | 1 file, 2/2 pass in 6.27s |
 
 Successful focused suites were not repeated. Tests ran only inside retained
 Claw container `ii-tonya-test-yookassa` against the single existing PostgreSQL
@@ -53,16 +56,27 @@ lacked per-topic metrics; the owned-topic tuple was duplicated between worker
 and database layers; and the real enabled production composition/recovery path
 was not covered by PostgreSQL evidence.
 
-Remediation now validates the complete capability before repository creation,
-derives worker and database ownership from one frozen contracts tuple, locks
-authoritative safety/feedback rows, returns and records filtered exhaustion
-counts, and exposes the real production composition seam. The new focused Claw
+Remediation now validates the registry before filtered outbox repository
+construction or database mutation, derives worker and database ownership from
+one frozen contracts tuple, locks authoritative safety/feedback rows, returns
+and records filtered exhaustion counts, and exposes the real production composition seam. The new focused Claw
 suite exercises fail-before-repository validation, authority races, real
 filtered recovery/exhaustion/metrics/ambiguity and provider-row exclusion. Two
 diagnostic precursor reruns exposed assertion/module-resolution and prepared-SQL
 fixture defects (8/10 pass, then 1/2 collected tests pass); neither was accepted
 as GREEN. Exact `af83fac` passed 10/10 with zero residual test databases,
 sessions or Vitest processes.
+
+Re-review found three further Important gaps: a non-callable metric recorder was
+not rejected before filtered repository construction, detailed exhaustion was
+not bounded by the runner batch limit, and real SQL metric evidence did not
+assert exact records. Exact `44d0955` validates the recorder before repository
+construction (isolated Claw RED 4/4, GREEN 4/4). Exact `249b4f3` uses ordered
+`FOR UPDATE SKIP LOCKED LIMIT` candidates in both detailed exhaustion phases and
+passes the runner limit through; its real-PostgreSQL suite was RED 1/2 and GREEN
+2/2 while deep-equaling exact topic/phase/outcome/reason/count records for both
+owned topics. Post-suite cleanup was zero test databases, sessions and Vitest
+processes.
 
 ## Static evidence and incidents
 
@@ -81,8 +95,8 @@ worktree-local cleanup before handoff.
 ## Pending completion gates
 
 - Independent adversarial review of exact code/docs HEAD with every Critical or
-  Important finding re-reviewed as closed. The remediation is implemented; the
-  exact-HEAD verdict is pending.
+  Important finding re-reviewed as closed. All known remediation is implemented;
+  the exact-HEAD verdict is pending.
 - One final focused Claw gate on the reviewed exact SHA, then source/test-process
   cleanup and truthful evidence update.
 

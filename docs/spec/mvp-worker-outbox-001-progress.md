@@ -22,8 +22,8 @@
 | Task 4 local case mutation/reconciliation | complete              | implementation owner               | real-PG concurrency/crash tests                                     | Claw `7563e13`, 7/7                                    |
 | Task 5 runtime/metrics                    | complete              | implementation owner               | runtime + bounded telemetry tests                                   | Claw `58d63c7`, 17/17                                  |
 | Task 6 boundaries/evidence                | boundary complete     | implementation owner               | scope/rollback guards, independent review, final Claw gate          | RED `7af98b7`: 3/5; GREEN `bc935cd`: 5/5               |
-| Review remediation                        | complete              | implementation owner               | focused unit + real production PostgreSQL composition               | Claw `af83fac`: 10/10 in 11.24s; cleanup 0/0           |
-| Independent code review                   | re-review pending     | reviewer distinct from implementer | no open Critical/Important at exact HEAD                            | first verdict: 0 Critical, 5 Important; all remediated |
+| Review remediation                        | complete              | implementation owner               | focused unit + real production PostgreSQL composition               | `af83fac`: 10/10; `44d0955`: 4/4; `249b4f3`: 2/2      |
+| Independent code review                   | re-review pending     | reviewer distinct from implementer | no open Critical/Important at exact HEAD                            | 0 Critical, 8 Important across loops; all remediated   |
 | Final focused Claw gate                   | prepared, not run     | implementation owner               | one run only after approved review; cleanup recorded                | `worker-outbox-final-gate.test.ts`                     |
 | Deployment approval                       | blocked outside story | human owner                        | explicit target authorization and release evidence                  | none                                                   |
 
@@ -51,3 +51,7 @@
   unit/PostgreSQL suite 10/10 in 11.24s and left zero test databases, sessions
   and Vitest processes. Exact-HEAD re-review and the prepared one-shot final gate
   remain pending.
+- 2026-08-14: re-review found three further Important gaps. The metric
+  capability guard passed isolated Claw RED/GREEN 4/4 at `44d0955`; bounded
+  exhaustion and exact real-SQL metric records passed RED 1/2 then GREEN 2/2 at
+  `249b4f3`. Cleanup remained zero. Exact-HEAD approval remains pending.
