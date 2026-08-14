@@ -13,7 +13,9 @@ import {
   adminRoleAssignments,
   adminSessions,
   channelIdentities,
+  clientIdentityProofReceipts,
   clientProfiles,
+  clientSessions,
   experts,
   integrationInbox,
   integrationErrors,
@@ -247,6 +249,23 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(clientProfiles).checks).toEqual([
       "client_profiles_expert_note_bounded",
     ]);
+    expect(names(clientSessions)).toMatchObject({
+      checks: [
+        "client_sessions_lifecycle_check",
+        "client_sessions_scope_check",
+        "client_sessions_token_digest_check",
+      ],
+      indexes: ["client_sessions_expiry_idx"],
+    });
+    expect(names(clientIdentityProofReceipts)).toMatchObject({
+      checks: [
+        "client_identity_proof_receipts_expiry_check",
+        "client_identity_proof_receipts_replay_digest_check",
+        "client_identity_proof_receipts_session_digest_check",
+      ],
+      indexes: ["client_identity_proof_receipts_expiry_idx"],
+      uniques: ["client_identity_proof_receipts_session_digest_unique"],
+    });
     expect(names(slots)).toMatchObject({
       checks: ["slots_capacity_positive"],
       uniques: ["slots_provider_external_unique"],
@@ -430,6 +449,11 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0028_operator_case_inbox.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0029_client_catalog_requests.sql",
+        "utf8",
+      ),
+      readFileSync("packages/db/migrations/0030_client_sessions.sql", "utf8"),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -519,6 +543,15 @@ describe("authoritative Drizzle schema parity", () => {
       "outbox_operator_alerts_payload_check",
       "outbox_operator_alerts_lifecycle_check",
       "outbox_operator_alerts_unresolved_cursor_idx",
+      "client_sessions_token_digest_check",
+      "client_sessions_scope_check",
+      "client_sessions_lifecycle_check",
+      "client_sessions_expiry_idx",
+      "client_identity_proof_receipts_replay_digest_check",
+      "client_identity_proof_receipts_session_digest_check",
+      "client_identity_proof_receipts_expiry_check",
+      "client_identity_proof_receipts_session_digest_unique",
+      "client_identity_proof_receipts_expiry_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toContain(
@@ -532,14 +565,14 @@ describe("authoritative Drizzle schema parity", () => {
     );
   });
 
-  it("registers migration 0028 last in the ordered Drizzle journal", () => {
+  it("registers migration 0030 last in the ordered Drizzle journal", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
     const latest = journal.entries.at(-1);
     expect(latest).toMatchObject({
-      idx: 28,
-      tag: "0028_operator_case_inbox",
+      idx: 30,
+      tag: "0030_client_sessions",
     });
     expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
   });

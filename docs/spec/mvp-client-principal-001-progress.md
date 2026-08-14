@@ -9,6 +9,7 @@
 | 2026-08-14 | implementation blocked | Rebase after catalog merge and allocate the next actual migration after catalog; no `0030` reservation | DB / Platform |
 | 2026-08-14 | activation blocked | Security-approved proof source, named approver and evidence are absent | Security |
 | 2026-08-14 | safe posture | `CLIENT_SESSION_ENABLED=false`; no tests, Claw, network, provider, push, merge, Actions or production operation run | Platform |
+| 2026-08-14 | migration allocated | Rebased implementation base contains catalog migration `0029`; the next actual journal entry is `0030_client_sessions` | DB / Platform |
 
 ## Expected rebase conflict surface
 
