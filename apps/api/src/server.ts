@@ -25,8 +25,10 @@ import {
   type DrizzleDb,
 } from "@ii-tonya/db";
 import {
+  createExpertTelegramIngress,
   DisabledSelartiAdapter,
   EnvironmentExpertCodeSecretResolver,
+  type ExpertTelegramIngressFactoryDependencies,
 } from "@ii-tonya/integrations";
 import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
@@ -60,7 +62,13 @@ export const createDefaultLifecycle = (
         requiredVersions: readonly string[];
       }): ExpertCodeKeyring;
     };
-    expertTelegramQueries?: AppDependencies["expertTelegramQueries"];
+    expertTelegramComposition?: Omit<
+      ExpertTelegramIngressFactoryDependencies,
+      "enabled" | "financialViewsEnabled" | "referral" | "residency"
+    > &
+      Required<
+        Pick<ExpertTelegramIngressFactoryDependencies, "referral" | "residency">
+      >;
   } = {},
 ): ServerLifecycle => ({
   async migrate(db) {
@@ -97,6 +105,18 @@ export const createDefaultLifecycle = (
             },
           }
         : new ExpertCodeCrypto(expertCodeKeyring);
+    const telegramEnabled =
+      config.features.expertTelegramQueries === true ||
+      config.features.expertTelegramFinancialViews === true;
+    const expertTelegramQueries =
+      options.expertTelegramComposition === undefined
+        ? undefined
+        : createExpertTelegramIngress({
+            ...options.expertTelegramComposition,
+            enabled: telegramEnabled,
+            financialViewsEnabled:
+              config.features.expertTelegramFinancialViews === true,
+          });
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -140,9 +160,7 @@ export const createDefaultLifecycle = (
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
       telegramWebhookSecret: randomBytes(32).toString("base64url"),
-      ...(options.expertTelegramQueries === undefined
-        ? {}
-        : { expertTelegramQueries: options.expertTelegramQueries }),
+      ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
     };
   },
   async close(db) {

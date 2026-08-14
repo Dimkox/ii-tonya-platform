@@ -100,8 +100,11 @@ cash, duration, currency, or price; quote authority is the exact server-issued t
 UUID and all rendered amounts come from the server response. The change does not redeem
 codes, create checkouts, call a payment provider, or activate AI/provider capabilities.
 `EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED` is versioned and defaults to `false`.
-`createExpertTelegramIngress` is the production-reachable, capability-injected factory;
-the default server supplies no live Telegram transport or token. App composition fails
-closed if either Telegram query feature is enabled without the complete ingress.
+`createExpertTelegramIngress` is the production-reachable, capability-injected factory.
+The server lifecycle accepts the typed resolver/query/referral/residency/view dependency
+bundle and constructs the ingress from the current `RuntimeConfig`; a prebuilt ingress
+cannot bypass the two feature flags. The default server supplies no live Telegram
+transport or token. App composition fails closed if either Telegram query feature is
+enabled without the complete ingress.
 An ordinary send with `unknown_outcome` releases the inbox claim and returns a sanitized
 retryable 503; it is not recorded as complete before idempotent delivery resolution.
