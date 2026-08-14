@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  char,
   index,
   integer,
   jsonb,
@@ -62,9 +63,59 @@ export const webhookInbox = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
-    unique("webhook_inbox_provider_event_unique").on(table.provider, table.externalEventId),
-    check("webhook_inbox_status_allowed", sql`${table.status} in ('processing', 'complete', 'failed')`),
+    unique("webhook_inbox_provider_event_unique").on(
+      table.provider,
+      table.externalEventId,
+    ),
+    check(
+      "webhook_inbox_status_allowed",
+      sql`${table.status} in ('processing', 'complete', 'failed')`,
+    ),
     index("webhook_inbox_lease").on(table.status, table.leaseUntil),
+  ],
+);
+export const expertAiRequestReceipts = pgTable(
+  "expert_ai_request_receipts",
+  {
+    requestKeyHash: char("request_key_hash", { length: 64 })
+      .notNull()
+      .primaryKey(),
+    requestDigest: char("request_digest", { length: 64 }).notNull(),
+    status: text("status").notNull(),
+    claimId: uuid("claim_id").notNull(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    outcomeStatus: integer("outcome_status"),
+    outcomeCode: text("outcome_code"),
+    outcomeDetail: text("outcome_detail"),
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '7 days'`),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    check(
+      "expert_ai_request_receipts_hashes_check",
+      sql`${table.requestKeyHash} ~ '^[0-9a-f]{64}$' and ${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_ai_request_receipts_status_check",
+      sql`${table.status} in ('processing','complete','failed')`,
+    ),
+    check(
+      "expert_ai_request_receipts_version_check",
+      sql`${table.version} > 0`,
+    ),
+    check(
+      "expert_ai_request_receipts_state_check",
+      sql`(${table.status} = 'processing' and ${table.leaseUntil} is not null and ${table.outcomeStatus} is null and ${table.outcomeCode} is null and ${table.outcomeDetail} is null) or (${table.status} = 'failed' and ${table.leaseUntil} is null and ${table.outcomeStatus} is null and ${table.outcomeCode} is null and ${table.outcomeDetail} is null) or (${table.status} = 'complete' and ${table.leaseUntil} is null and ((${table.outcomeStatus} = 200 and ${table.outcomeCode} = 'completed' and ${table.outcomeDetail} in ('redeem_expert_referral','view_referral_summary','quote_residency','start_residency_checkout')) or (${table.outcomeStatus} = 422 and ${table.outcomeCode} = 'proposal_rejected' and ${table.outcomeDetail} in ('invalid_shape','unsupported_intent','unauthorized_scope')) or (${table.outcomeStatus} = 403 and ${table.outcomeCode} = 'forbidden' and ${table.outcomeDetail} is null) or (${table.outcomeStatus} = 503 and ${table.outcomeCode} = 'feature_disabled' and ${table.outcomeDetail} is null)))`,
+    ),
+    index("expert_ai_request_receipts_lease_idx")
+      .on(table.leaseUntil)
+      .where(sql`${table.status} = 'processing'`),
+    index("expert_ai_request_receipts_cleanup_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.status} in ('complete','failed')`),
   ],
 );
 export const integrationErrors = pgTable(
@@ -79,7 +130,10 @@ export const integrationErrors = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
-    check("integration_errors_status_allowed", sql`${table.status} in ('open', 'resolved')`),
+    check(
+      "integration_errors_status_allowed",
+      sql`${table.status} in ('open', 'resolved')`,
+    ),
   ],
 );
 export const integrationOutbox = pgTable(

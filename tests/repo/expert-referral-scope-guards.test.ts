@@ -28,11 +28,13 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
       "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
       "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+      "packages/db/migrations/0027_expert_ai_request_receipts.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
+      "expert_ai_request_receipts",
       "expert_first_residency_settlements",
       "expert_referral_abuse_holds",
       "expert_referral_admin_execution_results",

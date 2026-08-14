@@ -113,6 +113,11 @@ export {
   WebhookInboxClaimLostError,
 } from "./repositories/webhook-inbox-repository.js";
 export {
+  PostgresExpertAiRequestReceiptStore,
+  type ExpertAiReceiptClaim,
+  type ExpertAiStoredOutcome,
+} from "./repositories/expert-ai-request-receipt-repository.js";
+export {
   ExpertReferralCommandError,
   ExpertReferralDataIntegrityError,
   PostgresExpertReferralRepository,
