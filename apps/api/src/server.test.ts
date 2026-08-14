@@ -135,11 +135,19 @@ describe("server composition", () => {
   });
 
   it.each([
-    { financialViewsEnabled: false, expectedKind: "disabled" },
-    { financialViewsEnabled: true, expectedKind: "processed" },
+    {
+      financialViewsEnabled: false,
+      checkoutEnabled: false,
+      expectedKind: "disabled",
+    },
+    {
+      financialViewsEnabled: true,
+      checkoutEnabled: true,
+      expectedKind: "processed",
+    },
   ] as const)(
-    "derives financial view exposure from RuntimeConfig: $financialViewsEnabled",
-    async ({ financialViewsEnabled, expectedKind }) => {
+    "derives financial and checkout exposure from RuntimeConfig: $financialViewsEnabled/$checkoutEnabled",
+    async ({ financialViewsEnabled, checkoutEnabled, expectedKind }) => {
       const referralSummary = vi.fn(async () => ({
         availableMinor: "100000",
         reservedMinor: "0",
@@ -154,6 +162,12 @@ describe("server composition", () => {
         kind: "applied" as const,
         providerOperationId: "2",
       });
+      const checkoutProcess = vi.fn(async () => ({
+        kind: "ready" as const,
+        tokenHash: "b".repeat(64),
+        checkoutUrl: "https://pay.example/checkout",
+        replay: false,
+      }));
       const lifecycle = createDefaultLifecycle({
         expertTelegramComposition: {
           resolvePrincipal: async (telegramUserId) => ({
@@ -184,10 +198,15 @@ describe("server composition", () => {
             redeemCode: async () => ({ kind: "disabled" as const }),
           },
           residency: { quote: async () => ({ kind: "disabled" as const }) },
+          checkout: {
+            issue: async () => "xr1.safe",
+            process: checkoutProcess,
+          },
           views: {
             sendReferralSummary,
             sendReferralRedeemed: applied,
             sendResidencyQuote: applied,
+            sendResidencyCheckoutLink: applied,
             sendQuerySchedule: applied,
             sendClientChoices: applied,
             sendClientView: applied,
@@ -219,6 +238,7 @@ describe("server composition", () => {
           expertReferral: false,
           expertResidencyBilling: false,
           expertTelegramFinancialViews: financialViewsEnabled,
+          expertTelegramCheckout: checkoutEnabled,
         },
       };
 
@@ -240,6 +260,24 @@ describe("server composition", () => {
       expect(sendReferralSummary).toHaveBeenCalledTimes(
         financialViewsEnabled ? 1 : 0,
       );
+      const checkoutInput = {
+        data: "xr1.safe",
+        principal: principal!,
+      };
+      if (checkoutEnabled) {
+        await expect(
+          dependencies.expertTelegramQueries!.processResidencyCheckout(
+            checkoutInput,
+          ),
+        ).resolves.toMatchObject({ kind: "ready" });
+      } else {
+        await expect(
+          dependencies.expertTelegramQueries!.processResidencyCheckout(
+            checkoutInput,
+          ),
+        ).rejects.toThrow("Expert Telegram checkout is disabled");
+      }
+      expect(checkoutProcess).toHaveBeenCalledTimes(checkoutEnabled ? 1 : 0);
       await lifecycle.close(fakeDb);
     },
   );

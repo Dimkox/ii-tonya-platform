@@ -3,6 +3,10 @@ import type {
   ExpertAiIngressService,
   ExpertPrincipal,
 } from "@ii-tonya/application";
+import type {
+  ExpertTelegramCheckoutResult,
+  TelegramSendOutcome,
+} from "@ii-tonya/integrations";
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -100,6 +104,20 @@ export interface TelegramExpertQueryIngress {
         readonly reasonCode: string;
       }
   >;
+  processResidencyCheckout(input: {
+    readonly data: string;
+    readonly principal: {
+      readonly userId: string;
+      readonly expertId: string;
+      readonly telegramUserId: string;
+      readonly timezone: string;
+    };
+  }): Promise<ExpertTelegramCheckoutResult>;
+  sendResidencyCheckoutLink(input: {
+    readonly idempotencyKey: string;
+    readonly telegramUserId: string;
+    readonly checkoutUrl: string;
+  }): Promise<TelegramSendOutcome>;
 }
 
 const numericIdentity = /^[1-9]\d{0,19}$/u;
@@ -117,13 +135,17 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
   expertQueriesEnabled?: boolean;
+  expertCheckoutEnabled?: boolean;
   expertQueries?: TelegramExpertQueryIngress;
   expertAiEnabled?: boolean;
   expertAi?: TelegramExpertAiIngress;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
 }> = async (app, deps) => {
-  if (deps.expertQueriesEnabled === true && deps.expertQueries === undefined) {
+  if (
+    (deps.expertQueriesEnabled === true || deps.expertCheckoutEnabled === true) &&
+    deps.expertQueries === undefined
+  ) {
     throw new Error("Expert Telegram query capability is required");
   }
   if (deps.expertAiEnabled === true && deps.expertAi === undefined) {
@@ -193,10 +215,72 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           return reply.code(403).send({ error: "invalid_callback" });
         }
         if (data.startsWith("xr1.")) {
-          // ER-TG-002 storage/authentication is isolated from ct2/cv1. Checkout
-          // dispatch remains unavailable until a provider-neutral readiness
-          // capability is explicitly composed.
-          return { accepted: true, unsupported: true };
+          if (
+            deps.expertCheckoutEnabled !== true ||
+            deps.expertQueries === undefined
+          ) {
+            return { accepted: true, unsupported: true };
+          }
+          const updateId = String(body.update_id);
+          const answerBestEffort = async (
+            status: "processed" | "unavailable",
+          ): Promise<void> => {
+            try {
+              await deps.expertQueries?.answerCallbackQuery({
+                callbackQueryId,
+                status,
+                idempotencyKey: `telegram:${updateId}:checkout:answer`,
+              });
+            } catch {
+              // Acknowledgement is separate from mutation and link delivery.
+            }
+          };
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed") {
+            await answerBestEffort("unavailable");
+            return { accepted: true, unavailable: true };
+          }
+          try {
+            const principal = await deps.expertQueries.resolvePrincipal(
+              String(id),
+            );
+            if (principal === null) {
+              await deps.inbox.complete(claim.claimId);
+              await answerBestEffort("unavailable");
+              return { accepted: true, unavailable: true };
+            }
+            const result = await deps.expertQueries.processResidencyCheckout({
+              data,
+              principal,
+            });
+            if (result.kind === "ready") {
+              const delivery =
+                await deps.expertQueries.sendResidencyCheckoutLink({
+                  idempotencyKey: `telegram:${result.tokenHash}:checkout:delivery`,
+                  telegramUserId: principal.telegramUserId,
+                  checkoutUrl: result.checkoutUrl,
+                });
+              if (delivery.kind !== "applied") {
+                await deps.inbox.fail(claim.claimId);
+                await answerBestEffort("unavailable");
+                return reply
+                  .code(503)
+                  .send({ error: "expert_checkout_delivery_unavailable" });
+              }
+              await deps.inbox.complete(claim.claimId);
+              await answerBestEffort("processed");
+              return { accepted: true };
+            }
+            await deps.inbox.complete(claim.claimId);
+            await answerBestEffort("unavailable");
+            return { accepted: true, unavailable: true };
+          } catch {
+            await deps.inbox.fail(claim.claimId);
+            await answerBestEffort("unavailable");
+            return reply
+              .code(503)
+              .send({ error: "expert_checkout_unavailable" });
+          }
         }
         if (data.startsWith("cv1.")) {
           if (

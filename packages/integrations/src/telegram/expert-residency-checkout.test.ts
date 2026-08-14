@@ -136,4 +136,68 @@ describe("expert Telegram residency checkout capability", () => {
     ).resolves.toMatchObject({ kind: "unknown", replay: true });
     expect(state.checkout).toHaveBeenCalledTimes(1);
   });
+
+  it("maps a foreign callback to a bounded denial without checkout", async () => {
+    const state = build();
+    const token = await state.capability.issue({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram:quote:4:checkout",
+    });
+
+    await expect(
+      state.capability.process({
+        data: token,
+        principal: { ...principal, telegramUserId: "987654321" },
+      }),
+    ).resolves.toEqual({ kind: "unavailable", replay: true });
+    expect(state.checkout).not.toHaveBeenCalled();
+  });
+
+  it("keeps callback repository failures retryable instead of disguising them as denial", async () => {
+    const state = build();
+    const token = await state.capability.issue({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram:quote:5:checkout",
+    });
+    vi.mocked(state.store.inspectCheckout).mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
+
+    await expect(
+      state.capability.process({ data: token, principal }),
+    ).rejects.toThrow("database unavailable");
+    expect(state.checkout).not.toHaveBeenCalled();
+  });
+
+  it("re-enters an expired processing lease with the unchanged token-hash idempotency", async () => {
+    const state = build();
+    const token = await state.capability.issue({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram:quote:6:checkout",
+    });
+    vi.mocked(state.store.claimCheckout).mockImplementationOnce(
+      async (tokenHash, claims, _at, _lease, fence) => ({
+        kind: "acquired",
+        tokenHash,
+        claims: {
+          ...claims,
+          expiresAt: new Date("2026-08-14T10:10:00.000Z"),
+        },
+        fence,
+        recovery: true,
+      }),
+    );
+
+    const result = await state.capability.process({ data: token, principal });
+
+    expect(result.kind).toBe("ready");
+    expect(state.checkout).toHaveBeenCalledWith(
+      expect.anything(),
+      tariffVersionId,
+      result.tokenHash,
+    );
+  });
 });

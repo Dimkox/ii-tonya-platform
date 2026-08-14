@@ -35,6 +35,25 @@ export const createExpertTelegramIngress = (
     authenticateClientView: deps.authenticateClientView,
     processCommand: processor.processCommand,
     processClientView: processor.processClientView,
+    async processResidencyCheckout(input: Parameters<
+      ExpertTelegramCheckoutCapability["process"]
+    >[0]) {
+      if (deps.checkoutReadiness !== true) {
+        throw new Error("Expert Telegram checkout is disabled");
+      }
+      if (deps.checkout === undefined) {
+        throw new Error("Expert Telegram checkout capability is required");
+      }
+      return deps.checkout.process(input);
+    },
+    async sendResidencyCheckoutLink(input: Parameters<
+      ExpertTelegramIngressFactoryDependencies["views"]["sendResidencyCheckoutLink"]
+    >[0]) {
+      if (deps.checkoutReadiness !== true) {
+        throw new Error("Expert Telegram checkout is disabled");
+      }
+      return deps.views.sendResidencyCheckoutLink(input);
+    },
     answerCallbackQuery: deps.views.answerCallbackQuery.bind(deps.views),
   };
 };

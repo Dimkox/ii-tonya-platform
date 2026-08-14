@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   inspectResidencyCheckoutCallback,
   issueResidencyCheckoutCallback,
+  ResidencyCheckoutCallbackVerificationError,
   type ResidencyCheckoutStateStore,
   type ResidencyCheckoutStoredOutcome,
 } from "./residency-checkout-callback-token.js";
@@ -47,8 +48,13 @@ export type ExpertTelegramCheckoutResult =
       readonly replay: boolean;
     }
   | {
-      readonly kind: "unavailable" | "unknown" | "processing";
+      readonly kind: "unknown" | "processing";
       readonly tokenHash: string;
+      readonly replay: boolean;
+    }
+  | {
+      readonly kind: "unavailable";
+      readonly tokenHash?: string;
       readonly replay: boolean;
     };
 
@@ -143,16 +149,26 @@ export function createExpertResidencyCheckoutCapability(deps: {
 
     async process(input) {
       const at = now();
-      const authenticated = await inspectResidencyCheckoutCallback(
-        input.data,
-        {
-          expertId: input.principal.expertId,
-          telegramUserId: input.principal.telegramUserId,
-        },
-        deps.secret,
-        deps.store,
-        at,
-      );
+      let authenticated: Awaited<
+        ReturnType<typeof inspectResidencyCheckoutCallback>
+      >;
+      try {
+        authenticated = await inspectResidencyCheckoutCallback(
+          input.data,
+          {
+            expertId: input.principal.expertId,
+            telegramUserId: input.principal.telegramUserId,
+          },
+          deps.secret,
+          deps.store,
+          at,
+        );
+      } catch (error) {
+        if (error instanceof ResidencyCheckoutCallbackVerificationError) {
+          return { kind: "unavailable", replay: true };
+        }
+        throw error;
+      }
       const leaseUntil = new Date(
         Math.min(
           authenticated.claims.expiresAt.getTime(),

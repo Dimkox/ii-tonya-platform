@@ -161,6 +161,11 @@ export interface ExpertTelegramViewPort {
   sendResidencyQuote(
     view: ExpertResidencyQuoteView,
   ): Promise<TelegramSendOutcome>;
+  sendResidencyCheckoutLink(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    checkoutUrl: string;
+  }): Promise<TelegramSendOutcome>;
 }
 
 export interface ExpertTelegramQueryViewPort {
@@ -593,6 +598,38 @@ export class TelegramAdapter
               ],
             },
           }),
+    });
+  }
+
+  async sendResidencyCheckoutLink(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    checkoutUrl: string;
+  }): Promise<TelegramSendOutcome> {
+    if (
+      view.checkoutUrl.length < 1 ||
+      view.checkoutUrl.length > 2_048 ||
+      /\s/u.test(view.checkoutUrl)
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    let checkoutUrl: URL;
+    try {
+      checkoutUrl = new URL(view.checkoutUrl);
+    } catch {
+      throw new Error("invalid_expert_view");
+    }
+    if (
+      checkoutUrl.protocol !== "https:" ||
+      checkoutUrl.username !== "" ||
+      checkoutUrl.password !== ""
+    ) {
+      throw new Error("invalid_expert_view");
+    }
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: `Оплата резидентства: ${view.checkoutUrl}`,
     });
   }
 

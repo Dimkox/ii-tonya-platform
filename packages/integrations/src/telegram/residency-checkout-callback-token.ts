@@ -161,6 +161,7 @@ export async function inspectResidencyCheckoutCallback(
   store: ResidencyCheckoutStateStore,
   now: Date,
 ): Promise<{ tokenHash: string; claims: ResidencyCheckoutCallbackClaims }> {
+  let decoded: ReturnType<typeof decode>;
   try {
     if (
       secret.byteLength < 32 ||
@@ -170,13 +171,17 @@ export async function inspectResidencyCheckoutCallback(
     ) {
       throw new Error();
     }
-    const decoded = decode(token);
-    const claims = await store.inspectCheckout(
-      decoded.tokenHash,
-      binding.expertId,
-      binding.telegramUserId,
-      now,
-    );
+    decoded = decode(token);
+  } catch {
+    throw new ResidencyCheckoutCallbackVerificationError();
+  }
+  const claims = await store.inspectCheckout(
+    decoded.tokenHash,
+    binding.expertId,
+    binding.telegramUserId,
+    now,
+  );
+  try {
     if (
       claims === null ||
       claims.expiresAt.getTime() <= now.getTime() ||
