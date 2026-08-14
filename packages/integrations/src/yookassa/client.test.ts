@@ -4,6 +4,7 @@ import {
   YooKassaUnknownOutcomeError,
   createYooKassaClient,
   formatRubMinor,
+  serializeYooKassaPaymentRequest,
   type CreateYooKassaPayment,
   type YooKassaClientConfig,
   type YooKassaTransport,
@@ -57,6 +58,15 @@ const jsonResponse = (status: number, body: unknown): Response =>
   });
 
 describe("YooKassaClient", () => {
+  it("uses one canonical serializer for the first payment POST", async () => {
+    const body = serializeYooKassaPaymentRequest(command);
+    const transport = vi.fn<YooKassaTransport>(async (_url, init) => {
+      expect(init.body).toBe(body);
+      return jsonResponse(200, payment);
+    });
+    await createYooKassaClient(config, transport).createPayment(command);
+    expect(transport).toHaveBeenCalledOnce();
+  });
   it("uses the fixed v3 payment endpoint, Basic Auth, and the stable idempotency key", async () => {
     const transport = vi.fn<YooKassaTransport>(async () =>
       jsonResponse(200, payment),

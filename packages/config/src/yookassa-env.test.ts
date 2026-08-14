@@ -61,4 +61,24 @@ describe("YooKassa environment contract", () => {
     expect(config.yookassa).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain("stored-but-disabled-secret");
   });
+
+  it("parses all six recovery placeholders as disabled when empty", () => {
+    const config = loadEnv({
+      ...base(),
+      YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE: "",
+      YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION: "",
+      YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE: "",
+      YOOKASSA_RECOVERY_RETENTION_DAYS: "",
+      YOOKASSA_UNBOUND_RECOVERY_ENABLED: "",
+      YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS: "",
+    });
+    expect(config.yookassaRecovery).toEqual({ enabled: false });
+  });
+
+  it("fails closed when recovery is enabled without every authority input", () => {
+    expect(() => loadEnv({
+      ...base(),
+      YOOKASSA_UNBOUND_RECOVERY_ENABLED: "true",
+    })).toThrow("yookassa_recovery_configuration_incomplete");
+  });
 });

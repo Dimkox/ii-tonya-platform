@@ -121,6 +121,32 @@ const receiptBody = (receipt: YooKassaReceiptInput, amount: string) => {
   };
 };
 
+export const serializeYooKassaPaymentRequest = (
+  command: CreateYooKassaPayment,
+): string => {
+  const amount = formatRubMinor(command.amountMinor);
+  return JSON.stringify({
+    amount: { value: amount, currency: "RUB" },
+    capture: true,
+    confirmation: { type: "redirect", return_url: command.returnUrl },
+    description: command.description,
+    metadata: command.metadata,
+    receipt: receiptBody(command.receipt, amount),
+  });
+};
+
+export const serializeYooKassaRefundRequest = (
+  command: CreateYooKassaRefund,
+): string => {
+  const amount = formatRubMinor(command.amountMinor);
+  return JSON.stringify({
+    payment_id: assertProviderId(command.paymentId),
+    amount: { value: amount, currency: "RUB" },
+    description: command.description,
+    receipt: receiptBody(command.receipt, amount),
+  });
+};
+
 export const createYooKassaClient = (
   config: YooKassaClientConfig,
   transport: YooKassaTransport = (url, init) => fetch(url, init),
@@ -180,21 +206,13 @@ export const createYooKassaClient = (
   return {
     async createPayment(command) {
       const amount = formatRubMinor(command.amountMinor);
-      const body = {
-        amount: { value: amount, currency: "RUB" },
-        capture: true,
-        confirmation: { type: "redirect", return_url: command.returnUrl },
-        description: command.description,
-        metadata: command.metadata,
-        receipt: receiptBody(command.receipt, amount),
-      };
       const result = parsePayment(
         await request("/v3/payments", {
           method: "POST",
           headers: {
             "Idempotence-Key": assertIdempotencyKey(command.idempotencyKey),
           },
-          body: JSON.stringify(body),
+          body: serializeYooKassaPaymentRequest(command),
         }),
       );
       if (result.amount.value !== amount || result.amount.currency !== "RUB") {
@@ -217,12 +235,7 @@ export const createYooKassaClient = (
           headers: {
             "Idempotence-Key": assertIdempotencyKey(command.idempotencyKey),
           },
-          body: JSON.stringify({
-            payment_id: assertProviderId(command.paymentId),
-            amount: { value: amount, currency: "RUB" },
-            description: command.description,
-            receipt: receiptBody(command.receipt, amount),
-          }),
+          body: serializeYooKassaRefundRequest(command),
         }),
       );
       if (

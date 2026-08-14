@@ -25,7 +25,7 @@ describe("exact-body YooKassa recovery", () => {
         claim,
         decryptor: { decrypt },
         transport: { postExact },
-        completion: { bind, manualReview: vi.fn() },
+        completion: { bind, manualReview: vi.fn(), reschedule: vi.fn() },
       }),
     ).resolves.toEqual({ kind: "disabled" });
     expect(decrypt).not.toHaveBeenCalled();
@@ -46,7 +46,7 @@ describe("exact-body YooKassa recovery", () => {
         claim,
         decryptor: { decrypt },
         transport: { postExact },
-        completion: { bind, manualReview: vi.fn() },
+        completion: { bind, manualReview: vi.fn(), reschedule: vi.fn() },
       }),
     ).resolves.toEqual({ kind: "bound", providerObjectId: "payment_1" });
     expect(decrypt).toHaveBeenCalledWith({
@@ -82,7 +82,7 @@ describe("exact-body YooKassa recovery", () => {
           decrypt: vi.fn().mockResolvedValue({ body: "{}", bodyVersion: 2 }),
         },
         transport: { postExact: vi.fn() },
-        completion: { bind: vi.fn(), manualReview },
+        completion: { bind: vi.fn(), manualReview, reschedule: vi.fn() },
       }),
     ).resolves.toEqual({ kind: "manual_review" });
     expect(manualReview).toHaveBeenCalledWith(
@@ -90,6 +90,20 @@ describe("exact-body YooKassa recovery", () => {
       claim.leaseToken,
       "snapshot_version_mismatch",
     );
+  });
+
+  it("reschedules an ambiguous exact POST without exposing request material", async () => {
+    const reschedule = vi.fn().mockResolvedValue(undefined);
+    await expect(
+      recoverExactYooKassaOperation({
+        enabled: true,
+        claim,
+        decryptor: { decrypt: vi.fn().mockResolvedValue({ body: "{}", bodyVersion: 1 }) },
+        transport: { postExact: vi.fn().mockRejectedValue(new Error("network")) },
+        completion: { bind: vi.fn(), manualReview: vi.fn(), reschedule },
+      }),
+    ).resolves.toEqual({ kind: "rescheduled" });
+    expect(reschedule).toHaveBeenCalledWith(claim.operationId, claim.leaseToken);
   });
 
   it.each([
@@ -107,7 +121,7 @@ describe("exact-body YooKassa recovery", () => {
           claim: { ...claim, status, providerObjectId },
           decryptor: { decrypt: vi.fn() },
           transport: { postExact },
-          completion: { bind: vi.fn(), manualReview: vi.fn() },
+          completion: { bind: vi.fn(), manualReview: vi.fn(), reschedule: vi.fn() },
         }),
       ).resolves.toEqual({ kind: "ineligible" });
       expect(postExact).not.toHaveBeenCalled();

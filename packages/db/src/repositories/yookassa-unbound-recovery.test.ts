@@ -33,4 +33,14 @@ describe("YooKassa unbound recovery repository", () => {
     );
     expect(source).not.toContain("offset ${");
   });
+
+  it("attaches before POST and fences recovery completion by active lease", () => {
+    expect(source).toContain("attachreplaysnapshot");
+    expect(source).toMatch(/status = 'claimed'[\s\S]*replay_ciphertext is null/u);
+    expect(source).toContain("bindrecoveredproviderobject");
+    expect(source).toMatch(/recovery_lease_token\s*=\s*\$\{leasetoken\}::uuid/u);
+    expect(source).toContain("recovery_lease_until > transaction_timestamp()");
+    expect(source).toContain("rescheduleunboundrecovery");
+    expect(source).toContain("markunboundrecoverymanualreview");
+  });
 });

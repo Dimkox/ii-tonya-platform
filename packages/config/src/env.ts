@@ -101,6 +101,15 @@ const schema = z
         ])
         .optional(),
     ),
+    YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE: optionalNonEmptyString,
+    YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION: optionalNonEmptyString,
+    YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE: optionalNonEmptyString,
+    YOOKASSA_RECOVERY_RETENTION_DAYS: optionalNonEmptyString,
+    YOOKASSA_UNBOUND_RECOVERY_ENABLED: z.preprocess(
+      (value) => (value === "" ? "false" : value),
+      z.enum(["true", "false"]).default("false"),
+    ),
+    YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS: optionalNonEmptyString,
     LLM_PROVIDER: z.literal("disabled").default("disabled"),
     MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
     RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
@@ -177,6 +186,19 @@ const schema = z
         });
       }
     }
+    if (value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true") {
+      const retention = Number(value.YOOKASSA_RECOVERY_RETENTION_DAYS);
+      const windowHours = Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS);
+      if (
+        !/^[a-z][a-z0-9_.:-]{2,127}$/u.test(value.YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE ?? "") ||
+        !/^v[1-9]\d{0,8}$/u.test(value.YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION ?? "") ||
+        !/^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$/u.test(value.YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE ?? "") ||
+        !Number.isInteger(retention) || retention < 1 || retention > 365 ||
+        !Number.isInteger(windowHours) || windowHours < 1 || windowHours > 168
+      ) {
+        context.addIssue({ code: "custom", path: ["YOOKASSA_UNBOUND_RECOVERY_ENABLED"], message: "yookassa_recovery_configuration_incomplete" });
+      }
+    }
   });
 
 export type RuntimeConfig = {
@@ -214,6 +236,14 @@ export type RuntimeConfig = {
       paymentMode: string;
     };
   };
+  yookassaRecovery: { enabled: false } | {
+    enabled: true;
+    consentPurpose: string;
+    policyVersion: string;
+    encryptionKeyReference: string;
+    retentionDays: number;
+    windowHours: number;
+  };
 };
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
@@ -243,6 +273,16 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
       yookassa: value.YOOKASSA_ENABLED === "true",
     },
+    yookassaRecovery: value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true"
+      ? {
+          enabled: true,
+          consentPurpose: value.YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE!,
+          policyVersion: value.YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION!,
+          encryptionKeyReference: value.YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE!,
+          retentionDays: Number(value.YOOKASSA_RECOVERY_RETENTION_DAYS),
+          windowHours: Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS),
+        }
+      : { enabled: false },
     ...(value.EXPERT_REFERRAL_ENABLED === "true"
       ? {
           expertReferralKey: {

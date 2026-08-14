@@ -7,12 +7,18 @@ import type {
   ExpertResidencyPaymentPort,
   ExpertResidencyRefundCommand,
 } from "../expert-residency/payment-port.js";
-import { YooKassaTerminalError, type YooKassaClient } from "./client.js";
+import {
+  YooKassaTerminalError,
+  serializeYooKassaPaymentRequest,
+  serializeYooKassaRefundRequest,
+  type YooKassaClient,
+} from "./client.js";
 import type { YooKassaMode, YooKassaVatCode } from "./contracts.js";
 import type {
   YooKassaOperationPort,
   YooKassaReceiptContactPort,
 } from "./operation-port.js";
+import type { YooKassaReplayProtector } from "./exact-body-recovery.js";
 
 const stableUuid = (namespace: string, value: string): string => {
   const hex = createHash("sha256")
@@ -105,6 +111,9 @@ export interface YooKassaPaymentAdapterDependencies {
     readonly paymentSubject: string;
     readonly paymentMode: string;
   };
+  /** Absent means exact-body recovery is disabled and performs zero crypto. */
+  readonly replayProtector?: YooKassaReplayProtector;
+  readonly recoveryExpiresAt?: () => string;
 }
 
 export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPaymentPort {
@@ -187,10 +196,12 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       throw new Error("yookassa_operation_terminal");
     }
     try {
-      const payment = await this.deps.client.createPayment({
+      const providerCommand = {
         ...request,
         idempotencyKey: operation.idempotencyKey,
-      });
+      };
+      await this.attachRecoverySnapshot(operation, serializeYooKassaPaymentRequest(providerCommand));
+      const payment = await this.deps.client.createPayment(providerCommand);
       if (
         payment.metadata.order_id !== command.orderId ||
         payment.confirmation === undefined ||
@@ -270,10 +281,12 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       throw new Error("yookassa_operation_terminal");
     }
     try {
-      const refund = await this.deps.client.createRefund({
+      const providerCommand = {
         ...request,
         idempotencyKey: operation.idempotencyKey,
-      });
+      };
+      await this.attachRecoverySnapshot(operation, serializeYooKassaRefundRequest(providerCommand));
+      const refund = await this.deps.client.createRefund(providerCommand);
       await this.deps.operations.bindProviderObject(operation.id, refund.id);
       return { kind: "pending", refundId: refund.id };
     } catch (error: unknown) {
@@ -284,5 +297,34 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
 
   async reconcile(): Promise<null> {
     return null;
+  }
+
+  private async attachRecoverySnapshot(
+    operation: Awaited<ReturnType<YooKassaOperationPort["claim"]>>,
+    body: string,
+  ): Promise<void> {
+    if (this.deps.replayProtector === undefined) return;
+    if (
+      this.deps.operations.attachReplaySnapshot === undefined ||
+      this.deps.recoveryExpiresAt === undefined
+    ) {
+      throw new Error("yookassa_recovery_capability_incomplete");
+    }
+    const bodyVersion = 1;
+    const snapshot = await this.deps.replayProtector.protect({
+      body,
+      bodyVersion,
+      associatedData: {
+        operationId: operation.id,
+        operationKind: operation.kind,
+        idempotencyKey: operation.idempotencyKey,
+        requestDigest: operation.requestDigest,
+        bodyVersion,
+      },
+    });
+    if (snapshot.expiresAt !== this.deps.recoveryExpiresAt()) {
+      throw new Error("yookassa_recovery_expiry_mismatch");
+    }
+    await this.deps.operations.attachReplaySnapshot(operation.id, snapshot);
   }
 }
