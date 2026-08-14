@@ -1,7 +1,7 @@
 # MVP-CLIENT-CATALOG-001 Traceability
 
-Status: implementation checkpoint under independent review; not activated. Exact main
-base: `b6763dd`. Both catalog-related flags remain false by default.
+Status: implementation and focused Claw verification complete; not activated. Exact
+main base: `b6763dd`. Both catalog-related flags remain false by default.
 
 | Requirement | Implementation boundary | Required verification | Release / recovery owner |
 | --- | --- | --- | --- |
@@ -22,7 +22,7 @@ Focused Claw evidence is 2/2 plus PostgreSQL 3/3, 21/21, 10/10 plus 33/33, Task 
 23/23, Task 5 9/9, and adversarial-remediation 11/11. The first independent review
 found one Critical and seven Important issues; its closure passes found three
 Important issues and then one missing-outbox cleanup issue. All remediation gates
-pass (11/11, 5/5, and 1/1), and all affected builds pass. Final independent closure
-confirmation and one new focused Claw/PostgreSQL gate are still required. No GitHub
-Actions, live provider, image build, activation, deployment, push, or merge is
-authorized by this checkpoint.
+pass (11/11, 5/5, and 1/1), and all affected builds pass. Independent review is
+`READY: YES`; the final new focused Claw/PostgreSQL gate passed 2/2 against production
+source `9fc20b7`. No GitHub Actions, live provider, image build, activation,
+deployment, push, or merge is authorized by this checkpoint.
