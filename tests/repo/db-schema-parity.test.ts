@@ -125,7 +125,10 @@ describe("authoritative Drizzle schema parity", () => {
     expect(requiredTable("expertTelegramResidencyCallbacks")).toMatchObject({
       checks: [
         "expert_telegram_residency_callbacks_action_check",
+        "expert_telegram_residency_callbacks_checkout_outcome_check",
+        "expert_telegram_residency_callbacks_checkout_state_check",
         "expert_telegram_residency_callbacks_expiry_check",
+        "expert_telegram_residency_callbacks_processing_lease_check",
         "expert_telegram_residency_callbacks_telegram_id_check",
         "expert_telegram_residency_callbacks_token_hash_check",
       ],
@@ -133,7 +136,11 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_telegram_residency_callbacks_expert_id_experts_id_fk",
         "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
       ],
-      indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
+      indexes: [
+        "expert_telegram_residency_callbacks_expiry_idx",
+        "expert_telegram_residency_callbacks_processing_lease_idx",
+        "expert_telegram_residency_callbacks_url_cleanup_idx",
+      ],
       uniques: ["expert_telegram_residency_callbacks_idempotency_unique"],
     });
     expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
@@ -396,6 +403,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -468,6 +479,11 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_provider_operations_order_kind_idx",
       "expert_provider_operations_unbound_recovery_idx",
       "expert_receipt_contacts_append_only",
+      "expert_telegram_residency_callbacks_checkout_outcome_check",
+      "expert_telegram_residency_callbacks_checkout_state_check",
+      "expert_telegram_residency_callbacks_processing_lease_check",
+      "expert_telegram_residency_callbacks_processing_lease_idx",
+      "expert_telegram_residency_callbacks_url_cleanup_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toMatch(

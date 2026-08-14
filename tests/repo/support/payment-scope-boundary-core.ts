@@ -83,6 +83,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0023_yookassa_provider_operations.sql",
   "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
   "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
+  "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -126,6 +127,7 @@ export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
   "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
   "EXPERT_AI_INGRESS_ENABLED",
   "EXPERT_TELEGRAM_REFERRAL_ENABLED",
+  "EXPERT_TELEGRAM_CHECKOUT_ENABLED",
   "EXPERT_REFERRAL_HMAC_KEY_VERSION",
   "EXPERT_REFERRAL_HMAC_KEY_REF",
   "EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -592,6 +594,10 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
     "7af18618c6a06638b85dfbba734ee9ffea416629493eb139575ac6c5d3905b2d",
+  ],
+  [
+    "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+    "63b6a66a6445f93504c85e5499c49e24f67e619d59f1114f54c26e8411a44091",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

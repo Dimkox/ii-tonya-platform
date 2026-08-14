@@ -181,6 +181,8 @@ export {
 export {
   PostgresExpertTelegramResidencyCallbackRepository,
   type ExpertResidencyCallbackClaims,
+  type ExpertResidencyCheckoutClaim,
+  type ExpertResidencyCheckoutOutcome,
 } from "./repositories/expert-telegram-residency-callback-repository.js";
 export {
   PostgresExpertReferralWorkerRepository,
