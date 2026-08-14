@@ -591,7 +591,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
-    "fc3f6e1bfc4b36fc1c60dcdd4f9dca3e090a5d5e963d1340a10b3f1194fd14f3",
+    "7af18618c6a06638b85dfbba734ee9ffea416629493eb139575ac6c5d3905b2d",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

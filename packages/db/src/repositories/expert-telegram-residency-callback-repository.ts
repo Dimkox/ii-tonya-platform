@@ -51,7 +51,9 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
       `insert into expert_telegram_residency_callbacks
        (token_hash,expert_id,telegram_user_id,tariff_version_id,action,idempotency_key,expires_at)
        select $1,$2::uuid,$3,$4::uuid,'start_residency_checkout',$5,$6
-       from experts e join channel_identities ci on ci.user_id=e.user_id and ci.provider='telegram' and ci.external_id=$3
+       from experts e
+       join users u on u.id=e.user_id and u.active
+       join channel_identities ci on ci.user_id=e.user_id and ci.provider='telegram' and ci.external_id=$3
        where e.id=$2::uuid and e.active and e.verified
        returning token_hash`,
       [
@@ -84,7 +86,9 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
     }
     const result: QueryResult<CallbackRow> = await this.db.$client.query(
       `update expert_telegram_residency_callbacks c set consumed_at=$6
-       from experts e join channel_identities ci on ci.user_id=e.user_id and ci.provider='telegram' and ci.external_id=$3
+       from experts e
+       join users u on u.id=e.user_id and u.active
+       join channel_identities ci on ci.user_id=e.user_id and ci.provider='telegram' and ci.external_id=$3
        where c.token_hash=$1 and c.expert_id=$2::uuid and c.telegram_user_id=$3
          and c.tariff_version_id=$4::uuid and c.action=$5 and c.consumed_at is null and c.expires_at>$6
          and e.id=c.expert_id and e.active and e.verified

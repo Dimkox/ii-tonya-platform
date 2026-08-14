@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, createDb } from "../../packages/db/src/client.js";
 import { PostgresExpertTelegramResidencyCallbackRepository } from "../../packages/db/src/repositories/expert-telegram-residency-callback-repository.js";
 
@@ -43,6 +43,12 @@ describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
     await db.execute(sql.raw(`drop schema if exists ${schema} cascade`));
     await closeDb(db);
   });
+  beforeEach(async () => {
+    await db.execute(sql`truncate expert_telegram_residency_callbacks`);
+    await db.execute(
+      sql`update users set active=true where id=${userId}::uuid`,
+    );
+  });
 
   it("binds and consumes an xr1 callback exactly once", async () => {
     const tokenHash = "a".repeat(64);
@@ -60,11 +66,38 @@ describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
       tariffVersionId,
       action: "start_residency_checkout" as const,
     };
+    const winners = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        repository.consume(tokenHash, binding, new Date()),
+      ),
+    );
+    expect(winners.filter((result) => result !== null)).toHaveLength(1);
+  });
+
+  it("rejects consume after the bound user is deactivated", async () => {
+    const tokenHash = "b".repeat(64);
+    const claims = {
+      expertId,
+      telegramUserId: "123456789",
+      tariffVersionId,
+      action: "start_residency_checkout" as const,
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    await repository.put(tokenHash, claims, "telegram:quote:2");
+    await db.execute(
+      sql`update users set active=false where id=${userId}::uuid`,
+    );
     await expect(
-      repository.consume(tokenHash, binding, new Date()),
-    ).resolves.toMatchObject(binding);
-    await expect(
-      repository.consume(tokenHash, binding, new Date()),
+      repository.consume(
+        tokenHash,
+        {
+          expertId,
+          telegramUserId: "123456789",
+          tariffVersionId,
+          action: "start_residency_checkout",
+        },
+        new Date(),
+      ),
     ).resolves.toBeNull();
   });
 });

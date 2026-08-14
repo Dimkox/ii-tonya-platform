@@ -17,6 +17,6 @@ CREATE TABLE "expert_telegram_residency_callbacks" (
 --> statement-breakpoint
 ALTER TABLE "expert_telegram_residency_callbacks" ADD CONSTRAINT "expert_telegram_residency_callbacks_expert_id_experts_id_fk" FOREIGN KEY ("expert_id") REFERENCES "experts"("id") ON DELETE no action ON UPDATE no action;
 --> statement-breakpoint
-ALTER TABLE "expert_telegram_residency_callbacks" ADD CONSTRAINT "expert_telegram_residency_callbacks_tariff_version_id_fk" FOREIGN KEY ("tariff_version_id") REFERENCES "expert_residency_tariff_versions"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "expert_telegram_residency_callbacks" ADD CONSTRAINT "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk" FOREIGN KEY ("tariff_version_id") REFERENCES "expert_residency_tariff_versions"("id") ON DELETE no action ON UPDATE no action;
 --> statement-breakpoint
 CREATE INDEX "expert_telegram_residency_callbacks_expiry_idx" ON "expert_telegram_residency_callbacks" USING btree ("expires_at") WHERE "consumed_at" IS NULL;
