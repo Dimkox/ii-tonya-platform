@@ -175,8 +175,9 @@ export class PostgresClientSessionRepository {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
       throw new Error("client_session_cleanup_invalid");
     }
-    return this.db.transaction(async (tx: Transaction) => {
-      const receipts = await tx.execute(sql`
+    try {
+      return await this.db.transaction(async (tx: Transaction) => {
+        const receipts = await tx.execute(sql`
         delete from client_identity_proof_receipts
         where replay_digest in (
           select replay_digest from client_identity_proof_receipts
@@ -187,7 +188,7 @@ export class PostgresClientSessionRepository {
         )
         returning 1
       `);
-      const sessions = await tx.execute(sql`
+        const sessions = await tx.execute(sql`
         delete from client_sessions
         where token_digest in (
           select token_digest from client_sessions
@@ -198,10 +199,13 @@ export class PostgresClientSessionRepository {
         )
         returning 1
       `);
-      return {
-        receiptsRemoved: receipts.rows.length,
-        sessionsRemoved: sessions.rows.length,
-      };
-    });
+        return {
+          receiptsRemoved: receipts.rows.length,
+          sessionsRemoved: sessions.rows.length,
+        };
+      });
+    } catch {
+      throw new Error("client_session_repository_unavailable");
+    }
   }
 }

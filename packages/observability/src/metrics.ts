@@ -15,6 +15,7 @@ export const operationalMetrics = {
   outboxDeadLetters: meter.createCounter("ii_tonya_outbox_dead_letters"),
   workerOutboxDelivery: meter.createCounter("ii_tonya_worker_outbox_delivery"),
   clientCatalog: meter.createCounter("ii_tonya_client_catalog"),
+  clientSession: meter.createCounter("ii_tonya_client_session"),
   providerCircuitState: meter.createUpDownCounter(
     "ii_tonya_provider_circuit_state",
   ),
@@ -52,6 +53,57 @@ export const operationalMetrics = {
     "ii_tonya_expert_residency_job_duration_ms",
   ),
 } as const;
+
+const clientSessionOperations = new Set([
+  "issue",
+  "resolve",
+  "revoke",
+  "cleanup",
+]);
+const clientSessionOutcomes = new Set([
+  "allowed",
+  "denied",
+  "unavailable",
+  "removed",
+]);
+
+export type ClientSessionMetricLabels = Readonly<{
+  operation: "issue" | "resolve" | "revoke" | "cleanup";
+  outcome: "allowed" | "denied" | "unavailable" | "removed";
+}>;
+
+export function clientSessionMetricLabels(
+  value: unknown,
+): ClientSessionMetricLabels {
+  if (!isRecord(value)) {
+    throw new Error("invalid_client_session_metric_labels");
+  }
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 2 ||
+    keys.some((key) => key !== "operation" && key !== "outcome") ||
+    typeof value.operation !== "string" ||
+    !clientSessionOperations.has(value.operation) ||
+    typeof value.outcome !== "string" ||
+    !clientSessionOutcomes.has(value.outcome)
+  ) {
+    throw new Error("invalid_client_session_metric_labels");
+  }
+  return value as ClientSessionMetricLabels;
+}
+
+export function recordClientSessionMetric(
+  labels: ClientSessionMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error("invalid_client_session_metric_count");
+  }
+  operationalMetrics.clientSession.add(
+    count,
+    clientSessionMetricLabels(labels),
+  );
+}
 
 export type MetricLabels = Readonly<{
   module: string;

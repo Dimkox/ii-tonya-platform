@@ -15,7 +15,11 @@ import type {
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
-import { createLogger, type Logger } from "@ii-tonya/observability";
+import {
+  createLogger,
+  recordClientSessionMetric,
+  type Logger,
+} from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
@@ -176,6 +180,7 @@ export async function buildApp(
           deps.clientSessionRepository!.revoke(tokenDigest),
       },
       principals: deps.clientPrincipal,
+      metrics: { record: recordClientSessionMetric },
     });
   }
   if (

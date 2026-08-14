@@ -174,3 +174,55 @@ export async function runClientCatalogRetention(
     throw error;
   }
 }
+
+export interface ClientSessionRetentionReport {
+  readonly receiptsRemoved: number;
+  readonly sessionsRemoved: number;
+}
+
+type ClientSessionRetentionLabels = Readonly<{
+  operation: "cleanup";
+  outcome: "allowed" | "unavailable" | "removed";
+}>;
+
+export async function runClientSessionRetention(
+  deps: {
+    repository: {
+      cleanupExpired(limit: number): Promise<ClientSessionRetentionReport>;
+    };
+    metrics?: {
+      record(labels: ClientSessionRetentionLabels, count?: number): void;
+    };
+  },
+  limit: number,
+): Promise<ClientSessionRetentionReport> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
+    throw new Error("client_session_retention_invalid");
+  }
+  try {
+    const report = await deps.repository.cleanupExpired(limit);
+    if (
+      !Number.isSafeInteger(report.receiptsRemoved) ||
+      report.receiptsRemoved < 0 ||
+      report.receiptsRemoved > limit ||
+      !Number.isSafeInteger(report.sessionsRemoved) ||
+      report.sessionsRemoved < 0 ||
+      report.sessionsRemoved > limit
+    ) {
+      throw new Error("client_session_retention_unavailable");
+    }
+    const removed = report.receiptsRemoved + report.sessionsRemoved;
+    if (removed > 0) {
+      deps.metrics?.record(
+        { operation: "cleanup", outcome: "removed" },
+        removed,
+      );
+    } else {
+      deps.metrics?.record({ operation: "cleanup", outcome: "allowed" });
+    }
+    return report;
+  } catch {
+    deps.metrics?.record({ operation: "cleanup", outcome: "unavailable" });
+    throw new Error("client_session_retention_unavailable");
+  }
+}

@@ -65,18 +65,40 @@ export async function resolveClientPrincipal(
   }
 }
 
-export const createClientPrincipalResolver = (repository: {
-  resolve(tokenDigest: `sha256:${string}`): Promise<unknown>;
-}): ClientPrincipalResolver =>
+export const createClientPrincipalResolver = (
+  repository: {
+    resolve(tokenDigest: `sha256:${string}`): Promise<unknown>;
+  },
+  metrics?: {
+    record(labels: {
+      operation: "resolve";
+      outcome: "allowed" | "denied" | "unavailable";
+    }): void;
+  },
+): ClientPrincipalResolver =>
   Object.freeze({
     async resolve(authorization: string): Promise<ClientPrincipalResolution> {
       const token = parseClientBearer(authorization);
-      if (token === null) return { kind: "denied" };
+      if (token === null) {
+        metrics?.record({ operation: "resolve", outcome: "denied" });
+        return { kind: "denied" };
+      }
       try {
-        return validatedResolution(
+        const result = validatedResolution(
           await repository.resolve(clientSessionTokenHash(token)),
         );
+        metrics?.record({
+          operation: "resolve",
+          outcome:
+            result.kind === "resolved"
+              ? "allowed"
+              : result.kind === "unavailable"
+                ? "unavailable"
+                : "denied",
+        });
+        return result;
       } catch {
+        metrics?.record({ operation: "resolve", outcome: "unavailable" });
         return { kind: "unavailable" };
       }
     },

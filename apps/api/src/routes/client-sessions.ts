@@ -19,6 +19,12 @@ interface RouteOptions {
     ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
   };
   readonly principals: ClientPrincipalResolver;
+  readonly metrics?: {
+    record(labels: {
+      operation: "issue" | "revoke";
+      outcome: "allowed" | "denied" | "unavailable";
+    }): void;
+  };
 }
 
 interface RawHeader {
@@ -87,6 +93,7 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
         !contentLength.valid ||
         !transferEncoding.valid
       ) {
+        deps.metrics?.record({ operation: "issue", outcome: "denied" });
         return reply.code(400).send({ error: "invalid_request" });
       }
       const parsed = parseClientSessionBody({
@@ -103,15 +110,19 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
           : { transferEncoding: transferEncoding.value }),
       });
       if (parsed === null) {
+        deps.metrics?.record({ operation: "issue", outcome: "denied" });
         return reply.code(400).send({ error: "invalid_request" });
       }
       const result = await deps.sessions.issue(parsed.identityProof);
       if (result.kind === "unauthorized") {
+        deps.metrics?.record({ operation: "issue", outcome: "denied" });
         return reply.code(401).send({ error: "unauthorized" });
       }
       if (result.kind === "unavailable") {
+        deps.metrics?.record({ operation: "issue", outcome: "unavailable" });
         return reply.code(503).send({ error: "temporarily_unavailable" });
       }
+      deps.metrics?.record({ operation: "issue", outcome: "allowed" });
       return reply.code(201).send({
         accessToken: result.accessToken,
         tokenType: result.tokenType,
@@ -124,6 +135,7 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
   app.delete("/v1/client/sessions/current", async (request, reply) => {
     const authorization = readExactAuthorization(request.raw.rawHeaders);
     if (authorization === null) {
+      deps.metrics?.record({ operation: "revoke", outcome: "denied" });
       return reply.code(401).send({ error: "unauthorized" });
     }
     const resolution = await resolveClientPrincipal(
@@ -131,21 +143,29 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
       authorization,
     );
     if (resolution.kind === "denied") {
+      deps.metrics?.record({ operation: "revoke", outcome: "denied" });
       return reply.code(401).send({ error: "unauthorized" });
     }
     if (resolution.kind === "unavailable") {
+      deps.metrics?.record({ operation: "revoke", outcome: "unavailable" });
       return reply.code(503).send({ error: "temporarily_unavailable" });
     }
     const token = parseClientBearer(authorization);
     if (token === null) {
+      deps.metrics?.record({ operation: "revoke", outcome: "denied" });
       return reply.code(401).send({ error: "unauthorized" });
     }
     try {
       const result = await deps.sessions.revoke(clientSessionTokenHash(token));
+      deps.metrics?.record({
+        operation: "revoke",
+        outcome: result.kind === "revoked" ? "allowed" : "denied",
+      });
       return result.kind === "revoked"
         ? reply.code(204).send()
         : reply.code(401).send({ error: "unauthorized" });
     } catch {
+      deps.metrics?.record({ operation: "revoke", outcome: "unavailable" });
       return reply.code(503).send({ error: "temporarily_unavailable" });
     }
   });

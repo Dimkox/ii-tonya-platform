@@ -228,6 +228,19 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`);
+      const subject = (await tx.execute<{ userId: string }>(sql`
+        select id as "userId" from users
+        where id=${command.targetUserId}::uuid
+        for update
+      `)).rows[0];
+      if (subject === undefined) throw new Error("Privacy subject is unavailable");
+      await tx.execute(sql`
+        update users set active=false,updated_at=clock_timestamp()
+        where id=${command.targetUserId}::uuid
+      `);
+      await tx.execute(sql`
+        delete from client_sessions where user_id=${command.targetUserId}::uuid
+      `);
       const existing = (await tx.execute<{ jobId: string; status: ErasureJob["status"] }>(sql`
         select id as "jobId", status from privacy_deletion_jobs
         where user_id = ${command.targetUserId}::uuid and idempotency_key = ${command.idempotencyKey}

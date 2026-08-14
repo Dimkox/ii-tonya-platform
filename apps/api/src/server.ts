@@ -39,7 +39,11 @@ import {
   EnvironmentExpertCodeSecretResolver,
   type ExpertTelegramIngressFactoryDependencies,
 } from "@ii-tonya/integrations";
-import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
+import {
+  createLogger,
+  recordClientSessionMetric,
+  shutdownTelemetry,
+} from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
@@ -186,7 +190,9 @@ export const createDefaultLifecycle = (
     const clientPrincipal =
       clientSessionRepository === undefined
         ? undefined
-        : createClientPrincipalResolver(clientSessionRepository);
+        : createClientPrincipalResolver(clientSessionRepository, {
+            record: recordClientSessionMetric,
+          });
     const clientCatalogService =
       config.features.clientCatalog === true &&
       clientSessionService !== undefined &&

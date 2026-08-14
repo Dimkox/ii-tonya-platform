@@ -7,12 +7,15 @@ export {
 export {
   operationalMetrics,
   clientCatalogMetricLabels,
+  clientSessionMetricLabels,
   recordClientCatalogMetric,
+  recordClientSessionMetric,
   recordWorkerOutboxMetric,
   referralMetricLabels,
   workerOutboxMetricLabels,
   type ExpertReferralMetricLabels,
   type ClientCatalogMetricLabels,
+  type ClientSessionMetricLabels,
   type MetricLabels,
   type WorkerOutboxMetricLabels,
 } from "./metrics.js";

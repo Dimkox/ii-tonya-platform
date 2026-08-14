@@ -2,6 +2,8 @@ import pino, { type DestinationStream, type Logger, type LoggerOptions } from "p
 
 const REDACT_PATHS = [
   "authorization", "cookie", "cookies", "token", "secret", "rawBody", "body",
+  "identityProof", "accessToken", "tokenHash", "tokenDigest", "replayDigest",
+  "rawHeaders", "verifierInput", "verifierOutput", "cause",
   "clientProfile", "profile", "contact", "contacts", "meetingUrl", "providerPayload",
   "url", "req.url", "err.request.url", "req.headers.authorization", "req.headers.cookie",
   "headers.authorization", "headers.cookie", "*.authorization", "*.token", "*.secret",
@@ -9,13 +11,18 @@ const REDACT_PATHS = [
 ] as const;
 
 const telegramBotUrl = /\/bot[^/\s]+\//gu;
-const sensitiveKey = /(?:authorization|cookie|token|secret|rawbody|clientprofile|profile|contact|meetingurl|providerpayload|body|conversation|message|text|url)/iu;
+const sensitiveKey = /(?:authorization|cookie|token|secret|rawbody|rawheaders|identityproof|proof|replay|digest|cause|verifier|clientprofile|profile|contact|meetingurl|providerpayload|body|conversation|message|text|url)/iu;
+const clientCredential =
+  /(?:Bearer\s+)?cs1\.[A-Za-z0-9_-]{8,}|(?:hmac-)?sha256:v?[^\s,;}\]]+|sha256:[0-9a-f]{16,}/giu;
+
+const sanitizeString = (value: string): string =>
+  value.replace(telegramBotUrl, "/bot[REDACTED]/").replace(clientCredential, "[REDACTED]");
 
 export const redactProviderUrl = (value: unknown): unknown =>
-  typeof value === "string" ? value.replace(telegramBotUrl, "/bot[REDACTED]/") : "[REDACTED]";
+  typeof value === "string" ? sanitizeString(value) : "[REDACTED]";
 
 export function sanitizeTelemetry(value: unknown, seen = new WeakSet<object>()): unknown {
-  if (typeof value === "string") return value.replace(telegramBotUrl, "/bot[REDACTED]/");
+  if (typeof value === "string") return sanitizeString(value);
   if (value === null || typeof value !== "object") return value;
   if (seen.has(value)) return "[REDACTED:CIRCULAR]";
   seen.add(value);
