@@ -29,6 +29,10 @@ import {
   type TelegramCallbackService,
   type TelegramExpertQueryIngress,
 } from "./routes/telegram-webhook.js";
+import {
+  yookassaWebhookRoutes,
+  type YooKassaWebhookDependencies,
+} from "./routes/yookassa-webhook.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -53,10 +57,17 @@ export interface AppDependencies {
   expertApi?: ExpertReferralApiDependencies;
   expertCodeKeyring?: ExpertCodeKeyring;
   expertTelegramQueries?: TelegramExpertQueryIngress;
+  yookassaWebhook?: YooKassaWebhookDependencies;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
-  if (Object.values(config.integrations).some((enabled) => enabled !== false))
+  const nonPaymentIntegrations = {
+    ...config.integrations,
+    payments: false,
+  };
+  if (
+    Object.values(nonPaymentIntegrations).some((enabled) => enabled !== false)
+  )
     throw new Error("Live provider activation is prohibited");
 };
 export async function buildApp(
@@ -76,6 +87,14 @@ export async function buildApp(
   ) {
     throw new Error("Expert Telegram query capability is required");
   }
+  const yookassaEnabled = deps.config.features.yookassa === true;
+  if (
+    yookassaEnabled !== deps.config.integrations.payments ||
+    yookassaEnabled !== (deps.config.yookassa !== undefined) ||
+    yookassaEnabled !== (deps.yookassaWebhook !== undefined)
+  ) {
+    throw new Error("YooKassa runtime capability is required");
+  }
   const app = Fastify({
     loggerInstance: deps.logger,
     bodyLimit: 64_000,
@@ -85,6 +104,9 @@ export async function buildApp(
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  if (deps.yookassaWebhook !== undefined) {
+    await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
+  }
   await app.register(selartiWebhookRoutes, {
     selarti: deps.selarti,
     conversation: deps.conversationService,
@@ -210,6 +232,7 @@ export async function buildTestApp(
     selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>;
     selartiFailOnce?: boolean;
     expertApi?: ExpertReferralApiDependencies;
+    yookassaWebhook?: YooKassaWebhookDependencies;
     features?: RuntimeConfig["features"];
   } = {},
 ): Promise<TestApp> {
@@ -248,7 +271,7 @@ export async function buildTestApp(
         telegram: false,
         makeProjection: false,
         intentModel: false,
-        payments: false,
+        payments: options.features?.yookassa === true,
       },
       minorOnboarding: false,
       rawConversationLogging: false,
@@ -258,6 +281,21 @@ export async function buildTestApp(
         expertReferral: false,
         expertResidencyBilling: false,
       },
+      ...(options.features?.yookassa === true
+        ? {
+            yookassa: {
+              mode: "test" as const,
+              shopId: "123456",
+              secretReference: "env://YOOKASSA_SECRET_KEY" as const,
+              returnUrl: "https://ii-tonya.ru/payments/return",
+              receipt: {
+                vatCode: 1 as const,
+                paymentSubject: "service",
+                paymentMode: "full_payment",
+              },
+            },
+          }
+        : {}),
     },
     conversationService: conversation,
     bookingService: never as BookingService,
@@ -310,6 +348,9 @@ export async function buildTestApp(
     ...(options.expertApi === undefined
       ? {}
       : { expertApi: options.expertApi }),
+    ...(options.yookassaWebhook === undefined
+      ? {}
+      : { yookassaWebhook: options.yookassaWebhook }),
     ...(options.now === undefined
       ? {}
       : { now: () => new Date(options.now!()) }),

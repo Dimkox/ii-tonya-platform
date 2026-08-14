@@ -108,6 +108,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/expert/residency/quotes",
   "/v1/expert/residency/checkouts",
   "/v1/admin/expert-referrals/inventory",
+  "/v1/webhooks/yookassa",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
@@ -1081,7 +1082,11 @@ const inspectTypeScript = (
           violations.push(`unapproved expert residency API route: ${route}`);
         }
       }
-      if (ts.isIdentifier(node) && paymentApiIdentifier.test(node.text)) {
+      if (
+        ts.isIdentifier(node) &&
+        paymentApiIdentifier.test(node.text) &&
+        path !== "apps/api/src/routes/yookassa-webhook.ts"
+      ) {
         violations.push(`commercial API route identifier: ${node.text}`);
       }
     }
