@@ -12,6 +12,22 @@ export interface ResidencyQuote {
   creditMinor: string;
   cashMinor: string;
 }
+export interface ResidencyCheckoutOrder extends ResidencyQuote {
+  id: string;
+  status: "payment_pending" | "expired";
+}
+export interface ResidencyCheckoutProvider {
+  createCheckout(input: {
+    orderId: string;
+    amountMinor: string;
+    currency: "RUB";
+    idempotencyKey: string;
+  }): Promise<{
+    kind: "created";
+    paymentId: string;
+    checkoutUrl: string;
+  }>;
+}
 export interface ExpertResidencyCommands {
   quote(input: {
     expertId: string;
@@ -21,7 +37,7 @@ export interface ExpertResidencyCommands {
     expertId: string;
     tariffVersionId: string;
     idempotencyKey: string;
-  }): Promise<unknown>;
+  }): Promise<ResidencyCheckoutOrder>;
 }
 export interface ExpertResidencyQueries {
   ownerUserId(expertId: string): Promise<string | undefined>;
@@ -41,7 +57,19 @@ export interface ExpertResidencyService {
     principal: ExpertPrincipal,
     tariffVersionId: string,
     idempotencyKey: string,
-  ): Promise<unknown>;
+  ): Promise<
+    | ForbiddenResult
+    | { kind: "disabled" }
+    | {
+        id: string;
+        status: "payment_pending" | "expired";
+        payment?: {
+          kind: "created";
+          paymentId: string;
+          checkoutUrl: string;
+        };
+      }
+  >;
   reconciliation: ExpertResidencyReconciliation;
 }
 
@@ -50,6 +78,7 @@ export const createExpertResidencyService = (deps: {
   commands: ExpertResidencyCommands;
   queries: ExpertResidencyQueries;
   reconciliation: ExpertResidencyReconciliation;
+  checkoutProvider?: ResidencyCheckoutProvider;
 }): ExpertResidencyService => {
   const owns = async (principal: ExpertPrincipal) =>
     principal.authenticated &&
@@ -66,11 +95,24 @@ export const createExpertResidencyService = (deps: {
     async checkout(principal, tariffVersionId, idempotencyKey) {
       if (!(await owns(principal))) return { kind: "forbidden" };
       if (!deps.environmentEnabled) return { kind: "disabled" };
-      return deps.commands.checkout({
+      const order = await deps.commands.checkout({
         expertId: principal.expertId,
         tariffVersionId,
         idempotencyKey,
       });
+      if (
+        order.status !== "payment_pending" ||
+        deps.checkoutProvider === undefined
+      ) {
+        return { id: order.id, status: order.status };
+      }
+      const payment = await deps.checkoutProvider.createCheckout({
+        orderId: order.id,
+        amountMinor: order.cashMinor,
+        currency: "RUB",
+        idempotencyKey,
+      });
+      return { id: order.id, status: order.status, payment };
     },
     reconciliation: deps.reconciliation,
   };
