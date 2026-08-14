@@ -120,7 +120,7 @@ describe("native dedicated-server production release", () => {
     expect(
       script.split('install_release_units "$deploy_root/$previous"').length - 1,
     ).toBe(2);
-    expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(2);
+    expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(3);
     expect(script.indexOf("trap rollback_on_error ERR")).toBeLessThan(
       script.indexOf('install_release_units "$release_dir"'),
     );
@@ -128,6 +128,10 @@ describe("native dedicated-server production release", () => {
     expect(script).toContain('symlink_switched="true"');
     expect(script).toContain('find "$release_dir" -mindepth 1 -delete');
     expect(script).toContain('find "$incoming" -mindepth 1 -delete');
+    expect(script).toContain('if [[ -z "$previous" ]]');
+    expect(script).toContain('rm -f "$deploy_root/current"');
+    expect(script).toContain("rm -f /etc/systemd/system/ii-tonya-api.service");
+    expect(script).toContain("systemctl disable ii-tonya-api.service");
   });
 
   it("preserves interactive root password access without storing the password", () => {

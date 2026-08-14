@@ -139,6 +139,21 @@ rollback_on_error() {
       sudo systemctl restart ii-tonya-worker.service || true
     fi
   fi
+  if [[ -z "$previous" ]]; then
+    if [[ "$symlink_switched" == "true" && -L "$deploy_root/current" ]]; then
+      if [[ "$(readlink "$deploy_root/current")" == "releases/$release_sha" ]]; then
+        rm -f "$deploy_root/current" || true
+      fi
+    fi
+    if [[ "$unit_install_started" == "true" ]]; then
+      sudo systemctl stop ii-tonya-api.service ii-tonya-worker.service || true
+      sudo systemctl disable ii-tonya-api.service ii-tonya-worker.service || true
+      sudo rm -f /etc/systemd/system/ii-tonya-api.service
+      sudo rm -f /etc/systemd/system/ii-tonya-worker.service
+      sudo rm -f /etc/systemd/system/ii-tonya-migrate.service
+      sudo systemctl daemon-reload || true
+    fi
+  fi
   if [[ "$release_created" == "true" && -d "$release_dir" ]]; then
     find "$release_dir" -mindepth 1 -delete || true
     rmdir "$release_dir" || true
