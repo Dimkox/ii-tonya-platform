@@ -262,6 +262,25 @@ export const clientCatalogTombstones = pgTable(
     check("client_catalog_tombstones_state_check", sql`${table.state} = 'expired'`),
   ],
 );
+
+export const clientCatalogErasureIndex = pgTable(
+  "client_catalog_erasure_index",
+  {
+    requestId: uuid("request_id").primaryKey(),
+    subjectKey: char("subject_key", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "client_catalog_erasure_index_subject_check",
+      sql`${table.subjectKey} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("client_catalog_erasure_index_subject_idx").on(
+      table.subjectKey,
+      table.requestId,
+    ),
+  ],
+);
 export const deliveryAttempts = pgTable("delivery_attempts", {
   id: uuid("id").defaultRandom().primaryKey(),
   outboxId: uuid("outbox_id")

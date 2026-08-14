@@ -85,6 +85,11 @@ const canonicalUuid = (value: string): string => {
   return value;
 };
 
+export const clientCatalogErasureSubjectKey = (userId: string): string =>
+  createHash("sha256")
+    .update(`client-catalog-erasure-v1\0${canonicalUuid(userId)}`)
+    .digest("hex");
+
 const finiteInstant = (value: string): boolean => {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
@@ -180,6 +185,7 @@ export class PostgresClientCatalogRepository
     correlationId: string;
   }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
     const userId = canonicalUuid(input.userId);
+    const subjectKey = clientCatalogErasureSubjectKey(userId);
     if (!HASH_PATTERN.test(input.requestDigest) || input.correlationId.length < 1) {
       return Promise.reject(new Error("client_catalog_request_invalid"));
     }
@@ -214,6 +220,11 @@ export class PostgresClientCatalogRepository
             ${catalogRequestId}::uuid,${userId}::uuid,${input.requestDigest},
             ${serviceCode ?? null},${language ?? null}
           )
+        `);
+        await tx.execute(sql`
+          insert into client_catalog_erasure_index (request_id,subject_key,expires_at)
+          select id,${subjectKey},expires_at from client_catalog_requests
+          where id=${catalogRequestId}::uuid
         `);
         const payload = canonicalPayload(catalogRequestId);
         const payloadHash = createHash("sha256").update(payload).digest("hex");
@@ -393,6 +404,7 @@ export class PostgresClientCatalogRepository
         limit ${input.limit}
       `)).rows;
       let examined = 0;
+      let expiryExamined = 0;
       let expired = 0;
       let removed = 0;
 
@@ -407,6 +419,7 @@ export class PostgresClientCatalogRepository
         `)).rows[0];
         if (request === undefined) continue;
         examined += 1;
+        expiryExamined += 1;
         const expiresAt =
           request.expiresAt instanceof Date
             ? request.expiresAt
@@ -427,11 +440,15 @@ export class PostgresClientCatalogRepository
             delete from client_catalog_tombstones
             where request_id=${candidate.requestId}::uuid
           `);
+          await tx.execute(sql`
+            delete from client_catalog_erasure_index
+            where request_id=${candidate.requestId}::uuid
+          `);
           removed += 1;
         }
       }
 
-      let remaining = input.limit - examined;
+      let remaining = input.limit - expiryExamined;
       if (remaining > 0) {
         const orphanRequests = (await tx.execute<{
           requestId: string;
@@ -460,11 +477,13 @@ export class PostgresClientCatalogRepository
             where id=${request.requestId}::uuid
           `);
           examined += 1;
+          expiryExamined += 1;
           expired += 1;
         }
       }
 
-      remaining = input.limit - examined;
+      let cleanupExamined = 0;
+      remaining = input.limit;
       if (remaining > 0) {
         const terminalTombstones = (await tx.execute<{
           requestId: string;
@@ -486,15 +505,23 @@ export class PostgresClientCatalogRepository
             delete from client_catalog_tombstones
             where request_id=${tombstone.requestId}::uuid
           `);
+          await tx.execute(sql`
+            delete from client_catalog_erasure_index
+            where request_id=${tombstone.requestId}::uuid
+          `);
           examined += 1;
+          cleanupExamined += 1;
           removed += 1;
         }
       }
 
-      remaining = input.limit - examined;
+      remaining = input.limit - cleanupExamined;
       if (remaining > 0) {
-        const orphans = (await tx.execute<{ outboxId: string }>(sql`
-          select o.id as "outboxId"
+        const orphans = (await tx.execute<{
+          outboxId: string;
+          idempotencyKey: string;
+        }>(sql`
+          select o.id as "outboxId",o.idempotency_key as "idempotencyKey"
           from integration_outbox o
           where o.topic='catalog.show'
             and o.idempotency_key like 'client-catalog:%'
@@ -513,7 +540,12 @@ export class PostgresClientCatalogRepository
         `)).rows;
         for (const orphan of orphans) {
           await deleteCatalogOutbox(tx, orphan.outboxId);
+          await tx.execute(sql`
+            delete from client_catalog_erasure_index
+            where ${orphan.idempotencyKey}='client-catalog:' || request_id::text
+          `);
           examined += 1;
+          cleanupExamined += 1;
           removed += 1;
         }
       }

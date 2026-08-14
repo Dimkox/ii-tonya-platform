@@ -123,7 +123,7 @@ interface ClientCatalogService {
 
 - [x] **Step 1: Write RED lifecycle/metric tests.** Assert 24-hour snapshot/filter removal, retained public facts only in export, eventual terminal-outbox cleanup, erasure deletes catalog rows, and claimed-worker-versus-retention/erasure interleavings are safe. Assert metric labels are fixed `phase`/`outcome` values.
 - [x] **Step 2: Implement lifecycle.** Retention locks request/outbox and marks an unmaterialized request expired, stripping public content while a minimum tombstone waits for terminal outbox state. Erasure uses the same lock and removes all catalog facts; a later worker sees missing/expired as terminal. Export exposes no digest, source identifier or outbox payload. Expose counters only for `request|materialize|cleanup` phases with normalized outcomes.
-- [ ] **Step 3: Review and build.** Six affected builds pass. The first independent review found one Critical and seven Important issues; the focused remediation gate passes 11/11. Independent closure review remains.
+- [ ] **Step 3: Review and build.** Six affected builds pass. The first independent review found one Critical and seven Important issues; the first focused remediation gate passes 11/11. Closure review found three further Important issues; the separate remediation gate passes 5/5 and direct affected builds pass. Final independent closure review remains.
 - [ ] **Step 4: Run one focused Claw gate.** Run application/API/worker/config/privacy/boundary and real-PostgreSQL integration files once after local green. On PASS, stop; restore retained source state and record exact SHA/counts/cleanup.
 - [ ] **Step 5: Commit evidence.** Commit `docs: record client catalog Claw verification`.
 

@@ -34,3 +34,12 @@ CREATE TABLE "client_catalog_tombstones" (
   "state" text DEFAULT 'expired' NOT NULL,
   CONSTRAINT "client_catalog_tombstones_state_check" CHECK ("state" = 'expired')
 );
+--> statement-breakpoint
+CREATE TABLE "client_catalog_erasure_index" (
+  "request_id" uuid PRIMARY KEY NOT NULL,
+  "subject_key" char(64) NOT NULL,
+  "expires_at" timestamp with time zone NOT NULL,
+  CONSTRAINT "client_catalog_erasure_index_subject_check" CHECK ("subject_key" ~ '^[0-9a-f]{64}$')
+);
+--> statement-breakpoint
+CREATE INDEX "client_catalog_erasure_index_subject_idx" ON "client_catalog_erasure_index" ("subject_key","request_id");

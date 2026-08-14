@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import {
+  clientCatalogErasureSubjectKey,
   validateClientCatalogCards,
   type ClientCatalogCard,
 } from "./client-catalog-repository.js";
@@ -216,6 +217,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     captureManifests: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["captureManifests"]>,
     verifyEnvelope: NonNullable<NonNullable<typeof this.options.privacyMutationCapability>["verifyEnvelope"]>,
   ): Promise<ErasureJob> {
+    const catalogSubjectKey = clientCatalogErasureSubjectKey(
+      command.targetUserId,
+    );
     const manifests = await captureManifests(command.targetUserId);
     const verified = await Promise.all(manifests.map(async (manifest) => {
       try { return await verifyEnvelope(manifest); } catch { return false; }
@@ -245,9 +249,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       await tx.execute(sql`
         select o.id as "outboxId"
         from integration_outbox o
-        join client_catalog_requests r
-          on o.idempotency_key='client-catalog:' || r.id::text
-        where r.user_id=${command.targetUserId}::uuid
+        join client_catalog_erasure_index e
+          on o.idempotency_key='client-catalog:' || e.request_id::text
+        where e.subject_key=${catalogSubjectKey}
           and o.topic='catalog.show'
         order by o.id
         for update of o
@@ -258,8 +262,28 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         order by id for update
       `);
       await tx.execute(sql`
+        select t.request_id from client_catalog_tombstones t
+        join client_catalog_erasure_index e on e.request_id=t.request_id
+        where e.subject_key=${catalogSubjectKey}
+        order by t.request_id for update of t
+      `);
+      await tx.execute(sql`
+        select request_id from client_catalog_erasure_index
+        where subject_key=${catalogSubjectKey}
+        order by request_id for update
+      `);
+      await tx.execute(sql`
         delete from client_catalog_requests
         where user_id=${command.targetUserId}::uuid
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_tombstones t
+        using client_catalog_erasure_index e
+        where e.request_id=t.request_id and e.subject_key=${catalogSubjectKey}
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_erasure_index
+        where subject_key=${catalogSubjectKey}
       `);
       const job = one((await tx.execute<{ id: string }>(sql`
         insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)

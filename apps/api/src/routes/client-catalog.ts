@@ -13,6 +13,7 @@ interface RouteOptions {
 
 const uuidPattern =
   "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+const uuidRegex = new RegExp(uuidPattern, "u");
 const controlPattern = /[\u0000-\u001f\u007f]/u;
 
 const strictFilters = (
@@ -46,15 +47,6 @@ const strictFilters = (
   }
   return record as { serviceCode?: string; language?: string };
 };
-
-const paramsSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["catalogRequestId"],
-  properties: {
-    catalogRequestId: { type: "string", pattern: uuidPattern },
-  },
-} as const;
 
 export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
   app,
@@ -106,7 +98,6 @@ export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
 
   app.get<{ Params: { catalogRequestId: string } }>(
     "/v1/client/catalog-requests/:catalogRequestId",
-    { schema: { params: paramsSchema } },
     async (request, reply) => {
       const principal = await resolveClientPrincipal(
         deps.principals,
@@ -114,6 +105,9 @@ export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
       );
       if (principal === null) {
         return reply.code(401).send({ error: "unauthorized" });
+      }
+      if (!uuidRegex.test(request.params.catalogRequestId)) {
+        return reply.code(400).send({ error: "invalid_request" });
       }
       try {
         const snapshot = await deps.catalog.get(
