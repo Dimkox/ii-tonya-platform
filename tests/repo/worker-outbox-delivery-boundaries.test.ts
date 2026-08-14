@@ -18,7 +18,9 @@ describe("MVP worker outbox delivery boundaries", () => {
     expect(new Set(topicLiterals)).toEqual(
       new Set(["safety.operator_escalation", "admin.negative_feedback"]),
     );
-    expect(registry).not.toMatch(/provider|telegram|selarti|planerka|yookassa/iu);
+    expect(registry).not.toMatch(
+      /provider|telegram|selarti|planerka|yookassa/iu,
+    );
     expect(localRepository).not.toMatch(
       /provider_operation|recipient|transport|telegram|selarti|planerka|yookassa/iu,
     );
@@ -43,7 +45,9 @@ describe("MVP worker outbox delivery boundaries", () => {
       jobsRepository.indexOf("async deliverSafetyEscalationsBatch"),
     );
     expect(legacyMethod).toContain("status in ('pending', 'retry_wait')");
-    expect(legacyMethod).not.toMatch(/unknown_outcome|reconciling|processing/gu);
+    expect(legacyMethod).not.toMatch(
+      /unknown_outcome|reconciling|processing/gu,
+    );
 
     const runtime = read("apps/worker/src/runtime.ts");
     expect(runtime).toContain("owned_by_filtered_runner");
@@ -57,7 +61,9 @@ describe("MVP worker outbox delivery boundaries", () => {
   });
 
   it("binds traceability and the implementation report without activation claims", () => {
-    const traceability = read("docs/spec/mvp-worker-outbox-001-traceability.md");
+    const traceability = read(
+      "docs/spec/mvp-worker-outbox-001-traceability.md",
+    );
     const progress = read("docs/spec/mvp-worker-outbox-001-progress.md");
     const report = read(".superpowers/sdd/mvp-worker-outbox-001-report.md");
     for (const requirement of Array.from(

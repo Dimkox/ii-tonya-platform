@@ -12,19 +12,19 @@
 
 ## Story ledger
 
-| Work item | Status | Owner | Verification responsibility | Evidence |
-| --- | --- | --- | --- | --- |
-| Requirements and exact handler contract | complete | specification author | implementation owner must preserve R1-R13 | BMAD spec + companion |
-| Architecture decision | complete | specification author | independent reviewer checks single ownership and provider isolation | feature architecture spine |
-| Task 1 config/composition | complete | implementation owner | config/app-worker focused tests | Claw `9f0db2a`, 30/30 |
-| Task 2 registry/decoders | complete | implementation owner | unit + scope tests | Claw `5a06de3`, 24/24 |
-| Task 3 allowlisted outbox repository | complete | implementation owner | repository + real-PG mixed-topic tests | Claw `c1b8fa4`, 19/19 |
-| Task 4 local case mutation/reconciliation | complete | implementation owner | real-PG concurrency/crash tests | Claw `7563e13`, 7/7 |
-| Task 5 runtime/metrics | complete | implementation owner | runtime + bounded telemetry tests | Claw `58d63c7`, 17/17 |
-| Task 6 boundaries/evidence | in progress | implementation owner | scope/rollback guards, independent review, final Claw gate | RED `7af98b7`: 3/5 pass, two expected missing-doc failures |
-| Independent code review | pending | reviewer distinct from implementer | no open Critical/Important at exact HEAD | none |
-| Final focused Claw gate | pending | implementation owner | one run only after GREEN/review; cleanup recorded | none |
-| Deployment approval | blocked outside story | human owner | explicit target authorization and release evidence | none |
+| Work item                                 | Status                | Owner                              | Verification responsibility                                         | Evidence                                                   |
+| ----------------------------------------- | --------------------- | ---------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Requirements and exact handler contract   | complete              | specification author               | implementation owner must preserve R1-R13                           | BMAD spec + companion                                      |
+| Architecture decision                     | complete              | specification author               | independent reviewer checks single ownership and provider isolation | feature architecture spine                                 |
+| Task 1 config/composition                 | complete              | implementation owner               | config/app-worker focused tests                                     | Claw `9f0db2a`, 30/30                                      |
+| Task 2 registry/decoders                  | complete              | implementation owner               | unit + scope tests                                                  | Claw `5a06de3`, 24/24                                      |
+| Task 3 allowlisted outbox repository      | complete              | implementation owner               | repository + real-PG mixed-topic tests                              | Claw `c1b8fa4`, 19/19                                      |
+| Task 4 local case mutation/reconciliation | complete              | implementation owner               | real-PG concurrency/crash tests                                     | Claw `7563e13`, 7/7                                        |
+| Task 5 runtime/metrics                    | complete              | implementation owner               | runtime + bounded telemetry tests                                   | Claw `58d63c7`, 17/17                                      |
+| Task 6 boundaries/evidence                | in progress           | implementation owner               | scope/rollback guards, independent review, final Claw gate          | RED `7af98b7`: 3/5 pass, two expected missing-doc failures |
+| Independent code review                   | pending               | reviewer distinct from implementer | no open Critical/Important at exact HEAD                            | none                                                       |
+| Final focused Claw gate                   | pending               | implementation owner               | one run only after GREEN/review; cleanup recorded                   | none                                                       |
+| Deployment approval                       | blocked outside story | human owner                        | explicit target authorization and release evidence                  | none                                                       |
 
 ## Decisions and boundaries
 
