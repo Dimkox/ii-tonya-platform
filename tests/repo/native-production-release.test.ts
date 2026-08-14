@@ -91,6 +91,9 @@ describe("native dedicated-server production release", () => {
     expect(script).toContain("native-release.sha256");
     expect(script).toContain("native-release.spdx.json");
     expect(script).toContain('syft "dir:$work_dir/release"');
+    expect(script).toContain(
+      'cp scripts/validate-runtime-env.sh "$work_dir/release/scripts/validate-runtime-env.sh"',
+    );
     expect(script).not.toMatch(/docker|compose|\.env/iu);
   });
 
@@ -107,10 +110,18 @@ describe("native dedicated-server production release", () => {
     expect(script).toContain("releases/$RELEASE_SHA");
     expect(script).toContain("sha256sum -c");
     expect(script).toContain("cosign verify-blob");
+    expect(script).toContain(
+      'bash "$release_dir/scripts/validate-runtime-env.sh" /etc/ii-tonya/runtime.env "$release_sha"',
+    );
     expect(script).toContain("systemctl restart ii-tonya-api.service");
     expect(script).toContain("systemctl restart ii-tonya-worker.service");
     expect(script).toContain("rollback)");
     expect(script).toContain("readlink");
+    expect(
+      script.split('install_release_units "$deploy_root/$previous"').length -
+        1,
+    ).toBe(2);
+    expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(2);
   });
 
   it("preserves interactive root password access without storing the password", () => {
@@ -148,8 +159,10 @@ describe("native dedicated-server production release", () => {
       expect(unit).toContain("ProtectSystem=strict");
       expect(unit).not.toMatch(/pnpm|docker|compose/u);
     }
-    expect(api).toContain("/usr/bin/node api/dist/server.js");
-    expect(worker).toContain("/usr/bin/node worker/dist/main.js");
+    expect(api).toContain("ExecStart=/usr/bin/node --jitless api/dist/server.js");
+    expect(worker).toContain(
+      "ExecStart=/usr/bin/node --jitless worker/dist/main.js",
+    );
   });
 
   it("keeps Node compatible with W^X hardening and creates writable state paths", () => {
@@ -159,13 +172,19 @@ describe("native dedicated-server production release", () => {
 
     for (const unit of [api, worker, migrate]) {
       expect(unit).toContain("MemoryDenyWriteExecute=true");
-      expect(unit).toContain("Environment=NODE_OPTIONS=--jitless");
+      expect(unit).not.toContain("Environment=NODE_OPTIONS=");
+      expect(unit).toContain("ExecStart=/usr/bin/node --jitless");
     }
     for (const unit of [api, worker]) {
       expect(unit).toContain("StateDirectory=ii-tonya");
       expect(unit).toContain("StateDirectoryMode=0750");
       expect(unit).toContain("LogsDirectory=ii-tonya");
       expect(unit).toContain("LogsDirectoryMode=0750");
+      expect(unit).toContain("StartLimitIntervalSec=60s");
+      expect(unit).toContain("StartLimitBurst=5");
+      expect(unit).toContain("OOMPolicy=stop");
+      expect(unit).toContain("MemoryHigh=192M");
+      expect(unit).toContain("MemoryMax=256M");
     }
   });
 
