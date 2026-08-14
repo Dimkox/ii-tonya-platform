@@ -25,7 +25,9 @@ const fixture = async (input: {
   const app = Fastify();
   apps.push(app);
   const approvals = {
-    resolvePrincipal: vi.fn(async () => input.resolved ?? principal),
+    resolvePrincipal: vi.fn(async () =>
+      input.resolved === undefined ? principal : input.resolved,
+    ),
   };
   await app.register(operatorCaseRoutes, { approvals, cases: input.cases });
   return { app, approvals };

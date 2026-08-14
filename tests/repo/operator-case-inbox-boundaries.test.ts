@@ -46,7 +46,9 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     );
     expect(repository).not.toMatch(/as\s+"?(?:outboxId|payload)"?/u);
     expect(repository).toContain('case_reason_code as "reasonCode"');
-    expect(repository).not.toContain('reason_code as "reasonCode"');
+    expect(repository).not.toMatch(
+      /\breason_code\s+as\s+"reasonCode"/u,
+    );
     expect(repository).toContain("for update");
     expect(repository).toContain("operator_case.transitioned");
   });
