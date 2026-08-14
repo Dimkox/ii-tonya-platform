@@ -65,6 +65,40 @@ describe("direct Claw verification semantics", () => {
     const runner = read("scripts/run-claw-ci.sh");
     expect(runner).not.toContain("pnpm test:repeat");
     expect(runner).toContain("repeat_limit: 1");
+    for (const suite of [
+      "tests/integration/yookassa-migration-upgrade.test.ts",
+      "tests/integration/yookassa-operation-concurrency.test.ts",
+      "tests/integration/yookassa-reconciliation.test.ts",
+    ]) {
+      expect(runner.split(suite)).toHaveLength(2);
+    }
+  });
+
+  it("keeps unbound YooKassa recovery blocked behind explicit policy inputs", () => {
+    const runbook = read("docs/runbooks/yookassa-provider.md");
+    const design = read(
+      "docs/superpowers/specs/2026-08-14-yookassa-provider-design.md",
+    );
+    const traceability = read("docs/spec/yookassa-provider-traceability.md");
+
+    expect(runbook).toContain("user-command retry only");
+    expect(runbook).toContain("same idempotency key and exact request body");
+    expect(runbook).toContain("autonomous unbound recovery remains BLOCKED");
+    for (const placeholder of [
+      "YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE=",
+      "YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION=",
+      "YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE=",
+      "YOOKASSA_RECOVERY_RETENTION_DAYS=",
+      "YOOKASSA_UNBOUND_RECOVERY_ENABLED=",
+      "YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS=",
+    ]) {
+      expect(runbook).toContain(placeholder);
+      expect(runbook).not.toContain(`${placeholder}__PLACEHOLDER`);
+    }
+    expect(design).toContain("YKP-015 — Consent-bound receipt contact");
+    expect(design).toContain("YKP-016 — Encrypted exact-body unbound recovery");
+    expect(traceability).toContain("YKP-015");
+    expect(traceability).toContain("YKP-016");
   });
 
   it("writes exact-SHA evidence outside transient test containers", () => {

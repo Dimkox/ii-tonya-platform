@@ -35,12 +35,36 @@ All items require named owner and independent review before a separate activatio
 
 - Keep the feature off to stop new provider calls; do not delete provider mappings,
   inbox records, orders, or financial audit records.
-- For a timeout, 429, or 5xx, classify the operation as unknown and re-read the exact
-  provider object before any retry or settlement/reversal delivery.
+- For a timeout, 429, or 5xx, classify the operation as unknown. If a provider object ID
+  was durably bound, re-read that exact provider object before settlement/reversal
+  delivery or another mutation.
+- An unbound unknown outcome cannot be found by the current reconciliation reader. The
+  only safe path currently represented in code is a **user-command retry only**: replay
+  the POST with the same idempotency key and exact request body through the original
+  checkout command. This is not an autonomous worker capability and must stay within the
+  provider idempotency window. Never infer absence from an unbound local row, scan payment
+  history, or create a new idempotency key.
+- Automated replay requires encrypted persistence of the exact request body plus an
+  approved retention/recovery policy. Until YKP-015 and YKP-016 are implemented and
+  independently approved, autonomous unbound recovery remains BLOCKED.
 - Treat webhook content as a signal: validate it, use trusted nginx peer information,
   then perform the authenticated authoritative read before durable delivery.
 - For a credential incident, disable the feature, rotate only through the approved secret
   owner, preserve sanitized correlation evidence, and require new approval before enable.
+
+## Unresolved activation placeholders
+
+Keep these values empty in versioned examples. They are decisions or secret references,
+not defaults, and any empty value keeps receipt delivery and unbound recovery disabled:
+
+```dotenv
+YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE=
+YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION=
+YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE=
+YOOKASSA_RECOVERY_RETENTION_DAYS=
+YOOKASSA_UNBOUND_RECOVERY_ENABLED=
+YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS=
+```
 
 ## Evidence links
 
