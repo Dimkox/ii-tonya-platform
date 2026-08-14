@@ -171,7 +171,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/verifier.ts",
-    "e173abae446914aa6114bdf3cd0f22c8538621fa46ba318df09b3b3a036696e2",
+    "26508ea39566317af7a1ef3355a65162860c0297c270a66c78228ce39e2335fa",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
