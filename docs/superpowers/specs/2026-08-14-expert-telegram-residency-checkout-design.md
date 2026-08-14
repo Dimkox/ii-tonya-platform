@@ -24,10 +24,12 @@ replays return the bounded stored outcome and never call checkout again.
 If execution stops while a row is `processing`, recovery may re-enter the application
 service only with the same server-derived token hash. The existing residency command
 and provider boundary own that idempotency. Telegram code never constructs or calls a
-provider request. A processing recovery is therefore distinguishable from a new
-checkout and must be covered by a test proving the unchanged idempotency key. If the
-application service cannot safely resolve the idempotent command, the durable outcome
-remains `unknown`; the Telegram layer must not invent a second payment identity.
+provider request. A processing recovery is protected by a database lease and fencing
+token so concurrent retries cannot both call the service. It is distinguishable from a
+new checkout and must be covered by tests proving one recovery winner and the unchanged
+idempotency key. If the application service cannot safely resolve the idempotent
+command, the durable outcome remains `unknown`; the Telegram layer must not invent a
+second payment identity.
 
 Rejected alternatives:
 
@@ -63,8 +65,9 @@ Rejected alternatives:
   authorize another checkout mutation. Callback acknowledgement is best effort.
 - **ER-TG-003-R7 — Sensitive URL handling.** A stored URL must be bounded to 2,048
   characters, use HTTPS, never enter logs or telemetry, and remain visible only to the
-  currently authorized bound principal before callback expiry. Retention follows the
-  callback expiry/cleanup lifecycle.
+  currently authorized bound principal before callback expiry. Cleanup physically
+  nulls or deletes the URL at or immediately after callback expiry; merely hiding it
+  from reads is insufficient.
 - **ER-TG-003-R8 — Isolation.** `xr1` remains separate from `ct2` and `cv1`; no YooKassa
   or other provider import, credential, activation, production deployment, or GitHub
   Actions workflow is introduced.
@@ -96,8 +99,11 @@ Rejected alternatives:
 - Checkout-link delivery is `not_applied` or `unknown_outcome`: fail/release the inbox
   claim and return sanitized 503. A retry reuses stored mutation state and the same
   delivery idempotency key.
-- Crash after `processing`: recovery can use only the same service idempotency key. No
-  client field or freshly generated key may enter that recovery.
+- Crash after `processing`: an expired lease may be reclaimed once with a new fencing
+  token and only the same service idempotency key. Concurrent recovery attempts have one
+  winner. No client field or freshly generated key may enter that recovery.
+- At callback expiry, bounded cleanup nulls or deletes `checkout_url` even when the row
+  is retained for replay/audit state.
 
 ## Verification
 
@@ -108,7 +114,8 @@ Rejected alternatives:
   processing recovery with unchanged idempotency, and bounded outcomes.
 - Webhook tests prove mutation/delivery/ack separation and retry-safe unknown delivery.
 - Real PostgreSQL tests prove one processing winner, terminal replay, expiry/foreign
-  denial, URL constraints, and state transitions against migration 0026.
+  denial, lease/fence-safe single recovery, URL constraints, expiry cleanup, and state
+  transitions against migration 0026.
 - Schema parity, scope guards, typecheck, lint, and one final focused Claw run are
   required. There are no repeats, image builds, prunes, production actions, or Actions.
 
