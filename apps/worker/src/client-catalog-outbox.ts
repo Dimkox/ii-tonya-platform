@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from "node:crypto";
+
 import type {
   ClientCatalogCard,
   ClientCatalogRequestRepository,
@@ -33,6 +35,7 @@ export interface ClientCatalogPublicSource {
 }
 
 type AvailabilitySlot = Readonly<{
+  localSlotId?: string;
   sourceOrder: string;
   startsAt: Date;
   observedAt: Date;
@@ -55,6 +58,19 @@ export interface ClientCatalogSourceReader {
     language?: string;
     databaseNow: Date;
   }): Promise<readonly ClientCatalogCard[]>;
+  listBookingAware?(input: {
+    serviceCode?: string;
+    language?: string;
+    databaseNow: Date;
+    requestExpiresAt: Date;
+  }): Promise<{
+    readonly cards: readonly ClientCatalogCard[];
+    readonly choices: readonly {
+      choiceDigest: `sha256:${string}`;
+      localSlotId: string;
+      expiresAt: Date;
+    }[];
+  }>;
 }
 
 export interface ClientCatalogOutboxRegistry {
@@ -108,7 +124,11 @@ function boundedString(value: unknown, maximum: number): string {
 }
 
 type CatalogPayload =
-  | Readonly<{ kind: "request"; catalogRequestId: string }>
+  | Readonly<{
+      kind: "request";
+      catalogRequestId: string;
+      version: 1 | 2;
+    }>
   | Readonly<{ kind: "legacy" }>;
 
 function decodeCatalogPayload(value: unknown): CatalogPayload {
@@ -119,13 +139,17 @@ function decodeCatalogPayload(value: unknown): CatalogPayload {
   if (keys.includes("v") || keys.includes("catalogRequestId")) {
     const record = exactRecord(value, ["v", "catalogRequestId"]);
     if (
-      record.v !== 1 ||
+      (record.v !== 1 && record.v !== 2) ||
       typeof record.catalogRequestId !== "string" ||
       !UUID_PATTERN.test(record.catalogRequestId)
     ) {
       throw new InvalidCatalogPayloadError();
     }
-    return { kind: "request", catalogRequestId: record.catalogRequestId };
+    return {
+      kind: "request",
+      catalogRequestId: record.catalogRequestId,
+      version: record.v,
+    };
   }
 
   const expected = keys.includes("serviceCode")
@@ -213,6 +237,10 @@ function freshSlots(
 export function createClientCatalogSourceReader(
   source: ClientCatalogPublicSource,
   availability?: ClientCatalogAvailabilityReader,
+  booking?: {
+    generateChoiceHandle?: () => `ch1.${string}`;
+    digestChoiceHandle?: (handle: `ch1.${string}`) => `sha256:${string}`;
+  },
 ): ClientCatalogSourceReader {
   if (typeof source.listPublicServices !== "function") {
     throw new Error("client_catalog_source_capability_unavailable");
@@ -220,30 +248,37 @@ export function createClientCatalogSourceReader(
   if (availability !== undefined && typeof availability.read !== "function") {
     throw new Error("client_catalog_availability_capability_unavailable");
   }
-  return {
-    async list(input) {
-      if (!finiteDate(input.databaseNow)) {
-        throw new Error("client_catalog_database_clock_invalid");
-      }
-      const services = (
-        await source.listPublicServices({
-          ...(input.serviceCode === undefined
-            ? {}
-            : { serviceCode: input.serviceCode }),
-          ...(input.language === undefined ? {} : { language: input.language }),
-          limit: MAX_SERVICES,
-        })
+  const listServices = async (input: {
+    serviceCode?: string;
+    language?: string;
+    databaseNow: Date;
+  }): Promise<readonly PublicService[]> => {
+    if (!finiteDate(input.databaseNow)) {
+      throw new Error("client_catalog_database_clock_invalid");
+    }
+    return (
+      await source.listPublicServices({
+        ...(input.serviceCode === undefined
+          ? {}
+          : { serviceCode: input.serviceCode }),
+        ...(input.language === undefined ? {} : { language: input.language }),
+        limit: MAX_SERVICES,
+      })
+    )
+      .map(publicService)
+      .sort(
+        (left, right) =>
+          left.serviceCode.localeCompare(right.serviceCode) ||
+          left.language.localeCompare(right.language) ||
+          left.displayName.localeCompare(right.displayName) ||
+          left.sourceKey.localeCompare(right.sourceKey),
       )
-        .map(publicService)
-        .sort(
-          (left, right) =>
-            left.serviceCode.localeCompare(right.serviceCode) ||
-            left.language.localeCompare(right.language) ||
-            left.displayName.localeCompare(right.displayName) ||
-            left.sourceKey.localeCompare(right.sourceKey),
-        )
-        .slice(0, MAX_SERVICES);
+      .slice(0, MAX_SERVICES);
+  };
 
+  const reader: ClientCatalogSourceReader = {
+    async list(input) {
+      const services = await listServices(input);
       return Promise.all(
         services.map(async (service): Promise<ClientCatalogCard> => {
           if (availability === undefined) return catalogOnly(service);
@@ -267,6 +302,85 @@ export function createClientCatalogSourceReader(
       );
     },
   };
+  if (booking === undefined) return reader;
+  if (availability === undefined) {
+    throw new Error("client_catalog_booking_capability_unavailable");
+  }
+  const generateChoiceHandle =
+    booking.generateChoiceHandle ??
+    (() => `ch1.${randomBytes(32).toString("base64url")}` as const);
+  const digestChoiceHandle =
+    booking.digestChoiceHandle ??
+    ((handle: `ch1.${string}`) =>
+      `sha256:${createHash("sha256").update(handle).digest("hex")}` as const);
+  return {
+    ...reader,
+    async listBookingAware(input) {
+      if (!finiteDate(input.requestExpiresAt)) {
+        throw new Error("client_catalog_database_clock_invalid");
+      }
+      const services = await listServices(input);
+      const choices: {
+        choiceDigest: `sha256:${string}`;
+        localSlotId: string;
+        expiresAt: Date;
+      }[] = [];
+      const cards = await Promise.all(
+        services.map(async (service): Promise<ClientCatalogCard> => {
+          const result = await availability.read({
+            sourceKey: service.sourceKey,
+            databaseNow: input.databaseNow,
+          });
+          const publicSlots = freshSlots(result, input.databaseNow);
+          if (result.kind !== "complete" || publicSlots === null) {
+            return catalogOnly(service);
+          }
+          const selected = [...result.slots]
+            .sort(
+              (left, right) =>
+                left.startsAt.getTime() - right.startsAt.getTime() ||
+                left.sourceOrder.localeCompare(right.sourceOrder),
+            )
+            .slice(0, 3);
+          const slots = publicSlots.map(({ startsAt }, index) => {
+            const sourceSlot = selected[index];
+            if (
+              sourceSlot === undefined ||
+              typeof sourceSlot.localSlotId !== "string" ||
+              !UUID_PATTERN.test(sourceSlot.localSlotId)
+            ) {
+              throw new Error("client_catalog_booking_slot_invalid");
+            }
+            const handle = generateChoiceHandle();
+            if (!/^ch1\.[A-Za-z0-9_-]{43}$/u.test(handle)) {
+              throw new Error("client_catalog_choice_handle_invalid");
+            }
+            const expiresAt = new Date(
+              Math.min(
+                input.requestExpiresAt.getTime(),
+                sourceSlot.observedAt.getTime() + SLOT_FRESHNESS_MS,
+                sourceSlot.startsAt.getTime() - SLOT_LEAD_MS,
+              ),
+            );
+            choices.push({
+              choiceDigest: digestChoiceHandle(handle),
+              localSlotId: sourceSlot.localSlotId,
+              expiresAt,
+            });
+            return { startsAt, choiceHandle: handle };
+          });
+          return {
+            displayName: service.displayName,
+            serviceCode: service.serviceCode,
+            language: service.language,
+            availability: "fresh_slots",
+            slots,
+          };
+        }),
+      );
+      return { cards, choices };
+    },
+  };
 }
 
 export function createClientCatalogOutboxRegistry(input: {
@@ -274,7 +388,8 @@ export function createClientCatalogOutboxRegistry(input: {
   requests: Pick<
     ClientCatalogRequestRepository,
     "loadPending" | "materialize"
-  >;
+  > &
+    Partial<Pick<ClientCatalogRequestRepository, "materializeBookingAware">>;
   source: ClientCatalogSourceReader;
 }): ClientCatalogOutboxRegistry {
   if (
@@ -301,6 +416,33 @@ export function createClientCatalogOutboxRegistry(input: {
     if (payload.kind === "legacy") return { kind: "applied" };
     const request = await input.requests.loadPending(payload.catalogRequestId);
     if (request === null || request === "replayed") return { kind: "applied" };
+    if (payload.version === 2) {
+      if (
+        typeof input.source.listBookingAware !== "function" ||
+        typeof input.requests.materializeBookingAware !== "function"
+      ) {
+        throw new Error("client_catalog_booking_capability_unavailable");
+      }
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await input.source.listBookingAware({
+          ...(request.serviceCode === undefined
+            ? {}
+            : { serviceCode: request.serviceCode }),
+          ...(request.language === undefined
+            ? {}
+            : { language: request.language }),
+          databaseNow: request.databaseNow,
+          requestExpiresAt: request.expiresAt,
+        });
+        const outcome = await input.requests.materializeBookingAware({
+          catalogRequestId: payload.catalogRequestId,
+          cards: result.cards,
+          choices: result.choices,
+        });
+        if (outcome !== "collision") return { kind: "applied" };
+      }
+      throw new Error("client_catalog_choice_handle_collision_exhausted");
+    }
     const cards = await input.source.list({
       ...(request.serviceCode === undefined
         ? {}
@@ -322,15 +464,15 @@ export function createClientCatalogOutboxRegistry(input: {
         ? handle(message)
         : input.local.dispatch(message);
     },
-    async reconcile(
-      message: OutboxInput,
-    ): Promise<LocalReconciliationResult> {
+    async reconcile(message: OutboxInput): Promise<LocalReconciliationResult> {
       if (message.topic !== "catalog.show") {
         return input.local.reconcile(message);
       }
       const result = await handle(message);
       if (result.kind === "terminal") return result;
-      return result.kind === "applied" ? { kind: "applied" } : { kind: "not_applied" };
+      return result.kind === "applied"
+        ? { kind: "applied" }
+        : { kind: "not_applied" };
     },
   });
 }

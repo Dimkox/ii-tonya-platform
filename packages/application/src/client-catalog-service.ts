@@ -76,8 +76,12 @@ const normalizedFilters = (value: unknown): CatalogFilters => {
 export function createClientCatalogService(deps: {
   readonly repository: ClientCatalogRepository;
   readonly newCorrelationId?: () => string;
+  readonly bookingAware?: boolean;
 }): ClientCatalogService {
   const newCorrelationId = deps.newCorrelationId ?? randomUUID;
+  const version = deps.bookingAware === true ? 2 : 1;
+  const digestDomain =
+    version === 2 ? "client-catalog-booking-v1" : "client-catalog-v1";
   return Object.freeze({
     async request(principal: ClientPrincipal, filterInput: CatalogFilters) {
       const authority = requirePrincipal(principal);
@@ -86,7 +90,7 @@ export function createClientCatalogService(deps: {
       const language = filters.language ?? "";
       const requestDigest = createHash("sha256")
         .update(
-          `client-catalog-v1\0${authority.userId}\0${serviceCode}\0${language}`,
+          `${digestDomain}\0${authority.userId}\0${serviceCode}\0${language}`,
         )
         .digest("hex");
       return deps.repository.createOrReplay({
@@ -95,8 +99,11 @@ export function createClientCatalogService(deps: {
         ...(filters.serviceCode === undefined
           ? {}
           : { serviceCode: filters.serviceCode }),
-        ...(filters.language === undefined ? {} : { language: filters.language }),
+        ...(filters.language === undefined
+          ? {}
+          : { language: filters.language }),
         correlationId: newCorrelationId(),
+        ...(version === 1 ? {} : { version }),
       });
     },
     async get(principal: ClientPrincipal, catalogRequestId: string) {
