@@ -64,6 +64,7 @@ const schema = z
     EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    EXPERT_AI_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
@@ -237,6 +238,7 @@ export type RuntimeConfig = {
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
     expertTelegramFinancialViews?: boolean;
+    expertAiIngress?: boolean;
     yookassa?: boolean;
   };
   expertReferralKey?: {
@@ -293,6 +295,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
       expertTelegramFinancialViews:
         value.EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED === "true",
+      expertAiIngress: value.EXPERT_AI_INGRESS_ENABLED === "true",
       yookassa: value.YOOKASSA_ENABLED === "true",
     },
     yookassaRecovery:

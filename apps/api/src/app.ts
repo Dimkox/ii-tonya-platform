@@ -3,6 +3,7 @@ import type {
   BookingService,
   CatalogService,
   ConversationService,
+  ExpertAiIngressService,
   ExpertCodeKeyring,
   ExpertReferralAdminService,
   PrivacyService,
@@ -57,6 +58,7 @@ export interface AppDependencies {
   expertApi?: ExpertReferralApiDependencies;
   expertCodeKeyring?: ExpertCodeKeyring;
   expertTelegramQueries?: TelegramExpertQueryIngress;
+  expertAiIngress?: ExpertAiIngressService;
   yookassaWebhook?: YooKassaWebhookDependencies;
   now?: () => Date;
 }
@@ -87,6 +89,12 @@ export async function buildApp(
     deps.expertTelegramQueries === undefined
   ) {
     throw new Error("Expert Telegram query capability is required");
+  }
+  if (
+    deps.config.features.expertAiIngress === true &&
+    deps.expertAiIngress === undefined
+  ) {
+    throw new Error("Expert AI ingress runtime capability is required");
   }
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
@@ -235,6 +243,7 @@ export async function buildTestApp(
     selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>;
     selartiFailOnce?: boolean;
     expertApi?: ExpertReferralApiDependencies;
+    expertAiIngress?: ExpertAiIngressService;
     yookassaWebhook?: YooKassaWebhookDependencies;
     features?: RuntimeConfig["features"];
   } = {},
@@ -351,6 +360,9 @@ export async function buildTestApp(
     ...(options.expertApi === undefined
       ? {}
       : { expertApi: options.expertApi }),
+    ...(options.expertAiIngress === undefined
+      ? {}
+      : { expertAiIngress: options.expertAiIngress }),
     ...(options.yookassaWebhook === undefined
       ? {}
       : { yookassaWebhook: options.yookassaWebhook }),

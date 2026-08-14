@@ -54,6 +54,7 @@ describe("expert residency referral scope boundary", () => {
       "/v1/expert/residency/quotes",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([
+      "EXPERT_AI_INGRESS_ENABLED",
       "EXPERT_REFERRAL_ENABLED",
       "EXPERT_REFERRAL_HMAC_KEYS_JSON",
       "EXPERT_REFERRAL_HMAC_KEY_REF",
