@@ -1,8 +1,8 @@
 # ER-TG-003 Expert Telegram Residency Checkout Design
 
-**Status:** approved for implementation  
-**Date:** 2026-08-14  
-**Owner:** Dmitry  
+**Status:** approved for implementation
+**Date:** 2026-08-14
+**Owner:** Dmitry
 **Base:** `651b8bf63c32a1e2f0caf295fe0b28aad830c960`
 
 ## Objective
