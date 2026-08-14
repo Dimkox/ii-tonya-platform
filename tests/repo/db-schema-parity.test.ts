@@ -56,6 +56,7 @@ describe("authoritative Drizzle schema parity", () => {
       "expertResidencyTariffVersions",
       "expertResidencyOrders",
       "expertResidencyPaymentAttempts",
+      "expertResidencyProviderOperations",
       "expertResidencyProviderEventInbox",
       "expertFirstResidencySettlements",
       "expertReferralRewardGrants",
@@ -124,6 +125,32 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_payment_attempt_idempotency_unique",
       "expert_payment_attempt_provider_request_unique",
     ]);
+    expect(requiredTable("expertResidencyProviderOperations")).toMatchObject({
+      checks: [
+        "expert_provider_operations_amount",
+        "expert_provider_operations_claim_digest",
+        "expert_provider_operations_currency",
+        "expert_provider_operations_kind",
+        "expert_provider_operations_mode",
+        "expert_provider_operations_parent",
+        "expert_provider_operations_provider",
+        "expert_provider_operations_provider_id",
+        "expert_provider_operations_request_digest",
+        "expert_provider_operations_resolution",
+        "expert_provider_operations_status",
+      ],
+      foreignKeys: [
+        "expert_provider_operations_attempt_order_fk",
+        "expert_provider_operations_order_fk",
+      ],
+      indexes: [
+        "expert_provider_operations_command_unique",
+        "expert_provider_operations_idempotency_unique",
+        "expert_provider_operations_object_unique",
+        "expert_provider_operations_order_kind_idx",
+        "expert_provider_operations_reconcile_idx",
+      ],
+    });
     expect(requiredTable("expertFirstResidencySettlements")).toMatchObject({
       foreignKeys: expect.arrayContaining([
         "expert_first_settlement_order_owner_fk",
@@ -336,6 +363,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0018_expert_residency_referrals.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0023_yookassa_provider_operations.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -399,6 +430,13 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_first_settlement_guard",
       "expert_reward_grants_eligible_settlement",
       "expert_ledger_allocations_exact_total",
+      "expert_provider_operations_order_fk",
+      "expert_provider_operations_attempt_order_fk",
+      "expert_provider_operations_command_unique",
+      "expert_provider_operations_idempotency_unique",
+      "expert_provider_operations_object_unique",
+      "expert_provider_operations_reconcile_idx",
+      "expert_provider_operations_order_kind_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toMatch(

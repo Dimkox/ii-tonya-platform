@@ -497,9 +497,7 @@ export const expertResidencyProviderOperations = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     commandId: uuid("command_id").notNull(),
-    orderId: uuid("order_id")
-      .notNull()
-      .references(() => expertResidencyOrders.id),
+    orderId: uuid("order_id").notNull(),
     paymentAttemptId: uuid("payment_attempt_id").notNull(),
     operationKind: text("operation_kind")
       .$type<"create_payment" | "create_refund">()
@@ -534,6 +532,11 @@ export const expertResidencyProviderOperations = pgTable(
     updatedAt,
   },
   (table) => [
+    foreignKey({
+      columns: [table.orderId],
+      foreignColumns: [expertResidencyOrders.id],
+      name: "expert_provider_operations_order_fk",
+    }),
     foreignKey({
       columns: [table.paymentAttemptId, table.orderId],
       foreignColumns: [

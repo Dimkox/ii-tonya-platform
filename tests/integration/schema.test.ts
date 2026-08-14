@@ -217,6 +217,7 @@ describe("MVP schema", () => {
       "expert_residency_orders",
       "expert_residency_payment_attempts",
       "expert_residency_provider_event_inbox",
+      "expert_residency_provider_operations",
       "expert_residency_tariff_versions",
       "expert_services",
       "experts",
