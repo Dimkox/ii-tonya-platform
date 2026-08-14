@@ -21,7 +21,8 @@ activation gates.
 ## 2. Selected approach
 
 Use a first-party TypeScript HTTP client in `@ii-tonya/integrations`, built on the runtime
-`fetch` interface and strict local schemas. Do not add a payment SDK.
+`fetch` interface and local schemas that strictly validate every authority-bearing field
+while discarding unrelated provider response fields. Do not add a payment SDK.
 
 Reasons:
 
@@ -69,7 +70,7 @@ Rejected alternatives:
 - **YKP-007 — Webhook is a signal.** The inbound route accepts only supported notification
   events, a bounded body, and an allowlisted effective peer address supplied by the
   trusted nginx boundary. It never trusts forwarded headers from the public request.
-  Notification facts are strict-parsed, then re-read through the authenticated API.
+  Notification envelope facts are strict-parsed, then re-read through the authenticated API.
   Duplicate delivery is handled by the existing PostgreSQL provider inbox.
 - **YKP-008 — Unknown outcome safety.** Timeouts, connection failures, HTTP 429, and HTTP
   5xx are retryable/unknown outcomes. The system reconciles before retrying a financial
@@ -103,7 +104,7 @@ Rejected alternatives:
 ### 4.1 YooKassa client
 
 `packages/integrations/src/yookassa/client.ts` owns HTTP Basic Auth, request timeouts,
-idempotency headers, strict response parsing, safe status classification, and transport
+idempotency headers, minimized response parsing, safe status classification, and transport
 injection for tests. It exposes only:
 
 - `createPayment`;
@@ -176,7 +177,7 @@ authority.
 
 ## 6. Failure handling
 
-- Malformed provider JSON, excess fields at authority-bearing boundaries, ID/amount/
+- Malformed provider JSON, invalid authority-bearing fields, ID/amount/
   currency/environment mismatch, and unsupported status fail closed.
 - Connection loss after POST is `unknown`, never `failed`; reconciliation precedes any
   further financial mutation.
@@ -195,7 +196,7 @@ run is not repeated. Verification covers:
 - exact request method/path/headers and secret redaction;
 - stable idempotency and body-digest replay;
 - integer money conversion and mismatch rejection;
-- strict payment/refund/notification schema parsing;
+- strict request and notification-envelope parsing plus minimized payment/refund response parsing;
 - webhook IP/proxy boundary and authoritative API re-read;
 - timeout/429/5xx unknown outcomes and deterministic 4xx handling;
 - test/live cross-mode rejection;
@@ -245,4 +246,3 @@ These inputs do not block code implementation but keep staging/live disabled:
 - YooKassa operations registries:
   <https://yookassa.ru/docs/support/merchant/payments/reports/overview>
 - Rejected wallet client: <https://github.com/AlekseyKorshuk/yoomoney-api>
-
