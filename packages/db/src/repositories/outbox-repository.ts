@@ -294,19 +294,26 @@ async function terminalizeDispatchExhaustedByTopic(
   tx: Transaction,
   maxAttempts: number,
   topics: LocalOperatorCaseTopics,
+  limit: number,
 ): Promise<readonly OutboxRecoveryCount[]> {
   const result = await tx.execute<{
     topic: string;
     count: number | string;
   }>(sql`
-    with exhausted as (
-      update integration_outbox
+    with candidates as (
+      select id from integration_outbox
+      where status in ('pending','retry_wait') and attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
+      order by created_at,id
+      for update skip locked
+      limit ${limit}
+    ), exhausted as (
+      update integration_outbox o
       set status='dead_letter',next_attempt_at=null,
         last_normalized_reason='dispatch_attempts_exhausted_before_claim',
         updated_at=now()
-      where status in ('pending','retry_wait') and attempt >= ${maxAttempts}
-        ${topicPredicate(topics)}
-      returning id,payload_hash,topic
+      from candidates where o.id=candidates.id
+      returning o.id,o.payload_hash,o.topic
     ), dead as (
       insert into dead_letters (outbox_id,reason,payload_hash)
       select id,'dispatch_attempts_exhausted_before_claim',payload_hash
@@ -325,21 +332,28 @@ async function terminalizeReconciliationExhaustedByTopic(
   tx: Transaction,
   maxAttempts: number,
   topics: LocalOperatorCaseTopics,
+  limit: number,
 ): Promise<readonly OutboxRecoveryCount[]> {
   const result = await tx.execute<{
     topic: string;
     count: number | string;
   }>(sql`
-    with exhausted as (
-      update integration_outbox
+    with candidates as (
+      select id from integration_outbox
+      where status='unknown_outcome'
+        and reconciliation_attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
+      order by updated_at,id
+      for update skip locked
+      limit ${limit}
+    ), exhausted as (
+      update integration_outbox o
       set status='dead_letter',next_reconciliation_at=null,
         last_normalized_reason=
           'unknown_outcome_reconciliation_exhausted_before_claim',
         updated_at=now()
-      where status='unknown_outcome'
-        and reconciliation_attempt >= ${maxAttempts}
-        ${topicPredicate(topics)}
-      returning id,payload_hash,topic
+      from candidates where o.id=candidates.id
+      returning o.id,o.payload_hash,o.topic
     ), dead as (
       insert into dead_letters (outbox_id,reason,payload_hash)
       select id,'unknown_outcome_reconciliation_exhausted_before_claim',
@@ -476,6 +490,7 @@ export class PostgresOutboxRepository {
         tx,
         maxAttempts,
         topics,
+        limit,
       );
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
@@ -588,6 +603,7 @@ export class PostgresOutboxRepository {
         tx,
         maxReconciliationAttempts,
         topics,
+        limit,
       );
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
