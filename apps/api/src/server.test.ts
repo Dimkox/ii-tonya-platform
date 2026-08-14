@@ -30,6 +30,54 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("composes the durable expert AI receipt store only with an injected source capability", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      $client: {
+        query: async () => ({ rows: [], rowCount: 0 }),
+        end: async () => undefined,
+      },
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      features: {
+        expertReferral: false,
+        expertResidencyBilling: false,
+        expertAiIngress: false,
+      },
+    };
+    const absent = await createDefaultLifecycle().dependencies(config, fakeDb);
+    expect(absent.expertAiIngress).toBeUndefined();
+    expect(absent.expertAiPrincipal).toBeUndefined();
+    expect(absent.expertAiRequests).toBeUndefined();
+
+    const lifecycle = createDefaultLifecycle({
+      expertAiComposition: {
+        ingress: { handle: async () => ({ kind: "disabled" }) },
+        principals: { resolve: async () => null },
+      },
+    });
+    const deps = await lifecycle.dependencies(config, fakeDb);
+    expect(deps.expertAiIngress).toBeDefined();
+    expect(deps.expertAiPrincipal).toBeDefined();
+    expect(deps.expertAiRequests).toBeInstanceOf(
+      (await import("@ii-tonya/db")).PostgresExpertAiRequestReceiptStore,
+    );
+    await lifecycle.close(fakeDb);
+  });
   it("migrates before dependency readiness and closes app before database/telemetry lifecycle", async () => {
     process.env.DATABASE_URL =
       "postgresql://placeholder.invalid/test?sslmode=require";

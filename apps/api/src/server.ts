@@ -8,6 +8,7 @@ import {
   type CatalogService,
   type ConversationService,
   type ExpertCodeKeyring,
+  type ExpertAiIngressService,
   type PrivacyService,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
@@ -21,6 +22,7 @@ import {
   PostgresAdminRepository,
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
+  PostgresExpertAiRequestReceiptStore,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -34,6 +36,7 @@ import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
+import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 
 export interface ServerLifecycle {
   dependencies(
@@ -61,6 +64,15 @@ export const createDefaultLifecycle = (
         currentVersion: string;
         requiredVersions: readonly string[];
       }): ExpertCodeKeyring;
+    };
+    expertAiComposition?: {
+      readonly ingress: ExpertAiIngressService;
+      readonly principals: ExpertPrincipalResolver;
+      readonly telegramPrincipals?: {
+        resolvePrincipal(
+          telegramUserId: string,
+        ): ReturnType<ExpertPrincipalResolver["resolve"]>;
+      };
     };
     expertTelegramComposition?: Omit<
       ExpertTelegramIngressFactoryDependencies,
@@ -125,8 +137,7 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramFinancialViews === true,
             referralMutationsEnabled:
               config.features.expertTelegramReferral === true,
-            checkoutReadiness:
-              config.features.expertTelegramCheckout === true,
+            checkoutReadiness: config.features.expertTelegramCheckout === true,
           });
     return {
       config,
@@ -172,6 +183,19 @@ export const createDefaultLifecycle = (
       rateLimiter: createWindowedRateLimiter(),
       telegramWebhookSecret: randomBytes(32).toString("base64url"),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
+      ...(options.expertAiComposition === undefined
+        ? {}
+        : {
+            expertAiIngress: options.expertAiComposition.ingress,
+            expertAiPrincipal: options.expertAiComposition.principals,
+            expertAiRequests: new PostgresExpertAiRequestReceiptStore(db),
+            ...(options.expertAiComposition.telegramPrincipals === undefined
+              ? {}
+              : {
+                  expertAiTelegramPrincipal:
+                    options.expertAiComposition.telegramPrincipals,
+                }),
+          }),
     };
   },
   async close(db) {

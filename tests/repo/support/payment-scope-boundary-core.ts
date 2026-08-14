@@ -84,12 +84,14 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
   "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
   "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+  "packages/db/migrations/0027_expert_ai_request_receipts.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "expert_ai_request_receipts",
   "expert_referral_admin_execution_results",
   "expert_referral_code_batches",
   "expert_referral_codes",
@@ -598,6 +600,10 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
     "35868ffc1cb73de322942aebee08922a75d226e30d5e739b1dc5d6681de2816b",
+  ],
+  [
+    "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+    "67eed73ef55735f94a3b4727bd5bcd8479b678d6b61f0ebb7c2d7d46d3bf9c7e",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",

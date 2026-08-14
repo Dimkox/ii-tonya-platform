@@ -407,6 +407,10 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -484,6 +488,12 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_telegram_residency_callbacks_processing_lease_check",
       "expert_telegram_residency_callbacks_processing_lease_idx",
       "expert_telegram_residency_callbacks_url_cleanup_idx",
+      "expert_ai_request_receipts_hashes_check",
+      "expert_ai_request_receipts_status_check",
+      "expert_ai_request_receipts_version_check",
+      "expert_ai_request_receipts_state_check",
+      "expert_ai_request_receipts_lease_idx",
+      "expert_ai_request_receipts_cleanup_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toContain(
@@ -497,14 +507,14 @@ describe("authoritative Drizzle schema parity", () => {
     );
   });
 
-  it("registers migration 0026 last in the ordered Drizzle journal", () => {
+  it("registers migration 0027 last in the ordered Drizzle journal", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
     const latest = journal.entries.at(-1);
     expect(latest).toMatchObject({
-      idx: 26,
-      tag: "0026_expert_telegram_checkout_outcomes",
+      idx: 27,
+      tag: "0027_expert_ai_request_receipts",
     });
     expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
   });
