@@ -101,6 +101,8 @@ export const createClientSessionService = (
       identityProof: string,
       signal = new AbortController().signal,
     ): Promise<ClientSessionIssueResult> {
+      if (signal.aborted) return { kind: "unavailable" };
+
       let verified: VerifiedClientIdentityProof | null;
       try {
         verified = await dependencies.verifier.verify({
@@ -112,11 +114,13 @@ export const createClientSessionService = (
       } catch {
         return { kind: "unavailable" };
       }
+      if (signal.aborted) return { kind: "unavailable" };
       if (!validVerifiedProof(verified)) return { kind: "unauthorized" };
 
       try {
         const accessToken = dependencies.generateToken();
         const tokenDigest = dependencies.digestToken(accessToken);
+        if (signal.aborted) return { kind: "unavailable" };
         const result = await dependencies.sessions.issue({
           userId: verified.userId,
           replayDigest: verified.replayDigest,

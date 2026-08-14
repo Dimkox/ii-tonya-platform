@@ -125,7 +125,7 @@ export class PostgresClientSessionRepository {
         return { kind: "issued", expiresAt } as const;
       });
     } catch (error) {
-      if (hasSqlState(error, "23505") || hasSqlState(error, "23514")) {
+      if (hasSqlState(error, "23505")) {
         return { kind: "denied" };
       }
       throw new Error("client_session_repository_unavailable");
