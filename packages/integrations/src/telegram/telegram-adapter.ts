@@ -129,6 +129,7 @@ export interface ExpertResidencyQuoteView {
   cashMinor: string;
   currency: "RUB";
   durationSeconds: number;
+  checkoutCallbackData?: string;
 }
 
 export type TelegramSendOutcome =
@@ -570,10 +571,28 @@ export class TelegramAdapter
   async sendResidencyQuote(
     view: ExpertResidencyQuoteView,
   ): Promise<TelegramSendOutcome> {
+    const callbackData = view.checkoutCallbackData;
+    if (
+      callbackData !== undefined &&
+      (!callbackData.startsWith("xr1.") ||
+        Buffer.byteLength(callbackData, "utf8") > 64 ||
+        Buffer.byteLength(callbackData, "utf8") < 1)
+    ) {
+      throw new Error("invalid_expert_view");
+    }
     return this.sendText({
       idempotencyKey: view.idempotencyKey,
       telegramUserId: view.telegramUserId,
       text: renderExpertResidencyQuote(view),
+      ...(callbackData === undefined
+        ? {}
+        : {
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: "Оплатить", callback_data: callbackData }],
+              ],
+            },
+          }),
     });
   }
 

@@ -32,6 +32,48 @@ export interface ResidencyCheckoutCallbackStore {
   ): Promise<ResidencyCheckoutCallbackClaims | null>;
 }
 
+export type ResidencyCheckoutStoredOutcome =
+  | { readonly kind: "ready"; readonly checkoutUrl: string }
+  | { readonly kind: "unavailable" | "unknown" };
+
+export type ResidencyCheckoutStateClaim =
+  | {
+      readonly kind: "acquired";
+      readonly tokenHash: string;
+      readonly claims: ResidencyCheckoutCallbackClaims;
+      readonly fence: string;
+      readonly recovery: boolean;
+    }
+  | {
+      readonly kind: "replay";
+      readonly tokenHash: string;
+      readonly outcome: ResidencyCheckoutStoredOutcome;
+    }
+  | { readonly kind: "processing"; readonly tokenHash: string };
+
+export interface ResidencyCheckoutStateStore
+  extends ResidencyCheckoutCallbackStore {
+  inspectCheckout(
+    tokenHash: string,
+    expertId: string,
+    telegramUserId: string,
+    now: Date,
+  ): Promise<ResidencyCheckoutCallbackClaims | null>;
+  claimCheckout(
+    tokenHash: string,
+    claims: Omit<ResidencyCheckoutCallbackClaims, "expiresAt">,
+    now: Date,
+    leaseUntil: Date,
+    fence: string,
+  ): Promise<ResidencyCheckoutStateClaim | null>;
+  recordCheckoutOutcome(
+    tokenHash: string,
+    fence: string,
+    outcome: ResidencyCheckoutStoredOutcome,
+    now: Date,
+  ): Promise<boolean>;
+}
+
 const valid = (claims: ResidencyCheckoutCallbackClaims): boolean =>
   UUID.test(claims.expertId) &&
   TELEGRAM_ID.test(claims.telegramUserId) &&
@@ -63,6 +105,19 @@ export class ResidencyCheckoutCallbackVerificationError extends Error {
   }
 }
 
+const decode = (token: string): { nonce: Buffer; tokenHash: string; mac: Buffer } => {
+  if (!token.startsWith(PREFIX)) throw new Error();
+  const payload = Buffer.from(token.slice(PREFIX.length), "base64url");
+  if (
+    payload.length !== 32 ||
+    token !== `${PREFIX}${payload.toString("base64url")}`
+  ) {
+    throw new Error();
+  }
+  const nonce = payload.subarray(0, 16);
+  return { nonce, tokenHash: digest(nonce), mac: payload.subarray(16) };
+};
+
 export async function issueResidencyCheckoutCallback(
   claims: ResidencyCheckoutCallbackClaims,
   idempotencyKey: string,
@@ -85,25 +140,51 @@ export async function authenticateResidencyCheckoutCallback(
   now: Date,
 ) {
   try {
-    if (
-      !token.startsWith(PREFIX) ||
-      secret.byteLength < 32 ||
-      !Number.isFinite(now.getTime())
-    )
+    if (secret.byteLength < 32 || !Number.isFinite(now.getTime()))
       throw new Error();
-    const payload = Buffer.from(token.slice(PREFIX.length), "base64url");
-    if (
-      payload.length !== 32 ||
-      token !== `${PREFIX}${payload.toString("base64url")}`
-    )
+    const decoded = decode(token);
+    if (!timingSafeEqual(decoded.mac, mac(decoded.nonce, binding, secret)))
       throw new Error();
-    const nonce = payload.subarray(0, 16);
-    if (!timingSafeEqual(payload.subarray(16), mac(nonce, binding, secret)))
-      throw new Error();
-    const claims = await store.consume(digest(nonce), binding, now);
+    const claims = await store.consume(decoded.tokenHash, binding, now);
     if (claims === null || claims.expiresAt.getTime() <= now.getTime())
       throw new Error();
-    return { tokenHash: digest(nonce), claims };
+    return { tokenHash: decoded.tokenHash, claims };
+  } catch {
+    throw new ResidencyCheckoutCallbackVerificationError();
+  }
+}
+
+export async function inspectResidencyCheckoutCallback(
+  token: string,
+  binding: { readonly expertId: string; readonly telegramUserId: string },
+  secret: Uint8Array,
+  store: ResidencyCheckoutStateStore,
+  now: Date,
+): Promise<{ tokenHash: string; claims: ResidencyCheckoutCallbackClaims }> {
+  try {
+    if (
+      secret.byteLength < 32 ||
+      !UUID.test(binding.expertId) ||
+      !TELEGRAM_ID.test(binding.telegramUserId) ||
+      !Number.isFinite(now.getTime())
+    ) {
+      throw new Error();
+    }
+    const decoded = decode(token);
+    const claims = await store.inspectCheckout(
+      decoded.tokenHash,
+      binding.expertId,
+      binding.telegramUserId,
+      now,
+    );
+    if (
+      claims === null ||
+      claims.expiresAt.getTime() <= now.getTime() ||
+      !timingSafeEqual(decoded.mac, mac(decoded.nonce, claims, secret))
+    ) {
+      throw new Error();
+    }
+    return { tokenHash: decoded.tokenHash, claims };
   } catch {
     throw new ResidencyCheckoutCallbackVerificationError();
   }

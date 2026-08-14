@@ -2,6 +2,7 @@ import {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
 } from "./expert-command-processor.js";
+import type { ExpertTelegramCheckoutCapability } from "./expert-residency-checkout.js";
 
 type ProcessorDependencies = Parameters<typeof createExpertCommandProcessor>[0];
 type Principal = Parameters<
@@ -13,7 +14,7 @@ type AuthenticatedClientView = Parameters<
 
 export interface ExpertTelegramIngressFactoryDependencies extends ProcessorDependencies {
   readonly checkoutReadiness?: boolean;
-  readonly checkout?: object;
+  readonly checkout?: ExpertTelegramCheckoutCapability;
   resolvePrincipal(telegramUserId: string): Promise<Principal | null>;
   authenticateClientView(input: {
     readonly data: string;
