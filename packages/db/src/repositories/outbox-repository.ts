@@ -1,13 +1,81 @@
 import { sql } from "drizzle-orm";
+import {
+  LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  type LocalOperatorCaseOutboxTopic,
+} from "@ii-tonya/contracts";
 import type { DrizzleDb } from "../client.js";
 
 const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
+type LocalOperatorCaseTopics = typeof LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
+export interface OutboxRecoveryCount {
+  readonly topic: LocalOperatorCaseOutboxTopic;
+  readonly count: number;
+}
+
+function validateTopicAllowlist(
+  topics: readonly string[] | undefined,
+): LocalOperatorCaseTopics | undefined {
+  if (topics === undefined) return undefined;
+  if (
+    topics.length !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length ||
+    topics.some(
+      (topic, index) => topic !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
+    )
+  ) {
+    throw new Error("worker_outbox_topic_allowlist_invalid");
+  }
+  return LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
+}
+
+function topicPredicate(topics: LocalOperatorCaseTopics | undefined) {
+  return topics === undefined
+    ? sql``
+    : sql` and topic in (${topics[0]}, ${topics[1]})`;
+}
+
+function recoveryCounts(
+  topics: LocalOperatorCaseTopics | undefined,
+  rows: readonly { topic: string }[],
+): readonly OutboxRecoveryCount[] {
+  if (topics === undefined) {
+    throw new Error("worker_outbox_topic_allowlist_required");
+  }
+  return topics
+    .map((topic) => ({
+      topic,
+      count: rows.filter((row) => row.topic === topic).length,
+    }))
+    .filter((entry) => entry.count > 0);
+}
+
+function recoveryCountAggregates(
+  topics: LocalOperatorCaseTopics,
+  rows: readonly { topic: string; count: number | string }[],
+): readonly OutboxRecoveryCount[] {
+  return topics.flatMap((topic) => {
+    const raw = rows.find((row) => row.topic === topic)?.count ?? 0;
+    const count = Number(raw);
+    if (!Number.isSafeInteger(count) || count < 0) {
+      throw new Error("worker_outbox_recovery_count_invalid");
+    }
+    return count === 0 ? [] : [{ topic, count }];
+  });
+}
+
+function requireRecoveryTopics(
+  topics: LocalOperatorCaseTopics | undefined,
+): LocalOperatorCaseTopics {
+  if (topics === undefined) {
+    throw new Error("worker_outbox_topic_allowlist_required");
+  }
+  return topics;
+}
 
 function assertRecoveryLimit(limit: number): void {
   if (
-    !Number.isSafeInteger(limit)
-    || limit < 1
-    || limit > MAX_OUTBOX_RECOVERY_LIMIT
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > MAX_OUTBOX_RECOVERY_LIMIT
   ) {
     throw new RangeError("limit must be a safe integer between 1 and 1000");
   }
@@ -131,7 +199,9 @@ function requireDispatchLease(
     !row.dispatchLeaseValid ||
     row.leaseUntil === null
   ) {
-    throw new OutboxLeaseLostError(`Dispatch lease lost for outbox row ${row.id}`);
+    throw new OutboxLeaseLostError(
+      `Dispatch lease lost for outbox row ${row.id}`,
+    );
   }
 }
 
@@ -156,6 +226,7 @@ function requireReconciliationLease(
 async function terminalizeDispatchExhausted(
   tx: Transaction,
   maxAttempts: number,
+  topics: LocalOperatorCaseTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -166,6 +237,7 @@ async function terminalizeDispatchExhausted(
         last_normalized_reason = 'dispatch_attempts_exhausted_before_claim',
         updated_at = now()
       where status in ('pending', 'retry_wait') and attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
       returning id, payload_hash
     ),
     dead as (
@@ -184,6 +256,7 @@ async function terminalizeDispatchExhausted(
 async function terminalizeReconciliationExhausted(
   tx: Transaction,
   maxAttempts: number,
+  topics: LocalOperatorCaseTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -196,6 +269,7 @@ async function terminalizeReconciliationExhausted(
         updated_at = now()
       where status = 'unknown_outcome'
         and reconciliation_attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
       returning id, payload_hash
     ),
     dead as (
@@ -214,6 +288,85 @@ async function terminalizeReconciliationExhausted(
     from exhausted
     on conflict (outbox_id, reason_code) do nothing
   `);
+}
+
+async function terminalizeDispatchExhaustedByTopic(
+  tx: Transaction,
+  maxAttempts: number,
+  topics: LocalOperatorCaseTopics,
+  limit: number,
+): Promise<readonly OutboxRecoveryCount[]> {
+  const result = await tx.execute<{
+    topic: string;
+    count: number | string;
+  }>(sql`
+    with candidates as (
+      select id from integration_outbox
+      where status in ('pending','retry_wait') and attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
+      order by created_at,id
+      for update skip locked
+      limit ${limit}
+    ), exhausted as (
+      update integration_outbox o
+      set status='dead_letter',next_attempt_at=null,
+        last_normalized_reason='dispatch_attempts_exhausted_before_claim',
+        updated_at=now()
+      from candidates where o.id=candidates.id
+      returning o.id,o.payload_hash,o.topic
+    ), dead as (
+      insert into dead_letters (outbox_id,reason,payload_hash)
+      select id,'dispatch_attempts_exhausted_before_claim',payload_hash
+      from exhausted on conflict (outbox_id) do nothing
+    ), alerts as (
+      insert into outbox_operator_alerts (outbox_id,reason_code)
+      select id,'dispatch_attempts_exhausted_before_claim' from exhausted
+      on conflict (outbox_id,reason_code) do nothing
+    )
+    select topic,count(*)::integer as count from exhausted group by topic
+  `);
+  return recoveryCountAggregates(topics, result.rows);
+}
+
+async function terminalizeReconciliationExhaustedByTopic(
+  tx: Transaction,
+  maxAttempts: number,
+  topics: LocalOperatorCaseTopics,
+  limit: number,
+): Promise<readonly OutboxRecoveryCount[]> {
+  const result = await tx.execute<{
+    topic: string;
+    count: number | string;
+  }>(sql`
+    with candidates as (
+      select id from integration_outbox
+      where status='unknown_outcome'
+        and reconciliation_attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
+      order by updated_at,id
+      for update skip locked
+      limit ${limit}
+    ), exhausted as (
+      update integration_outbox o
+      set status='dead_letter',next_reconciliation_at=null,
+        last_normalized_reason=
+          'unknown_outcome_reconciliation_exhausted_before_claim',
+        updated_at=now()
+      from candidates where o.id=candidates.id
+      returning o.id,o.payload_hash,o.topic
+    ), dead as (
+      insert into dead_letters (outbox_id,reason,payload_hash)
+      select id,'unknown_outcome_reconciliation_exhausted_before_claim',
+        payload_hash from exhausted
+      on conflict (outbox_id) do nothing
+    ), alerts as (
+      insert into outbox_operator_alerts (outbox_id,reason_code)
+      select id,'unknown_outcome_reconciliation_exhausted_before_claim'
+      from exhausted on conflict (outbox_id,reason_code) do nothing
+    )
+    select topic,count(*)::integer as count from exhausted group by topic
+  `);
+  return recoveryCountAggregates(topics, result.rows);
 }
 
 async function writeDeadLetterAndAlert(
@@ -250,7 +403,14 @@ async function writeDeadLetterAndAlert(
 }
 
 export class PostgresOutboxRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  private readonly topics: LocalOperatorCaseTopics | undefined;
+
+  constructor(
+    private readonly db: DrizzleDb,
+    topics?: readonly string[],
+  ) {
+    this.topics = validateTopicAllowlist(topics);
+  }
 
   async claim(
     limit: number,
@@ -263,7 +423,7 @@ export class PostgresOutboxRepository {
       throw new RangeError("leaseDurationMs must be a positive integer");
     }
     return this.db.transaction(async (tx) => {
-      await terminalizeDispatchExhausted(tx, maxAttempts);
+      await terminalizeDispatchExhausted(tx, maxAttempts, this.topics);
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
           select id
@@ -276,6 +436,7 @@ export class PostgresOutboxRepository {
             )
           )
             and attempt < ${maxAttempts}
+            ${topicPredicate(this.topics)}
           order by created_at, id
           for update skip locked
           limit ${limit}
@@ -308,6 +469,63 @@ export class PostgresOutboxRepository {
     });
   }
 
+  async claimWithMetrics(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxAttempts: number,
+  ): Promise<{
+    readonly messages: readonly PersistedOutboxMessage[];
+    readonly exhausted: readonly OutboxRecoveryCount[];
+  }> {
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      return { messages: [], exhausted: [] };
+    }
+    if (!Number.isSafeInteger(leaseDurationMs) || leaseDurationMs < 1) {
+      throw new RangeError("leaseDurationMs must be a positive integer");
+    }
+    const topics = requireRecoveryTopics(this.topics);
+    return this.db.transaction(async (tx) => {
+      const exhausted = await terminalizeDispatchExhaustedByTopic(
+        tx,
+        maxAttempts,
+        topics,
+        limit,
+      );
+      const result = await tx.execute<RawOutboxMessage>(sql`
+        with claimable as (
+          select id from integration_outbox
+          where (
+            status='pending' or (
+              status='retry_wait'
+              and (next_attempt_at is null or next_attempt_at <= now())
+            )
+          )
+            and attempt < ${maxAttempts}
+            ${topicPredicate(topics)}
+          order by created_at,id
+          for update skip locked
+          limit ${limit}
+        )
+        update integration_outbox o
+        set status='processing',attempt=o.attempt+1,
+          dispatch_owner_id=${owner},
+          dispatch_claim_token=gen_random_uuid()::text,
+          reconciliation_claim_token=null,
+          lease_until=clock_timestamp()+(${leaseDurationMs} * interval '1 millisecond'),
+          next_attempt_at=null,updated_at=now()
+        from claimable where o.id=claimable.id
+        returning o.id,o.topic,o.payload,
+          o.correlation_id as "correlationId",o.attempt,
+          o.reconciliation_key as "reconciliationKey",
+          o.reconciliation_attempt as "reconciliationAttempt",
+          o.dispatch_claim_token as "dispatchClaimToken",
+          o.reconciliation_claim_token as "reconciliationClaimToken"
+      `);
+      return { messages: messages(result.rows), exhausted };
+    });
+  }
+
   async claimUnknown(
     limit: number,
     owner: string,
@@ -322,6 +540,7 @@ export class PostgresOutboxRepository {
       await terminalizeReconciliationExhausted(
         tx,
         maxReconciliationAttempts,
+        this.topics,
       );
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
@@ -330,6 +549,7 @@ export class PostgresOutboxRepository {
           where status = 'unknown_outcome'
             and reconciliation_attempt < ${maxReconciliationAttempts}
             and (next_reconciliation_at is null or next_reconciliation_at <= now())
+            ${topicPredicate(this.topics)}
           order by updated_at, id
           for update skip locked
           limit ${limit}
@@ -359,6 +579,61 @@ export class PostgresOutboxRepository {
           o.reconciliation_claim_token as "reconciliationClaimToken"
       `);
       return messages(result.rows);
+    });
+  }
+
+  async claimUnknownWithMetrics(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxReconciliationAttempts: number,
+  ): Promise<{
+    readonly messages: readonly PersistedOutboxMessage[];
+    readonly exhausted: readonly OutboxRecoveryCount[];
+  }> {
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      return { messages: [], exhausted: [] };
+    }
+    if (!Number.isSafeInteger(leaseDurationMs) || leaseDurationMs < 1) {
+      throw new RangeError("leaseDurationMs must be a positive integer");
+    }
+    const topics = requireRecoveryTopics(this.topics);
+    return this.db.transaction(async (tx) => {
+      const exhausted = await terminalizeReconciliationExhaustedByTopic(
+        tx,
+        maxReconciliationAttempts,
+        topics,
+        limit,
+      );
+      const result = await tx.execute<RawOutboxMessage>(sql`
+        with claimable as (
+          select id from integration_outbox
+          where status='unknown_outcome'
+            and reconciliation_attempt < ${maxReconciliationAttempts}
+            and (next_reconciliation_at is null or next_reconciliation_at <= now())
+            ${topicPredicate(topics)}
+          order by updated_at,id
+          for update skip locked
+          limit ${limit}
+        )
+        update integration_outbox o
+        set status='reconciling',
+          reconciliation_attempt=o.reconciliation_attempt+1,
+          reconciliation_owner_id=${owner},
+          reconciliation_claim_token=gen_random_uuid()::text,
+          dispatch_claim_token=null,
+          reconciliation_lease_until=
+            clock_timestamp()+(${leaseDurationMs} * interval '1 millisecond'),
+          next_reconciliation_at=null,updated_at=now()
+        from claimable where o.id=claimable.id
+        returning o.id,o.topic,o.payload,
+          o.correlation_id as "correlationId",o.attempt,
+          o.reconciliation_key as "reconciliationKey",
+          o.reconciliation_attempt as "reconciliationAttempt",
+          o.dispatch_claim_token as "dispatchClaimToken",
+          o.reconciliation_claim_token as "reconciliationClaimToken"
+      `);
+      return { messages: messages(result.rows), exhausted };
     });
   }
 
@@ -612,6 +887,7 @@ export class PostgresOutboxRepository {
           from integration_outbox
           where status = 'processing'
             and lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
           order by lease_until, id
           for update skip locked
           limit ${limit}
@@ -648,6 +924,59 @@ export class PostgresOutboxRepository {
     });
   }
 
+  async recoverExpiredDispatchLeasesByTopic(
+    limit = 1_000,
+  ): Promise<readonly OutboxRecoveryCount[]> {
+    assertRecoveryLimit(limit);
+    const topics = requireRecoveryTopics(this.topics);
+    const rows = await this.db.transaction(async (tx) => {
+      const result = await tx.execute<{ topic: string }>(sql`
+        with candidates as materialized (
+          select id
+          from integration_outbox
+          where status = 'processing'
+            and lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
+          order by lease_until, id
+          for update skip locked
+          limit ${limit}
+        ), recovered as (
+          update integration_outbox o
+          set
+            status = 'unknown_outcome',
+            dispatch_owner_id = null,
+            dispatch_claim_token = null,
+            lease_until = null,
+            next_reconciliation_at = clock_timestamp(),
+            last_normalized_reason = 'dispatch_lease_expired_unknown_outcome',
+            updated_at = now()
+          from candidates
+          where o.id = candidates.id
+          returning o.id, o.topic, o.attempt, o.reconciliation_key
+        ), attempts as (
+        insert into delivery_attempts (
+          outbox_id, attempt_id, attempt, provider, outcome,
+          reconciliation_key, normalized_reason
+        )
+        select
+          id,
+          'dispatch-lease-recovery:' || attempt::text,
+          attempt,
+          split_part(topic, '.', 1),
+          'unknown_outcome',
+          reconciliation_key,
+          'dispatch_lease_expired_unknown_outcome'
+        from recovered
+        returning outbox_id
+        )
+        select recovered.topic
+        from recovered join attempts on attempts.outbox_id=recovered.id
+      `);
+      return result.rows;
+    });
+    return recoveryCounts(topics, rows);
+  }
+
   async recoverExpiredReconciliationLeases(limit = 1_000): Promise<number> {
     assertRecoveryLimit(limit);
     return this.db.transaction(async (tx) => {
@@ -657,6 +986,7 @@ export class PostgresOutboxRepository {
           from integration_outbox
           where status = 'reconciling'
             and reconciliation_lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
           order by reconciliation_lease_until, id
           for update skip locked
           limit ${limit}
@@ -691,5 +1021,58 @@ export class PostgresOutboxRepository {
       `);
       return result.rows.length;
     });
+  }
+
+  async recoverExpiredReconciliationLeasesByTopic(
+    limit = 1_000,
+  ): Promise<readonly OutboxRecoveryCount[]> {
+    assertRecoveryLimit(limit);
+    const topics = requireRecoveryTopics(this.topics);
+    const rows = await this.db.transaction(async (tx) => {
+      const result = await tx.execute<{ topic: string }>(sql`
+        with candidates as materialized (
+          select id
+          from integration_outbox
+          where status = 'reconciling'
+            and reconciliation_lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
+          order by reconciliation_lease_until, id
+          for update skip locked
+          limit ${limit}
+        ), recovered as (
+          update integration_outbox o
+          set
+            status = 'unknown_outcome',
+            reconciliation_owner_id = null,
+            reconciliation_claim_token = null,
+            reconciliation_lease_until = null,
+            next_reconciliation_at = clock_timestamp(),
+            last_normalized_reason = 'reconciliation_lease_expired',
+            updated_at = now()
+          from candidates
+          where o.id = candidates.id
+          returning o.id, o.topic, o.attempt, o.reconciliation_attempt, o.reconciliation_key
+        ), attempts as (
+        insert into delivery_attempts (
+          outbox_id, attempt_id, attempt, provider, outcome,
+          reconciliation_key, normalized_reason
+        )
+        select
+          id,
+          'reconciliation-lease-recovery:' || reconciliation_attempt::text,
+          attempt,
+          split_part(topic, '.', 1),
+          'reconciliation_lease_expired',
+          reconciliation_key,
+          'reconciliation_lease_expired'
+        from recovered
+        returning outbox_id
+        )
+        select recovered.topic
+        from recovered join attempts on attempts.outbox_id=recovered.id
+      `);
+      return result.rows;
+    });
+    return recoveryCounts(topics, rows);
   }
 }

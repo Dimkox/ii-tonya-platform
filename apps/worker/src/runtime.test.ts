@@ -260,4 +260,79 @@ describe("worker runtime", () => {
       expertResidencyReconciliation: { provider: "disabled" },
     });
   });
+
+  it("gives registered rows to exactly one runtime owner", async () => {
+    const productionDeps = () => ({
+      jobsRepository: {
+        processDueBatch: vi.fn(async () => ({})),
+        expireDueBatch: vi.fn(async () => ({})),
+        listLocalReservations: vi.fn(async () => []),
+        recordProviderUnavailable: vi.fn(async () => undefined),
+        materializeOperatorCasesBatch: vi.fn(async () => ({ materialized: 2 })),
+      },
+      expertReferralJobsRepository: {
+        expireDueBatch: vi.fn(async () => ({
+          examined: 0,
+          changed: 0,
+          failed: 0,
+        })),
+        replayDueBatch: vi.fn(async () => ({
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+        })),
+        listReconciliationBatch: vi.fn(async () => []),
+        recordReconciliationMismatches: vi.fn(async () => undefined),
+      },
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: vi.fn(async () => 0),
+      },
+      outboxRepository: {
+        recoverExpiredDispatchLeases: vi.fn(async () => 0),
+        recoverExpiredReconciliationLeases: vi.fn(async () => 0),
+      },
+      closeDatabase: vi.fn(async () => undefined),
+      closeTelemetry: vi.fn(async () => undefined),
+      now: () => new Date("2026-08-14T10:00:00.000Z"),
+    });
+    const disabled = productionDeps();
+    await createProductionWorkerRuntime(disabled).runOnce();
+    expect(
+      disabled.jobsRepository.materializeOperatorCasesBatch,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).toHaveBeenCalledOnce();
+
+    const enabled = productionDeps();
+    const workerOutboxRunner = vi.fn(async () => ({
+      reconciled: 1,
+      dispatched: 2,
+    }));
+    const report = await createProductionWorkerRuntime({
+      ...enabled,
+      workerOutboxRegistry: {
+        topics: ["safety.operator_escalation", "admin.negative_feedback"],
+      },
+      workerOutboxRunner,
+    } as never).runOnce();
+
+    expect(workerOutboxRunner).toHaveBeenCalledOnce();
+    expect(
+      enabled.jobsRepository.materializeOperatorCasesBatch,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).not.toHaveBeenCalled();
+    expect(report.confirmedOutboxDelivery).toEqual({
+      reconciled: 1,
+      dispatched: 2,
+    });
+  });
 });

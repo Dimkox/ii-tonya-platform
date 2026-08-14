@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,15 +7,26 @@ import {
   createDb,
   PostgresExpertReferralWorkerRepository,
   PostgresExpertTelegramResidencyCallbackRepository,
+  PostgresOperatorCaseOutboxRepository,
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
+import { recordWorkerOutboxMetric } from "@ii-tonya/observability";
+import type { DrizzleDb } from "@ii-tonya/db";
 import {
   createProductionWorkerRuntime,
   disabledExpertResidencyProviderReader,
   type WorkerRuntime,
 } from "./runtime.js";
-import type { ExpertResidencyProviderReader } from "@ii-tonya/worker";
+import {
+  boundedFullJitterDelay,
+  createLocalOperatorCaseOutboxRegistry,
+  LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  runOutboxBatch,
+  type ExpertResidencyProviderReader,
+  type LocalOperatorCaseOutboxRegistry,
+  type OutboxRunnerMetricLabels,
+} from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
 
@@ -23,6 +35,9 @@ export interface WorkerRuntimeFactory {
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly yookassaReader?: ExpertResidencyProviderReader;
+  readonly workerOutboxRegistryFactory?: (
+    db: DrizzleDb,
+  ) => LocalOperatorCaseOutboxRegistry;
 }
 export interface WorkerLoopOptions {
   readonly signal: AbortSignal;
@@ -41,6 +56,83 @@ export interface WorkerMainOptions {
 const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
 export { disabledExpertResidencyProviderReader };
+
+export function selectWorkerOutboxRegistry<T>(
+  config: RuntimeConfig,
+  factory?: () => T,
+): LocalOperatorCaseOutboxRegistry | undefined {
+  if (config.features.workerOutboxDelivery !== true) return undefined;
+  if (factory === undefined) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  return requireWorkerOutboxRegistry(factory());
+}
+
+function requireWorkerOutboxRegistry(
+  value: unknown,
+): LocalOperatorCaseOutboxRegistry {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  const registry = value as Partial<LocalOperatorCaseOutboxRegistry>;
+  if (
+    registry.topics?.length !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length ||
+    registry.topics.some(
+      (topic, index) => topic !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
+    ) ||
+    typeof registry.dispatch !== "function" ||
+    typeof registry.reconcile !== "function"
+  ) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  return registry as LocalOperatorCaseOutboxRegistry;
+}
+
+type WorkerOutboxMetricRecorder = (
+  labels: OutboxRunnerMetricLabels,
+  count?: number,
+) => void;
+
+export function composeWorkerOutboxDelivery(
+  db: DrizzleDb,
+  registryInput: unknown = createLocalOperatorCaseOutboxRegistry(
+    new PostgresOperatorCaseOutboxRepository(db),
+  ),
+  metricRecorder: WorkerOutboxMetricRecorder = recordWorkerOutboxMetric,
+) {
+  const registry = requireWorkerOutboxRegistry(registryInput);
+  if (typeof metricRecorder !== "function") {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  const repository = new PostgresOutboxRepository(db, registry.topics);
+  return {
+    registry,
+    repository,
+    run: () =>
+      runOutboxBatch({
+        repository,
+        dispatcher: registry,
+        reconciler: {
+          async reconcile(message) {
+            const result = await registry.reconcile(message);
+            if (result.kind === "applied") return "applied";
+            if (result.kind === "not_applied") return "not_applied";
+            if (result.kind === "still_unknown") return "still_unknown";
+            return result;
+          },
+        },
+        metrics: { record: metricRecorder },
+        now: () => new Date(),
+        retryDelayMs: (attempt) =>
+          boundedFullJitterDelay(attempt, 1_000, 30_000),
+        maxAttempts: 3,
+        maxReconciliationAttempts: 3,
+        batchSize: 100,
+        workerId: "local-operator-case-worker",
+        newAttemptId: randomUUID,
+      }),
+  } as const;
+}
 
 export function selectExpertResidencyProviderReader(
   config: RuntimeConfig,
@@ -63,11 +155,29 @@ export function createProductionWorkerRuntimeFactory(
 ): WorkerRuntimeFactory {
   return {
     async create(config) {
+      if (
+        config.features.workerOutboxDelivery === true &&
+        deps.workerOutboxRegistryFactory === undefined
+      ) {
+        throw new Error("worker_outbox_delivery_capability_unavailable");
+      }
       const expertResidencyProviderReader = selectExpertResidencyProviderReader(
         config,
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
+      const workerOutboxRegistry = selectWorkerOutboxRegistry(
+        config,
+        deps.workerOutboxRegistryFactory === undefined
+          ? undefined
+          : () => deps.workerOutboxRegistryFactory!(db),
+      );
+      const workerOutbox =
+        workerOutboxRegistry === undefined
+          ? undefined
+          : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
+      const outboxRepository =
+        workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -75,7 +185,13 @@ export function createProductionWorkerRuntimeFactory(
         expertTelegramCheckoutRepository:
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
-        outboxRepository: new PostgresOutboxRepository(db),
+        outboxRepository,
+        ...(workerOutbox === undefined
+          ? {}
+          : {
+              workerOutboxRegistry: workerOutbox.registry,
+              workerOutboxRunner: workerOutbox.run,
+            }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),
@@ -84,7 +200,12 @@ export function createProductionWorkerRuntimeFactory(
   };
 }
 
-const productionRuntimeFactory = createProductionWorkerRuntimeFactory();
+const productionRuntimeFactory = createProductionWorkerRuntimeFactory({
+  workerOutboxRegistryFactory: (db) =>
+    createLocalOperatorCaseOutboxRegistry(
+      new PostgresOperatorCaseOutboxRepository(db),
+    ),
+});
 
 function waitForNextCycle(
   milliseconds: number,

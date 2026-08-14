@@ -54,6 +54,7 @@ export {
   OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
+  type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
 export {
   PostgresTelegramCallbackRepository,
@@ -118,6 +119,10 @@ export {
   type ExpertAiStoredOutcome,
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
+export {
+  PostgresOperatorCaseOutboxRepository,
+  type OperatorCaseOutboxMessage,
+} from "./repositories/operator-case-outbox-repository.js";
 export {
   ExpertReferralCommandError,
   ExpertReferralDataIntegrityError,

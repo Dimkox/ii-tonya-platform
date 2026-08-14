@@ -5,11 +5,18 @@ const meter = metrics.getMeter("ii-tonya");
 export const operationalMetrics = {
   inboxDuplicates: meter.createCounter("ii_tonya_inbox_duplicates"),
   debitOutcomes: meter.createCounter("ii_tonya_debit_outcomes"),
-  reservationTransitions: meter.createCounter("ii_tonya_reservation_transitions"),
-  outboxUnknownOutcomes: meter.createCounter("ii_tonya_outbox_unknown_outcomes"),
+  reservationTransitions: meter.createCounter(
+    "ii_tonya_reservation_transitions",
+  ),
+  outboxUnknownOutcomes: meter.createCounter(
+    "ii_tonya_outbox_unknown_outcomes",
+  ),
   outboxLagMs: meter.createHistogram("ii_tonya_outbox_lag_ms"),
   outboxDeadLetters: meter.createCounter("ii_tonya_outbox_dead_letters"),
-  providerCircuitState: meter.createUpDownCounter("ii_tonya_provider_circuit_state"),
+  workerOutboxDelivery: meter.createCounter("ii_tonya_worker_outbox_delivery"),
+  providerCircuitState: meter.createUpDownCounter(
+    "ii_tonya_provider_circuit_state",
+  ),
   safetyHandoffs: meter.createCounter("ii_tonya_safety_handoffs"),
   reconciliationDrift: meter.createCounter("ii_tonya_reconciliation_drift"),
   expertReferralCodeLifecycle: meter.createCounter(
@@ -50,6 +57,47 @@ export type MetricLabels = Readonly<{
   operation: string;
   outcome: string;
   errorCode?: string;
+}>;
+
+const workerOutboxTopics = new Set([
+  "safety_operator_escalation",
+  "admin_negative_feedback",
+]);
+const workerOutboxPhases = new Set([
+  "claim",
+  "dispatch",
+  "reconciliation",
+  "lease_recovery",
+]);
+const workerOutboxOutcomes = new Set([
+  "applied",
+  "retry",
+  "unknown",
+  "terminal",
+  "dead_letter",
+  "no_op",
+]);
+const workerOutboxReasonClasses = new Set([
+  "invalid_payload",
+  "local_source_invalid",
+  "attempts_exhausted",
+  "reconciliation_exhausted",
+  "lease_expired",
+  "internal",
+]);
+
+export type WorkerOutboxMetricLabels = Readonly<{
+  topic: "safety_operator_escalation" | "admin_negative_feedback";
+  phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
+  outcome:
+    "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
+  reasonClass:
+    | "invalid_payload"
+    | "local_source_invalid"
+    | "attempts_exhausted"
+    | "reconciliation_exhausted"
+    | "lease_expired"
+    | "internal";
 }>;
 
 const referralModules = new Set(["expert_referral", "expert_residency"]);
@@ -130,7 +178,52 @@ export type ExpertReferralMetricLabels = Readonly<{
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export function referralMetricLabels(value: unknown): ExpertReferralMetricLabels {
+export function workerOutboxMetricLabels(
+  value: unknown,
+): WorkerOutboxMetricLabels {
+  if (!isRecord(value)) {
+    throw new Error("invalid_worker_outbox_metric_labels");
+  }
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 4 ||
+    keys.some(
+      (key) =>
+        key !== "topic" &&
+        key !== "phase" &&
+        key !== "outcome" &&
+        key !== "reasonClass",
+    ) ||
+    typeof value.topic !== "string" ||
+    !workerOutboxTopics.has(value.topic) ||
+    typeof value.phase !== "string" ||
+    !workerOutboxPhases.has(value.phase) ||
+    typeof value.outcome !== "string" ||
+    !workerOutboxOutcomes.has(value.outcome) ||
+    typeof value.reasonClass !== "string" ||
+    !workerOutboxReasonClasses.has(value.reasonClass)
+  ) {
+    throw new Error("invalid_worker_outbox_metric_labels");
+  }
+  return value as WorkerOutboxMetricLabels;
+}
+
+export function recordWorkerOutboxMetric(
+  labels: WorkerOutboxMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error("invalid_worker_outbox_metric_count");
+  }
+  operationalMetrics.workerOutboxDelivery.add(
+    count,
+    workerOutboxMetricLabels(labels),
+  );
+}
+
+export function referralMetricLabels(
+  value: unknown,
+): ExpertReferralMetricLabels {
   if (!isRecord(value)) throw new Error("invalid_referral_metric_labels");
   const keys = Object.keys(value);
   if (
