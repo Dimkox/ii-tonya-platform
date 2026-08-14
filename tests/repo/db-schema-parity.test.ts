@@ -454,6 +454,10 @@ describe("authoritative Drizzle schema parity", () => {
         "utf8",
       ),
       readFileSync("packages/db/migrations/0030_client_sessions.sql", "utf8"),
+      readFileSync(
+        "packages/db/migrations/0031_client_booking_references.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -552,6 +556,20 @@ describe("authoritative Drizzle schema parity", () => {
       "client_identity_proof_receipts_expiry_check",
       "client_identity_proof_receipts_session_digest_unique",
       "client_identity_proof_receipts_expiry_idx",
+      "client_catalog_choices_choice_digest_check",
+      "client_catalog_choices_choice_digest_unique",
+      "client_catalog_choices_expiry_check",
+      "client_catalog_choices_request_expiry_idx",
+      "client_booking_receipts_user_choice_unique",
+      "client_booking_receipts_booking_handle_unique",
+      "client_booking_receipts_reservation_unique",
+      "client_booking_receipts_choice_digest_check",
+      "client_booking_receipts_booking_handle_check",
+      "client_booking_receipts_owner_handle_idx",
+      "client_booking_erasure_work_phase_check",
+      "client_booking_erasure_work_attempt_count_check",
+      "client_booking_erasure_work_lease_check",
+      "client_booking_erasure_work_claim_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
     expect(migration).toContain(
@@ -565,16 +583,36 @@ describe("authoritative Drizzle schema parity", () => {
     );
   });
 
-  it("registers migration 0030 last in the ordered Drizzle journal", () => {
+  it("keeps the principal migration directly before client booking", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    const latest = journal.entries.at(-1);
-    expect(latest).toMatchObject({
+    const principal = journal.entries.at(-2);
+    expect(principal).toMatchObject({
       idx: 30,
       tag: "0030_client_sessions",
     });
-    expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
+    expect(principal?.when).toBeGreaterThan(journal.entries.at(-3)?.when ?? 0);
+  });
+
+  it("registers the protected client booking relations as migration 0031", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; when: number; tag: string }> };
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 31,
+      tag: "0031_client_booking_references",
+    });
+    expect(
+      existsSync("packages/db/migrations/0031_client_booking_references.sql"),
+    ).toBe(true);
+    for (const exportName of [
+      "clientCatalogChoices",
+      "clientBookingReceipts",
+      "clientBookingErasureWork",
+    ]) {
+      expect(dbSchema, exportName).toHaveProperty(exportName);
+    }
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

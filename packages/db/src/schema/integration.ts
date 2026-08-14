@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { messageEvents } from "./billing.js";
+import { slots } from "./catalog.js";
 import { users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
@@ -259,7 +260,10 @@ export const clientCatalogTombstones = pgTable(
     state: text("state").notNull().default("expired"),
   },
   (table) => [
-    check("client_catalog_tombstones_state_check", sql`${table.state} = 'expired'`),
+    check(
+      "client_catalog_tombstones_state_check",
+      sql`${table.state} = 'expired'`,
+    ),
   ],
 );
 
@@ -278,6 +282,39 @@ export const clientCatalogErasureIndex = pgTable(
     index("client_catalog_erasure_index_subject_idx").on(
       table.subjectKey,
       table.requestId,
+    ),
+  ],
+);
+export const clientCatalogChoices = pgTable(
+  "client_catalog_choices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => clientCatalogRequests.id, { onDelete: "cascade" }),
+    choiceDigest: char("choice_digest", { length: 71 }).notNull(),
+    slotId: uuid("slot_id")
+      .notNull()
+      .references(() => slots.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("client_catalog_choices_choice_digest_unique").on(
+      table.choiceDigest,
+    ),
+    check(
+      "client_catalog_choices_choice_digest_check",
+      sql`${table.choiceDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_catalog_choices_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    index("client_catalog_choices_request_expiry_idx").on(
+      table.requestId,
+      table.expiresAt,
+      table.id,
     ),
   ],
 );
