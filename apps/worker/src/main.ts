@@ -101,6 +101,9 @@ export function composeWorkerOutboxDelivery(
   metricRecorder: WorkerOutboxMetricRecorder = recordWorkerOutboxMetric,
 ) {
   const registry = requireWorkerOutboxRegistry(registryInput);
+  if (typeof metricRecorder !== "function") {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
   const repository = new PostgresOutboxRepository(db, registry.topics);
   return {
     registry,
