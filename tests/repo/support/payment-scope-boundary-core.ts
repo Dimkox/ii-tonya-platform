@@ -163,11 +163,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "a7727399e10c27b968c8ad4acd4242bdde625e8ca3e9c8de1288363f80c050e0",
+    "22acc3fbf7978a162c262da6555573589a7b913394e251beeb703c2b5069185d",
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
-    "381e0562873a7131e7fc1d5f0e2e55125eeed074dd62a770bed8476658837764",
+    "52fa4499a97eb9f24db70e2ddbaf6d9cf7118379c49f1878b567b7fdf798c2ac",
   ],
   [
     "packages/integrations/src/yookassa/verifier.ts",

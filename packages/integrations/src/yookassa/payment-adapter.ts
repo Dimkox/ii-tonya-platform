@@ -76,7 +76,6 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     const operation = await this.deps.operations.claim({
       commandId: stableUuid("yookassa-command", commandIdentity),
       orderId: command.orderId,
-      paymentAttemptId: stableUuid("yookassa-attempt", commandIdentity),
       kind: "create_payment",
       mode: this.deps.mode,
       amountMinor: command.amountMinor,
@@ -138,7 +137,6 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     const operation = await this.deps.operations.claim({
       commandId: stableUuid("yookassa-refund-command", identity),
       orderId: command.orderId,
-      paymentAttemptId: stableUuid("yookassa-attempt", command.orderId),
       kind: "create_refund",
       mode: this.deps.mode,
       amountMinor: command.amountMinor,

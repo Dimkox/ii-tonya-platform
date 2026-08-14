@@ -63,6 +63,15 @@ interface StoredOperation extends Record<string, unknown> {
   status: YooKassaOperationStatus;
 }
 
+interface StoredPaymentAttempt extends Record<string, unknown> {
+  id: string;
+  orderId: string;
+  providerRequestId: string;
+  expectedAmountMinor: string;
+  currency: "RUB";
+  status: "created" | "pending" | "unknown_outcome" | "settled" | "failed";
+}
+
 const toOperation = (row: StoredOperation): YooKassaOperation => ({
   id: row.id,
   orderId: row.orderId,
@@ -89,7 +98,8 @@ const validateClaim = (command: ClaimYooKassaOperationCommand): void => {
   if (
     !UUID.test(command.commandId) ||
     !UUID.test(command.orderId) ||
-    !UUID.test(command.paymentAttemptId) ||
+    (command.paymentAttemptId !== undefined &&
+      !UUID.test(command.paymentAttemptId)) ||
     !DIGEST.test(command.requestDigest) ||
     amount <= 0n ||
     amount > 999_999_999_999n ||
@@ -132,21 +142,130 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     command: ClaimYooKassaOperationCommand,
   ): Promise<YooKassaOperation> {
     validateClaim(command);
-    const claimDigest = canonicalYooKassaRequestDigest(command);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
-        const parent = await tx.execute<{ id: string }>(sql`
-          select a.id
+        const prior = await tx.execute<StoredOperation>(sql`
+          select id,order_id as "orderId",
+            payment_attempt_id as "paymentAttemptId",
+            operation_kind as "operationKind",
+            environment_mode as "environmentMode",
+            provider_object_id as "providerObjectId",
+            parent_payment_id as "parentPaymentId",
+            amount_minor::text as "amountMinor",currency,
+            request_digest as "requestDigest",claim_digest as "claimDigest",
+            idempotency_key::text as "idempotencyKey",status
+          from expert_residency_provider_operations
+          where provider='yookassa' and command_id=${command.commandId}::uuid
+          for update
+        `);
+        const replay = prior.rows[0];
+        if (replay !== undefined) {
+          const replayDigest = canonicalYooKassaRequestDigest({
+            ...command,
+            paymentAttemptId:
+              command.paymentAttemptId ?? replay.paymentAttemptId,
+          });
+          if (replay.claimDigest !== replayDigest) {
+            throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
+          }
+          return toOperation(replay);
+        }
+        let paymentAttemptId = command.paymentAttemptId;
+        if (
+          command.kind === "create_payment" &&
+          paymentAttemptId === undefined
+        ) {
+          const order = await tx.execute<{
+            id: string;
+            cashMinor: string;
+            currency: string;
+            status: string;
+          }>(sql`
+            select id,cash_minor::text as "cashMinor",currency,status
+            from expert_residency_orders
+            where id=${command.orderId}::uuid
+            for update
+          `);
+          const row = order.rows[0];
+          if (
+            row === undefined ||
+            row.status !== "payment_pending" ||
+            row.cashMinor !== command.amountMinor ||
+            row.currency !== command.currency
+          ) {
+            throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+          }
+          const providerRequestId = `command:${command.commandId}`;
+          const attemptIdempotencyKey = `yookassa:${command.commandId}`;
+          await tx.execute(sql`
+            insert into expert_residency_payment_attempts (
+              order_id,provider,provider_request_id,expected_amount_minor,
+              currency,status,idempotency_key
+            ) values (
+              ${command.orderId}::uuid,'yookassa',${providerRequestId},
+              ${command.amountMinor}::bigint,'RUB','created',
+              ${attemptIdempotencyKey}
+            ) on conflict (provider,provider_request_id) do nothing
+          `);
+          const attempt = await tx.execute<StoredPaymentAttempt>(sql`
+            select id,order_id as "orderId",
+              provider_request_id as "providerRequestId",
+              expected_amount_minor::text as "expectedAmountMinor",
+              currency,status
+            from expert_residency_payment_attempts
+            where provider='yookassa' and provider_request_id=${providerRequestId}
+            for update
+          `);
+          const stored = attempt.rows[0];
+          if (
+            stored === undefined ||
+            stored.orderId !== command.orderId ||
+            stored.expectedAmountMinor !== command.amountMinor ||
+            stored.currency !== command.currency ||
+            !["created", "pending", "unknown_outcome"].includes(stored.status)
+          ) {
+            throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
+          }
+          paymentAttemptId = stored.id;
+        }
+        if (
+          command.kind === "create_refund" &&
+          paymentAttemptId === undefined
+        ) {
+          const attempt = await tx.execute<StoredPaymentAttempt>(sql`
+            select id,order_id as "orderId",
+              provider_request_id as "providerRequestId",
+              expected_amount_minor::text as "expectedAmountMinor",
+              currency,status
+            from expert_residency_payment_attempts
+            where provider='yookassa'
+              and provider_request_id=${command.parentPaymentId!}
+              and order_id=${command.orderId}::uuid
+            for update
+          `);
+          paymentAttemptId = attempt.rows[0]?.id;
+        }
+        if (paymentAttemptId === undefined) {
+          throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+        }
+        const parent = await tx.execute<StoredPaymentAttempt>(sql`
+          select a.id,a.order_id as "orderId",
+            a.provider_request_id as "providerRequestId",
+            a.expected_amount_minor::text as "expectedAmountMinor",
+            a.currency,a.status
           from expert_residency_payment_attempts a
           join expert_residency_orders o on o.id = a.order_id
-          where a.id = ${command.paymentAttemptId}::uuid
+          where a.id = ${paymentAttemptId}::uuid
             and a.order_id = ${command.orderId}::uuid
+            and a.provider='yookassa'
           for update of a, o
         `);
         if (parent.rows.length !== 1) {
           throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
         }
+        const resolvedCommand = { ...command, paymentAttemptId };
+        const claimDigest = canonicalYooKassaRequestDigest(resolvedCommand);
         await tx.execute(sql`
           insert into expert_residency_provider_operations (
             command_id, order_id, payment_attempt_id, operation_kind,
@@ -154,7 +273,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
             currency, request_digest, claim_digest
           ) values (
             ${command.commandId}::uuid, ${command.orderId}::uuid,
-            ${command.paymentAttemptId}::uuid, ${command.kind}, 'yookassa',
+            ${paymentAttemptId}::uuid, ${command.kind}, 'yookassa',
             ${command.mode}, ${command.parentPaymentId ?? null},
             ${command.amountMinor}::bigint, 'RUB', ${command.requestDigest},
             ${claimDigest}
@@ -215,6 +334,21 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
                 updated_at = transaction_timestamp()
             where id = ${operationId}::uuid and provider_object_id is null
           `);
+          if (existing.operationKind === "create_payment") {
+            const attempt = await tx.execute<{ id: string }>(sql`
+              update expert_residency_payment_attempts
+              set provider_request_id=${providerObjectId},status='pending',
+                  updated_at=transaction_timestamp()
+              where id=${existing.paymentAttemptId}::uuid
+                and order_id=${existing.orderId}::uuid
+                and provider='yookassa'
+                and status in ('created','pending','unknown_outcome')
+              returning id
+            `);
+            if (attempt.rows.length !== 1) {
+              throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+            }
+          }
         }
         const updated = await selectOperation(
           tx as unknown as DrizzleDb,

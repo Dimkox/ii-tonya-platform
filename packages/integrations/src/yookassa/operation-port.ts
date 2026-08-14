@@ -27,7 +27,7 @@ export interface YooKassaOperation {
 export interface ClaimYooKassaOperationCommand {
   readonly commandId: string;
   readonly orderId: string;
-  readonly paymentAttemptId: string;
+  readonly paymentAttemptId?: string;
   readonly kind: YooKassaOperationKind;
   readonly mode: YooKassaMode;
   readonly amountMinor: string;

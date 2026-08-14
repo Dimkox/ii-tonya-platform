@@ -15,7 +15,6 @@ const db = createDb(isolatedUrl.toString());
 const repository = new PostgresYooKassaOperationRepository(db);
 
 const orderId = "00000000-0000-4000-8000-000000000301";
-const attemptId = "00000000-0000-4000-8000-000000000302";
 const commandId = "00000000-0000-4000-8000-000000000303";
 const requestDigest = `sha256:${"c".repeat(64)}`;
 
@@ -26,10 +25,26 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
     );
     await db.execute(
       sql.raw(`
-      create table expert_residency_orders (id uuid primary key);
-      create table expert_residency_payment_attempts (
+      create table expert_residency_orders (
         id uuid primary key,
+        cash_minor bigint not null,
+        currency text not null,
+        status text not null
+      );
+      create table expert_residency_payment_attempts (
+        id uuid primary key default gen_random_uuid(),
         order_id uuid not null references expert_residency_orders(id),
+        provider text not null,
+        provider_request_id text not null,
+        expected_amount_minor bigint not null,
+        currency text not null,
+        status text not null default 'created',
+        idempotency_key text not null,
+        resolved_at timestamptz,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique (provider, provider_request_id),
+        unique (idempotency_key),
         unique (id, order_id)
       );
     `),
@@ -46,10 +61,7 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       sql`truncate expert_residency_provider_operations, expert_residency_payment_attempts, expert_residency_orders`,
     );
     await db.execute(
-      sql`insert into expert_residency_orders (id) values (${orderId}::uuid)`,
-    );
-    await db.execute(
-      sql`insert into expert_residency_payment_attempts (id, order_id) values (${attemptId}::uuid,${orderId}::uuid)`,
+      sql`insert into expert_residency_orders (id,cash_minor,currency,status) values (${orderId}::uuid,50000,'RUB','payment_pending')`,
     );
   });
 
@@ -64,7 +76,6 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
     const command = {
       commandId,
       orderId,
-      paymentAttemptId: attemptId,
       kind: "create_payment" as const,
       mode: "test" as const,
       amountMinor: "50000",
@@ -83,13 +94,19 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       sql`select count(*)::int as count from expert_residency_provider_operations`,
     );
     expect(rows.rows[0]?.count).toBe(1);
+    expect(
+      new Set(claims.map(({ paymentAttemptId }) => paymentAttemptId)),
+    ).toHaveLength(1);
+    const attempts = await db.execute<{ count: number }>(
+      sql`select count(*)::int as count from expert_residency_payment_attempts where order_id=${orderId}::uuid and provider='yookassa' and expected_amount_minor=50000`,
+    );
+    expect(attempts.rows[0]?.count).toBe(1);
   });
 
   it("rejects conflicting replay and compare-and-set provider rebinding", async () => {
     const claimed = await repository.claim({
       commandId,
       orderId,
-      paymentAttemptId: attemptId,
       kind: "create_payment",
       mode: "test",
       amountMinor: "50000",
@@ -100,7 +117,6 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       repository.claim({
         commandId,
         orderId,
-        paymentAttemptId: attemptId,
         kind: "create_payment",
         mode: "test",
         amountMinor: "50001",
@@ -114,6 +130,16 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       (await repository.bindProviderObject(claimed.id, providerId))
         .providerObjectId,
     ).toBe(providerId);
+    const attempt = await db.execute<{
+      providerRequestId: string;
+      status: string;
+    }>(
+      sql`select provider_request_id as "providerRequestId",status from expert_residency_payment_attempts where id=${claimed.paymentAttemptId}::uuid`,
+    );
+    expect(attempt.rows[0]).toEqual({
+      providerRequestId: providerId,
+      status: "pending",
+    });
     await expect(
       repository.bindProviderObject(claimed.id, randomUUID()),
     ).rejects.toMatchObject({ code: "YOOKASSA_PROVIDER_BINDING_CONFLICT" });
