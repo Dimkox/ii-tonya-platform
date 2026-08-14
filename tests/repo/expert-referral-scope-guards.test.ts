@@ -24,6 +24,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
       "packages/db/migrations/0021_expert_settlement_snapshot.sql",
       "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+      "packages/db/migrations/0023_yookassa_provider_operations.sql",
+      "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
