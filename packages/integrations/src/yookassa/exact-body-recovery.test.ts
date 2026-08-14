@@ -8,6 +8,7 @@ const claim = {
   bodyVersion: 1,
   keyReference: "kms:yookassa-replay-v1",
   idempotencyKey: "11111111-1111-4111-8111-111111111111",
+  requestDigest: `sha256:${"a".repeat(64)}`,
   leaseToken: "lease-1",
   status: "unknown_outcome" as const,
   providerObjectId: null,
@@ -38,17 +39,27 @@ describe("exact-body YooKassa recovery", () => {
       .fn()
       .mockResolvedValue({ providerObjectId: "payment_1" });
     const bind = vi.fn().mockResolvedValue(undefined);
+    const decrypt = vi.fn().mockResolvedValue({ body, bodyVersion: 1 });
     await expect(
       recoverExactYooKassaOperation({
         enabled: true,
         claim,
-        decryptor: {
-          decrypt: vi.fn().mockResolvedValue({ body, bodyVersion: 1 }),
-        },
+        decryptor: { decrypt },
         transport: { postExact },
         completion: { bind, manualReview: vi.fn() },
       }),
     ).resolves.toEqual({ kind: "bound", providerObjectId: "payment_1" });
+    expect(decrypt).toHaveBeenCalledWith({
+      encryptedBody: claim.encryptedBody,
+      keyReference: claim.keyReference,
+      associatedData: {
+        operationId: claim.operationId,
+        operationKind: claim.operationKind,
+        idempotencyKey: claim.idempotencyKey,
+        requestDigest: claim.requestDigest,
+        bodyVersion: claim.bodyVersion,
+      },
+    });
     expect(postExact).toHaveBeenCalledWith({
       operationKind: "create_payment",
       body,

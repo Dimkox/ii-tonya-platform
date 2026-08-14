@@ -169,6 +169,13 @@
       "when": 1786669200000,
       "tag": "0023_yookassa_provider_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786672800000,
+      "tag": "0024_yookassa_encrypted_recovery",
+      "breakpoints": true
     }
   ]
 }

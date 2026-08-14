@@ -23,7 +23,7 @@ CREATE TABLE "expert_residency_receipt_contacts" (
 --> statement-breakpoint
 CREATE INDEX "expert_receipt_contacts_authority_idx" ON "expert_residency_receipt_contacts" ("user_id","consent_purpose","policy_version","created_at" DESC,"id" DESC);
 --> statement-breakpoint
-CREATE TRIGGER "expert_receipt_contacts_append_only" BEFORE UPDATE OR DELETE ON "expert_residency_receipt_contacts" FOR EACH ROW EXECUTE FUNCTION reject_append_only_mutation();
+CREATE TRIGGER "expert_receipt_contacts_append_only" BEFORE UPDATE OR DELETE ON "expert_residency_receipt_contacts" FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();
 --> statement-breakpoint
 ALTER TABLE "expert_residency_provider_operations" ADD COLUMN "replay_ciphertext" text;
 --> statement-breakpoint

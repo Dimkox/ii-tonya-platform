@@ -23,6 +23,13 @@ describe("Postgres YooKassa receipt contact authority", () => {
     expect(query).toContain("expert_residency_orders");
     expect(query).toContain("join experts");
     expect(query).toContain("expert_residency_receipt_contacts");
+    expect(query).toContain(
+      "join consents consent on consent.id = contact.consent_id",
+    );
+    expect(query).toContain("consent.user_id = contact.user_id");
+    expect(query).toContain("consent.decision = contact.consent_decision");
+    expect(query).toContain("consent.consent_type = contact.consent_purpose");
+    expect(query).toContain("consent.policy_version = contact.policy_version");
     expect(query).toContain("consent_purpose");
     expect(query).toContain("policy_version");
     expect(query).toContain("order by");

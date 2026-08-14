@@ -40,17 +40,22 @@ export class PostgresYooKassaReceiptContactAuthority implements YooKassaReceiptC
         contact.contact_kind as "contactKind",
         contact.ciphertext,
         contact.key_reference as "keyReference",
-        contact.consent_decision as "consentDecision",
-        contact.consent_purpose as "consentPurpose",
-        contact.policy_version as "policyVersion",
+        consent.decision as "consentDecision",
+        consent.consent_type as "consentPurpose",
+        consent.policy_version as "policyVersion",
         contact.verified_at as "verifiedAt",
         contact.revoked_at as "revokedAt"
       from expert_residency_orders residency_order
       join experts expert on expert.id = residency_order.expert_id
       join expert_residency_receipt_contacts contact on contact.user_id = expert.user_id
+      join consents consent on consent.id = contact.consent_id
+        and consent.user_id = contact.user_id
+        and consent.decision = contact.consent_decision
+        and consent.consent_type = contact.consent_purpose
+        and consent.policy_version = contact.policy_version
       where residency_order.id = ${orderId}::uuid
-        and contact.consent_purpose = ${consentPurpose}
-        and contact.policy_version = ${policyVersion}
+        and consent.consent_type = ${consentPurpose}
+        and consent.policy_version = ${policyVersion}
       order by contact.created_at desc, contact.id desc
       limit 1
     `);

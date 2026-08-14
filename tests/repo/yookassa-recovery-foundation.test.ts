@@ -4,6 +4,16 @@ import { describe, expect, it } from "vitest";
 const path = "packages/db/migrations/0024_yookassa_encrypted_recovery.sql";
 
 describe("YooKassa encrypted recovery schema", () => {
+  it("registers migration 0024 in the ordered Drizzle journal", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; tag: string }> };
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 24,
+      tag: "0024_yookassa_encrypted_recovery",
+    });
+  });
+
   it("stores receipt contacts append-only and never defines plaintext contact columns", () => {
     expect(existsSync(path)).toBe(true);
     const sql = readFileSync(path, "utf8").toLowerCase();
@@ -31,7 +41,7 @@ describe("YooKassa encrypted recovery schema", () => {
     ])
       expect(sql).toContain(`\"${column}\"`);
     expect(sql).toContain(
-      "for each row execute function reject_append_only_mutation()",
+      "for each row execute function reject_append_only_change()",
     );
     expect(sql).toContain("expert_provider_operations_unbound_recovery_idx");
     expect(sql).toContain('"provider_object_id" is null');

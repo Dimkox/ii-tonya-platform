@@ -527,6 +527,8 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           and replay_ciphertext is not null and manual_review_at is null
           and (recovery_expires_at <= transaction_timestamp()
             or recovery_attempt >= ${input.maxAttempts})
+          and (recovery_lease_until is null
+            or recovery_lease_until < transaction_timestamp())
       `);
       const result = await tx.execute<{
         operationId: string;
@@ -535,6 +537,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         bodyVersion: number;
         keyReference: string;
         idempotencyKey: string;
+        requestDigest: string;
         leaseToken: string;
         status: "unknown_outcome";
         providerObjectId: null;
@@ -563,6 +566,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           operation.replay_body_version as "bodyVersion",
           operation.replay_key_reference as "keyReference",
           operation.idempotency_key::text as "idempotencyKey",
+          operation.request_digest as "requestDigest",
           operation.recovery_lease_token::text as "leaseToken",
           operation.status, operation.provider_object_id as "providerObjectId"
       `);

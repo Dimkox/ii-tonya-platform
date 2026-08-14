@@ -169,7 +169,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
-    "599c4621cd735d9afe78428228cb6b9264c7182fdfeab081225c32e1827dae8f",
+    "f5be246cab03659fc3082c1eca1d491223ef60e730f0c762958ff65f01e802e2",
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
@@ -582,7 +582,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
-    "11b1b50c4ada1ddceb1d6d1f918a2c882fb81d03fb3ceac7fdddb144d6ebab72",
+    "05c9447c12d75a0b4a8400822a43d9dfd8ed4855fdb3913dd5836923a8c0679c",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -662,7 +662,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "fecdb577436f818303be23754a3bf70e60ac71e7eb2d5833e476d9163d415db2",
+    "18487f7e5ede990b0010c223afc396366bf5fd899106ba866dbc06328685b2bd",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

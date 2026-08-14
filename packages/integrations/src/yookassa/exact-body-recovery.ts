@@ -1,6 +1,14 @@
 export type YooKassaExactRecoveryOperationKind =
   "create_payment" | "create_refund";
 
+export interface YooKassaReplayAssociatedData {
+  readonly operationId: string;
+  readonly operationKind: YooKassaExactRecoveryOperationKind;
+  readonly idempotencyKey: string;
+  readonly requestDigest: string;
+  readonly bodyVersion: number;
+}
+
 export interface YooKassaExactRecoveryClaim {
   readonly operationId: string;
   readonly operationKind: YooKassaExactRecoveryOperationKind;
@@ -8,6 +16,7 @@ export interface YooKassaExactRecoveryClaim {
   readonly bodyVersion: number;
   readonly keyReference: string;
   readonly idempotencyKey: string;
+  readonly requestDigest: string;
   readonly leaseToken: string;
   readonly status: "unknown_outcome" | "succeeded" | "canceled" | "failed";
   readonly providerObjectId: string | null;
@@ -15,7 +24,12 @@ export interface YooKassaExactRecoveryClaim {
 
 export interface YooKassaReplayDecryptor {
   decrypt(
-    input: Pick<YooKassaExactRecoveryClaim, "encryptedBody" | "keyReference">,
+    input: Pick<
+      YooKassaExactRecoveryClaim,
+      "encryptedBody" | "keyReference"
+    > & {
+      readonly associatedData: YooKassaReplayAssociatedData;
+    },
   ): Promise<{
     readonly body: string;
     readonly bodyVersion: number;
@@ -27,6 +41,7 @@ export interface YooKassaReplayProtector {
   protect(input: {
     readonly body: string;
     readonly bodyVersion: number;
+    readonly associatedData: YooKassaReplayAssociatedData;
   }): Promise<{
     readonly ciphertext: string;
     readonly keyReference: string;
@@ -77,6 +92,13 @@ export async function recoverExactYooKassaOperation(input: {
   const decrypted = await input.decryptor.decrypt({
     encryptedBody: input.claim.encryptedBody,
     keyReference: input.claim.keyReference,
+    associatedData: {
+      operationId: input.claim.operationId,
+      operationKind: input.claim.operationKind,
+      idempotencyKey: input.claim.idempotencyKey,
+      requestDigest: input.claim.requestDigest,
+      bodyVersion: input.claim.bodyVersion,
+    },
   });
   if (decrypted.bodyVersion !== input.claim.bodyVersion) {
     await input.completion.manualReview(

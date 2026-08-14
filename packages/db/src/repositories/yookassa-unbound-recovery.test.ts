@@ -21,6 +21,16 @@ describe("YooKassa unbound recovery repository", () => {
     expect(source).toContain("recovery_lease_token = gen_random_uuid()");
     expect(source).toContain("manual_review_at = transaction_timestamp()");
     expect(source).toContain("recovery_expires_at <= transaction_timestamp()");
+    const manualReviewPrepass = source.slice(
+      source.indexOf("set manual_review_at = transaction_timestamp()"),
+      source.indexOf(
+        "const result = await tx.execute",
+        source.indexOf("claimunboundrecoverybatch"),
+      ),
+    );
+    expect(manualReviewPrepass).toMatch(
+      /recovery_lease_until is null\s+or recovery_lease_until < transaction_timestamp\(\)/u,
+    );
     expect(source).not.toContain("offset ${");
   });
 });
