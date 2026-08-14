@@ -21,7 +21,7 @@ const support = {
   id: "00000000-0000-4000-8000-000000000001",
   sessionIdHash: "sha256:support-session",
   roles: ["support" as const],
-  mfaVerifiedAt: new Date("2026-08-14T09:59:00.000Z"),
+  mfaVerifiedAt: new Date("2026-08-14T05:59:00.000Z"),
 };
 const security = {
   ...support,
@@ -78,14 +78,14 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
       insert into integration_outbox (id,topic,status,payload,created_at)
       values (
         '00000000-0000-4000-8000-000000000200','mail.delivery','dead_letter',
-        '{}','2026-08-14T09:58:00Z'
+        '{}','2026-08-14T05:58:00Z'
       )
     `);
     await db.execute(sql`
       insert into outbox_operator_alerts (outbox_id,reason_code,created_at)
       values (
         '00000000-0000-4000-8000-000000000200',
-        'Legacy Reason With Spaces / punctuation','2026-08-14T09:58:00Z'
+        'Legacy Reason With Spaces / punctuation','2026-08-14T05:58:00Z'
       )
     `);
     const migration = await readFile(
@@ -105,16 +105,16 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
       insert into integration_outbox (id,topic,payload,created_at) values
       ('00000000-0000-4000-8000-000000000203','admin.negative_feedback',
        ${JSON.stringify({ feedbackId: "not-a-uuid", rawText: "forbidden malformed feedback" })}::jsonb,
-       '2026-08-14T09:59:00Z'),
+       '2026-08-14T05:59:00Z'),
       ('00000000-0000-4000-8000-000000000204','admin.negative_feedback',
        ${JSON.stringify({ feedbackId: absentFeedbackId, rawText: "forbidden orphan feedback" })}::jsonb,
-       '2026-08-14T09:59:30Z'),
+       '2026-08-14T05:59:30Z'),
       ('00000000-0000-4000-8000-000000000201','safety.operator_escalation',
        ${JSON.stringify({ handoffId, rawDialogue: "forbidden safety narrative" })}::jsonb,
-       '2026-08-14T10:00:00Z'),
+       '2026-08-14T06:00:00Z'),
       ('00000000-0000-4000-8000-000000000202','admin.negative_feedback',
        ${JSON.stringify({ feedbackId, rawText: "forbidden private feedback" })}::jsonb,
-       '2026-08-14T10:01:00Z');
+       '2026-08-14T06:01:00Z');
     `);
   });
   afterAll(async () => {
@@ -182,14 +182,14 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
     const deliveryOutboxId = randomUUID();
     await db.execute(sql`
       insert into integration_outbox (id,topic,status,payload,created_at)
-      values (${deliveryOutboxId}::uuid,'mail.delivery','dead_letter','{}','2026-08-14T10:02:00Z')
+      values (${deliveryOutboxId}::uuid,'mail.delivery','dead_letter','{}','2026-08-14T06:02:00Z')
     `);
     await db.execute(sql`
       insert into outbox_operator_alerts (
-        outbox_id,reason_code,case_type,status,updated_at
+        outbox_id,reason_code,case_type,status,created_at,updated_at
       ) values (
         ${deliveryOutboxId}::uuid,'dispatch_attempts_exhausted',
-        'delivery_failure','open','2026-08-14T10:02:00Z'
+        'delivery_failure','open','2026-08-14T06:02:00Z','2026-08-14T06:02:00Z'
       );
     `);
     const service = createOperatorCaseService({ cases });
