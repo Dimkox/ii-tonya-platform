@@ -410,6 +410,83 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
+  it("returns retryable 503 without owning a busy xr1 inbox claim", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.claim.mockResolvedValueOnce({ kind: "busy" });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 906,
+          callback_query: {
+            id: "xr1-busy",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_checkout_unavailable" });
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.fail).not.toHaveBeenCalled();
+      expect(state.processResidencyCheckout).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("releases an xr1 inbox claim while checkout processing is nonterminal", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.processResidencyCheckout.mockResolvedValueOnce({
+      kind: "processing",
+      tokenHash: "c".repeat(64),
+      replay: true,
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 907,
+          callback_query: {
+            id: "xr1-processing",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_checkout_unavailable" });
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.sendResidencyCheckoutLink).not.toHaveBeenCalled();
+
+      const retry = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 907,
+          callback_query: {
+            id: "xr1-processing-retry",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json()).toEqual({ accepted: true });
+      expect(state.sendResidencyCheckoutLink).toHaveBeenCalledTimes(1);
+    } finally {
+      await state.app.close();
+    }
+  });
+
   it("completes a denied xr1 claim without attempting link delivery", async () => {
     const state = await build({ checkoutEnabled: true });
     state.processResidencyCheckout.mockResolvedValueOnce({

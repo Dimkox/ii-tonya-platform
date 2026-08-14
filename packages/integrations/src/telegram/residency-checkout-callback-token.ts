@@ -1,15 +1,14 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const PREFIX = "xr1.";
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const TELEGRAM_ID = /^[1-9]\d{0,19}$/u;
 const domain = Buffer.from("ii-tonya:expert-residency-checkout:xr1\0", "utf8");
+const issuanceDomain = Buffer.from(
+  "ii-tonya:expert-residency-checkout:xr1:issue:v1\0",
+  "utf8",
+);
 
 export interface ResidencyCheckoutCallbackClaims {
   readonly expertId: string;
@@ -51,8 +50,7 @@ export type ResidencyCheckoutStateClaim =
     }
   | { readonly kind: "processing"; readonly tokenHash: string };
 
-export interface ResidencyCheckoutStateStore
-  extends ResidencyCheckoutCallbackStore {
+export interface ResidencyCheckoutStateStore extends ResidencyCheckoutCallbackStore {
   inspectCheckout(
     tokenHash: string,
     expertId: string,
@@ -82,6 +80,22 @@ const valid = (claims: ResidencyCheckoutCallbackClaims): boolean =>
   Number.isFinite(claims.expiresAt.getTime());
 const digest = (nonce: Uint8Array): string =>
   createHash("sha256").update(nonce).digest("hex");
+const issuanceNonce = (
+  idempotencyKey: string,
+  claims: Omit<ResidencyCheckoutCallbackClaims, "expiresAt">,
+  secret: Uint8Array,
+): Buffer =>
+  createHmac("sha256", secret)
+    .update(issuanceDomain)
+    .update(idempotencyKey)
+    .update("\0")
+    .update(claims.telegramUserId)
+    .update("\0")
+    .update(claims.expertId)
+    .update("\0")
+    .update(claims.tariffVersionId)
+    .digest()
+    .subarray(0, 16);
 const mac = (
   nonce: Uint8Array,
   claims: Omit<ResidencyCheckoutCallbackClaims, "expiresAt">,
@@ -105,7 +119,9 @@ export class ResidencyCheckoutCallbackVerificationError extends Error {
   }
 }
 
-const decode = (token: string): { nonce: Buffer; tokenHash: string; mac: Buffer } => {
+const decode = (
+  token: string,
+): { nonce: Buffer; tokenHash: string; mac: Buffer } => {
   if (!token.startsWith(PREFIX)) throw new Error();
   const payload = Buffer.from(token.slice(PREFIX.length), "base64url");
   if (
@@ -124,9 +140,14 @@ export async function issueResidencyCheckoutCallback(
   secret: Uint8Array,
   store: ResidencyCheckoutCallbackStore,
 ): Promise<string> {
-  if (!valid(claims) || secret.byteLength < 32 || idempotencyKey.length < 1)
+  if (
+    !valid(claims) ||
+    secret.byteLength < 32 ||
+    idempotencyKey.length < 1 ||
+    idempotencyKey.length > 256
+  )
     throw new ResidencyCheckoutCallbackVerificationError();
-  const nonce = randomBytes(16);
+  const nonce = issuanceNonce(idempotencyKey, claims, secret);
   const token = `${PREFIX}${Buffer.concat([nonce, mac(nonce, claims, secret)]).toString("base64url")}`;
   await store.put(digest(nonce), claims, idempotencyKey);
   return token;

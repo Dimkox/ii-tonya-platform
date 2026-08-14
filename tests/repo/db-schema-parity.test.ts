@@ -489,10 +489,24 @@ describe("authoritative Drizzle schema parity", () => {
     expect(migration).toContain(
       'char_length("checkout_url") BETWEEN 1 AND 2048',
     );
+    expect(migration).toContain('"checkout_url" IS NOT NULL');
+    expect(migration).toContain('"checkout_url" ~* \'^https://');
     expect(migration).not.toContain("{1,2040}");
     expect(migration).toMatch(
       /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
     );
+  });
+
+  it("registers migration 0026 last in the ordered Drizzle journal", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; when: number; tag: string }> };
+    const latest = journal.entries.at(-1);
+    expect(latest).toMatchObject({
+      idx: 26,
+      tag: "0026_expert_telegram_checkout_outcomes",
+    });
+    expect(latest?.when).toBeGreaterThan(journal.entries.at(-2)?.when ?? 0);
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

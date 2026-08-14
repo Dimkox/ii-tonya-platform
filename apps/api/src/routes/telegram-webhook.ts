@@ -143,7 +143,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   unauthenticatedLimit?: number;
 }> = async (app, deps) => {
   if (
-    (deps.expertQueriesEnabled === true || deps.expertCheckoutEnabled === true) &&
+    (deps.expertQueriesEnabled === true ||
+      deps.expertCheckoutEnabled === true) &&
     deps.expertQueries === undefined
   ) {
     throw new Error("Expert Telegram query capability is required");
@@ -236,9 +237,15 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             }
           };
           const claim = await deps.inbox.claim("telegram", updateId);
-          if (claim.kind !== "claimed") {
+          if (claim.kind === "duplicate") {
             await answerBestEffort("unavailable");
             return { accepted: true, unavailable: true };
+          }
+          if (claim.kind === "busy") {
+            await answerBestEffort("unavailable");
+            return reply
+              .code(503)
+              .send({ error: "expert_checkout_unavailable" });
           }
           try {
             const principal = await deps.expertQueries.resolvePrincipal(
@@ -270,6 +277,13 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
               await deps.inbox.complete(claim.claimId);
               await answerBestEffort("processed");
               return { accepted: true };
+            }
+            if (result.kind === "processing") {
+              await deps.inbox.fail(claim.claimId);
+              await answerBestEffort("unavailable");
+              return reply
+                .code(503)
+                .send({ error: "expert_checkout_unavailable" });
             }
             await deps.inbox.complete(claim.claimId);
             await answerBestEffort("unavailable");

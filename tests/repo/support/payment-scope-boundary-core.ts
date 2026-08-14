@@ -597,7 +597,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
-    "63b6a66a6445f93504c85e5499c49e24f67e619d59f1114f54c26e8411a44091",
+    "35868ffc1cb73de322942aebee08922a75d226e30d5e739b1dc5d6681de2816b",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -677,7 +677,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "1d5f407bf64f5959bcbb65f9e4c4df5737af1450e7d45d6efa7d6948e37b6915",
+    "40e3aa88e5de4eb11f3284e5cf76280d53c29f53ed2231ac543fbe626b09287f",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -756,8 +756,7 @@ const paymentApplicationIdentifier =
 const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
 const expertResidencyRoute = /^\/v1\/(?:admin\/)?expert(?:-|\/)/u;
-const expertResidencyFlag =
-  /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
+const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;

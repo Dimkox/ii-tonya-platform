@@ -47,14 +47,16 @@ export type ExpertResidencyCheckoutClaim =
     }
   | { readonly kind: "processing"; readonly tokenHash: string };
 
-const validInstant = (value: Date): boolean =>
-  Number.isFinite(value.getTime());
+const validInstant = (value: Date): boolean => Number.isFinite(value.getTime());
 const validFence = (value: string): boolean => UUID.test(value);
 const validCheckoutUrl = (value: string): boolean => {
-  if (value.length < 1 || value.length > 2048 || /\s/u.test(value)) return false;
+  if (value.length < 1 || value.length > 2048 || /\s/u.test(value))
+    return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.username === "" && url.password === "";
+    return (
+      url.protocol === "https:" && url.username === "" && url.password === ""
+    );
   } catch {
     return false;
   }
@@ -87,13 +89,20 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
       throw new Error("invalid_expert_residency_callback");
     }
     const result = await this.db.$client.query(
-      `insert into expert_telegram_residency_callbacks
+      `insert into expert_telegram_residency_callbacks as c
        (token_hash,expert_id,telegram_user_id,tariff_version_id,action,idempotency_key,expires_at)
        select $1,$2::uuid,$3,$4::uuid,'start_residency_checkout',$5,$6
        from experts e
        join users u on u.id=e.user_id and u.active
        join channel_identities ci on ci.user_id=e.user_id and ci.provider='telegram' and ci.external_id=$3
        where e.id=$2::uuid and e.active and e.verified
+       on conflict (idempotency_key) do update
+       set idempotency_key=excluded.idempotency_key
+       where c.token_hash=excluded.token_hash
+         and c.expert_id=excluded.expert_id
+         and c.telegram_user_id=excluded.telegram_user_id
+         and c.tariff_version_id=excluded.tariff_version_id
+         and c.action=excluded.action
        returning token_hash`,
       [
         tokenHash,
@@ -303,12 +312,17 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
     ) {
       return false;
     }
-    const result = await this.db.$client.query(
+    const result = await this.db.$client.query<{ checkoutStatus: string }>(
       `update expert_telegram_residency_callbacks
-       set checkout_status=$3,checkout_url=$4,processing_fence=null,
-           processing_lease_until=null,outcome_recorded_at=$5
+       set checkout_status=case
+             when $3='ready' and expires_at<=$5 then 'unavailable'
+             else $3 end,
+           checkout_url=case
+             when $3='ready' and expires_at>$5 then $4 else null end,
+           processing_fence=null,
+            processing_lease_until=null,outcome_recorded_at=$5
        where token_hash=$1 and checkout_status='processing' and processing_fence=$2::uuid
-       returning token_hash`,
+       returning checkout_status as "checkoutStatus"`,
       [
         tokenHash,
         fence,
@@ -317,7 +331,9 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
         now,
       ],
     );
-    return result.rowCount === 1;
+    return (
+      result.rowCount === 1 && result.rows[0]?.checkoutStatus === outcome.kind
+    );
   }
 
   async clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number> {

@@ -183,6 +183,13 @@
       "when": 1786683600000,
       "tag": "0025_expert_telegram_residency_callbacks",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786687200000,
+      "tag": "0026_expert_telegram_checkout_outcomes",
+      "breakpoints": true
     }
   ]
 }

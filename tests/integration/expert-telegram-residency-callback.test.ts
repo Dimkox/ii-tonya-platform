@@ -135,9 +135,7 @@ describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
         ),
       ),
     );
-    const acquired = winners.filter(
-      (result) => result?.kind === "acquired",
-    );
+    const acquired = winners.filter((result) => result?.kind === "acquired");
     expect(acquired).toHaveLength(1);
     const winner = acquired[0];
     if (winner?.kind !== "acquired") throw new Error("missing winner");
@@ -206,9 +204,7 @@ describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
         ),
       ),
     );
-    const recovered = attempts.filter(
-      (result) => result?.kind === "acquired",
-    );
+    const recovered = attempts.filter((result) => result?.kind === "acquired");
     expect(recovered).toHaveLength(1);
     expect(recovered[0]).toMatchObject({ recovery: true });
     await expect(
@@ -264,5 +260,90 @@ describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
       checkoutUrl: null,
       checkoutStatus: "unavailable",
     });
+  });
+
+  it("downgrades a ready outcome completed after callback expiry", async () => {
+    const tokenHash = "f".repeat(64);
+    const now = new Date();
+    const claims = {
+      expertId,
+      telegramUserId: "123456789",
+      tariffVersionId,
+      action: "start_residency_checkout" as const,
+      expiresAt: new Date(now.getTime() + 1_000),
+    };
+    await repository.put(tokenHash, claims, "telegram:quote:late-ready");
+    const claim = await repository.claimCheckout(
+      tokenHash,
+      claims,
+      now,
+      claims.expiresAt,
+      randomUUID(),
+    );
+    if (claim?.kind !== "acquired") throw new Error("missing claim");
+
+    await expect(
+      repository.recordCheckoutOutcome(
+        tokenHash,
+        claim.fence,
+        { kind: "ready", checkoutUrl: "HTTPS://pay.example/late" },
+        new Date(claims.expiresAt.getTime() + 1),
+      ),
+    ).resolves.toBe(false);
+    const state = await db.execute<{
+      checkoutUrl: string | null;
+      checkoutStatus: string;
+    }>(sql`select checkout_url as "checkoutUrl",checkout_status as "checkoutStatus"
+           from expert_telegram_residency_callbacks where token_hash=${tokenHash}`);
+    expect(state.rows[0]).toEqual({
+      checkoutUrl: null,
+      checkoutStatus: "unavailable",
+    });
+  });
+
+  it("requires a ready URL and accepts an uppercase HTTPS scheme", async () => {
+    const now = new Date();
+    const claims = {
+      expertId,
+      telegramUserId: "123456789",
+      tariffVersionId,
+      action: "start_residency_checkout" as const,
+      expiresAt: new Date(now.getTime() + 60_000),
+    };
+    const missingUrlHash = "7".repeat(64);
+    await repository.put(missingUrlHash, claims, "telegram:quote:null-ready");
+    const missingUrlClaim = await repository.claimCheckout(
+      missingUrlHash,
+      claims,
+      now,
+      new Date(now.getTime() + 30_000),
+      randomUUID(),
+    );
+    if (missingUrlClaim?.kind !== "acquired") throw new Error("missing claim");
+    await expect(
+      db.execute(sql`update expert_telegram_residency_callbacks
+        set checkout_status='ready',checkout_url=null,processing_fence=null,
+            processing_lease_until=null,outcome_recorded_at=${now}
+        where token_hash=${missingUrlHash}`),
+    ).rejects.toThrow();
+
+    const uppercaseHash = "8".repeat(64);
+    await repository.put(uppercaseHash, claims, "telegram:quote:uppercase");
+    const uppercaseClaim = await repository.claimCheckout(
+      uppercaseHash,
+      claims,
+      now,
+      new Date(now.getTime() + 30_000),
+      randomUUID(),
+    );
+    if (uppercaseClaim?.kind !== "acquired") throw new Error("missing claim");
+    await expect(
+      repository.recordCheckoutOutcome(
+        uppercaseHash,
+        uppercaseClaim.fence,
+        { kind: "ready", checkoutUrl: "HTTPS://pay.example/checkout" },
+        now,
+      ),
+    ).resolves.toBe(true);
   });
 });
