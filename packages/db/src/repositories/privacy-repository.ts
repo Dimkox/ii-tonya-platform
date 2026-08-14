@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import {
+  validateClientCatalogCards,
+  type ClientCatalogCard,
+} from "./client-catalog-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 export interface WithdrawConsentCommand {
@@ -25,7 +29,7 @@ export interface SubjectExport {
   readonly catalogSnapshots: readonly {
     catalogRequestId: string;
     expiresAt: string;
-    cards: readonly Record<string, unknown>[];
+    cards: readonly ClientCatalogCard[];
   }[];
 }
 export interface StartErasureCommand {
@@ -168,13 +172,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       where r.user_id=${userId}::uuid and r.state='ready'
       order by r.created_at,r.id
     `)).rows.map((row) => {
-      if (!Array.isArray(row.cards)) {
-        throw new Error("client_catalog_snapshot_invalid");
-      }
       return {
         catalogRequestId: row.catalogRequestId,
         expiresAt: new Date(row.expiresAt).toISOString(),
-        cards: row.cards as readonly Record<string, unknown>[],
+        cards: validateClientCatalogCards(row.cards),
       };
     });
     const counts = one((await this.db.execute<{ packageCount: number; eventCount: number; ledgerEntryCount: number }>(sql`
@@ -241,11 +242,8 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       const profileBefore = (await tx.execute<{ displayName: string | null; timezone: string | null; expertNote: string | null }>(sql`
         select display_name as "displayName", timezone, expert_note as "expertNote" from client_profiles where user_id = ${command.targetUserId}::uuid for update
       `)).rows[0];
-      const catalogOutboxes = (await tx.execute<{
-        outboxId: string;
-        requestId: string;
-      }>(sql`
-        select o.id as "outboxId",r.id as "requestId"
+      await tx.execute(sql`
+        select o.id as "outboxId"
         from integration_outbox o
         join client_catalog_requests r
           on o.idempotency_key='client-catalog:' || r.id::text
@@ -253,19 +251,16 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           and o.topic='catalog.show'
         order by o.id
         for update of o
-      `)).rows;
-      for (const catalog of catalogOutboxes) {
-        await tx.execute(sql`
-          select id from client_catalog_requests
-          where id=${catalog.requestId}::uuid for update
-        `);
-      }
-      if (catalogOutboxes.length > 0) {
-        await tx.execute(sql`
-          delete from client_catalog_requests
-          where user_id=${command.targetUserId}::uuid
-        `);
-      }
+      `);
+      await tx.execute(sql`
+        select id from client_catalog_requests
+        where user_id=${command.targetUserId}::uuid
+        order by id for update
+      `);
+      await tx.execute(sql`
+        delete from client_catalog_requests
+        where user_id=${command.targetUserId}::uuid
+      `);
       const job = one((await tx.execute<{ id: string }>(sql`
         insert into privacy_deletion_jobs (user_id, idempotency_key, status, evidence_pseudonym, legacy_provider_identifier_evidence)
         values (${command.targetUserId}::uuid, ${command.idempotencyKey}, 'pending', ${command.pseudonym}, ${hash({ userId: command.targetUserId, kind: "legacy_provider_identifier_evidence" })}) returning id

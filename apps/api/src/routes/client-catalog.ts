@@ -75,16 +75,16 @@ export const clientCatalogRoutes: FastifyPluginAsync<RouteOptions> = async (
     "/v1/client/catalog-requests",
     { bodyLimit: 8 * 1024 },
     async (request, reply) => {
-      const filters = strictFilters(request.body);
-      if (filters === null) {
-        return reply.code(400).send({ error: "invalid_request" });
-      }
       const principal = await resolveClientPrincipal(
         deps.principals,
         request.headers.authorization,
       );
       if (principal === null) {
         return reply.code(401).send({ error: "unauthorized" });
+      }
+      const filters = strictFilters(request.body);
+      if (filters === null) {
+        return reply.code(400).send({ error: "invalid_request" });
       }
       try {
         const receipt = await deps.catalog.request(principal, filters);

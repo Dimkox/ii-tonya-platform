@@ -38,6 +38,14 @@ const createRequest = async (userId: string) => {
   return { repository, receipt };
 };
 
+const forceDue = (catalogRequestId: string) =>
+  testDb.db.execute(sql`
+    update client_catalog_requests
+    set created_at=clock_timestamp()-interval '2 days',
+      updated_at=clock_timestamp(),expires_at=clock_timestamp()-interval '1 second'
+    where id=${catalogRequestId}::uuid
+  `);
+
 const card = {
   displayName: "Public Expert",
   serviceCode: "career",
@@ -67,32 +75,30 @@ describe("PostgreSQL client catalog privacy lifecycle", () => {
       /requestDigest|outbox|correlation|sourceKey|provider|contact/iu,
     );
 
+    await forceDue(receipt.catalogRequestId);
     const future = new Date(Date.now() + 25 * 60 * 60 * 1_000);
     await expect(
       repository.expireDue({ now: future, limit: 10 }),
     ).resolves.toEqual({ examined: 1, expired: 1, removed: 0 });
     const tombstone = await testDb.db.execute<{
       state: string;
-      userId: string | null;
-      requestDigest: string | null;
-      serviceCode: string | null;
-      language: string | null;
+      expiresAt: Date | string;
+      requestCount: number;
       snapshotCount: number;
     }>(sql`
-      select r.state,r.user_id as "userId",r.request_digest as "requestDigest",
-        r.service_code as "serviceCode",r.language,
+      select t.state,t.expires_at as "expiresAt",
+        (select count(*)::integer from client_catalog_requests r
+          where r.id=t.request_id) as "requestCount",
         (select count(*)::integer from client_catalog_snapshots s
-          where s.request_id=r.id) as "snapshotCount"
-      from client_catalog_requests r where r.id=${receipt.catalogRequestId}::uuid
+          where s.request_id=t.request_id) as "snapshotCount"
+      from client_catalog_tombstones t
+      where t.request_id=${receipt.catalogRequestId}::uuid
     `);
-    expect(tombstone.rows[0]).toEqual({
+    expect(tombstone.rows[0]).toEqual(expect.objectContaining({
       state: "expired",
-      userId: null,
-      requestDigest: null,
-      serviceCode: null,
-      language: null,
+      requestCount: 0,
       snapshotCount: 0,
-    });
+    }));
 
     await testDb.db.execute(sql`
       update integration_outbox set status='succeeded'
@@ -124,6 +130,7 @@ describe("PostgreSQL client catalog privacy lifecycle", () => {
         dispatch_claim_token='claim',lease_until=now()+interval '5 minutes'
       where idempotency_key=${`client-catalog:${receipt.catalogRequestId}`}
     `);
+    await forceDue(receipt.catalogRequestId);
 
     await repository.expireDue({
       now: new Date(Date.now() + 25 * 60 * 60 * 1_000),

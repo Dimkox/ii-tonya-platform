@@ -191,15 +191,15 @@ export const clientCatalogRequests = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id")
+      .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    requestDigest: char("request_digest", { length: 64 }),
+    requestDigest: char("request_digest", { length: 64 }).notNull(),
     serviceCode: text("service_code"),
     language: text("language"),
     state: text("state").notNull().default("pending"),
     expiresAt: timestamp("expires_at", { withTimezone: true })
       .notNull()
       .default(sql`now() + interval '24 hours'`),
-    expiredAt: timestamp("expired_at", { withTimezone: true }),
     ...mutableTimestamps,
   },
   (table) => [
@@ -209,15 +209,19 @@ export const clientCatalogRequests = pgTable(
     ),
     check(
       "client_catalog_requests_digest_check",
-      sql`${table.requestDigest} is null or ${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
+      sql`${table.requestDigest} ~ '^[0-9a-f]{64}$'`,
     ),
     check(
       "client_catalog_requests_state_check",
-      sql`${table.state} in ('pending','ready','expired')`,
+      sql`${table.state} in ('pending','ready')`,
     ),
     check(
-      "client_catalog_requests_expiry_check",
-      sql`(${table.state} = 'expired' and ${table.expiredAt} is not null and ${table.userId} is null and ${table.requestDigest} is null and ${table.serviceCode} is null and ${table.language} is null) or (${table.state} in ('pending','ready') and ${table.expiredAt} is null and ${table.userId} is not null and ${table.requestDigest} is not null)`,
+      "client_catalog_requests_filters_check",
+      sql`(${table.serviceCode} is null or (char_length(${table.serviceCode}) between 1 and 64 and ${table.serviceCode} !~ '[[:cntrl:]]')) and (${table.language} is null or (char_length(${table.language}) between 1 and 32 and ${table.language} !~ '[[:cntrl:]]'))`,
+    ),
+    check(
+      "client_catalog_requests_time_check",
+      sql`${table.expiresAt} >= ${table.createdAt} and ${table.updatedAt} >= ${table.createdAt}`,
     ),
     index("client_catalog_requests_expiry_idx")
       .on(table.expiresAt, table.id)
@@ -240,6 +244,22 @@ export const clientCatalogSnapshots = pgTable(
       "client_catalog_snapshots_cards_check",
       sql`jsonb_typeof(${table.cards}) = 'array' and jsonb_array_length(${table.cards}) <= 20`,
     ),
+    check(
+      "client_catalog_snapshots_expiry_check",
+      sql`${table.expiresAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const clientCatalogTombstones = pgTable(
+  "client_catalog_tombstones",
+  {
+    requestId: uuid("request_id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    state: text("state").notNull().default("expired"),
+  },
+  (table) => [
+    check("client_catalog_tombstones_state_check", sql`${table.state} = 'expired'`),
   ],
 );
 export const deliveryAttempts = pgTable("delivery_attempts", {

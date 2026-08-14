@@ -13,7 +13,10 @@ import {
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
-import { recordWorkerOutboxMetric } from "@ii-tonya/observability";
+import {
+  recordClientCatalogMetric,
+  recordWorkerOutboxMetric,
+} from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
 import {
   createClientCatalogOutboxRegistry,
@@ -30,6 +33,7 @@ import {
   boundedFullJitterDelay,
   createLocalOperatorCaseOutboxRegistry,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+  runClientCatalogRetention,
   runOutboxBatch,
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
@@ -37,6 +41,7 @@ import {
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
+type BoundedJob = () => Promise<unknown>;
 
 export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
@@ -84,6 +89,26 @@ export function selectWorkerOutboxRegistry(
       ? CLIENT_CATALOG_OUTBOX_TOPICS
       : LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
   );
+}
+
+export function selectClientCatalogRetention(
+  config: RuntimeConfig,
+  factory?: () => BoundedJob,
+): BoundedJob | undefined {
+  if (
+    config.features.workerOutboxDelivery !== true ||
+    config.features.clientCatalog !== true
+  ) {
+    return undefined;
+  }
+  if (factory === undefined) {
+    throw new Error("client_catalog_retention_capability_unavailable");
+  }
+  const job = factory();
+  if (typeof job !== "function") {
+    throw new Error("client_catalog_retention_capability_unavailable");
+  }
+  return job;
 }
 
 function requireWorkerOutboxRegistry(
@@ -206,6 +231,15 @@ export function createProductionWorkerRuntimeFactory(
         workerOutboxRegistry === undefined
           ? undefined
           : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
+      const clientCatalogRetention = selectClientCatalogRetention(config, () => {
+        const repository = new PostgresClientCatalogRepository(db);
+        return () =>
+          runClientCatalogRetention(
+            { repository, metrics: { record: recordClientCatalogMetric } },
+            new Date(),
+            100,
+          );
+      });
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
@@ -222,6 +256,9 @@ export function createProductionWorkerRuntimeFactory(
               workerOutboxRegistry: workerOutbox.registry,
               workerOutboxRunner: workerOutbox.run,
             }),
+        ...(clientCatalogRetention === undefined
+          ? {}
+          : { clientCatalogRetention }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),

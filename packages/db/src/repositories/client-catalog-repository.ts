@@ -90,13 +90,13 @@ const finiteInstant = (value: string): boolean => {
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 };
 
-const validateCards = (
-  cards: readonly ClientCatalogCard[],
+export const validateClientCatalogCards = (
+  cards: unknown,
 ): readonly ClientCatalogCard[] => {
   if (!Array.isArray(cards) || cards.length > 20) {
     throw new Error("client_catalog_snapshot_invalid");
   }
-  for (const card of cards) {
+  for (const card of cards as readonly ClientCatalogCard[]) {
     if (
       typeof card !== "object" ||
       card === null ||
@@ -139,7 +139,7 @@ const validateCards = (
       }
     }
   }
-  return cards;
+  return cards as readonly ClientCatalogCard[];
 };
 
 const state = (value: string): "pending" | "ready" => {
@@ -257,7 +257,7 @@ export class PostgresClientCatalogRepository
     return {
       catalogRequestId,
       state: "ready",
-      cards: validateCards(row.cards as ClientCatalogCard[]),
+      cards: validateClientCatalogCards(row.cards),
     };
   }
 
@@ -309,22 +309,48 @@ export class PostgresClientCatalogRepository
     const catalogRequestId = canonicalUuid(input.catalogRequestId);
     return this.db.transaction(async (tx: Transaction) => {
       const request = (
-        await tx.execute<{ state: string; expiresAt: Date | string }>(sql`
-          select state,expires_at as "expiresAt"
+        await tx.execute<{
+          state: string;
+          expiresAt: Date | string;
+          databaseNow: Date | string;
+        }>(sql`
+          select state,expires_at as "expiresAt",
+            clock_timestamp() as "databaseNow"
           from client_catalog_requests where id=${catalogRequestId}::uuid
           for update
         `)
       ).rows[0];
-      if (request === undefined || request.state === "expired") return "missing";
-      if (request.state === "ready") return "replayed";
-      if (request.state !== "pending") {
-        throw new Error("client_catalog_request_state_invalid");
-      }
-      const cards = validateCards(input.cards);
+      if (request === undefined) return "missing";
       const expiresAt =
         request.expiresAt instanceof Date
           ? request.expiresAt
           : new Date(request.expiresAt);
+      const databaseNow =
+        request.databaseNow instanceof Date
+          ? request.databaseNow
+          : new Date(request.databaseNow);
+      if (
+        !Number.isFinite(expiresAt.getTime()) ||
+        !Number.isFinite(databaseNow.getTime())
+      ) {
+        throw new Error("client_catalog_database_clock_invalid");
+      }
+      if (expiresAt.getTime() <= databaseNow.getTime()) {
+        await tx.execute(sql`
+          insert into client_catalog_tombstones (request_id,expires_at,state)
+          values (${catalogRequestId}::uuid,${expiresAt},'expired')
+          on conflict (request_id) do nothing
+        `);
+        await tx.execute(sql`
+          delete from client_catalog_requests where id=${catalogRequestId}::uuid
+        `);
+        return "missing";
+      }
+      if (request.state === "ready") return "replayed";
+      if (request.state !== "pending") {
+        throw new Error("client_catalog_request_state_invalid");
+      }
+      const cards = validateClientCatalogCards(input.cards);
       await tx.execute(sql`
         insert into client_catalog_snapshots (request_id,cards,expires_at)
         values (${catalogRequestId}::uuid,${JSON.stringify(cards)}::jsonb,${expiresAt})
@@ -351,12 +377,19 @@ export class PostgresClientCatalogRepository
       return Promise.reject(new Error("client_catalog_retention_invalid"));
     }
     return this.db.transaction(async (tx: Transaction) => {
-      const candidates = (await tx.execute<{ requestId: string }>(sql`
-        select r.id as "requestId"
+      const candidates = (await tx.execute<{
+        requestId: string;
+        outboxId: string;
+        status: string;
+      }>(sql`
+        select r.id as "requestId",o.id as "outboxId",o.status
         from client_catalog_requests r
-        where (r.state in ('pending','ready') and r.expires_at <= ${input.now})
-          or r.state='expired'
+        join integration_outbox o
+          on o.idempotency_key='client-catalog:' || r.id::text
+          and o.topic='catalog.show'
+        where r.expires_at <= clock_timestamp()
         order by r.expires_at,r.id
+        for update of o skip locked
         limit ${input.limit}
       `)).rows;
       let examined = 0;
@@ -364,19 +397,10 @@ export class PostgresClientCatalogRepository
       let removed = 0;
 
       for (const candidate of candidates) {
-        const outbox = (await tx.execute<{ outboxId: string; status: string }>(sql`
-          select id as "outboxId",status
-          from integration_outbox
-          where idempotency_key=${`client-catalog:${candidate.requestId}`}
-            and topic='catalog.show'
-          for update skip locked
-        `)).rows[0];
-        if (outbox === undefined) continue;
         const request = (await tx.execute<{
-          state: string;
           expiresAt: Date | string;
         }>(sql`
-          select state,expires_at as "expiresAt"
+          select expires_at as "expiresAt"
           from client_catalog_requests
           where id=${candidate.requestId}::uuid
           for update skip locked
@@ -387,34 +411,87 @@ export class PostgresClientCatalogRepository
           request.expiresAt instanceof Date
             ? request.expiresAt
             : new Date(request.expiresAt);
-        if (
-          request.state !== "expired" &&
-          expiresAt.getTime() <= input.now.getTime()
-        ) {
+        await tx.execute(sql`
+          insert into client_catalog_tombstones (request_id,expires_at,state)
+          values (${candidate.requestId}::uuid,${expiresAt},'expired')
+          on conflict (request_id) do nothing
+        `);
+        await tx.execute(sql`
+          delete from client_catalog_requests
+          where id=${candidate.requestId}::uuid
+        `);
+        expired += 1;
+        if (terminalOutboxStatus(candidate.status)) {
+          await deleteCatalogOutbox(tx, candidate.outboxId);
           await tx.execute(sql`
-            delete from client_catalog_snapshots
+            delete from client_catalog_tombstones
             where request_id=${candidate.requestId}::uuid
-          `);
-          await tx.execute(sql`
-            update client_catalog_requests
-            set state='expired',user_id=null,request_digest=null,
-              service_code=null,language=null,expired_at=${input.now},
-              updated_at=${input.now}
-            where id=${candidate.requestId}::uuid
-          `);
-          expired += 1;
-        }
-        if (terminalOutboxStatus(outbox.status)) {
-          await deleteCatalogOutbox(tx, outbox.outboxId);
-          await tx.execute(sql`
-            delete from client_catalog_requests
-            where id=${candidate.requestId}::uuid
           `);
           removed += 1;
         }
       }
 
-      const remaining = input.limit - examined;
+      let remaining = input.limit - examined;
+      if (remaining > 0) {
+        const orphanRequests = (await tx.execute<{
+          requestId: string;
+          expiresAt: Date | string;
+        }>(sql`
+          select r.id as "requestId",r.expires_at as "expiresAt"
+          from client_catalog_requests r
+          where r.expires_at <= clock_timestamp()
+            and not exists (
+              select 1 from integration_outbox o
+              where o.idempotency_key='client-catalog:' || r.id::text
+                and o.topic='catalog.show'
+            )
+          order by r.expires_at,r.id
+          for update of r skip locked
+          limit ${remaining}
+        `)).rows;
+        for (const request of orphanRequests) {
+          await tx.execute(sql`
+            insert into client_catalog_tombstones (request_id,expires_at,state)
+            values (${request.requestId}::uuid,${request.expiresAt},'expired')
+            on conflict (request_id) do nothing
+          `);
+          await tx.execute(sql`
+            delete from client_catalog_requests
+            where id=${request.requestId}::uuid
+          `);
+          examined += 1;
+          expired += 1;
+        }
+      }
+
+      remaining = input.limit - examined;
+      if (remaining > 0) {
+        const terminalTombstones = (await tx.execute<{
+          requestId: string;
+          outboxId: string;
+        }>(sql`
+          select t.request_id as "requestId",o.id as "outboxId"
+          from client_catalog_tombstones t
+          join integration_outbox o
+            on o.idempotency_key='client-catalog:' || t.request_id::text
+            and o.topic='catalog.show'
+          where o.status in ('succeeded','dead_letter')
+          order by t.expires_at,t.request_id
+          for update of o skip locked
+          limit ${remaining}
+        `)).rows;
+        for (const tombstone of terminalTombstones) {
+          await deleteCatalogOutbox(tx, tombstone.outboxId);
+          await tx.execute(sql`
+            delete from client_catalog_tombstones
+            where request_id=${tombstone.requestId}::uuid
+          `);
+          examined += 1;
+          removed += 1;
+        }
+      }
+
+      remaining = input.limit - examined;
       if (remaining > 0) {
         const orphans = (await tx.execute<{ outboxId: string }>(sql`
           select o.id as "outboxId"
@@ -425,6 +502,10 @@ export class PostgresClientCatalogRepository
             and not exists (
               select 1 from client_catalog_requests r
               where o.idempotency_key='client-catalog:' || r.id::text
+            )
+            and not exists (
+              select 1 from client_catalog_tombstones t
+              where o.idempotency_key='client-catalog:' || t.request_id::text
             )
           order by o.updated_at,o.id
           for update skip locked
