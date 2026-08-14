@@ -24,6 +24,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
       "packages/db/migrations/0021_expert_settlement_snapshot.sql",
       "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+      "packages/db/migrations/0023_yookassa_provider_operations.sql",
+      "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -44,6 +46,8 @@ describe("expert residency referral scope boundary", () => {
       "expert_residency_orders",
       "expert_residency_payment_attempts",
       "expert_residency_provider_event_inbox",
+      "expert_residency_provider_operations",
+      "expert_residency_receipt_contacts",
       "expert_residency_tariff_versions",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
@@ -52,13 +56,16 @@ describe("expert residency referral scope boundary", () => {
       "/v1/expert/referrals/summary",
       "/v1/expert/residency/checkouts",
       "/v1/expert/residency/quotes",
+      "/v1/webhooks/yookassa",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([
+      "EXPERT_AI_INGRESS_ENABLED",
       "EXPERT_REFERRAL_ENABLED",
       "EXPERT_REFERRAL_HMAC_KEYS_JSON",
       "EXPERT_REFERRAL_HMAC_KEY_REF",
       "EXPERT_REFERRAL_HMAC_KEY_VERSION",
       "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
@@ -123,6 +130,16 @@ describe("expert residency referral scope boundary", () => {
       "unreviewed feature flag",
       "packages/config/src/expert-referrals.ts",
       "export const enabled = process.env.EXPERT_REFERRAL_SHADOW_ENABLED;",
+    ],
+    [
+      "unreviewed expert AI feature flag",
+      "packages/config/src/expert-ai.ts",
+      "export const enabled = process.env.EXPERT_AI_SHADOW_ENABLED;",
+    ],
+    [
+      "unreviewed expert Telegram feature flag",
+      "packages/config/src/expert-telegram.ts",
+      "export const enabled = process.env.EXPERT_TELEGRAM_SHADOW_ENABLED;",
     ],
     [
       "unreviewed admin action",

@@ -121,6 +121,8 @@ export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
   "EXPERT_REFERRAL_ENABLED",
   "EXPERT_RESIDENCY_BILLING_ENABLED",
   "EXPERT_TELEGRAM_QUERIES_ENABLED",
+  "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
+  "EXPERT_AI_INGRESS_ENABLED",
   "EXPERT_REFERRAL_HMAC_KEY_VERSION",
   "EXPERT_REFERRAL_HMAC_KEY_REF",
   "EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -740,7 +742,8 @@ const paymentApplicationIdentifier =
 const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
 const expertResidencyRoute = /^\/v1\/(?:admin\/)?expert(?:-|\/)/u;
-const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY)_/u;
+const expertResidencyFlag =
+  /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;

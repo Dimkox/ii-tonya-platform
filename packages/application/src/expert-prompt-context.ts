@@ -76,10 +76,14 @@ export type ExpertIntentProposalValidation =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const isForbiddenResult = (value: unknown): value is { readonly kind: "forbidden" } =>
+const isForbiddenResult = (
+  value: unknown,
+): value is { readonly kind: "forbidden" } =>
   isRecord(value) && value.kind === "forbidden";
 
-const isDisabledResult = (value: unknown): value is { readonly kind: "disabled" } =>
+const isDisabledResult = (
+  value: unknown,
+): value is { readonly kind: "disabled" } =>
   isRecord(value) && value.kind === "disabled";
 
 const hasExactKeys = (
@@ -143,9 +147,9 @@ export function validateExpertIntentProposal(
     }
     if (value.kind === "start_residency_checkout") {
       if (
-        !hasExactKeys(value, ["kind", "orderId"]) ||
-        typeof value.orderId !== "string" ||
-        !uuid.test(value.orderId)
+        !hasExactKeys(value, ["kind", "tariffVersionId"]) ||
+        typeof value.tariffVersionId !== "string" ||
+        !uuid.test(value.tariffVersionId)
       ) {
         return { valid: false, reasonCode: "invalid_shape" };
       }
@@ -153,7 +157,7 @@ export function validateExpertIntentProposal(
         valid: true,
         proposal: {
           kind: "start_residency_checkout",
-          orderId: value.orderId,
+          tariffVersionId: value.tariffVersionId,
         },
       };
     }
@@ -165,7 +169,8 @@ export function validateExpertIntentProposal(
 
 const validInstantOrNull = (value: string | null): boolean =>
   value === null ||
-  (Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
+  (Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value);
 
 const sanitizeSummary = (
   summary: ReferralSummary,

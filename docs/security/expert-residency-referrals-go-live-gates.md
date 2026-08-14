@@ -32,6 +32,9 @@ A release remains NO-GO until all of the following refer to the same exact SHA:
 - Independent migration review and financial-integrity review are recorded.
 - Authenticated sandbox settlement, partial refund, terminating reversal, debt, expiry/release, and held-replay evidence is recorded.
 - A named human AI spot-check reviews ERR-FR-027 and ERR-FR-028 prompt/proposal evidence.
+- ER-AI-001 remains disabled while its named human reviewer, review date, and
+  approval result are blank or marked `BLOCKED`; fixture distribution parity is
+  not a substitute for that approval.
 - Operations and rollback runbooks are reviewed, including HMAC key rotation, kill switch, reconciliation, held replay, debt investigation, and database recovery.
 
 ## Activation boundary

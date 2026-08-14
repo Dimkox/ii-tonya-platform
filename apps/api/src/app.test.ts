@@ -409,6 +409,38 @@ describe("API boundary", () => {
     ).rejects.toThrow("Expert Telegram query capability is required");
   });
 
+  it("rejects expert AI activation without its complete runtime capability", async () => {
+    await expect(
+      buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertAiIngress: true,
+        },
+      }),
+    ).rejects.toThrow("Expert AI ingress runtime capability is required");
+  });
+
+  it("accepts an injected fixture ingress without registering a public route", async () => {
+    const app = await buildTestApp({
+      features: {
+        expertReferral: false,
+        expertResidencyBilling: false,
+        expertAiIngress: true,
+      },
+      expertAiIngress: { handle: async () => ({ kind: "disabled" }) },
+    });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/expert/assistant/messages",
+        })
+      ).statusCode,
+    ).toBe(404);
+    await app.close();
+  });
+
   it("keeps residency routes absent when only referral is enabled", async () => {
     const app = await buildTestApp({
       expertApi: testExpertApi(),

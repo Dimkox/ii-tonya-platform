@@ -28,6 +28,7 @@ describe("loadEnv", () => {
       expertResidencyBilling: false,
       expertTelegramQueries: false,
       expertTelegramFinancialViews: false,
+      expertAiIngress: false,
       yookassa: false,
     });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
@@ -82,6 +83,14 @@ describe("loadEnv", () => {
     expect(
       loadEnv(localEnv({ EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED: "true" }))
         .features.expertTelegramFinancialViews,
+    ).toBe(true);
+  });
+
+  it("keeps expert AI ingress off unless explicitly requested", () => {
+    expect(loadEnv(localEnv()).features.expertAiIngress).toBe(false);
+    expect(
+      loadEnv(localEnv({ EXPERT_AI_INGRESS_ENABLED: "true" })).features
+        .expertAiIngress,
     ).toBe(true);
   });
 
