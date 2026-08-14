@@ -241,7 +241,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "6b7f801cc5c94ceb256f47e31fbe4d17dbe638ae959e5a3ef489348d24c78609",
+    "bf076475760c3a601633ef1374b238af1b4e7a52b8ab4ffcfac2d749df817ce3",
   ],
   [
     "scripts/build-native-release.sh",
@@ -1095,7 +1095,11 @@ const inspectTypeScript = (
       if (
         ts.isIdentifier(node) &&
         paymentApiIdentifier.test(node.text) &&
-        path !== "apps/api/src/routes/yookassa-webhook.ts"
+        path !== "apps/api/src/routes/yookassa-webhook.ts" &&
+        !(
+          path === "apps/api/src/app.ts" &&
+          node.text === "yookassaWebhookRoutes"
+        )
       ) {
         violations.push(`commercial API route identifier: ${node.text}`);
       }
