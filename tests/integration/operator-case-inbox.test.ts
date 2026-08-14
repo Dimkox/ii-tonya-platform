@@ -178,6 +178,7 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
   });
 
   it("paginates role-scoped unresolved cases and audits first transitions only", async () => {
+    await workerA.materializeOperatorCasesBatch(10);
     const deliveryOutboxId = randomUUID();
     await db.execute(sql`
       insert into integration_outbox (id,topic,status,payload,created_at)
