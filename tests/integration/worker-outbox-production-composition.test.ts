@@ -208,7 +208,16 @@ describe("review-remediated production worker outbox composition", () => {
       before update on integration_outbox
       for each row execute function worker_outbox_fail_ack()
     `);
-    await expect(composition.run()).rejects.toThrow("simulated_ack_failure");
+    let acknowledgementError: unknown;
+    try {
+      await composition.run();
+    } catch (error) {
+      acknowledgementError = error;
+    }
+    expect(acknowledgementError).toBeInstanceOf(Error);
+    expect(
+      (acknowledgementError as Error & { cause?: Error }).cause?.message,
+    ).toContain("simulated_ack_failure");
     expect(await status(appliedId)).toBe("processing");
     await testDb.db.execute(sql`
       drop trigger worker_outbox_fail_ack_trigger on integration_outbox
