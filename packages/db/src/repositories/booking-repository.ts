@@ -757,6 +757,11 @@ export class PostgresBookingRepository {
     }
     try {
       return await this.runSerializable(async (tx) => {
+        await tx.execute(sql`
+          select pg_advisory_xact_lock(
+            hashtextextended(${`choice:${command.choiceDigest}`}, 0)
+          )
+        `);
         const now = normalizeBookingTimestamp(
           one(
             (
@@ -768,11 +773,6 @@ export class PostgresBookingRepository {
           ).databaseNow,
           "clock_timestamp",
         );
-        await tx.execute(sql`
-          select pg_advisory_xact_lock(
-            hashtextextended(${`choice:${command.choiceDigest}`}, 0)
-          )
-        `);
         const replay = (
           await tx.execute<{
             bookingHandle: `bk1.${string}`;

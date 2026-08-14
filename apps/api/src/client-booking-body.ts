@@ -20,7 +20,10 @@ export const parseClientBookingBody = (
     input.contentType === undefined ||
     !MEDIA_TYPE.test(input.contentType) ||
     input.contentEncoding !== undefined ||
-    input.transferEncoding !== undefined ||
+    (input.transferEncoding !== undefined &&
+      input.transferEncoding.toLowerCase() !== "chunked") ||
+    (input.transferEncoding !== undefined &&
+      input.contentLength !== undefined) ||
     (input.contentLength !== undefined &&
       (!/^(?:0|[1-9]\d*)$/u.test(input.contentLength) ||
         Number(input.contentLength) !== input.body.byteLength))

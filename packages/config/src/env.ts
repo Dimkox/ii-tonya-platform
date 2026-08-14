@@ -174,6 +174,21 @@ const schema = z
         });
       }
     }
+    if (
+      (value.CLIENT_BOOKING_ENABLED === "true" &&
+        (value.CLIENT_SESSION_ENABLED !== "true" ||
+          value.CLIENT_CATALOG_ENABLED !== "true")) ||
+      (value.CLIENT_BOOKING_RESERVE_ENABLED === "true" &&
+        (value.CLIENT_SESSION_ENABLED !== "true" ||
+          value.CLIENT_CATALOG_ENABLED !== "true" ||
+          value.CLIENT_BOOKING_ENABLED !== "true"))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_BOOKING_ENABLED"],
+        message: "client_booking_configuration_incomplete",
+      });
+    }
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||

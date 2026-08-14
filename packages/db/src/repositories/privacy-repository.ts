@@ -119,9 +119,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       beforeWithdrawalAudit?: () => Promise<void> | void;
       privacyMutationCapability?: {
         enabled: boolean;
-        captureManifests?: (
-          userId: string,
-        ) => Promise<
+        captureManifests?: (userId: string) => Promise<
           readonly {
             processor: (typeof PROCESSORS)[number];
             ciphertext: string;
@@ -430,6 +428,15 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`
+        select pg_advisory_xact_lock(
+          hashtextextended('choice:' || c.choice_digest,0)
+        )
+        from client_catalog_choices c
+        join client_catalog_requests r on r.id=c.request_id
+        where r.user_id=${command.targetUserId}::uuid
+        order by c.choice_digest
+      `);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`,
         );
@@ -497,15 +504,6 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           and o.topic='catalog.show'
         order by o.id
         for update of o
-      `);
-        await tx.execute(sql`
-        select pg_advisory_xact_lock(
-          hashtextextended('choice:' || c.choice_digest,0)
-        )
-        from client_catalog_choices c
-        join client_catalog_requests r on r.id=c.request_id
-        where r.user_id=${command.targetUserId}::uuid
-        order by c.choice_digest
       `);
         await tx.execute(sql`
         select id from client_catalog_requests

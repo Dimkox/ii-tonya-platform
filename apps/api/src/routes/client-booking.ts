@@ -84,6 +84,14 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
     { bodyLimit: 1_024 },
     async (request, reply) => {
       noStore(reply);
+      const rawPath =
+        /^\/v1\/client\/bookings\/(bk1\.[A-Za-z0-9_-]{43})$/u.exec(
+          request.raw.url ?? "",
+        );
+      if (rawPath === null) {
+        deps.metrics?.record({ operation: "cancel", outcome: "invalid" });
+        return reply.code(400).send({ error: "invalid_request" });
+      }
       const contentType = rawHeader(request.raw.rawHeaders, "content-type");
       const contentEncoding = rawHeader(
         request.raw.rawHeaders,
@@ -207,7 +215,7 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
       try {
         const result = await deps.bookings.cancel(
           resolution.principal,
-          request.params.bookingHandle,
+          rawPath[1]!,
         );
         deps.metrics?.record({ operation: "cancel", outcome: "cancelled" });
         return reply.code(200).send(result);

@@ -85,30 +85,50 @@ const processCancel = async (
       throw new Error("client_booking_erasure_cancel_conflict");
     }
   }
-  const remaining = (
-    await db.execute<{ exists: boolean }>(sql`
-      select exists (
-        select 1 from reservations
-        where user_id=${claim.userId}::uuid and status in ('reserved','booked')
-      ) as exists
-    `)
-  ).rows[0]?.exists;
-  if (remaining !== false)
-    throw new Error("client_booking_erasure_active_remains");
-  const advanced = await db.execute(sql`
-    update client_booking_erasure_work set phase='cleanup_public',
-      lease_token=null,lease_until=null,attempt_count=0,updated_at=clock_timestamp()
-    where deletion_job_id=${claim.deletionJobId}::uuid
-      and lease_token=${claim.leaseToken}::uuid and phase='cancel_active'
-    returning 1
-  `);
-  if (advanced.rows.length !== 1) {
-    throw new Error("client_booking_erasure_lease_lost");
-  }
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level serializable`);
+    const fenced = (
+      await tx.execute<{ userId: string }>(sql`
+        select j.user_id as "userId"
+        from client_booking_erasure_work w
+        join privacy_deletion_jobs j on j.id=w.deletion_job_id
+        where w.deletion_job_id=${claim.deletionJobId}::uuid
+          and w.lease_token=${claim.leaseToken}::uuid
+          and w.phase='cancel_active'
+        for update of w
+      `)
+    ).rows[0];
+    if (fenced === undefined || fenced.userId !== claim.userId) {
+      throw new Error("client_booking_erasure_lease_lost");
+    }
+    await tx.execute(sql`
+      select pg_advisory_xact_lock(
+        hashtextextended(${`client:${claim.userId}`},0)
+      )
+    `);
+    const remaining = await tx.execute(sql`
+      select id from reservations
+      where user_id=${claim.userId}::uuid and status in ('reserved','booked')
+      order by id for update
+    `);
+    if (remaining.rows.length !== 0) {
+      throw new Error("client_booking_erasure_active_remains");
+    }
+    const advanced = await tx.execute(sql`
+      update client_booking_erasure_work set phase='cleanup_public',
+        lease_token=null,lease_until=null,attempt_count=0,updated_at=clock_timestamp()
+      where deletion_job_id=${claim.deletionJobId}::uuid
+        and lease_token=${claim.leaseToken}::uuid and phase='cancel_active'
+      returning 1
+    `);
+    if (advanced.rows.length !== 1) {
+      throw new Error("client_booking_erasure_lease_lost");
+    }
+  });
 };
 
-const processCleanup = async (db: DrizzleDb, claim: Claim): Promise<void> => {
-  await db.transaction(async (tx) => {
+const processCleanup = async (db: DrizzleDb, claim: Claim): Promise<boolean> =>
+  db.transaction(async (tx) => {
     await tx.execute(sql`set transaction isolation level serializable`);
     const fenced = (
       await tx.execute<{ userId: string }>(sql`
@@ -135,7 +155,19 @@ const processCleanup = async (db: DrizzleDb, claim: Claim): Promise<void> => {
       order by id for update
     `);
     if (active.rows.length !== 0) {
-      throw new Error("client_booking_erasure_active_remains");
+      const recovered = await tx.execute(sql`
+        update client_booking_erasure_work set phase='cancel_active',
+          lease_token=null,lease_until=null,attempt_count=0,
+          updated_at=clock_timestamp()
+        where deletion_job_id=${claim.deletionJobId}::uuid
+          and lease_token=${claim.leaseToken}::uuid
+          and phase='cleanup_public'
+        returning 1
+      `);
+      if (recovered.rows.length !== 1) {
+        throw new Error("client_booking_erasure_lease_lost");
+      }
+      return false;
     }
     await tx.execute(sql`
       delete from client_booking_receipts where user_id=${claim.userId}::uuid
@@ -154,8 +186,8 @@ const processCleanup = async (db: DrizzleDb, claim: Claim): Promise<void> => {
     if (completed.rows.length !== 1) {
       throw new Error("client_booking_erasure_lease_lost");
     }
+    return true;
   });
-};
 
 export async function runClientBookingErasureBatch(input: {
   db: DrizzleDb;
@@ -188,8 +220,7 @@ export async function runClientBookingErasureBatch(input: {
       if (claim.phase === "cancel_active") {
         await processCancel(input.db, bookings, claim);
       } else {
-        await processCleanup(input.db, claim);
-        completed += 1;
+        if (await processCleanup(input.db, claim)) completed += 1;
       }
     } catch {
       await releaseFailure(input.db, claim);

@@ -11,7 +11,10 @@ describe("immutable client booking Claw adapter", () => {
     );
     expect(runner).toContain("node scripts/assert-client-booking-postgres.mjs");
     expect(runner).toContain(
-      "tests/integration/client-booking-final-gate.test.ts",
+      "tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts",
+    );
+    expect(runner).toContain(
+      "packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1",
     );
     expect(runner).not.toMatch(/CLIENT_BOOKING_MANIFEST|BOOKING_TEST_FILES/u);
 

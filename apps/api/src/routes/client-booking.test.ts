@@ -114,4 +114,17 @@ describe("client booking routes", () => {
     expect(cancel).toHaveBeenCalledOnce();
     await app.close();
   });
+
+  it("rejects a percent-encoded booking handle before cancellation", async () => {
+    const { app, cancel } = await appFor();
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/client/bookings/%62${bookingHandle.slice(1)}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_request" });
+    expect(cancel).not.toHaveBeenCalled();
+    await app.close();
+  });
 });

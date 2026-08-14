@@ -15,7 +15,7 @@ describe("direct Claw verification semantics", () => {
 
   it("runs CI and database gates directly on Claw without Actions context", () => {
     const runner = read("scripts/run-claw-ci.sh");
-    expect(runner).toContain("<ci|database|release>");
+    expect(runner).toContain("<ci|database|release|client-booking>");
     expect(runner).toContain(
       'source_root="$(realpath "${SOURCE_ROOT:?SOURCE_ROOT is required}")"',
     );
@@ -108,5 +108,36 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain("claw_test_container: true");
     expect(runner).toContain("production_container: false");
     expect(runner).toContain("trap cleanup EXIT");
+  });
+
+  it("freezes the one-process client-booking gate and its secret-safe cleanup", () => {
+    const runner = read("scripts/run-claw-ci.sh");
+    const manifest = [
+      "tests/integration/client-booking-schema.test.ts",
+      "tests/repo/db-schema-parity.test.ts",
+      "tests/integration/client-catalog-booking-choice.test.ts",
+      "tests/integration/client-booking-repository.test.ts",
+      "tests/integration/client-booking-privacy.test.ts",
+      "tests/e2e/client-booking-boundary.test.ts",
+      "tests/repo/client-booking-boundaries.test.ts",
+      "apps/api/src/client-booking-principal-resolver.test.ts",
+      "apps/api/src/routes/client-booking.test.ts",
+      "packages/worker/src/client-booking-erasure.test.ts",
+      "packages/contracts/src/worker-outbox.test.ts",
+      "apps/worker/src/main.test.ts",
+      "apps/worker/src/runtime.test.ts",
+      "packages/observability/src/logger.test.ts",
+      "packages/observability/src/metrics.test.ts",
+      "tests/repo/workflow-semantics.test.ts",
+    ];
+    const literal = `pnpm exec vitest run ${manifest.join(" ")} --maxWorkers=1`;
+    expect(runner).toContain("ci | database | release | client-booking");
+    expect(runner).toContain(literal);
+    expect(runner.split("pnpm exec vitest run", 20)).toHaveLength(18);
+    expect(runner).toContain("--untracked-files=all");
+    expect(runner).toContain("-e II_TONYA_TEST_POSTGRES_ADMIN_URL");
+    expect(runner).not.toContain("$II_TONYA_TEST_POSTGRES_ADMIN_URL");
+    expect(runner).toContain("trap cleanup EXIT");
+    expect(runner).toContain("repeat_limit: 1");
   });
 });

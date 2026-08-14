@@ -98,7 +98,7 @@ case "$CLAW_GATE_MODE" in
   client-booking)
     node scripts/assert-client-booking-postgres.mjs
     pnpm build
-    pnpm exec vitest run tests/integration/client-booking-final-gate.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts tests/integration/client-catalog-booking-choice.test.ts tests/integration/client-booking-repository.test.ts tests/integration/client-booking-privacy.test.ts tests/e2e/client-booking-boundary.test.ts tests/repo/client-booking-boundaries.test.ts apps/api/src/client-booking-principal-resolver.test.ts apps/api/src/routes/client-booking.test.ts packages/worker/src/client-booking-erasure.test.ts packages/contracts/src/worker-outbox.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
     ;;
 esac
 SCRIPT

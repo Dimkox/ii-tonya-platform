@@ -477,9 +477,11 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
               .digest("hex")}`;
           }),
         );
+        const protectedDigests = choices.map((choice) => choice.choiceDigest);
         if (
           choices.length !== publicDigests.length ||
-          new Set(publicDigests).size !== publicDigests.length
+          new Set(publicDigests).size !== publicDigests.length ||
+          new Set(protectedDigests).size !== protectedDigests.length
         ) {
           throw new Error("client_catalog_snapshot_invalid");
         }
@@ -539,16 +541,14 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
         await tx.execute<{
           requestId: string;
           outboxId: string;
-          status: string;
         }>(sql`
-        select r.id as "requestId",o.id as "outboxId",o.status
+        select r.id as "requestId",o.id as "outboxId"
         from client_catalog_requests r
         join integration_outbox o
           on o.idempotency_key='client-catalog:' || r.id::text
           and o.topic='catalog.show'
         where r.expires_at <= clock_timestamp()
         order by r.expires_at,r.id
-        for update of o skip locked
         limit ${input.limit}
       `)
       ).rows;
@@ -559,6 +559,16 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
 
       for (const candidate of candidates) {
         await lockCatalogChoices(tx, candidate.requestId);
+        const claimedOutbox = (
+          await tx.execute<{ status: string }>(sql`
+            select status from integration_outbox
+            where id=${candidate.outboxId}::uuid
+              and idempotency_key='client-catalog:' || ${candidate.requestId}::uuid::text
+              and topic='catalog.show'
+            for update skip locked
+          `)
+        ).rows[0];
+        if (claimedOutbox === undefined) continue;
         const request = (
           await tx.execute<{
             expiresAt: Date | string;
@@ -586,7 +596,7 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
           where id=${candidate.requestId}::uuid
         `);
         expired += 1;
-        if (terminalOutboxStatus(candidate.status)) {
+        if (terminalOutboxStatus(claimedOutbox.status)) {
           await deleteCatalogOutbox(tx, candidate.outboxId);
           await tx.execute(sql`
             delete from client_catalog_tombstones
