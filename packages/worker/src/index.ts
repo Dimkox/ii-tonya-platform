@@ -18,3 +18,4 @@ export * from "./expert-residency-expiry.js";
 export * from "./expert-residency-reconciliation.js";
 export * from "./expert-referral-hold-replay.js";
 export * from "./yookassa-unbound-recovery.js";
+export * from "./local-operator-case-outbox.js";
