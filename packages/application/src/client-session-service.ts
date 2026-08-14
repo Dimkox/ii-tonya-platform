@@ -92,9 +92,9 @@ const validVerifiedProof = (
 
 export const createClientSessionService = (
   dependencies: ClientSessionServiceDependencies,
-): ClientSessionService =>
-  Object.freeze({
-    async issue(identityProof) {
+): ClientSessionService => {
+  const service: ClientSessionService = {
+    async issue(identityProof: string): Promise<ClientSessionIssueResult> {
       let verified: VerifiedClientIdentityProof | null;
       try {
         verified = await dependencies.verifier.verify({
@@ -131,4 +131,6 @@ export const createClientSessionService = (
         return { kind: "unavailable" };
       }
     },
-  });
+  };
+  return Object.freeze(service);
+};
