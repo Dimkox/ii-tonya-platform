@@ -49,6 +49,10 @@ export interface YooKassaOperationPort {
     kind: YooKassaOperationKind,
   ): Promise<YooKassaOperation | null>;
   claim(command: ClaimYooKassaOperationCommand): Promise<YooKassaOperation>;
+  attachReplaySnapshot?(
+    operationId: string,
+    snapshot: NonNullable<ClaimYooKassaOperationCommand["replaySnapshot"]>,
+  ): Promise<void>;
   bindProviderObject(
     operationId: string,
     providerObjectId: string,

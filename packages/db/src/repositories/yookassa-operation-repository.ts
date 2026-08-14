@@ -361,6 +361,39 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     );
   }
 
+  async attachReplaySnapshot(
+    operationId: string,
+    snapshot: NonNullable<ClaimYooKassaOperationCommand["replaySnapshot"]>,
+  ): Promise<void> {
+    if (!UUID.test(operationId))
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    validateClaim({
+      commandId: operationId,
+      orderId: operationId,
+      paymentAttemptId: operationId,
+      kind: "create_payment",
+      mode: "test",
+      amountMinor: "1",
+      currency: "RUB",
+      requestDigest: `sha256:${"0".repeat(64)}`,
+      replaySnapshot: snapshot,
+    });
+    const result = await this.db.execute<{ id: string }>(sql`
+      update expert_residency_provider_operations
+      set replay_ciphertext=${snapshot.ciphertext},
+          replay_key_reference=${snapshot.keyReference},
+          replay_body_version=${snapshot.bodyVersion},
+          recovery_expires_at=${snapshot.expiresAt}::timestamptz,
+          recovery_next_at=transaction_timestamp(),
+          updated_at=transaction_timestamp()
+      where id=${operationId}::uuid and status = 'claimed'
+        and provider_object_id is null and replay_ciphertext is null
+      returning id
+    `);
+    if (result.rows.length !== 1)
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+  }
+
   async bindProviderObject(
     operationId: string,
     providerObjectId: string,
@@ -572,5 +605,76 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
       `);
       return result.rows;
     });
+  }
+
+  async bindRecoveredProviderObject(
+    operationId: string,
+    leaseToken: string,
+    providerObjectId: string,
+  ): Promise<void> {
+    if (!UUID.test(operationId) || !UUID.test(leaseToken) || !PROVIDER_ID.test(providerObjectId))
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    await this.db.transaction(async (tx) => {
+      const bound = await tx.execute<{ paymentAttemptId: string; operationKind: "create_payment" | "create_refund"; orderId: string }>(sql`
+        update expert_residency_provider_operations
+        set provider_object_id=${providerObjectId}, status='pending',
+            recovery_lease_token=null, recovery_lease_until=null,
+            recovery_next_at=null, updated_at=transaction_timestamp()
+        where id=${operationId}::uuid and status='unknown_outcome'
+          and provider_object_id is null
+          and recovery_lease_token=${leaseToken}::uuid
+          and recovery_lease_until > transaction_timestamp()
+        returning payment_attempt_id::text as "paymentAttemptId",
+          operation_kind as "operationKind", order_id::text as "orderId"
+      `);
+      const row = bound.rows[0];
+      if (row === undefined)
+        throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+      if (row.operationKind === "create_payment") {
+        const attempt = await tx.execute<{ id: string }>(sql`
+          update expert_residency_payment_attempts
+          set provider_request_id=${providerObjectId}, status='pending',
+              updated_at=transaction_timestamp()
+          where id=${row.paymentAttemptId}::uuid and order_id=${row.orderId}::uuid
+            and provider='yookassa' and status in ('created','unknown_outcome')
+          returning id
+        `);
+        if (attempt.rows.length !== 1)
+          throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+      }
+    });
+  }
+
+  async rescheduleUnboundRecovery(operationId: string, leaseToken: string): Promise<void> {
+    await this.finishRecoveryLease(operationId, leaseToken, sql`
+      recovery_next_at=transaction_timestamp() + interval '5 minutes'
+    `);
+  }
+
+  async markUnboundRecoveryManualReview(operationId: string, leaseToken: string): Promise<void> {
+    await this.finishRecoveryLease(operationId, leaseToken, sql`
+      manual_review_at=transaction_timestamp(), recovery_next_at=null
+    `);
+  }
+
+  private async finishRecoveryLease(
+    operationId: string,
+    leaseToken: string,
+    disposition: ReturnType<typeof sql>,
+  ): Promise<void> {
+    if (!UUID.test(operationId) || !UUID.test(leaseToken))
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    const result = await this.db.execute<{ id: string }>(sql`
+      update expert_residency_provider_operations
+      set ${disposition}, recovery_lease_token=null, recovery_lease_until=null,
+          updated_at=transaction_timestamp()
+      where id=${operationId}::uuid and status='unknown_outcome'
+        and provider_object_id is null
+        and recovery_lease_token=${leaseToken}::uuid
+        and recovery_lease_until > transaction_timestamp()
+      returning id
+    `);
+    if (result.rows.length !== 1)
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
   }
 }

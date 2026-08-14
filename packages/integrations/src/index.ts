@@ -122,6 +122,8 @@ export {
   YooKassaUnknownOutcomeError,
   createYooKassaClient,
   formatRubMinor,
+  serializeYooKassaPaymentRequest,
+  serializeYooKassaRefundRequest,
 } from "./yookassa/client.js";
 export type {
   CreateYooKassaPayment,

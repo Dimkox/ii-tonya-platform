@@ -241,4 +241,29 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       }),
     ).rejects.toMatchObject({ code: "YOOKASSA_OPERATION_INVALID" });
   });
+
+  it("fences exact-body recovery and atomically binds its payment attempt", async () => {
+    const claimed = await repository.claim({
+      commandId,
+      orderId,
+      kind: "create_payment",
+      mode: "test",
+      amountMinor: "50000",
+      currency: "RUB",
+      requestDigest,
+    });
+    await repository.attachReplaySnapshot(claimed.id, {
+      ciphertext: "opaque-test-ciphertext",
+      keyReference: "kms:test-key",
+      bodyVersion: 1,
+      expiresAt: "2030-01-01T00:00:00.000Z",
+    });
+    await repository.markUnknown(claimed.id);
+    const [lease] = await repository.claimUnboundRecoveryBatch({ limit: 1, leaseSeconds: 60, maxAttempts: 3 });
+    expect(lease?.operationId).toBe(claimed.id);
+    const providerId = randomUUID();
+    await repository.bindRecoveredProviderObject(claimed.id, lease!.leaseToken, providerId);
+    await expect(repository.findByProviderObject(providerId, "create_payment"))
+      .resolves.toMatchObject({ id: claimed.id, providerObjectId: providerId, status: "pending" });
+  });
 });

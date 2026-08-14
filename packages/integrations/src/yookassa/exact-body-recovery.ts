@@ -70,6 +70,7 @@ export interface YooKassaExactRecoveryCompletion {
     leaseToken: string,
     reason: string,
   ): Promise<void>;
+  reschedule(operationId: string, leaseToken: string): Promise<void>;
 }
 
 export async function recoverExactYooKassaOperation(input: {
@@ -79,7 +80,7 @@ export async function recoverExactYooKassaOperation(input: {
   readonly transport: YooKassaExactRecoveryTransport;
   readonly completion: YooKassaExactRecoveryCompletion;
 }): Promise<
-  | { readonly kind: "disabled" | "manual_review" | "ineligible" }
+  | { readonly kind: "disabled" | "manual_review" | "ineligible" | "rescheduled" }
   | { readonly kind: "bound"; readonly providerObjectId: string }
 > {
   if (!input.enabled) return { kind: "disabled" };
@@ -108,11 +109,20 @@ export async function recoverExactYooKassaOperation(input: {
     );
     return { kind: "manual_review" };
   }
-  const response = await input.transport.postExact({
-    operationKind: input.claim.operationKind,
-    body: decrypted.body,
-    idempotencyKey: input.claim.idempotencyKey,
-  });
+  let response: { readonly providerObjectId: string };
+  try {
+    response = await input.transport.postExact({
+      operationKind: input.claim.operationKind,
+      body: decrypted.body,
+      idempotencyKey: input.claim.idempotencyKey,
+    });
+  } catch {
+    await input.completion.reschedule(
+      input.claim.operationId,
+      input.claim.leaseToken,
+    );
+    return { kind: "rescheduled" };
+  }
   await input.completion.bind(
     input.claim.operationId,
     input.claim.leaseToken,

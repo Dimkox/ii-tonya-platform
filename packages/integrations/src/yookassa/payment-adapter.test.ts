@@ -89,6 +89,55 @@ const contacts = (
 });
 
 describe("YooKassaExpertResidencyPaymentAdapter", () => {
+  it("protects and attaches the exact request before the first provider POST", async () => {
+    const events: string[] = [];
+    const operations = operationPort();
+    operations.attachReplaySnapshot = vi.fn(async (_id, snapshot) => {
+      events.push("attach");
+      expect(snapshot.ciphertext).toBe("opaque-ciphertext");
+    });
+    const provider = client();
+    provider.createPayment = vi.fn(async () => {
+      events.push("post");
+      return payment;
+    });
+    const protect = vi.fn(async (input) => {
+      expect(input.associatedData.operationId).toBe(operation.id);
+      expect(input.associatedData.idempotencyKey).toBe(operation.idempotencyKey);
+      expect(input.body).toContain('"capture":true');
+      return {
+        ciphertext: "opaque-ciphertext",
+        keyReference: "kms:test-key",
+        bodyVersion: 1,
+        expiresAt: "2030-01-01T00:00:00.000Z",
+      };
+    });
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: provider,
+      operations,
+      contacts: contacts(),
+      mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: { vatCode: 1, paymentSubject: "service", paymentMode: "full_payment" },
+      replayProtector: { protect },
+      recoveryExpiresAt: () => "2030-01-01T00:00:00.000Z",
+    });
+    await adapter.createCheckout(checkout);
+    expect(events).toEqual(["attach", "post"]);
+    expect(protect).toHaveBeenCalledOnce();
+  });
+
+  it("does no replay crypto or snapshot mutation when recovery is disabled", async () => {
+    const operations = operationPort();
+    operations.attachReplaySnapshot = vi.fn();
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: client(), operations, contacts: contacts(), mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: { vatCode: 1, paymentSubject: "service", paymentMode: "full_payment" },
+    });
+    await adapter.createCheckout(checkout);
+    expect(operations.attachReplaySnapshot).not.toHaveBeenCalled();
+  });
   it("claims before POST and returns only the bound redirect", async () => {
     const operations = operationPort();
     const provider = client();
