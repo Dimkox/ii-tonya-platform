@@ -1,8 +1,8 @@
 # YooKassa Provider Adapter Design
 
-**Date:** 2026-08-14  
-**Status:** approved architecture; implementation not started  
-**Requirement:** `PAY-PROV-001`  
+**Date:** 2026-08-14
+**Status:** default-off implementation checkpoint; activation blocked
+**Requirement:** `PAY-PROV-001`
 **Release posture:** disabled by default; no merchant credentials or live activation
 
 ## 1. Objective
