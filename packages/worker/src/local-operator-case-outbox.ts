@@ -34,10 +34,12 @@ export interface LocalOperatorCaseOutboxRepository {
   materialize(
     input: LocalOperatorCaseMessage,
   ): Promise<"materialized" | "replayed" | "source_invalid">;
-  inspect(input: Readonly<{
-    outboxId: string;
-    topic: LocalOutboxTopic;
-  }>): Promise<"applied" | "absent" | "source_invalid">;
+  inspect(
+    input: Readonly<{
+      outboxId: string;
+      topic: LocalOutboxTopic;
+    }>,
+  ): Promise<"applied" | "absent" | "source_invalid">;
 }
 
 type LocalOutboxInput = Readonly<{

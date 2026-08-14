@@ -52,7 +52,9 @@ describe("local operator-case outbox registry", () => {
     );
     const input = message("safety.operator_escalation", safetyPayload());
 
-    await expect(registry.dispatch(input)).resolves.toEqual({ kind: "applied" });
+    await expect(registry.dispatch(input)).resolves.toEqual({
+      kind: "applied",
+    });
     expect(materialize).toHaveBeenCalledWith({
       outboxId: input.id,
       topic: "safety.operator_escalation",
@@ -73,7 +75,9 @@ describe("local operator-case outbox registry", () => {
     payload.policyVersion = "payload-mismatch-v9";
     const input = message("admin.negative_feedback", payload);
 
-    await expect(registry.dispatch(input)).resolves.toEqual({ kind: "applied" });
+    await expect(registry.dispatch(input)).resolves.toEqual({
+      kind: "applied",
+    });
     expect(materialize).toHaveBeenCalledWith({
       outboxId: input.id,
       topic: "admin.negative_feedback",
@@ -85,8 +89,14 @@ describe("local operator-case outbox registry", () => {
     ["missing safety field", { handoffId: randomUUID(), charge: 0 }],
     ["extra safety field", { ...safetyPayload(), recipient: "operator" }],
     ["wrong safety UUID", { ...safetyPayload(), handoffId: "NOT-A-UUID" }],
-    ["noncanonical UUID", { ...safetyPayload(), handoffId: randomUUID().toUpperCase() }],
-    ["unsafe safety version", { ...safetyPayload(), version: Number.MAX_SAFE_INTEGER + 1 }],
+    [
+      "noncanonical UUID",
+      { ...safetyPayload(), handoffId: randomUUID().toUpperCase() },
+    ],
+    [
+      "unsafe safety version",
+      { ...safetyPayload(), version: Number.MAX_SAFE_INTEGER + 1 },
+    ],
     ["zero safety version", { ...safetyPayload(), version: 0 }],
     ["noninteger safety version", { ...safetyPayload(), version: 1.5 }],
     ["nonzero charge", { ...safetyPayload(), charge: 1 }],
@@ -105,7 +115,10 @@ describe("local operator-case outbox registry", () => {
   });
 
   it.each([
-    ["missing feedback field", { feedbackId: randomUUID(), contentHash: "a".repeat(64) }],
+    [
+      "missing feedback field",
+      { feedbackId: randomUUID(), contentHash: "a".repeat(64) },
+    ],
     ["extra feedback field", { ...feedbackPayload(), amount: "1.00" }],
     ["wrong feedback UUID", { ...feedbackPayload(), feedbackId: "nope" }],
     ["uppercase hash", { ...feedbackPayload(), contentHash: "A".repeat(64) }],
@@ -155,7 +168,10 @@ describe("local operator-case outbox registry", () => {
     });
 
     const applied = createLocalOperatorCaseOutboxRegistry(
-      repository(undefined, vi.fn(async () => "applied" as const)),
+      repository(
+        undefined,
+        vi.fn(async () => "applied" as const),
+      ),
     );
     await expect(
       applied.reconcile(message("admin.negative_feedback", feedbackPayload())),
@@ -167,7 +183,10 @@ describe("local operator-case outbox registry", () => {
     ).resolves.toEqual({ kind: "not_applied" });
 
     const invalid = createLocalOperatorCaseOutboxRegistry(
-      repository(undefined, vi.fn(async () => "source_invalid" as const)),
+      repository(
+        undefined,
+        vi.fn(async () => "source_invalid" as const),
+      ),
     );
     await expect(
       invalid.reconcile(message("safety.operator_escalation", safetyPayload())),
