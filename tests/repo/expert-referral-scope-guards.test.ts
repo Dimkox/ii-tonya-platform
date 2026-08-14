@@ -46,6 +46,8 @@ describe("expert residency referral scope boundary", () => {
       "expert_residency_orders",
       "expert_residency_payment_attempts",
       "expert_residency_provider_event_inbox",
+      "expert_residency_provider_operations",
+      "expert_residency_receipt_contacts",
       "expert_residency_tariff_versions",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
@@ -62,6 +64,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_REFERRAL_HMAC_KEY_REF",
       "EXPERT_REFERRAL_HMAC_KEY_VERSION",
       "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
@@ -126,6 +129,16 @@ describe("expert residency referral scope boundary", () => {
       "unreviewed feature flag",
       "packages/config/src/expert-referrals.ts",
       "export const enabled = process.env.EXPERT_REFERRAL_SHADOW_ENABLED;",
+    ],
+    [
+      "unreviewed expert AI feature flag",
+      "packages/config/src/expert-ai.ts",
+      "export const enabled = process.env.EXPERT_AI_SHADOW_ENABLED;",
+    ],
+    [
+      "unreviewed expert Telegram feature flag",
+      "packages/config/src/expert-telegram.ts",
+      "export const enabled = process.env.EXPERT_TELEGRAM_SHADOW_ENABLED;",
     ],
     [
       "unreviewed admin action",
