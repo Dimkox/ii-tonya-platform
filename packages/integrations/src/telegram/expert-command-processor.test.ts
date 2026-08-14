@@ -154,7 +154,7 @@ const command = (text: string) => ({
 describe("expert Telegram command processor", () => {
   it("redeems an exact opaque expert code with server idempotency and never renders it", async () => {
     const state = build(true, true, true);
-    const code = "EXR_aZ09-opaque_token";
+    const code = "EXR_aZ09-opaque_token_12345";
 
     await expect(
       state.processor.processCommand(command(`/redeem ${code}`)),
@@ -180,6 +180,7 @@ describe("expert Telegram command processor", () => {
   it.each([
     "/redeem",
     "/redeem EXR_",
+    "/redeem EXR_too-short",
     "/redeem EXR_bad value",
     "/redeem CLIENT_opaque",
   ])(
@@ -193,7 +194,9 @@ describe("expert Telegram command processor", () => {
 
   it("keeps referral mutation independently disabled", async () => {
     const state = build(true, true, false);
-    await state.processor.processCommand(command("/redeem EXR_opaque-token"));
+    await state.processor.processCommand(
+      command("/redeem EXR_opaque-token-123456789"),
+    );
     expect(state.redeemCode).not.toHaveBeenCalled();
     expect(state.views.sendReferralRedeemed).not.toHaveBeenCalled();
   });
