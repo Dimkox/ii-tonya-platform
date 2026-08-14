@@ -3,6 +3,7 @@ export {
   runOutboxBatch,
   type DispatchOutcome,
   type OutboxDispatcher,
+  type OutboxClaimBatch,
   type OutboxMessage,
   type OutboxMetricOutcome,
   type OutboxMetricPhase,

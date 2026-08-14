@@ -23,6 +23,18 @@ export interface OutboxRepository {
     leaseDurationMs: number,
     maxReconciliationAttempts: number,
   ): Promise<readonly OutboxMessage[]>;
+  claimWithMetrics?(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxAttempts: number,
+  ): Promise<OutboxClaimBatch>;
+  claimUnknownWithMetrics?(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxReconciliationAttempts: number,
+  ): Promise<OutboxClaimBatch>;
   recordAttemptStarted(
     id: string,
     owner: string,
@@ -154,6 +166,10 @@ export interface OutboxRecoveryCount {
   readonly topic: "safety.operator_escalation" | "admin.negative_feedback";
   readonly count: number;
 }
+export interface OutboxClaimBatch {
+  readonly messages: readonly OutboxMessage[];
+  readonly exhausted: readonly OutboxRecoveryCount[];
+}
 
 export interface OutboxRunResult {
   reconciled: number;
@@ -252,6 +268,28 @@ function recordRecovery(
         "lease_recovery",
         "unknown",
         "lease_expired",
+        item.count,
+      );
+    }
+  }
+}
+
+function recordExhaustion(
+  deps: OutboxRunnerDeps,
+  counts: readonly OutboxRecoveryCount[],
+  metricReason: "attempts_exhausted" | "reconciliation_exhausted",
+): void {
+  for (const item of counts) {
+    if (!Number.isSafeInteger(item.count) || item.count < 0) {
+      throw new Error("worker_outbox_exhaustion_count_invalid");
+    }
+    if (item.count > 0) {
+      record(
+        deps,
+        item.topic,
+        "claim",
+        "dead_letter",
+        metricReason,
         item.count,
       );
     }
@@ -495,23 +533,57 @@ export async function runOutboxBatch(
   }
   const leaseDurationMs = deps.leaseDurationMs ?? 30_000;
 
-  const unknown = await deps.repository.claimUnknown(
-    deps.batchSize,
-    deps.workerId,
-    leaseDurationMs,
-    deps.maxReconciliationAttempts,
-  );
+  let unknown: readonly OutboxMessage[];
+  if (deps.metrics === undefined) {
+    unknown = await deps.repository.claimUnknown(
+      deps.batchSize,
+      deps.workerId,
+      leaseDurationMs,
+      deps.maxReconciliationAttempts,
+    );
+  } else {
+    if (deps.repository.claimUnknownWithMetrics === undefined) {
+      throw new Error("worker_outbox_metrics_claim_capability_unavailable");
+    }
+    const batch = await deps.repository.claimUnknownWithMetrics(
+      deps.batchSize,
+      deps.workerId,
+      leaseDurationMs,
+      deps.maxReconciliationAttempts,
+    );
+    unknown = batch.messages;
+    recordExhaustion(
+      deps,
+      batch.exhausted,
+      "reconciliation_exhausted",
+    );
+  }
   for (const message of unknown) {
     record(deps, message.topic, "claim", "no_op", "internal");
     await reconcileUnknown(deps, message, now);
   }
 
-  const messages = await deps.repository.claim(
-    deps.batchSize,
-    deps.workerId,
-    leaseDurationMs,
-    deps.maxAttempts,
-  );
+  let messages: readonly OutboxMessage[];
+  if (deps.metrics === undefined) {
+    messages = await deps.repository.claim(
+      deps.batchSize,
+      deps.workerId,
+      leaseDurationMs,
+      deps.maxAttempts,
+    );
+  } else {
+    if (deps.repository.claimWithMetrics === undefined) {
+      throw new Error("worker_outbox_metrics_claim_capability_unavailable");
+    }
+    const batch = await deps.repository.claimWithMetrics(
+      deps.batchSize,
+      deps.workerId,
+      leaseDurationMs,
+      deps.maxAttempts,
+    );
+    messages = batch.messages;
+    recordExhaustion(deps, batch.exhausted, "attempts_exhausted");
+  }
   for (const message of messages) {
     record(deps, message.topic, "claim", "no_op", "internal");
     await dispatchPending(deps, message, now);

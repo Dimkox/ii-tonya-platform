@@ -1,7 +1,5 @@
-export const LOCAL_OPERATOR_CASE_OUTBOX_TOPICS = Object.freeze([
-  "safety.operator_escalation",
-  "admin.negative_feedback",
-] as const);
+export { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "@ii-tonya/contracts";
+import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "@ii-tonya/contracts";
 
 export type LocalOutboxTopic =
   (typeof LOCAL_OPERATOR_CASE_OUTBOX_TOPICS)[number];

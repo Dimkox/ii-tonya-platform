@@ -124,7 +124,7 @@ describe("review-remediated production worker outbox composition", () => {
       safetyClient,
       async () => {
         await safetyClient.query(
-          "update human_escalations set version=4 where id=$1::uuid",
+          "update human_escalations set status='resolved',version=4,resolved_at=transaction_timestamp(),updated_at=transaction_timestamp() where id=$1::uuid",
           [handoffId],
         );
       },
@@ -202,6 +202,8 @@ describe("review-remediated production worker outbox composition", () => {
         end if;
         return new;
       end $$;
+    `);
+    await testDb.db.execute(sql`
       create trigger worker_outbox_fail_ack_trigger
       before update on integration_outbox
       for each row execute function worker_outbox_fail_ack()
@@ -209,8 +211,10 @@ describe("review-remediated production worker outbox composition", () => {
     await expect(composition.run()).rejects.toThrow("simulated_ack_failure");
     expect(await status(appliedId)).toBe("processing");
     await testDb.db.execute(sql`
-      drop trigger worker_outbox_fail_ack_trigger on integration_outbox;
-      drop function worker_outbox_fail_ack();
+      drop trigger worker_outbox_fail_ack_trigger on integration_outbox
+    `);
+    await testDb.db.execute(sql`drop function worker_outbox_fail_ack()`);
+    await testDb.db.execute(sql`
       update integration_outbox set lease_until=clock_timestamp()-interval '1 second'
       where id=${appliedId}::uuid
     `);

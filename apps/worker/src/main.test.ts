@@ -18,7 +18,14 @@ describe("worker main", () => {
 
   it("constructs the worker outbox registry lazily only for enabled config", async () => {
     const { selectWorkerOutboxRegistry } = await import("./main.js");
-    const registry = { topics: ["safety.operator_escalation"] };
+    const registry = {
+      topics: [
+        "safety.operator_escalation",
+        "admin.negative_feedback",
+      ] as const,
+      dispatch: vi.fn(),
+      reconcile: vi.fn(),
+    };
     const factory = vi.fn(() => registry);
 
     expect(

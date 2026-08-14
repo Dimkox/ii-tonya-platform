@@ -55,6 +55,10 @@ interface FeedbackRow extends Record<string, unknown> {
   policyVersion: string;
   escalationStatus: string;
 }
+interface SafetySourceRow extends Record<string, unknown> {
+  version: number;
+  status: string;
+}
 interface CaseProjection {
   readonly reasonCode: string;
   readonly caseType: "safety" | "negative_feedback" | "delivery_failure";
@@ -229,17 +233,20 @@ async function casesFor(tx: Transaction, outboxId: string): Promise<CaseRow[]> {
 async function projectionFor(
   tx: Transaction,
   input: OperatorCaseOutboxMessage,
+  lockSource: boolean,
 ): Promise<CaseProjection | undefined> {
   if (input.topic === "safety.operator_escalation") {
-    const source = await tx.execute<{ present: boolean }>(sql`
-      select exists(
-        select 1 from human_escalations
-        where id=${input.payload.handoffId}::uuid
-          and version=${input.payload.version}
-          and status='escalated'
-      ) as present
+    const source = await tx.execute<SafetySourceRow>(sql`
+      select version,status from human_escalations
+      where id=${input.payload.handoffId}::uuid
+      ${lockSource ? sql`for update` : sql``}
     `);
-    if (source.rows[0]?.present !== true) return undefined;
+    if (
+      source.rows[0]?.version !== input.payload.version ||
+      source.rows[0]?.status !== "escalated"
+    ) {
+      return undefined;
+    }
     return {
       reasonCode: "safety_operator_escalation",
       caseType: "safety",
@@ -254,6 +261,7 @@ async function projectionFor(
       negative_policy_version as "policyVersion",
       escalation_status as "escalationStatus"
     from feedback where id=${input.payload.feedbackId}::uuid
+    ${lockSource ? sql`for update` : sql``}
   `);
   const source = result.rows[0];
   if (source === undefined || source.escalationStatus !== "escalated") {
@@ -329,7 +337,7 @@ export class PostgresOperatorCaseOutboxRepository {
           ? "replayed"
           : "source_invalid";
       }
-      const projection = await projectionFor(tx, input);
+      const projection = await projectionFor(tx, input, true);
       if (projection === undefined) return "source_invalid";
       const inserted = await tx.execute<{ id: string }>(sql`
         insert into outbox_operator_alerts (
@@ -386,7 +394,7 @@ export class PostgresOperatorCaseOutboxRepository {
       } catch {
         return "source_invalid";
       }
-      const projection = await projectionFor(tx, persisted);
+      const projection = await projectionFor(tx, persisted, false);
       return projection === undefined ? "source_invalid" : "absent";
     });
   }

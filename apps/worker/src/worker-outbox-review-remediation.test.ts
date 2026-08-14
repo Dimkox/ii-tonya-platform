@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "@ii-tonya/contracts";
-import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS as registryTopics } from "@ii-tonya/worker";
+import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "../../../packages/contracts/src/worker-outbox.js";
+import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS as registryTopics } from "../../../packages/worker/src/local-operator-case-outbox.js";
 import {
   composeWorkerOutboxDelivery,
   selectWorkerOutboxRegistry,

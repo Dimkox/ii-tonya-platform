@@ -48,6 +48,14 @@ describe("worker outbox metrics", () => {
       ]),
       claimUnknown: vi.fn(async () => unknown),
       claim: vi.fn(async () => pending),
+      claimUnknownWithMetrics: vi.fn(async () => ({
+        messages: unknown,
+        exhausted: [],
+      })),
+      claimWithMetrics: vi.fn(async () => ({
+        messages: pending,
+        exhausted: [],
+      })),
       recordAttemptStarted: vi.fn(async () => undefined),
       markUnknownOutcome: vi.fn(async () => undefined),
       markStillUnknown: vi.fn(async () => undefined),

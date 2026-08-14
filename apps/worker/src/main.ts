@@ -21,9 +21,11 @@ import {
 import {
   boundedFullJitterDelay,
   createLocalOperatorCaseOutboxRegistry,
+  LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
   runOutboxBatch,
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
+  type OutboxRunnerMetricLabels,
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
@@ -58,16 +60,75 @@ export { disabledExpertResidencyProviderReader };
 export function selectWorkerOutboxRegistry<T>(
   config: RuntimeConfig,
   factory?: () => T,
-): T | undefined {
+): LocalOperatorCaseOutboxRegistry | undefined {
   if (config.features.workerOutboxDelivery !== true) return undefined;
   if (factory === undefined) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
-  const registry = factory();
-  if (registry === undefined || registry === null) {
+  return requireWorkerOutboxRegistry(factory());
+}
+
+function requireWorkerOutboxRegistry(
+  value: unknown,
+): LocalOperatorCaseOutboxRegistry {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
-  return registry;
+  const registry = value as Partial<LocalOperatorCaseOutboxRegistry>;
+  if (
+    registry.topics?.length !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS.length ||
+    registry.topics.some(
+      (topic, index) => topic !== LOCAL_OPERATOR_CASE_OUTBOX_TOPICS[index],
+    ) ||
+    typeof registry.dispatch !== "function" ||
+    typeof registry.reconcile !== "function"
+  ) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  return registry as LocalOperatorCaseOutboxRegistry;
+}
+
+type WorkerOutboxMetricRecorder = (
+  labels: OutboxRunnerMetricLabels,
+  count?: number,
+) => void;
+
+export function composeWorkerOutboxDelivery(
+  db: DrizzleDb,
+  registryInput: unknown = createLocalOperatorCaseOutboxRegistry(
+    new PostgresOperatorCaseOutboxRepository(db),
+  ),
+  metricRecorder: WorkerOutboxMetricRecorder = recordWorkerOutboxMetric,
+) {
+  const registry = requireWorkerOutboxRegistry(registryInput);
+  const repository = new PostgresOutboxRepository(db, registry.topics);
+  return {
+    registry,
+    repository,
+    run: () =>
+      runOutboxBatch({
+        repository,
+        dispatcher: registry,
+        reconciler: {
+          async reconcile(message) {
+            const result = await registry.reconcile(message);
+            if (result.kind === "applied") return "applied";
+            if (result.kind === "not_applied") return "not_applied";
+            if (result.kind === "still_unknown") return "still_unknown";
+            return result;
+          },
+        },
+        metrics: { record: metricRecorder },
+        now: () => new Date(),
+        retryDelayMs: (attempt) =>
+          boundedFullJitterDelay(attempt, 1_000, 30_000),
+        maxAttempts: 3,
+        maxReconciliationAttempts: 3,
+        batchSize: 100,
+        workerId: "local-operator-case-worker",
+        newAttemptId: randomUUID,
+      }),
+  } as const;
 }
 
 export function selectExpertResidencyProviderReader(
@@ -108,37 +169,12 @@ export function createProductionWorkerRuntimeFactory(
           ? undefined
           : () => deps.workerOutboxRegistryFactory!(db),
       );
-      const outboxRepository = new PostgresOutboxRepository(
-        db,
-        workerOutboxRegistry?.topics,
-      );
-      const workerOutboxRunner =
+      const workerOutbox =
         workerOutboxRegistry === undefined
           ? undefined
-          : async () =>
-              runOutboxBatch({
-                repository: outboxRepository,
-                dispatcher: workerOutboxRegistry,
-                reconciler: {
-                  async reconcile(message) {
-                    const result =
-                      await workerOutboxRegistry.reconcile(message);
-                    if (result.kind === "applied") return "applied";
-                    if (result.kind === "not_applied") return "not_applied";
-                    if (result.kind === "still_unknown") return "still_unknown";
-                    return result;
-                  },
-                },
-                metrics: { record: recordWorkerOutboxMetric },
-                now: () => new Date(),
-                retryDelayMs: (attempt) =>
-                  boundedFullJitterDelay(attempt, 1_000, 30_000),
-                maxAttempts: 3,
-                maxReconciliationAttempts: 3,
-                batchSize: 100,
-                workerId: "local-operator-case-worker",
-                newAttemptId: randomUUID,
-              });
+          : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
+      const outboxRepository =
+        workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -147,8 +183,12 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository,
-        ...(workerOutboxRegistry === undefined ? {} : { workerOutboxRegistry }),
-        ...(workerOutboxRunner === undefined ? {} : { workerOutboxRunner }),
+        ...(workerOutbox === undefined
+          ? {}
+          : {
+              workerOutboxRegistry: workerOutbox.registry,
+              workerOutboxRunner: workerOutbox.run,
+            }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),
