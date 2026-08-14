@@ -9,6 +9,7 @@ import {
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
+import type { DrizzleDb } from "@ii-tonya/db";
 import {
   createProductionWorkerRuntime,
   disabledExpertResidencyProviderReader,
@@ -23,6 +24,9 @@ export interface WorkerRuntimeFactory {
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly yookassaReader?: ExpertResidencyProviderReader;
+  readonly workerOutboxRegistryFactory?: (
+    db: DrizzleDb,
+  ) => Readonly<{ readonly topics: readonly string[] }>;
 }
 export interface WorkerLoopOptions {
   readonly signal: AbortSignal;
@@ -41,6 +45,21 @@ export interface WorkerMainOptions {
 const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
 export { disabledExpertResidencyProviderReader };
+
+export function selectWorkerOutboxRegistry<T>(
+  config: RuntimeConfig,
+  factory?: () => T,
+): T | undefined {
+  if (config.features.workerOutboxDelivery !== true) return undefined;
+  if (factory === undefined) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  const registry = factory();
+  if (registry === undefined || registry === null) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
+  return registry;
+}
 
 export function selectExpertResidencyProviderReader(
   config: RuntimeConfig,
@@ -63,11 +82,23 @@ export function createProductionWorkerRuntimeFactory(
 ): WorkerRuntimeFactory {
   return {
     async create(config) {
+      if (
+        config.features.workerOutboxDelivery === true &&
+        deps.workerOutboxRegistryFactory === undefined
+      ) {
+        throw new Error("worker_outbox_delivery_capability_unavailable");
+      }
       const expertResidencyProviderReader = selectExpertResidencyProviderReader(
         config,
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
+      const workerOutboxRegistry = selectWorkerOutboxRegistry(
+        config,
+        deps.workerOutboxRegistryFactory === undefined
+          ? undefined
+          : () => deps.workerOutboxRegistryFactory!(db),
+      );
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -76,6 +107,7 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository: new PostgresOutboxRepository(db),
+        ...(workerOutboxRegistry === undefined ? {} : { workerOutboxRegistry }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),

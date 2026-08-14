@@ -55,6 +55,9 @@ export interface WorkerRuntimeDependencies {
 }
 
 export interface ProductionWorkerRuntimeDependencies {
+  readonly workerOutboxRegistry?: Readonly<{
+    readonly topics: readonly string[];
+  }>;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;

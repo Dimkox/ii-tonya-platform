@@ -71,6 +71,7 @@ const schema = z
     EXPERT_TELEGRAM_CHECKOUT_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
@@ -240,6 +241,7 @@ export type RuntimeConfig = {
   selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
   features: {
+    workerOutboxDelivery: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
@@ -298,6 +300,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
     features: {
+      workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
