@@ -22,6 +22,7 @@ describe("client booking environment", () => {
         base({
           CLIENT_SESSION_ENABLED: "true",
           CLIENT_CATALOG_ENABLED: "true",
+          WORKER_OUTBOX_DELIVERY_ENABLED: "true",
           CLIENT_BOOKING_ENABLED: "true",
           CLIENT_BOOKING_RESERVE_ENABLED: "true",
           CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: "30",

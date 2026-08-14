@@ -177,11 +177,13 @@ const schema = z
     if (
       (value.CLIENT_BOOKING_ENABLED === "true" &&
         (value.CLIENT_SESSION_ENABLED !== "true" ||
-          value.CLIENT_CATALOG_ENABLED !== "true")) ||
+          value.CLIENT_CATALOG_ENABLED !== "true" ||
+          value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true")) ||
       (value.CLIENT_BOOKING_RESERVE_ENABLED === "true" &&
         (value.CLIENT_SESSION_ENABLED !== "true" ||
           value.CLIENT_CATALOG_ENABLED !== "true" ||
-          value.CLIENT_BOOKING_ENABLED !== "true"))
+          value.CLIENT_BOOKING_ENABLED !== "true" ||
+          value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true"))
     ) {
       context.addIssue({
         code: "custom",

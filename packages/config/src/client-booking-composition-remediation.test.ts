@@ -20,6 +20,11 @@ describe("client booking feature dependency chain", () => {
       CLIENT_CATALOG_ENABLED: "true",
       CLIENT_BOOKING_RESERVE_ENABLED: "true",
     },
+    {
+      CLIENT_SESSION_ENABLED: "true",
+      CLIENT_CATALOG_ENABLED: "true",
+      CLIENT_BOOKING_ENABLED: "true",
+    },
   ])("rejects an incomplete booking composition", (flags) => {
     expect(() => loadEnv(base(flags))).toThrow(
       "client_booking_configuration_incomplete",
@@ -32,6 +37,7 @@ describe("client booking feature dependency chain", () => {
         base({
           CLIENT_SESSION_ENABLED: "true",
           CLIENT_CATALOG_ENABLED: "true",
+          WORKER_OUTBOX_DELIVERY_ENABLED: "true",
           CLIENT_BOOKING_ENABLED: "true",
           CLIENT_BOOKING_RESERVE_ENABLED: "true",
         }),
