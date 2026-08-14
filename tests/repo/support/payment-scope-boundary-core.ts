@@ -16,6 +16,8 @@ export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/client.ts",
   "packages/integrations/src/yookassa/contracts.ts",
   "packages/integrations/src/yookassa/operation-port.ts",
+  "packages/integrations/src/yookassa/payment-adapter.ts",
+  "packages/integrations/src/yookassa/verifier.ts",
 ]);
 
 export const SANDBOX_PAYMENT_ALLOWED_PATHS = new Set([
@@ -140,7 +142,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "577d837c880813af669c3592c918e77280dd6900dcb30d8ed927a36986b718cd",
+    "aa16cd3623ebd33ee7dcdbb69c3a18e3c134a85f75a122301e758386bfb37bb5",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -161,6 +163,14 @@ const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/yookassa/operation-port.ts",
     "a7727399e10c27b968c8ad4acd4242bdde625e8ca3e9c8de1288363f80c050e0",
+  ],
+  [
+    "packages/integrations/src/yookassa/payment-adapter.ts",
+    "381e0562873a7131e7fc1d5f0e2e55125eeed074dd62a770bed8476658837764",
+  ],
+  [
+    "packages/integrations/src/yookassa/verifier.ts",
+    "e173abae446914aa6114bdf3cd0f22c8538621fa46ba318df09b3b3a036696e2",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -826,6 +836,8 @@ const isApprovedPaymentBoundaryImport = (
   (path ===
     "packages/integrations/src/expert-residency/disabled-payment-adapter.ts" &&
     specifier === "./payment-port.js") ||
+  (path === "packages/integrations/src/yookassa/payment-adapter.ts" &&
+    specifier === "../expert-residency/payment-port.js") ||
   (path === "packages/integrations/src/index.ts" &&
     specifier.startsWith("./yookassa/"));
 

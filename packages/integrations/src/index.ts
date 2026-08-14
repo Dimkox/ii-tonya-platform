@@ -100,7 +100,10 @@ export {
   type TelegramUpdate,
 } from "./telegram/telegram-adapter.js";
 export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
-export type { ExpertResidencyPaymentPort } from "./expert-residency/payment-port.js";
+export type {
+  ExpertResidencyPaymentPort,
+  ExpertResidencyRefundCommand,
+} from "./expert-residency/payment-port.js";
 export {
   assertVerifiedExpertResidencyPaymentEvent,
   createCanonicalExpertResidencyPaymentEventVerifier,
@@ -149,6 +152,11 @@ export type {
   YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./yookassa/operation-port.js";
+export {
+  YooKassaExpertResidencyPaymentAdapter,
+  type YooKassaPaymentAdapterDependencies,
+} from "./yookassa/payment-adapter.js";
+export { YooKassaPaymentVerifier } from "./yookassa/verifier.js";
 export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,

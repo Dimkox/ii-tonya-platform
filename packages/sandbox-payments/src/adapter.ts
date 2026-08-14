@@ -42,6 +42,10 @@ export class SandboxExpertResidencyPaymentAdapter implements ExpertResidencyPaym
     const event = await this.repository.nextPendingEvent(paymentId);
     return event === null ? null : this.verifier.verify(event);
   }
+
+  async refund(): Promise<never> {
+    throw new Error("sandbox_refund_requires_approved_transition");
+  }
 }
 
 type CanonicalProviderInbox = Pick<

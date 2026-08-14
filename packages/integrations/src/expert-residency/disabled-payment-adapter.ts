@@ -11,4 +11,7 @@ export class DisabledExpertResidencyPaymentAdapter implements ExpertResidencyPay
     void paymentId;
     return null;
   }
+  async refund(): Promise<never> {
+    throw new Error("expert_residency_payments_disabled");
+  }
 }
