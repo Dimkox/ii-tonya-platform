@@ -1,9 +1,11 @@
 # MVP-CLIENT-PRINCIPAL-001 Traceability
 
-Status: specified and planned; not implemented, tested, activated, deployed, or provider-bound.
-Base: `b6763dde890f472c5ad0fcf5a5dbd4ebba2e8423`.
+Status: implemented and verified; not activated, deployed, approved for a live proof source, or provider-bound.
+Base: `3db7ad1f3c76a58ebe6478863226c12e83ce306c`.
+Reviewed implementation: `5772762d92c269c4eb9586d0a8d21c41484740a5`.
+Evidence: `docs/test-evidence/claw/5772762-mvp-client-principal-001/verification.md`.
 
-| Requirement | Future implementation | Verification / evidence | Release, telemetry and recovery |
+| Requirement | Implementation | Verification / evidence | Release, telemetry and recovery |
 | --- | --- | --- | --- |
 | CPS-001 | config, pure preflight, API composition, session route registration | default false; full flag/dependency matrix proves migration/listen/registration not called | Platform; disable catalog before session |
 | CPS-002 | `IdentityProofVerifier` port, hostile-result validator and production composition guard | exact-key/UUID/audience/scope/date/versioned-digest matrix; test-fake import boundary; no fallback scan | Security approval required; verifier outcome labels only |
@@ -20,7 +22,7 @@ Base: `b6763dde890f472c5ad0fcf5a5dbd4ebba2e8423`.
 | CPS-011 | logger, traces, metrics and error mapping | sentinel scan across logs/traces/metrics/errors/evidence | Observability owner; fixed operation/outcome labels |
 | CPS-012 | import/scope and end-to-end boundary guards | session paths create zero business facts; catalog POST creates only request plus one `catalog.show`; zero provider/ledger/reservation/booking/payment facts | Platform; no provider reconciliation needed |
 | CPS-013 | migration journal at implementation start | exact merged catalog SHA and next actual journal entry recorded | DB owner; forward-only migration recovery |
-| CPS-014 | focused local/PG gate, review, exactly one Claw invocation for this slice | exact SHA, command, counts, cleanup, `repeat_limit: 1`; failure retained as terminal evidence | Verification owner; no second invocation under this slice ID |
+| CPS-014 | focused component/PG gates, independent nested review, one new terminal Claw/PG gate | exact `5772762`; final 1/1 in 8.49s; `repeat_limit: 1`; DB/session counts zero and retained source restored | Verification owner; successful suites and final gate were not repeated |
 | CPS-015 | activation runbook | all Security evidence rows plus named approval and deployment authorization | Security/deployment owners; status remains BLOCKED |
 | CPS-016 | non-idempotent issuance client behavior | lost-`201` same-proof `401` plus distinct-proof recovery test | Client/API owner; never recover or replay the original bearer |
 
@@ -35,5 +37,6 @@ Base: `b6763dde890f472c5ad0fcf5a5dbd4ebba2e8423`.
 | `FOLLOW-CLIENT-BOOKING-001` | later protected choice-to-booking contract with new write scope |
 | `FOLLOW-SELARTI-IDENTITY-001` | later verified channel-to-internal-principal binding |
 
-No current CI, Claw, provider, staging, production, or deployment result is evidence for this
-slice. The only current activation result is `BLOCKED`.
+The cited Claw result is verification evidence for this slice only. No CI,
+provider, staging, production, deployment or identity-proof approval was executed.
+The only current activation result remains `BLOCKED` / `NO-GO`.
