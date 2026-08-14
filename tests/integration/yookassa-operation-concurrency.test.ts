@@ -186,4 +186,35 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       }),
     ).rejects.toMatchObject({ code: "YOOKASSA_OPERATION_INVALID" });
   });
+
+  it("binds an explicit refund attempt to the exact parent provider payment", async () => {
+    const payment = await repository.claim({
+      commandId,
+      orderId,
+      kind: "create_payment",
+      mode: "test",
+      amountMinor: "50000",
+      currency: "RUB",
+      requestDigest,
+    });
+    const paymentId = randomUUID();
+    await repository.bindProviderObject(payment.id, paymentId);
+    await db.execute(
+      sql`update expert_residency_payment_attempts set status='settled',resolved_at=now() where id=${payment.paymentAttemptId}::uuid`,
+    );
+
+    await expect(
+      repository.claim({
+        commandId: "00000000-0000-4000-8000-000000000306",
+        orderId,
+        paymentAttemptId: payment.paymentAttemptId,
+        kind: "create_refund",
+        mode: "test",
+        amountMinor: "10000",
+        currency: "RUB",
+        requestDigest: `sha256:${"f".repeat(64)}`,
+        parentPaymentId: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ code: "YOOKASSA_OPERATION_INVALID" });
+  });
 });

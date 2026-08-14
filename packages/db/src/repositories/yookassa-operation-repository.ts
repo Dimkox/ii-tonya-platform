@@ -266,7 +266,10 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         }
         const parentAttempt = parent.rows[0]!;
         if (command.kind === "create_refund") {
-          if (parentAttempt.status !== "settled") {
+          if (
+            parentAttempt.status !== "settled" ||
+            parentAttempt.providerRequestId !== command.parentPaymentId
+          ) {
             throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
           }
           const claimed = await tx.execute<{ claimedMinor: string }>(sql`
