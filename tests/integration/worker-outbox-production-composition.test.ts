@@ -282,7 +282,9 @@ describe("review-remediated production worker outbox composition", () => {
       update integration_outbox
       set dispatch_owner_id='stale',dispatch_claim_token='stale',
         lease_until=clock_timestamp()-interval '1 second'
-      where id in (${localProcessing}::uuid,${providerProcessing}::uuid);
+      where id in (${localProcessing}::uuid,${providerProcessing}::uuid)
+    `);
+    await testDb.db.execute(sql`
       update integration_outbox
       set reconciliation_owner_id='stale',reconciliation_claim_token='stale',
         reconciliation_lease_until=clock_timestamp()-interval '1 second'

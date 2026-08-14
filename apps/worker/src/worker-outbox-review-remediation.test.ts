@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "@ii-tonya/contracts";
+import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "../../../packages/contracts/src/worker-outbox.js";
 import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS as registryTopics } from "../../../packages/worker/src/local-operator-case-outbox.js";
 import {
   composeWorkerOutboxDelivery,
@@ -12,7 +12,7 @@ const enabled = {
 
 describe("review-remediated worker outbox composition", () => {
   it("derives both consumers from the same frozen ordered tuple", () => {
-    expect(registryTopics).toBe(LOCAL_OPERATOR_CASE_OUTBOX_TOPICS);
+    expect(registryTopics).toStrictEqual(LOCAL_OPERATOR_CASE_OUTBOX_TOPICS);
     expect(registryTopics).toEqual([
       "safety.operator_escalation",
       "admin.negative_feedback",
