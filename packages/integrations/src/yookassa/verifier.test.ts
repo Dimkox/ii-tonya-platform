@@ -25,6 +25,7 @@ const payment = {
   amount: { value: "500.00", currency: "RUB" as const },
   test: true,
   createdAt: "2026-08-14T10:00:00.000Z",
+  capturedAt: "2026-08-14T10:05:00.000Z",
   metadata: { order_id: operation.orderId },
   refundable: true,
 };
@@ -57,7 +58,7 @@ const canonical = () => {
 };
 
 describe("YooKassaPaymentVerifier", () => {
-  it("brands and durably resolves a settlement only after an exact authenticated read", async () => {
+  it("brands a deterministic settlement without resolving before durable delivery", async () => {
     const client = { getPayment: async () => payment } as YooKassaClient;
     const operations = operationPort();
     const eventVerifier = canonical();
@@ -65,7 +66,6 @@ describe("YooKassaPaymentVerifier", () => {
       client,
       operations,
       eventVerifier,
-      () => new Date("2026-08-14T11:00:00.000Z"),
     );
     await expect(verifier.verifyPayment(operation)).resolves.toMatchObject({
       kind: "settled",
@@ -74,10 +74,27 @@ describe("YooKassaPaymentVerifier", () => {
       orderId: operation.orderId,
       amountMinor: "50000",
     });
-    expect(eventVerifier.verifyCanonical).toHaveBeenCalledBefore(
-      operations.resolve,
+    expect(eventVerifier.verifyCanonical).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredAt: payment.capturedAt }),
+      expect.any(Object),
     );
-    expect(operations.resolve).toHaveBeenCalledWith(operation.id, "succeeded");
+    expect(operations.resolve).not.toHaveBeenCalled();
+  });
+
+  it("re-verifies a succeeded operation into the same exact settlement", async () => {
+    const verifier = new YooKassaPaymentVerifier(
+      { getPayment: async () => payment } as YooKassaClient,
+      operationPort(),
+      createCanonicalExpertResidencyPaymentEventVerifier(),
+    );
+
+    const first = await verifier.verifyPayment(operation);
+    const retried = await verifier.verifyPayment({
+      ...operation,
+      status: "succeeded",
+    });
+
+    expect(retried).toEqual(first);
   });
 
   it("rejects any order, amount, currency, ID, or mode mismatch", async () => {
@@ -138,7 +155,23 @@ describe("YooKassaPaymentVerifier", () => {
     expect(operations.resolve).toHaveBeenCalledWith(operation.id, "canceled");
   });
 
-  it("brands and durably resolves a refund only after reading both refund and parent payment", async () => {
+  it("idempotently re-verifies an already canceled payment", async () => {
+    const operations = operationPort();
+    const verifier = new YooKassaPaymentVerifier(
+      {
+        getPayment: async () => ({ ...payment, status: "canceled", paid: false }),
+      } as YooKassaClient,
+      operations,
+      createCanonicalExpertResidencyPaymentEventVerifier(),
+    );
+
+    await expect(
+      verifier.verifyPayment({ ...operation, status: "canceled" }),
+    ).resolves.toBeNull();
+    expect(operations.resolve).not.toHaveBeenCalled();
+  });
+
+  it("brands a deterministic refund without resolving before durable delivery", async () => {
     const operations = operationPort();
     const eventVerifier = canonical();
     const client = {
@@ -149,7 +182,6 @@ describe("YooKassaPaymentVerifier", () => {
       client,
       operations,
       eventVerifier,
-      () => new Date("2026-08-14T11:00:00.000Z"),
     );
 
     await expect(verifier.verifyRefund(refundOperation)).resolves.toMatchObject(
@@ -167,13 +199,11 @@ describe("YooKassaPaymentVerifier", () => {
     expect(client.getPayment).toHaveBeenCalledWith(
       refundOperation.parentPaymentId,
     );
-    expect(eventVerifier.verifyCanonical).toHaveBeenCalledBefore(
-      operations.resolve,
+    expect(eventVerifier.verifyCanonical).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredAt: refund.createdAt }),
+      expect.any(Object),
     );
-    expect(operations.resolve).toHaveBeenCalledWith(
-      refundOperation.id,
-      "succeeded",
-    );
+    expect(operations.resolve).not.toHaveBeenCalled();
   });
 
   it("rejects refund ID, payment ID, order, amount, currency, mode, and over-refund mismatches without resolving", async () => {
@@ -249,5 +279,22 @@ describe("YooKassaPaymentVerifier", () => {
       refundOperation.id,
       "canceled",
     );
+  });
+
+  it("idempotently re-verifies an already canceled refund", async () => {
+    const operations = operationPort();
+    const verifier = new YooKassaPaymentVerifier(
+      {
+        getRefund: async () => ({ ...refund, status: "canceled" }),
+        getPayment: async () => payment,
+      } as YooKassaClient,
+      operations,
+      createCanonicalExpertResidencyPaymentEventVerifier(),
+    );
+
+    await expect(
+      verifier.verifyRefund({ ...refundOperation, status: "canceled" }),
+    ).resolves.toBeNull();
+    expect(operations.resolve).not.toHaveBeenCalled();
   });
 });

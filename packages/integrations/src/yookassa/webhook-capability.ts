@@ -6,7 +6,10 @@ import type {
 } from "./operation-port.js";
 import type { YooKassaPaymentVerifier } from "./verifier.js";
 
-type OperationLookup = Pick<YooKassaOperationPort, "findByProviderObject">;
+type OperationLookup = Pick<
+  YooKassaOperationPort,
+  "findByProviderObject" | "resolve"
+>;
 type AuthoritativeVerifier = Pick<
   YooKassaPaymentVerifier,
   "verifyPayment" | "verifyRefund"
@@ -49,5 +52,24 @@ export class YooKassaWebhookCapability {
       throw new Error("yookassa_webhook_pending");
     }
     return null;
+  }
+
+  async resolveSucceeded(notification: YooKassaNotification): Promise<void> {
+    if (notification.event === "payment.canceled") {
+      throw new Error("yookassa_webhook_binding_mismatch");
+    }
+    const kind: YooKassaOperationKind =
+      notification.event === "refund.succeeded"
+        ? "create_refund"
+        : "create_payment";
+    const operation = await this.operations.findByProviderObject(
+      notification.object.id,
+      kind,
+    );
+    if (operation === null) {
+      throw new Error("yookassa_webhook_binding_not_found");
+    }
+    if (operation.status === "succeeded") return;
+    await this.operations.resolve(operation.id, "succeeded");
   }
 }

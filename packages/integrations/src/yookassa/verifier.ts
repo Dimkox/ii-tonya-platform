@@ -19,14 +19,16 @@ const payloadDigest = (value: unknown): string =>
   `sha256:${createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex")}`;
 
 const isReconciliationCandidate = (operation: YooKassaOperation): boolean =>
-  operation.status === "pending" || operation.status === "unknown_outcome";
+  operation.status === "pending" ||
+  operation.status === "unknown_outcome" ||
+  operation.status === "succeeded" ||
+  operation.status === "canceled";
 
 export class YooKassaPaymentVerifier {
   constructor(
     private readonly client: Pick<YooKassaClient, "getPayment" | "getRefund">,
     private readonly operations: Pick<YooKassaOperationPort, "resolve">,
     private readonly canonical: CanonicalExpertResidencyPaymentEventVerifier,
-    private readonly now: () => Date = () => new Date(),
   ) {}
 
   async verifyPayment(
@@ -59,13 +61,19 @@ export class YooKassaPaymentVerifier {
       if (payment.paid) {
         throw new Error("yookassa_payment_binding_mismatch");
       }
-      await this.operations.resolve(operation.id, "canceled");
+      if (operation.status !== "canceled") {
+        await this.operations.resolve(operation.id, "canceled");
+      }
       return null;
     }
-    if (!payment.paid || payment.status !== "succeeded") {
+    if (
+      !payment.paid ||
+      payment.status !== "succeeded" ||
+      payment.capturedAt === undefined
+    ) {
       throw new Error("yookassa_payment_binding_mismatch");
     }
-    const occurredAt = this.now().toISOString();
+    const occurredAt = payment.capturedAt;
     const facts = {
       kind: "settled" as const,
       provider: "yookassa",
@@ -82,7 +90,6 @@ export class YooKassaPaymentVerifier {
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,
     });
-    await this.operations.resolve(operation.id, "succeeded");
     return verified;
   }
 
@@ -119,11 +126,13 @@ export class YooKassaPaymentVerifier {
 
     if (refund.status === "pending") return null;
     if (refund.status === "canceled") {
-      await this.operations.resolve(operation.id, "canceled");
+      if (operation.status !== "canceled") {
+        await this.operations.resolve(operation.id, "canceled");
+      }
       return null;
     }
 
-    const occurredAt = this.now().toISOString();
+    const occurredAt = refund.createdAt;
     const facts = {
       kind: "refunded" as const,
       provider: "yookassa",
@@ -140,7 +149,6 @@ export class YooKassaPaymentVerifier {
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,
     });
-    await this.operations.resolve(operation.id, "succeeded");
     return verified;
   }
 }
