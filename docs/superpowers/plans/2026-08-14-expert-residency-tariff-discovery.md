@@ -89,7 +89,7 @@ not changed.
 - Links ER-TG-004-R1 through R6 to code, tests, gate, recovery, and owner.
 
 - [x] Add truthful traceability without live-provider or release claims.
-- [ ] Run relevant typecheck/lint and `git diff --check` once.
-- [ ] Commit the exact candidate and run one final focused Claw gate.
-- [ ] Record exact evidence, request independent review, fix every Critical/Important
+- [x] Run relevant typecheck/lint and `git diff --check` once.
+- [x] Commit the exact candidate and run one final focused Claw gate.
+- [x] Record exact evidence, request independent review, fix every Critical/Important
   finding through a new RED/GREEN cycle, and leave the branch clean without push/merge.
