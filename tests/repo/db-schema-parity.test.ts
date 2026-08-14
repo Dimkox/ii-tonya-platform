@@ -375,6 +375,7 @@ describe("authoritative Drizzle schema parity", () => {
       ),
       readFileSync(
         "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+        "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
         "utf8",
       ),
     ].join("\n");

@@ -64,7 +64,11 @@ export const createDefaultLifecycle = (
     };
     expertTelegramComposition?: Omit<
       ExpertTelegramIngressFactoryDependencies,
-      "enabled" | "financialViewsEnabled" | "referral" | "residency"
+      | "enabled"
+      | "financialViewsEnabled"
+      | "referralMutationsEnabled"
+      | "referral"
+      | "residency"
     > &
       Required<
         Pick<ExpertTelegramIngressFactoryDependencies, "referral" | "residency">
@@ -107,7 +111,8 @@ export const createDefaultLifecycle = (
         : new ExpertCodeCrypto(expertCodeKeyring);
     const telegramEnabled =
       config.features.expertTelegramQueries === true ||
-      config.features.expertTelegramFinancialViews === true;
+      config.features.expertTelegramFinancialViews === true ||
+      config.features.expertTelegramReferral === true;
     const expertTelegramQueries =
       options.expertTelegramComposition === undefined
         ? undefined
@@ -116,6 +121,8 @@ export const createDefaultLifecycle = (
             enabled: telegramEnabled,
             financialViewsEnabled:
               config.features.expertTelegramFinancialViews === true,
+            referralMutationsEnabled:
+              config.features.expertTelegramReferral === true,
           });
     return {
       config,

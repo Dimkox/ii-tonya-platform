@@ -67,6 +67,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_RESIDENCY_BILLING_ENABLED",
       "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
+      "EXPERT_TELEGRAM_REFERRAL_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
       "expert_referral.abuse_hold_close",

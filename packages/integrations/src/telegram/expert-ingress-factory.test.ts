@@ -53,6 +53,10 @@ describe("expert Telegram production ingress factory", () => {
           kind: "applied",
           providerOperationId: "7",
         }),
+        sendReferralRedeemed: async () => ({
+          kind: "applied",
+          providerOperationId: "9",
+        }),
         sendResidencyQuote: async () => ({
           kind: "applied",
           providerOperationId: "8",

@@ -93,6 +93,30 @@ const build = async (
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
+  it("keeps xr1 isolated from ct2/cv1 until checkout readiness is composed", async () => {
+    const state = await build({ queriesEnabled: true });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 901,
+          callback_query: {
+            id: "xr1-checkout",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, unsupported: true });
+      expect(state.authenticateClientView).not.toHaveBeenCalled();
+      expect(state.verifyCallback).not.toHaveBeenCalled();
+      expect(state.claim).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
   it("rejects missing callback data before authorization or inbox intake", async () => {
     const state = await build();
     try {

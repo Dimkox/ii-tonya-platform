@@ -191,3 +191,10 @@ export {
   createExpertTelegramIngress,
   type ExpertTelegramIngressFactoryDependencies,
 } from "./telegram/expert-ingress-factory.js";
+export {
+  authenticateResidencyCheckoutCallback,
+  issueResidencyCheckoutCallback,
+  ResidencyCheckoutCallbackVerificationError,
+  type ResidencyCheckoutCallbackClaims,
+  type ResidencyCheckoutCallbackStore,
+} from "./telegram/residency-checkout-callback-token.js";
