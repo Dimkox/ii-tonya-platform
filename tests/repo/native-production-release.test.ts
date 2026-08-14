@@ -152,6 +152,23 @@ describe("native dedicated-server production release", () => {
     expect(worker).toContain("/usr/bin/node worker/dist/main.js");
   });
 
+  it("keeps Node compatible with W^X hardening and creates writable state paths", () => {
+    const api = read("deploy/systemd/ii-tonya-api.service");
+    const worker = read("deploy/systemd/ii-tonya-worker.service");
+    const migrate = read("deploy/systemd/ii-tonya-migrate.service");
+
+    for (const unit of [api, worker, migrate]) {
+      expect(unit).toContain("MemoryDenyWriteExecute=true");
+      expect(unit).toContain("Environment=NODE_OPTIONS=--jitless");
+    }
+    for (const unit of [api, worker]) {
+      expect(unit).toContain("StateDirectory=ii-tonya");
+      expect(unit).toContain("StateDirectoryMode=0750");
+      expect(unit).toContain("LogsDirectory=ii-tonya");
+      expect(unit).toContain("LogsDirectoryMode=0750");
+    }
+  });
+
   it("publishes native provenance through direct Claw verification, never Actions", () => {
     const workflows = existsSync(".github/workflows")
       ? readdirSync(".github/workflows").filter((name) =>
