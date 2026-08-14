@@ -1,7 +1,8 @@
 # MVP-WORKER-OUTBOX-001 implementation report
 
 Status: implementation and boundary evidence complete; independent review and
-the final exact-SHA Claw gate are pending.
+the final exact-SHA Claw gate are pending. The first independent review returned
+five Important findings; all five are remediated and await exact-HEAD re-review.
 
 ## Identity and scope
 
@@ -37,10 +38,31 @@ the final exact-SHA Claw gate are pending.
 | 4 | 2 suites failed at missing module, 0 collected | `7563e13` | 2 files, 7/7 pass |
 | 5 | 3 files, 17 tests: 9 pass / 8 fail | `58d63c7` | 3 files, 17/17 pass |
 | 6 | 2 files, 5 tests: 3 pass / 2 missing-doc failures | `bc935cd` | 2 files, 5/5 pass after one assertion-only fix rerun |
+| Review remediation | 2 failed files: 2 failing tests plus 1 collection failure | `af83fac` | 2 files, 10/10 pass in 11.24s |
 
 Successful focused suites were not repeated. Tests ran only inside retained
 Claw container `ii-tonya-test-yookassa` against the single existing PostgreSQL
 service. No test database or test backend remained after PostgreSQL suites.
+
+## Independent-review remediation
+
+The first full-diff adversarial review found no Critical and five Important
+issues: incomplete enabled-registry validation could fail after a filtered
+mutation; authoritative source reads were not row-locked; pre-claim exhaustion
+lacked per-topic metrics; the owned-topic tuple was duplicated between worker
+and database layers; and the real enabled production composition/recovery path
+was not covered by PostgreSQL evidence.
+
+Remediation now validates the complete capability before repository creation,
+derives worker and database ownership from one frozen contracts tuple, locks
+authoritative safety/feedback rows, returns and records filtered exhaustion
+counts, and exposes the real production composition seam. The new focused Claw
+suite exercises fail-before-repository validation, authority races, real
+filtered recovery/exhaustion/metrics/ambiguity and provider-row exclusion. Two
+diagnostic precursor reruns exposed assertion/module-resolution and prepared-SQL
+fixture defects (8/10 pass, then 1/2 collected tests pass); neither was accepted
+as GREEN. Exact `af83fac` passed 10/10 with zero residual test databases,
+sessions or Vitest processes.
 
 ## Static evidence and incidents
 
@@ -59,7 +81,8 @@ worktree-local cleanup before handoff.
 ## Pending completion gates
 
 - Independent adversarial review of exact code/docs HEAD with every Critical or
-  Important finding remediated and re-reviewed.
+  Important finding re-reviewed as closed. The remediation is implemented; the
+  exact-HEAD verdict is pending.
 - One final focused Claw gate on the reviewed exact SHA, then source/test-process
   cleanup and truthful evidence update.
 
