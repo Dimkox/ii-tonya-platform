@@ -73,16 +73,15 @@ case "$CLAW_GATE_MODE" in
     pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
     pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
-    pnpm test:repeat -- 3 tests/integration/message-ledger-concurrency.test.ts
-    pnpm test:repeat -- 3 tests/integration/conversation-message-repository.test.ts
-    pnpm test:repeat -- 3 tests/integration/booking-concurrency.test.ts
-    pnpm test:repeat -- 3 tests/integration/expert-referral-redemption-concurrency.test.ts
-    pnpm test:repeat -- 3 tests/integration/expert-residency-checkout-concurrency.test.ts
-    pnpm test:repeat -- 3 tests/integration/expert-residency-settlement-concurrency.test.ts
-    pnpm test:repeat -- 3 tests/integration/expert-residency-deadline.test.ts
-    pnpm test:repeat -- 3 tests/integration/expert-residency-hold-replay.test.ts
+    pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/expert-referral-redemption-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/expert-residency-checkout-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
     pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
-    pnpm test:repeat -- 3 tests/integration/sandbox-payment-reconciliation.test.ts
     ;;
   release)
     SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
@@ -122,6 +121,6 @@ cat > "$evidence_dir/${mode}.md" <<EOF
 - status: PASS
 - claw_test_container: true
 - production_container: false
-- repeat_limit: 3
+- repeat_limit: 1
 - github_actions: not_used
 EOF

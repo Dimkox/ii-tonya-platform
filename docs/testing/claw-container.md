@@ -35,7 +35,7 @@ sanitized summaries/checksums are committed to `docs/test-evidence/`.
 `scripts/run-claw-ci.sh` rejects non-Claw hosts, requires an explicit source root and full
 Git SHA, verifies the checked-out commit, then mounts only that source into the constrained
 test container. It also verifies the exact image ID before execution. Database concurrency
-tests repeat exactly three times. GitHub stores the resulting commit and PR; sanitized
+each test or suite runs once. GitHub stores the resulting commit and PR; sanitized
 exact-SHA evidence is committed in the repository.
 
 The server-imitation image is retained between runs. Rebuild it only when its pinned
