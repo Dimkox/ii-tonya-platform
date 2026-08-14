@@ -255,10 +255,11 @@ export function createProductionWorkerRuntime(
         batchSize,
       ),
     expertTelegramCheckoutCleanup: async () => ({
-      cleared: await deps.expertTelegramCheckoutRepository.clearExpiredCheckoutUrls(
-        deps.now(),
-        batchSize,
-      ),
+      cleared:
+        await deps.expertTelegramCheckoutRepository.clearExpiredCheckoutUrls(
+          deps.now(),
+          batchSize,
+        ),
     }),
     expertResidencyReconciliation: async () =>
       reconcileExpertResidencyPayments(
@@ -275,7 +276,8 @@ export function createProductionWorkerRuntime(
       ),
     deliverConfirmedOutbox: workerOutboxEnabled
       ? deps.workerOutboxRunner!
-      : async () => deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
+      : async () =>
+          deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
     processorPrivacy: async () => ({
       processed: 0,
       reason: "privacy_capability_disabled",

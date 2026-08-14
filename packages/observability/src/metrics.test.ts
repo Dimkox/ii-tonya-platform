@@ -83,9 +83,24 @@ describe("worker outbox metric labels", () => {
   });
 
   it.each([
-    { topic: "provider_notification", phase: "dispatch", outcome: "applied", reasonClass: "internal" },
-    { topic: "admin_negative_feedback", phase: "send", outcome: "applied", reasonClass: "internal" },
-    { topic: "admin_negative_feedback", phase: "dispatch", outcome: randomUUID(), reasonClass: "internal" },
+    {
+      topic: "provider_notification",
+      phase: "dispatch",
+      outcome: "applied",
+      reasonClass: "internal",
+    },
+    {
+      topic: "admin_negative_feedback",
+      phase: "send",
+      outcome: "applied",
+      reasonClass: "internal",
+    },
+    {
+      topic: "admin_negative_feedback",
+      phase: "dispatch",
+      outcome: randomUUID(),
+      reasonClass: "internal",
+    },
     {
       topic: "admin_negative_feedback",
       phase: "dispatch",

@@ -100,7 +100,9 @@ describe("worker outbox metrics", () => {
     });
 
     expect(repository.recoverExpiredDispatchLeases).not.toHaveBeenCalled();
-    expect(repository.recoverExpiredReconciliationLeases).not.toHaveBeenCalled();
+    expect(
+      repository.recoverExpiredReconciliationLeases,
+    ).not.toHaveBeenCalled();
     expect(records.length).toBeGreaterThanOrEqual(12);
     for (const record of records as Record<string, unknown>[]) {
       expect(Object.keys(record).sort()).toEqual(
@@ -110,9 +112,12 @@ describe("worker outbox metrics", () => {
         "safety_operator_escalation",
         "admin_negative_feedback",
       ]).toContain(record.topic);
-      expect(["claim", "dispatch", "reconciliation", "lease_recovery"]).toContain(
-        record.phase,
-      );
+      expect([
+        "claim",
+        "dispatch",
+        "reconciliation",
+        "lease_recovery",
+      ]).toContain(record.phase);
       expect([
         "applied",
         "retry",

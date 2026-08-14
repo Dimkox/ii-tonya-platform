@@ -271,8 +271,16 @@ describe("worker runtime", () => {
         materializeOperatorCasesBatch: vi.fn(async () => ({ materialized: 2 })),
       },
       expertReferralJobsRepository: {
-        expireDueBatch: vi.fn(async () => ({ examined: 0, changed: 0, failed: 0 })),
-        replayDueBatch: vi.fn(async () => ({ examined: 0, granted: 0, cancelled: 0 })),
+        expireDueBatch: vi.fn(async () => ({
+          examined: 0,
+          changed: 0,
+          failed: 0,
+        })),
+        replayDueBatch: vi.fn(async () => ({
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+        })),
         listReconciliationBatch: vi.fn(async () => []),
         recordReconciliationMismatches: vi.fn(async () => undefined),
       },
@@ -289,12 +297,21 @@ describe("worker runtime", () => {
     });
     const disabled = productionDeps();
     await createProductionWorkerRuntime(disabled).runOnce();
-    expect(disabled.jobsRepository.materializeOperatorCasesBatch).toHaveBeenCalledOnce();
-    expect(disabled.outboxRepository.recoverExpiredDispatchLeases).toHaveBeenCalledOnce();
-    expect(disabled.outboxRepository.recoverExpiredReconciliationLeases).toHaveBeenCalledOnce();
+    expect(
+      disabled.jobsRepository.materializeOperatorCasesBatch,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).toHaveBeenCalledOnce();
 
     const enabled = productionDeps();
-    const workerOutboxRunner = vi.fn(async () => ({ reconciled: 1, dispatched: 2 }));
+    const workerOutboxRunner = vi.fn(async () => ({
+      reconciled: 1,
+      dispatched: 2,
+    }));
     const report = await createProductionWorkerRuntime({
       ...enabled,
       workerOutboxRegistry: {
@@ -304,9 +321,18 @@ describe("worker runtime", () => {
     } as never).runOnce();
 
     expect(workerOutboxRunner).toHaveBeenCalledOnce();
-    expect(enabled.jobsRepository.materializeOperatorCasesBatch).not.toHaveBeenCalled();
-    expect(enabled.outboxRepository.recoverExpiredDispatchLeases).not.toHaveBeenCalled();
-    expect(enabled.outboxRepository.recoverExpiredReconciliationLeases).not.toHaveBeenCalled();
-    expect(report.confirmedOutboxDelivery).toEqual({ reconciled: 1, dispatched: 2 });
+    expect(
+      enabled.jobsRepository.materializeOperatorCasesBatch,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).not.toHaveBeenCalled();
+    expect(report.confirmedOutboxDelivery).toEqual({
+      reconciled: 1,
+      dispatched: 2,
+    });
   });
 });

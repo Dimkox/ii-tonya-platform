@@ -5,12 +5,18 @@ const meter = metrics.getMeter("ii-tonya");
 export const operationalMetrics = {
   inboxDuplicates: meter.createCounter("ii_tonya_inbox_duplicates"),
   debitOutcomes: meter.createCounter("ii_tonya_debit_outcomes"),
-  reservationTransitions: meter.createCounter("ii_tonya_reservation_transitions"),
-  outboxUnknownOutcomes: meter.createCounter("ii_tonya_outbox_unknown_outcomes"),
+  reservationTransitions: meter.createCounter(
+    "ii_tonya_reservation_transitions",
+  ),
+  outboxUnknownOutcomes: meter.createCounter(
+    "ii_tonya_outbox_unknown_outcomes",
+  ),
   outboxLagMs: meter.createHistogram("ii_tonya_outbox_lag_ms"),
   outboxDeadLetters: meter.createCounter("ii_tonya_outbox_dead_letters"),
   workerOutboxDelivery: meter.createCounter("ii_tonya_worker_outbox_delivery"),
-  providerCircuitState: meter.createUpDownCounter("ii_tonya_provider_circuit_state"),
+  providerCircuitState: meter.createUpDownCounter(
+    "ii_tonya_provider_circuit_state",
+  ),
   safetyHandoffs: meter.createCounter("ii_tonya_safety_handoffs"),
   reconciliationDrift: meter.createCounter("ii_tonya_reconciliation_drift"),
   expertReferralCodeLifecycle: meter.createCounter(
@@ -84,12 +90,7 @@ export type WorkerOutboxMetricLabels = Readonly<{
   topic: "safety_operator_escalation" | "admin_negative_feedback";
   phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
   outcome:
-    | "applied"
-    | "retry"
-    | "unknown"
-    | "terminal"
-    | "dead_letter"
-    | "no_op";
+    "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
   reasonClass:
     | "invalid_payload"
     | "local_source_invalid"
@@ -220,7 +221,9 @@ export function recordWorkerOutboxMetric(
   );
 }
 
-export function referralMetricLabels(value: unknown): ExpertReferralMetricLabels {
+export function referralMetricLabels(
+  value: unknown,
+): ExpertReferralMetricLabels {
   if (!isRecord(value)) throw new Error("invalid_referral_metric_labels");
   const keys = Object.keys(value);
   if (

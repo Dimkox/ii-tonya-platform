@@ -121,7 +121,8 @@ export function createProductionWorkerRuntimeFactory(
                 dispatcher: workerOutboxRegistry,
                 reconciler: {
                   async reconcile(message) {
-                    const result = await workerOutboxRegistry.reconcile(message);
+                    const result =
+                      await workerOutboxRegistry.reconcile(message);
                     if (result.kind === "applied") return "applied";
                     if (result.kind === "not_applied") return "not_applied";
                     if (result.kind === "still_unknown") return "still_unknown";

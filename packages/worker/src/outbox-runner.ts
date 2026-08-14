@@ -129,20 +129,11 @@ export interface OutboxRunnerDeps {
 }
 
 export type OutboxMetricTopic =
-  | "safety_operator_escalation"
-  | "admin_negative_feedback";
+  "safety_operator_escalation" | "admin_negative_feedback";
 export type OutboxMetricPhase =
-  | "claim"
-  | "dispatch"
-  | "reconciliation"
-  | "lease_recovery";
+  "claim" | "dispatch" | "reconciliation" | "lease_recovery";
 export type OutboxMetricOutcome =
-  | "applied"
-  | "retry"
-  | "unknown"
-  | "terminal"
-  | "dead_letter"
-  | "no_op";
+  "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
 export type OutboxMetricReasonClass =
   | "invalid_payload"
   | "local_source_invalid"
@@ -298,13 +289,7 @@ async function reconcileUnknown(
         "reconciliation_exception",
         retryAt(deps, now, message.reconciliationAttempt),
       );
-      record(
-        deps,
-        message.topic,
-        "reconciliation",
-        "unknown",
-        "internal",
-      );
+      record(deps, message.topic, "reconciliation", "unknown", "internal");
     }
     return;
   }
