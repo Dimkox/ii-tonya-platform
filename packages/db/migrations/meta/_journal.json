@@ -176,6 +176,13 @@
       "when": 1786672800000,
       "tag": "0024_yookassa_encrypted_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786683600000,
+      "tag": "0025_expert_telegram_residency_callbacks",
+      "breakpoints": true
     }
   ]
 }

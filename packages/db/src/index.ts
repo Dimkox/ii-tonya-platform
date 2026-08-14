@@ -179,6 +179,10 @@ export {
   type ExpertTelegramQueryRepositoryOptions,
 } from "./repositories/expert-telegram-query-repository.js";
 export {
+  PostgresExpertTelegramResidencyCallbackRepository,
+  type ExpertResidencyCallbackClaims,
+} from "./repositories/expert-telegram-residency-callback-repository.js";
+export {
   PostgresExpertReferralWorkerRepository,
   type ExpertReferralHoldReplayBatchResult,
   type ExpertReferralWorkerBatchCommand,

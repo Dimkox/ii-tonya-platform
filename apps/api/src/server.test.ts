@@ -170,10 +170,14 @@ describe("server composition", () => {
               throw new Error("not used");
             },
           },
-          referral: { summary: referralSummary },
+          referral: {
+            summary: referralSummary,
+            redeemCode: async () => ({ kind: "disabled" as const }),
+          },
           residency: { quote: async () => ({ kind: "disabled" as const }) },
           views: {
             sendReferralSummary,
+            sendReferralRedeemed: applied,
             sendResidencyQuote: applied,
             sendQuerySchedule: applied,
             sendClientChoices: applied,

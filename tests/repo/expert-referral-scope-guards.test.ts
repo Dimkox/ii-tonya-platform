@@ -26,6 +26,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0022_expert_referral_admin_replays.sql",
       "packages/db/migrations/0023_yookassa_provider_operations.sql",
       "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+      "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -49,6 +50,7 @@ describe("expert residency referral scope boundary", () => {
       "expert_residency_provider_operations",
       "expert_residency_receipt_contacts",
       "expert_residency_tariff_versions",
+      "expert_telegram_residency_callbacks",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
       "/v1/admin/expert-referrals/inventory",
@@ -67,6 +69,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_RESIDENCY_BILLING_ENABLED",
       "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
+      "EXPERT_TELEGRAM_REFERRAL_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
       "expert_referral.abuse_hold_close",

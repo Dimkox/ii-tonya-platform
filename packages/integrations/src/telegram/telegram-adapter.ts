@@ -150,6 +150,10 @@ export interface TelegramPort {
 }
 
 export interface ExpertTelegramViewPort {
+  sendReferralRedeemed(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
   sendReferralSummary(
     view: ExpertReferralSummaryView,
   ): Promise<TelegramSendOutcome>;
@@ -550,6 +554,16 @@ export class TelegramAdapter
       idempotencyKey: view.idempotencyKey,
       telegramUserId: view.telegramUserId,
       text: renderExpertReferralSummary(view),
+    });
+  }
+
+  async sendReferralRedeemed(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      ...view,
+      text: "Экспертный промокод принят.",
     });
   }
 

@@ -29,6 +29,7 @@ describe("loadEnv", () => {
       expertTelegramQueries: false,
       expertTelegramFinancialViews: false,
       expertAiIngress: false,
+      expertTelegramReferral: false,
       yookassa: false,
     });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
@@ -91,6 +92,14 @@ describe("loadEnv", () => {
     expect(
       loadEnv(localEnv({ EXPERT_AI_INGRESS_ENABLED: "true" })).features
         .expertAiIngress,
+    ).toBe(true);
+  });
+
+  it("defaults expert Telegram referral mutations off", () => {
+    expect(loadEnv(localEnv()).features.expertTelegramReferral).toBe(false);
+    expect(
+      loadEnv(localEnv({ EXPERT_TELEGRAM_REFERRAL_ENABLED: "true" })).features
+        .expertTelegramReferral,
     ).toBe(true);
   });
 

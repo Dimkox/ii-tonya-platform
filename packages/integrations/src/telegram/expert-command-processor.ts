@@ -18,6 +18,14 @@ interface FinancialPrincipal {
 }
 
 interface ReferralQueryService {
+  redeemCode(
+    principal: FinancialPrincipal,
+    code: string,
+    idempotencyKey: string,
+  ): Promise<
+    | { readonly kind: "redeemed"; readonly referralId: string }
+    | { readonly kind: "forbidden" | "disabled" }
+  >;
   summary(principal: FinancialPrincipal): Promise<
     | {
         readonly availableMinor: string;
@@ -136,14 +144,17 @@ const unavailable = async <T>(operation: () => Promise<T>): Promise<T> => {
 export const createExpertCommandProcessor = (deps: {
   readonly enabled: boolean;
   readonly financialViewsEnabled?: boolean;
+  readonly referralMutationsEnabled?: boolean;
   readonly queries: QueryService;
   readonly views: ExpertTelegramQueryViewPort & ExpertTelegramViewPort;
   readonly referral?: ReferralQueryService;
   readonly residency?: ResidencyQueryService;
 }): ExpertCommandProcessor => {
   if (
-    deps.financialViewsEnabled === true &&
-    (deps.referral === undefined || deps.residency === undefined)
+    (deps.financialViewsEnabled === true ||
+      deps.referralMutationsEnabled === true) &&
+    (deps.referral === undefined ||
+      (deps.financialViewsEnabled === true && deps.residency === undefined))
   ) {
     throw new Error("Expert Telegram financial query capability is required");
   }
@@ -156,6 +167,7 @@ export const createExpertCommandProcessor = (deps: {
   });
   const tariffCommand =
     /^\/residency ([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
+  const redeemCommand = /^\/redeem (EXR_[A-Za-z0-9_-]{22,128})$/u;
   return {
     async processCommand(command) {
       if (!deps.enabled) return { kind: "disabled" };
@@ -251,6 +263,26 @@ export const createExpertCommandProcessor = (deps: {
           return { kind: "processed", deliveryOutcome };
         }
         default: {
+          const redeemMatch = redeemCommand.exec(command.text);
+          if (deps.referralMutationsEnabled === true && redeemMatch !== null) {
+            const result = await unavailable(() =>
+              deps.referral!.redeemCode(
+                financialPrincipal(command.principal),
+                redeemMatch[1]!,
+                command.idempotencyKey,
+              ),
+            );
+            if (result.kind !== "redeemed") {
+              throw new Error("expert_query_unavailable");
+            }
+            const deliveryOutcome = ordinaryDeliveryOutcome(
+              await deps.views.sendReferralRedeemed({
+                idempotencyKey: `${command.idempotencyKey}:redeem:delivery`,
+                telegramUserId: command.principal.telegramUserId,
+              }),
+            );
+            return { kind: "processed", deliveryOutcome };
+          }
           const match = tariffCommand.exec(command.text);
           if (deps.financialViewsEnabled === true && match !== null) {
             const quote = await unavailable(() =>

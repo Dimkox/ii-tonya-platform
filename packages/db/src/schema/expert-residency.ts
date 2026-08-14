@@ -3,6 +3,7 @@ import {
   bigint as pgBigint,
   bigserial,
   boolean,
+  char,
   check,
   foreignKey,
   index,
@@ -17,6 +18,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { adminApprovals, adminSessions } from "./audit.js";
 import { experts } from "./catalog.js";
@@ -348,6 +350,49 @@ export const expertResidencyTariffVersions = pgTable(
       sql`${table.activeTo} > ${table.activeFrom}`,
     ),
     index("expert_tariff_lookup_idx").on(table.tariffKey, table.activeFrom),
+  ],
+);
+
+export const expertTelegramResidencyCallbacks = pgTable(
+  "expert_telegram_residency_callbacks",
+  {
+    tokenHash: char("token_hash", { length: 64 }).primaryKey(),
+    expertId: uuid("expert_id")
+      .notNull()
+      .references(() => experts.id),
+    telegramUserId: varchar("telegram_user_id", { length: 20 }).notNull(),
+    tariffVersionId: uuid("tariff_version_id")
+      .notNull()
+      .references(() => expertResidencyTariffVersions.id),
+    action: text("action").notNull().default("start_residency_checkout"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    unique("expert_telegram_residency_callbacks_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_action_check",
+      sql`${table.action} = 'start_residency_checkout'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_token_hash_check",
+      sql`${table.tokenHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_telegram_id_check",
+      sql`${table.telegramUserId} ~ '^[1-9][0-9]{0,19}$'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    index("expert_telegram_residency_callbacks_expiry_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.consumedAt} is null`),
   ],
 );
 

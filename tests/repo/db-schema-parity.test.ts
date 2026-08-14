@@ -58,6 +58,7 @@ describe("authoritative Drizzle schema parity", () => {
       "expertResidencyPaymentAttempts",
       "expertResidencyProviderOperations",
       "expertResidencyReceiptContacts",
+      "expertTelegramResidencyCallbacks",
       "expertResidencyProviderEventInbox",
       "expertFirstResidencySettlements",
       "expertReferralRewardGrants",
@@ -120,6 +121,20 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_orders_expert_idempotency_unique",
         "expert_orders_id_expert_unique",
       ],
+    });
+    expect(requiredTable("expertTelegramResidencyCallbacks")).toMatchObject({
+      checks: [
+        "expert_telegram_residency_callbacks_action_check",
+        "expert_telegram_residency_callbacks_expiry_check",
+        "expert_telegram_residency_callbacks_telegram_id_check",
+        "expert_telegram_residency_callbacks_token_hash_check",
+      ],
+      foreignKeys: [
+        "expert_telegram_residency_callbacks_expert_id_experts_id_fk",
+        "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
+      ],
+      indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
+      uniques: ["expert_telegram_residency_callbacks_idempotency_unique"],
     });
     expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
       "expert_payment_attempt_id_order_unique",
@@ -375,6 +390,10 @@ describe("authoritative Drizzle schema parity", () => {
       ),
       readFileSync(
         "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
         "utf8",
       ),
     ].join("\n");

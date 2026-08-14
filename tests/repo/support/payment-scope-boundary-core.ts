@@ -82,6 +82,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0022_expert_referral_admin_replays.sql",
   "packages/db/migrations/0023_yookassa_provider_operations.sql",
   "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+  "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -93,6 +94,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_referral_codes",
   "expert_referrals",
   "expert_residency_tariff_versions",
+  "expert_telegram_residency_callbacks",
   "expert_residency_orders",
   "expert_residency_payment_attempts",
   "expert_residency_provider_operations",
@@ -123,6 +125,7 @@ export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
   "EXPERT_TELEGRAM_QUERIES_ENABLED",
   "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
   "EXPERT_AI_INGRESS_ENABLED",
+  "EXPERT_TELEGRAM_REFERRAL_ENABLED",
   "EXPERT_REFERRAL_HMAC_KEY_VERSION",
   "EXPERT_REFERRAL_HMAC_KEY_REF",
   "EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -587,6 +590,10 @@ const approvedMigrationHashes = new Map([
     "05c9447c12d75a0b4a8400822a43d9dfd8ed4855fdb3913dd5836923a8c0679c",
   ],
   [
+    "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
+    "7af18618c6a06638b85dfbba734ee9ffea416629493eb139575ac6c5d3905b2d",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -664,7 +671,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "18487f7e5ede990b0010c223afc396366bf5fd899106ba866dbc06328685b2bd",
+    "1d5f407bf64f5959bcbb65f9e4c4df5737af1450e7d45d6efa7d6948e37b6915",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -675,6 +682,7 @@ const approvedDatabaseRelations = new Set([
   "admin_sessions",
   "audit_events",
   "channel_identities",
+  "expert_telegram_residency_callbacks",
   "client_profiles",
   "consents",
   "conversation_messages",
