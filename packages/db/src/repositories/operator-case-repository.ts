@@ -24,10 +24,10 @@ interface OperatorCaseRow extends Record<string, unknown> {
   reasonCode: string;
   contentHash: string | null;
   policyVersion: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  acknowledgedAt: Date | null;
-  resolvedAt: Date | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  acknowledgedAt: Date | string | null;
+  resolvedAt: Date | string | null;
 }
 const CASE_TYPES = new Set<OperatorCaseType>([
   "safety",
@@ -49,9 +49,21 @@ const projection = sql`
   acknowledged_at as "acknowledgedAt",
   resolved_at as "resolvedAt"
 `;
+const asDate = (value: Date | string): Date => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(parsed.getTime()))
+    throw new Error("operator_case_timestamp_invalid");
+  return parsed;
+};
+const asNullableDate = (value: Date | string | null): Date | null =>
+  value === null ? null : asDate(value);
 const asCase = (row: OperatorCaseRow): OperatorCase => ({
   ...row,
   rating: row.rating as 1 | 2 | 3 | 4 | 5 | null,
+  createdAt: asDate(row.createdAt),
+  updatedAt: asDate(row.updatedAt),
+  acknowledgedAt: asNullableDate(row.acknowledgedAt),
+  resolvedAt: asNullableDate(row.resolvedAt),
 });
 const validateTypes = (values: readonly OperatorCaseType[]): void => {
   if (
@@ -155,6 +167,7 @@ export class PostgresOperatorCaseRepository {
       `);
       const item = changed.rows[0];
       if (item === undefined) throw new Error("operator_case_transition_lost");
+      const normalized = asCase(item);
       const metadataHash = createHash("sha256")
         .update(`${input.caseId}:${input.action}:${desired}`, "utf8")
         .digest("hex");
@@ -168,10 +181,10 @@ export class PostgresOperatorCaseRepository {
           'operator_case.transitioned','operator_case',${input.caseId}::uuid,
           'allowed',${input.action},
           ${`operator-case:${input.caseId}:${desired}`},
-          ${item.updatedAt},${metadataHash}
+          ${normalized.updatedAt},${metadataHash}
         )
       `);
-      return { kind: "updated" as const, item: asCase(item) };
+      return { kind: "updated" as const, item: normalized };
     });
   }
 }

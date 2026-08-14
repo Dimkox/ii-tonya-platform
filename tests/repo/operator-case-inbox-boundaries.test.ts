@@ -56,6 +56,8 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     expect(repository).toContain("sql.join(");
     expect(repository).toContain("values.map((value) => sql`${value}`)");
     expect(repository).not.toContain("any(${input.allowedTypes}");
+    expect(repository).toContain("const normalized = asCase(item)");
+    expect(repository).toContain("${normalized.updatedAt}");
     expect(repository).toContain("for update");
     expect(repository).toContain("operator_case.transitioned");
   });
