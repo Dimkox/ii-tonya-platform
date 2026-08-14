@@ -19,6 +19,12 @@ Actions, release workflows, application images, or production Compose:
 - Production is container-free: native API/worker systemd services, system PostgreSQL,
   nginx/TLS, immutable release directories, atomic `current` symlink, and native rollback.
 - `docs/runbooks/native-production-deployment.md` is the current deployment runbook.
+- The YooKassa adapter boundary is implemented but remains disabled: credentials are
+  empty placeholders, direct Claw evidence is not merchant evidence, and deployment or
+  activation is deferred during hoster maintenance. Continue with
+  `docs/runbooks/yookassa-provider.md` and
+  `docs/spec/yookassa-provider-traceability.md`, not a T-Bank or personal YooMoney Wallet
+  integration.
 
 This handoff supersedes the continuation instructions in
 `docs/handoffs/2026-08-04-expert-residency-referrals.md` for Tasks 10–12. The older

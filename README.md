@@ -83,7 +83,7 @@ The connected repository architecture, including runtime modules, PostgreSQL aut
 CI/deployment, tests, evidence, disabled capabilities, deferred scope, prohibited paths,
 and orphan/dead-code classifications, is documented in:
 
-- **[Open the full project connectivity graph](docs/architecture/project-connectivity-graph.md)**
+- **[Open the full project connectivity graph](docs/architecture/project-connectivity-graph.md)** — production-native and Claw-test topology
 - **[Open the companion connectivity inventory](docs/architecture/project-connectivity-inventory.md)**
 - [Open the production architecture](docs/superpowers/specs/2026-07-28-ii-tonya-platform-design.md)
 - [Open the authoritative normalized requirements](docs/spec/normalized-requirements.md)
@@ -104,6 +104,25 @@ The source contains product intent, prompts, pseudo-JSON, and repeated drafts. I
 treated as executable Make configuration. The
 [normalized requirements](docs/spec/normalized-requirements.md) are the implementation
 contract; the source remains the traceability baseline.
+
+## YooKassa release boundary
+
+The repository contains a narrow YooKassa Merchant API boundary: fixed-origin client,
+durable PostgreSQL operation mapping, authoritative verifier, default-off webhook seam,
+and bounded reconciliation seam. It is **not activated**: all credentials are empty
+placeholders, the default API/worker composition supplies no YooKassa capability, and no
+test-shop or live provider evidence is recorded. YooKassa is the merchant product of
+YooMoney; the personal YooMoney Wallet API and the former T-Bank proposal are not used.
+
+- [YooKassa design](docs/superpowers/specs/2026-08-14-yookassa-provider-design.md)
+- [YooKassa requirement traceability](docs/spec/yookassa-provider-traceability.md)
+- [YooKassa operator runbook](docs/runbooks/yookassa-provider.md)
+- [Provider-connected staging evidence](docs/runbooks/provider-staging-evidence.md)
+
+No GitHub Actions are used. Direct Claw gates are the executable CI and Database Gate
+path, and their committed evidence is not merchant-connected evidence. Production
+deployment is deferred while hoster maintenance is active; this does not authorize a
+container deployment, credential entry, or feature activation.
 
 ## System boundary
 
