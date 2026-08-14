@@ -94,7 +94,15 @@ export interface OutboxDispatcher {
 export interface OutboxReconciler {
   reconcile(
     message: OutboxMessage,
-  ): Promise<"applied" | "not_applied" | "still_unknown">;
+  ): Promise<
+    | "applied"
+    | "not_applied"
+    | "still_unknown"
+    | {
+        kind: "terminal";
+        reasonCode: "invalid_payload" | "local_source_invalid";
+      }
+  >;
 }
 
 export interface OutboxRunnerDeps {
@@ -164,7 +172,7 @@ async function reconcileUnknown(
   message: OutboxMessage,
   now: Date,
 ): Promise<void> {
-  let resolution: "applied" | "not_applied" | "still_unknown";
+  let resolution: Awaited<ReturnType<OutboxReconciler["reconcile"]>>;
   try {
     resolution = await deps.reconciler.reconcile(message);
   } catch {
@@ -184,6 +192,16 @@ async function reconcileUnknown(
         retryAt(deps, now, message.reconciliationAttempt),
       );
     }
+    return;
+  }
+
+  if (typeof resolution === "object") {
+    await deps.repository.deadLetterAfterReconciliationAndAlert(
+      message.id,
+      deps.workerId,
+      reconciliationToken(message),
+      resolution.reasonCode,
+    );
     return;
   }
 

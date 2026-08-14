@@ -2,6 +2,30 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 
 const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
+const LOCAL_OPERATOR_CASE_TOPICS = [
+  "safety.operator_escalation",
+  "admin.negative_feedback",
+] as const;
+type LocalOperatorCaseTopics = typeof LOCAL_OPERATOR_CASE_TOPICS;
+
+function validateTopicAllowlist(
+  topics: readonly string[] | undefined,
+): LocalOperatorCaseTopics | undefined {
+  if (topics === undefined) return undefined;
+  if (
+    topics.length !== LOCAL_OPERATOR_CASE_TOPICS.length ||
+    topics.some((topic, index) => topic !== LOCAL_OPERATOR_CASE_TOPICS[index])
+  ) {
+    throw new Error("worker_outbox_topic_allowlist_invalid");
+  }
+  return LOCAL_OPERATOR_CASE_TOPICS;
+}
+
+function topicPredicate(topics: LocalOperatorCaseTopics | undefined) {
+  return topics === undefined
+    ? sql``
+    : sql` and topic in (${topics[0]}, ${topics[1]})`;
+}
 
 function assertRecoveryLimit(limit: number): void {
   if (
@@ -156,6 +180,7 @@ function requireReconciliationLease(
 async function terminalizeDispatchExhausted(
   tx: Transaction,
   maxAttempts: number,
+  topics: LocalOperatorCaseTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -166,6 +191,7 @@ async function terminalizeDispatchExhausted(
         last_normalized_reason = 'dispatch_attempts_exhausted_before_claim',
         updated_at = now()
       where status in ('pending', 'retry_wait') and attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
       returning id, payload_hash
     ),
     dead as (
@@ -184,6 +210,7 @@ async function terminalizeDispatchExhausted(
 async function terminalizeReconciliationExhausted(
   tx: Transaction,
   maxAttempts: number,
+  topics: LocalOperatorCaseTopics | undefined,
 ): Promise<void> {
   await tx.execute(sql`
     with exhausted as (
@@ -196,6 +223,7 @@ async function terminalizeReconciliationExhausted(
         updated_at = now()
       where status = 'unknown_outcome'
         and reconciliation_attempt >= ${maxAttempts}
+        ${topicPredicate(topics)}
       returning id, payload_hash
     ),
     dead as (
@@ -250,7 +278,14 @@ async function writeDeadLetterAndAlert(
 }
 
 export class PostgresOutboxRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  private readonly topics: LocalOperatorCaseTopics | undefined;
+
+  constructor(
+    private readonly db: DrizzleDb,
+    topics?: readonly string[],
+  ) {
+    this.topics = validateTopicAllowlist(topics);
+  }
 
   async claim(
     limit: number,
@@ -263,7 +298,7 @@ export class PostgresOutboxRepository {
       throw new RangeError("leaseDurationMs must be a positive integer");
     }
     return this.db.transaction(async (tx) => {
-      await terminalizeDispatchExhausted(tx, maxAttempts);
+      await terminalizeDispatchExhausted(tx, maxAttempts, this.topics);
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
           select id
@@ -276,6 +311,7 @@ export class PostgresOutboxRepository {
             )
           )
             and attempt < ${maxAttempts}
+            ${topicPredicate(this.topics)}
           order by created_at, id
           for update skip locked
           limit ${limit}
@@ -322,6 +358,7 @@ export class PostgresOutboxRepository {
       await terminalizeReconciliationExhausted(
         tx,
         maxReconciliationAttempts,
+        this.topics,
       );
       const result = await tx.execute<RawOutboxMessage>(sql`
         with claimable as (
@@ -330,6 +367,7 @@ export class PostgresOutboxRepository {
           where status = 'unknown_outcome'
             and reconciliation_attempt < ${maxReconciliationAttempts}
             and (next_reconciliation_at is null or next_reconciliation_at <= now())
+            ${topicPredicate(this.topics)}
           order by updated_at, id
           for update skip locked
           limit ${limit}
@@ -612,6 +650,7 @@ export class PostgresOutboxRepository {
           from integration_outbox
           where status = 'processing'
             and lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
           order by lease_until, id
           for update skip locked
           limit ${limit}
@@ -657,6 +696,7 @@ export class PostgresOutboxRepository {
           from integration_outbox
           where status = 'reconciling'
             and reconciliation_lease_until < clock_timestamp()
+            ${topicPredicate(this.topics)}
           order by reconciliation_lease_until, id
           for update skip locked
           limit ${limit}
