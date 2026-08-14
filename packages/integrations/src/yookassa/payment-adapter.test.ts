@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExpertResidencyCheckoutCommand } from "@ii-tonya/contracts";
-import type { YooKassaClient } from "./client.js";
+import {
+  YooKassaTerminalError,
+  YooKassaUnknownOutcomeError,
+  type YooKassaClient,
+} from "./client.js";
 import type {
   YooKassaOperation,
   YooKassaOperationPort,
@@ -67,10 +71,15 @@ const client = (): YooKassaClient => ({
   }),
 });
 
-const contacts = (available = true): YooKassaReceiptContactPort => ({
-  receiptContactForOrder: vi.fn(async () =>
-    available ? { email: "fixture@example.invalid" } : null,
-  ),
+const contacts = (
+  available = true,
+  contact: {
+    readonly email?: string;
+    readonly phone?: string;
+    readonly authorityReference?: string;
+  } = { email: "fixture@example.invalid" },
+): YooKassaReceiptContactPort => ({
+  receiptContactForOrder: vi.fn(async () => (available ? contact : null)),
 });
 
 describe("YooKassaExpertResidencyPaymentAdapter", () => {
@@ -159,5 +168,167 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       kind: "pending",
       refundId: "2f4b6d0d-000f-5000-9000-000000000499",
     });
+  });
+
+  it("marks terminal refund rejection failed and permits a later refund", async () => {
+    const operations = operationPort();
+    const provider = client();
+    provider.createRefund = vi
+      .fn()
+      .mockRejectedValueOnce(new YooKassaTerminalError("yookassa_http_400"))
+      .mockResolvedValueOnce({
+        id: "refund-valid",
+        paymentId: payment.id,
+        status: "pending",
+        amount: { value: "100.00", currency: "RUB" },
+        createdAt: "2026-08-14T10:00:00.000Z",
+      });
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: provider,
+      operations,
+      contacts: contacts(),
+      mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
+    });
+    const refund = {
+      orderId: checkout.orderId,
+      paymentId: payment.id,
+      amountMinor: "10000",
+      currency: "RUB" as const,
+      idempotencyKey: "refund-terminal-1",
+    };
+
+    await expect(adapter.refund(refund)).rejects.toMatchObject({
+      code: "yookassa_http_400",
+    });
+    expect(operations.resolve).toHaveBeenCalledWith(operation.id, "failed");
+    await expect(
+      adapter.refund({ ...refund, idempotencyKey: "refund-valid-2" }),
+    ).resolves.toMatchObject({ kind: "pending" });
+  });
+
+  it.each([
+    new YooKassaUnknownOutcomeError(),
+    new YooKassaTerminalError("yookassa_refund_binding_mismatch"),
+    new Error("provider_binding_ambiguous"),
+  ])("keeps ambiguous refund failure unknown", async (failure) => {
+    const operations = operationPort();
+    const provider = client();
+    provider.createRefund = vi.fn(async () => {
+      throw failure;
+    });
+    const adapter = new YooKassaExpertResidencyPaymentAdapter({
+      client: provider,
+      operations,
+      contacts: contacts(),
+      mode: "test",
+      returnUrl: "https://ii-tonya.ru/payments/return",
+      receipt: {
+        vatCode: 1,
+        paymentSubject: "service",
+        paymentMode: "full_payment",
+      },
+    });
+
+    await expect(
+      adapter.refund({
+        orderId: checkout.orderId,
+        paymentId: payment.id,
+        amountMinor: "10000",
+        currency: "RUB",
+        idempotencyKey: "refund-ambiguous-1",
+      }),
+    ).rejects.toBe(failure);
+    expect(operations.markUnknown).toHaveBeenCalledWith(operation.id);
+    expect(operations.resolve).not.toHaveBeenCalled();
+  });
+
+  it("persists a versioned digest without raw receipt contact PII", async () => {
+    const emailOperations = operationPort();
+    const otherEmailOperations = operationPort();
+    const otherAuthorityOperations = operationPort();
+    const fallbackEmailOperations = operationPort();
+    const otherFallbackEmailOperations = operationPort();
+    const phoneOperations = operationPort();
+    const makeAdapter = (
+      operations: YooKassaOperationPort,
+      contact: {
+        readonly email?: string;
+        readonly phone?: string;
+        readonly authorityReference?: string;
+      },
+    ) =>
+      new YooKassaExpertResidencyPaymentAdapter({
+        client: client(),
+        operations,
+        contacts: contacts(true, contact),
+        mode: "test",
+        returnUrl: "https://ii-tonya.ru/payments/return",
+        receipt: {
+          vatCode: 1,
+          paymentSubject: "service",
+          paymentMode: "full_payment",
+        },
+      });
+
+    await makeAdapter(emailOperations, {
+      email: "first.secret@example.invalid",
+      authorityReference: "consent:customer-401",
+    }).createCheckout(checkout);
+    await makeAdapter(otherEmailOperations, {
+      email: "other.secret@example.invalid",
+      authorityReference: "consent:customer-401",
+    }).createCheckout(checkout);
+    await makeAdapter(otherAuthorityOperations, {
+      email: "first.secret@example.invalid",
+      authorityReference: "consent:customer-402",
+    }).createCheckout(checkout);
+    await makeAdapter(fallbackEmailOperations, {
+      email: "fallback-one@example.invalid",
+    }).createCheckout(checkout);
+    await makeAdapter(otherFallbackEmailOperations, {
+      email: "fallback-two@example.invalid",
+    }).createCheckout(checkout);
+    await makeAdapter(phoneOperations, {
+      phone: "+79990000000",
+      authorityReference: "consent:customer-401",
+    }).createCheckout(checkout);
+
+    const emailClaim = vi.mocked(emailOperations.claim).mock.calls[0]?.[0];
+    const otherEmailClaim = vi.mocked(otherEmailOperations.claim).mock
+      .calls[0]?.[0];
+    const otherAuthorityClaim = vi.mocked(otherAuthorityOperations.claim).mock
+      .calls[0]?.[0];
+    const fallbackEmailClaim = vi.mocked(fallbackEmailOperations.claim).mock
+      .calls[0]?.[0];
+    const otherFallbackEmailClaim = vi.mocked(
+      otherFallbackEmailOperations.claim,
+    ).mock.calls[0]?.[0];
+    const phoneClaim = vi.mocked(phoneOperations.claim).mock.calls[0]?.[0];
+    expect(emailClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(phoneClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    expect(JSON.stringify(emailClaim)).not.toContain(
+      "first.secret@example.invalid",
+    );
+    expect(JSON.stringify(otherEmailClaim)).not.toContain(
+      "other.secret@example.invalid",
+    );
+    expect(JSON.stringify(phoneClaim)).not.toContain("+79990000000");
+    expect(JSON.stringify(fallbackEmailClaim)).not.toContain(
+      "fallback-one@example.invalid",
+    );
+    expect(emailClaim?.requestDigest).toBe(otherEmailClaim?.requestDigest);
+    expect(emailClaim?.requestDigest).not.toBe(
+      otherAuthorityClaim?.requestDigest,
+    );
+    expect(fallbackEmailClaim?.requestDigest).toBe(
+      otherFallbackEmailClaim?.requestDigest,
+    );
+    expect(emailClaim?.requestDigest).not.toBe(phoneClaim?.requestDigest);
   });
 });
