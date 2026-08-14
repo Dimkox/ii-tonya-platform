@@ -56,6 +56,7 @@ describe("expert residency referral scope boundary", () => {
       "/v1/expert/referrals/summary",
       "/v1/expert/residency/checkouts",
       "/v1/expert/residency/quotes",
+      "/v1/webhooks/yookassa",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([
       "EXPERT_AI_INGRESS_ENABLED",
