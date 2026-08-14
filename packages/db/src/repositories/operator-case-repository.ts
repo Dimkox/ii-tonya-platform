@@ -62,6 +62,11 @@ const validateTypes = (values: readonly OperatorCaseType[]): void => {
   )
     throw new Error("operator_case_types_invalid");
 };
+const typeArray = (values: readonly OperatorCaseType[]) =>
+  sql`array[${sql.join(
+    values.map((value) => sql`${value}`),
+    sql`, `,
+  )}]::text[]`;
 
 export class PostgresOperatorCaseRepository {
   constructor(private readonly db: DrizzleDb) {}
@@ -91,7 +96,7 @@ export class PostgresOperatorCaseRepository {
       select ${projection}
       from outbox_operator_alerts
       where status in ('open','acknowledged')
-        and case_type = any(${input.allowedTypes}::text[])
+        and case_type = any(${typeArray(input.allowedTypes)})
         ${
           input.cursor === undefined
             ? sql``
@@ -127,7 +132,7 @@ export class PostgresOperatorCaseRepository {
         select ${projection}
         from outbox_operator_alerts
         where id=${input.caseId}::uuid
-          and case_type=any(${input.allowedTypes}::text[])
+          and case_type=any(${typeArray(input.allowedTypes)})
         for update
       `);
       const current = target.rows[0];

@@ -26,9 +26,7 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     );
     expect(migration).toContain("'open','acknowledged','resolved'");
     expect(migration).not.toContain('CHECK ("reason_code" ~');
-    expect(migration.indexOf('SET "updated_at" = GREATEST')).toBeGreaterThan(
-      0,
-    );
+    expect(migration.indexOf('SET "updated_at" = GREATEST')).toBeGreaterThan(0);
     expect(migration.indexOf('SET "updated_at" = GREATEST')).toBeLessThan(
       migration.indexOf(
         'ADD CONSTRAINT "outbox_operator_alerts_lifecycle_check"',
@@ -54,9 +52,10 @@ describe("MVP-OPS-CASE-001 repository boundary", () => {
     );
     expect(repository).not.toMatch(/as\s+"?(?:outboxId|payload)"?/u);
     expect(repository).toContain('case_reason_code as "reasonCode"');
-    expect(repository).not.toMatch(
-      /\breason_code\s+as\s+"reasonCode"/u,
-    );
+    expect(repository).not.toMatch(/\breason_code\s+as\s+"reasonCode"/u);
+    expect(repository).toContain("sql.join(");
+    expect(repository).toContain("values.map((value) => sql`${value}`)");
+    expect(repository).not.toContain("any(${input.allowedTypes}");
     expect(repository).toContain("for update");
     expect(repository).toContain("operator_case.transitioned");
   });
