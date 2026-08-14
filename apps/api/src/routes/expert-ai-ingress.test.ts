@@ -12,6 +12,47 @@ const features = {
   expertAiIngress: true,
 };
 
+const requestLedger = () => {
+  const receipts = new Map<
+    string,
+    { digest: string; outcome?: { status: number; body: Record<string, string> } }
+  >();
+  const claims = new Map<string, string>();
+  return {
+    async claim(input: {
+      expertId: string;
+      idempotencyKey: string;
+      requestDigest: string;
+    }) {
+      const key = `${input.expertId}:${input.idempotencyKey}`;
+      const receipt = receipts.get(key);
+      if (receipt !== undefined) {
+        if (receipt.digest !== input.requestDigest)
+          return { kind: "conflict" as const };
+        return receipt.outcome === undefined
+          ? { kind: "busy" as const }
+          : { kind: "replay" as const, outcome: receipt.outcome };
+      }
+      const claimId = `claim:${key}`;
+      receipts.set(key, { digest: input.requestDigest });
+      claims.set(claimId, key);
+      return { kind: "claimed" as const, claimId };
+    },
+    async complete(
+      claimId: string,
+      outcome: { status: number; body: Record<string, string> },
+    ) {
+      const key = claims.get(claimId)!;
+      const receipt = receipts.get(key)!;
+      receipts.set(key, { ...receipt, outcome });
+    },
+    async fail(claimId: string) {
+      const key = claims.get(claimId);
+      if (key !== undefined) receipts.delete(key);
+    },
+  };
+};
+
 describe("expert AI HTTP transport", () => {
   it("stays absent while disabled", async () => {
     const app = await buildTestApp();
@@ -35,6 +76,7 @@ describe("expert AI HTTP transport", () => {
       features,
       expertAiIngress: { handle },
       expertAiPrincipal: { resolve },
+      expertAiRequests: requestLedger(),
     });
     const request = () =>
       app.inject({
@@ -84,6 +126,7 @@ describe("expert AI HTTP transport", () => {
       features,
       expertAiIngress: { handle },
       expertAiPrincipal: { resolve: async () => principal },
+      expertAiRequests: requestLedger(),
     });
     const headers = {
       authorization: `Bearer ${"A".repeat(32)}`,
@@ -113,6 +156,7 @@ describe("expert AI HTTP transport", () => {
       features,
       expertAiIngress: { handle },
       expertAiPrincipal: { resolve: async () => null },
+      expertAiRequests: requestLedger(),
     });
     const common = {
       method: "POST" as const,
@@ -161,6 +205,7 @@ describe("expert AI HTTP transport", () => {
       features,
       expertAiIngress: { handle: async () => result },
       expertAiPrincipal: { resolve: async () => principal },
+      expertAiRequests: requestLedger(),
     });
     const response = await app.inject({
       method: "POST",

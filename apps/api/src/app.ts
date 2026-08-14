@@ -16,7 +16,10 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
-import { expertAiIngressRoutes } from "./routes/expert-ai-ingress.js";
+import {
+  expertAiIngressRoutes,
+  type ExpertAiRequestLedger,
+} from "./routes/expert-ai-ingress.js";
 import {
   expertReferralRoutes,
   type ExpertReferralApiDependencies,
@@ -63,6 +66,7 @@ export interface AppDependencies {
   expertTelegramQueries?: TelegramExpertQueryIngress;
   expertAiIngress?: ExpertAiIngressService;
   expertAiPrincipal?: ExpertPrincipalResolver;
+  expertAiRequests?: ExpertAiRequestLedger;
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
   now?: () => Date;
@@ -98,7 +102,9 @@ export async function buildApp(
   }
   if (
     deps.config.features.expertAiIngress === true &&
-    (deps.expertAiIngress === undefined || deps.expertAiPrincipal === undefined)
+    (deps.expertAiIngress === undefined ||
+      deps.expertAiPrincipal === undefined ||
+      deps.expertAiRequests === undefined)
   ) {
     throw new Error("Expert AI ingress runtime capability is required");
   }
@@ -164,11 +170,13 @@ export async function buildApp(
   if (
     deps.config.features.expertAiIngress === true &&
     deps.expertAiIngress !== undefined &&
-    deps.expertAiPrincipal !== undefined
+    deps.expertAiPrincipal !== undefined &&
+    deps.expertAiRequests !== undefined
   ) {
     await app.register(expertAiIngressRoutes, {
       ingress: deps.expertAiIngress,
       principals: deps.expertAiPrincipal,
+      requests: deps.expertAiRequests,
     });
   }
   if (deps.adminApprovals !== undefined) {
@@ -275,6 +283,7 @@ export async function buildTestApp(
     expertApi?: ExpertReferralApiDependencies;
     expertAiIngress?: ExpertAiIngressService;
     expertAiPrincipal?: ExpertPrincipalResolver;
+    expertAiRequests?: ExpertAiRequestLedger;
     expertAiTelegramPrincipal?: Pick<
       TelegramExpertAiIngress,
       "resolvePrincipal"
@@ -402,6 +411,9 @@ export async function buildTestApp(
     ...(options.expertAiPrincipal === undefined
       ? {}
       : { expertAiPrincipal: options.expertAiPrincipal }),
+    ...(options.expertAiRequests === undefined
+      ? {}
+      : { expertAiRequests: options.expertAiRequests }),
     ...(options.expertAiTelegramPrincipal === undefined
       ? {}
       : { expertAiTelegramPrincipal: options.expertAiTelegramPrincipal }),

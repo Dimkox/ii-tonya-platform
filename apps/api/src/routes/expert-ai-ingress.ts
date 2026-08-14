@@ -20,16 +20,35 @@ const bodySchema = {
 export interface ExpertAiHttpDependencies {
   readonly principals: ExpertPrincipalResolver;
   readonly ingress: ExpertAiIngressService;
+  readonly requests: ExpertAiRequestLedger;
 }
 
-type TransportOutcome = {
+export type ExpertAiTransportOutcome = {
   readonly status: 200 | 403 | 422 | 503;
   readonly body: Readonly<Record<string, string>>;
 };
 
+export interface ExpertAiRequestLedger {
+  claim(input: {
+    readonly expertId: string;
+    readonly idempotencyKey: string;
+    readonly requestDigest: string;
+  }): Promise<
+    | { readonly kind: "claimed"; readonly claimId: string }
+    | { readonly kind: "replay"; readonly outcome: ExpertAiTransportOutcome }
+    | { readonly kind: "conflict" }
+    | { readonly kind: "busy" }
+  >;
+  complete(
+    claimId: string,
+    outcome: ExpertAiTransportOutcome,
+  ): Promise<void>;
+  fail(claimId: string): Promise<void>;
+}
+
 const outcomeFor = (
   result: Awaited<ReturnType<ExpertAiIngressService["handle"]>>,
-): TransportOutcome => {
+): ExpertAiTransportOutcome => {
   switch (result.kind) {
     case "completed":
       return {
@@ -53,21 +72,12 @@ const outcomeFor = (
   }
 };
 
-const sendOutcome = (reply: FastifyReply, outcome: TransportOutcome) =>
+const sendOutcome = (reply: FastifyReply, outcome: ExpertAiTransportOutcome) =>
   reply.code(outcome.status).send(outcome.body);
 
 export const expertAiIngressRoutes: FastifyPluginAsync<
   ExpertAiHttpDependencies
 > = async (app, deps) => {
-  const requests = new Map<
-    string,
-    | { readonly digest: string; readonly state: "processing" }
-    | {
-        readonly digest: string;
-        readonly state: "complete";
-        readonly outcome: TransportOutcome;
-      }
-  >();
   app.setErrorHandler((error, _request, reply) => {
     const candidate = error as {
       readonly validation?: unknown;
@@ -105,7 +115,6 @@ export const expertAiIngressRoutes: FastifyPluginAsync<
         readonly locale: string;
         readonly tariffVersionId?: string;
       };
-      const requestKey = `${principal.expertId}:${idempotency}`;
       const digest = createHash("sha256")
         .update(
           JSON.stringify([
@@ -116,23 +125,16 @@ export const expertAiIngressRoutes: FastifyPluginAsync<
           "utf8",
         )
         .digest("hex");
-      const replay = requests.get(requestKey);
-      if (replay !== undefined) {
-        if (replay.digest !== digest)
-          return reply.code(409).send({ error: "idempotency_conflict" });
-        if (replay.state === "processing")
-          return reply.code(409).send({ error: "request_in_progress" });
-        return sendOutcome(reply, replay.outcome);
-      }
-      if (requests.size >= 1_024) {
-        const completed = [...requests].find(
-          ([, entry]) => entry.state === "complete",
-        );
-        if (completed === undefined)
-          return reply.code(503).send({ error: "unavailable" });
-        requests.delete(completed[0]);
-      }
-      requests.set(requestKey, { digest, state: "processing" });
+      const claim = await deps.requests.claim({
+        expertId: principal.expertId,
+        idempotencyKey: idempotency,
+        requestDigest: digest,
+      });
+      if (claim.kind === "conflict")
+        return reply.code(409).send({ error: "idempotency_conflict" });
+      if (claim.kind === "busy")
+        return reply.code(409).send({ error: "request_in_progress" });
+      if (claim.kind === "replay") return sendOutcome(reply, claim.outcome);
       try {
         const result = await deps.ingress.handle({
           principal,
@@ -145,16 +147,12 @@ export const expertAiIngressRoutes: FastifyPluginAsync<
             : { tariffVersionId: body.tariffVersionId }),
         });
         const outcome = outcomeFor(result);
-        if (result.kind === "unavailable") requests.delete(requestKey);
-        else
-          requests.set(requestKey, {
-            digest,
-            state: "complete",
-            outcome,
-          });
+        if (result.kind === "unavailable")
+          await deps.requests.fail(claim.claimId);
+        else await deps.requests.complete(claim.claimId, outcome);
         return sendOutcome(reply, outcome);
       } catch (error) {
-        requests.delete(requestKey);
+        await deps.requests.fail(claim.claimId);
         throw error;
       }
     },

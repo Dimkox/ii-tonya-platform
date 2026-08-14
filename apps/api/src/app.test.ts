@@ -434,6 +434,26 @@ describe("API boundary", () => {
     ).rejects.toThrow("Expert AI ingress runtime capability is required");
   });
 
+  it("rejects expert AI activation when the durable request ledger is missing", async () => {
+    await expect(
+      buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertAiIngress: true,
+        },
+        expertAiIngress: { handle: async () => ({ kind: "disabled" }) },
+        expertAiPrincipal: {
+          resolve: async () => ({
+            authenticated: true,
+            userId: "00000000-0000-4000-8000-000000000001",
+            expertId: "00000000-0000-4000-8000-000000000002",
+          }),
+        },
+      }),
+    ).rejects.toThrow("Expert AI ingress runtime capability is required");
+  });
+
   it("registers the authenticated route only with the complete fixture capability", async () => {
     const app = await buildTestApp({
       features: {
@@ -448,6 +468,11 @@ describe("API boundary", () => {
           userId: "00000000-0000-4000-8000-000000000001",
           expertId: "00000000-0000-4000-8000-000000000002",
         }),
+      },
+      expertAiRequests: {
+        claim: async () => ({ kind: "claimed", claimId: "claim-1" }),
+        complete: async () => undefined,
+        fail: async () => undefined,
       },
     });
     expect(

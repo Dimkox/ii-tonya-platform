@@ -31,6 +31,8 @@ describe("expert AI ingress architecture boundary", () => {
     );
     expect(route).toContain("deps.principals.resolve");
     expect(route).toContain("deps.ingress.handle");
+    expect(route).toContain("deps.requests.claim");
+    expect(route).not.toContain("new Map");
     expect(route).not.toMatch(
       /@ii-tonya\/(?:db|integrations)|yookassa|node:fs|fetch\s*\(|result:\s*result\.result/u,
     );

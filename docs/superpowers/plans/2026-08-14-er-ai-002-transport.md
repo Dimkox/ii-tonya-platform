@@ -4,7 +4,7 @@
 
 **Goal:** Expose the existing bounded `ExpertAiIngressService` through a default-off authenticated HTTP route and an optional private Telegram non-command seam without adding a live model, persistence, or payment provider.
 
-**Architecture:** A dedicated Fastify route resolves a fresh expert principal for every request, validates an exact small body plus bounded idempotency/correlation metadata, and maps only the ingress service's closed result union. Telegram receives a separate optional capability and dispatches only private non-slash text when explicitly enabled; the existing slash/callback branches remain authoritative and the default lifecycle composes neither transport.
+**Architecture:** A dedicated Fastify route resolves a fresh expert principal for every request, validates an exact small body plus bounded idempotency/correlation metadata, claims an injected durable request receipt, and maps only the ingress service's closed result union. Telegram receives a separate optional capability and dispatches only private non-slash text when explicitly enabled; the existing slash/callback branches remain authoritative and the default lifecycle composes neither transport.
 
 **Tech Stack:** TypeScript, Fastify, Vitest, pnpm workspace.
 
