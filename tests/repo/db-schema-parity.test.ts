@@ -486,6 +486,10 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_telegram_residency_callbacks_url_cleanup_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
+    expect(migration).toContain(
+      'char_length("checkout_url") BETWEEN 1 AND 2048',
+    );
+    expect(migration).not.toContain("{1,2040}");
     expect(migration).toMatch(
       /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
     );

@@ -409,7 +409,7 @@ export const expertTelegramResidencyCallbacks = pgTable(
     ),
     check(
       "expert_telegram_residency_callbacks_checkout_outcome_check",
-      sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} ~ '^https://[^[:space:]]{1,2040}$')`,
+      sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and char_length(${table.checkoutUrl}) between 1 and 2048 and ${table.checkoutUrl} ~ '^https://[^[:space:]]+$')`,
     ),
     index("expert_telegram_residency_callbacks_expiry_idx")
       .on(table.expiresAt)
