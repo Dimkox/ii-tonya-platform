@@ -16,7 +16,6 @@ const principal: ExpertPrincipal = {
   expertId: "expert-1",
 };
 const tariffVersionId = "00000000-0000-4000-8000-000000000101";
-const orderId = "00000000-0000-4000-8000-000000000201";
 const code = `EXR_${"A".repeat(22)}`;
 
 const reconciliation = {
@@ -149,7 +148,7 @@ describe("expert intent proposal boundary", () => {
     { kind: "redeem_expert_referral", code },
     { kind: "view_referral_summary" },
     { kind: "quote_residency", tariffVersionId },
-    { kind: "start_residency_checkout", orderId },
+    { kind: "start_residency_checkout", tariffVersionId },
   ])("accepts strict proposal %#", (proposal) => {
     expect(validateExpertIntentProposal(proposal)).toEqual({
       valid: true,
@@ -177,7 +176,7 @@ describe("expert intent proposal boundary", () => {
     { kind: "redeem_expert_referral", code: "bad" },
     { kind: "view_referral_summary", extra: true },
     { kind: "quote_residency", tariffVersionId: "not-a-uuid" },
-    { kind: "start_residency_checkout", orderId: "not-a-uuid" },
+    { kind: "start_residency_checkout", tariffVersionId: "not-a-uuid" },
   ])("rejects malformed supported proposal %#", (proposal) => {
     expect(validateExpertIntentProposal(proposal)).toEqual({
       valid: false,

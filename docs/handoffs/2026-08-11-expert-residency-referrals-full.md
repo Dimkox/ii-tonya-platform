@@ -800,7 +800,8 @@ Deferred because exact external contracts are unknown:
 - Telegram-to-HTTP principal mapping;
 - payment-provider deadline/session creation;
 - LLM proposal runtime dispatch;
-- `start_residency_checkout.orderId` versus HTTP `tariffVersionId` semantics.
+- ER-AI-001 resolves `start_residency_checkout` to authoritative
+  `tariffVersionId` semantics; live model/provider composition remains absent.
 
 Focused RED/GREEN and static evidence is recorded under
 `docs/test-evidence/claw/3f8ed564-expert-api-composition/verification.md`. The test ran

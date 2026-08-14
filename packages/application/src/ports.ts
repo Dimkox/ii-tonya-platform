@@ -18,7 +18,10 @@ export type ExpertIntentProposal =
   | { readonly kind: "redeem_expert_referral"; readonly code: string }
   | { readonly kind: "view_referral_summary" }
   | { readonly kind: "quote_residency"; readonly tariffVersionId: string }
-  | { readonly kind: "start_residency_checkout"; readonly orderId: string };
+  | {
+      readonly kind: "start_residency_checkout";
+      readonly tariffVersionId: string;
+    };
 
 export type IntentProposal =
   | { readonly kind: "answer"; readonly text: string }
@@ -83,12 +86,7 @@ export interface AcceptInboundInput {
 }
 
 export type OutboundDeliveryStatus =
-  | "accepted"
-  | "queued"
-  | "sent"
-  | "delivered"
-  | "failed"
-  | "ambiguous";
+  "accepted" | "queued" | "sent" | "delivered" | "failed" | "ambiguous";
 
 export interface CanonicalOutboundDelivery {
   readonly kind: "outbound_delivery";
@@ -181,9 +179,7 @@ export type CompleteInboundResult =
 export interface ConversationMessageRepository {
   prepareInbound(input: AcceptInboundInput): Promise<PreparedInbound>;
   completeInbound(input: CompleteInboundInput): Promise<CompleteInboundResult>;
-  recordOutboundDelivery(
-    input: RecordOutboundDeliveryInput,
-  ): Promise<
+  recordOutboundDelivery(input: RecordOutboundDeliveryInput): Promise<
     | { readonly kind: "duplicate"; readonly messageEventId: string }
     | {
         readonly kind: "accepted";
@@ -224,10 +220,7 @@ export interface AcceptSafetyHandoffInput {
   readonly reasonCode: SafetyRisk | "classifier_unavailable";
   readonly ownerId: string;
   readonly acknowledgeBy: Date;
-  readonly directoryState:
-    | "fresh"
-    | "no_fresh_contact"
-    | "unavailable";
+  readonly directoryState: "fresh" | "no_fresh_contact" | "unavailable";
   readonly contacts: readonly VerifiedSafetyContact[];
 }
 
@@ -255,9 +248,7 @@ export interface ConversationDependencies {
   readonly clock: Clock;
   readonly handoffOwnerId: string;
   readonly handoffAcknowledgeWithinMs: number;
-  readonly outboundBillingMode:
-    | "disabled"
-    | "provider_delivery_event";
+  readonly outboundBillingMode: "disabled" | "provider_delivery_event";
   readonly approvedSafetyContactIds: readonly string[];
 }
 

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "baselineRevision": "75c964e7190fb92adcc8534f627c61405b338931",
+  "validatorContract": "expert-intent-v1",
+  "distribution": {
+    "total": 9,
+    "accepted": {
+      "quote_residency": 1,
+      "redeem_expert_referral": 1,
+      "start_residency_checkout": 1,
+      "view_referral_summary": 1
+    },
+    "rejected": { "unsupported_intent": 5 }
+  }
+}
