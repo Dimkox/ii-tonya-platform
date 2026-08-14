@@ -128,8 +128,12 @@ describe("PostgreSQL client session repository", () => {
     const input = issueInput(userId, "cleanup");
     await repository.issue(input);
     await testDb.db.execute(sql`
-      update client_identity_proof_receipts set expires_at=clock_timestamp() - interval '1 second';
-      update client_sessions set expires_at=clock_timestamp() - interval '1 second';
+      update client_identity_proof_receipts
+      set created_at=clock_timestamp() - interval '2 seconds',
+          expires_at=clock_timestamp() - interval '1 second';
+      update client_sessions
+      set created_at=clock_timestamp() - interval '2 seconds',
+          expires_at=clock_timestamp() - interval '1 second';
     `);
 
     await expect(repository.resolve(input.tokenDigest)).resolves.toEqual({ kind: "denied" });
