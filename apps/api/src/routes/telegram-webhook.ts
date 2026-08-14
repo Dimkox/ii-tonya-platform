@@ -17,6 +17,7 @@ export interface TelegramCallbackService {
 
 export interface TelegramExpertQueryIngress {
   resolvePrincipal(telegramUserId: string): Promise<{
+    readonly userId: string;
     readonly expertId: string;
     readonly telegramUserId: string;
     readonly timezone: string;
@@ -46,11 +47,7 @@ export interface TelegramExpertQueryIngress {
     readonly idempotencyKey: string;
     readonly correlationId: string;
   }): Promise<{
-    readonly kind:
-      | "processed"
-      | "reissue_client"
-      | "disabled"
-      | "unavailable";
+    readonly kind: "processed" | "reissue_client" | "disabled" | "unavailable";
     readonly deliveryOutcome?: "applied" | "not_applied" | "unknown_outcome";
   }>;
   processClientView(input: {
@@ -259,7 +256,9 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           typeof text === "string" &&
           (deps.expertQueriesEnabled === true
             ? text.startsWith("/")
-            : /^\/(?:schedule|client|stats)(?:\s|$)/u.test(text))
+            : /^\/(?:schedule|client|stats|referral|residency)(?:\s|$)/u.test(
+                text,
+              ))
         ) {
           if (
             deps.expertQueriesEnabled !== true ||
@@ -304,13 +303,19 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             return { accepted: true, duplicate: true };
           }
           try {
-            await deps.expertQueries.processCommand({
+            const processResult = await deps.expertQueries.processCommand({
               text,
               chatType: "private",
               principal,
               idempotencyKey: `telegram:${updateId}:command`,
               correlationId,
             });
+            if (processResult.deliveryOutcome === "unknown_outcome") {
+              await deps.inbox.fail(claim.claimId);
+              return reply
+                .code(503)
+                .send({ error: "expert_query_unavailable" });
+            }
             await deps.inbox.complete(claim.claimId);
           } catch {
             await deps.inbox.fail(claim.claimId);

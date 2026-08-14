@@ -397,6 +397,18 @@ describe("API boundary", () => {
     ).rejects.toThrow("Expert Telegram query capability is required");
   });
 
+  it("rejects Telegram financial-view activation without its complete runtime capability", async () => {
+    await expect(
+      buildTestApp({
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertTelegramFinancialViews: true,
+        },
+      }),
+    ).rejects.toThrow("Expert Telegram query capability is required");
+  });
+
   it("keeps residency routes absent when only referral is enabled", async () => {
     const app = await buildTestApp({
       expertApi: testExpertApi(),

@@ -7,12 +7,13 @@ import type {
 } from "./telegram-adapter.js";
 
 const principal = {
+  userId: "00000000-0000-4000-8000-000000000100",
   expertId: "00000000-0000-4000-8000-000000000101",
   telegramUserId: "123456789",
   timezone: "Europe/Moscow",
 };
 
-const build = (enabled = true) => {
+const build = (enabled = true, financialViewsEnabled = false) => {
   const schedule = vi.fn(async () => ({
     expertId: principal.expertId,
     timezone: principal.timezone,
@@ -38,6 +39,21 @@ const build = (enabled = true) => {
     clientDisplayName: "Client",
     startsAt: new Date("2026-08-14T09:00:00.000Z"),
     serviceName: "Consultation",
+  }));
+  const referralSummary = vi.fn(async () => ({
+    availableMinor: "100000",
+    reservedMinor: "25000",
+    debtMinor: "0",
+    nearestExpiry: "2027-08-14T00:00:00.000Z",
+  }));
+  const residencyQuote = vi.fn(async () => ({
+    tariffVersionId: "00000000-0000-4000-8000-000000000301",
+    displayName: "Резидентство на месяц",
+    priceMinor: "200000",
+    creditMinor: "100000",
+    cashMinor: "100000",
+    currency: "RUB" as const,
+    durationSeconds: 2_592_000,
   }));
   const sendQuerySchedule = vi.fn<
     ExpertTelegramQueryViewPort["sendQuerySchedule"]
@@ -69,6 +85,14 @@ const build = (enabled = true) => {
       providerOperationId: "5",
     }),
   );
+  const sendReferralSummary = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "7",
+  }));
+  const sendResidencyQuote = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "8",
+  }));
   const answerCallbackQuery = vi.fn<
     ExpertTelegramQueryViewPort["answerCallbackQuery"]
   >(async (): Promise<TelegramSendOutcome> => ({
@@ -82,17 +106,24 @@ const build = (enabled = true) => {
     sendStats,
     sendUnsupported,
     answerCallbackQuery,
+    sendReferralSummary,
+    sendResidencyQuote,
   };
   return {
     processor: createExpertCommandProcessor({
       enabled,
       queries: { schedule, clientChoices, stats, clientView },
       views,
+      financialViewsEnabled,
+      referral: { summary: referralSummary },
+      residency: { quote: residencyQuote },
     }),
     schedule,
     clientChoices,
     stats,
     clientView,
+    referralSummary,
+    residencyQuote,
     views,
   };
 };
@@ -106,6 +137,98 @@ const command = (text: string) => ({
 });
 
 describe("expert Telegram command processor", () => {
+  it("renders the authenticated expert's server-derived referral summary", async () => {
+    const state = build(true, true);
+
+    await expect(
+      state.processor.processCommand(command("/referral")),
+    ).resolves.toEqual({ kind: "processed", deliveryOutcome: "applied" });
+    expect(state.referralSummary).toHaveBeenCalledWith({
+      authenticated: true,
+      userId: principal.userId,
+      expertId: principal.expertId,
+    });
+    expect(state.views.sendReferralSummary).toHaveBeenCalledWith({
+      idempotencyKey: "telegram-update-1",
+      telegramUserId: principal.telegramUserId,
+      availableMinor: "100000",
+      reservedMinor: "25000",
+      debtMinor: "0",
+      nearestExpiry: "2027-08-14T00:00:00.000Z",
+    });
+  });
+
+  it("quotes only an exact server-issued tariff UUID with no client price fields", async () => {
+    const state = build(true, true);
+    const tariffVersionId = "00000000-0000-4000-8000-000000000301";
+
+    await state.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+    expect(state.residencyQuote).toHaveBeenCalledWith(
+      {
+        authenticated: true,
+        userId: principal.userId,
+        expertId: principal.expertId,
+      },
+      tariffVersionId,
+    );
+    expect(state.views.sendResidencyQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tariffVersionId,
+        priceMinor: "200000",
+        creditMinor: "100000",
+        cashMinor: "100000",
+      }),
+    );
+    for (const text of [
+      `/residency ${tariffVersionId} 1`,
+      "/residency not-a-uuid",
+      "/referral anything",
+    ]) {
+      await state.processor.processCommand(command(text));
+    }
+    expect(state.residencyQuote).toHaveBeenCalledTimes(1);
+    expect(state.referralSummary).not.toHaveBeenCalled();
+  });
+
+  it("keeps financial views independently disabled with no service or view call", async () => {
+    const state = build(true, false);
+    await expect(
+      state.processor.processCommand(command("/referral")),
+    ).resolves.toMatchObject({ kind: "unsupported" });
+    expect(state.referralSummary).not.toHaveBeenCalled();
+    expect(state.views.sendReferralSummary).not.toHaveBeenCalled();
+  });
+
+  it("fails closed at composition when enabled financial services are missing", () => {
+    const state = build();
+    expect(() =>
+      createExpertCommandProcessor({
+        enabled: true,
+        financialViewsEnabled: true,
+        queries: {
+          schedule: state.schedule,
+          clientChoices: state.clientChoices,
+          stats: state.stats,
+          clientView: state.clientView,
+        },
+        views: state.views,
+      }),
+    ).toThrow("Expert Telegram financial query capability is required");
+  });
+
+  it.each(["forbidden", "disabled"] as const)(
+    "fails closed without rendering a %s referral result",
+    async (kind) => {
+      const state = build(true, true);
+      state.referralSummary.mockResolvedValueOnce({ kind } as never);
+      await expect(
+        state.processor.processCommand(command("/referral")),
+      ).rejects.toThrow("expert_query_unavailable");
+      expect(state.views.sendReferralSummary).not.toHaveBeenCalled();
+    },
+  );
   it.each(["/schedule", "/client", "/stats"] as const)(
     "dispatches the exact %s command",
     async (text) => {

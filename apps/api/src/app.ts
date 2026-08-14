@@ -82,7 +82,8 @@ export async function buildApp(
     throw new Error("Expert API runtime capability is required");
   }
   if (
-    deps.config.features.expertTelegramQueries === true &&
+    (deps.config.features.expertTelegramQueries === true ||
+      deps.config.features.expertTelegramFinancialViews === true) &&
     deps.expertTelegramQueries === undefined
   ) {
     throw new Error("Expert Telegram query capability is required");
@@ -119,7 +120,9 @@ export async function buildApp(
     callbacks: deps.telegramCallbacks,
     inbox: deps.inbox,
     rateLimiter: deps.rateLimiter,
-    expertQueriesEnabled: deps.config.features.expertTelegramQueries === true,
+    expertQueriesEnabled:
+      deps.config.features.expertTelegramQueries === true ||
+      deps.config.features.expertTelegramFinancialViews === true,
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "@ii-tonya/db";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { createLogger } from "@ii-tonya/observability";
@@ -16,7 +16,8 @@ const originalExpertKeys = process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
 afterEach(() => {
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
-  if (originalExpertKeys === undefined) delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
+  if (originalExpertKeys === undefined)
+    delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
   else process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON = originalExpertKeys;
 });
 const disabled = new Proxy(
@@ -124,6 +125,144 @@ describe("server composition", () => {
     await lifecycle.close(fakeDb);
   });
 
+  it.each([
+    { financialViewsEnabled: false, expectedKind: "disabled" },
+    { financialViewsEnabled: true, expectedKind: "processed" },
+  ] as const)(
+    "derives financial view exposure from RuntimeConfig: $financialViewsEnabled",
+    async ({ financialViewsEnabled, expectedKind }) => {
+      const referralSummary = vi.fn(async () => ({
+        availableMinor: "100000",
+        reservedMinor: "0",
+        debtMinor: "0",
+        nearestExpiry: null,
+      }));
+      const sendReferralSummary = vi.fn(async () => ({
+        kind: "applied" as const,
+        providerOperationId: "1",
+      }));
+      const applied = async () => ({
+        kind: "applied" as const,
+        providerOperationId: "2",
+      });
+      const lifecycle = createDefaultLifecycle({
+        expertTelegramComposition: {
+          resolvePrincipal: async (telegramUserId) => ({
+            userId: "00000000-0000-4000-8000-000000000100",
+            expertId: "00000000-0000-4000-8000-000000000101",
+            telegramUserId,
+            timezone: "Europe/Moscow",
+          }),
+          authenticateClientView: async () => null,
+          queries: {
+            schedule: async () => ({
+              timezone: "Europe/Moscow",
+              appointments: [],
+            }),
+            clientChoices: async () => [],
+            stats: async () => ({
+              upcoming: 0,
+              completed: 0,
+              cancelled: 0,
+              noShow: 0,
+            }),
+            clientView: async () => {
+              throw new Error("not used");
+            },
+          },
+          referral: { summary: referralSummary },
+          residency: { quote: async () => ({ kind: "disabled" as const }) },
+          views: {
+            sendReferralSummary,
+            sendResidencyQuote: applied,
+            sendQuerySchedule: applied,
+            sendClientChoices: applied,
+            sendClientView: applied,
+            sendStats: applied,
+            sendUnsupported: applied,
+            answerCallbackQuery: applied,
+          },
+        },
+      });
+      const fakeDb = {
+        execute: async () => ({ rows: [{ present: true, fresh: true }] }),
+        $client: { end: async () => undefined },
+      } as unknown as DrizzleDb;
+      const config: RuntimeConfig = {
+        databaseUrl: "postgresql://placeholder.invalid/test",
+        integrations: {
+          selarti: false,
+          planerka: false,
+          telegram: false,
+          makeProjection: false,
+          intentModel: false,
+          payments: false,
+        },
+        minorOnboarding: false,
+        rawConversationLogging: false,
+        selartiOutboundBillingMode: "disabled",
+        displayTimezone: "Europe/Moscow",
+        features: {
+          expertReferral: false,
+          expertResidencyBilling: false,
+          expertTelegramFinancialViews: financialViewsEnabled,
+        },
+      };
+
+      const dependencies = await lifecycle.dependencies(config, fakeDb);
+      const principal =
+        await dependencies.expertTelegramQueries!.resolvePrincipal("123456789");
+      await expect(
+        dependencies.expertTelegramQueries!.processCommand({
+          text: "/referral",
+          chatType: "private",
+          principal: principal!,
+          idempotencyKey: "telegram:1:command",
+          correlationId: "corr-1",
+        }),
+      ).resolves.toMatchObject({ kind: expectedKind });
+      expect(referralSummary).toHaveBeenCalledTimes(
+        financialViewsEnabled ? 1 : 0,
+      );
+      expect(sendReferralSummary).toHaveBeenCalledTimes(
+        financialViewsEnabled ? 1 : 0,
+      );
+      await lifecycle.close(fakeDb);
+    },
+  );
+
+  it("keeps enabled startup fail-closed when composition dependencies are absent", async () => {
+    const lifecycle = createDefaultLifecycle();
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      features: {
+        expertReferral: false,
+        expertResidencyBilling: false,
+        expertTelegramFinancialViews: true,
+      },
+    };
+    await expect(
+      (await import("./app.js")).buildApp(
+        await lifecycle.dependencies(config, fakeDb),
+      ),
+    ).rejects.toThrow("Expert Telegram query capability is required");
+  });
+
   it("fails before app composition when an enabled referral key version is unavailable", async () => {
     delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
     const lifecycle = createDefaultLifecycle();
@@ -133,15 +272,27 @@ describe("server composition", () => {
     } as unknown as DrizzleDb;
     const config: RuntimeConfig = {
       databaseUrl: "postgresql://placeholder.invalid/test",
-      integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false },
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
       minorOnboarding: false,
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       features: { expertReferral: true, expertResidencyBilling: false },
-      expertReferralKey: { currentVersion: "v1", reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON" },
+      expertReferralKey: {
+        currentVersion: "v1",
+        reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      },
     };
-    await expect(lifecycle.dependencies(config, fakeDb)).rejects.toThrow("expert_referral_key_unavailable");
+    await expect(lifecycle.dependencies(config, fakeDb)).rejects.toThrow(
+      "expert_referral_key_unavailable",
+    );
   });
 
   it("passes the startup-validated keyring while public expert routes stay disabled", async () => {
@@ -151,33 +302,49 @@ describe("server composition", () => {
       key: () => new Uint8Array(32),
     };
     const resolver = { resolve: () => keyring };
-    const lifecycle = createDefaultLifecycle({ expertCodeSecretResolver: resolver });
+    const lifecycle = createDefaultLifecycle({
+      expertCodeSecretResolver: resolver,
+    });
     const fakeDb = {
       execute: async () => ({ rows: [] }),
       $client: { end: async () => undefined },
     } as unknown as DrizzleDb;
     const config: RuntimeConfig = {
       databaseUrl: "postgresql://placeholder.invalid/test",
-      integrations: { selarti: false, planerka: false, telegram: false, makeProjection: false, intentModel: false, payments: false },
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
       minorOnboarding: false,
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       features: { expertReferral: true, expertResidencyBilling: false },
-      expertReferralKey: { currentVersion: "v1", reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON" },
+      expertReferralKey: {
+        currentVersion: "v1",
+        reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      },
     };
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertCodeKeyring).toBe(keyring);
     expect(dependencies.expertReferralAdminService).toBeDefined();
     expect(dependencies.expertApi).toBeUndefined();
-    const app = await (await import("./app.js")).buildApp({
+    const app = await (
+      await import("./app.js")
+    ).buildApp({
       ...dependencies,
       config: {
         ...dependencies.config,
         features: { expertReferral: false, expertResidencyBilling: false },
       },
     });
-    expect((app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring).toBe(keyring);
+    expect(
+      (app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring,
+    ).toBe(keyring);
     await app.close();
   });
 

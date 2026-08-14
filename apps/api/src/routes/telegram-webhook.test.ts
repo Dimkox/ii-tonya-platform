@@ -27,6 +27,7 @@ const build = async (
   const resolvePrincipal = vi.fn<
     TelegramExpertQueryIngress["resolvePrincipal"]
   >(async (telegramUserId: string) => ({
+    userId: "00000000-0000-4000-8000-000000000100",
     expertId: "00000000-0000-4000-8000-000000000101",
     telegramUserId,
     timezone: "Europe/Moscow",
@@ -166,7 +167,11 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
-  it("keeps query commands isolated while the flag is false", async () => {
+  it.each([
+    "/schedule",
+    "/referral",
+    "/residency 00000000-0000-4000-8000-000000000301",
+  ])("keeps %s isolated while the query flag is false", async (text) => {
     const state = await build();
     try {
       const response = await state.app.inject({
@@ -178,7 +183,7 @@ describe("Telegram webhook callback boundary", () => {
           message: {
             from: { id: 123456789 },
             chat: { id: 123456789, type: "private" },
-            text: "/schedule",
+            text,
           },
         },
       });
@@ -423,9 +428,10 @@ describe("Telegram webhook callback boundary", () => {
           },
         },
       });
-      expect(response.statusCode).toBe(200);
-      expect(state.complete).toHaveBeenCalledWith("claim-1");
-      expect(state.fail).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_query_unavailable" });
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
     } finally {
       await state.app.close();
     }
