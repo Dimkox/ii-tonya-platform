@@ -17,14 +17,14 @@
 
 ### Task 1: Durable schema and repository
 
-- [ ] Add migration/schema tests for hashes, state, fence/version, bounded outcome and retention.
+- [x] Add migration/schema tests for hashes, state, fence/version, bounded outcome and retention.
 - [ ] Observe RED before migration/repository exists.
-- [ ] Implement migration 0027 plus atomic repository claim/complete/fail/cleanup.
+- [x] Implement migration 0027 plus atomic repository claim/complete/fail/cleanup.
 - [ ] Prove real-PostgreSQL multi-worker claim, replay, conflict, stale-fence rejection and cleanup.
 
 ### Task 2: Default-off composition and release evidence
 
-- [ ] Test source-absent default lifecycle and injected-source durable composition.
-- [ ] Compose the PostgreSQL store only with the complete injected expert-AI capability.
+- [x] Test source-absent default lifecycle and injected-source durable composition.
+- [x] Compose the PostgreSQL store only with the complete injected expert-AI capability.
 - [ ] Run one focused Claw gate at the committed code SHA and record evidence.
-- [ ] Obtain independent review; keep human approval BLOCKED and do not push or merge.
+- [x] Obtain independent review; keep human approval BLOCKED and do not push or merge.
