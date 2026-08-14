@@ -1,7 +1,7 @@
 # MVP-WORKER-OUTBOX-001 implementation report
 
-Status: implementation tasks 1-5 complete; Task 6 boundary evidence in progress;
-independent review and the final exact-SHA Claw gate are pending.
+Status: implementation and boundary evidence complete; independent review and
+the final exact-SHA Claw gate are pending.
 
 ## Identity and scope
 
@@ -36,7 +36,7 @@ independent review and the final exact-SHA Claw gate are pending.
 | 3 | 2 files, 19 tests: 13 pass / 6 fail | `c1b8fa4` | 2 files, 19/19 pass |
 | 4 | 2 suites failed at missing module, 0 collected | `7563e13` | 2 files, 7/7 pass |
 | 5 | 3 files, 17 tests: 9 pass / 8 fail | `58d63c7` | 3 files, 17/17 pass |
-| 6 | 2 files, 5 tests: 3 pass / 2 missing-doc failures | pending | pending |
+| 6 | 2 files, 5 tests: 3 pass / 2 missing-doc failures | `bc935cd` | 2 files, 5/5 pass after one assertion-only fix rerun |
 
 Successful focused suites were not repeated. Tests ran only inside retained
 Claw container `ii-tonya-test-yookassa` against the single existing PostgreSQL
@@ -58,7 +58,6 @@ worktree-local cleanup before handoff.
 
 ## Pending completion gates
 
-- Task 6 GREEN boundary suite and versioned evidence.
 - Independent adversarial review of exact code/docs HEAD with every Critical or
   Important finding remediated and re-reviewed.
 - One final focused Claw gate on the reviewed exact SHA, then source/test-process

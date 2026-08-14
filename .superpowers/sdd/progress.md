@@ -57,7 +57,7 @@
 | 3. Filtered repository ownership | complete | Claw PostgreSQL 19/19 at `c1b8fa4` |
 | 4. Idempotent local mutation | complete | Claw PostgreSQL 7/7 at `7563e13` |
 | 5. Exclusive runtime and metrics | complete | Claw 17/17 at `58d63c7` |
-| 6. Boundaries, review, final gate | in progress | RED boundary 3/5 at `7af98b7`; review/final gate pending |
+| 6. Boundaries, review, final gate | in progress | boundary GREEN 5/5 at `bc935cd`; review/final gate pending |
 - Privacy mutations and workers are explicitly fail-closed by default. Production
   enablement requires real exact-four provider target capture, bound envelope
   encryption/KMS, provider reconciliation proof, crash-safe retention leases and

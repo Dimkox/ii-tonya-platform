@@ -21,7 +21,7 @@
 | Task 3 allowlisted outbox repository      | complete              | implementation owner               | repository + real-PG mixed-topic tests                              | Claw `c1b8fa4`, 19/19                                      |
 | Task 4 local case mutation/reconciliation | complete              | implementation owner               | real-PG concurrency/crash tests                                     | Claw `7563e13`, 7/7                                        |
 | Task 5 runtime/metrics                    | complete              | implementation owner               | runtime + bounded telemetry tests                                   | Claw `58d63c7`, 17/17                                      |
-| Task 6 boundaries/evidence                | in progress           | implementation owner               | scope/rollback guards, independent review, final Claw gate          | RED `7af98b7`: 3/5 pass, two expected missing-doc failures |
+| Task 6 boundaries/evidence                | boundary complete     | implementation owner               | scope/rollback guards, independent review, final Claw gate          | RED `7af98b7`: 3/5; GREEN `bc935cd`: 5/5                    |
 | Independent code review                   | pending               | reviewer distinct from implementer | no open Critical/Important at exact HEAD                            | none                                                       |
 | Final focused Claw gate                   | pending               | implementation owner               | one run only after GREEN/review; cleanup recorded                   | none                                                       |
 | Deployment approval                       | blocked outside story | human owner                        | explicit target authorization and release evidence                  | none                                                       |
@@ -43,5 +43,5 @@
   implementation plan and traceability frozen. No production code or tests run.
 - 2026-08-14: Tasks 1-5 implemented sequentially with causal RED and one focused
   GREEN per task on retained Claw. PostgreSQL suites left zero test databases and
-  sessions. Task 6 RED reached the expected missing runbook/report boundary;
+  sessions. Task 6 boundary guards passed 5/5 after one assertion-only fix;
   review, final exact-SHA gate, and deployment authorization remain pending.
