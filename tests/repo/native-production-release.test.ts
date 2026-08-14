@@ -118,8 +118,7 @@ describe("native dedicated-server production release", () => {
     expect(script).toContain("rollback)");
     expect(script).toContain("readlink");
     expect(
-      script.split('install_release_units "$deploy_root/$previous"').length -
-        1,
+      script.split('install_release_units "$deploy_root/$previous"').length - 1,
     ).toBe(2);
     expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(2);
   });
@@ -159,7 +158,9 @@ describe("native dedicated-server production release", () => {
       expect(unit).toContain("ProtectSystem=strict");
       expect(unit).not.toMatch(/pnpm|docker|compose/u);
     }
-    expect(api).toContain("ExecStart=/usr/bin/node --jitless api/dist/server.js");
+    expect(api).toContain(
+      "ExecStart=/usr/bin/node --jitless api/dist/server.js",
+    );
     expect(worker).toContain(
       "ExecStart=/usr/bin/node --jitless worker/dist/main.js",
     );

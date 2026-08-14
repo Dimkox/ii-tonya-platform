@@ -203,11 +203,11 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-native-release.sh",
-    "f76650020a7d6edb4e8507f33be916d7c0bf898ae08bb996b599ec39a3abade0",
+    "f8157d9d0c23de1cf813f32664e702f25c06ec4f6cad0b2404808307b2cfd0b5",
   ],
   [
     "scripts/deploy-native-remote.sh",
-    "88f410b3116016579204dab95312aa7fe752f9e4671620140183da67f73972d3",
+    "1ddf499bb257e2f9de1bcdbee33886ba66cb4959f136d2be54c46c2a9d61c955",
   ],
   [
     "scripts/provision-claw-syft.sh",
@@ -223,15 +223,15 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/systemd/ii-tonya-api.service",
-    "8623f475796d072125651df917e6b96c0ea9bfc1cb4eb3a8bc90aae648d62785",
+    "ab01263f0edf37cb9eaf4502c5365b3b81002f4c761631359f41012bd98e76fc",
   ],
   [
     "deploy/systemd/ii-tonya-worker.service",
-    "c67bc5a7dbe04cdfb743c37ddb712a5084601c2f88d4558218a35320cf71ec5a",
+    "f507dedeaa04d0c39aad9fba03d9c90f3a2d280fcd31221d19caae87b6a3dc26",
   ],
   [
     "deploy/systemd/ii-tonya-migrate.service",
-    "fb09dbfba550a66abf46cea65cd9348d68c345ef76df8af2ed923ddd0b19176f",
+    "d2914b6ef210d94d42fa8f08c89c300c3f8dbe8a0637669ed3cc5e94ae785704",
   ],
   [
     "deploy/claw/dockerfile.test",
@@ -243,7 +243,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "a8756532e2fc71672347572af34acbfd852bd9043cfa99c3458f113530bfd22b",
+    "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
   ],
   [
     "scripts/run-claw-container-tests.sh",
