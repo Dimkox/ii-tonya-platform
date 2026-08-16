@@ -158,18 +158,21 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm',
     );
+    expect(clientBooking).toContain("resolve_seed_package() {");
     expect(clientBooking).toContain(
-      "drizzle-orm:/seed/node_modules/.pnpm/drizzle-orm@0.45.2_@opentel_228eefb61488836a4f41d6ac83b2f909/node_modules/drizzle-orm",
+      'candidates=(/seed/node_modules/.pnpm/"$pnpm_prefix"*/node_modules/"$package_name")',
     );
-    for (const packageName of ["pg", "pino", "fastify"]) {
-      expect(clientBooking).toContain(`\"${packageName}:/seed/node_modules/.pnpm/`);
-      expect(clientBooking).toContain(`node_modules/${packageName}`);
-    }
-    expect(clientBooking).toContain("@fastify+rate-limit@10.3.0");
+    expect(clientBooking).toContain('test "${#candidates[@]}" -eq 1');
+    expect(clientBooking).toContain('"$candidate/package.json" "$package_name" "$package_version"');
+    expect(clientBooking).toContain('"drizzle-orm|0.45.2|drizzle-orm@"');
+    expect(clientBooking).toContain('"pg|8.22.0|pg@"');
+    expect(clientBooking).toContain('"pino|9.14.0|pino@"');
+    expect(clientBooking).toContain('"fastify|5.10.0|fastify@"');
+    expect(clientBooking).toContain('"@fastify/rate-limit" 10.3.0 "@fastify+rate-limit@"');
     expect(clientBooking).toContain("node_modules/@fastify/rate-limit");
     expect(clientBooking).toContain("rm -f node_modules/@ii-tonya");
     expect(clientBooking).toContain(
-      "zod_package=/seed/node_modules/.pnpm/zod@4.4.3/node_modules/zod",
+      'zod_package="$(resolve_seed_package zod 4.4.3 zod@)"',
     );
     expect(clientBooking).toContain('rm -f node_modules/zod');
     expect(clientBooking).toContain('ln -s "$zod_package" node_modules/zod');

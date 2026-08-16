@@ -108,24 +108,43 @@ case "$CLAW_GATE_MODE" in
     test -d /seed/node_modules/.pnpm
     ln -s /seed/node_modules/.pnpm node_modules/.pnpm
     test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm
-    for package_link in \
-      "drizzle-orm:/seed/node_modules/.pnpm/drizzle-orm@0.45.2_@opentel_228eefb61488836a4f41d6ac83b2f909/node_modules/drizzle-orm" \
-      "pg:/seed/node_modules/.pnpm/pg@8.22.0/node_modules/pg" \
-      "pino:/seed/node_modules/.pnpm/pino@9.14.0/node_modules/pino" \
-      "fastify:/seed/node_modules/.pnpm/fastify@5.10.0/node_modules/fastify"; do
-      package_name="${package_link%%:*}"
-      package_path="${package_link#*:}"
-      test -d "$package_path"
+    resolve_seed_package() {
+      local package_name="$1" package_version="$2" pnpm_prefix="$3"
+      local candidate
+      local -a candidates
+      shopt -s nullglob
+      candidates=(/seed/node_modules/.pnpm/"$pnpm_prefix"*/node_modules/"$package_name")
+      shopt -u nullglob
+      test "${#candidates[@]}" -eq 1 || {
+        printf 'Expected exactly one seeded package for %s@%s; found %s.\n' \
+          "$package_name" "$package_version" "${#candidates[@]}" >&2
+        exit 1
+      }
+      candidate="${candidates[0]}"
+      test -f "$candidate/package.json"
+      node -e '
+        const fs = require("node:fs");
+        const [packageJson, expectedName, expectedVersion] = process.argv.slice(1);
+        const actual = JSON.parse(fs.readFileSync(packageJson, "utf8"));
+        if (actual.name !== expectedName || actual.version !== expectedVersion) process.exit(1);
+      ' "$candidate/package.json" "$package_name" "$package_version"
+      printf '%s\n' "$candidate"
+    }
+    for package_spec in \
+      "drizzle-orm|0.45.2|drizzle-orm@" \
+      "pg|8.22.0|pg@" \
+      "pino|9.14.0|pino@" \
+      "fastify|5.10.0|fastify@"; do
+      IFS='|' read -r package_name package_version pnpm_prefix <<< "$package_spec"
+      package_path="$(resolve_seed_package "$package_name" "$package_version" "$pnpm_prefix")"
       ln -s "$package_path" "node_modules/$package_name"
       test "$(readlink -f "node_modules/$package_name")" = "$package_path"
     done
     mkdir node_modules/@fastify
-    rate_limit_package=/seed/node_modules/.pnpm/@fastify+rate-limit@10.3.0/node_modules/@fastify/rate-limit
-    test -d "$rate_limit_package"
+    rate_limit_package="$(resolve_seed_package "@fastify/rate-limit" 10.3.0 "@fastify+rate-limit@")"
     ln -s "$rate_limit_package" node_modules/@fastify/rate-limit
     test "$(readlink -f node_modules/@fastify/rate-limit)" = "$rate_limit_package"
-    zod_package=/seed/node_modules/.pnpm/zod@4.4.3/node_modules/zod
-    test -d "$zod_package"
+    zod_package="$(resolve_seed_package zod 4.4.3 zod@)"
     rm -f node_modules/zod
     ln -s "$zod_package" node_modules/zod
     test "$(readlink -f node_modules/zod)" = "$zod_package"
