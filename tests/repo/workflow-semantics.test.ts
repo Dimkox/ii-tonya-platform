@@ -177,11 +177,7 @@ describe("direct Claw verification semantics", () => {
       'test "$(readlink -f node_modules/zod)" = "$zod_package"',
     );
     expect(clientBooking).toContain(
-      'test "$(readlink -f node_modules/@ii-tonya/config)" = /workspace/source/packages/config',
-    );
-    expect(clientBooking).toContain("test -f packages/config/dist/index.js");
-    expect(clientBooking).toContain(
-      'for workspace_package in contracts worker application db; do',
+      "workspace_packages=(domain config contracts application integrations db observability worker)",
     );
     expect(clientBooking).toContain(
       'test "$(readlink -f "node_modules/@ii-tonya/$workspace_package")" = "/workspace/source/packages/$workspace_package"',
@@ -189,12 +185,18 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain(
       'test -f "packages/$workspace_package/dist/index.js"',
     );
+    expect(clientBooking).toContain(
+      'for workspace_package in "${workspace_packages[@]}"; do\n' +
+        '      test "$(readlink -f "node_modules/@ii-tonya/$workspace_package")" = "/workspace/source/packages/$workspace_package"\n' +
+        '      test -f "packages/$workspace_package/dist/index.js"\n' +
+        "    done",
+    );
     expect(clientBooking).not.toContain(
       "node scripts/assert-client-booking-postgres.mjs",
     );
     expect(clientBooking).not.toContain("pnpm --workspace-concurrency=1 -r --sort run build");
     expect(clientBooking).toContain(
-      "for workspace_package in domain config contracts application integrations db observability worker; do",
+      'for workspace_package in "${workspace_packages[@]}"; do',
     );
     expect(clientBooking).toContain(
       "/seed/node_modules/.bin/tsup src/index.ts --format esm --clean --tsconfig ../../tsconfig.base.json",
@@ -203,9 +205,6 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain("/seed/node_modules/.bin/vitest run");
     expect(clientBooking).not.toContain("pnpm exec vitest run");
     expect(clientBooking).not.toContain("pnpm install");
-    expect(clientBooking).toContain(
-      "for workspace_package in domain config application worker contracts db integrations observability; do",
-    );
     expect(clientBooking).toContain(
       'ln -sfn "/workspace/source/packages/$workspace_package" "node_modules/@ii-tonya/$workspace_package"',
     );

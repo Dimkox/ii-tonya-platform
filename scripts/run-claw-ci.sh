@@ -131,18 +131,17 @@ case "$CLAW_GATE_MODE" in
     test "$(readlink -f node_modules/zod)" = "$zod_package"
     rm -f node_modules/@ii-tonya
     mkdir node_modules/@ii-tonya
-    for workspace_package in domain config application worker contracts db integrations observability; do
+    workspace_packages=(domain config contracts application integrations db observability worker)
+    for workspace_package in "${workspace_packages[@]}"; do
       ln -sfn "/workspace/source/packages/$workspace_package" "node_modules/@ii-tonya/$workspace_package"
     done
-    for workspace_package in domain config contracts application integrations db observability worker; do
+    for workspace_package in "${workspace_packages[@]}"; do
       (
         cd "packages/$workspace_package"
         /seed/node_modules/.bin/tsup src/index.ts --format esm --clean --tsconfig ../../tsconfig.base.json
       )
     done
-    test "$(readlink -f node_modules/@ii-tonya/config)" = /workspace/source/packages/config
-    test -f packages/config/dist/index.js
-    for workspace_package in contracts worker application db; do
+    for workspace_package in "${workspace_packages[@]}"; do
       test "$(readlink -f "node_modules/@ii-tonya/$workspace_package")" = "/workspace/source/packages/$workspace_package"
       test -f "packages/$workspace_package/dist/index.js"
     done
