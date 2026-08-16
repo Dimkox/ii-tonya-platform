@@ -148,6 +148,10 @@ case "$CLAW_GATE_MODE" in
     rm -f node_modules/zod
     ln -s "$zod_package" node_modules/zod
     test "$(readlink -f node_modules/zod)" = "$zod_package"
+    vitest_package="$(resolve_seed_package vitest 3.2.7 vitest@)"
+    rm -f node_modules/vitest
+    ln -s "$vitest_package" node_modules/vitest
+    test "$(readlink -f node_modules/vitest)" = "$vitest_package"
     rm -f node_modules/@ii-tonya
     mkdir node_modules/@ii-tonya
     workspace_packages=(domain config contracts application integrations db observability worker)

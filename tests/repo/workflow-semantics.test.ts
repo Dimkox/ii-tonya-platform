@@ -170,6 +170,11 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain('"fastify|5.10.0|fastify@"');
     expect(clientBooking).toContain('"@fastify/rate-limit" 10.3.0 "@fastify+rate-limit@"');
     expect(clientBooking).toContain("node_modules/@fastify/rate-limit");
+    expect(clientBooking).toContain('vitest_package="$(resolve_seed_package vitest 3.2.7 vitest@)"');
+    expect(clientBooking).toContain('ln -s "$vitest_package" node_modules/vitest');
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/vitest)" = "$vitest_package"',
+    );
     expect(clientBooking).toContain("rm -f node_modules/@ii-tonya");
     expect(clientBooking).toContain(
       'zod_package="$(resolve_seed_package zod 4.4.3 zod@)"',
