@@ -175,6 +175,27 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/vitest)" = "$vitest_package"',
     );
+    expect(clientBooking).toContain("mkdir node_modules/@opentelemetry");
+    expect(clientBooking).toContain(
+      'opentelemetry_api_package="$(resolve_seed_package "@opentelemetry/api" 1.9.1 "@opentelemetry+api@")"',
+    );
+    expect(clientBooking).toContain(
+      'ln -s "$opentelemetry_api_package" node_modules/@opentelemetry/api',
+    );
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/@opentelemetry/api)" = "$opentelemetry_api_package"',
+    );
+    expect(clientBooking).toContain("mkdir node_modules/@testcontainers");
+    expect(clientBooking).toContain(
+      'testcontainers_postgresql_package="$(resolve_seed_package "@testcontainers/postgresql" 10.28.0 "@testcontainers+postgresql@")"',
+    );
+    expect(clientBooking).toContain(
+      'ln -s "$testcontainers_postgresql_package" node_modules/@testcontainers/postgresql',
+    );
+    expect(clientBooking).toContain(
+      'test "$(readlink -f node_modules/@testcontainers/postgresql)" = "$testcontainers_postgresql_package"',
+    );
+    expect(clientBooking).toContain("node scripts/assert-client-booking-postgres.mjs");
     expect(clientBooking).toContain("rm -f node_modules/@ii-tonya");
     expect(clientBooking).toContain(
       'zod_package="$(resolve_seed_package zod 4.4.3 zod@)"',
@@ -199,9 +220,7 @@ describe("direct Claw verification semantics", () => {
         '      test -f "packages/$workspace_package/dist/index.js"\n' +
         "    done",
     );
-    expect(clientBooking).not.toContain(
-      "node scripts/assert-client-booking-postgres.mjs",
-    );
+    expect(clientBooking).toContain("node scripts/assert-client-booking-postgres.mjs");
     expect(clientBooking).not.toContain("pnpm --workspace-concurrency=1 -r --sort run build");
     expect(clientBooking).toContain(
       'for workspace_package in "${workspace_packages[@]}"; do',

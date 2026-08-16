@@ -152,6 +152,15 @@ case "$CLAW_GATE_MODE" in
     rm -f node_modules/vitest
     ln -s "$vitest_package" node_modules/vitest
     test "$(readlink -f node_modules/vitest)" = "$vitest_package"
+    mkdir node_modules/@opentelemetry
+    opentelemetry_api_package="$(resolve_seed_package "@opentelemetry/api" 1.9.1 "@opentelemetry+api@")"
+    ln -s "$opentelemetry_api_package" node_modules/@opentelemetry/api
+    test "$(readlink -f node_modules/@opentelemetry/api)" = "$opentelemetry_api_package"
+    mkdir node_modules/@testcontainers
+    testcontainers_postgresql_package="$(resolve_seed_package "@testcontainers/postgresql" 10.28.0 "@testcontainers+postgresql@")"
+    ln -s "$testcontainers_postgresql_package" node_modules/@testcontainers/postgresql
+    test "$(readlink -f node_modules/@testcontainers/postgresql)" = "$testcontainers_postgresql_package"
+    node scripts/assert-client-booking-postgres.mjs
     rm -f node_modules/@ii-tonya
     mkdir node_modules/@ii-tonya
     workspace_packages=(domain config contracts application integrations db observability worker)

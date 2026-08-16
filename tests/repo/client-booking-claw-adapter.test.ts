@@ -9,7 +9,7 @@ describe("immutable client booking Claw adapter", () => {
     expect(runner).toContain(
       "${II_TONYA_TEST_POSTGRES_ADMIN_URL:?II_TONYA_TEST_POSTGRES_ADMIN_URL is required}",
     );
-    expect(runner).not.toContain("node scripts/assert-client-booking-postgres.mjs");
+    expect(runner).toContain("node scripts/assert-client-booking-postgres.mjs");
     expect(runner).toContain(
       "tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts",
     );
