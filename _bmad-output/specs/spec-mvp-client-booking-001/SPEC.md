@@ -77,8 +77,8 @@ caller-supplied identifier, amount, or payment fact authoritative.
   registry, claim, reconciliation, and provider-adapter composition under every feature matrix.
 - After a focused suite passes it is not repeated. The integrated Claw/real-PostgreSQL gate has
   one total invocation through a versioned immutable `client-booking` adapter at an exact clean
-  SHA. It accepts no manifest input, requires credential-redacted external PostgreSQL 17.5 proof,
-  and a failed invocation remains terminal evidence.
+  SHA. It accepts no manifest input, requires credential-redacted external test PostgreSQL 16.0.15
+  (`server_version_num=160015`) proof, and a failed invocation remains terminal evidence.
 
 ## Non-goals
 
