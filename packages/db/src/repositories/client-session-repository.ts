@@ -25,8 +25,7 @@ export type ClientSessionResolution =
   | { readonly kind: "resolved"; readonly principal: ClientPrincipal }
   | { readonly kind: "denied" };
 export type ClientSessionRevocation =
-  | { readonly kind: "revoked" }
-  | { readonly kind: "denied" };
+  { readonly kind: "revoked" } | { readonly kind: "denied" };
 
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   transaction: infer T,
@@ -42,7 +41,11 @@ const replayDigestPattern = /^hmac-sha256:v[1-9][0-9]*:[0-9a-f]{64}$/u;
 const hasSqlState = (error: unknown, state: string): boolean => {
   const seen = new Set<unknown>();
   let current = error;
-  while (typeof current === "object" && current !== null && !seen.has(current)) {
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
     seen.add(current);
     if ((current as { code?: unknown }).code === state) return true;
     current = (current as { cause?: unknown }).cause;
@@ -59,7 +62,9 @@ const validInstant = (value: Date): boolean =>
 export class PostgresClientSessionRepository {
   constructor(private readonly db: DrizzleDb) {}
 
-  async issue(input: ClientSessionIssueInput): Promise<ClientSessionIssueOutcome> {
+  async issue(
+    input: ClientSessionIssueInput,
+  ): Promise<ClientSessionIssueOutcome> {
     if (
       !uuidPattern.test(input.userId) ||
       !tokenDigestPattern.test(input.tokenDigest) ||
@@ -86,12 +91,14 @@ export class PostgresClientSessionRepository {
             select clock_timestamp() as "databaseNow"
           `)
         ).rows[0];
-        if (clock === undefined) throw new Error("client_session_issue_unavailable");
+        if (clock === undefined)
+          throw new Error("client_session_issue_unavailable");
         const databaseNow =
           clock.databaseNow instanceof Date
             ? clock.databaseNow
             : new Date(clock.databaseNow);
-        const remaining = input.proofExpiresAt.getTime() - databaseNow.getTime();
+        const remaining =
+          input.proofExpiresAt.getTime() - databaseNow.getTime();
         if (remaining <= 0 || remaining > input.maximumTtlMs) {
           return { kind: "denied" } as const;
         }
@@ -106,7 +113,8 @@ export class PostgresClientSessionRepository {
             returning expires_at as "expiresAt"
           `)
         ).rows[0];
-        if (session === undefined) throw new Error("client_session_issue_unavailable");
+        if (session === undefined)
+          throw new Error("client_session_issue_unavailable");
         await tx.execute(sql`
           insert into client_identity_proof_receipts (
             replay_digest,session_token_digest,expires_at,created_at
@@ -132,7 +140,9 @@ export class PostgresClientSessionRepository {
     }
   }
 
-  async resolve(tokenDigest: `sha256:${string}`): Promise<ClientSessionResolution> {
+  async resolve(
+    tokenDigest: `sha256:${string}`,
+  ): Promise<ClientSessionResolution> {
     if (!tokenDigestPattern.test(tokenDigest)) return { kind: "denied" };
     const row = (
       await this.db.execute<{ userId: string }>(sql`
@@ -158,7 +168,37 @@ export class PostgresClientSessionRepository {
         };
   }
 
-  async revoke(tokenDigest: `sha256:${string}`): Promise<ClientSessionRevocation> {
+  async resolveBooking(
+    tokenDigest: `sha256:${string}`,
+  ): Promise<ClientSessionResolution> {
+    if (!tokenDigestPattern.test(tokenDigest)) return { kind: "denied" };
+    const row = (
+      await this.db.execute<{ userId: string }>(sql`
+        select s.user_id as "userId"
+        from client_sessions s
+        join users u on u.id=s.user_id
+        where s.token_digest=${tokenDigest}
+          and s.scope='client_booking:write'
+          and s.revoked_at is null
+          and s.expires_at > clock_timestamp()
+          and u.active=true
+      `)
+    ).rows[0];
+    return row === undefined
+      ? { kind: "denied" }
+      : {
+          kind: "resolved",
+          principal: {
+            authenticated: true,
+            active: true,
+            userId: row.userId,
+          },
+        };
+  }
+
+  async revoke(
+    tokenDigest: `sha256:${string}`,
+  ): Promise<ClientSessionRevocation> {
     if (!tokenDigestPattern.test(tokenDigest)) return { kind: "denied" };
     const row = (
       await this.db.execute<{ tokenDigest: string }>(sql`

@@ -23,6 +23,14 @@ export interface CatalogExpertRecord {
   readonly slotStartsAt: Date;
 }
 
+export interface BookingAwareAvailabilitySlot {
+  readonly localSlotId: string;
+  readonly sourceOrder: string;
+  readonly startsAt: Date;
+  readonly observedAt: Date;
+  readonly remainingCapacity: number;
+}
+
 export interface PublicCatalogServiceRecord extends Record<string, unknown> {
   readonly sourceKey: string;
   readonly displayName: string;
@@ -36,6 +44,8 @@ type RawCatalogExpertRecord = Omit<CatalogExpertRecord, "slotStartsAt"> & {
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
 const MAX_RESULTS = 500;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 const finiteDate = (value: Date): boolean =>
   value instanceof Date && Number.isFinite(value.getTime());
@@ -48,7 +58,11 @@ export class PostgresCatalogRepository {
     language?: string;
     limit: number;
   }): Promise<readonly PublicCatalogServiceRecord[]> {
-    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 20) {
+    if (
+      !Number.isSafeInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > 20
+    ) {
       throw new Error("Invalid public catalog limit");
     }
     const serviceCode = input.serviceCode ?? null;
@@ -94,14 +108,9 @@ export class PostgresCatalogRepository {
     const serviceCode = input.serviceCode ?? null;
     const language = input.language ?? null;
     const earliest = new Date(
-      Math.max(
-        input.from.getTime(),
-        input.now.getTime() + input.minimumLeadMs,
-      ),
+      Math.max(input.from.getTime(), input.now.getTime() + input.minimumLeadMs),
     );
-    const freshAfter = new Date(
-      input.now.getTime() - SLOT_FRESHNESS_MS,
-    );
+    const freshAfter = new Date(input.now.getTime() - SLOT_FRESHNESS_MS);
     const result = await this.db.execute<RawCatalogExpertRecord>(sql`
       select
         e.id as "expertId",
@@ -146,5 +155,64 @@ export class PostgresCatalogRepository {
       }
       return { ...row, slotStartsAt };
     });
+  }
+
+  async read(input: { sourceKey: string; databaseNow: Date }): Promise<
+    | Readonly<{
+        kind: "complete";
+        slots: readonly BookingAwareAvailabilitySlot[];
+      }>
+    | Readonly<{ kind: "unavailable" }>
+  > {
+    if (!UUID_PATTERN.test(input.sourceKey) || !finiteDate(input.databaseNow)) {
+      return { kind: "unavailable" };
+    }
+    const result = await this.db.execute<{
+      localSlotId: string;
+      startsAt: Date | string;
+      observedAt: Date | string | null;
+      remainingCapacity: number | string;
+    }>(sql`
+      select s.id as "localSlotId",s.starts_at as "startsAt",
+        s.observed_at as "observedAt",
+        (s.capacity-count(r.id))::int as "remainingCapacity"
+      from slots s
+      left join reservations r on r.slot_id=s.id and (
+        r.status='booked' or
+        (r.status='reserved' and r.reserved_until>${input.databaseNow})
+      )
+      where s.expert_service_id=${input.sourceKey}::uuid
+      group by s.id,s.starts_at,s.observed_at,s.capacity
+      order by s.starts_at,s.id
+      limit ${MAX_RESULTS}
+    `);
+    const slots: BookingAwareAvailabilitySlot[] = [];
+    for (const row of result.rows) {
+      const startsAt =
+        row.startsAt instanceof Date ? row.startsAt : new Date(row.startsAt);
+      const observedAt =
+        row.observedAt instanceof Date
+          ? row.observedAt
+          : row.observedAt === null
+            ? null
+            : new Date(row.observedAt);
+      const remainingCapacity = Number(row.remainingCapacity);
+      if (
+        !finiteDate(startsAt) ||
+        observedAt === null ||
+        !finiteDate(observedAt) ||
+        !Number.isSafeInteger(remainingCapacity)
+      ) {
+        return { kind: "unavailable" };
+      }
+      slots.push({
+        localSlotId: row.localSlotId,
+        sourceOrder: row.localSlotId,
+        startsAt,
+        observedAt,
+        remainingCapacity,
+      });
+    }
+    return { kind: "complete", slots };
   }
 }

@@ -93,6 +93,42 @@ export interface BookingRepositoryOptions {
   beforeCallbackTransition?: () => Promise<void>;
 }
 
+export type ProtectedClientBookingReserveResult =
+  | {
+      kind: "reserved" | "replayed";
+      bookingHandle: `bk1.${string}`;
+      reservationStatus: ReservationStatus;
+      reservedUntil: Date;
+    }
+  | { kind: "not_found" | "conflict" | "handle_collision" };
+
+export type ProtectedClientBookingCancelResult = {
+  kind: "cancelled" | "replayed" | "not_found" | "conflict";
+};
+
+export interface ReserveProtectedChoiceCommand {
+  userId: string;
+  choiceDigest: `sha256:${string}`;
+  idempotencyKey: string;
+  bookingHandle: `bk1.${string}`;
+  correlationId: string;
+  minimumLeadMs: number;
+  slotFreshnessMs: number;
+  confirmationBufferMs: number;
+}
+
+export interface CancelOwnedBookingCommand {
+  userId: string;
+  bookingHandle: `bk1.${string}`;
+  correlationId: string;
+}
+
+export interface CancelBookingForErasureCommand {
+  userId: string;
+  reservationId: string;
+  correlationId: string;
+}
+
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   transaction: infer T,
 ) => unknown
@@ -182,6 +218,8 @@ const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
 };
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
+const MINIMUM_LEAD_MS = 24 * 60 * 60 * 1_000;
+const MAXIMUM_HOLD_MS = 72 * 60 * 60 * 1_000;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -697,6 +735,237 @@ export class PostgresBookingRepository {
         now: command.now,
         correlationId: command.correlationId,
       });
+    });
+  }
+
+  async reserveProtectedChoice(
+    command: ReserveProtectedChoiceCommand,
+  ): Promise<ProtectedClientBookingReserveResult> {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      !/^sha256:[0-9a-f]{64}$/u.test(command.choiceDigest) ||
+      !/^[0-9a-f]{64}$/u.test(command.idempotencyKey) ||
+      !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.bookingHandle) ||
+      command.correlationId.length < 1 ||
+      command.minimumLeadMs !== MINIMUM_LEAD_MS ||
+      command.slotFreshnessMs !== SLOT_FRESHNESS_MS ||
+      !Number.isSafeInteger(command.confirmationBufferMs) ||
+      command.confirmationBufferMs < 1 ||
+      command.confirmationBufferMs > MAXIMUM_HOLD_MS
+    ) {
+      return { kind: "conflict" };
+    }
+    try {
+      return await this.runSerializable(async (tx) => {
+        await tx.execute(sql`
+          select pg_advisory_xact_lock(
+            hashtextextended(${`choice:${command.choiceDigest}`}, 0)
+          )
+        `);
+        const now = normalizeBookingTimestamp(
+          one(
+            (
+              await tx.execute<{ databaseNow: Date | string }>(sql`
+                select clock_timestamp() as "databaseNow"
+              `)
+            ).rows,
+            "the database clock",
+          ).databaseNow,
+          "clock_timestamp",
+        );
+        const replay = (
+          await tx.execute<{
+            bookingHandle: `bk1.${string}`;
+            reservationStatus: ReservationStatus;
+            reservedUntil: Date | string;
+          }>(sql`
+            select b.booking_handle as "bookingHandle",
+              r.status as "reservationStatus",r.reserved_until as "reservedUntil"
+            from client_booking_receipts b
+            join reservations r on r.id=b.reservation_id
+            join users u on u.id=b.user_id
+            where b.user_id=${command.userId}::uuid
+              and b.choice_digest=${command.choiceDigest}
+              and u.active
+          `)
+        ).rows[0];
+        if (replay !== undefined) {
+          return {
+            kind: "replayed" as const,
+            bookingHandle: replay.bookingHandle,
+            reservationStatus: replay.reservationStatus,
+            reservedUntil: normalizeBookingTimestamp(
+              replay.reservedUntil,
+              "reservations.reserved_until",
+            ),
+          };
+        }
+        const choice = (
+          await tx.execute<{ slotId: string }>(sql`
+            select c.slot_id as "slotId"
+            from client_catalog_choices c
+            join client_catalog_requests cr on cr.id=c.request_id
+            join users u on u.id=cr.user_id
+            where c.choice_digest=${command.choiceDigest}
+              and cr.user_id=${command.userId}::uuid
+              and u.active
+              and cr.state='ready'
+              and c.expires_at>${now}
+              and cr.expires_at>${now}
+            for update of c,cr,u
+          `)
+        ).rows[0];
+        if (choice === undefined) return { kind: "not_found" as const };
+        const reservation = await this.reserveInTransaction(tx, {
+          idempotencyKey: command.idempotencyKey,
+          userId: command.userId,
+          slotId: choice.slotId,
+          now,
+          minimumLeadMs: command.minimumLeadMs,
+          confirmationBufferMs: command.confirmationBufferMs,
+          correlationId: command.correlationId,
+        });
+        if (reservation.kind === "unavailable") {
+          return { kind: "conflict" as const };
+        }
+        if (
+          reservation.reservedUntil.getTime() - now.getTime() >
+          MAXIMUM_HOLD_MS
+        ) {
+          throw new Error("client_booking_hold_policy_invalid");
+        }
+        await tx.execute(sql`
+          insert into client_booking_receipts (
+            user_id,choice_digest,booking_handle,reservation_id
+          ) values (
+            ${command.userId}::uuid,${command.choiceDigest},
+            ${command.bookingHandle},${reservation.reservationId}::uuid
+          )
+        `);
+        return {
+          kind: "reserved" as const,
+          bookingHandle: command.bookingHandle,
+          reservationStatus: "reserved" as const,
+          reservedUntil: reservation.reservedUntil,
+        };
+      });
+    } catch (error) {
+      if (
+        hasSqlState(error, "23505") &&
+        hasConstraint(error, "client_booking_receipts_booking_handle_unique")
+      ) {
+        return { kind: "handle_collision" };
+      }
+      throw error;
+    }
+  }
+
+  cancelOwnedByHandle(
+    command: CancelOwnedBookingCommand,
+  ): Promise<ProtectedClientBookingCancelResult> {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.bookingHandle) ||
+      command.correlationId.length < 1
+    ) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    return this.runSerializable(async (tx) => {
+      const now = normalizeBookingTimestamp(
+        one(
+          (
+            await tx.execute<{ databaseNow: Date | string }>(sql`
+              select clock_timestamp() as "databaseNow"
+            `)
+          ).rows,
+          "the database clock",
+        ).databaseNow,
+        "clock_timestamp",
+      );
+      const owned = (
+        await tx.execute<{
+          reservationId: string;
+          status: ReservationStatus;
+          version: number;
+        }>(sql`
+          select r.id as "reservationId",r.status,r.version
+          from client_booking_receipts b
+          join reservations r on r.id=b.reservation_id
+          join users u on u.id=b.user_id
+          where b.user_id=${command.userId}::uuid
+            and b.booking_handle=${command.bookingHandle}
+            and u.active
+        `)
+      ).rows[0];
+      if (owned === undefined) return { kind: "not_found" };
+      if (
+        owned.status === "cancelled_by_client" ||
+        owned.status === "cancelled_by_expert"
+      ) {
+        return { kind: "replayed" };
+      }
+      if (owned.status !== "reserved" && owned.status !== "booked") {
+        return { kind: "conflict" };
+      }
+      const result = await this.transitionInTransaction(tx, {
+        reservationId: owned.reservationId,
+        expectedVersion: owned.version,
+        action: "client_cancel",
+        actor: { type: "client", id: command.userId },
+        now,
+        correlationId: command.correlationId,
+      });
+      return result.status === "cancelled_by_client"
+        ? { kind: "cancelled" }
+        : { kind: "conflict" };
+    });
+  }
+
+  cancelBookingForErasure(
+    command: CancelBookingForErasureCommand,
+  ): Promise<ProtectedClientBookingCancelResult> {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      !UUID_PATTERN.test(command.reservationId) ||
+      command.correlationId.length < 1
+    ) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    return this.runSerializable(async (tx) => {
+      const owned = (
+        await tx.execute<{ status: ReservationStatus; version: number }>(sql`
+          select status,version from reservations
+          where id=${command.reservationId}::uuid
+            and user_id=${command.userId}::uuid
+        `)
+      ).rows[0];
+      if (owned === undefined) return { kind: "not_found" };
+      if (
+        owned.status === "cancelled_by_client" ||
+        owned.status === "cancelled_by_expert"
+      ) {
+        return { kind: "replayed" };
+      }
+      if (owned.status !== "reserved" && owned.status !== "booked") {
+        return { kind: "conflict" };
+      }
+      const clock = one(
+        (
+          await tx.execute<{ databaseNow: Date | string }>(sql`
+            select clock_timestamp() as "databaseNow"
+          `)
+        ).rows,
+        "the database clock",
+      );
+      await this.transitionInTransaction(tx, {
+        reservationId: command.reservationId,
+        expectedVersion: owned.version,
+        action: "client_cancel",
+        actor: { type: "client", id: command.userId },
+        now: normalizeBookingTimestamp(clock.databaseNow, "clock_timestamp"),
+        correlationId: command.correlationId,
+      });
+      return { kind: "cancelled" };
     });
   }
 

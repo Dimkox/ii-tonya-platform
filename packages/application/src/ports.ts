@@ -303,9 +303,9 @@ export interface CatalogRequestReceipt {
   readonly state: "pending" | "ready";
 }
 
-export interface CatalogSnapshotSlot {
-  readonly startsAt: string;
-}
+export type CatalogSnapshotSlot =
+  | Readonly<{ startsAt: string }>
+  | Readonly<{ startsAt: string; choiceHandle: `ch1.${string}` }>;
 
 export interface CatalogSnapshotCard {
   readonly displayName: string;
@@ -330,6 +330,7 @@ export interface ClientCatalogRepository {
     serviceCode?: string;
     language?: string;
     correlationId: string;
+    version?: 1 | 2;
   }): Promise<CatalogRequestReceipt>;
   getOwned(input: {
     userId: string;

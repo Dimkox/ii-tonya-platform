@@ -3,6 +3,7 @@ import type {
   BookingService,
   CatalogService,
   ClientCatalogService,
+  ClientBookingService,
   ClientPrincipalResolver,
   ClientSessionService,
   ConversationService,
@@ -18,6 +19,7 @@ import type { SelartiPort } from "@ii-tonya/integrations";
 import {
   createLogger,
   recordClientSessionMetric,
+  recordClientBookingMetric,
   type Logger,
 } from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -51,6 +53,7 @@ import {
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
+import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 
 type ApprovalPort = Pick<
@@ -91,6 +94,8 @@ export interface AppDependencies {
   clientSessionService?: ClientSessionService;
   clientSessionRepository?: ClientSessionRevocation;
   clientPrincipal?: ClientPrincipalResolver;
+  clientBookingService?: ClientBookingService;
+  clientBookingPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -113,6 +118,9 @@ export async function buildApp(
     deps.clientPrincipal !== undefined;
   assertClientCapabilityPreflight(deps.config.features, {
     identityProofVerifier: sessionCapability,
+    bookingRuntime:
+      deps.clientBookingService !== undefined &&
+      deps.clientBookingPrincipal !== undefined,
   });
   if (
     (deps.config.features.expertReferral ||
@@ -120,6 +128,14 @@ export async function buildApp(
     deps.expertApi === undefined
   ) {
     throw new Error("Expert API runtime capability is required");
+  }
+  if (
+    deps.config.features.clientBooking === true &&
+    (deps.clientBookingService === undefined ||
+      deps.clientBookingPrincipal === undefined ||
+      deps.clientCatalogService === undefined)
+  ) {
+    throw new Error("Client booking runtime capability is required");
   }
   if (
     (deps.config.features.expertTelegramQueries === true ||
@@ -145,7 +161,8 @@ export async function buildApp(
   }
   if (
     deps.config.features.clientCatalog === true &&
-    (deps.clientCatalogService === undefined || deps.clientPrincipal === undefined)
+    (deps.clientCatalogService === undefined ||
+      deps.clientPrincipal === undefined)
   ) {
     throw new Error("Client catalog runtime capability is required");
   }
@@ -193,6 +210,18 @@ export async function buildApp(
       principals: deps.clientPrincipal,
     });
   }
+  if (
+    deps.config.features.clientBooking === true &&
+    deps.clientBookingService !== undefined &&
+    deps.clientBookingPrincipal !== undefined
+  ) {
+    await app.register(clientBookingRoutes, {
+      bookings: deps.clientBookingService,
+      principals: deps.clientBookingPrincipal,
+      reserveEnabled: deps.config.features.clientBookingReserve === true,
+      metrics: { record: recordClientBookingMetric },
+    });
+  }
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }
@@ -212,8 +241,7 @@ export async function buildApp(
       deps.config.features.expertTelegramQueries === true ||
       deps.config.features.expertTelegramFinancialViews === true ||
       deps.config.features.expertTelegramReferral === true,
-    expertCheckoutEnabled:
-      deps.config.features.expertTelegramCheckout === true,
+    expertCheckoutEnabled: deps.config.features.expertTelegramCheckout === true,
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),

@@ -6,6 +6,7 @@ export {
   migrateDb,
   type DrizzleDb,
 } from "./client.js";
+export { sql } from "drizzle-orm";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -21,7 +22,12 @@ export {
   type BookingRepositoryOptions,
   type BookingExpertScheduleRecord,
   type BookingSlotView,
+  type CancelBookingForErasureCommand,
+  type CancelOwnedBookingCommand,
+  type ProtectedClientBookingCancelResult,
+  type ProtectedClientBookingReserveResult,
   type ReservationAction,
+  type ReserveProtectedChoiceCommand,
   type ReserveSlotCommand,
   type ReserveSlotResult,
   type TransitionReservationCommand,
@@ -32,6 +38,7 @@ export {
   PostgresCatalogRepository,
   type CatalogEligibilityQuery,
   type CatalogExpertRecord,
+  type BookingAwareAvailabilitySlot,
   type PublicCatalogServiceRecord,
 } from "./repositories/catalog-repository.js";
 export {
@@ -40,6 +47,7 @@ export {
   type ClientCatalogRequestRepository,
   type ClientCatalogSlot,
   type ClientCatalogSnapshot,
+  type ProtectedCatalogChoiceInput,
 } from "./repositories/client-catalog-repository.js";
 export {
   PostgresClientSessionRepository,

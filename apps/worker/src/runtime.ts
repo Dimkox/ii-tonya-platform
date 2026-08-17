@@ -61,6 +61,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly workerOutboxRunner?: BoundedJob;
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
+  readonly clientBookingErasure?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -282,19 +283,23 @@ export function createProductionWorkerRuntime(
           deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
     processorPrivacy:
       deps.clientCatalogRetention === undefined &&
-      deps.clientSessionRetention === undefined
+      deps.clientSessionRetention === undefined &&
+      deps.clientBookingErasure === undefined
         ? async () => ({
             processed: 0,
             reason: "privacy_capability_disabled",
           })
-        : deps.clientCatalogRetention === undefined
-          ? deps.clientSessionRetention!
-          : deps.clientSessionRetention === undefined
-            ? deps.clientCatalogRetention
-            : async () => ({
-                clientCatalog: await deps.clientCatalogRetention!(),
-                clientSession: await deps.clientSessionRetention!(),
-              }),
+        : async () => ({
+            ...(deps.clientCatalogRetention === undefined
+              ? {}
+              : { clientCatalog: await deps.clientCatalogRetention() }),
+            ...(deps.clientSessionRetention === undefined
+              ? {}
+              : { clientSession: await deps.clientSessionRetention() }),
+            ...(deps.clientBookingErasure === undefined
+              ? {}
+              : { clientBooking: await deps.clientBookingErasure() }),
+          }),
     providerReconciliation: async () => ({
       examined: 0,
       matched: 0,

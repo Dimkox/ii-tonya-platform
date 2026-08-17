@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   createAdminService,
   createClientCatalogService,
+  createClientBookingService,
   createClientSessionService,
   createExpertReferralAdminService,
   createOperatorCaseService,
@@ -29,6 +30,7 @@ import {
   PostgresExpertAiRequestReceiptStore,
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
+  PostgresBookingRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
@@ -50,6 +52,7 @@ import type { FastifyInstance } from "fastify";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { createClientPrincipalResolver } from "./client-principal-resolver.js";
+import { createClientBookingPrincipalResolver } from "./client-booking-principal-resolver.js";
 import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
 import {
   clientSessionTokenHash,
@@ -114,6 +117,7 @@ export const createDefaultLifecycle = (
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
+      bookingRuntime: true,
     });
   },
   async migrate(db) {
@@ -123,6 +127,7 @@ export const createDefaultLifecycle = (
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
+      bookingRuntime: true,
     });
     let expertCodeKeyring: ExpertCodeKeyring | undefined;
     if (config.features?.expertReferral) {
@@ -193,12 +198,25 @@ export const createDefaultLifecycle = (
         : createClientPrincipalResolver(clientSessionRepository, {
             record: recordClientSessionMetric,
           });
+    const clientBookingPrincipal =
+      clientSessionRepository === undefined
+        ? undefined
+        : createClientBookingPrincipalResolver(clientSessionRepository);
     const clientCatalogService =
       config.features.clientCatalog === true &&
       clientSessionService !== undefined &&
       clientPrincipal !== undefined
         ? createClientCatalogService({
             repository: new PostgresClientCatalogRepository(db),
+            bookingAware: config.features.clientBooking === true,
+          })
+        : undefined;
+    const clientBookingService =
+      config.features.clientBooking === true
+        ? createClientBookingService({
+            repository: new PostgresBookingRepository(db),
+            confirmationBufferMs:
+              config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
         : undefined;
     return {
@@ -261,6 +279,10 @@ export const createDefaultLifecycle = (
             clientSessionRepository,
             clientPrincipal,
           }),
+      ...(clientBookingService === undefined ||
+      clientBookingPrincipal === undefined
+        ? {}
+        : { clientBookingService, clientBookingPrincipal }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
         ? {}

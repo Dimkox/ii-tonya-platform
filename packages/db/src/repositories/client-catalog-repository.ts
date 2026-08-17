@@ -5,7 +5,9 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
 
-export type ClientCatalogSlot = Readonly<{ startsAt: string }>;
+export type ClientCatalogSlot =
+  | Readonly<{ startsAt: string }>
+  | Readonly<{ startsAt: string; choiceHandle: `ch1.${string}` }>;
 export type ClientCatalogCard = Readonly<{
   displayName: string;
   serviceCode: string;
@@ -28,6 +30,7 @@ export interface ClientCatalogRequestRepository {
     serviceCode?: string;
     language?: string;
     correlationId: string;
+    version?: 1 | 2;
   }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }>;
   getOwned(input: {
     userId: string;
@@ -39,6 +42,7 @@ export interface ClientCatalogRequestRepository {
         serviceCode?: string;
         language?: string;
         databaseNow: Date;
+        expiresAt: Date;
       }>
     | "replayed"
     | null
@@ -47,10 +51,21 @@ export interface ClientCatalogRequestRepository {
     catalogRequestId: string;
     cards: readonly ClientCatalogCard[];
   }): Promise<"ready" | "replayed" | "missing">;
+  materializeBookingAware(input: {
+    catalogRequestId: string;
+    cards: readonly ClientCatalogCard[];
+    choices: readonly ProtectedCatalogChoiceInput[];
+  }): Promise<"ready" | "replayed" | "missing" | "collision">;
   expireDue(input: {
     now: Date;
     limit: number;
   }): Promise<{ examined: number; expired: number; removed: number }>;
+}
+
+export interface ProtectedCatalogChoiceInput {
+  readonly choiceDigest: `sha256:${string}`;
+  readonly localSlotId: string;
+  readonly expiresAt: Date;
 }
 
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
@@ -62,6 +77,8 @@ type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+const CHOICE_HANDLE_PATTERN = /^ch1\.[A-Za-z0-9_-]{43}$/u;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
 
 const optionalFilter = (
@@ -81,7 +98,8 @@ const optionalFilter = (
 };
 
 const canonicalUuid = (value: string): string => {
-  if (!UUID_PATTERN.test(value)) throw new Error("client_catalog_request_invalid");
+  if (!UUID_PATTERN.test(value))
+    throw new Error("client_catalog_request_invalid");
   return value;
 };
 
@@ -136,9 +154,15 @@ export const validateClientCatalogCards = (
         typeof slot !== "object" ||
         slot === null ||
         Array.isArray(slot) ||
-        Object.keys(slot).length !== 1 ||
+        (Object.keys(slot).length !== 1 && Object.keys(slot).length !== 2) ||
+        Object.keys(slot).some(
+          (key) => key !== "startsAt" && key !== "choiceHandle",
+        ) ||
         typeof slot.startsAt !== "string" ||
-        !finiteInstant(slot.startsAt)
+        !finiteInstant(slot.startsAt) ||
+        ("choiceHandle" in slot &&
+          (typeof slot.choiceHandle !== "string" ||
+            !CHOICE_HANDLE_PATTERN.test(slot.choiceHandle)))
       ) {
         throw new Error("client_catalog_snapshot_invalid");
       }
@@ -152,8 +176,24 @@ const state = (value: string): "pending" | "ready" => {
   throw new Error("client_catalog_request_state_invalid");
 };
 
-const canonicalPayload = (catalogRequestId: string): string =>
-  JSON.stringify({ v: 1, catalogRequestId });
+const canonicalPayload = (catalogRequestId: string, version: 1 | 2): string =>
+  JSON.stringify({ v: version, catalogRequestId });
+
+const databaseErrorConstraint = (error: unknown): string | undefined => {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
+    seen.add(current);
+    const evidence = current as { constraint?: unknown; cause?: unknown };
+    if (typeof evidence.constraint === "string") return evidence.constraint;
+    current = evidence.cause;
+  }
+  return undefined;
+};
 
 const terminalOutboxStatus = (status: string): boolean =>
   status === "succeeded" || status === "dead_letter";
@@ -162,19 +202,37 @@ async function deleteCatalogOutbox(
   tx: Transaction,
   outboxId: string,
 ): Promise<void> {
-  await tx.execute(sql`delete from delivery_attempts where outbox_id=${outboxId}::uuid`);
-  await tx.execute(sql`delete from dead_letters where outbox_id=${outboxId}::uuid`);
-  await tx.execute(sql`delete from outbox_operator_alerts where outbox_id=${outboxId}::uuid`);
+  await tx.execute(
+    sql`delete from delivery_attempts where outbox_id=${outboxId}::uuid`,
+  );
+  await tx.execute(
+    sql`delete from dead_letters where outbox_id=${outboxId}::uuid`,
+  );
+  await tx.execute(
+    sql`delete from outbox_operator_alerts where outbox_id=${outboxId}::uuid`,
+  );
   await tx.execute(sql`
     update reconciliation_mismatches set outbox_id=null
     where outbox_id=${outboxId}::uuid
   `);
-  await tx.execute(sql`delete from integration_outbox where id=${outboxId}::uuid`);
+  await tx.execute(
+    sql`delete from integration_outbox where id=${outboxId}::uuid`,
+  );
 }
 
-export class PostgresClientCatalogRepository
-  implements ClientCatalogRequestRepository
-{
+async function lockCatalogChoices(
+  tx: Transaction,
+  requestId: string,
+): Promise<void> {
+  await tx.execute(sql`
+    select pg_advisory_xact_lock(hashtextextended('choice:' || choice_digest,0))
+    from client_catalog_choices
+    where request_id=${requestId}::uuid
+    order by choice_digest
+  `);
+}
+
+export class PostgresClientCatalogRepository implements ClientCatalogRequestRepository {
   constructor(private readonly db: DrizzleDb) {}
 
   createOrReplay(input: {
@@ -183,14 +241,22 @@ export class PostgresClientCatalogRepository
     serviceCode?: string;
     language?: string;
     correlationId: string;
+    version?: 1 | 2;
   }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
     const userId = canonicalUuid(input.userId);
     const subjectKey = clientCatalogErasureSubjectKey(userId);
-    if (!HASH_PATTERN.test(input.requestDigest) || input.correlationId.length < 1) {
+    if (
+      !HASH_PATTERN.test(input.requestDigest) ||
+      input.correlationId.length < 1
+    ) {
       return Promise.reject(new Error("client_catalog_request_invalid"));
     }
     const serviceCode = optionalFilter(input.serviceCode, 64);
     const language = optionalFilter(input.language, 32);
+    const version = input.version ?? 1;
+    if (version !== 1 && version !== 2) {
+      return Promise.reject(new Error("client_catalog_request_invalid"));
+    }
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
@@ -226,14 +292,14 @@ export class PostgresClientCatalogRepository
           select id,${subjectKey},expires_at from client_catalog_requests
           where id=${catalogRequestId}::uuid
         `);
-        const payload = canonicalPayload(catalogRequestId);
+        const payload = canonicalPayload(catalogRequestId, version);
         const payloadHash = createHash("sha256").update(payload).digest("hex");
         await tx.execute(sql`
           insert into integration_outbox (
             idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
           ) values (
             ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
-            ${input.correlationId},${`client-catalog:${catalogRequestId}:v1`},${payloadHash}
+            ${input.correlationId},${`client-catalog:${catalogRequestId}:v${version}`},${payloadHash}
           )
         `);
         return { catalogRequestId, state: "pending" as const };
@@ -278,6 +344,7 @@ export class PostgresClientCatalogRepository
         serviceCode?: string;
         language?: string;
         databaseNow: Date;
+        expiresAt: Date;
       }>
     | "replayed"
     | null
@@ -289,20 +356,28 @@ export class PostgresClientCatalogRepository
         serviceCode: string | null;
         language: string | null;
         databaseNow: Date | string;
+        expiresAt: Date | string;
       }>(sql`
         select state,service_code as "serviceCode",language,
+          expires_at as "expiresAt",
           clock_timestamp() as "databaseNow"
         from client_catalog_requests where id=${catalogRequestId}::uuid
       `)
     ).rows[0];
     if (row === undefined || row.state === "expired") return null;
     if (row.state === "ready") return "replayed";
-    if (row.state !== "pending") throw new Error("client_catalog_request_state_invalid");
+    if (row.state !== "pending")
+      throw new Error("client_catalog_request_state_invalid");
     const databaseNow =
       row.databaseNow instanceof Date
         ? row.databaseNow
         : new Date(row.databaseNow);
-    if (!Number.isFinite(databaseNow.getTime())) {
+    const expiresAt =
+      row.expiresAt instanceof Date ? row.expiresAt : new Date(row.expiresAt);
+    if (
+      !Number.isFinite(databaseNow.getTime()) ||
+      !Number.isFinite(expiresAt.getTime())
+    ) {
       throw new Error("client_catalog_database_clock_invalid");
     }
     return {
@@ -310,6 +385,7 @@ export class PostgresClientCatalogRepository
       ...(row.serviceCode === null ? {} : { serviceCode: row.serviceCode }),
       ...(row.language === null ? {} : { language: row.language }),
       databaseNow,
+      expiresAt,
     };
   }
 
@@ -317,6 +393,34 @@ export class PostgresClientCatalogRepository
     catalogRequestId: string;
     cards: readonly ClientCatalogCard[];
   }): Promise<"ready" | "replayed" | "missing"> {
+    return this.materializeInternal(input, undefined);
+  }
+
+  async materializeBookingAware(input: {
+    catalogRequestId: string;
+    cards: readonly ClientCatalogCard[];
+    choices: readonly ProtectedCatalogChoiceInput[];
+  }): Promise<"ready" | "replayed" | "missing" | "collision"> {
+    try {
+      return await this.materializeInternal(input, input.choices);
+    } catch (error) {
+      if (
+        databaseErrorConstraint(error) ===
+        "client_catalog_choices_choice_digest_unique"
+      ) {
+        return "collision";
+      }
+      throw error;
+    }
+  }
+
+  private materializeInternal(
+    input: {
+      catalogRequestId: string;
+      cards: readonly ClientCatalogCard[];
+    },
+    choices: readonly ProtectedCatalogChoiceInput[] | undefined,
+  ): Promise<"ready" | "replayed" | "missing"> {
     const catalogRequestId = canonicalUuid(input.catalogRequestId);
     return this.db.transaction(async (tx: Transaction) => {
       const request = (
@@ -362,6 +466,51 @@ export class PostgresClientCatalogRepository
         throw new Error("client_catalog_request_state_invalid");
       }
       const cards = validateClientCatalogCards(input.cards);
+      if (choices !== undefined) {
+        const publicDigests = cards.flatMap((card) =>
+          card.slots.map((slot) => {
+            if (!("choiceHandle" in slot)) {
+              throw new Error("client_catalog_snapshot_invalid");
+            }
+            return `sha256:${createHash("sha256")
+              .update(slot.choiceHandle)
+              .digest("hex")}`;
+          }),
+        );
+        const protectedDigests = choices.map((choice) => choice.choiceDigest);
+        if (
+          choices.length !== publicDigests.length ||
+          new Set(publicDigests).size !== publicDigests.length ||
+          new Set(protectedDigests).size !== protectedDigests.length
+        ) {
+          throw new Error("client_catalog_snapshot_invalid");
+        }
+        for (const choice of choices) {
+          if (
+            !DIGEST_PATTERN.test(choice.choiceDigest) ||
+            !UUID_PATTERN.test(choice.localSlotId) ||
+            !(choice.expiresAt instanceof Date) ||
+            !Number.isFinite(choice.expiresAt.getTime()) ||
+            choice.expiresAt.getTime() <= databaseNow.getTime() ||
+            choice.expiresAt.getTime() > expiresAt.getTime() ||
+            !publicDigests.includes(choice.choiceDigest)
+          ) {
+            throw new Error("client_catalog_snapshot_invalid");
+          }
+          await tx.execute(sql`
+            insert into client_catalog_choices (
+              request_id,choice_digest,slot_id,expires_at
+            ) values (
+              ${catalogRequestId}::uuid,${choice.choiceDigest},
+              ${choice.localSlotId}::uuid,${choice.expiresAt}
+            )
+          `);
+        }
+      } else if (
+        cards.some((card) => card.slots.some((slot) => "choiceHandle" in slot))
+      ) {
+        throw new Error("client_catalog_snapshot_invalid");
+      }
       await tx.execute(sql`
         insert into client_catalog_snapshots (request_id,cards,expires_at)
         values (${catalogRequestId}::uuid,${JSON.stringify(cards)}::jsonb,${expiresAt})
@@ -388,35 +537,48 @@ export class PostgresClientCatalogRepository
       return Promise.reject(new Error("client_catalog_retention_invalid"));
     }
     return this.db.transaction(async (tx: Transaction) => {
-      const candidates = (await tx.execute<{
-        requestId: string;
-        outboxId: string;
-        status: string;
-      }>(sql`
-        select r.id as "requestId",o.id as "outboxId",o.status
+      const candidates = (
+        await tx.execute<{
+          requestId: string;
+          outboxId: string;
+        }>(sql`
+        select r.id as "requestId",o.id as "outboxId"
         from client_catalog_requests r
         join integration_outbox o
           on o.idempotency_key='client-catalog:' || r.id::text
           and o.topic='catalog.show'
         where r.expires_at <= clock_timestamp()
         order by r.expires_at,r.id
-        for update of o skip locked
         limit ${input.limit}
-      `)).rows;
+      `)
+      ).rows;
       let examined = 0;
       let expiryExamined = 0;
       let expired = 0;
       let removed = 0;
 
       for (const candidate of candidates) {
-        const request = (await tx.execute<{
-          expiresAt: Date | string;
-        }>(sql`
+        await lockCatalogChoices(tx, candidate.requestId);
+        const claimedOutbox = (
+          await tx.execute<{ status: string }>(sql`
+            select status from integration_outbox
+            where id=${candidate.outboxId}::uuid
+              and idempotency_key='client-catalog:' || ${candidate.requestId}::uuid::text
+              and topic='catalog.show'
+            for update skip locked
+          `)
+        ).rows[0];
+        if (claimedOutbox === undefined) continue;
+        const request = (
+          await tx.execute<{
+            expiresAt: Date | string;
+          }>(sql`
           select expires_at as "expiresAt"
           from client_catalog_requests
           where id=${candidate.requestId}::uuid
           for update skip locked
-        `)).rows[0];
+        `)
+        ).rows[0];
         if (request === undefined) continue;
         examined += 1;
         expiryExamined += 1;
@@ -434,7 +596,7 @@ export class PostgresClientCatalogRepository
           where id=${candidate.requestId}::uuid
         `);
         expired += 1;
-        if (terminalOutboxStatus(candidate.status)) {
+        if (terminalOutboxStatus(claimedOutbox.status)) {
           await deleteCatalogOutbox(tx, candidate.outboxId);
           await tx.execute(sql`
             delete from client_catalog_tombstones
@@ -450,10 +612,11 @@ export class PostgresClientCatalogRepository
 
       let remaining = input.limit - expiryExamined;
       if (remaining > 0) {
-        const orphanRequests = (await tx.execute<{
-          requestId: string;
-          expiresAt: Date | string;
-        }>(sql`
+        const orphanRequests = (
+          await tx.execute<{
+            requestId: string;
+            expiresAt: Date | string;
+          }>(sql`
           select r.id as "requestId",r.expires_at as "expiresAt"
           from client_catalog_requests r
           where r.expires_at <= clock_timestamp()
@@ -463,10 +626,20 @@ export class PostgresClientCatalogRepository
                 and o.topic='catalog.show'
             )
           order by r.expires_at,r.id
-          for update of r skip locked
           limit ${remaining}
-        `)).rows;
+        `)
+        ).rows;
         for (const request of orphanRequests) {
+          await lockCatalogChoices(tx, request.requestId);
+          const claimed = (
+            await tx.execute<{ requestId: string }>(sql`
+              select id as "requestId" from client_catalog_requests
+              where id=${request.requestId}::uuid
+                and expires_at<=clock_timestamp()
+              for update skip locked
+            `)
+          ).rows[0];
+          if (claimed === undefined) continue;
           await tx.execute(sql`
             insert into client_catalog_tombstones (request_id,expires_at,state)
             values (${request.requestId}::uuid,${request.expiresAt},'expired')
@@ -483,10 +656,11 @@ export class PostgresClientCatalogRepository
       }
 
       {
-        const terminalTombstones = (await tx.execute<{
-          requestId: string;
-          outboxId: string;
-        }>(sql`
+        const terminalTombstones = (
+          await tx.execute<{
+            requestId: string;
+            outboxId: string;
+          }>(sql`
           select t.request_id as "requestId",o.id as "outboxId"
           from client_catalog_tombstones t
           join integration_outbox o
@@ -496,7 +670,8 @@ export class PostgresClientCatalogRepository
           order by t.expires_at,t.request_id
           for update of o skip locked
           limit ${input.limit}
-        `)).rows;
+        `)
+        ).rows;
         for (const tombstone of terminalTombstones) {
           await deleteCatalogOutbox(tx, tombstone.outboxId);
           await tx.execute(sql`
@@ -512,9 +687,10 @@ export class PostgresClientCatalogRepository
         }
       }
 
-      const orphanTombstones = (await tx.execute<{
-        requestId: string;
-      }>(sql`
+      const orphanTombstones = (
+        await tx.execute<{
+          requestId: string;
+        }>(sql`
         select t.request_id as "requestId"
         from client_catalog_tombstones t
         where not exists (
@@ -525,7 +701,8 @@ export class PostgresClientCatalogRepository
         order by t.expires_at,t.request_id
         for update of t skip locked
         limit ${input.limit}
-      `)).rows;
+      `)
+      ).rows;
       for (const tombstone of orphanTombstones) {
         await tx.execute(sql`
           delete from client_catalog_tombstones
@@ -540,10 +717,11 @@ export class PostgresClientCatalogRepository
       }
 
       {
-        const orphans = (await tx.execute<{
-          outboxId: string;
-          idempotencyKey: string;
-        }>(sql`
+        const orphans = (
+          await tx.execute<{
+            outboxId: string;
+            idempotencyKey: string;
+          }>(sql`
           select o.id as "outboxId",o.idempotency_key as "idempotencyKey"
           from integration_outbox o
           where o.topic='catalog.show'
@@ -560,7 +738,8 @@ export class PostgresClientCatalogRepository
           order by o.updated_at,o.id
           for update skip locked
           limit ${input.limit}
-        `)).rows;
+        `)
+        ).rows;
         for (const orphan of orphans) {
           await deleteCatalogOutbox(tx, orphan.outboxId);
           await tx.execute(sql`
