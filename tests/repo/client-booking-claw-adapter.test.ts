@@ -17,5 +17,13 @@ describe("immutable client booking Claw adapter", () => {
       "packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1",
     );
     expect(runner).not.toMatch(/CLIENT_BOOKING_MANIFEST|BOOKING_TEST_FILES/u);
+
+    const assertion = readFileSync(
+      "scripts/assert-client-booking-postgres.mjs",
+      "utf8",
+    );
+    expect(assertion).toContain('version !== "160015"');
+    expect(assertion).toContain("client_booking_postgres_version=160015");
+    expect(assertion).not.toMatch(/console\.log\([^)]*(?:URL|connection)/iu);
   });
 });
