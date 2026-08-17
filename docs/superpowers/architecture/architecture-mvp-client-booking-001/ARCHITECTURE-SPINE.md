@@ -150,8 +150,9 @@ reservation mutation path; provider adapters remain disabled outer capabilities.
   being treated as live authorization.
 - **Rule:** Allocate the migration after principal at implementation time, close independent
   Critical/Important findings, add and review an immutable `run-claw-ci.sh client-booking` mode,
-  then run it once at an exact clean SHA against credential-redacted external PostgreSQL 17.5. The
-  mode accepts no test selection and records target version, counts, checksums and cleanup. Product,
+  then run it once at an exact clean SHA against credential-redacted external test PostgreSQL
+  16.0.15 (`160015`). The mode accepts no test selection and records target version, counts,
+  checksums and cleanup. Product,
   Security, and deployment approvals remain separate.
 
 ## Consistency Conventions

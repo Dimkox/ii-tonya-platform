@@ -13,7 +13,7 @@ Status: specified and planned; not implemented, tested, activated, deployed, or 
 | CBK-012 | existing audit/outbox path, disabled adapters | exact topic/count/hash facts; four booking topics absent from export/registry/claim/reconcile; zero provider adapter/attempt | Provider owners; flags remain false |
 | CBK-013/014 | fenced durable two-phase erasure, export/redaction, fixed metrics/cache/time | lease/crash/partial/dead-letter races; retained handles; exact label keys/enums, no-store and UTC grammar | Privacy/Observability; no handle labels |
 | CBK-015 | migration journal at implementation start | exact merged principal SHA and next actual journal entry | DB; forward-only migration |
-| CBK-016 | focused TDD, independent review, immutable Claw/PG17.5 adapter | no successful suite repeat; exact SHA/version/counts/cleanup/repeat limit | Verification; failed gate terminal |
+| CBK-016 | focused TDD, independent review, immutable Claw/PostgreSQL 16.0.15 (`160015`) adapter | no successful suite repeat; exact SHA/version/counts/cleanup/repeat limit | Verification; failed gate terminal |
 | CBK-017/018 | reserve kill switch, runbook and approval ledger | rollback drill; named Product/Security/deployment decisions | Operations; new reserve off before route off |
 
 ## Upstream and downstream links

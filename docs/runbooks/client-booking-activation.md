@@ -23,7 +23,7 @@ Status: **BLOCKED**. This note is evidence metadata, not activation or deploymen
 | Transaction safety | Booking/DB | real-PG concurrency, lock-order, reserve/retention/erasure and cancel/expiry/expert race evidence | not executed; blocked |
 | Privacy | Privacy/Security | fenced booking-local phase, lease/crash/dead-letter recovery, retained handles, and identifier absence | not executed; blocked |
 | Interface review | Independent reviewer | zero unresolved Critical/Important findings with file/line evidence | PASS for docs: 0 Critical/0 Important; not Security activation approval |
-| Focused gate | Verification | one immutable `client-booking` Claw invocation, exact clean SHA, external PostgreSQL 17.5 assertion, counts/cleanup, `repeat_limit: 1` | not run; blocked |
+| Focused gate | Verification | one immutable `client-booking` Claw invocation, exact clean SHA, external PostgreSQL 16.0.15 (`160015`) assertion, counts/cleanup, `repeat_limit: 1` | not run; blocked |
 | Provider activation | Provider owners | authenticated Planerka and Telegram contracts, credentials, staging/reconciliation evidence | explicitly outside slice; blocked |
 | Deployment | Deployment owner | separate target authorization and immutable release/rollback evidence | absent; blocked |
 
@@ -36,8 +36,8 @@ Status: **BLOCKED**. This note is evidence metadata, not activation or deploymen
    permanently after its first success; successful suites are not rerun.
 4. Obtain independent interface/security review and close every Critical and Important finding.
 5. Run exactly one `run-claw-ci.sh client-booking` invocation at the reviewed clean SHA with the
-   approved external PostgreSQL variable. The adapter asserts version 17.5 without printing the
-   URL. A pass ends the gate; a failure is terminal evidence without a second run.
+   approved external PostgreSQL variable. The adapter asserts version 16.0.15 (`160015`) without
+   printing the URL. A pass ends the gate; a failure is terminal evidence without a second run.
 6. Record named Security approval for the live write-authority source. Keep provider flags false.
 7. Obtain separate deployment authorization before any target mutation.
 

@@ -10,9 +10,8 @@ and protected local slot mappings. A client booking application boundary derives
 extends BookingService/PostgresBookingRepository so receipt, reservation, audit and outbox commit
 atomically. Owner cancellation uses an opaque public booking handle and the existing transition.
 
-**Tech Stack:** Node.js 24, TypeScript, Fastify, Drizzle, pnpm 11.9.0, Vitest; the ordinary
-integration fallback is PostgreSQL 16, while the only qualifying terminal gate requires and
-asserts the production-Compose target PostgreSQL 17.5.
+**Tech Stack:** Node.js 24, TypeScript, Fastify, Drizzle, pnpm 11.9.0, Vitest; the qualifying
+terminal gate uses the single test PostgreSQL 16.0.15 target (`server_version_num = 160015`).
 
 ## Global Constraints
 
@@ -31,9 +30,9 @@ asserts the production-Compose target PostgreSQL 17.5.
   do not create a parallel booking authority.
 - A focused suite stops after its first PASS and is not rerun. Run exactly one integrated focused
   Claw/real-PostgreSQL invocation for the complete slice after review; failure is terminal.
-- PostgreSQL 16 fallback runs are compatibility/development evidence only. The terminal adapter
-  requires an approved external PostgreSQL URL, asserts `server_version_num = 170005` before the
-  manifest, never prints the URL, and records the sanitized version result.
+- The terminal adapter requires an approved external PostgreSQL URL, asserts the actual test
+  PostgreSQL 16.0.15 target `server_version_num = 160015` before the manifest, never prints the
+  URL, and records the sanitized version result.
 - Product approves the HTTP/public-state contract. Security separately approves live
   `client_booking:write`. Deployment requires a third explicit authorization.
 
@@ -57,8 +56,8 @@ asserts the production-Compose target PostgreSQL 17.5.
 | `packages/worker/src/data-retention.ts` | catalog-choice expiry cleanup without reservation loss |
 | `packages/worker/src/client-booking-erasure.ts` | leased local cancellation-before-cleanup privacy phase |
 | `packages/contracts/src/worker-outbox.ts`, `apps/worker/src/main.ts` | booking topics remain unclaimable and undispatchable |
-| `scripts/run-claw-ci.sh` | reviewed immutable `client-booking` mode, exact manifest and PG 17.5 preflight |
-| `scripts/assert-client-booking-postgres.mjs` | credential-redacted `server_version_num = 170005` preflight |
+| `scripts/run-claw-ci.sh` | reviewed immutable `client-booking` mode, exact manifest and PostgreSQL 16.0.15 preflight |
+| `scripts/assert-client-booking-postgres.mjs` | credential-redacted `server_version_num = 160015` preflight |
 | `packages/observability/src/metrics.ts`, `packages/observability/src/logger.ts` | fixed labels and handle redaction |
 
 ### Task 1: Rebase prerequisite and add protected relations
@@ -408,7 +407,7 @@ pnpm exec vitest run apps/api/src/client-booking-principal-resolver.test.ts apps
   literal `client-booking` mode; it accepts no manifest argument, reuses the pinned-image/host/SHA
   checks, requires a fully clean source including untracked files, requires and forwards the
   already-provisioned `II_TONYA_TEST_POSTGRES_ADMIN_URL` without printing it, and runs
-  the fixed `assert-client-booking-postgres.mjs` first to assert `server_version_num = 170005`
+  the fixed `assert-client-booking-postgres.mjs` first to assert `server_version_num = 160015`
   through `pg` with credential-redacted failures. It builds once, then launches one Vitest process
   over the exact Task 5 manifest with `--maxWorkers=1`.
   Evidence records only SHA, image ID, PostgreSQL version, test/file counts, timings, checksums,

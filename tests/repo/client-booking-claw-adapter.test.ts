@@ -25,5 +25,21 @@ describe("immutable client booking Claw adapter", () => {
     expect(assertion).toContain('version !== "160015"');
     expect(assertion).toContain("client_booking_postgres_version=160015");
     expect(assertion).not.toMatch(/console\.log\([^)]*(?:URL|connection)/iu);
+
+    for (const documentPath of [
+      "docs/spec/mvp-client-booking-001.md",
+      "docs/spec/mvp-client-booking-001-traceability.md",
+      "docs/superpowers/plans/2026-08-14-mvp-client-booking-001.md",
+      "docs/runbooks/client-booking-activation.md",
+      "docs/superpowers/architecture/architecture-mvp-client-booking-001/ARCHITECTURE-SPINE.md",
+    ]) {
+      const document = readFileSync(documentPath, "utf8");
+      expect(document).toMatch(/PostgreSQL\s+16\.0\.15/u);
+      expect(document).not.toContain("170005");
+    }
+
+    const progress = readFileSync("docs/spec/mvp-client-booking-001-progress.md", "utf8");
+    expect(progress).toContain("160015");
+    expect(progress).toContain("not a Claw gate result");
   });
 });

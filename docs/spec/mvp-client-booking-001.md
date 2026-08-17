@@ -137,9 +137,9 @@ Security approval and a separate target deployment authorization.
   After independent interface/security review closes every Critical and Important finding, run
   exactly one integrated focused Claw invocation through the versioned immutable
   `run-claw-ci.sh client-booking` mode at an exact clean SHA. The mode accepts no mutable manifest,
-  requires an approved external PostgreSQL URL, and asserts target `server_version_num = 170005`
-  without logging credentials before its one fixed Vitest process. PostgreSQL 16 fallback runs are
-  development compatibility only. A pass ends the gate; a failure is retained as terminal evidence
+  requires an approved external PostgreSQL URL, and asserts the single test PostgreSQL 16.0.15
+  target `server_version_num = 160015` without logging credentials before its one fixed Vitest
+  process. A pass ends the gate; a failure is retained as terminal evidence
   and blocks the slice without a second invocation under `MVP-CLIENT-BOOKING-001`.
 - **CBK-017 — Rollback without stranding cancellation.** Rollback first sets
   `CLIENT_BOOKING_RESERVE_ENABLED=false` to reject new reserves while leaving authenticated owner
@@ -167,7 +167,7 @@ Security approval and a separate target deployment authorization.
 | CBK-AC-09 | `reserved_until` uses database time, 24-hour lead, 15-minute freshness, and the configured 60-minute confirmation buffer. |
 | CBK-AC-10 | HTTP, logs, traces, metrics, exports, errors, and evidence contain no internal ID, handle sentinel, provider/contact/payment data, or caller authority field. |
 | CBK-AC-11 | Side-effect counts show booking audit/outbox only, zero ledger/payment/provider attempts, and both live Planerka and Telegram delivery disabled. |
-| CBK-AC-12 | Review records zero unresolved Critical/Important findings and exactly one immutable-mode Claw invocation with exact SHA, PostgreSQL 17.5 assertion, counts, cleanup, and `repeat_limit: 1`. |
+| CBK-AC-12 | Review records zero unresolved Critical/Important findings and exactly one immutable-mode Claw invocation with exact SHA, PostgreSQL 16.0.15 (`160015`) assertion, counts, cleanup, and `repeat_limit: 1`. |
 
 ## Non-goals and blockers
 
