@@ -1,9 +1,8 @@
 # MVP-CLIENT-CONVERSATION-001 — Canonical Specification
 
 Status: docs approved for implementation planning after independent review (0 Critical, 0
-Important, 0 Minor). Implementation and live activation remain blocked. Exact base:
-`dad7e3a867e0ee4e262c5da28fd7a1f7c03449b9`.
-Newest booking worktree input inspected read-only at `e5efdb23a8bd80119aa2a28a533949d8a399d99a`.
+Important, 0 Minor). Implementation and live activation remain blocked. Exact implementation base:
+`141fd0229816723b137663816b2dc1773934f13f` (merged protected booking, PR #29).
 
 ## Objective, actors, owners, and approvals
 
@@ -111,7 +110,7 @@ are separate live gates.
   cleanup. No prefix is reserved and no other schema is authorized.
 - **CCV-018 — Development and one release gate.** Development may repeat focused/property/race
   tests without invoking Claw/PG. After zero unresolved Critical/Important findings, run one total
-  immutable `client-conversation` Claw/PG17.5 release-evidence invocation for the reviewed SHA and
+  immutable `client-conversation` Claw/PostgreSQL 16.15 release-evidence invocation for the reviewed SHA and
   identity. Pass ends the gate; failure is preserved and blocks this story. A successor run needs
   new SHA, delta review and explicit new verification identity/authorization, never silent rerun.
 - **CCV-019 — Activation remains NO-GO.** Live requires immutable provider auth/payload/rate/
@@ -121,20 +120,20 @@ are separate live gates.
 
 ## Acceptance criteria
 
-| ID | Acceptance |
-| --- | --- |
-| CCV-AC-01 | All defaults create no route/job/provider/AI/network; invalid matrices fail before migration/listen. |
-| CCV-AC-02 | Duplicate/folded headers, HTTP/2/proxy ambiguity and hostile capability shapes fail before authentication/resolution; raw ordered HTTP/1.1 vectors pass only in the fixture. |
-| CCV-AC-03 | Exact tenant/user/thread/event/message/payload vectors avoid cross-tenant/thread collisions; only version 1 parses. |
-| CCV-AC-04 | Active exact binding resolves; inbound UUID, channel identity, wrong tenant, inactive/erased binding and outage never become authority. |
+| ID        | Acceptance                                                                                                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CCV-AC-01 | All defaults create no route/job/provider/AI/network; invalid matrices fail before migration/listen.                                                                                                   |
+| CCV-AC-02 | Duplicate/folded headers, HTTP/2/proxy ambiguity and hostile capability shapes fail before authentication/resolution; raw ordered HTTP/1.1 vectors pass only in the fixture.                           |
+| CCV-AC-03 | Exact tenant/user/thread/event/message/payload vectors avoid cross-tenant/thread collisions; only version 1 parses.                                                                                    |
+| CCV-AC-04 | Active exact binding resolves; inbound UUID, channel identity, wrong tenant, inactive/erased binding and outage never become authority.                                                                |
 | CCV-AC-05 | Runtime claim forgeries fail; catalog cannot book; real-PG races prove lifecycle commit-winner, no deadlock, and identical ordinary/conversation prelock keys including booking `choice:choiceDigest`. |
-| CCV-AC-06 | Three same event/hash deliveries create one message/accounting/operation; changed hash is conflict; concurrent different proposals produce one frozen winner. |
-| CCV-AC-07 | Crash tests before freeze, after freeze, after downstream commit and after receipt resume one exact effect; nondeterministic second inference cannot change the frozen operation. |
-| CCV-AC-08 | Catalog and protected booking gateways receive only matching runtime-authenticated claims and exact frozen input; zero structural principal/direct repository/financial/provider authority crosses. |
-| CCV-AC-09 | Leases/fencing/unknown reconciliation/dead-letter counts are deterministic; exact AEAD hostile vectors pass; the operation job is absent from outbox registry and providers record zero attempts. |
-| CCV-AC-10 | Lifecycle races serialize; expiry transaction writes `privacy_expired`, invalidates stale claims, creates one case/receipt, clears crypto, and logs/exports/evidence contain no forbidden sentinels. |
-| CCV-AC-11 | Mandatory AI regression/diff/named signoff artifacts exist before implementation completion/nonfixture engine. |
-| CCV-AC-12 | Closure review has zero Critical/Important and one total immutable release gate records exact SHA/identity, PG17.5, counts, cleanup and no credentials. |
+| CCV-AC-06 | Three same event/hash deliveries create one message/accounting/operation; changed hash is conflict; concurrent different proposals produce one frozen winner.                                          |
+| CCV-AC-07 | Crash tests before freeze, after freeze, after downstream commit and after receipt resume one exact effect; nondeterministic second inference cannot change the frozen operation.                      |
+| CCV-AC-08 | Catalog and protected booking gateways receive only matching runtime-authenticated claims and exact frozen input; zero structural principal/direct repository/financial/provider authority crosses.    |
+| CCV-AC-09 | Leases/fencing/unknown reconciliation/dead-letter counts are deterministic; exact AEAD hostile vectors pass; the operation job is absent from outbox registry and providers record zero attempts.      |
+| CCV-AC-10 | Lifecycle races serialize; expiry transaction writes `privacy_expired`, invalidates stale claims, creates one case/receipt, clears crypto, and logs/exports/evidence contain no forbidden sentinels.   |
+| CCV-AC-11 | Mandatory AI regression/diff/named signoff artifacts exist before implementation completion/nonfixture engine.                                                                                         |
+| CCV-AC-12 | Closure review has zero Critical/Important and one total immutable release gate records exact SHA/identity, PostgreSQL 16.15, counts, cleanup and no credentials.                                      |
 
 ## Non-goals and blockers
 
