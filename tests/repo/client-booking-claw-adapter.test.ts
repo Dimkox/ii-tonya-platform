@@ -34,6 +34,7 @@ describe("immutable client booking Claw adapter", () => {
       "docs/superpowers/architecture/architecture-mvp-client-booking-001/ARCHITECTURE-SPINE.md",
       "docs/superpowers/architecture/architecture-mvp-client-booking-001/.memlog.md",
       "_bmad-output/specs/spec-mvp-client-booking-001/SPEC.md",
+      "_bmad-output/specs/spec-mvp-client-booking-001/.memlog.md",
     ]) {
       const document = readFileSync(documentPath, "utf8");
       expect(document).toMatch(/PostgreSQL\s+16\.0\.15/u);
