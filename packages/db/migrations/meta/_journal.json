@@ -225,6 +225,13 @@
       "when": 1786708800000,
       "tag": "0031_client_booking_references",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787011200000,
+      "tag": "0032_client_conversation",
+      "breakpoints": true
     }
   ]
 }

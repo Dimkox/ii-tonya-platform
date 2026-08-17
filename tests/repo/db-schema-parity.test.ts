@@ -14,6 +14,10 @@ import {
   adminSessions,
   channelIdentities,
   clientIdentityProofReceipts,
+  clientConversationGrants,
+  clientConversationOperationCases,
+  clientConversationOperations,
+  clientConversationRuntimeLeases,
   clientProfiles,
   clientSessions,
   experts,
@@ -51,6 +55,42 @@ const names = (table: AnyPgTable) => {
 };
 
 describe("authoritative Drizzle schema parity", () => {
+  it("exports the durable client conversation relations and their named invariants", () => {
+    expect(names(clientConversationGrants)).toMatchObject({
+      checks: [
+        "client_conversation_grants_expiry_check",
+        "client_conversation_grants_revocation_check",
+        "client_conversation_grants_scope_check",
+      ],
+      indexes: ["client_conversation_grants_mapping_scope_lookup_idx"],
+      uniques: ["client_conversation_grants_mapping_scope_unique"],
+    });
+    expect(names(clientConversationOperations)).toMatchObject({
+      checks: expect.arrayContaining([
+        "client_conversation_operations_crypto_check",
+        "client_conversation_operations_lease_check",
+        "client_conversation_operations_tool_scope_check",
+      ]),
+      indexes: [
+        "client_conversation_operations_dispatch_idx",
+        "client_conversation_operations_expiry_idx",
+      ],
+      uniques: [
+        "client_conversation_operations_message_event_unique",
+        "client_conversation_operations_nonce_unique",
+      ],
+    });
+    expect(names(clientConversationRuntimeLeases).checks).toEqual([
+      "client_conversation_runtime_leases_capability_check",
+      "client_conversation_runtime_leases_contract_check",
+      "client_conversation_runtime_leases_duration_check",
+      "client_conversation_runtime_leases_sha_check",
+    ]);
+    expect(names(clientConversationOperationCases).checks).toEqual([
+      "client_conversation_operation_cases_kind_check",
+      "client_conversation_operation_cases_reason_check",
+    ]);
+  });
   it("describes the operator case inbox invariants", () => {
     expect(names(outboxOperatorAlerts)).toMatchObject({
       checks: [
@@ -583,23 +623,23 @@ describe("authoritative Drizzle schema parity", () => {
     );
   });
 
-  it("keeps the principal migration directly before client booking", () => {
+  it("keeps the principal and protected booking migrations directly before client conversation", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    const principal = journal.entries.at(-2);
+    const principal = journal.entries.at(-3);
     expect(principal).toMatchObject({
       idx: 30,
       tag: "0030_client_sessions",
     });
-    expect(principal?.when).toBeGreaterThan(journal.entries.at(-3)?.when ?? 0);
+    expect(principal?.when).toBeGreaterThan(journal.entries.at(-4)?.when ?? 0);
   });
 
   it("registers the protected client booking relations as migration 0031", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries.at(-2)).toMatchObject({
       idx: 31,
       tag: "0031_client_booking_references",
     });
@@ -613,6 +653,21 @@ describe("authoritative Drizzle schema parity", () => {
     ]) {
       expect(dbSchema, exportName).toHaveProperty(exportName);
     }
+  });
+
+  it("registers client conversation as the next actual post-booking migration", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as {
+      entries: Array<{ idx: number; tag: string }>;
+    };
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 32,
+      tag: "0032_client_conversation",
+    });
+    expect(
+      existsSync("packages/db/migrations/0032_client_conversation.sql"),
+    ).toBe(true);
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

@@ -11,13 +11,13 @@ operation claim; the matching catalog/booking transaction locks and freshly rech
 grant before mutation. Catalog/booking remain authoritative; provider, payment, LLM and outbound
 delivery remain disabled.
 
-**Tech Stack:** Node.js 24, TypeScript 5.8, Fastify 5.5, Drizzle ORM 0.45, PostgreSQL 17.5,
+**Tech Stack:** Node.js 24, TypeScript 5.8, Fastify 5.5, Drizzle ORM 0.45, PostgreSQL 16.15,
 Vitest, pnpm 11.9.0.
 
 ## Global Constraints
 
-- Implement only after merged/reviewed-equivalent booking input `e5efdb23a8bd80119aa2a28a533949d8a399d99a`;
-  it currently contains protected service/repository code and migration 0031 but is unmerged here.
+- Implement only after the protected-booking merge `141fd0229816723b137663816b2dc1773934f13f`
+  (PR #29), including migration `0031_client_booking_references.sql`.
 - Preserve CCV-001–019, architecture AD-1–8 and the exact v2 contract.
 - All conversation/tool/Selarti/LLM/provider/billing flags default false/disabled.
 - One migration is required, but its prefix is only the next actual journal entry after booking;
@@ -27,16 +27,16 @@ Vitest, pnpm 11.9.0.
 
 ## File Structure
 
-| Path | Responsibility |
-| --- | --- |
-| `packages/application/src/client-conversation-authority.ts` | opaque tokens plus private runtime-authenticated operation claim |
-| `packages/application/src/conversation-service.ts` | safety, strict proposal validation and atomic operation freeze request |
-| `packages/db/src/repositories/client-conversation-principal-repository.ts` | tenant/subject identity and shared lifecycle-lock facts |
-| `packages/db/src/repositories/client-conversation-operation-repository.ts` | claim/fence/reconcile/terminal/cleanup operations |
-| `apps/api/src/client-conversation-inbound.ts` | ordered raw-header capability/result parser |
-| `apps/api/src/routes/selarti-webhook.ts` | exact HTTP edge and state matrix without inbound UUID |
-| `apps/worker/src/client-conversation-operations.ts` | dedicated local operation job, not outbox registry |
-| `packages/contracts/src/worker-outbox.test.ts` | proves operation/provider topics are absent |
+| Path                                                                       | Responsibility                                                         |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `packages/application/src/client-conversation-authority.ts`                | opaque tokens plus private runtime-authenticated operation claim       |
+| `packages/application/src/conversation-service.ts`                         | safety, strict proposal validation and atomic operation freeze request |
+| `packages/db/src/repositories/client-conversation-principal-repository.ts` | tenant/subject identity and shared lifecycle-lock facts                |
+| `packages/db/src/repositories/client-conversation-operation-repository.ts` | claim/fence/reconcile/terminal/cleanup operations                      |
+| `apps/api/src/client-conversation-inbound.ts`                              | ordered raw-header capability/result parser                            |
+| `apps/api/src/routes/selarti-webhook.ts`                                   | exact HTTP edge and state matrix without inbound UUID                  |
+| `apps/worker/src/client-conversation-operations.ts`                        | dedicated local operation job, not outbox registry                     |
+| `packages/contracts/src/worker-outbox.test.ts`                             | proves operation/provider topics are absent                            |
 
 ---
 
@@ -156,13 +156,13 @@ create table client_conversation_operation_cases (
 ```
 
 - [ ] **Step 1: Read the merged journal and record the next actual prefix in progress docs.** Abort
-  if booking is not merged or the journal conflicts; do not choose from this plan.
+      if booking is not merged or the journal conflicts; do not choose from this plan.
 - [ ] **Step 2: Write RED schema/parity tests.** Assert provider-literal token constraints,
-  `(tenant_token,subject_token,token_version)` lookup index, scope/state/check pairings, unique
-  message event, cascade grants, operation binding `SET NULL`, lease/fencing consistency, nonnegative
-  attempts, exact crypto envelope/nonce uniqueness, digest grammar, ciphertext expiry no later than
-  creation + 24h, runtime-lease compatibility and unique operator/deletion cases. Attempt every
-  forbidden row shape enumerated in contract section 5.2 with hostile SQL.
+      `(tenant_token,subject_token,token_version)` lookup index, scope/state/check pairings, unique
+      message event, cascade grants, operation binding `SET NULL`, lease/fencing consistency, nonnegative
+      attempts, exact crypto envelope/nonce uniqueness, digest grammar, ciphertext expiry no later than
+      creation + 24h, runtime-lease compatibility and unique operator/deletion cases. Attempt every
+      forbidden row shape enumerated in contract section 5.2 with hostile SQL.
 - [ ] **Step 3: Run `pnpm exec vitest run tests/integration/client-conversation-schema.test.ts tests/repo/db-schema-parity.test.ts` and confirm RED.**
 - [ ] **Step 4: Add the exact migration/schema and rerun the same focused command until GREEN.**
 - [ ] **Step 5: Commit.**
@@ -191,20 +191,24 @@ export interface ClientConversationIdentityResolver {
   resolveIdentity(input: {
     tenantToken: OpaqueConversationToken;
     subjectToken: OpaqueConversationToken;
-  }): Promise<{ kind: "resolved"; identity: ClientConversationIdentity } | { kind: "denied" } | { kind: "unavailable" }>;
+  }): Promise<
+    | { kind: "resolved"; identity: ClientConversationIdentity }
+    | { kind: "denied" }
+    | { kind: "unavailable" }
+  >;
 }
 ```
 
 - [ ] **Step 1: Write RED compile/runtime tests.** Prove tokens parse only fixture v1; identity
-  query matches provider+tenant+subject+version+active. Prove the private operation-claim
-  constructor/reader is not exported and plain JS, `as unknown as`, stolen UUID, cross-tool,
-  spread, clone and deserialized objects are rejected before DB/service invocation.
+      query matches provider+tenant+subject+version+active. Prove the private operation-claim
+      constructor/reader is not exported and plain JS, `as unknown as`, stolen UUID, cross-tool,
+      spread, clone and deserialized objects are rejected before DB/service invocation.
 - [ ] **Step 2: Run `pnpm exec vitest run packages/application/src/client-conversation-authority.test.ts tests/integration/client-conversation-authority.test.ts tests/repo/client-conversation-import-boundary.test.ts` and confirm RED.**
 - [ ] **Step 3: Implement DB raw-row facts and an application-only private claim class.** Register
-  genuine instances in a module-private `WeakSet` and verify both native private-field and WeakSet
-  provenance. The private reader exposes only operation/fence/tool/scope/frozen input to matching
-  gateways. Zero/multiple/corrupt identity rows are denied; database errors are unavailable; no
-  query reads `channel_identities` or creates/updates mappings/grants.
+      genuine instances in a module-private `WeakSet` and verify both native private-field and WeakSet
+      provenance. The private reader exposes only operation/fence/tool/scope/frozen input to matching
+      gateways. Zero/multiple/corrupt identity rows are denied; database errors are unavailable; no
+      query reads `channel_identities` or creates/updates mappings/grants.
 - [ ] **Step 4: Rerun the focused command until GREEN.**
 - [ ] **Step 5: Commit.**
 
@@ -227,7 +231,10 @@ git commit -m "feat: enforce runtime conversation operation claims"
 **Interfaces:**
 
 ```ts
-export interface RawHeaderOccurrence { readonly name: string; readonly value: string }
+export interface RawHeaderOccurrence {
+  readonly name: string;
+  readonly value: string;
+}
 export interface AuthenticatedConversationInboundCapability {
   authenticate(input: {
     rawBody: Uint8Array;
@@ -238,16 +245,16 @@ export interface AuthenticatedConversationInboundCapability {
 ```
 
 - [ ] **Step 1: Write RED vectors.** Cover rawHeaders order/mixed-case duplicates/comma fold,
-  HTTP/2/proxy denial, trustProxy false, source/IPv4-mapped-IPv6, 64,000/64,001 bytes, framing,
-  UTF-8, hostile exact-key result, v1-only token grammar, cross-tenant/user/thread event/message
-  collisions, exact payload digest, freshness and four rate buckets. Assert no `channelUserId` or
-  inbound `userId` reaches conversation.
+      HTTP/2/proxy denial, trustProxy false, source/IPv4-mapped-IPv6, 64,000/64,001 bytes, framing,
+      UTF-8, hostile exact-key result, v1-only token grammar, cross-tenant/user/thread event/message
+      collisions, exact payload digest, freshness and four rate buckets. Assert no `channelUserId` or
+      inbound `userId` reaches conversation.
 - [ ] **Step 2: Run `pnpm exec vitest run apps/api/src/client-conversation-inbound.test.ts apps/api/src/routes/selarti-webhook.test.ts tests/repo/runtime-fixture-boundary.test.ts packages/config/src/env.test.ts` and confirm RED.**
 - [ ] **Step 3: Implement raw occurrence extraction from `request.raw.rawHeaders`, exact parser/
-  digest, fixed state matrix and API-local preflight.** Route exposure and each tool freeze require
-  compatible `dispatch_v1` and `cleanup_v1` DB-time leases for the same exact build SHA; new or
-  pre-completion DB/lease failure is 503 with Retry-After 1. Post-freeze state is always no-store
-  202; changed digest is 409. Prove API startup alone never claims worker presence.
+      digest, fixed state matrix and API-local preflight.** Route exposure and each tool freeze require
+      compatible `dispatch_v1` and `cleanup_v1` DB-time leases for the same exact build SHA; new or
+      pre-completion DB/lease failure is 503 with Retry-After 1. Post-freeze state is always no-store
+      202; changed digest is 409. Prove API startup alone never claims worker presence.
 - [ ] **Step 4: Rerun the focused command until GREEN.**
 - [ ] **Step 5: Commit.**
 
@@ -276,18 +283,18 @@ type ClientConversationToolProposal =
 ```
 
 - [ ] **Step 1: Write RED tests.** Reject `expertId`, user/internal/provider/financial/URL/
-  idempotency fields and mixed keys. Cover same/different payload, ten concurrent deliveries with
-  different deterministic proposals, nondeterministic second inference, encryption failure and
-  crashes before/after completion commit. Cover AES-256-GCM v1 vectors, CSPRNG 96-bit nonce
-  collision, exact AAD/plaintext framing, row/metadata/ciphertext/tag swaps, normalized decrypt
-  failure, active/decrypt-only/retired/compromised keys and 24h+6m rotation. Assert one ledger/
-  audit/operation and zero tool calls.
+      idempotency fields and mixed keys. Cover same/different payload, ten concurrent deliveries with
+      different deterministic proposals, nondeterministic second inference, encryption failure and
+      crashes before/after completion commit. Cover AES-256-GCM v1 vectors, CSPRNG 96-bit nonce
+      collision, exact AAD/plaintext framing, row/metadata/ciphertext/tag swaps, normalized decrypt
+      failure, active/decrypt-only/retired/compromised keys and 24h+6m rotation. Assert one ledger/
+      audit/operation and zero tool calls.
 - [ ] **Step 2: Run `pnpm exec vitest run packages/application/src/conversation-service.test.ts tests/integration/client-conversation-freeze.test.ts` and confirm RED.**
 - [ ] **Step 3: Extend `completeInbound` so its existing serializable message/inbox row lock writes
-  the exact proposal digest, AES-256-GCM v1 envelope, 24h expiry and accounting together.** Use the
-  injected key-provider boundary, unique `(key_id,nonce)`, exact AAD and key lifecycle in contract
-  5.1; wipe explicit plaintext buffers in `finally`. Tool outcomes do not create integration-outbox
-  rows. Stored completion reads the operation row.
+      the exact proposal digest, AES-256-GCM v1 envelope, 24h expiry and accounting together.** Use the
+      injected key-provider boundary, unique `(key_id,nonce)`, exact AAD and key lifecycle in contract
+      5.1; wipe explicit plaintext buffers in `finally`. Tool outcomes do not create integration-outbox
+      rows. Stored completion reads the operation row.
 - [ ] **Step 4: Rerun the focused command until GREEN.**
 - [ ] **Step 5: Commit.**
 
@@ -315,13 +322,17 @@ git commit -m "feat: freeze conversation tools before mutation"
 
 ```ts
 export interface ConversationCatalogGateway {
-  request(claim: ClaimedConversationOperation): Promise<
+  request(
+    claim: ClaimedConversationOperation,
+  ): Promise<
     | { kind: "applied"; downstreamReceiptDigest: string }
     | { kind: "rejected"; code: "not_found" | "conflict" | "feature_disabled" }
   >;
 }
 export interface ConversationBookingGateway {
-  reserve(claim: ClaimedConversationOperation): Promise<
+  reserve(
+    claim: ClaimedConversationOperation,
+  ): Promise<
     | { kind: "applied"; downstreamReceiptDigest: string }
     | { kind: "rejected"; code: "not_found" | "conflict" | "feature_disabled" }
   >;
@@ -329,34 +340,34 @@ export interface ConversationBookingGateway {
 ```
 
 - [ ] **Step 1: Write RED job/race tests.** Cover claim/lease/fence, expired claim, wrong grant,
-  runtime claim forgeries, decrypt/digest mismatch, after-commit exception, unknown reconciliation
-  by exact replay, five-attempt dead letter, crash after receipt, and both commit orders for revoke,
-  user deactivation and mapping erasure immediately before/during catalog or booking commit. Assert
-  the lifecycle winner rule, one operator case, one deletion receipt, ciphertext clear, fenced
-  `privacy_expired` at 24h, stale-owner rejection, bounded transaction timeouts, and zero provider/
-  outbox-registry attempts.
+      runtime claim forgeries, decrypt/digest mismatch, after-commit exception, unknown reconciliation
+      by exact replay, five-attempt dead letter, crash after receipt, and both commit orders for revoke,
+      user deactivation and mapping erasure immediately before/during catalog or booking commit. Assert
+      the lifecycle winner rule, one operator case, one deletion receipt, ciphertext clear, fenced
+      `privacy_expired` at 24h, stale-owner rejection, bounded transaction timeouts, and zero provider/
+      outbox-registry attempts.
 - [ ] **Step 2: Run `pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts tests/integration/client-conversation-operation-races.test.ts packages/contracts/src/worker-outbox.test.ts` and confirm RED.**
 - [ ] **Step 3: Implement the bounded job and transaction seam.** Mint only a genuine private
-  operation claim. Refactor/reuse a repository-owned prelock helper—never reconstruct it—whose
-  current exact expressions are catalog `hashtextextended(userId || ':' || requestDigest,0)` and
-  booking `hashtextextended('choice:' || choiceDigest,0)`. Ordinary and conversation entries call
-  the same helper in the same transaction, then lock `users -> mapping -> exact
-  grant -> operation`, recheck all facts, and take remaining existing downstream locks. Lifecycle
-  paths start at `users` and never acquire a tool prelock afterward; missing ancestors are skipped,
-  never locked after operation. Never convert to `ClientPrincipal`; use a 2-second pre-call lock
-  timeout. Write under claim fence; post-call exception is unknown and
-  reconciliation replays only the frozen idempotent call. Run worker-local preflight, then publish
-  DB-time 30-second `dispatch_v1`/`cleanup_v1` leases every 10 seconds for exact contract/build.
+      operation claim. Refactor/reuse a repository-owned prelock helper—never reconstruct it—whose
+      current exact expressions are catalog `hashtextextended(userId || ':' || requestDigest,0)` and
+      booking `hashtextextended('choice:' || choiceDigest,0)`. Ordinary and conversation entries call
+      the same helper in the same transaction, then lock `users -> mapping -> exact
+grant -> operation`, recheck all facts, and take remaining existing downstream locks. Lifecycle
+      paths start at `users` and never acquire a tool prelock afterward; missing ancestors are skipped,
+      never locked after operation. Never convert to `ClientPrincipal`; use a 2-second pre-call lock
+      timeout. Write under claim fence; post-call exception is unknown and
+      reconciliation replays only the frozen idempotent call. Run worker-local preflight, then publish
+      DB-time 30-second `dispatch_v1`/`cleanup_v1` leases every 10 seconds for exact contract/build.
 - [ ] **Step 4: Implement expiry terminalization.** Cap all leases and DB statement/lock/idle
-  deadlines at payload expiry; require 30 seconds remaining before dispatch. Cleanup steals only an
-  expired lease, increments the fence, invalidates both claim tuples, writes `privacy_expired`/
-  `payload_expired`, clears every crypto field, and inserts unique sanitized operator/deletion rows
-  in one transaction. Legal hold cannot retain ciphertext.
+      deadlines at payload expiry; require 30 seconds remaining before dispatch. Cleanup steals only an
+      expired lease, increments the fence, invalidates both claim tuples, writes `privacy_expired`/
+      `payload_expired`, clears every crypto field, and inserts unique sanitized operator/deletion rows
+      in one transaction. Legal hold cannot retain ciphertext.
 - [ ] **Step 5: Rerun focused/property/concurrency diagnostics until stable GREEN.** No Claw/PG
-  release invocation occurs here. Include deadlock probes mixing ordinary catalog/protected-booking,
-  catalog choice cleanup, conversation and lifecycle calls at every advisory/row seam without
-  changing lock-key bytes. A blocking test must prove ordinary and conversation paths contend on
-  the identical PostgreSQL advisory key.
+      release invocation occurs here. Include deadlock probes mixing ordinary catalog/protected-booking,
+      catalog choice cleanup, conversation and lifecycle calls at every advisory/row seam without
+      changing lock-key bytes. A blocking test must prove ordinary and conversation paths contend on
+      the identical PostgreSQL advisory key.
 - [ ] **Step 6: Commit.**
 
 ```powershell
@@ -380,28 +391,29 @@ git commit -m "feat: run fenced client conversation operations"
   `docs/runbooks/client-conversation-activation.md`
 
 - [ ] **Step 1: Write/run focused privacy tests until GREEN.** Prove mapping deletion cascades
-  grants and nulls operation binding after winning the shared lock order; if a mutation wins it
-  commits first. Prove expiry increments the fence, terminalizes `privacy_expired`, clears every
-  crypto field and writes exactly one sanitized case/receipt; exports/logs/traces/metrics/errors
-  omit every sentinel. Record broader anonymization/backup receipt as live blockers.
+      grants and nulls operation binding after winning the shared lock order; if a mutation wins it
+      commits first. Prove expiry increments the fence, terminalizes `privacy_expired`, clears every
+      crypto field and writes exactly one sanitized case/receipt; exports/logs/traces/metrics/errors
+      omit every sentinel. Record broader anonymization/backup receipt as live blockers.
 - [ ] **Step 2: Record mandatory AI artifacts.** Run real-incident old/new schema regressions and
-  distribution diff against prior release; obtain named Product/Safety/Security spot-check. Until
-  all exist, keep implementation status blocked and permit deterministic fixtures only.
+      distribution diff against prior release; obtain named Product/Safety/Security spot-check. Until
+      all exist, keep implementation status blocked and permit deterministic fixtures only.
 - [ ] **Step 3: Add but do not run immutable `client-conversation` gate mode.** One fixed process
-  asserts clean SHA, `server_version_num=170005`, schema parity, counts, forbidden sentinels,
-  exact outbox topic set, zero providers, cleanup and invocation identity; it accepts no mutable
-  manifest and prints no DB URL/credential.
+      asserts clean SHA, `server_version_num=160015`, schema parity, counts, forbidden sentinels,
+      exact outbox topic set, zero providers, cleanup and invocation identity; it accepts no mutable
+      manifest and prints no DB URL/credential.
 - [ ] **Step 4: Obtain independent adversarial closure review.** Close every Critical/Important
-  finding and commit the reviewed clean implementation. Record exact SHA and invocation identity.
+      finding and commit the reviewed clean implementation. Record exact SHA and invocation identity.
 - [ ] **Step 5: Run one total release-evidence command:**
 
 Run: `bash scripts/run-claw-ci.sh client-conversation`
 
-Expected: one fixed process; PG 17.5; exact reviewed SHA/identity; zero forbidden/provider counts;
+Expected: one fixed process; PostgreSQL 16.15; exact reviewed SHA/identity; zero forbidden/provider counts;
 cleanup complete; exit 0. Pass ends the gate. Failure is preserved and blocks this story. A
 successor requires new SHA, delta review, new identity and explicit authorization.
+
 - [ ] **Step 6: Commit sanitized evidence locally only; do not push, merge, run Actions, deploy,
-  activate, mutate production/Claw, or sync Obsidian without a separate explicit command.**
+      activate, mutate production/Claw, or sync Obsidian without a separate explicit command.**
 
 ## Self-Review Record
 

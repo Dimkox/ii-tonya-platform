@@ -2,11 +2,15 @@ import { sql } from "drizzle-orm";
 import {
   check,
   char,
+  bigint,
+  customType,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -14,7 +18,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { messageEvents } from "./billing.js";
 import { slots } from "./catalog.js";
-import { users } from "./identity.js";
+import { providerSubjectMappings, users } from "./identity.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -25,6 +29,207 @@ const mutableTimestamps = {
     .notNull()
     .defaultNow(),
 };
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
+
+export const clientConversationGrants = pgTable(
+  "client_conversation_grants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerSubjectMappingId: uuid("provider_subject_mapping_id")
+      .notNull()
+      .references(() => providerSubjectMappings.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    unique("client_conversation_grants_mapping_scope_unique").on(
+      table.providerSubjectMappingId,
+      table.scope,
+    ),
+    check(
+      "client_conversation_grants_scope_check",
+      sql`${table.scope} in ('client_catalog:read','client_booking:write')`,
+    ),
+    check(
+      "client_conversation_grants_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    check(
+      "client_conversation_grants_revocation_check",
+      sql`${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt}`,
+    ),
+    index("client_conversation_grants_mapping_scope_lookup_idx").on(
+      table.providerSubjectMappingId,
+      table.scope,
+      table.expiresAt,
+    ),
+  ],
+);
+
+export const clientConversationOperations = pgTable(
+  "client_conversation_operations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    messageEventId: uuid("message_event_id")
+      .notNull()
+      .references(() => messageEvents.id, { onDelete: "cascade" }),
+    bindingId: uuid("binding_id").references(() => providerSubjectMappings.id, {
+      onDelete: "set null",
+    }),
+    requiredScope: text("required_scope").notNull(),
+    toolKind: text("tool_kind").notNull(),
+    proposalDigest: char("proposal_digest", { length: 64 }).notNull(),
+    payloadEnvelopeVersion: smallint("payload_envelope_version"),
+    payloadKeyId: text("payload_key_id"),
+    payloadNonce: bytea("payload_nonce"),
+    payloadCiphertext: bytea("payload_ciphertext"),
+    payloadTag: bytea("payload_tag"),
+    payloadExpiresAt: timestamp("payload_expires_at", {
+      withTimezone: true,
+    }).notNull(),
+    status: text("status").notNull(),
+    claimFence: bigint("claim_fence", { mode: "number" }).notNull().default(0),
+    claimOwnerId: text("claim_owner_id"),
+    claimToken: uuid("claim_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    reconciliationOwnerId: text("reconciliation_owner_id"),
+    reconciliationClaimToken: uuid("reconciliation_claim_token"),
+    reconciliationLeaseUntil: timestamp("reconciliation_lease_until", {
+      withTimezone: true,
+    }),
+    attempt: integer("attempt").notNull().default(0),
+    reconciliationAttempt: integer("reconciliation_attempt")
+      .notNull()
+      .default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    resultDigest: char("result_digest", { length: 64 }),
+    terminalReason: text("terminal_reason"),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("client_conversation_operations_message_event_unique").on(
+      table.messageEventId,
+    ),
+    unique("client_conversation_operations_nonce_unique").on(
+      table.payloadKeyId,
+      table.payloadNonce,
+    ),
+    check(
+      "client_conversation_operations_proposal_digest_check",
+      sql`${table.proposalDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_conversation_operations_result_digest_check",
+      sql`${table.resultDigest} is null or ${table.resultDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_conversation_operations_fence_check",
+      sql`${table.claimFence} >= 0 and ${table.attempt} between 0 and 5 and ${table.reconciliationAttempt} between 0 and 5`,
+    ),
+    check(
+      "client_conversation_operations_tool_scope_check",
+      sql`(${table.toolKind} = 'show_catalog' and ${table.requiredScope} = 'client_catalog:read') or (${table.toolKind} = 'start_booking' and ${table.requiredScope} = 'client_booking:write')`,
+    ),
+    check(
+      "client_conversation_operations_expiry_check",
+      sql`${table.payloadExpiresAt} > ${table.createdAt} and ${table.payloadExpiresAt} <= ${table.createdAt} + interval '24 hours' and ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+    check(
+      "client_conversation_operations_key_check",
+      sql`${table.payloadKeyId} is null or ${table.payloadKeyId} ~ '^[A-Za-z0-9_-]{1,32}$'`,
+    ),
+    check(
+      "client_conversation_operations_crypto_check",
+      sql`(${table.status} in ('pending','retry_wait','unknown_outcome','processing','reconciling') and ${table.payloadEnvelopeVersion} = 1 and ${table.payloadKeyId} is not null and octet_length(${table.payloadNonce}) = 12 and ${table.payloadCiphertext} is not null and octet_length(${table.payloadTag}) = 16) or (${table.status} in ('succeeded','denied','dead_letter','privacy_expired') and ${table.payloadEnvelopeVersion} is null and ${table.payloadKeyId} is null and ${table.payloadNonce} is null and ${table.payloadCiphertext} is null and ${table.payloadTag} is null)`,
+    ),
+    check(
+      "client_conversation_operations_lease_check",
+      sql`(${table.status} = 'processing' and ${table.claimOwnerId} is not null and ${table.claimToken} is not null and ${table.leaseUntil} is not null and ${table.leaseUntil} <= ${table.payloadExpiresAt} and ${table.reconciliationOwnerId} is null and ${table.reconciliationClaimToken} is null and ${table.reconciliationLeaseUntil} is null) or (${table.status} = 'reconciling' and ${table.reconciliationOwnerId} is not null and ${table.reconciliationClaimToken} is not null and ${table.reconciliationLeaseUntil} is not null and ${table.reconciliationLeaseUntil} <= ${table.payloadExpiresAt} and ${table.claimOwnerId} is null and ${table.claimToken} is null and ${table.leaseUntil} is null) or (${table.status} not in ('processing','reconciling') and ${table.claimOwnerId} is null and ${table.claimToken} is null and ${table.leaseUntil} is null and ${table.reconciliationOwnerId} is null and ${table.reconciliationClaimToken} is null and ${table.reconciliationLeaseUntil} is null)`,
+    ),
+    check(
+      "client_conversation_operations_retry_check",
+      sql`(${table.status} = 'retry_wait' and ${table.nextAttemptAt} is not null) or (${table.status} <> 'retry_wait' and ${table.nextAttemptAt} is null)`,
+    ),
+    check(
+      "client_conversation_operations_terminal_check",
+      sql`(${table.status} = 'succeeded' and ${table.resultDigest} is not null and ${table.terminalReason} is null) or (${table.status} = 'denied' and ${table.resultDigest} is null and ${table.terminalReason} = 'grant_denied') or (${table.status} = 'dead_letter' and ${table.resultDigest} is null and ${table.terminalReason} in ('invalid_operation','attempts_exhausted','crypto_invalid')) or (${table.status} = 'privacy_expired' and ${table.resultDigest} is null and ${table.terminalReason} = 'payload_expired') or (${table.status} in ('pending','processing','retry_wait','unknown_outcome','reconciling') and ${table.resultDigest} is null and ${table.terminalReason} is null)`,
+    ),
+    index("client_conversation_operations_dispatch_idx")
+      .on(table.status, table.nextAttemptAt, table.leaseUntil)
+      .where(
+        sql`${table.status} in ('pending','retry_wait','unknown_outcome','reconciling')`,
+      ),
+    index("client_conversation_operations_expiry_idx")
+      .on(table.payloadExpiresAt, table.id)
+      .where(
+        sql`${table.status} in ('pending','processing','retry_wait','unknown_outcome','reconciling')`,
+      ),
+  ],
+);
+
+export const clientConversationRuntimeLeases = pgTable(
+  "client_conversation_runtime_leases",
+  {
+    capability: text("capability").notNull(),
+    instanceId: text("instance_id").notNull(),
+    contractVersion: integer("contract_version").notNull(),
+    buildSha: char("build_sha", { length: 40 }).notNull(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }).notNull(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.capability, table.instanceId],
+      name: "client_conversation_runtime_leases_pkey",
+    }),
+    check(
+      "client_conversation_runtime_leases_capability_check",
+      sql`${table.capability} in ('dispatch_v1','cleanup_v1')`,
+    ),
+    check(
+      "client_conversation_runtime_leases_contract_check",
+      sql`${table.contractVersion} = 1`,
+    ),
+    check(
+      "client_conversation_runtime_leases_sha_check",
+      sql`${table.buildSha} ~ '^[0-9a-f]{40}$'`,
+    ),
+    check(
+      "client_conversation_runtime_leases_duration_check",
+      sql`${table.leaseUntil} > ${table.heartbeatAt} and ${table.leaseUntil} <= ${table.heartbeatAt} + interval '30 seconds'`,
+    ),
+  ],
+);
+
+export const clientConversationOperationCases = pgTable(
+  "client_conversation_operation_cases",
+  {
+    operationId: uuid("operation_id")
+      .notNull()
+      .references(() => clientConversationOperations.id, {
+        onDelete: "cascade",
+      }),
+    caseKind: text("case_kind").notNull(),
+    reason: text("reason").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("client_conversation_operation_cases_operation_kind_unique").on(
+      table.operationId,
+      table.caseKind,
+    ),
+    check(
+      "client_conversation_operation_cases_kind_check",
+      sql`${table.caseKind} in ('operator_case','deletion_receipt')`,
+    ),
+    check(
+      "client_conversation_operation_cases_reason_check",
+      sql`${table.reason} in ('grant_denied','invalid_operation','attempts_exhausted','payload_expired','crypto_invalid')`,
+    ),
+  ],
+);
 export const outboxStatus = pgEnum("outbox_status", [
   "pending",
   "processing",

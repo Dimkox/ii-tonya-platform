@@ -4,6 +4,7 @@ import {
   char,
   check,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -117,12 +118,24 @@ export const providerSubjectMappings = pgTable(
     provider: text("provider").notNull(),
     subjectToken: text("subject_token").notNull(),
     subjectCiphertext: text("subject_ciphertext").notNull(),
+    tenantToken: text("tenant_token"),
+    tokenVersion: integer("token_version"),
     ...mutableTimestamps,
   },
   (table) => [
     unique("provider_subject_mappings_provider_token_unique").on(
       table.provider,
       table.subjectToken,
+    ),
+    check(
+      "provider_subject_mappings_conversation_token_check",
+      sql`(${table.provider} = 'selarti.client-thread.v1' and ${table.tenantToken} ~ '^hmac-sha256:v1:[0-9a-f]{64}$' and ${table.tokenVersion} = 1) or (${table.provider} <> 'selarti.client-thread.v1' and ${table.tenantToken} is null and ${table.tokenVersion} is null)`,
+    ),
+    index("provider_subject_mappings_conversation_lookup_idx").on(
+      table.provider,
+      table.tenantToken,
+      table.subjectToken,
+      table.tokenVersion,
     ),
   ],
 );
