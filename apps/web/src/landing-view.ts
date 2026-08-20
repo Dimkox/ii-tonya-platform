@@ -44,5 +44,5 @@ export function renderLanding(config: PublicConfig): string {
       <section class="section faq" id="faq"><p class="section-index">05 / Вопросы</p><div class="section-heading"><h2>Коротко о главном</h2><p>Если ответа нет, ии-Тоня уточнит информацию в диалоге.</p></div><div class="faq-list">${faq}</div></section>
       <section class="section contact" id="contacts"><p class="contact-kicker">Готовы начать?</p><h2>Один диалог.<br>Следующий шаг — ваш.</h2><a class="button dark-button" data-messenger-action href="${href(config, "client")}">Написать ии-Тоне ↗</a></section>
     </main>
-    <footer id="legal"><a class="brand footer-brand" href="#top"><span>ии</span>Тоня</a><p>Информационный сервис по выбору экспертов и записи.</p><nav aria-label="Юридическая информация"><a href="/privacy.html">Политика конфиденциальности</a><a href="/offer.html">Публичная оферта</a></nav><p>© 2026 ии-Тоня</p></footer>`;
+    <footer id="legal"><a class="brand footer-brand" href="#top"><span>ии</span>Тоня</a><p>Информационный сервис по выбору экспертов и записи.</p><p>Юридическая информация предоставляется в диалоге.</p><p>© 2026 ии-Тоня</p></footer>`;
 }

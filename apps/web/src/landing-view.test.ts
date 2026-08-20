@@ -41,5 +41,6 @@ describe("promotional landing view", () => {
       /<form\b|<input\b|authorization|bearer|checkout|yookassa|payment|analytics|pixel/iu,
     );
     expect(html).not.toMatch(/on(?:click|submit|load)=/iu);
+    expect(html).not.toMatch(/href="\/(?:privacy|offer)\.html"/u);
   });
 });
