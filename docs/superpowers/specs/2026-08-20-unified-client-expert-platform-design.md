@@ -135,9 +135,10 @@ create a second Make/Google Sheets implementation beside the backend.
 - **UCP-WEB-02:** Public prices, expert counts, availability, and links are served
   from an approved published-content snapshot; no browser request receives admin
   or provider credentials.
-- **UCP-WEB-03:** Contact submission uses a narrow rate-limited API, explicit
-  consent, minimal retention, spam controls, audit correlation, and no analytics
-  tracker by default.
+- **UCP-WEB-03:** Every action button is a validated link to the configured
+  messenger entry. The landing has no sign-in, form submission, quote, checkout,
+  payment call, or financial status handling and uses no analytics tracker by
+  default.
 - **UCP-WEB-04:** SEO copy must remain factual. Placeholder legal details, social
   links, unsupported guarantees, and unapproved claims block publication.
 - **UCP-WEB-05:** The visual direction starts from the warm neutral palette in the
@@ -212,16 +213,14 @@ because it exists in the database.
 
 ## 9. Delivery slices
 
-1. **Landing and checkout entry (release blocker):** deliver the public landing,
-   approved tariff publication, authenticated expert entry, quote-to-checkout
-   handoff, return states, and sandbox payment proof first. No payment provider
-   can be considered usable until a human can reach and complete this path from
-   the landing.
+1. **Promotional landing (release blocker):** deliver the public information
+   catalogue, approved tariff/product copy, and validated messenger links first.
+   The landing is not part of authentication or payment execution.
 2. **Requirements and prompt baseline:** normalize the supplied material, add
    versioned client/expert prompts, proposal contracts, and regression fixtures.
-3. **Existing expert residency/referrals:** integrate the already merged ledgers,
-   APIs, Telegram/AI boundaries, sandbox provider, and YooKassa adapter into the
-   landing checkout without duplicating their domain or database implementation.
+3. **Existing expert residency/referrals:** keep the already merged ledgers, APIs,
+   Telegram/AI boundaries, sandbox provider, and YooKassa adapter outside the
+   landing. The messenger flow owns any later authenticated checkout.
 4. **Client coupons/referrals:** add versioned terms and append-only lifecycle with
    settlement/refund reconciliation.
 5. **Expert operations:** owner-scoped schedule, callbacks, reschedule, waitlist,

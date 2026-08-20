@@ -1,10 +1,10 @@
-# Landing and Checkout Entry Implementation Plan
+# Promotional Landing Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the public ии-Тоня landing as the first release slice and connect its expert conversion path to the existing authenticated residency checkout and YooKassa return flow.
+**Goal:** Ship the public ии-Тоня promotional landing as an information catalogue whose action buttons open the configured messenger.
 
-**Architecture:** Add a static-first Vite application under `apps/web`, deployed as its own unprivileged nginx image beside the API. The browser renders approved public content and sends expert purchase intent to a configurable Telegram handoff; all quotes, orders, sessions, receipts, and payment redirects remain in the existing authenticated backend. The `/payments/return` route displays a pending/reconciliation state and never treats a browser redirect as settlement evidence.
+**Architecture:** Add a static-first Vite application under `apps/web`, deployed as its own unprivileged nginx image beside the API. The browser renders approved public content and opens a configurable messenger link for every action. It contains no authentication, forms, quote, checkout, payment, receipt, webhook, reconciliation, or financial-status logic.
 
 **Tech Stack:** Node.js 24, pnpm 11.9.0, TypeScript strict mode, Vite 7, semantic HTML, CSS design tokens, Vitest, nginx unprivileged, Docker Compose, existing Fastify/PostgreSQL/YooKassa services.
 
@@ -14,7 +14,7 @@
 
 - PostgreSQL/backend remains authoritative; the browser cannot create ledger, booking, referral, or residency facts directly.
 - No provider credential, bearer token, client profile, receipt contact, or internal UUID is embedded in web assets, URLs, logs, or analytics.
-- Expert purchase starts through the authenticated assistant handoff; YooKassa settlement remains webhook/reconciliation-authoritative.
+- Products and tariffs are informational catalogue content only; subsequent messenger behaviour remains outside the landing.
 - Public tariff wording and legal claims are marked as subject to approved published content; placeholders block production release.
 - The site supports keyboard navigation, reduced motion, responsive layouts, and WCAG AA contrast.
 - Local concurrency is one focused run; 20x gates run only in CI.
@@ -27,8 +27,8 @@
 - `apps/web/index.html` — metadata and application mount point.
 - `apps/web/src/content.ts` — typed, reviewed public copy and tariff display data.
 - `apps/web/src/config.ts` — validates the public Telegram/chat URL and exposes no secrets.
-- `apps/web/src/checkout-handoff.ts` — builds an allowlisted purchase-intent link.
-- `apps/web/src/main.ts` — renders the landing and payment-return state.
+- `apps/web/src/messenger-link.ts` — builds an allowlisted messenger intent link.
+- `apps/web/src/main.ts` — renders the promotional landing.
 - `apps/web/src/styles.css` — warm design system, layout, accessibility, and responsive rules.
 - `apps/web/src/*.test.ts` — public-config, content, handoff, and rendered-source regression tests.
 - `apps/web/public/robots.txt` — crawler policy.
@@ -76,7 +76,7 @@ Expected: PASS and `apps/web/dist/index.html` exists.
 
 Commit: `feat(web): scaffold public landing application`
 
-### Task 2: Add reviewed content and safe checkout handoff
+### Task 2: Add reviewed content and safe messenger links
 
 **Files:**
 
@@ -84,12 +84,12 @@ Commit: `feat(web): scaffold public landing application`
 - Create: `apps/web/src/content.test.ts`
 - Create: `apps/web/src/config.ts`
 - Create: `apps/web/src/config.test.ts`
-- Create: `apps/web/src/checkout-handoff.ts`
-- Create: `apps/web/src/checkout-handoff.test.ts`
+- Create: `apps/web/src/messenger-link.ts`
+- Create: `apps/web/src/messenger-link.test.ts`
 
 **Interfaces:**
 
-- Produces: `landingContent`, `readPublicConfig(metaEnv)`, and `buildExpertHandoff(config, tariffCode)`.
+- Produces: `landingContent`, `readPublicConfig(metaEnv)`, and `buildMessengerLink(config, intent)`.
 - `PublicConfig = { expertChatUrl: URL }`.
 - `TariffCode = "base" | "exclusive" | "event"`.
 
@@ -99,7 +99,7 @@ Cover exact ии-Тоня spelling, prohibited sales/medical guarantees, missing
 
 - [ ] **Step 2: Run focused tests and confirm RED**
 
-Run: `pnpm exec vitest run apps/web/src/content.test.ts apps/web/src/config.test.ts apps/web/src/checkout-handoff.test.ts`
+Run: `pnpm exec vitest run apps/web/src/content.test.ts apps/web/src/config.test.ts apps/web/src/messenger-link.test.ts`
 Expected: FAIL because the modules do not exist.
 
 - [ ] **Step 3: Implement typed public content and URL policy**
@@ -113,7 +113,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
-Commit: `feat(web): add approved landing content and checkout handoff`
+Commit: `feat(web): add approved landing content and messenger links`
 
 ### Task 3: Build the complete responsive landing
 
@@ -127,11 +127,11 @@ Commit: `feat(web): add approved landing content and checkout handoff`
 **Interfaces:**
 
 - Consumes: `landingContent`, `readPublicConfig`, `buildExpertHandoff`.
-- Produces: sections `hero`, `about`, `clients`, `experts`, `tariffs`, `faq`, `contacts`, `legal`; keyboard-operable FAQ; tariff CTA links; `/payments/return` state.
+- Produces: sections `hero`, `about`, `clients`, `experts`, `tariffs`, `faq`, `contacts`, `legal`; keyboard-operable FAQ; messenger CTA links.
 
 - [ ] **Step 1: Write RED source/DOM-contract tests**
 
-Assert one `h1`, ordered heading levels, landmarks, skip link, labelled navigation, buttons/links with visible names, all eight sections, no inline event handlers, no remote tracker, and a return page that says payment is being verified rather than paid.
+Assert one `h1`, ordered heading levels, landmarks, skip link, labelled navigation, links with visible names, all eight sections, no inline event handlers, no form, no authentication UI, no payment code, and no remote tracker.
 
 - [ ] **Step 2: Run focused test and confirm RED**
 
@@ -189,31 +189,31 @@ Expected: PASS.
 
 Commit: `feat(deploy): package landing as hardened web service`
 
-### Task 5: Prove landing-to-payment behaviour
+### Task 5: Prove promotional landing behaviour
 
 **Files:**
 
-- Create: `tests/e2e/landing-checkout.test.ts`
+- Create: `tests/e2e/landing-promo.test.ts`
 - Create: `docs/test-evidence/landing/README.md`
 - Modify: `docs/spec/expert-residency-referrals-traceability.md`
 
 **Interfaces:**
 
-- Consumes: built web image, configured Telegram handoff, existing expert tariff/quote/checkout APIs, sandbox provider, YooKassa return URL.
-- Produces: sanitized evidence for landing response, handoff intent, sandbox checkout redirect, return-page pending state, webhook settlement, reconciliation, and cleanup.
+- Consumes: built web image and configured messenger link.
+- Produces: sanitized evidence for landing response, catalogue content, CTA intents, security headers, accessibility checks, and cleanup.
 
 - [ ] **Step 1: Add a failing end-to-end contract**
 
-Assert the public page returns 200, each tariff CTA carries only its allowed intent, the sandbox authenticated checkout returns a redirect, `/payments/return` never marks payment settled, and settlement becomes authoritative only after the provider event/reconciliation path.
+Assert the public page returns 200, each CTA carries only its allowed messenger intent, and the web bundle contains no API checkout, authorization, receipt, webhook, or payment-provider reference.
 
 - [ ] **Step 2: Run local non-container portion**
 
-Run: `pnpm build && pnpm exec vitest run apps/web tests/repo/release-assets.test.ts tests/e2e/landing-checkout.test.ts`.
-Expected: static and mocked boundary checks PASS; container-marked proof is reserved for Docker target.
+Run: `pnpm build && pnpm exec vitest run apps/web tests/repo/release-assets.test.ts tests/e2e/landing-promo.test.ts`.
+Expected: static and boundary checks PASS.
 
 - [ ] **Step 3: Run the Docker-capable gate**
 
-Push the exact branch SHA, run GitHub CI/Database Gate, then run one approved focused Claw landing+sandbox-payment gate. Require final summary, exit code 0, SHA/checksums, zero leaked secrets, and cleanup counts.
+Push the exact branch SHA, run GitHub CI/Database Gate, then run one approved focused Claw web-image gate. Require final summary, exit code 0, SHA/checksums, zero leaked secrets, and cleanup counts.
 
 - [ ] **Step 4: Record evidence and review**
 
@@ -221,7 +221,7 @@ Commit only sanitized verification metadata; keep raw logs remote. Run adversari
 
 - [ ] **Step 5: Commit**
 
-Commit: `test(web): verify landing checkout conversion path`
+Commit: `test(web): verify promotional landing boundary`
 
 ### Task 6: Final verification and publication readiness
 
