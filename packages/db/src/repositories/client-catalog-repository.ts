@@ -610,7 +610,7 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
         }
       }
 
-      let remaining = input.limit - expiryExamined;
+      const remaining = input.limit - expiryExamined;
       if (remaining > 0) {
         const orphanRequests = (
           await tx.execute<{

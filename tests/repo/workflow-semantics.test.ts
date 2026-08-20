@@ -154,7 +154,9 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).not.toContain("find /seed/node_modules");
     expect(runner).not.toMatch(/find\s+[^\n]*-exec/u);
     expect(clientBooking).toContain("test -d /seed/node_modules/.pnpm");
-    expect(clientBooking).toContain("ln -s /seed/node_modules/.pnpm node_modules/.pnpm");
+    expect(clientBooking).toContain(
+      "ln -s /seed/node_modules/.pnpm node_modules/.pnpm",
+    );
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm',
     );
@@ -163,15 +165,23 @@ describe("direct Claw verification semantics", () => {
       'candidates=(/seed/node_modules/.pnpm/"$pnpm_prefix"*/node_modules/"$package_name")',
     );
     expect(clientBooking).toContain('test "${#candidates[@]}" -eq 1');
-    expect(clientBooking).toContain('"$candidate/package.json" "$package_name" "$package_version"');
+    expect(clientBooking).toContain(
+      '"$candidate/package.json" "$package_name" "$package_version"',
+    );
     expect(clientBooking).toContain('"drizzle-orm|0.45.2|drizzle-orm@"');
     expect(clientBooking).toContain('"pg|8.22.0|pg@"');
     expect(clientBooking).toContain('"pino|9.14.0|pino@"');
     expect(clientBooking).toContain('"fastify|5.10.0|fastify@"');
-    expect(clientBooking).toContain('"@fastify/rate-limit" 10.3.0 "@fastify+rate-limit@"');
+    expect(clientBooking).toContain(
+      '"@fastify/rate-limit" 10.3.0 "@fastify+rate-limit@"',
+    );
     expect(clientBooking).toContain("node_modules/@fastify/rate-limit");
-    expect(clientBooking).toContain('vitest_package="$(resolve_seed_package vitest 3.2.7 vitest@)"');
-    expect(clientBooking).toContain('ln -s "$vitest_package" node_modules/vitest');
+    expect(clientBooking).toContain(
+      'vitest_package="$(resolve_seed_package vitest 3.2.7 vitest@)"',
+    );
+    expect(clientBooking).toContain(
+      'ln -s "$vitest_package" node_modules/vitest',
+    );
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/vitest)" = "$vitest_package"',
     );
@@ -195,12 +205,14 @@ describe("direct Claw verification semantics", () => {
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/@testcontainers/postgresql)" = "$testcontainers_postgresql_package"',
     );
-    expect(clientBooking).toContain("node scripts/assert-client-booking-postgres.mjs");
+    expect(clientBooking).toContain(
+      "node scripts/assert-client-booking-postgres.mjs",
+    );
     expect(clientBooking).toContain("rm -f node_modules/@ii-tonya");
     expect(clientBooking).toContain(
       'zod_package="$(resolve_seed_package zod 4.4.3 zod@)"',
     );
-    expect(clientBooking).toContain('rm -f node_modules/zod');
+    expect(clientBooking).toContain("rm -f node_modules/zod");
     expect(clientBooking).toContain('ln -s "$zod_package" node_modules/zod');
     expect(clientBooking).toContain(
       'test "$(readlink -f node_modules/zod)" = "$zod_package"',
@@ -220,8 +232,12 @@ describe("direct Claw verification semantics", () => {
         '      test -f "packages/$workspace_package/dist/index.js"\n' +
         "    done",
     );
-    expect(clientBooking).toContain("node scripts/assert-client-booking-postgres.mjs");
-    expect(clientBooking).not.toContain("pnpm --workspace-concurrency=1 -r --sort run build");
+    expect(clientBooking).toContain(
+      "node scripts/assert-client-booking-postgres.mjs",
+    );
+    expect(clientBooking).not.toContain(
+      "pnpm --workspace-concurrency=1 -r --sort run build",
+    );
     expect(clientBooking).toContain(
       'for workspace_package in "${workspace_packages[@]}"; do',
     );

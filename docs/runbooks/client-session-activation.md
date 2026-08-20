@@ -13,17 +13,17 @@ Status: **BLOCKED**. This file is evidence metadata, not activation or deploymen
 
 ## Required Security evidence
 
-| Gate | Required evidence | Current result |
-| --- | --- | --- |
-| Proof source | named source, owner, official contract/version, environment and evidence URI/checksum | not approved; activation blocked |
-| Internal mapping | proof resolves canonical internal `users.id` without exposing provider subject or contact | not approved; activation blocked |
-| Audience and scope | exact `ii-tonya-client` and `client_session:create` negative/positive evidence | not executed; activation blocked |
-| Signature/trust | algorithm, key reference, rotation, expiry, revocation and compromise procedure | not approved; activation blocked |
-| Replay | stable versioned `HMAC-SHA-256(K_replay[v], domain-separated canonical fields)`, key-overlap, proof-expiry and concurrent single-winner evidence | not executed; activation blocked |
-| Verifier bounds | 2-second deadline, cancellation, 32-call process ceiling, saturation and late-completion evidence | not executed; activation blocked |
-| Failure modes | invalid, expired, wrong scope/audience, verifier outage and unknown subject outcomes | not executed; activation blocked |
-| Privacy | proof/subject/contact/token absence from storage, logs, traces, metrics and evidence | not executed; activation blocked |
-| Reviewer | named Security approver, date, verdict and signed evidence reference | no approver; activation blocked |
+| Gate               | Required evidence                                                                                                                                | Current result                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| Proof source       | named source, owner, official contract/version, environment and evidence URI/checksum                                                            | not approved; activation blocked |
+| Internal mapping   | proof resolves canonical internal `users.id` without exposing provider subject or contact                                                        | not approved; activation blocked |
+| Audience and scope | exact `ii-tonya-client` and `client_session:create` negative/positive evidence                                                                   | not executed; activation blocked |
+| Signature/trust    | algorithm, key reference, rotation, expiry, revocation and compromise procedure                                                                  | not approved; activation blocked |
+| Replay             | stable versioned `HMAC-SHA-256(K_replay[v], domain-separated canonical fields)`, key-overlap, proof-expiry and concurrent single-winner evidence | not executed; activation blocked |
+| Verifier bounds    | 2-second deadline, cancellation, 32-call process ceiling, saturation and late-completion evidence                                                | not executed; activation blocked |
+| Failure modes      | invalid, expired, wrong scope/audience, verifier outage and unknown subject outcomes                                                             | not executed; activation blocked |
+| Privacy            | proof/subject/contact/token absence from storage, logs, traces, metrics and evidence                                                             | not executed; activation blocked |
+| Reviewer           | named Security approver, date, verdict and signed evidence reference                                                                             | no approver; activation blocked  |
 
 All rows must be satisfied by project-owned evidence. A local fake, fixture, Claw environment,
 green CI run, provider screenshot, or verbal approval does not satisfy a row.

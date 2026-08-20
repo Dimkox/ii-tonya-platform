@@ -14,18 +14,18 @@ Status: **BLOCKED**. This note is evidence metadata, not activation or deploymen
 
 ## Required approvals and evidence
 
-| Gate | Owner | Required evidence | Current result |
-| --- | --- | --- | --- |
-| Public contract | Product | named approval of opaque handles, public states, `404|409`, reserve/cancel behavior | absent; blocked |
-| Principal prerequisite | Platform/Security | merged principal implementation and exact SHA with fresh active-user resolution | absent; blocked |
-| Booking write authority | Security | named issuer/verifier, `client_booking:write` proof, scope separation, expiry/revocation and raw-header evidence | absent; blocked |
-| Protected mapping | Catalog/DB | owner binding, 24-hour expiry/erasure, v1/v2 compatibility and no-ID serialization proof | not executed; blocked |
-| Transaction safety | Booking/DB | real-PG concurrency, lock-order, reserve/retention/erasure and cancel/expiry/expert race evidence | not executed; blocked |
-| Privacy | Privacy/Security | fenced booking-local phase, lease/crash/dead-letter recovery, retained handles, and identifier absence | not executed; blocked |
-| Interface review | Independent reviewer | zero unresolved Critical/Important findings with file/line evidence | PASS for docs: 0 Critical/0 Important; not Security activation approval |
-| Focused gate | Verification | one immutable `client-booking` Claw invocation, exact clean SHA, external PostgreSQL 16.0.15 (`160015`) assertion, counts/cleanup, `repeat_limit: 1` | not run; blocked |
-| Provider activation | Provider owners | authenticated Planerka and Telegram contracts, credentials, staging/reconciliation evidence | explicitly outside slice; blocked |
-| Deployment | Deployment owner | separate target authorization and immutable release/rollback evidence | absent; blocked |
+| Gate                    | Owner                | Required evidence                                                                                                                                    | Current result                                                          |
+| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Public contract         | Product              | named approval of opaque handles, public states, `404                                                                                                | 409`, reserve/cancel behavior                                           | absent; blocked |
+| Principal prerequisite  | Platform/Security    | merged principal implementation and exact SHA with fresh active-user resolution                                                                      | absent; blocked                                                         |
+| Booking write authority | Security             | named issuer/verifier, `client_booking:write` proof, scope separation, expiry/revocation and raw-header evidence                                     | absent; blocked                                                         |
+| Protected mapping       | Catalog/DB           | owner binding, 24-hour expiry/erasure, v1/v2 compatibility and no-ID serialization proof                                                             | not executed; blocked                                                   |
+| Transaction safety      | Booking/DB           | real-PG concurrency, lock-order, reserve/retention/erasure and cancel/expiry/expert race evidence                                                    | not executed; blocked                                                   |
+| Privacy                 | Privacy/Security     | fenced booking-local phase, lease/crash/dead-letter recovery, retained handles, and identifier absence                                               | not executed; blocked                                                   |
+| Interface review        | Independent reviewer | zero unresolved Critical/Important findings with file/line evidence                                                                                  | PASS for docs: 0 Critical/0 Important; not Security activation approval |
+| Focused gate            | Verification         | one immutable `client-booking` Claw invocation, exact clean SHA, external PostgreSQL 16.0.15 (`160015`) assertion, counts/cleanup, `repeat_limit: 1` | not run; blocked                                                        |
+| Provider activation     | Provider owners      | authenticated Planerka and Telegram contracts, credentials, staging/reconciliation evidence                                                          | explicitly outside slice; blocked                                       |
+| Deployment              | Deployment owner     | separate target authorization and immutable release/rollback evidence                                                                                | absent; blocked                                                         |
 
 ## Implementation and verification sequence
 

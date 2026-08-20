@@ -156,7 +156,13 @@ describe("expert AI ingress", () => {
       kind: "start_residency_checkout",
       tariffVersionId,
     });
-    const { tariffVersionId: _omitted, ...withoutTariff } = command;
+    const withoutTariff = {
+      principal: command.principal,
+      text: command.text,
+      locale: command.locale,
+      correlationId: command.correlationId,
+      idempotencyKey: command.idempotencyKey,
+    };
     await expect(
       createExpertAiIngressService(state.deps).handle(withoutTariff),
     ).resolves.toEqual({ kind: "rejected", reasonCode: "unauthorized_scope" });

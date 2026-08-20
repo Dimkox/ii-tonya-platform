@@ -74,7 +74,7 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
     { bodyLimit: 8 * 1024 },
     async (request, reply) => {
       const controller = new AbortController();
-      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const deadline = setTimeout(abort, 3_000);
       function cleanup() {
         if (deadline !== undefined) clearTimeout(deadline);
         request.raw.removeListener("aborted", abort);
@@ -92,7 +92,6 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
       request.raw.once("aborted", abort);
       reply.raw.once("close", abortOnClosedResponse);
       reply.raw.once("finish", cleanup);
-      deadline = setTimeout(abort, 3_000);
       deadline.unref?.();
       reply.header("cache-control", "no-store").header("pragma", "no-cache");
       const contentType = readRawHeader(request.raw.rawHeaders, "content-type");
