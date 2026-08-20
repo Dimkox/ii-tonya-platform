@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readPublicConfig } from "./config.js";
 
 describe("public web config", () => {
+  it("uses the current test expert promo bot when no override is configured", () => {
+    expect(readPublicConfig({}).expertChatUrl.href).toBe(
+      "https://t.me/ii_tonya_expert_promo_bot",
+    );
+  });
+
   it.each(["https://t.me/ii_tonya_bot", "tg://resolve?domain=ii_tonya_bot"])(
     "accepts an allowlisted expert chat URL: %s",
     (expertChatUrl) => {

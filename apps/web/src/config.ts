@@ -3,13 +3,14 @@ export interface PublicConfig {
 }
 
 const forbiddenKey = /(?:token|secret|password|auth|key)/iu;
+const defaultExpertChatUrl = "https://t.me/ii_tonya_expert_promo_bot";
 
 export function readPublicConfig(input: {
   readonly VITE_EXPERT_CHAT_URL?: string;
 }): PublicConfig {
   let url: URL;
   try {
-    url = new URL(input.VITE_EXPERT_CHAT_URL ?? "");
+    url = new URL(input.VITE_EXPERT_CHAT_URL ?? defaultExpertChatUrl);
   } catch {
     throw new Error("public_expert_chat_url_invalid");
   }
