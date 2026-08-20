@@ -1,12 +1,12 @@
 import "./styles.css";
+import { readPublicConfig } from "./config.js";
+import { renderLanding } from "./landing-view.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("web_root_missing");
 
-app.innerHTML = `
-  <section class="preview" aria-labelledby="preview-title">
-    <p class="eyebrow">Сервис персонального сопровождения</p>
-    <h1 id="preview-title">Привет, я ии-Тоня</h1>
-    <p>Помогу сориентироваться в сервисе и выбрать следующий шаг.</p>
-  </section>
-`;
+app.innerHTML = renderLanding(
+  readPublicConfig({
+    VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
+  }),
+);
