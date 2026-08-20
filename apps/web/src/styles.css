@@ -1,0 +1,30 @@
+:root {
+  color: #352a24;
+  background: #f7f1e9;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.preview {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  padding: 2rem;
+}
+
+.eyebrow {
+  color: #8c5948;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+h1 {
+  max-width: 10ch;
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(3rem, 9vw, 7rem);
+  line-height: 0.92;
+}
