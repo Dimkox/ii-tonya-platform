@@ -86,12 +86,6 @@ describe("PostgreSQL client catalog worker", () => {
         id: randomUUID(),
         topic: "catalog.show",
         payload: { v: 1, catalogRequestId: receipt.catalogRequestId },
-        correlationId: "not-exported",
-        attempt: 1,
-        reconciliationKey: "not-exported",
-        reconciliationAttempt: 0,
-        dispatchClaimToken: "claim",
-        reconciliationClaimToken: null,
       }),
     ).resolves.toEqual({ kind: "applied" });
 

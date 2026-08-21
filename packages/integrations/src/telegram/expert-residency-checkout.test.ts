@@ -31,13 +31,15 @@ const build = () => {
   const store: ResidencyCheckoutStateStore = {
     put,
     consume: async () => null,
-    inspectCheckout: vi.fn(async (tokenHash, expertId, telegramUserId) =>
-      stored?.tokenHash === tokenHash &&
-      stored.claims.expertId === expertId &&
-      stored.claims.telegramUserId === telegramUserId
-        ? stored.claims
-        : null,
-    ),
+    inspectCheckout: vi.fn(async (tokenHash, expertId, telegramUserId) => {
+      const current = stored;
+      return current !== undefined &&
+        current.tokenHash === tokenHash &&
+        current.claims.expertId === expertId &&
+        current.claims.telegramUserId === telegramUserId
+        ? current.claims
+        : null;
+    }),
     claimCheckout: vi.fn(async (tokenHash, claims, _at, _lease, fence) => {
       if (outcome !== undefined) {
         return { kind: "replay" as const, tokenHash, outcome };

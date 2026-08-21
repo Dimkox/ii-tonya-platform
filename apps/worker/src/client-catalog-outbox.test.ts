@@ -29,6 +29,7 @@ const build = () => {
     serviceCode: "career",
     language: "ru",
     databaseNow: new Date("2026-08-14T10:00:00.000Z"),
+    expiresAt: new Date("2026-08-14T10:05:00.000Z"),
   }));
   const materialize = vi.fn(async () => "ready" as const);
   const list = vi.fn(async () => []);
@@ -103,16 +104,25 @@ describe("client catalog catalog.show registry", () => {
   it.each([
     {},
     { v: 1, catalogRequestId, serviceCode: "mixed" },
-    { v: 2, catalogRequestId },
     { catalogRequestId },
     { serviceCode: "career", allowedServiceCodes: ["career"], extra: true },
-  ])("terminalizes an unknown or mixed payload without guessing: %j", async (payload) => {
+  ])(
+    "terminalizes an unknown or mixed payload without guessing: %j",
+    async (payload) => {
+      const state = build();
+      await expect(state.registry.dispatch(message(payload))).resolves.toEqual({
+        kind: "terminal",
+        reasonCode: "invalid_payload",
+      });
+      expect(state.loadPending).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails closed for a valid v2 payload when booking capabilities are absent", async () => {
     const state = build();
-    await expect(state.registry.dispatch(message(payload))).resolves.toEqual({
-      kind: "terminal",
-      reasonCode: "invalid_payload",
-    });
-    expect(state.loadPending).not.toHaveBeenCalled();
+    await expect(
+      state.registry.dispatch(message({ v: 2, catalogRequestId })),
+    ).rejects.toThrow("client_catalog_booking_capability_unavailable");
   });
 
   it("delegates only the original two local topics to the prerequisite registry", async () => {

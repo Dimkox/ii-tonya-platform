@@ -199,6 +199,7 @@ describe("durable operator case inbox on shared Claw PostgreSQL", () => {
     expect(first.items).toHaveLength(1);
     expect(first.items[0]!.type).toBe("delivery_failure");
     expect(first.nextCursor).toBeDefined();
+    if (first.nextCursor === undefined) throw new Error("cursor not issued");
     const second = await service.listOpen(support, {
       limit: 1,
       cursor: first.nextCursor,

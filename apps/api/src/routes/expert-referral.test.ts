@@ -62,7 +62,7 @@ const build = async (options: {
     options.checkout ??
       (async () => ({
         id: "00000000-0000-4000-8000-000000000201",
-        status: "payment_pending",
+        status: "payment_pending" as const,
       })),
   );
   const app = await buildExpertReferralApi({

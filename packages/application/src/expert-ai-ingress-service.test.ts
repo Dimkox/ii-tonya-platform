@@ -24,6 +24,7 @@ const dependencies = (proposal: unknown, enabled = true) => {
     })),
   };
   const residency = {
+    listActiveTariffs: vi.fn(async () => []),
     quote: vi.fn(async () => ({
       tariffVersionId,
       priceMinor: "200000",

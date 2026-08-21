@@ -5,7 +5,7 @@ import { clientBookingRoutes } from "./client-booking.js";
 
 const token = `cs1.${"A".repeat(43)}`;
 const choiceHandle = `ch1.${"B".repeat(43)}`;
-const bookingHandle = `bk1.${"C".repeat(43)}`;
+const bookingHandle: `bk1.${string}` = `bk1.${"C".repeat(43)}`;
 const userId = "00000000-0000-4000-8000-000000000101";
 
 const appFor = async (input?: { reserveEnabled?: boolean }) => {

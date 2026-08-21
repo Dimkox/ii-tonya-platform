@@ -105,7 +105,9 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
       }
       const body = parseClientBookingBody({
         body: request.body,
-        contentType: contentType.value,
+        ...(contentType.value === undefined
+          ? {}
+          : { contentType: contentType.value }),
         ...(contentEncoding.value === undefined
           ? {}
           : { contentEncoding: contentEncoding.value }),

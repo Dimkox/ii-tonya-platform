@@ -121,6 +121,12 @@ const build = (
     kind: "applied" as const,
     providerOperationId: "10",
   }));
+  const sendResidencyCheckoutLink = vi.fn<
+    ExpertTelegramViewPort["sendResidencyCheckoutLink"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "11",
+  }));
   const sendReferralRedeemed = vi.fn(async () => ({
     kind: "applied" as const,
     providerOperationId: "9",
@@ -141,6 +147,7 @@ const build = (
     sendReferralSummary,
     sendResidencyQuote,
     sendResidencyTariffs,
+    sendResidencyCheckoutLink,
     sendReferralRedeemed,
   };
   return {

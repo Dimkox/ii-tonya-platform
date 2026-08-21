@@ -34,7 +34,7 @@ const negative: OperatorCase = {
 
 const repository = (): OperatorCaseRepository => ({
   listUnresolved: vi.fn(async () => ({ items: [negative], hasMore: true })),
-  transition: vi.fn(async () => ({ kind: "updated", item: negative })),
+  transition: vi.fn(async () => ({ kind: "updated" as const, item: negative })),
 });
 
 describe("operator case service", () => {
@@ -46,6 +46,7 @@ describe("operator case service", () => {
     if (first.kind !== "ok") throw new Error("list denied");
     expect(first.items).toEqual([negative]);
     expect(first.nextCursor).toMatch(/^[A-Za-z0-9_-]{16,256}$/u);
+    if (first.nextCursor === undefined) throw new Error("cursor not issued");
     expect(cases.listUnresolved).toHaveBeenCalledWith({
       allowedTypes: ["negative_feedback", "delivery_failure"],
       limit: 1,

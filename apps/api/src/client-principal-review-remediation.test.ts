@@ -1,7 +1,10 @@
 import { getEventListeners } from "node:events";
 import { PassThrough } from "node:stream";
 
-import { createClientSessionService } from "@ii-tonya/application";
+import {
+  createClientSessionService,
+  type IdentityProofVerifier,
+} from "@ii-tonya/application";
 import { createLogger } from "@ii-tonya/observability";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +20,12 @@ afterEach(() => {
 describe("client principal security review remediation", () => {
   it("propagates the caller signal through the application verifier boundary", async () => {
     const controller = new AbortController();
-    const verify = vi.fn(async () => null);
+    const verify = vi.fn(
+      async (_input: Parameters<IdentityProofVerifier["verify"]>[0]) => {
+        void _input;
+        return null;
+      },
+    );
     const service = createClientSessionService({
       verifier: { verify },
       sessions: { issue: vi.fn() },

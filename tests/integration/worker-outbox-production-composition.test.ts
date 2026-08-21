@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import type { Pool, PoolClient } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { composeWorkerOutboxDelivery } from "../../apps/worker/src/main.js";
 import { PostgresOperatorCaseOutboxRepository } from "../../packages/db/src/repositories/operator-case-outbox-repository.js";
@@ -10,6 +9,8 @@ import {
 } from "../../packages/db/src/testkit/postgres.js";
 
 let testDb: TestDatabase;
+const connectTestClient = () => testDb.db.$client.connect();
+type TestPoolClient = Awaited<ReturnType<typeof connectTestClient>>;
 beforeAll(async () => {
   testDb = await startTestPostgres();
   await testDb.migrate();
@@ -88,7 +89,7 @@ async function status(id: string): Promise<string> {
 }
 
 async function blockedAuthorityChange(
-  client: PoolClient,
+  client: TestPoolClient,
   change: () => Promise<void>,
   materialize: () => Promise<unknown>,
 ): Promise<unknown> {
@@ -119,7 +120,7 @@ describe("review-remediated production worker outbox composition", () => {
       topic: "safety.operator_escalation",
       payload: { handoffId, version: 3, charge: 0 },
     });
-    const safetyClient = await (testDb.db.$client as Pool).connect();
+    const safetyClient = await connectTestClient();
     const safety = await blockedAuthorityChange(
       safetyClient,
       async () => {
@@ -146,7 +147,7 @@ describe("review-remediated production worker outbox composition", () => {
         policyVersion: "payload-review-v1",
       },
     });
-    const feedbackClient = await (testDb.db.$client as Pool).connect();
+    const feedbackClient = await connectTestClient();
     const feedback = await blockedAuthorityChange(
       feedbackClient,
       async () => {

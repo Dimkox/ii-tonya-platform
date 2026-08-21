@@ -35,7 +35,7 @@ const refundOperation: YooKassaOperation = {
   id: "00000000-0000-4000-8000-000000000601",
   kind: "create_refund",
   providerObjectId: "2f4b6d0d-000f-5000-9000-000000000601",
-  parentPaymentId: operation.providerObjectId,
+  parentPaymentId: operation.providerObjectId!,
   amountMinor: "10000",
   status: "unknown_outcome",
 };
@@ -57,13 +57,21 @@ const canonical = () => {
   return { verifyCanonical: vi.fn(verifier.verifyCanonical) };
 };
 
+const client = (overrides: Partial<YooKassaClient>): YooKassaClient => ({
+  createPayment: async () => { throw new Error("unused"); },
+  getPayment: async () => { throw new Error("unused"); },
+  createRefund: async () => { throw new Error("unused"); },
+  getRefund: async () => { throw new Error("unused"); },
+  ...overrides,
+});
+
 describe("YooKassaPaymentVerifier", () => {
   it("brands a deterministic settlement without resolving before durable delivery", async () => {
-    const client = { getPayment: async () => payment } as YooKassaClient;
+    const provider = client({ getPayment: async () => payment });
     const operations = operationPort();
     const eventVerifier = canonical();
     const verifier = new YooKassaPaymentVerifier(
-      client,
+      provider,
       operations,
       eventVerifier,
     );
@@ -83,7 +91,7 @@ describe("YooKassaPaymentVerifier", () => {
 
   it("re-verifies a succeeded operation into the same exact settlement", async () => {
     const verifier = new YooKassaPaymentVerifier(
-      { getPayment: async () => payment } as YooKassaClient,
+      client({ getPayment: async () => payment }),
       operationPort(),
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -109,7 +117,7 @@ describe("YooKassaPaymentVerifier", () => {
       { ...payment, test: false },
     ]) {
       const verifier = new YooKassaPaymentVerifier(
-        { getPayment: async () => changed } as YooKassaClient,
+        client({ getPayment: async () => changed }),
         operationPort(),
         createCanonicalExpertResidencyPaymentEventVerifier(),
       );
@@ -122,13 +130,13 @@ describe("YooKassaPaymentVerifier", () => {
   it("leaves pending payments unresolved", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getPayment: async () => ({
           ...payment,
           status: "pending",
           paid: false,
         }),
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -140,13 +148,13 @@ describe("YooKassaPaymentVerifier", () => {
   it("resolves a verified canceled payment without minting a financial event", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getPayment: async () => ({
           ...payment,
           status: "canceled",
           paid: false,
         }),
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -158,9 +166,9 @@ describe("YooKassaPaymentVerifier", () => {
   it("idempotently re-verifies an already canceled payment", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getPayment: async () => ({ ...payment, status: "canceled", paid: false }),
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -174,12 +182,12 @@ describe("YooKassaPaymentVerifier", () => {
   it("brands a deterministic refund without resolving before durable delivery", async () => {
     const operations = operationPort();
     const eventVerifier = canonical();
-    const client = {
+    const provider = client({
       getRefund: vi.fn(async () => refund),
       getPayment: vi.fn(async () => payment),
-    } as YooKassaClient;
+    });
     const verifier = new YooKassaPaymentVerifier(
-      client,
+      provider,
       operations,
       eventVerifier,
     );
@@ -193,10 +201,10 @@ describe("YooKassaPaymentVerifier", () => {
         amountMinor: refundOperation.amountMinor,
       },
     );
-    expect(client.getRefund).toHaveBeenCalledWith(
+    expect(provider.getRefund).toHaveBeenCalledWith(
       refundOperation.providerObjectId,
     );
-    expect(client.getPayment).toHaveBeenCalledWith(
+    expect(provider.getPayment).toHaveBeenCalledWith(
       refundOperation.parentPaymentId,
     );
     expect(eventVerifier.verifyCanonical).toHaveBeenCalledWith(
@@ -234,10 +242,10 @@ describe("YooKassaPaymentVerifier", () => {
     ] as const) {
       const operations = operationPort();
       const verifier = new YooKassaPaymentVerifier(
-        {
+        client({
           getRefund: async () => changedRefund,
           getPayment: async () => changedPayment,
-        } as YooKassaClient,
+        }),
         operations,
         createCanonicalExpertResidencyPaymentEventVerifier(),
       );
@@ -251,10 +259,10 @@ describe("YooKassaPaymentVerifier", () => {
   it("leaves pending refunds unresolved", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getRefund: async () => ({ ...refund, status: "pending" }),
         getPayment: async () => payment,
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -266,10 +274,10 @@ describe("YooKassaPaymentVerifier", () => {
   it("resolves a verified canceled refund without minting a financial event", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getRefund: async () => ({ ...refund, status: "canceled" }),
         getPayment: async () => payment,
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );
@@ -284,10 +292,10 @@ describe("YooKassaPaymentVerifier", () => {
   it("idempotently re-verifies an already canceled refund", async () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
-      {
+      client({
         getRefund: async () => ({ ...refund, status: "canceled" }),
         getPayment: async () => payment,
-      } as YooKassaClient,
+      }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
     );

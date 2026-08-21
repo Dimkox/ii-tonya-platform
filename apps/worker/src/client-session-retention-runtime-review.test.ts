@@ -15,7 +15,11 @@ const runtimeDeps = () => ({
   },
   expertReferralJobsRepository: {
     expireDueBatch: vi.fn(async () => ({ examined: 0, changed: 0, failed: 0 })),
-    replayDueBatch: vi.fn(async () => ({ examined: 0, granted: 0, cancelled: 0 })),
+    replayDueBatch: vi.fn(async () => ({
+      examined: 0,
+      granted: 0,
+      cancelled: 0,
+    })),
     listReconciliationBatch: vi.fn(async () => []),
     recordReconciliationMismatches: vi.fn(async () => undefined),
   },
@@ -35,16 +39,19 @@ describe("client session retention production review closure", () => {
   it.each([
     { enabled: false, selected: false },
     { enabled: true, selected: true },
-  ])("selects bounded cleanup only when session=$enabled", ({ enabled, selected }) => {
-    const job = vi.fn(async () => ({}));
-    const factory = vi.fn(() => job);
-    const result = selectClientSessionRetention(
-      { features: { clientSession: enabled } } as never,
-      factory,
-    );
-    expect(result === job).toBe(selected);
-    expect(factory).toHaveBeenCalledTimes(selected ? 1 : 0);
-  });
+  ])(
+    "selects bounded cleanup only when session=$enabled",
+    ({ enabled, selected }) => {
+      const job = vi.fn(async () => ({}));
+      const factory = vi.fn(() => job);
+      const result = selectClientSessionRetention(
+        { features: { clientSession: enabled } } as never,
+        factory,
+      );
+      expect(result === job).toBe(selected);
+      expect(factory).toHaveBeenCalledTimes(selected ? 1 : 0);
+    },
+  );
 
   it("runs session cleanup once in every enabled production cycle", async () => {
     const clientSessionRetention = vi.fn(async () => ({
@@ -57,8 +64,10 @@ describe("client session retention production review closure", () => {
     } as never).runOnce();
     expect(clientSessionRetention).toHaveBeenCalledOnce();
     expect(report.processorPrivacy).toEqual({
-      receiptsRemoved: 1,
-      sessionsRemoved: 1,
+      clientSession: {
+        receiptsRemoved: 1,
+        sessionsRemoved: 1,
+      },
     });
   });
 

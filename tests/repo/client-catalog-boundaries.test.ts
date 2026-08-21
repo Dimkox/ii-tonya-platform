@@ -12,7 +12,7 @@ describe("MVP client catalog storage boundaries", () => {
     expect(read("packages/contracts/src/worker-outbox.ts")).toContain(
       '"safety.operator_escalation",\n  "admin.negative_feedback",',
     );
-    expect(read("packages/contracts/src/worker-outbox.ts")).not.toContain(
+    expect(read("packages/contracts/src/worker-outbox.ts")).toContain(
       "catalog.show",
     );
   });

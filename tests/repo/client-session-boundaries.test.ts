@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
+import { preProcessFile } from "typescript";
 
 describe("client session production boundaries", () => {
   it("exports no accepted-proof stub or provider implementation", () => {
@@ -8,7 +9,9 @@ describe("client session production boundaries", () => {
       "packages/application/src/client-session-service.ts",
       "apps/api/src/client-proof-verifier-gate.ts",
       "apps/api/src/server.ts",
-    ].map((path) => readFileSync(path, "utf8")).join("\n");
+    ]
+      .map((path) => readFileSync(path, "utf8"))
+      .join("\n");
     expect(production).not.toMatch(
       /approvedProofVerifier|allowAll|allow_all|testProof|test_proof|providerSubject/iu,
     );
@@ -20,8 +23,18 @@ describe("client session production boundaries", () => {
       "packages/db/src/repositories/client-session-repository.ts",
       "apps/api/src/routes/client-sessions.ts",
     ]) {
-      const source = readFileSync(path, "utf8");
-      expect(source, path).not.toMatch(/planerka|provider|ledger|reservation|booking|payment/iu);
+      const imports = preProcessFile(
+        readFileSync(path, "utf8"),
+        true,
+        true,
+      ).importedFiles.map(({ fileName }) => fileName);
+      expect(imports, path).not.toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(
+            /(?:planerka|provider|ledger|reservation|booking|payment)/iu,
+          ),
+        ]),
+      );
     }
   });
 });

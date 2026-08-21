@@ -106,9 +106,15 @@ describe("protected client booking PostgreSQL authority", () => {
     expect(results.filter((result) => result.kind === "replayed")).toHaveLength(
       4,
     );
-    expect(new Set(results.map((result) => result.bookingHandle))).toEqual(
-      new Set([bookingHandle]),
-    );
+    expect(
+      new Set(
+        results.flatMap((result) =>
+          result.kind === "reserved" || result.kind === "replayed"
+            ? [result.bookingHandle]
+            : [],
+        ),
+      ),
+    ).toEqual(new Set([bookingHandle]));
     const counts = await db.execute<{
       reservations: string;
       receipts: string;

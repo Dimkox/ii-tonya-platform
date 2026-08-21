@@ -115,8 +115,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/expert/assistant/messages",
   "/v1/expert/referrals/redeem",
   "/v1/expert/referrals/summary",
+  "/v1/expert/residency/tariffs",
   "/v1/expert/residency/quotes",
   "/v1/expert/residency/checkouts",
   "/v1/admin/expert-referrals/inventory",
@@ -159,7 +161,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "bf8544cd0f41b9f787db1465c46b067e4896619c6877fdf7a50784362bcaedc0",
+    "1240f56e1f9f3d50381da99f358404090deafc24525da7cd035d0c715fb1abd3",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -209,61 +211,65 @@ const approvedPaymentBoundaryHashes = new Map([
 const approvedPackageManifestHashes = new Map([
   [
     "apps/sandbox-api/package.json",
-    "441a5961fd5e7c9a075f605c74214084e4e4bbfa8d70ddd24800e0a6f87c8433",
+    "10d849ade54b15694f30f477c4911acbb2e0a2750fb7cec617339cb23f26f1f2",
   ],
   [
     "apps/api/package.json",
-    "34edd6b480799b53b8e378fa596586ff3406adb945ef1c48910150bcc55e8449",
+    "82e0499817addb7236e92216b60592618b4e03cc0c60acc1c24c0dedbdb42b3e",
+  ],
+  [
+    "apps/web/package.json",
+    "12a1b7ae68a27c1c79c816357e92a00b772385f1cc6e4877c33f7f271694def1",
   ],
   [
     "apps/worker/package.json",
-    "e339e6554bbd2d083f0e0d14f5c4893c4e57c719422ccbb29f807fea058eec72",
+    "8815b7494fbc0e1ccc7f1407f200d4b882328966267a9b34e6d76094cb15f41a",
   ],
   [
     "package.json",
-    "d44bc93073ca4f313b660495a32bacd8c339971798268ff65b6b2726c2991bf0",
+    "3e656cfe463533a05e0c55be93a963811d7c01a2f5e203e61a96e232964d88a0",
   ],
   [
     "packages/application/package.json",
-    "507dfff15d9c8b52a4fa3a30f97219c839921cee18ff2661ac15fb6bdbfcfe89",
+    "594a48971ab05dbfb080ea5343e36193ee29113989f171f49392f87094c2629d",
   ],
   [
     "packages/config/package.json",
-    "9aa5f2e8fa0c82f1f5ea18020537a8fa76c9416e01eb91fe9819948c65a65467",
+    "8d60e8bda20c29b9ff7d28ce0bd24265694ee09970ec020cc9e90cb4c1b72ffa",
   ],
   [
     "packages/contracts/package.json",
-    "3d58ef391e2b36da2a0ea5a5e19f9fb576fb555c12e97cfc4c84daa6948b62cf",
+    "a516d484080039198439e6d4f035900b2d23252356d55896c4f63a36f5924eed",
   ],
   [
     "packages/db/package.json",
-    "a31b01f44fb01dd663df8ad8ec456567d445b2d43ffca7a16eaf8bc115ee6090",
+    "8a3baf4d27138434baa7d9b591b006d99b7aa299c0215d4ee41f60f87b561d7f",
   ],
   [
     "packages/domain/package.json",
-    "79fc6070f4c1c2936b79c20e4635dc980c78742d66ca270340054d1e9e6265f8",
+    "ebf36831c2e9c1b1838f750b0f7d8cd712e99b64a8d481b05242d6ee9ec1547e",
   ],
   [
     "packages/integrations/package.json",
-    "24ff853ea1e3e9f6d810cccf2ed57bb6ab8a599fe9a0495ac5143f961996494c",
+    "e041afbaee8eacfd08b0ac94127f5fd181787713ffb89e56c6d33aa055d708df",
   ],
   [
     "packages/observability/package.json",
-    "74a51f0c482a51b47f47a765619a1ddf35e9e8c1ff4ab1997507663e61f38f0f",
+    "78c58e975d627f8cd9f632ca1a44f5a9c6709f62b518e2dc6eacb3b4ab918bca",
   ],
   [
     "packages/sandbox-payments/package.json",
-    "52aa74c41d90c56a7e351b85b5906af22ba7a7ca640685bb0ccc2258b0096a09",
+    "b8426f19f7d6aeb30e5ffdb2d0e50af134d7445db11e4022eb2f00a378fbc495",
   ],
   [
     "packages/worker/package.json",
-    "da18d8b8bbfa95815d8d9bfae9a2de15125c8bd91e2c84be1e4de73706fa8cd7",
+    "9548d95e818bc5d0010d9d1b6010e1a6cde75ffedfc721a9a11d0433deaac88d",
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "f8046f382ca4bbba413d67c4d58435bc3208b148bf822a7d66d3827273728229",
+    "8a3339432860b80076de8d7469d1b980843458dd247e2dea5f200c91b49c73df",
   ],
   [
     "scripts/build-native-release.sh",
@@ -385,6 +391,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
       "@ii-tonya/worker",
     ]),
   ],
+  ["apps/web/package.json", new Set(["typescript", "vite", "vitest"])],
   [
     "package.json",
     new Set([
@@ -485,6 +492,7 @@ const approvedDependencySpecifiers = new Map([
   ["tsx", "^4.20.3"],
   ["typescript", "^5.8.3"],
   ["typescript-eslint", "^8.30.1"],
+  ["vite", "^7.3.6"],
   ["vitest", "^3.2.4"],
   ["yaml", "^2.8.0"],
   ["zod", "^4.3.6"],
@@ -611,6 +619,18 @@ const approvedMigrationHashes = new Map([
     "ae71d45564466e71f3efa4c3c96227d28ea21af2483ff1c2c14b60210ba22d4c",
   ],
   [
+    "packages/db/migrations/0029_client_catalog_requests.sql",
+    "5f0e0ac72df3021946dcad4215137aba3d0724d4c8e4fb9d74767e31e920bb8c",
+  ],
+  [
+    "packages/db/migrations/0030_client_sessions.sql",
+    "01b13ed88582144faefad2fb0ca4e4ec0767ed25d3b6ebddb357a78e2250b31a",
+  ],
+  [
+    "packages/db/migrations/0031_client_booking_references.sql",
+    "b625de5a14c3aa542116b4ad7c88df6ddeab99b893fdbda83bca0f6d8c1f4529",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -688,7 +708,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "40e3aa88e5de4eb11f3284e5cf76280d53c29f53ed2231ac543fbe626b09287f",
+    "946ea5ba29dab55ed8865dc42a9fc2c64651b63d4b2440f29315867d6bbdd8ce",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -699,8 +719,17 @@ const approvedDatabaseRelations = new Set([
   "admin_sessions",
   "audit_events",
   "channel_identities",
+  "client_booking_erasure_work",
+  "client_booking_receipts",
+  "client_catalog_choices",
+  "client_catalog_erasure_index",
+  "client_catalog_requests",
+  "client_catalog_snapshots",
+  "client_catalog_tombstones",
+  "client_identity_proof_receipts",
   "expert_telegram_residency_callbacks",
   "client_profiles",
+  "client_sessions",
   "consents",
   "conversation_messages",
   "conversations",

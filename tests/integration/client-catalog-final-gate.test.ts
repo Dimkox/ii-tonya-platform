@@ -131,12 +131,6 @@ describe("MVP-CLIENT-CATALOG-001 final focused gate", () => {
         id: outbox.id,
         topic: "catalog.show",
         payload: outbox.payload,
-        correlationId: outbox.correlationId,
-        attempt: 1,
-        reconciliationKey: outbox.reconciliationKey,
-        reconciliationAttempt: 0,
-        dispatchClaimToken: "final-gate",
-        reconciliationClaimToken: null,
       }),
     ).resolves.toEqual({ kind: "applied" });
 

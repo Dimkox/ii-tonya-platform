@@ -141,6 +141,8 @@ describe("server composition", () => {
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
       features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
         expertAiIngress: false,
@@ -240,7 +242,13 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: false, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
     };
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.operatorCases).toBeDefined();
@@ -382,7 +390,10 @@ describe("server composition", () => {
         rawConversationLogging: false,
         selartiOutboundBillingMode: "disabled",
         displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
         features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
           expertReferral: false,
           expertResidencyBilling: false,
           expertTelegramFinancialViews: financialViewsEnabled,
@@ -449,7 +460,10 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
       features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
         expertTelegramFinancialViews: true,
@@ -483,7 +497,13 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: true, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
       expertReferralKey: {
         currentVersion: "v1",
         reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -522,7 +542,13 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: true, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
       expertReferralKey: {
         currentVersion: "v1",
         reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -538,7 +564,12 @@ describe("server composition", () => {
       ...dependencies,
       config: {
         ...dependencies.config,
-        features: { expertReferral: false, expertResidencyBilling: false },
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          expertReferral: false,
+          expertResidencyBilling: false,
+        },
       },
     });
     expect(

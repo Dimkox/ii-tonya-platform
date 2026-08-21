@@ -13,7 +13,11 @@ const runtimeDeps = () => ({
   },
   expertReferralJobsRepository: {
     expireDueBatch: vi.fn(async () => ({ examined: 0, changed: 0, failed: 0 })),
-    replayDueBatch: vi.fn(async () => ({ examined: 0, granted: 0, cancelled: 0 })),
+    replayDueBatch: vi.fn(async () => ({
+      examined: 0,
+      granted: 0,
+      cancelled: 0,
+    })),
     listReconciliationBatch: vi.fn(async () => []),
     recordReconciliationMismatches: vi.fn(async () => undefined),
   },
@@ -35,16 +39,21 @@ describe("client catalog retention production composition", () => {
     { worker: true, catalog: false, selected: false },
     { worker: false, catalog: true, selected: false },
     { worker: true, catalog: true, selected: true },
-  ])("selects retention only for worker=$worker catalog=$catalog", ({ worker, catalog, selected }) => {
-    const job = vi.fn(async () => ({}));
-    const factory = vi.fn(() => job);
-    const result = selectClientCatalogRetention(
-      { features: { workerOutboxDelivery: worker, clientCatalog: catalog } } as never,
-      factory,
-    );
-    expect(result === job).toBe(selected);
-    expect(factory).toHaveBeenCalledTimes(selected ? 1 : 0);
-  });
+  ])(
+    "selects retention only for worker=$worker catalog=$catalog",
+    ({ worker, catalog, selected }) => {
+      const job = vi.fn(async () => ({}));
+      const factory = vi.fn(() => job);
+      const result = selectClientCatalogRetention(
+        {
+          features: { workerOutboxDelivery: worker, clientCatalog: catalog },
+        } as never,
+        factory,
+      );
+      expect(result === job).toBe(selected);
+      expect(factory).toHaveBeenCalledTimes(selected ? 1 : 0);
+    },
+  );
 
   it("runs the bounded retention job once in every enabled worker cycle", async () => {
     const clientCatalogRetention = vi.fn(async () => ({
@@ -58,9 +67,11 @@ describe("client catalog retention production composition", () => {
     } as never).runOnce();
     expect(clientCatalogRetention).toHaveBeenCalledOnce();
     expect(report.processorPrivacy).toEqual({
-      examined: 1,
-      expired: 1,
-      removed: 0,
+      clientCatalog: {
+        examined: 1,
+        expired: 1,
+        removed: 0,
+      },
     });
   });
 });

@@ -9,10 +9,13 @@ const fence = "00000000-0000-4000-8000-000000000501";
 
 describe("expert Telegram residency callback SQL guards", () => {
   it("makes repeated issuance conflict-safe only for the same token and binding", async () => {
-    const query = vi.fn(async () => ({
+    const query = vi.fn(async (_statement: unknown) => {
+      void _statement;
+      return {
       rows: [{ token_hash: tokenHash }],
       rowCount: 1,
-    }));
+      };
+    });
     const repository = new PostgresExpertTelegramResidencyCallbackRepository({
       $client: { query },
     } as unknown as DrizzleDb);
@@ -40,10 +43,13 @@ describe("expert Telegram residency callback SQL guards", () => {
   });
 
   it("atomically downgrades a late ready URL to unavailable", async () => {
-    const query = vi.fn(async () => ({
+    const query = vi.fn(async (_statement: unknown) => {
+      void _statement;
+      return {
       rows: [{ checkoutStatus: "unavailable" }],
       rowCount: 1,
-    }));
+      };
+    });
     const repository = new PostgresExpertTelegramResidencyCallbackRepository({
       $client: { query },
     } as unknown as DrizzleDb);

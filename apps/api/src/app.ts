@@ -397,7 +397,7 @@ export async function buildTestApp(
     clientSessionService?: ClientSessionService;
     clientSessionRepository?: ClientSessionRevocation;
     clientPrincipal?: ClientPrincipalResolver;
-    features?: RuntimeConfig["features"];
+    features?: Partial<RuntimeConfig["features"]>;
   } = {},
 ): Promise<TestApp> {
   const receipts = new Map<string, "processing" | "complete">();
@@ -442,12 +442,13 @@ export async function buildTestApp(
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
-      features: options.features ?? {
+      features: {
         workerOutboxDelivery: false,
         clientSession: false,
         clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
+        ...options.features,
       },
       ...(options.features?.yookassa === true
         ? {

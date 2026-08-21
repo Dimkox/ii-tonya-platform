@@ -58,10 +58,12 @@ describe("expert residency referral scope boundary", () => {
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
       "/v1/admin/expert-referrals/inventory",
+      "/v1/expert/assistant/messages",
       "/v1/expert/referrals/redeem",
       "/v1/expert/referrals/summary",
       "/v1/expert/residency/checkouts",
       "/v1/expert/residency/quotes",
+      "/v1/expert/residency/tariffs",
       "/v1/webhooks/yookassa",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([

@@ -29,7 +29,7 @@ export const createClientProofVerifierGate = (
   let active = 0;
 
   return Object.freeze({
-    async verify(input) {
+    async verify(input: Parameters<IdentityProofVerifier["verify"]>[0]) {
       if (active >= maximumConcurrent) {
         throw new ClientProofUnavailableError();
       }

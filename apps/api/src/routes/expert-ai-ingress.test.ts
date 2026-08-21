@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildTestApp } from "../app.js";
+import type {
+  ExpertAiRequestLedger,
+  ExpertAiTransportOutcome,
+} from "./expert-ai-ingress.js";
 
 const principal = {
   authenticated: true as const,
@@ -12,10 +16,10 @@ const features = {
   expertAiIngress: true,
 };
 
-const requestLedger = () => {
+const requestLedger = (): ExpertAiRequestLedger => {
   const receipts = new Map<
     string,
-    { digest: string; outcome?: { status: number; body: Record<string, string> } }
+    { digest: string; outcome?: ExpertAiTransportOutcome }
   >();
   const claims = new Map<string, string>();
   return {
@@ -40,7 +44,7 @@ const requestLedger = () => {
     },
     async complete(
       claimId: string,
-      outcome: { status: number; body: Record<string, string> },
+      outcome: ExpertAiTransportOutcome,
     ) {
       const key = claims.get(claimId)!;
       const receipt = receipts.get(key)!;

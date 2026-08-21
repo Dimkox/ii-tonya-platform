@@ -12,7 +12,10 @@ describe("worker main", () => {
     const { disabledExpertResidencyProviderReader } = await import("./main.js");
 
     await expect(
-      disabledExpertResidencyProviderReader.readPayments(),
+      disabledExpertResidencyProviderReader.readPayments({
+        now: new Date("2026-08-14T10:00:00.000Z"),
+        payments: [],
+      }),
     ).resolves.toEqual({ kind: "disabled" });
   });
 

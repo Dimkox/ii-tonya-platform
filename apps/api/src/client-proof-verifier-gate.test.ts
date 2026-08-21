@@ -20,7 +20,7 @@ describe("client proof verifier gate", () => {
     const verifier: IdentityProofVerifier = {
       verify: vi.fn(async (request) => {
         verifierSignal = request.signal;
-        return await new Promise(() => undefined);
+        return await new Promise<null>(() => undefined);
       }),
     };
     const gate = createClientProofVerifierGate(verifier, {

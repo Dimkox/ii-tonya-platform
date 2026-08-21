@@ -23,7 +23,7 @@
     "format:check": "prettier --check README.md package.json compose.yaml scripts/smoke.mjs scripts/migrate-native.mjs tests/container/image-smoke.test.mjs tests/provider-stubs/server.mjs tests/repo/release-assets.test.ts tests/repo/workflow-semantics.test.ts tests/repo/native-production-release.test.ts docs/operations docs/runbooks docs/architecture docs/spec/deployment-readiness-amendment.md",
     "verify:deploy": "bash -n scripts/run-claw-ci.sh scripts/build-native-release.sh scripts/deploy-native-remote.sh scripts/validate-runtime-env.sh && vitest run tests/repo/release-assets.test.ts tests/repo/workflow-semantics.test.ts tests/repo/native-production-release.test.ts",
     "lint": "eslint .",
-    "typecheck": "pnpm --workspace-concurrency=1 -r --sort run typecheck",
+    "typecheck": "pnpm --workspace-concurrency=1 -r --sort run typecheck && tsc --noEmit -p tsconfig.tests.json",
     "build": "pnpm --workspace-concurrency=1 -r --sort run build",
     "verify": "pnpm build && pnpm format:check && pnpm verify:deploy && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:property && pnpm test:integration && pnpm test:contract && pnpm test:security && pnpm test:e2e && pnpm audit --prod --audit-level high"
   },

@@ -27,6 +27,8 @@ describe("loadEnv", () => {
       workerOutboxDelivery: false,
       clientCatalog: false,
       clientSession: false,
+      clientBooking: false,
+      clientBookingReserve: false,
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
@@ -74,17 +76,18 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "TRUE" })),
     ).toThrow();
-    expect(() =>
-      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "1" })),
-    ).toThrow();
+    expect(() => loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "1" }))).toThrow();
   });
 
   it("defaults client sessions off and accepts only exact booleans", () => {
     expect(loadEnv(localEnv()).features.clientSession).toBe(false);
     expect(
-      loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "true" })).features.clientSession,
+      loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "true" })).features
+        .clientSession,
     ).toBe(true);
-    expect(() => loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "TRUE" }))).toThrow();
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "TRUE" })),
+    ).toThrow();
     expect(() => loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "1" }))).toThrow();
   });
 
