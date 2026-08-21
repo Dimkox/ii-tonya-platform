@@ -6,10 +6,8 @@ import { closeDb, createDb } from "../../packages/db/src/client.js";
 import { PostgresExpertAiRequestReceiptStore } from "../../packages/db/src/repositories/expert-ai-request-receipt-repository.js";
 
 const schema = `expert_ai_receipts_${process.pid}_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-const connectionString =
-  process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL ?? process.env.DATABASE_URL;
-if (!connectionString) throw new Error("test_database_unavailable");
-const isolatedUrl = new URL(connectionString);
+const connectionString = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+const isolatedUrl = new URL(connectionString ?? "postgresql://invalid");
 isolatedUrl.searchParams.set("options", `-c search_path=${schema},public`);
 const db = createDb(isolatedUrl.toString());
 const stores = [
@@ -20,7 +18,9 @@ const stores = [
 const expertId = "00000000-0000-4000-8000-000000000101";
 const digest = "a".repeat(64);
 
-describe("Postgres expert AI request receipt store on shared Claw PostgreSQL", () => {
+const describeShared = connectionString === undefined ? describe.skip : describe;
+
+describeShared("Postgres expert AI request receipt store on shared Claw PostgreSQL", () => {
   beforeAll(async () => {
     await db.execute(
       sql.raw(
