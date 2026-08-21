@@ -305,6 +305,29 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
+    [
+      "migration",
+      "packages/db/migrations/0018_expert_residency_referrals.sql",
+      "CREATE TABLE expert_referrals (id uuid primary key);",
+    ],
+    [
+      "snapshot",
+      "packages/db/migrations/meta/0018_snapshot.json",
+      '{"tables":{"public.expert_referrals":{"name":"expert_referrals"}}}',
+    ],
+    [
+      "journal",
+      "packages/db/migrations/meta/_journal.json",
+      '{"entries":[{"tag":"0018_expert_residency_referrals"}]}',
+    ],
+  ])(
+    "reserves the reviewed expert residency referral %s artifact path",
+    (_label, path, content) => {
+      expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    },
+  );
+
+  it.each([
     "packages/db/migrations/0009_young_arachne.sql",
     "packages/db/migrations/0016_task17c_admin_workflows.sql",
     "packages/db/migrations/meta/0016_snapshot.json",
