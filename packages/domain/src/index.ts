@@ -47,3 +47,18 @@ export type {
   SafetyInput,
   SafetyRisk,
 } from "./safety.js";
+export {
+  allocateCreditFifo,
+  applyRewardToDebt,
+  EXPERT_REFERRAL_REWARD_MINOR,
+  nextResidencyInterval,
+  quoteResidency,
+  rewardExpiresAt,
+  resolveRewardReversal,
+  settlementBeforeDeadline,
+} from "./expert-referral.js";
+export type {
+  CreditAllocation,
+  ReferralCreditGrant,
+  RewardStatus,
+} from "./expert-referral.js";
