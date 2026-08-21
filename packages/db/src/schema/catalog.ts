@@ -16,14 +16,18 @@ const mutableTimestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
-export const experts = pgTable("experts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  publicDisplayName: text("public_display_name"),
-  active: boolean("active").notNull().default(false),
-  verified: boolean("verified").notNull().default(false),
-  ...mutableTimestamps,
-});
+export const experts = pgTable(
+  "experts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    publicDisplayName: text("public_display_name"),
+    active: boolean("active").notNull().default(false),
+    verified: boolean("verified").notNull().default(false),
+    ...mutableTimestamps,
+  },
+  (table) => [unique("experts_user_id_unique").on(table.userId)],
+);
 
 export const expertServices = pgTable("expert_services", {
   id: uuid("id").defaultRandom().primaryKey(),

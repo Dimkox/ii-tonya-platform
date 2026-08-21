@@ -184,6 +184,31 @@ describe("authoritative Drizzle schema parity", () => {
     }
   });
 
+  it("exports the reviewed expert-referral tables and derived balance view", () => {
+    const exports = dbSchema as Record<string, unknown>;
+    for (const name of [
+      "expertReferralCodeBatches",
+      "expertReferralCodes",
+      "expertReferrals",
+      "expertResidencyTariffVersions",
+      "expertResidencyOrders",
+      "expertResidencyPaymentAttempts",
+      "expertResidencyProviderEventInbox",
+      "expertFirstResidencySettlements",
+      "expertReferralRewardGrants",
+      "expertReferralLedgerEntries",
+      "expertReferralLedgerAllocations",
+      "expertReferralIssuanceOverrides",
+      "expertReferralAbuseHolds",
+      "expertReferralFeatureControls",
+    ]) {
+      expect(exports[name], name).toBeDefined();
+    }
+    expect(getViewConfig(exports.expertReferralBalances as PgView).name).toBe(
+      "expert_referral_balances",
+    );
+  });
+
   it("keeps the migration SQL and Drizzle metadata names synchronized", () => {
     const migration = [
       readFileSync("packages/db/migrations/0000_mvp.sql", "utf8"),
@@ -278,6 +303,48 @@ describe("authoritative Drizzle schema parity", () => {
     expect(notificationsTable?.foreignKeys).toHaveProperty(
       "notifications_callback_expert_id_experts_id_fk",
     );
+  });
+
+  it("keeps the hardened 0018 migration and generated snapshot in parity", () => {
+    const path = "packages/db/migrations/meta/0018_snapshot.json";
+    expect(existsSync(path)).toBe(true);
+    if (!existsSync(path)) return;
+    const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
+      tables?: Record<string, unknown>;
+      views?: Record<string, unknown>;
+    };
+    expect(snapshot.tables).toHaveProperty(
+      "public.expert_referral_ledger_allocations",
+    );
+    expect(snapshot.tables).toHaveProperty(
+      "public.expert_referral_feature_controls",
+    );
+    expect(snapshot.views).toHaveProperty("public.expert_referral_balances");
+
+    const migration = readFileSync(
+      "packages/db/migrations/0018_expert_residency_referrals.sql",
+      "utf8",
+    );
+    expect(
+      migration.indexOf("expert_user_identity_duplicates"),
+    ).toBeGreaterThan(-1);
+    expect(migration.indexOf("expert_user_identity_duplicates")).toBeLessThan(
+      migration.indexOf("CREATE EXTENSION"),
+    );
+    for (const name of [
+      "experts_user_id_unique",
+      "expert_order_credit_cap",
+      "expert_order_cash_remainder",
+      "expert_tariff_active_interval_exclusion",
+      "expert_provider_event_unique",
+      "expert_first_settlement_expert_unique",
+      "expert_reward_exact_amount",
+      "expert_reward_exact_expiry",
+      "expert_abuse_hold_one_open",
+      "expert_ledger_allocation_required",
+    ]) {
+      expect(migration, name).toContain(name);
+    }
   });
 
   it("keeps booking migration upgrade-safe and historical slots stale", () => {

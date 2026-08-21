@@ -346,6 +346,10 @@ const approvedMigrationHashes = new Map([
     "255b88191d6bdfc679ea5066b247c47ad19fca41832baace209db424736972fa",
   ],
   [
+    "packages/db/migrations/0018_expert_residency_referrals.sql",
+    "c5aace02f2d71ab16c96fb441dc1c10fa4f89d4a5cf98839ec2de87202104645",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -412,6 +416,10 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/meta/0017_snapshot.json",
     "42dd577fe90276a165e03294701ea22ad799cfdd5e631e69d94b5008a9bcb903",
+  ],
+  [
+    "packages/db/migrations/meta/0018_snapshot.json",
+    "7a575b28450b7ef7da5c9ff36633f9b76647897166c9e9e58c3186a896d7bfdf",
   ],
   [
     "packages/db/migrations/meta/_journal.json",
