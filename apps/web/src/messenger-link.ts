@@ -8,9 +8,8 @@ export function buildMessengerLink(
   intent: MessengerIntent,
 ): URL {
   const target = new URL(config.expertChatUrl.href);
-  target.searchParams.set(
-    "start",
-    intent === "client" ? "client" : `expert_${intent}`,
-  );
+  const start =
+    intent === "client" || intent === "expert" ? intent : `expert_${intent}`;
+  target.searchParams.set("start", start);
   return target;
 }

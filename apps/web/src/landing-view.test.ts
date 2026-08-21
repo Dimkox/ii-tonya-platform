@@ -21,14 +21,18 @@ describe("promotional landing view", () => {
     ]) {
       expect(html).toContain(`id="${id}"`);
     }
-    expect(html.match(/<details\b/gu)).toHaveLength(8);
+    expect(html.match(/<details\b/gu)?.length).toBeGreaterThanOrEqual(10);
+    expect(html).toContain('src="/tonya-hero.png"');
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/oferta"');
+    expect(html).toContain("326680000031840");
   });
 
   it("keeps every action inside the messenger boundary", () => {
     const actionLinks = [
       ...html.matchAll(/data-messenger-action href="([^"]+)"/gu),
     ];
-    expect(actionLinks.length).toBeGreaterThanOrEqual(6);
+    expect(actionLinks.length).toBeGreaterThanOrEqual(7);
     for (const [, href] of actionLinks) {
       const target = new URL(href!);
       expect(target.origin).toBe("https://t.me");
@@ -41,6 +45,10 @@ describe("promotional landing view", () => {
       /<form\b|<input\b|authorization|bearer|checkout|yookassa|payment|analytics|pixel/iu,
     );
     expect(html).not.toMatch(/on(?:click|submit|load)=/iu);
-    expect(html).not.toMatch(/href="\/(?:privacy|offer)\.html"/u);
+    expect(html).not.toMatch(/mc\.yandex|google-analytics|fonts\.googleapis/iu);
+    expect(html).not.toMatch(
+      /тест клиент|тест эксперт|пакет(?:ы|а)? сообщений|купон/iu,
+    );
+    expect(html).toContain("Платёжных элементов на этой странице нет");
   });
 });
