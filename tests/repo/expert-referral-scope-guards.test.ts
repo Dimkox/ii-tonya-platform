@@ -89,6 +89,11 @@ describe("expert residency referral scope guards", () => {
       "export const coupon500 = 500",
     ],
     [
+      "a case-variant expert referral domain sibling",
+      "packages/domain/src/Expert-Referral.ts",
+      "export const bypass = () => 0n;",
+    ],
+    [
       "an unreviewed expert referral route",
       "apps/api/src/routes/expert-referrals.ts",
       'fastify.post("/v1/expert/referrals/export", handler);',

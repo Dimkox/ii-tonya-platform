@@ -126,8 +126,13 @@ export function resolveRewardReversal(input: {
     throw new Error("invalid_reward_status");
   }
   const reversedAtMilliseconds = requireDate(input.reversedAt);
-  if (input.rewardStatus === "pending_feature_hold") {
-    if (input.allocations.length !== 0) throw new Error("invalid_reward_allocation");
+  if (
+    input.rewardStatus === "pending_feature_hold"
+    || (input.rewardStatus === "cancelled_by_refund" && input.allocations.length === 0)
+  ) {
+    if (input.rewardStatus === "pending_feature_hold" && input.allocations.length !== 0) {
+      throw new Error("invalid_reward_allocation");
+    }
     return { remove: 0n, cancelReservations: 0n, debt: 0n } as const;
   }
   let allocationTotalMinor = 0n;

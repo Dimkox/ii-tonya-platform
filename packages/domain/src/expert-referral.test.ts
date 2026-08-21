@@ -151,6 +151,11 @@ describe("expert referral financial rules", () => {
         expiresAt: new Date("2026-09-01T00:00:00.000Z"),
       }],
     })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
+    expect(resolveRewardReversal({
+      rewardStatus: "cancelled_by_refund",
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [],
+    })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
   });
 
   it("rejects the mutation that removes an allocation already expired at reversal equality", () => {

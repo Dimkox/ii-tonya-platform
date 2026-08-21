@@ -135,6 +135,19 @@ describe("expert referral financial properties", () => {
     ), { numRuns: 100 });
   });
 
+  it("rejects the mutation that requires a cancelled held reward to have grant allocations", () => {
+    fc.assert(fc.property(
+      fc.integer({ min: Date.UTC(2020, 0, 1), max: Date.UTC(2030, 11, 31) }),
+      (reversedAtMilliseconds) => {
+        expect(resolveRewardReversal({
+          rewardStatus: "cancelled_by_refund",
+          reversedAt: new Date(reversedAtMilliseconds),
+          allocations: [],
+        })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
+      },
+    ), { numRuns: 200 });
+  });
+
   it("rejects the mutation that repeats financial effects after a granted reward is reversed", () => {
     fc.assert(fc.property(
       fc.integer({ min: 1, max: 99_998 }),

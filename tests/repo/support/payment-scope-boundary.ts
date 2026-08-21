@@ -515,8 +515,9 @@ export interface PaymentScopeProbe {
   readonly content: string;
 }
 
-const normalizePath = (path: string): string =>
-  path.replaceAll("\\", "/").toLowerCase();
+const canonicalPath = (path: string): string => path.replaceAll("\\", "/");
+
+const normalizePath = (path: string): string => canonicalPath(path).toLowerCase();
 
 const isTestSource = (path: string): boolean =>
   /(?:^|\/)tests?\//u.test(path) ||
@@ -996,6 +997,7 @@ export const classifyPaymentScopeProbe = ({
   path: rawPath,
   content,
 }: PaymentScopeProbe): readonly string[] => {
+  const exactPath = canonicalPath(rawPath);
   const path = normalizePath(rawPath);
 
   const violations: string[] = [];
@@ -1025,7 +1027,7 @@ export const classifyPaymentScopeProbe = ({
 
   if (
     forbiddenCommercialDomainPath.test(path)
-    && !approvedExpertReferralDomainPaths.has(path)
+    && !approvedExpertReferralDomainPaths.has(exactPath)
   ) {
     violations.push("commercial coupon or referral domain path");
   }
