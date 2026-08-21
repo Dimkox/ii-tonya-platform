@@ -161,7 +161,9 @@ describe("PostgreSQL client catalog request repository", () => {
 
     await testDb.db.execute(sql`
       update client_catalog_requests
-      set state='expired',service_code=null,language=null,expired_at=now()
+      set created_at=clock_timestamp()-interval '2 days',
+        updated_at=clock_timestamp(),
+        expires_at=clock_timestamp()-interval '1 second'
       where id=${receipt.catalogRequestId}::uuid
     `);
     await testDb.db.execute(sql`

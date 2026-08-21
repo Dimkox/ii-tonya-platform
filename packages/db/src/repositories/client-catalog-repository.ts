@@ -324,6 +324,7 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
         where r.id=${catalogRequestId}::uuid
           and r.user_id=${userId}::uuid
           and r.state in ('pending','ready')
+          and r.expires_at > clock_timestamp()
       `)
     ).rows[0];
     if (row === undefined) return null;
