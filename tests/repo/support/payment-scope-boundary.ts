@@ -496,6 +496,8 @@ const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
 const expertResidencyIntegrationPath =
   /^packages\/integrations\/src\/expert-residency\//u;
+const expertResidencyContractPath =
+  /^packages\/contracts\/src\/expert-residency(?:[-_.\/]|$)/u;
 const expertResidencyRoute =
   /^\/v1\/(?:expert\/(?:referrals|residency)|admin\/expert-referrals)(?:\/|$)/u;
 const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY)_/u;
@@ -836,7 +838,31 @@ const inspectTypeScript = (
     }
 
     if (
-      ts.isStringLiteral(node) &&
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      node.initializer &&
+      ts.isPropertyAccessExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === "process" &&
+      node.initializer.name.text === "env"
+    ) {
+      for (const element of node.name.elements) {
+        const keyNode = element.propertyName ?? element.name;
+        if (!ts.isIdentifier(keyNode) && !ts.isStringLiteral(keyNode)) {
+          continue;
+        }
+        const key = keyNode.text;
+        if (
+          expertResidencyFlag.test(key) &&
+          !EXPERT_RESIDENCY_ALLOWED_FLAGS.has(key)
+        ) {
+          violations.push(`unapproved expert residency flag: ${key}`);
+        }
+      }
+    }
+
+    if (
+      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
       expertResidencyAdminAction.test(node.text) &&
       !EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS.has(node.text)
     ) {
@@ -971,10 +997,11 @@ export const classifyPaymentScopeProbe = ({
 
   const violations: string[] = [];
   if (
-    expertResidencyIntegrationPath.test(path) &&
+    (expertResidencyIntegrationPath.test(path) ||
+      expertResidencyContractPath.test(path)) &&
     !EXPERT_RESIDENCY_ALLOWED_PATHS.has(path)
   ) {
-    violations.push("unapproved expert residency integration path");
+    violations.push("unapproved expert residency boundary path");
   } else if (path.startsWith("packages/integrations/")) {
     if (
       !approvedPaymentBoundaryPaths.has(path) &&

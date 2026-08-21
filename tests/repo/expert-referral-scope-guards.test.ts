@@ -74,6 +74,11 @@ describe("expert residency referral scope guards", () => {
       'export const send = () => fetch("https://provider.invalid")',
     ],
     [
+      "an unlisted expert residency contract sibling",
+      "packages/contracts/src/expert-residency-copy.ts",
+      "export interface ExpertResidencyPaymentPort {}",
+    ],
+    [
       "provider content inside the named boundary",
       "packages/integrations/src/expert-residency/payment-port.ts",
       'export const send = () => fetch("https://provider.invalid")',
@@ -97,6 +102,16 @@ describe("expert residency referral scope guards", () => {
       "an unreviewed expert referral admin action",
       "packages/application/src/expert-referrals.ts",
       'export const action = "expert_referral.export";',
+    ],
+    [
+      "an unreviewed expert referral admin action in a template literal",
+      "packages/application/src/expert-referrals.ts",
+      "export const action = `expert_referral.export`;",
+    ],
+    [
+      "an unreviewed expert referral feature flag destructured from process.env",
+      "packages/config/src/expert-referrals.ts",
+      "const { EXPERT_REFERRAL_EXPORT_ENABLED } = process.env;",
     ],
     [
       "an unreviewed expert referral relation",
