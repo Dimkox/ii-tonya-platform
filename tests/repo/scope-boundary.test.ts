@@ -305,25 +305,29 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
-    [
-      "migration",
-      "packages/db/migrations/0018_expert_residency_referrals.sql",
-      "CREATE TABLE expert_referrals (id uuid primary key);",
-    ],
-    [
-      "snapshot",
-      "packages/db/migrations/meta/0018_snapshot.json",
-      '{"tables":{"public.expert_referrals":{"name":"expert_referrals"}}}',
-    ],
-    [
-      "journal",
-      "packages/db/migrations/meta/_journal.json",
-      '{"entries":[{"tag":"0018_expert_residency_referrals"}]}',
-    ],
+    ["migration", "packages/db/migrations/0018_expert_residency_referrals.sql"],
+    ["snapshot", "packages/db/migrations/meta/0018_snapshot.json"],
+    ["journal", "packages/db/migrations/meta/_journal.json"],
   ])(
-    "reserves the reviewed expert residency referral %s artifact path",
-    (_label, path, content) => {
-      expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    "pins and mutation-checks the final expert referral %s",
+    (_label, path) => {
+      const content = readFileSync(path, "utf8");
+      expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual(
+        [],
+      );
+      expect(
+        classifyApprovedTrackedScopeContent({
+          path,
+          content: `${content}\nmutation`,
+        }),
+      ).toEqual([
+        expect.stringMatching(/^approved tracked scope hash mismatch:/u),
+      ]);
+      expect(
+        classifyApprovedTrackedScopeContent({ path, content: "placeholder" }),
+      ).toEqual([
+        expect.stringMatching(/^approved tracked scope hash mismatch:/u),
+      ]);
     },
   );
 

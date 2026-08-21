@@ -519,6 +519,7 @@ export const expertReferralLedgerEntries = pgTable(
     amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull(),
     sourceType: text("source_type").notNull(),
     sourceId: uuid("source_id").notNull(),
+    rewardGrantId: uuid("reward_grant_id"),
     originalEntryId: uuid("original_entry_id"),
     adminApprovalId: uuid("admin_approval_id").references(
       () => adminApprovals.id,
@@ -530,6 +531,11 @@ export const expertReferralLedgerEntries = pgTable(
     createdAt,
   },
   (table) => [
+    foreignKey({
+      columns: [table.rewardGrantId],
+      foreignColumns: [expertReferralRewardGrants.id],
+      name: "expert_ledger_reward_grant_fk",
+    }),
     foreignKey({
       columns: [table.originalEntryId],
       foreignColumns: [table.id],
@@ -544,15 +550,21 @@ export const expertReferralLedgerEntries = pgTable(
     check(
       "expert_ledger_entry_contract",
       sql`
-        (${table.entryKind} = 'reward_grant' and ${table.amountMinor} > 0 and ${table.originalEntryId} is null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} = 'reservation' and ${table.amountMinor} < 0 and ${table.originalEntryId} is null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} = 'release' and ${table.amountMinor} > 0 and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} = 'spend' and ${table.amountMinor} < 0 and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} in ('expiry', 'reversal') and ${table.amountMinor} < 0 and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} = 'debt_repayment' and ${table.amountMinor} > 0 and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
-        or (${table.entryKind} = 'administrative_correction' and ${table.amountMinor} <> 0 and ${table.adminApprovalId} is not null and ${table.adminSessionIdHash} is not null)
+        (${table.entryKind} = 'reward_grant' and ${table.amountMinor} > 0 and ${table.sourceType} = 'reward_grant' and ${table.sourceId} = ${table.rewardGrantId} and ${table.rewardGrantId} is not null and ${table.originalEntryId} is null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} = 'reservation' and ${table.amountMinor} < 0 and ${table.rewardGrantId} is null and ${table.originalEntryId} is null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} = 'release' and ${table.amountMinor} > 0 and ${table.rewardGrantId} is null and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} = 'spend' and ${table.amountMinor} < 0 and ${table.rewardGrantId} is null and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} in ('expiry', 'reversal') and ${table.amountMinor} < 0 and ${table.sourceType} = 'reward_grant' and ${table.rewardGrantId} is null and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} = 'debt_repayment' and ${table.amountMinor} > 0 and ${table.sourceType} = 'reward_grant' and ${table.rewardGrantId} is null and ${table.originalEntryId} is not null and ${table.adminApprovalId} is null and ${table.adminSessionIdHash} is null)
+        or (${table.entryKind} = 'administrative_correction' and ${table.amountMinor} <> 0 and ${table.rewardGrantId} is null and ${table.adminApprovalId} is not null and ${table.adminSessionIdHash} is not null)
       `,
     ),
+    uniqueIndex("expert_ledger_reward_grant_unique")
+      .on(table.rewardGrantId)
+      .where(sql`${table.entryKind} = 'reward_grant'`),
+    uniqueIndex("expert_ledger_reservation_terminal_unique")
+      .on(table.originalEntryId)
+      .where(sql`${table.entryKind} in ('release', 'spend')`),
     index("expert_ledger_account_created").on(
       table.accountExpertId,
       table.createdAt,
@@ -759,7 +771,17 @@ export const expertReferralBalances = pgView("expert_referral_balances", {
       g.inviter_expert_id as expert_id,
       g.expires_at,
       coalesce(sum(
-        case when l.amount_minor < 0 then -a.amount_minor else a.amount_minor end
+        case
+          when l.entry_kind in ('release', 'debt_repayment') then 0
+          when l.entry_kind = 'reservation' and exists (
+            select 1
+            from expert_referral_ledger_entries terminal
+            where terminal.original_entry_id = l.id
+              and terminal.entry_kind in ('release', 'spend')
+          ) then 0
+          when l.amount_minor < 0 then -a.amount_minor
+          else a.amount_minor
+        end
       ), 0)::bigint as net_minor
     from expert_referral_reward_grants g
     left join expert_referral_ledger_allocations a on a.reward_grant_id = g.id

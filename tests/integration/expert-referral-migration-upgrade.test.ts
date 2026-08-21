@@ -40,6 +40,19 @@ async function relationExists(name: string): Promise<boolean> {
   return result.rows[0]?.exists ?? false;
 }
 
+function duplicateGuardIsFirstStatement(migration: string): boolean {
+  const statements = migration
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  const guard = statements[0] ?? "";
+  return (
+    guard.startsWith("DO $$") &&
+    guard.includes("expert_user_identity_duplicates") &&
+    !/\b(?:create|alter|drop|truncate|grant|revoke|comment)\b/iu.test(guard)
+  );
+}
+
 beforeAll(async () => {
   legacyDb = await startTestPostgres();
   for (let index = 0; index <= 17; index += 1) {
@@ -114,6 +127,12 @@ describe("expert referral 0017 to 0018 migration", () => {
       "packages/db/migrations/0018_expert_residency_referrals.sql",
       "utf8",
     );
+    expect(duplicateGuardIsFirstStatement(migration)).toBe(true);
+    expect(
+      duplicateGuardIsFirstStatement(
+        `CREATE TABLE leaked_before_guard (id integer);--> statement-breakpoint\n${migration}`,
+      ),
+    ).toBe(false);
     let caught: unknown;
     try {
       await legacyDb.db.$client.query(migration);
@@ -128,11 +147,52 @@ describe("expert referral 0017 to 0018 migration", () => {
           String(error.message).includes("expert_user_identity_duplicates"),
       ),
     ).toBe(true);
-    await expect(relationExists("expert_referral_code_batches")).resolves.toBe(
-      false,
-    );
-    await expect(
-      relationExists("expert_referral_feature_controls"),
-    ).resolves.toBe(false);
+    for (const relation of [
+      "expert_first_residency_settlements",
+      "expert_referral_abuse_holds",
+      "expert_referral_code_batches",
+      "expert_referral_codes",
+      "expert_referral_feature_controls",
+      "expert_referral_issuance_overrides",
+      "expert_referral_ledger_allocations",
+      "expert_referral_ledger_entries",
+      "expert_referral_reward_grants",
+      "expert_referrals",
+      "expert_residency_orders",
+      "expert_residency_payment_attempts",
+      "expert_residency_provider_event_inbox",
+      "expert_residency_tariff_versions",
+      "expert_referral_balances",
+    ]) {
+      await expect(relationExists(relation), relation).resolves.toBe(false);
+    }
+
+    const durableArtifacts = await legacyDb.db.execute<{ count: string }>(sql`
+      select count(*)::text as count
+      from (
+        select t.oid
+        from pg_type t
+        where t.typname = any(array[
+          'expert_first_settlement_eligibility',
+          'expert_referral_abuse_hold_status',
+          'expert_referral_batch_status',
+          'expert_referral_code_status',
+          'expert_referral_ledger_entry_kind',
+          'expert_residency_order_status',
+          'expert_residency_payment_attempt_status',
+          'expert_residency_provider_event_status'
+        ])
+        union all
+        select p.oid
+        from pg_proc p
+        where p.proname like '%expert_referral%'
+           or p.proname like 'enforce_expert_%'
+        union all
+        select e.oid
+        from pg_extension e
+        where e.extname = 'btree_gist'
+      ) artifacts
+    `);
+    expect(durableArtifacts.rows[0]?.count).toBe("0");
   });
 });

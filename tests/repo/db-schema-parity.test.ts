@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   getTableConfig,
   getViewConfig,
+  PgDialect,
   type AnyPgTable,
   type PgView,
 } from "drizzle-orm/pg-core";
@@ -310,40 +311,134 @@ describe("authoritative Drizzle schema parity", () => {
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
-      tables?: Record<string, unknown>;
-      views?: Record<string, unknown>;
+      id: string;
+      prevId: string;
+      tables: Record<
+        string,
+        {
+          columns: Record<string, { type: string }>;
+          indexes: Record<string, unknown>;
+          foreignKeys: Record<string, unknown>;
+          compositePrimaryKeys: Record<string, unknown>;
+          uniqueConstraints: Record<string, unknown>;
+          checkConstraints: Record<string, unknown>;
+        }
+      >;
+      views: Record<
+        string,
+        {
+          columns: Record<string, { type: string }>;
+          definition: string;
+        }
+      >;
     };
-    expect(snapshot.tables).toHaveProperty(
-      "public.expert_referral_ledger_allocations",
-    );
-    expect(snapshot.tables).toHaveProperty(
-      "public.expert_referral_feature_controls",
-    );
-    expect(snapshot.views).toHaveProperty("public.expert_referral_balances");
-
     const migration = readFileSync(
       "packages/db/migrations/0018_expert_residency_referrals.sql",
       "utf8",
     );
-    expect(
-      migration.indexOf("expert_user_identity_duplicates"),
-    ).toBeGreaterThan(-1);
-    expect(migration.indexOf("expert_user_identity_duplicates")).toBeLessThan(
-      migration.indexOf("CREATE EXTENSION"),
+    const reviewedTables = [
+      "expertReferralCodeBatches",
+      "expertReferralCodes",
+      "expertReferrals",
+      "expertResidencyTariffVersions",
+      "expertResidencyOrders",
+      "expertResidencyPaymentAttempts",
+      "expertResidencyProviderEventInbox",
+      "expertFirstResidencySettlements",
+      "expertReferralRewardGrants",
+      "expertReferralLedgerEntries",
+      "expertReferralLedgerAllocations",
+      "expertReferralIssuanceOverrides",
+      "expertReferralAbuseHolds",
+      "expertReferralFeatureControls",
+    ] as const;
+    expect(reviewedTables).toHaveLength(14);
+
+    for (const exportName of reviewedTables) {
+      const table = dbSchema[exportName] as AnyPgTable;
+      const config = getTableConfig(table);
+      const generated = snapshot.tables[`public.${config.name}`];
+      expect(generated, exportName).toBeDefined();
+      if (generated === undefined) continue;
+
+      expect(
+        Object.keys(generated.columns).sort(),
+        `${exportName} columns`,
+      ).toEqual(config.columns.map(({ name }) => name).sort());
+      for (const column of config.columns) {
+        expect(
+          generated.columns[column.name]?.type,
+          `${exportName}.${column.name}`,
+        ).toBe(column.getSQLType());
+      }
+
+      const expectedMetadataNames = {
+        checks: config.checks.map(({ name }) => name).sort(),
+        foreignKeys: config.foreignKeys
+          .map((foreignKey) => foreignKey.getName())
+          .sort(),
+        indexes: config.indexes.map(({ config: index }) => index.name).sort(),
+        primaryKeys: config.primaryKeys
+          .map((primaryKey) => primaryKey.getName())
+          .sort(),
+        uniques: config.uniqueConstraints.map(({ name }) => name).sort(),
+      };
+      expect(Object.keys(generated.checkConstraints).sort()).toEqual(
+        expectedMetadataNames.checks,
+      );
+      expect(Object.keys(generated.foreignKeys).sort()).toEqual(
+        expectedMetadataNames.foreignKeys,
+      );
+      expect(Object.keys(generated.indexes).sort()).toEqual(
+        expectedMetadataNames.indexes,
+      );
+      expect(Object.keys(generated.compositePrimaryKeys).sort()).toEqual(
+        expectedMetadataNames.primaryKeys,
+      );
+      expect(Object.keys(generated.uniqueConstraints).sort()).toEqual(
+        expectedMetadataNames.uniques,
+      );
+      for (const name of Object.values(expectedMetadataNames).flat()) {
+        expect(migration, `${exportName}: ${name}`).toContain(name);
+      }
+    }
+
+    const viewConfig = getViewConfig(dbSchema.expertReferralBalances as PgView);
+    const generatedView = snapshot.views["public.expert_referral_balances"];
+    expect(generatedView).toBeDefined();
+    expect(viewConfig.query).toBeDefined();
+    if (generatedView === undefined || viewConfig.query === undefined) return;
+    expect(Object.keys(generatedView.columns).sort()).toEqual(
+      (Object.values(viewConfig.selectedFields) as Array<{ name: string }>)
+        .map((field) => field.name)
+        .sort(),
     );
-    for (const name of [
+    expect(generatedView.definition.trim()).toBe(
+      new PgDialect().sqlToQuery(viewConfig.query).sql.trim(),
+    );
+
+    const previousSnapshot = JSON.parse(
+      readFileSync("packages/db/migrations/meta/0017_snapshot.json", "utf8"),
+    ) as { id: string };
+    expect(snapshot.prevId).toBe(previousSnapshot.id);
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; tag: string }> };
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 18,
+      tag: "0018_expert_residency_referrals",
+    });
+    expect(journal.entries.filter(({ idx }) => idx === 18)).toHaveLength(1);
+
+    for (const hardenedName of [
       "experts_user_id_unique",
-      "expert_order_credit_cap",
-      "expert_order_cash_remainder",
       "expert_tariff_active_interval_exclusion",
-      "expert_provider_event_unique",
-      "expert_first_settlement_expert_unique",
-      "expert_reward_exact_amount",
-      "expert_reward_exact_expiry",
-      "expert_abuse_hold_one_open",
+      "expert_first_settlement_order_eligible",
+      "expert_reward_ledger_exact",
+      "expert_ledger_terminal_match",
       "expert_ledger_allocation_required",
     ]) {
-      expect(migration, name).toContain(name);
+      expect(migration, hardenedName).toContain(hardenedName);
     }
   });
 

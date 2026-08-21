@@ -152,6 +152,7 @@ CREATE TABLE "expert_referral_ledger_entries" (
 	"amount_minor" bigint NOT NULL,
 	"source_type" text NOT NULL,
 	"source_id" uuid NOT NULL,
+	"reward_grant_id" uuid,
 	"original_entry_id" uuid,
 	"admin_approval_id" uuid,
 	"admin_session_id_hash" text,
@@ -160,13 +161,13 @@ CREATE TABLE "expert_referral_ledger_entries" (
 	CONSTRAINT "expert_ledger_idempotency_unique" UNIQUE("idempotency_key"),
 	CONSTRAINT "expert_ledger_source_fact_unique" UNIQUE("entry_kind","source_type","source_id"),
 	CONSTRAINT "expert_ledger_entry_contract" CHECK (
-        ("expert_referral_ledger_entries"."entry_kind" = 'reward_grant' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."original_entry_id" is null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" = 'reservation' and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."original_entry_id" is null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" = 'release' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" = 'spend' and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" in ('expiry', 'reversal') and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" = 'debt_repayment' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
-        or ("expert_referral_ledger_entries"."entry_kind" = 'administrative_correction' and "expert_referral_ledger_entries"."amount_minor" <> 0 and "expert_referral_ledger_entries"."admin_approval_id" is not null and "expert_referral_ledger_entries"."admin_session_id_hash" is not null)
+        ("expert_referral_ledger_entries"."entry_kind" = 'reward_grant' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."source_type" = 'reward_grant' and "expert_referral_ledger_entries"."source_id" = "expert_referral_ledger_entries"."reward_grant_id" and "expert_referral_ledger_entries"."reward_grant_id" is not null and "expert_referral_ledger_entries"."original_entry_id" is null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" = 'reservation' and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."original_entry_id" is null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" = 'release' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" = 'spend' and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" in ('expiry', 'reversal') and "expert_referral_ledger_entries"."amount_minor" < 0 and "expert_referral_ledger_entries"."source_type" = 'reward_grant' and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" = 'debt_repayment' and "expert_referral_ledger_entries"."amount_minor" > 0 and "expert_referral_ledger_entries"."source_type" = 'reward_grant' and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."original_entry_id" is not null and "expert_referral_ledger_entries"."admin_approval_id" is null and "expert_referral_ledger_entries"."admin_session_id_hash" is null)
+        or ("expert_referral_ledger_entries"."entry_kind" = 'administrative_correction' and "expert_referral_ledger_entries"."amount_minor" <> 0 and "expert_referral_ledger_entries"."reward_grant_id" is null and "expert_referral_ledger_entries"."admin_approval_id" is not null and "expert_referral_ledger_entries"."admin_session_id_hash" is not null)
       )
 );
 --> statement-breakpoint
@@ -329,6 +330,7 @@ ALTER TABLE "expert_referral_ledger_allocations" ADD CONSTRAINT "expert_referral
 ALTER TABLE "expert_referral_ledger_entries" ADD CONSTRAINT "expert_referral_ledger_entries_account_expert_id_experts_id_fk" FOREIGN KEY ("account_expert_id") REFERENCES "public"."experts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expert_referral_ledger_entries" ADD CONSTRAINT "expert_referral_ledger_entries_admin_approval_id_admin_approvals_id_fk" FOREIGN KEY ("admin_approval_id") REFERENCES "public"."admin_approvals"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expert_referral_ledger_entries" ADD CONSTRAINT "expert_referral_ledger_entries_admin_session_id_hash_admin_sessions_session_id_hash_fk" FOREIGN KEY ("admin_session_id_hash") REFERENCES "public"."admin_sessions"("session_id_hash") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "expert_referral_ledger_entries" ADD CONSTRAINT "expert_ledger_reward_grant_fk" FOREIGN KEY ("reward_grant_id") REFERENCES "public"."expert_referral_reward_grants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expert_referral_ledger_entries" ADD CONSTRAINT "expert_ledger_original_entry_fk" FOREIGN KEY ("original_entry_id") REFERENCES "public"."expert_referral_ledger_entries"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expert_referral_reward_grants" ADD CONSTRAINT "expert_referral_reward_grants_inviter_expert_id_experts_id_fk" FOREIGN KEY ("inviter_expert_id") REFERENCES "public"."experts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expert_referral_reward_grants" ADD CONSTRAINT "expert_referral_reward_grants_referral_id_expert_referrals_id_fk" FOREIGN KEY ("referral_id") REFERENCES "public"."expert_referrals"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -352,6 +354,8 @@ CREATE INDEX "expert_referral_code_inventory" ON "expert_referral_codes" USING b
 CREATE INDEX "expert_issuance_override_inviter_expiry" ON "expert_referral_issuance_overrides" USING btree ("inviter_expert_id","expires_at");--> statement-breakpoint
 CREATE INDEX "expert_ledger_allocation_grant" ON "expert_referral_ledger_allocations" USING btree ("reward_grant_id","ledger_entry_id");--> statement-breakpoint
 CREATE INDEX "expert_ledger_account_created" ON "expert_referral_ledger_entries" USING btree ("account_expert_id","created_at","id");--> statement-breakpoint
+CREATE UNIQUE INDEX "expert_ledger_reward_grant_unique" ON "expert_referral_ledger_entries" USING btree ("reward_grant_id") WHERE "expert_referral_ledger_entries"."entry_kind" = 'reward_grant';--> statement-breakpoint
+CREATE UNIQUE INDEX "expert_ledger_reservation_terminal_unique" ON "expert_referral_ledger_entries" USING btree ("original_entry_id") WHERE "expert_referral_ledger_entries"."entry_kind" in ('release', 'spend');--> statement-breakpoint
 CREATE INDEX "expert_ledger_original_entry" ON "expert_referral_ledger_entries" USING btree ("original_entry_id");--> statement-breakpoint
 CREATE INDEX "expert_reward_inviter_expiry" ON "expert_referral_reward_grants" USING btree ("inviter_expert_id","expires_at","granted_at","id");--> statement-breakpoint
 CREATE INDEX "expert_referral_inviter_bound" ON "expert_referrals" USING btree ("inviter_expert_id","bound_at");--> statement-breakpoint
@@ -391,12 +395,135 @@ FOR EACH ROW EXECUTE FUNCTION reject_expert_referral_append_only_change();--> st
 CREATE TRIGGER "expert_referral_ledger_allocations_append_only"
 BEFORE UPDATE OR DELETE ON "expert_referral_ledger_allocations"
 FOR EACH ROW EXECUTE FUNCTION reject_expert_referral_append_only_change();--> statement-breakpoint
+CREATE FUNCTION enforce_expert_first_settlement_order()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM expert_residency_orders o
+    WHERE o.id = NEW.qualifying_order_id
+      AND o.expert_id = NEW.expert_id
+      AND o.status = 'settled'
+      AND o.settled_at = NEW.settled_at
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert first settlement requires its expert settled order',
+      CONSTRAINT = 'expert_first_settlement_order_eligible';
+  END IF;
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "expert_first_settlement_order_eligible"
+BEFORE INSERT ON "expert_first_residency_settlements"
+FOR EACH ROW EXECUTE FUNCTION enforce_expert_first_settlement_order();--> statement-breakpoint
+CREATE FUNCTION enforce_expert_ledger_entry_lifecycle()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  original_kind expert_referral_ledger_entry_kind;
+  original_account_expert_id uuid;
+  original_amount_minor bigint;
+  original_reward_grant_id uuid;
+  compensated_minor numeric;
+  repaid_minor numeric;
+BEGIN
+  IF NEW.entry_kind IN ('release', 'spend', 'expiry', 'reversal', 'debt_repayment') THEN
+    SELECT entry_kind, account_expert_id, amount_minor, reward_grant_id
+    INTO original_kind, original_account_expert_id, original_amount_minor,
+      original_reward_grant_id
+    FROM expert_referral_ledger_entries
+    WHERE id = NEW.original_entry_id
+    FOR NO KEY UPDATE;
+
+    IF NOT FOUND OR original_account_expert_id <> NEW.account_expert_id THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'expert ledger compensation account or original is invalid',
+        CONSTRAINT = 'expert_ledger_compensation_original';
+    END IF;
+  END IF;
+
+  IF NEW.entry_kind IN ('release', 'spend')
+    AND (original_kind <> 'reservation' OR abs(NEW.amount_minor) <> abs(original_amount_minor))
+  THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert reservation terminal must exactly match its reservation',
+      CONSTRAINT = 'expert_ledger_terminal_match';
+  END IF;
+
+  IF NEW.entry_kind IN ('expiry', 'reversal')
+    AND (
+      original_kind <> 'reward_grant'
+      OR NEW.source_id <> original_reward_grant_id
+      OR abs(NEW.amount_minor) > abs(original_amount_minor)
+    )
+  THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert grant compensation must be bound and bounded',
+      CONSTRAINT = 'expert_ledger_compensation_original';
+  END IF;
+
+  IF NEW.entry_kind IN ('expiry', 'reversal') THEN
+    SELECT coalesce(sum(abs(amount_minor)), 0)
+    INTO compensated_minor
+    FROM expert_referral_ledger_entries
+    WHERE entry_kind IN ('expiry', 'reversal')
+      AND original_entry_id = NEW.original_entry_id;
+    IF compensated_minor + abs(NEW.amount_minor) > abs(original_amount_minor) THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'expert grant compensation exceeds its reward',
+        CONSTRAINT = 'expert_ledger_compensation_original';
+    END IF;
+  END IF;
+
+  IF NEW.entry_kind = 'debt_repayment' THEN
+    IF original_kind <> 'reversal'
+      OR NOT EXISTS (
+        SELECT 1
+        FROM expert_referral_reward_grants g
+        WHERE g.id = NEW.source_id
+          AND g.inviter_expert_id = NEW.account_expert_id
+          AND NEW.amount_minor <= g.amount_minor
+      )
+    THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'expert debt repayment requires its debt and reward grant',
+        CONSTRAINT = 'expert_ledger_debt_repayment_bound';
+    END IF;
+
+    SELECT coalesce(sum(amount_minor), 0)
+    INTO repaid_minor
+    FROM expert_referral_ledger_entries
+    WHERE entry_kind = 'debt_repayment'
+      AND original_entry_id = NEW.original_entry_id;
+    IF repaid_minor + NEW.amount_minor > abs(original_amount_minor) THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'expert debt repayment exceeds its debt',
+        CONSTRAINT = 'expert_ledger_debt_repayment_bound';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "expert_ledger_entry_lifecycle"
+BEFORE INSERT ON "expert_referral_ledger_entries"
+FOR EACH ROW EXECUTE FUNCTION enforce_expert_ledger_entry_lifecycle();--> statement-breakpoint
 CREATE FUNCTION enforce_expert_ledger_allocation_total()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   target_ledger_entry_id uuid;
   target_amount_minor bigint;
   target_account_expert_id uuid;
+  target_entry_kind expert_referral_ledger_entry_kind;
+  target_original_entry_id uuid;
+  target_reward_grant_id uuid;
+  target_source_id uuid;
   allocated_minor numeric;
 BEGIN
   IF TG_TABLE_NAME = 'expert_referral_ledger_entries' THEN
@@ -405,8 +532,10 @@ BEGIN
     target_ledger_entry_id := NEW.ledger_entry_id;
   END IF;
 
-  SELECT abs(amount_minor), account_expert_id
-  INTO target_amount_minor, target_account_expert_id
+  SELECT abs(amount_minor), account_expert_id, entry_kind, original_entry_id,
+    reward_grant_id, source_id
+  INTO target_amount_minor, target_account_expert_id, target_entry_kind,
+    target_original_entry_id, target_reward_grant_id, target_source_id
   FROM expert_referral_ledger_entries
   WHERE id = target_ledger_entry_id;
 
@@ -439,6 +568,57 @@ BEGIN
       CONSTRAINT = 'expert_ledger_allocation_required';
   END IF;
 
+  IF target_entry_kind = 'reward_grant' AND NOT EXISTS (
+    SELECT 1
+    FROM expert_referral_ledger_allocations a
+    JOIN expert_referral_reward_grants g ON g.id = a.reward_grant_id
+    WHERE a.ledger_entry_id = target_ledger_entry_id
+      AND a.reward_grant_id = target_reward_grant_id
+      AND a.amount_minor = target_amount_minor
+      AND g.amount_minor = target_amount_minor
+      AND g.inviter_expert_id = target_account_expert_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert reward ledger fact must exactly match its grant',
+      CONSTRAINT = 'expert_reward_ledger_exact';
+  END IF;
+
+  IF target_entry_kind IN ('release', 'spend') AND EXISTS (
+    (SELECT reward_grant_id, amount_minor
+     FROM expert_referral_ledger_allocations
+     WHERE ledger_entry_id = target_original_entry_id
+     EXCEPT
+     SELECT reward_grant_id, amount_minor
+     FROM expert_referral_ledger_allocations
+     WHERE ledger_entry_id = target_ledger_entry_id)
+    UNION ALL
+    (SELECT reward_grant_id, amount_minor
+     FROM expert_referral_ledger_allocations
+     WHERE ledger_entry_id = target_ledger_entry_id
+     EXCEPT
+     SELECT reward_grant_id, amount_minor
+     FROM expert_referral_ledger_allocations
+     WHERE ledger_entry_id = target_original_entry_id)
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert reservation terminal allocations must exactly match',
+      CONSTRAINT = 'expert_ledger_terminal_match';
+  END IF;
+
+  IF target_entry_kind IN ('expiry', 'reversal', 'debt_repayment') AND EXISTS (
+    SELECT 1
+    FROM expert_referral_ledger_allocations
+    WHERE ledger_entry_id = target_ledger_entry_id
+      AND reward_grant_id <> target_source_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert compensation allocation must match its reward grant',
+      CONSTRAINT = 'expert_ledger_compensation_allocation_match';
+  END IF;
+
   RETURN NULL;
 END;
 $$;--> statement-breakpoint
@@ -450,6 +630,35 @@ CREATE CONSTRAINT TRIGGER "expert_ledger_allocation_total"
 AFTER INSERT ON "expert_referral_ledger_allocations"
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION enforce_expert_ledger_allocation_total();--> statement-breakpoint
+CREATE FUNCTION enforce_expert_reward_grant_ledger_required()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM expert_referral_ledger_entries l
+    JOIN expert_referral_ledger_allocations a
+      ON a.ledger_entry_id = l.id
+    WHERE l.entry_kind = 'reward_grant'
+      AND l.reward_grant_id = NEW.id
+      AND l.source_type = 'reward_grant'
+      AND l.source_id = NEW.id
+      AND l.account_expert_id = NEW.inviter_expert_id
+      AND l.amount_minor = NEW.amount_minor
+      AND a.reward_grant_id = NEW.id
+      AND a.amount_minor = NEW.amount_minor
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'expert reward grant requires one exact ledger fact',
+      CONSTRAINT = 'expert_reward_ledger_exact';
+  END IF;
+  RETURN NULL;
+END;
+$$;--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER "expert_reward_grant_ledger_required"
+AFTER INSERT ON "expert_referral_reward_grants"
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION enforce_expert_reward_grant_ledger_required();--> statement-breakpoint
 CREATE FUNCTION enforce_expert_reward_grant_identity()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -458,11 +667,16 @@ BEGIN
     FROM expert_referrals r
     JOIN expert_first_residency_settlements s
       ON s.id = NEW.first_settlement_id
+    JOIN expert_residency_orders o
+      ON o.id = NEW.qualifying_order_id
     WHERE r.id = NEW.referral_id
       AND r.inviter_expert_id = NEW.inviter_expert_id
       AND r.invitee_expert_id = s.expert_id
       AND s.qualifying_order_id = NEW.qualifying_order_id
       AND s.eligibility_status = 'eligible'
+      AND o.expert_id = s.expert_id
+      AND o.status = 'settled'
+      AND o.settled_at = s.settled_at
   ) THEN
     RAISE EXCEPTION USING
       ERRCODE = '23514',
@@ -574,7 +788,17 @@ CREATE VIEW "public"."expert_referral_balances" AS (
       g.inviter_expert_id as expert_id,
       g.expires_at,
       coalesce(sum(
-        case when l.amount_minor < 0 then -a.amount_minor else a.amount_minor end
+        case
+          when l.entry_kind in ('release', 'debt_repayment') then 0
+          when l.entry_kind = 'reservation' and exists (
+            select 1
+            from expert_referral_ledger_entries terminal
+            where terminal.original_entry_id = l.id
+              and terminal.entry_kind in ('release', 'spend')
+          ) then 0
+          when l.amount_minor < 0 then -a.amount_minor
+          else a.amount_minor
+        end
       ), 0)::bigint as net_minor
     from expert_referral_reward_grants g
     left join expert_referral_ledger_allocations a on a.reward_grant_id = g.id

@@ -347,7 +347,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0018_expert_residency_referrals.sql",
-    "c5aace02f2d71ab16c96fb441dc1c10fa4f89d4a5cf98839ec2de87202104645",
+    "187f2a123db20a986703897c5428a6a35e04ebcab577879f244845ccd173567b",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -419,11 +419,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0018_snapshot.json",
-    "7a575b28450b7ef7da5c9ff36633f9b76647897166c9e9e58c3186a896d7bfdf",
+    "8706279e3b9ea9cc4ba436a816447e41e7acaa52a051a2aab65054ff8a60bb5b",
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "91a9690a08b6d029aae0e0ae1a297f0c986f84be01a97a3d20a03e341a7e8efc",
+    "537c9482a966e1de709549fc6fe2426cd54877331cea7e0f43ee255fb2bf4237",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -469,12 +469,6 @@ const approvedDatabaseRelations = new Set([
   "users",
   "webhook_inbox",
   ...EXPERT_RESIDENCY_ALLOWED_RELATIONS,
-]);
-
-const expertResidencyReviewedMigrationArtifacts = new Set([
-  "packages/db/migrations/0018_expert_residency_referrals.sql",
-  "packages/db/migrations/meta/0018_snapshot.json",
-  "packages/db/migrations/meta/_journal.json",
 ]);
 
 const providerName =
@@ -525,7 +519,8 @@ export interface PaymentScopeProbe {
 
 const canonicalPath = (path: string): string => path.replaceAll("\\", "/");
 
-const normalizePath = (path: string): string => canonicalPath(path).toLowerCase();
+const normalizePath = (path: string): string =>
+  canonicalPath(path).toLowerCase();
 
 const isTestSource = (path: string): boolean =>
   /(?:^|\/)tests?\//u.test(path) ||
@@ -1034,8 +1029,8 @@ export const classifyPaymentScopeProbe = ({
   }
 
   if (
-    forbiddenCommercialDomainPath.test(path)
-    && !approvedExpertReferralDomainPaths.has(exactPath)
+    forbiddenCommercialDomainPath.test(path) &&
+    !approvedExpertReferralDomainPaths.has(exactPath)
   ) {
     violations.push("commercial coupon or referral domain path");
   }
@@ -1065,7 +1060,6 @@ export const classifyApprovedTrackedScopeContent = ({
   const isPackageManifest =
     path.endsWith("/package.json") || path === "package.json";
   const isMigration = path.startsWith("packages/db/migrations/");
-  if (expertResidencyReviewedMigrationArtifacts.has(path)) return [];
   const expectedHash =
     approvedPaymentBoundaryHashes.get(path) ??
     approvedMigrationHashes.get(path) ??
