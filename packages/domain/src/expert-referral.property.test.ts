@@ -6,6 +6,7 @@ import {
   quoteResidency,
   resolveRewardReversal,
   rewardExpiresAt,
+  spendableReferralCredit,
   type ReferralCreditGrant,
 } from "./expert-referral.js";
 
@@ -88,23 +89,91 @@ describe("expert referral financial properties", () => {
     ), { numRuns: 200 });
   });
 
-  it("rejects the mutation that re-applies a cancelled or held reward reversal", () => {
+  it("rejects the mutation that makes positive debt leave referral credit spendable", () => {
     fc.assert(fc.property(
-      fc.constantFrom<"pending_feature_hold" | "cancelled_by_refund" | "reversed">(
-        "pending_feature_hold",
+      fc.bigInt({ min: 0n, max: maxPostgresBigint }),
+      fc.bigInt({ min: 1n, max: maxPostgresBigint }),
+      (availableMinor, debtMinor) => {
+        expect(spendableReferralCredit(availableMinor, debtMinor)).toBe(0n);
+      },
+    ), { numRuns: 500 });
+  });
+
+  it("rejects the mutation that re-applies a cancelled reward reversal with nonzero allocations", () => {
+    fc.assert(fc.property(
+      fc.constantFrom<"cancelled_by_refund" | "reversed">(
         "cancelled_by_refund",
         "reversed",
       ),
-      (rewardStatus) => {
+      fc.integer({ min: 1, max: 99_998 }),
+      (rewardStatus, activeMinorNumber) => {
+        const activeMinor = BigInt(activeMinorNumber);
+        const reservedMinor = BigInt(99_999 - activeMinorNumber);
         const reversal = resolveRewardReversal({
           rewardStatus,
-          unspentMinor: 0n,
-          reservedMinor: 0n,
-          spentMinor: 0n,
+          reversedAt: at,
+          allocations: [
+            {
+              state: "active",
+              amountMinor: activeMinor,
+              expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+            },
+            {
+              state: "reserved",
+              amountMinor: reservedMinor,
+              expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+            },
+            {
+              state: "spent",
+              amountMinor: 1n,
+              expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+            },
+          ],
         });
         expect(reversal).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
       },
     ), { numRuns: 100 });
+  });
+
+  it("rejects the mutation that repeats financial effects after a granted reward is reversed", () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 1, max: 99_998 }),
+      (activeMinorNumber) => {
+        const activeMinor = BigInt(activeMinorNumber);
+        const reservedMinor = BigInt(99_999 - activeMinorNumber);
+        const allocations = [
+          {
+            state: "active" as const,
+            amountMinor: activeMinor,
+            expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+          },
+          {
+            state: "reserved" as const,
+            amountMinor: reservedMinor,
+            expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+          },
+          {
+            state: "spent" as const,
+            amountMinor: 1n,
+            expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+          },
+        ];
+        expect(resolveRewardReversal({
+          rewardStatus: "granted",
+          reversedAt: at,
+          allocations,
+        })).toEqual({
+          remove: activeMinor,
+          cancelReservations: reservedMinor,
+          debt: 1n,
+        });
+        expect(resolveRewardReversal({
+          rewardStatus: "reversed",
+          reversedAt: at,
+          allocations,
+        })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
+      },
+    ), { numRuns: 200 });
   });
 
   it("rejects the mutation that loses reward value while debt-repaying", () => {

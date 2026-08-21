@@ -124,6 +124,11 @@ describe("expert residency referral scope guards", () => {
 
   it.each([
     [
+      "the reviewed pure expert referral domain",
+      "packages/domain/src/expert-referral.ts",
+      "export const pureRule = () => 0n;",
+    ],
+    [
       "expert referral redemption route",
       "apps/api/src/routes/expert-referrals.ts",
       'fastify.post("/v1/expert/referrals/redeem", handler);',

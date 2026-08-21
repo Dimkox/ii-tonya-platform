@@ -7,6 +7,7 @@ import {
   rewardExpiresAt,
   resolveRewardReversal,
   settlementBeforeDeadline,
+  spendableReferralCredit,
 } from "./expert-referral.js";
 
 describe("expert referral financial rules", () => {
@@ -78,32 +79,102 @@ describe("expert referral financial rules", () => {
     })).toThrow("insufficient_credit");
   });
 
-  it("rejects the mutation that returns spent grant value as credit after a reversal", () => {
+  it("rejects the mutation that orders canonically equivalent grant IDs by input order", () => {
+    expect(allocateCreditFifo({
+      at: new Date("2026-08-03T00:00:00.000Z"),
+      allocationMinor: 2n,
+      grants: [
+        {
+          grantId: "ä",
+          availableMinor: 1n,
+          grantedAt: new Date("2026-07-01T00:00:00.000Z"),
+          expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        {
+          grantId: "ä",
+          availableMinor: 1n,
+          grantedAt: new Date("2026-07-01T00:00:00.000Z"),
+          expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+      ],
+    })).toEqual([
+      { grantId: "ä", amountMinor: 1n },
+      { grantId: "ä", amountMinor: 1n },
+    ]);
+  });
+
+  it("rejects the mutation that removes expired value or returns spent value as credit after a reversal", () => {
     expect(resolveRewardReversal({
       rewardStatus: "granted",
-      unspentMinor: 20_000n,
-      reservedMinor: 30_000n,
-      spentMinor: 50_000n,
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [
+        {
+          state: "active",
+          amountMinor: 20_000n,
+          expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        {
+          state: "reserved",
+          amountMinor: 30_000n,
+          expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        {
+          state: "spent",
+          amountMinor: 40_000n,
+          expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+        {
+          state: "expired",
+          amountMinor: 10_000n,
+          expiresAt: new Date("2026-08-02T23:59:59.999Z"),
+        },
+      ],
     })).toEqual({
       remove: 20_000n,
       cancelReservations: 30_000n,
-      debt: 50_000n,
+      debt: 40_000n,
     });
   });
 
-  it("rejects the mutation that grants credit after a held entitlement is cancelled by refund", () => {
+  it("rejects the mutation that grants or reverses nonzero credit after a held or cancelled entitlement", () => {
     expect(resolveRewardReversal({
       rewardStatus: "pending_feature_hold",
-      unspentMinor: 0n,
-      reservedMinor: 0n,
-      spentMinor: 0n,
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [],
     })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
     expect(resolveRewardReversal({
       rewardStatus: "cancelled_by_refund",
-      unspentMinor: 0n,
-      reservedMinor: 0n,
-      spentMinor: 0n,
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [{
+        state: "active",
+        amountMinor: 100_000n,
+        expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+      }],
     })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
+  });
+
+  it("rejects the mutation that removes an allocation already expired at reversal equality", () => {
+    expect(resolveRewardReversal({
+      rewardStatus: "granted",
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [{
+        state: "active",
+        amountMinor: 100_000n,
+        expiresAt: new Date("2026-08-03T00:00:00.000Z"),
+      }],
+    })).toEqual({ remove: 0n, cancelReservations: 0n, debt: 0n });
+  });
+
+  it("rejects the mutation that silently treats an unknown persisted reward status as reversed", () => {
+    expect(() => resolveRewardReversal({
+      rewardStatus: "corrupted" as never,
+      reversedAt: new Date("2026-08-03T00:00:00.000Z"),
+      allocations: [{
+        state: "active",
+        amountMinor: 100_000n,
+        expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+      }],
+    })).toThrow("invalid_reward_status");
   });
 
   it("rejects the mutation that creates spendable reward credit before repaying debt", () => {
@@ -117,6 +188,13 @@ describe("expert referral financial rules", () => {
       creditMinor: 75_000n,
       remainingDebtMinor: 0n,
     });
+  });
+
+  it("rejects the mutation that leaves any available credit spendable while debt exists", () => {
+    expect(spendableReferralCredit(90_000n, 1n)).toBe(0n);
+    expect(spendableReferralCredit(90_000n, 20_000n)).toBe(0n);
+    expect(spendableReferralCredit(90_000n, 0n)).toBe(90_000n);
+    expect(quoteResidency(999n, 999n, 1n)).toEqual({ creditMinor: 0n, cashMinor: 999n });
   });
 
   it("rejects the mutation that settles at the payment deadline", () => {

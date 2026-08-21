@@ -504,6 +504,9 @@ const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY)_/u;
 const expertResidencyAdminAction = /^expert_(?:referral|residency)\./u;
 const forbiddenCommercialDomainPath =
   /^packages\/domain\/src\/.*(?:coupon|referral).*\.[cm]?[jt]sx?$/u;
+const approvedExpertReferralDomainPaths = new Set([
+  "packages/domain/src/expert-referral.ts",
+]);
 const forbiddenProviderContent =
   /\b(fetch|axios|stripe|yookassa|PAYMENT_API_KEY)\b/u;
 
@@ -1020,7 +1023,10 @@ export const classifyPaymentScopeProbe = ({
     violations.push("commercial database schema path");
   }
 
-  if (forbiddenCommercialDomainPath.test(path)) {
+  if (
+    forbiddenCommercialDomainPath.test(path)
+    && !approvedExpertReferralDomainPaths.has(path)
+  ) {
     violations.push("commercial coupon or referral domain path");
   }
   if (

@@ -56,9 +56,12 @@ export {
   rewardExpiresAt,
   resolveRewardReversal,
   settlementBeforeDeadline,
+  spendableReferralCredit,
 } from "./expert-referral.js";
 export type {
   CreditAllocation,
   ReferralCreditGrant,
+  RewardAllocation,
+  RewardAllocationState,
   RewardStatus,
 } from "./expert-referral.js";

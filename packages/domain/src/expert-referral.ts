@@ -18,6 +18,14 @@ export interface CreditAllocation {
   amountMinor: bigint;
 }
 
+export type RewardAllocationState = "active" | "reserved" | "spent" | "expired";
+
+export interface RewardAllocation {
+  state: RewardAllocationState;
+  amountMinor: bigint;
+  expiresAt: Date;
+}
+
 export type RewardStatus =
   | "granted"
   | "pending_feature_hold"
@@ -41,12 +49,20 @@ function dateAt(milliseconds: number): Date {
   return date;
 }
 
-export function quoteResidency(priceMinor: bigint, availableMinor: bigint) {
-  if (priceMinor <= 0n || availableMinor < 0n) throw new Error("invalid_money");
-  if (priceMinor > POSTGRES_BIGINT_MAX || availableMinor > POSTGRES_BIGINT_MAX) {
-    throw new Error("invalid_money");
-  }
-  const creditMinor = availableMinor < priceMinor / 2n ? availableMinor : priceMinor / 2n;
+function compareOrdinalStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+export function spendableReferralCredit(availableMinor: bigint, debtMinor: bigint): bigint {
+  requireMinor(availableMinor);
+  requireMinor(debtMinor);
+  return debtMinor === 0n ? availableMinor : 0n;
+}
+
+export function quoteResidency(priceMinor: bigint, availableMinor: bigint, debtMinor = 0n) {
+  if (priceMinor <= 0n || priceMinor > POSTGRES_BIGINT_MAX) throw new Error("invalid_money");
+  const spendableMinor = spendableReferralCredit(availableMinor, debtMinor);
+  const creditMinor = spendableMinor < priceMinor / 2n ? spendableMinor : priceMinor / 2n;
   return { creditMinor, cashMinor: priceMinor - creditMinor } as const;
 }
 
@@ -82,7 +98,7 @@ export function allocateCreditFifo(input: {
     };
   }).toSorted((left, right) => left.expiresAtMilliseconds - right.expiresAtMilliseconds
     || left.grantedAtMilliseconds - right.grantedAtMilliseconds
-    || left.grantId.localeCompare(right.grantId));
+    || compareOrdinalStrings(left.grantId, right.grantId));
 
   let remainingMinor = input.allocationMinor;
   const allocations: CreditAllocation[] = [];
@@ -98,24 +114,52 @@ export function allocateCreditFifo(input: {
 
 export function resolveRewardReversal(input: {
   rewardStatus: RewardStatus;
-  unspentMinor: bigint;
-  reservedMinor: bigint;
-  spentMinor: bigint;
+  reversedAt: Date;
+  allocations: readonly RewardAllocation[];
 }) {
-  requireMinor(input.unspentMinor);
-  requireMinor(input.reservedMinor);
-  requireMinor(input.spentMinor);
-  if (input.unspentMinor + input.reservedMinor + input.spentMinor > EXPERT_REFERRAL_REWARD_MINOR) {
-    throw new Error("invalid_reward_allocation");
+  if (
+    input.rewardStatus !== "granted"
+    && input.rewardStatus !== "pending_feature_hold"
+    && input.rewardStatus !== "cancelled_by_refund"
+    && input.rewardStatus !== "reversed"
+  ) {
+    throw new Error("invalid_reward_status");
   }
-  if (input.rewardStatus !== "granted") {
+  const reversedAtMilliseconds = requireDate(input.reversedAt);
+  if (input.rewardStatus === "pending_feature_hold") {
+    if (input.allocations.length !== 0) throw new Error("invalid_reward_allocation");
     return { remove: 0n, cancelReservations: 0n, debt: 0n } as const;
   }
-  return {
-    remove: input.unspentMinor,
-    cancelReservations: input.reservedMinor,
-    debt: input.spentMinor,
-  } as const;
+  let allocationTotalMinor = 0n;
+  let remove = 0n;
+  let cancelReservations = 0n;
+  let debt = 0n;
+  for (const allocation of input.allocations) {
+    if (
+      allocation.state !== "active"
+      && allocation.state !== "reserved"
+      && allocation.state !== "spent"
+      && allocation.state !== "expired"
+    ) {
+      throw new Error("invalid_reward_allocation");
+    }
+    requireMinor(allocation.amountMinor);
+    if (allocation.amountMinor === 0n) throw new Error("invalid_reward_allocation");
+    allocationTotalMinor += allocation.amountMinor;
+    const expiresAtMilliseconds = requireDate(allocation.expiresAt);
+    if (input.rewardStatus !== "granted") continue;
+    if (allocation.state === "spent") {
+      debt += allocation.amountMinor;
+    } else if (allocation.state === "active" && expiresAtMilliseconds > reversedAtMilliseconds) {
+      remove += allocation.amountMinor;
+    } else if (allocation.state === "reserved" && expiresAtMilliseconds > reversedAtMilliseconds) {
+      cancelReservations += allocation.amountMinor;
+    }
+  }
+  if (allocationTotalMinor !== EXPERT_REFERRAL_REWARD_MINOR) {
+    throw new Error("invalid_reward_allocation");
+  }
+  return { remove, cancelReservations, debt } as const;
 }
 
 export function applyRewardToDebt(debtMinor: bigint) {
