@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import ofertaSource from "./legal/oferta.txt?raw";
 import policySource from "./legal/policy.txt?raw";
 
