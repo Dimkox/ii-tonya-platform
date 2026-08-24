@@ -160,6 +160,17 @@ describe("expert residency checkout", () => {
     expect(order.allocations.map((row) => row.amountMinor)).toEqual(["100000", "25000"]);
     expect(order.creditMinor).toBe("125000");
     expect(order.cashMinor).toBe("125001");
+    expect(order).not.toHaveProperty("providerDeadline");
+    const persistedDeadline = (await testDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
+      select provider_deadline as "providerDeadline" from expert_residency_orders
+      where id = ${order.orderId}::uuid
+    `)).rows[0]?.providerDeadline;
+    expect(persistedDeadline).not.toBeNull();
+    if (persistedDeadline === null || persistedDeadline === undefined) throw new Error("provider_deadline_missing");
+    const persistedDeadlineAt = persistedDeadline instanceof Date
+      ? persistedDeadline
+      : new Date(persistedDeadline);
+    expect(persistedDeadlineAt.getTime()).toBe(providerDeadline.getTime());
     expect((await repo.balance(expert.expertId)).spendableBalanceMinor).toBe("75000");
     await expect(repo.createCheckoutOrder({
       expertId: expert.expertId,

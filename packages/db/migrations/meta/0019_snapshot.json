@@ -5697,7 +5697,7 @@
           "name": "provider_deadline",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "idempotency_key": {
           "name": "idempotency_key",

@@ -284,7 +284,7 @@ export const expertResidencyOrders = pgTable(
     }).notNull(),
     providerDeadline: timestamp("provider_deadline", {
       withTimezone: true,
-    }).notNull(),
+    }),
     idempotencyKey: text("idempotency_key").notNull(),
     paymentProvider: text("payment_provider"),
     providerPaymentId: text("provider_payment_id"),

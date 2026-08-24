@@ -61,7 +61,6 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
   readonly orderId: string;
   readonly expertId: string;
   readonly paymentDeadline: Date;
-  readonly providerDeadline: Date;
   readonly status: "quoted" | "payment_pending" | "settled" | "failed" | "expired" | "refunded" | "charged_back";
   readonly allocations: readonly { readonly grantId: string; readonly amountMinor: string }[];
 }
@@ -127,7 +126,7 @@ interface OrderRow extends TariffRow, Record<string, unknown> {
   creditMinor: bigint | string;
   cashMinor: bigint | string;
   paymentDeadline: Date | string;
-  providerDeadline: Date | string;
+  providerDeadline: Date | string | null;
   status: "quoted" | "payment_pending" | "expired" | "settled" | "failed" | "refunded" | "charged_back";
 }
 
@@ -220,7 +219,6 @@ function orderResult(row: OrderRow, allocations: readonly AllocationRow[]): Resi
     orderId: row.orderId,
     expertId: row.expertId,
     paymentDeadline: date(row.paymentDeadline),
-    providerDeadline: date(row.providerDeadline),
     status: row.status,
     allocations: allocations.map((allocation) => ({
       grantId: allocation.grantId,
@@ -365,6 +363,11 @@ export class PostgresExpertResidencyRepository {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`expert-residency:checkout:${command.expertId}`}, 0))`);
         const existing = await this.orderByIdempotency(tx, command.idempotencyKey);
         if (existing !== undefined) {
+          if (existing.providerDeadline === null) {
+            throw new ExpertResidencyRepositoryError(
+              "checkout_idempotency_legacy_ambiguity",
+            );
+          }
           if (
             existing.expertId !== command.expertId
             || existing.tariffKey !== command.tariffKey
