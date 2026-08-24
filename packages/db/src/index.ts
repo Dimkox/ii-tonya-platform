@@ -1,4 +1,11 @@
-export { checkDbReadiness, closeDb, createDb, defaultMigrationsFolder, migrateDb, type DrizzleDb } from "./client.js";
+export {
+  checkDbReadiness,
+  closeDb,
+  createDb,
+  defaultMigrationsFolder,
+  migrateDb,
+  type DrizzleDb,
+} from "./client.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -100,5 +107,32 @@ export {
   type SubmitFeedbackTransactionCommand,
 } from "./repositories/feedback-repository.js";
 export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
-export { PostgresWebhookInboxRepository, WebhookInboxClaimLostError } from "./repositories/webhook-inbox-repository.js";
+export {
+  PostgresWebhookInboxRepository,
+  WebhookInboxClaimLostError,
+} from "./repositories/webhook-inbox-repository.js";
+export {
+  ExpertReferralRepositoryError,
+  PostgresExpertReferralRepository,
+  computeExpertReferralOverrideConsumption,
+  validateExpertReferralBatchSize,
+  type IssueExpertReferralBatch,
+  type IssuedExpertReferralBatch,
+  type MaskedExpertReferralCode,
+  type RedeemExpertReferralCode,
+  type RedeemedExpertReferral,
+  type RevokedExpertReferralCode,
+  type RevokeExpertReferralCode,
+} from "./repositories/expert-referral-repository.js";
+export {
+  ExpertReferralControlError,
+  PostgresExpertReferralControlRepository,
+  type CloseExpertReferralAbuseHold,
+  type ExpertReferralAbuseHoldResult,
+  type ExpertReferralEligibility,
+  type ExpertReferralFeatureControl,
+  type ExpertReferralTransaction,
+  type OpenExpertReferralAbuseHold,
+  type UpdateExpertReferralFeatureControl,
+} from "./repositories/expert-referral-control-repository.js";
 export * from "./schema/index.js";
