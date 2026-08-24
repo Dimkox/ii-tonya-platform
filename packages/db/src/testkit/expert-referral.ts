@@ -296,12 +296,12 @@ export class ExpertReferralTestkit {
       insert into expert_residency_orders (
         id, expert_id, tariff_version_id, tariff_name, tariff_description,
         price_minor, currency, duration_seconds, credit_minor, cash_minor,
-        payment_deadline, idempotency_key, status, quoted_at, settled_at,
+        payment_deadline, provider_deadline, idempotency_key, status, quoted_at, settled_at,
         residency_starts_at, residency_ends_at
       ) values (
         ${orderId}::uuid, ${expertId}::uuid, ${tariffVersionId}::uuid,
         'Settled residency', 'Test settlement fixture', 1000, 'RUB', 86400,
-        0, 1000, clock_timestamp() + interval '1 day',
+        0, 1000, clock_timestamp() + interval '1 day', clock_timestamp() + interval '1 day',
         ${`settled-${orderId}`}, 'settled', clock_timestamp() - interval '1 minute',
         ${settledAt}, ${settledAt}, ${residencyEndsAt}
       )

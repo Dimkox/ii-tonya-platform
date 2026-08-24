@@ -350,6 +350,10 @@ const approvedMigrationHashes = new Map([
     "187f2a123db20a986703897c5428a6a35e04ebcab577879f244845ccd173567b",
   ],
   [
+    "packages/db/migrations/0019_residency-checkout-request.sql",
+    "c4c218077a3a55e19d682813e3c83efbced47a344e9487b802bfe070548bc02c",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -422,8 +426,12 @@ const approvedMigrationHashes = new Map([
     "8706279e3b9ea9cc4ba436a816447e41e7acaa52a051a2aab65054ff8a60bb5b",
   ],
   [
+    "packages/db/migrations/meta/0019_snapshot.json",
+    "0b13ddc4d895e75eca385b653719f5555219952f959f666c7f3f51d61d643e9b",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "537c9482a966e1de709549fc6fe2426cd54877331cea7e0f43ee255fb2bf4237",
+    "479fb9c45121007c416edb7bd8715569ed0cba75d229e04769270987dacb43df",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

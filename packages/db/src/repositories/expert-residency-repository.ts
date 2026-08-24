@@ -61,7 +61,8 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
   readonly orderId: string;
   readonly expertId: string;
   readonly paymentDeadline: Date;
-  readonly status: "quoted" | "payment_pending" | "expired";
+  readonly providerDeadline: Date;
+  readonly status: "quoted" | "payment_pending" | "settled" | "failed" | "expired" | "refunded" | "charged_back";
   readonly allocations: readonly { readonly grantId: string; readonly amountMinor: string }[];
 }
 
@@ -126,6 +127,7 @@ interface OrderRow extends TariffRow, Record<string, unknown> {
   creditMinor: bigint | string;
   cashMinor: bigint | string;
   paymentDeadline: Date | string;
+  providerDeadline: Date | string;
   status: "quoted" | "payment_pending" | "expired" | "settled" | "failed" | "refunded" | "charged_back";
 }
 
@@ -213,14 +215,12 @@ function tariffResult(row: TariffRow, creditMinor: bigint, cashMinor: bigint): R
 }
 
 function orderResult(row: OrderRow, allocations: readonly AllocationRow[]): ResidencyCheckoutOrder {
-  if (row.status !== "quoted" && row.status !== "payment_pending" && row.status !== "expired") {
-    throw new ExpertResidencyRepositoryError("order_not_checkout_mutable");
-  }
   return {
     ...tariffResult(row, bigint(row.creditMinor), bigint(row.cashMinor)),
     orderId: row.orderId,
     expertId: row.expertId,
     paymentDeadline: date(row.paymentDeadline),
+    providerDeadline: date(row.providerDeadline),
     status: row.status,
     allocations: allocations.map((allocation) => ({
       grantId: allocation.grantId,
@@ -365,7 +365,11 @@ export class PostgresExpertResidencyRepository {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`expert-residency:checkout:${command.expertId}`}, 0))`);
         const existing = await this.orderByIdempotency(tx, command.idempotencyKey);
         if (existing !== undefined) {
-          if (existing.expertId !== command.expertId || existing.tariffKey !== command.tariffKey) {
+          if (
+            existing.expertId !== command.expertId
+            || existing.tariffKey !== command.tariffKey
+            || date(existing.providerDeadline).getTime() !== command.providerDeadline.getTime()
+          ) {
             throw new ExpertResidencyRepositoryError("checkout_idempotency_conflict");
           }
           return orderResult(existing, await this.orderAllocations(tx, existing.orderId));
@@ -404,16 +408,16 @@ export class PostgresExpertResidencyRepository {
           insert into expert_residency_orders (
             id, expert_id, tariff_version_id, tariff_name, tariff_description,
             price_minor, currency, duration_seconds, credit_minor, cash_minor,
-            payment_deadline, idempotency_key, status, quoted_at
+            payment_deadline, provider_deadline, idempotency_key, status, quoted_at
           ) values (
             ${orderId}::uuid, ${command.expertId}::uuid, ${tariff.tariffVersionId}::uuid,
             ${tariff.displayName}, ${tariff.description}, ${bigint(tariff.priceMinor)}, 'RUB',
             ${tariff.durationSeconds}, ${quote.creditMinor}, ${quote.cashMinor},
-            ${paymentDeadline}, ${command.idempotencyKey}, 'quoted', ${now}
+            ${paymentDeadline}, ${command.providerDeadline}, ${command.idempotencyKey}, 'quoted', ${now}
           ) returning id as "orderId", expert_id as "expertId", tariff_version_id as "tariffVersionId",
             tariff_name as "displayName", tariff_description as description, price_minor as "priceMinor",
             currency, duration_seconds as "durationSeconds", credit_minor as "creditMinor",
-            cash_minor as "cashMinor", payment_deadline as "paymentDeadline", status,
+            cash_minor as "cashMinor", payment_deadline as "paymentDeadline", provider_deadline as "providerDeadline", status,
             ${tariff.tariffKey} as "tariffKey", ${tariff.version} as version
         `)).rows[0];
         if (order === undefined) throw new Error("checkout_order_insert_failed");
@@ -433,7 +437,7 @@ export class PostgresExpertResidencyRepository {
     return withSerializableRetry(() => this.db.transaction(async (tx) => {
       await tx.execute(sql`set transaction isolation level serializable`);
       const decision = (await tx.execute<{ decision: "settlement_allowed" | "expire_and_release"; status: OrderRow["status"] }>(sql`
-        select case when transaction_timestamp() < payment_deadline then 'settlement_allowed' else 'expire_and_release' end as decision,
+        select expert_residency_payment_deadline_state(payment_deadline) as decision,
           status
         from expert_residency_orders where id = ${command.orderId}::uuid for update
       `)).rows[0];
@@ -567,7 +571,7 @@ export class PostgresExpertResidencyRepository {
       select o.id as "orderId", o.expert_id as "expertId", o.tariff_version_id as "tariffVersionId",
         o.tariff_name as "displayName", o.tariff_description as description, o.price_minor as "priceMinor",
         o.currency, o.duration_seconds as "durationSeconds", o.credit_minor as "creditMinor", o.cash_minor as "cashMinor",
-        o.payment_deadline as "paymentDeadline", o.status, t.tariff_key as "tariffKey", t.version,
+        o.payment_deadline as "paymentDeadline", o.provider_deadline as "providerDeadline", o.status, t.tariff_key as "tariffKey", t.version,
         t.active_from as "activeFrom", t.active_to as "activeTo"
       from expert_residency_orders o join expert_residency_tariff_versions t on t.id = o.tariff_version_id
       where o.idempotency_key = ${idempotencyKey} for update of o

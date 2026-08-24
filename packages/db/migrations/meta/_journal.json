@@ -134,6 +134,13 @@
       "when": 1787347147226,
       "tag": "0018_expert_residency_referrals",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787609403665,
+      "tag": "0019_residency-checkout-request",
+      "breakpoints": true
     }
   ]
 }

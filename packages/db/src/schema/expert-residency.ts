@@ -282,6 +282,9 @@ export const expertResidencyOrders = pgTable(
     paymentDeadline: timestamp("payment_deadline", {
       withTimezone: true,
     }).notNull(),
+    providerDeadline: timestamp("provider_deadline", {
+      withTimezone: true,
+    }).notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     paymentProvider: text("payment_provider"),
     providerPaymentId: text("provider_payment_id"),
@@ -321,6 +324,10 @@ export const expertResidencyOrders = pgTable(
     check(
       "expert_order_payment_deadline_after_quote",
       sql`${table.paymentDeadline} > ${table.quotedAt}`,
+    ),
+    check(
+      "expert_order_provider_deadline_after_quote",
+      sql`${table.providerDeadline} > ${table.quotedAt}`,
     ),
     check(
       "expert_order_provider_identity_complete",

@@ -21,6 +21,8 @@ afterAll(async () => testDb?.stop(), 120_000);
 
 async function createActiveTariff(): Promise<void> {
   const tariffVersionId = randomUUID();
+  const now = await databaseNow();
+  const activeFrom = new Date(now.getTime() - 86_400_000);
   const evidence = await fixtures.createAdminEvidence(
     "expert_residency.tariff_create",
     tariffVersionId,
@@ -31,7 +33,7 @@ async function createActiveTariff(): Promise<void> {
       description: "Thirty-day expert residency",
       priceMinor: "250001",
       durationSeconds: 2_592_000,
-      activeFrom: "2020-01-01T00:00:00.000Z",
+      activeFrom: activeFrom.toISOString(),
       activeTo: null,
     },
   );
@@ -43,10 +45,18 @@ async function createActiveTariff(): Promise<void> {
     description: "Thirty-day expert residency",
     priceMinor: 250001n,
     durationSeconds: 2_592_000,
-    activeFrom: new Date("2020-01-01T00:00:00.000Z"),
+    activeFrom,
     activeTo: null,
     ...evidence,
   });
+}
+
+async function databaseNow(): Promise<Date> {
+  const row = (await testDb.db.execute<{ now: Date | string }>(
+    sql`select transaction_timestamp() as now`,
+  )).rows[0];
+  if (row === undefined) throw new Error("database clock unavailable");
+  return new Date(row.now);
 }
 
 async function seedGrant(expertId: string, input: {
@@ -83,16 +93,16 @@ async function seedGrant(expertId: string, input: {
       '2020-01-01T00:00:00Z', ${evidence.adminId}::uuid, ${evidence.approvalId}::uuid, ${evidence.sessionIdHash})`);
     await tx.execute(sql`insert into expert_residency_orders (
       id, expert_id, tariff_version_id, tariff_name, tariff_description, price_minor, currency,
-      duration_seconds, credit_minor, cash_minor, payment_deadline, idempotency_key,
+      duration_seconds, credit_minor, cash_minor, payment_deadline, provider_deadline, idempotency_key,
       status, quoted_at, settled_at, residency_starts_at, residency_ends_at
     ) values (${orderId}::uuid, ${invitee.expertId}::uuid, ${tariffId}::uuid, 'Grant tariff', 'Grant fixture',
-      1, 'RUB', 86400, 0, 1, '2030-01-02T00:00:00Z', ${`settled-${orderId}`}, 'settled',
-      '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z', '2030-01-02T00:00:00Z')`);
+      1, 'RUB', 86400, 0, 1, transaction_timestamp() + interval '2 days', transaction_timestamp() + interval '2 days', ${`settled-${orderId}`}, 'settled',
+      transaction_timestamp() - interval '1 day', transaction_timestamp() - interval '1 day', transaction_timestamp() - interval '1 day', transaction_timestamp())`);
     await tx.execute(sql`insert into expert_first_residency_settlements (
       id, expert_id, qualifying_order_id, eligibility_status, eligibility_reason_code,
       expert_active, expert_verified, unique_identity, abuse_cleared, settled_at
     ) values (${settlementId}::uuid, ${invitee.expertId}::uuid, ${orderId}::uuid, 'eligible', 'eligible',
-      true, true, true, true, '2030-01-01T00:00:00Z')`);
+      true, true, true, true, transaction_timestamp() - interval '1 day')`);
     await tx.execute(sql`insert into expert_referral_reward_grants (
       id, inviter_expert_id, referral_id, qualifying_order_id, first_settlement_id,
       amount_minor, granted_at, expires_at
@@ -113,17 +123,23 @@ describe("expert residency checkout", () => {
   it("quotes the exact 50 percent cap and reserves eligible credit FIFO", async () => {
     await createActiveTariff();
     const expert = await fixtures.createExpert();
+    const now = await databaseNow();
+    const firstGrantedAt = new Date(now.getTime() - 2 * 86_400_000);
+    const firstExpiresAt = new Date(firstGrantedAt.getTime() + 365 * 86_400_000);
+    const secondGrantedAt = new Date(now.getTime() - 86_400_000);
+    const secondExpiresAt = new Date(secondGrantedAt.getTime() + 365 * 86_400_000);
+    const providerDeadline = new Date(now.getTime() + 10 * 86_400_000);
     await seedGrant(expert.expertId, {
       grantId: "00000000-0000-4000-8000-000000000101",
       amountMinor: 100000n,
-      grantedAt: new Date("2026-01-01T00:00:00Z"),
-      expiresAt: new Date("2027-01-01T00:00:00Z"),
+      grantedAt: firstGrantedAt,
+      expiresAt: firstExpiresAt,
     });
     await seedGrant(expert.expertId, {
       grantId: "00000000-0000-4000-8000-000000000102",
       amountMinor: 100000n,
-      grantedAt: new Date("2026-02-01T00:00:00Z"),
-      expiresAt: new Date("2027-02-01T00:00:00Z"),
+      grantedAt: secondGrantedAt,
+      expiresAt: secondExpiresAt,
     });
 
     expect(await repo.quote({ expertId: expert.expertId, tariffKey: "residency-month" })).toMatchObject({
@@ -133,7 +149,7 @@ describe("expert residency checkout", () => {
     const order = await repo.createCheckoutOrder({
       expertId: expert.expertId,
       tariffKey: "residency-month",
-      providerDeadline: new Date("2026-12-31T00:00:00Z"),
+      providerDeadline,
       idempotencyKey: "checkout-fifo",
     });
 
@@ -145,5 +161,30 @@ describe("expert residency checkout", () => {
     expect(order.creditMinor).toBe("125000");
     expect(order.cashMinor).toBe("125001");
     expect((await repo.balance(expert.expertId)).spendableBalanceMinor).toBe("75000");
+    await expect(repo.createCheckoutOrder({
+      expertId: expert.expertId,
+      tariffKey: "residency-month",
+      providerDeadline: new Date(providerDeadline.getTime() + 1_000),
+      idempotencyKey: "checkout-fifo",
+    })).rejects.toMatchObject({ code: "checkout_idempotency_conflict" });
+  });
+
+  it("replays an identical checkout after its status becomes terminal", async () => {
+    await createActiveTariff();
+    const expert = await fixtures.createExpert();
+    const providerDeadline = new Date((await databaseNow()).getTime() + 86_400_000);
+    const command = {
+      expertId: expert.expertId,
+      tariffKey: "residency-month",
+      providerDeadline,
+      idempotencyKey: "terminal-replay",
+    };
+    const created = await repo.createCheckoutOrder(command);
+    await testDb.db.execute(sql`update expert_residency_orders set status = 'failed' where id = ${created.orderId}::uuid`);
+
+    await expect(repo.createCheckoutOrder(command)).resolves.toMatchObject({
+      orderId: created.orderId,
+      status: "failed",
+    });
   });
 });

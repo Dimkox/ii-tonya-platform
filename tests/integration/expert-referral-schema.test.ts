@@ -156,13 +156,14 @@ async function insertOrder(input: {
   status?: string;
   quotedAt?: string;
   paymentDeadline?: string;
+  providerDeadline?: string;
 }): Promise<string> {
   const orderId = randomUUID();
   await testDb.db.execute(sql`
     insert into expert_residency_orders (
       id, expert_id, tariff_version_id, tariff_name, tariff_description,
       price_minor, currency, duration_seconds, credit_minor, cash_minor,
-      payment_deadline, idempotency_key, status, quoted_at
+      payment_deadline, provider_deadline, idempotency_key, status, quoted_at
     ) values (
       ${orderId}::uuid, ${input.expertId}::uuid,
       ${input.tariffVersionId}::uuid, 'Residency', 'Immutable snapshot',
@@ -170,6 +171,7 @@ async function insertOrder(input: {
       ${input.durationSeconds ?? 2_592_000}, ${input.creditMinor ?? 499n},
       ${input.cashMinor ?? 500n},
       ${input.paymentDeadline ?? "2027-01-01T00:00:00Z"},
+      ${input.providerDeadline ?? input.paymentDeadline ?? "2027-01-01T00:00:00Z"},
       ${`order-${randomUUID()}`}, ${input.status ?? "quoted"},
       ${input.quotedAt ?? "2026-08-01T00:00:00Z"}
     )
