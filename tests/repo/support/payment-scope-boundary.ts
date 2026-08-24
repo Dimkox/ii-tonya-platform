@@ -439,7 +439,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "aca25a9bf21d9f4f58ae5ffd47855335ce53bbb424a0598cc0f599ee332f764e",
+    "5856929ac99dc3d49ce798c45f18e0d9c2e45293415976a0227c5d61f71472ca",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
