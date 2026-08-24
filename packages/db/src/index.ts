@@ -135,4 +135,17 @@ export {
   type OpenExpertReferralAbuseHold,
   type UpdateExpertReferralFeatureControl,
 } from "./repositories/expert-referral-control-repository.js";
+export {
+  ExpertResidencyRepositoryError,
+  PostgresExpertResidencyRepository,
+  type CreateCheckoutOrder,
+  type CreateTariffVersion,
+  type ExpiryReleaseResult,
+  type ReferralCreditBalance,
+  type ReleaseExpiredOrders,
+  type ResidencyCheckoutOrder,
+  type ResidencyQuote,
+  type ResidencyQuoteRequest,
+  type RetireTariffVersion,
+} from "./repositories/expert-residency-repository.js";
 export * from "./schema/index.js";
