@@ -351,7 +351,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0019_residency-checkout-request.sql",
-    "f397f8211d6ed839b6f9f7c629afdc461a0119b68ea479a536dfb10ac8ef2c63",
+    "c4c218077a3a55e19d682813e3c83efbced47a344e9487b802bfe070548bc02c",
+  ],
+  [
+    "packages/db/migrations/0020_fat_darkhawk.sql",
+    "83b8baffd09624c47d036e79d998389af4bef1aa80b1a680fecc9d1755dbe40f",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -427,11 +431,15 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0019_snapshot.json",
-    "0a473a9b6839799897a75ae982afe4a40b0f3bd8ecbadbfdb719944086d2d0c6",
+    "0b13ddc4d895e75eca385b653719f5555219952f959f666c7f3f51d61d643e9b",
+  ],
+  [
+    "packages/db/migrations/meta/0020_snapshot.json",
+    "3781420532d3244e2a635d246e2d10f6ec98eb50b1ef61a9642859af3722af0d",
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "479fb9c45121007c416edb7bd8715569ed0cba75d229e04769270987dacb43df",
+    "aca25a9bf21d9f4f58ae5ffd47855335ce53bbb424a0598cc0f599ee332f764e",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

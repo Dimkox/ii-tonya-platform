@@ -309,6 +309,8 @@ describe("MVP scope boundary", () => {
     ["snapshot", "packages/db/migrations/meta/0018_snapshot.json"],
     ["migration", "packages/db/migrations/0019_residency-checkout-request.sql"],
     ["snapshot", "packages/db/migrations/meta/0019_snapshot.json"],
+    ["migration", "packages/db/migrations/0020_fat_darkhawk.sql"],
+    ["snapshot", "packages/db/migrations/meta/0020_snapshot.json"],
     ["journal", "packages/db/migrations/meta/_journal.json"],
   ])(
     "pins and mutation-checks the final expert referral %s",

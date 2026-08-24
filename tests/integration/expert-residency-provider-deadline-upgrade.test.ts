@@ -22,6 +22,16 @@ async function migrateThrough0018(database: TestDatabase): Promise<void> {
   }
 }
 
+async function applyMigration(database: TestDatabase, index: number): Promise<void> {
+  const prefix = index.toString().padStart(4, "0");
+  const migration = readdirSync("packages/db/migrations")
+    .find((name) => name.startsWith(`${prefix}_`) && name.endsWith(".sql"));
+  if (migration === undefined) throw new Error(`missing migration ${prefix}`);
+  await database.db.$client.query(
+    readFileSync(`packages/db/migrations/${migration}`, "utf8"),
+  );
+}
+
 async function seedGrantShortenedOrder(database: TestDatabase): Promise<{
   expertId: string;
   idempotencyKey: string;
@@ -71,15 +81,13 @@ function messages(error: unknown): string {
 
 afterAll(async () => upgradeDb?.stop(), 120_000);
 
-describe("0019 residency provider deadline upgrade", () => {
-  it("keeps a grant-shortened legacy deadline unknown and fails both replay attempts closed", async () => {
+describe("residency provider deadline corrective upgrade", () => {
+  it("removes a fabricated 0019 legacy deadline and fails replay ambiguity closed", async () => {
     upgradeDb = await startTestPostgres();
     await migrateThrough0018(upgradeDb);
     const legacy = await seedGrantShortenedOrder(upgradeDb);
-    await upgradeDb.db.$client.query(
-      readFileSync("packages/db/migrations/0019_residency-checkout-request.sql", "utf8"),
-    );
-    const persistedOrder = (await upgradeDb.db.execute<{
+    await applyMigration(upgradeDb, 19);
+    const after0019 = (await upgradeDb.db.execute<{
       providerDeadline: Date | string | null;
       paymentDeadline: Date | string;
     }>(sql`
@@ -87,7 +95,26 @@ describe("0019 residency provider deadline upgrade", () => {
       from expert_residency_orders
       where idempotency_key = ${legacy.idempotencyKey}
     `)).rows[0];
-    if (persistedOrder === undefined) throw new Error("legacy_order_missing");
+    if (after0019 === undefined) throw new Error("legacy_order_missing");
+    expect(after0019.providerDeadline).not.toBeNull();
+    const effectivePaymentDeadline = after0019.paymentDeadline instanceof Date
+      ? after0019.paymentDeadline
+      : new Date(after0019.paymentDeadline);
+    const fabricatedProviderDeadline = after0019.providerDeadline instanceof Date
+      ? after0019.providerDeadline
+      : new Date(after0019.providerDeadline ?? 0);
+    expect(fabricatedProviderDeadline.getTime()).toBe(effectivePaymentDeadline.getTime());
+
+    await applyMigration(upgradeDb, 20);
+    const after0020 = (await upgradeDb.db.execute<{
+      providerDeadline: Date | string | null;
+      paymentDeadline: Date | string;
+    }>(sql`
+      select provider_deadline as "providerDeadline", payment_deadline as "paymentDeadline"
+      from expert_residency_orders
+      where idempotency_key = ${legacy.idempotencyKey}
+    `)).rows[0];
+    if (after0020 === undefined) throw new Error("corrected_legacy_order_missing");
     const repo = new PostgresExpertResidencyRepository(upgradeDb.db);
     const futureProviderDeadline = (await upgradeDb.db.execute<{ providerDeadline: Date | string }>(sql`
       select transaction_timestamp() + interval '2 days' as "providerDeadline"
@@ -107,12 +134,9 @@ describe("0019 residency provider deadline upgrade", () => {
       providerDeadline: new Date(firstReplay.providerDeadline.getTime() + 86_400_000),
     };
 
-    expect(persistedOrder.providerDeadline).toBeNull();
-    const effectiveGrantExpiry = persistedOrder.paymentDeadline instanceof Date
-      ? persistedOrder.paymentDeadline
-      : new Date(persistedOrder.paymentDeadline);
     // Pre-0019 stored only this earlier effective deadline, not the candidate provider deadline.
-    expect(effectiveGrantExpiry.getTime()).toBeLessThan(providerDeadline.getTime());
+    expect(after0020.providerDeadline).toBeNull();
+    expect(effectivePaymentDeadline.getTime()).toBeLessThan(providerDeadline.getTime());
     await expect(repo.createCheckoutOrder(firstReplay)).rejects.toMatchObject({
       code: "checkout_idempotency_legacy_ambiguity",
     });
@@ -134,5 +158,21 @@ describe("0019 residency provider deadline upgrade", () => {
       insertError = error;
     }
     expect(messages(insertError)).toContain("new expert residency orders require provider deadline");
+
+    const postCorrectionCommand = {
+      expertId: legacy.expertId,
+      tariffKey: "legacy-shortened",
+      providerDeadline: new Date(providerDeadline.getTime() + 86_400_000),
+      idempotencyKey: "post-0020-exact-replay",
+    };
+    const postCorrectionOrder = await repo.createCheckoutOrder(postCorrectionCommand);
+    const postCorrectionDeadline = (await upgradeDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
+      select provider_deadline as "providerDeadline" from expert_residency_orders
+      where id = ${postCorrectionOrder.orderId}::uuid
+    `)).rows[0]?.providerDeadline;
+    expect(postCorrectionDeadline).not.toBeNull();
+    await expect(repo.createCheckoutOrder(postCorrectionCommand)).resolves.toMatchObject({
+      orderId: postCorrectionOrder.orderId,
+    });
   }, 120_000);
 });

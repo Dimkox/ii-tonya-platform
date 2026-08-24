@@ -1,4 +1,6 @@
 ALTER TABLE "expert_residency_orders" ADD COLUMN "provider_deadline" timestamp with time zone;--> statement-breakpoint
+UPDATE "expert_residency_orders" SET "provider_deadline" = "payment_deadline" WHERE "provider_deadline" IS NULL;--> statement-breakpoint
+ALTER TABLE "expert_residency_orders" ALTER COLUMN "provider_deadline" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "expert_residency_orders" ADD CONSTRAINT "expert_order_provider_deadline_after_quote" CHECK ("expert_residency_orders"."provider_deadline" > "expert_residency_orders"."quoted_at");
 --> statement-breakpoint
 CREATE FUNCTION expert_residency_payment_deadline_state(deadline timestamp with time zone)
@@ -8,23 +10,6 @@ RETURNS text LANGUAGE sql STABLE AS $$
     ELSE 'expire_and_release'
   END
 $$;
---> statement-breakpoint
-CREATE FUNCTION enforce_expert_order_provider_deadline()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.provider_deadline IS NULL THEN
-    RAISE EXCEPTION USING
-      ERRCODE = '23514',
-      MESSAGE = 'new expert residency orders require provider deadline',
-      CONSTRAINT = 'expert_order_provider_deadline_required';
-  END IF;
-  RETURN NEW;
-END;
-$$;
---> statement-breakpoint
-CREATE TRIGGER "expert_order_provider_deadline_required"
-BEFORE INSERT ON "expert_residency_orders"
-FOR EACH ROW EXECUTE FUNCTION enforce_expert_order_provider_deadline();
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION enforce_expert_order_snapshot_immutability()
 RETURNS trigger LANGUAGE plpgsql AS $$
