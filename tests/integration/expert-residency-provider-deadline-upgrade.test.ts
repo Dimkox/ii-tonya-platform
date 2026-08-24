@@ -1,35 +1,62 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
 
+const migrationsFolder = "packages/db/migrations";
 let upgradeDb: TestDatabase | undefined;
+let migrationFixtureRoot: string | undefined;
 
-async function migrateThrough0018(database: TestDatabase): Promise<void> {
-  for (let index = 0; index <= 18; index += 1) {
-    const prefix = index.toString().padStart(4, "0");
-    const migration = readdirSync("packages/db/migrations")
-      .find((name) => name.startsWith(`${prefix}_`) && name.endsWith(".sql"));
-    if (migration === undefined) throw new Error(`missing migration ${prefix}`);
-    await database.db.$client.query(
-      readFileSync(`packages/db/migrations/${migration}`, "utf8"),
+type MigrationJournal = {
+  version: string;
+  dialect: string;
+  entries: Array<{
+    idx: number;
+    version: string;
+    when: number;
+    tag: string;
+    breakpoints: boolean;
+  }>;
+};
+
+function migrationsThrough(lastIndex: number): string {
+  migrationFixtureRoot ??= mkdtempSync(
+    join(tmpdir(), "ii-tonya-provider-deadline-migrations-"),
+  );
+  const destination = join(migrationFixtureRoot, `through-${lastIndex}`);
+  mkdirSync(join(destination, "meta"), { recursive: true });
+  const journal = JSON.parse(
+    readFileSync(join(migrationsFolder, "meta/_journal.json"), "utf8"),
+  ) as MigrationJournal;
+  const entries = journal.entries.filter((entry) => entry.idx <= lastIndex);
+  for (const entry of entries) {
+    copyFileSync(
+      join(migrationsFolder, `${entry.tag}.sql`),
+      join(destination, `${entry.tag}.sql`),
     );
   }
-}
-
-async function applyMigration(database: TestDatabase, index: number): Promise<void> {
-  const prefix = index.toString().padStart(4, "0");
-  const migration = readdirSync("packages/db/migrations")
-    .find((name) => name.startsWith(`${prefix}_`) && name.endsWith(".sql"));
-  if (migration === undefined) throw new Error(`missing migration ${prefix}`);
-  await database.db.$client.query(
-    readFileSync(`packages/db/migrations/${migration}`, "utf8"),
+  writeFileSync(
+    join(destination, "meta/_journal.json"),
+    `${JSON.stringify({ ...journal, entries }, null, 2)}\n`,
+    "utf8",
   );
+  return destination;
 }
 
 async function seedGrantShortenedOrder(database: TestDatabase): Promise<{
@@ -79,14 +106,22 @@ function messages(error: unknown): string {
   return result.join(" ");
 }
 
-afterAll(async () => upgradeDb?.stop(), 120_000);
+afterAll(async () => {
+  try {
+    await upgradeDb?.stop();
+  } finally {
+    if (migrationFixtureRoot !== undefined) {
+      rmSync(migrationFixtureRoot, { recursive: true, force: true });
+    }
+  }
+}, 120_000);
 
 describe("residency provider deadline corrective upgrade", () => {
-  it("removes a fabricated 0019 legacy deadline and fails replay ambiguity closed", async () => {
+  it("uses recorded 0019 metadata to apply only 0020 and fail legacy replay closed", async () => {
     upgradeDb = await startTestPostgres();
-    await migrateThrough0018(upgradeDb);
+    await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(18) });
     const legacy = await seedGrantShortenedOrder(upgradeDb);
-    await applyMigration(upgradeDb, 19);
+    await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(19) });
     const after0019 = (await upgradeDb.db.execute<{
       providerDeadline: Date | string | null;
       paymentDeadline: Date | string;
@@ -105,7 +140,55 @@ describe("residency provider deadline corrective upgrade", () => {
       : new Date(after0019.providerDeadline ?? 0);
     expect(fabricatedProviderDeadline.getTime()).toBe(effectivePaymentDeadline.getTime());
 
-    await applyMigration(upgradeDb, 20);
+    const migrations = readMigrationFiles({ migrationsFolder });
+    const original0019 = migrations[19];
+    const corrective0020 = migrations[20];
+    if (original0019 === undefined || corrective0020 === undefined) {
+      throw new Error("provider_deadline_migration_metadata_missing");
+    }
+    const metadataBefore = (await upgradeDb.db.execute<{
+      id: number;
+      hash: string;
+      createdAt: string;
+    }>(sql`
+      select id, hash, created_at::text as "createdAt"
+      from drizzle.__drizzle_migrations
+      order by id
+    `)).rows;
+    expect(metadataBefore).toHaveLength(20);
+    expect(metadataBefore.filter(
+      (row) => row.createdAt === String(original0019.folderMillis),
+    )).toEqual([{
+      id: 20,
+      hash: original0019.hash,
+      createdAt: String(original0019.folderMillis),
+    }]);
+    expect(metadataBefore.some(
+      (row) => row.createdAt === String(corrective0020.folderMillis),
+    )).toBe(false);
+
+    await upgradeDb.migrate();
+    const metadataAfter = (await upgradeDb.db.execute<{
+      id: number;
+      hash: string;
+      createdAt: string;
+    }>(sql`
+      select id, hash, created_at::text as "createdAt"
+      from drizzle.__drizzle_migrations
+      order by id
+    `)).rows;
+    expect(metadataAfter).toHaveLength(21);
+    expect(metadataAfter.filter(
+      (row) => row.createdAt === String(original0019.folderMillis),
+    )).toEqual(metadataBefore.slice(19));
+    expect(metadataAfter.filter(
+      (row) => row.createdAt === String(corrective0020.folderMillis),
+    )).toEqual([{
+      id: 21,
+      hash: corrective0020.hash,
+      createdAt: String(corrective0020.folderMillis),
+    }]);
+
     const after0020 = (await upgradeDb.db.execute<{
       providerDeadline: Date | string | null;
       paymentDeadline: Date | string;
