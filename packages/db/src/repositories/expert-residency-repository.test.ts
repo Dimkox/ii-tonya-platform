@@ -50,10 +50,12 @@ describe("expert residency tariffs and quotes", () => {
       ...evidence,
     });
 
-    await expect(repo.quote({
-      expertId: expert.expertId,
-      tariffKey: "residency-month",
-    })).resolves.toMatchObject({
+    await expect(
+      repo.quote({
+        expertId: expert.expertId,
+        tariffKey: "residency-month",
+      }),
+    ).resolves.toMatchObject({
       tariffVersionId,
       displayName: "Monthly residency",
       description: "Thirty-day expert residency",
@@ -109,17 +111,19 @@ describe("expert residency tariffs and quotes", () => {
       },
     );
 
-    await expect(repo.createTariffVersion({
-      tariffVersionId: secondId,
-      tariffKey: "residency-month",
-      version: 2,
-      displayName: "Monthly residency",
-      description: "Overlap",
-      priceMinor: 100000n,
-      durationSeconds: 2_592_000,
-      activeFrom: new Date("2026-06-01T00:00:00.000Z"),
-      activeTo: null,
-      ...secondEvidence,
-    })).rejects.toMatchObject({ code: "tariff_activation_overlap" });
+    await expect(
+      repo.createTariffVersion({
+        tariffVersionId: secondId,
+        tariffKey: "residency-month",
+        version: 2,
+        displayName: "Monthly residency",
+        description: "Overlap",
+        priceMinor: 100000n,
+        durationSeconds: 2_592_000,
+        activeFrom: new Date("2026-06-01T00:00:00.000Z"),
+        activeTo: null,
+        ...secondEvidence,
+      }),
+    ).rejects.toMatchObject({ code: "tariff_activation_overlap" });
   });
 });

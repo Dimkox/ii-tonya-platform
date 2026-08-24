@@ -336,7 +336,9 @@ describe("authoritative Drizzle schema parity", () => {
       "packages/db/migrations/0018_expert_residency_referrals.sql",
       "packages/db/migrations/0019_residency-checkout-request.sql",
       "packages/db/migrations/0020_fat_darkhawk.sql",
-    ].map((migrationPath) => readFileSync(migrationPath, "utf8")).join("\n");
+    ]
+      .map((migrationPath) => readFileSync(migrationPath, "utf8"))
+      .join("\n");
     const reviewedTables = [
       "expertReferralCodeBatches",
       "expertReferralCodes",

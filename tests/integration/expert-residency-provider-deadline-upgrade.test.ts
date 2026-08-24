@@ -72,10 +72,14 @@ async function seedGrantShortenedOrder(database: TestDatabase): Promise<{
   const orderId = randomUUID();
   const sessionIdHash = `sha256:${randomUUID()}`;
   const idempotencyKey = "legacy-grant-shortened-order";
-  await database.db.execute(sql`insert into users (id) values (${expertUserId}::uuid), (${adminId}::uuid)`);
-  await database.db.execute(sql`insert into experts (id, user_id, active, verified)
+  await database.db.execute(
+    sql`insert into users (id) values (${expertUserId}::uuid), (${adminId}::uuid)`,
+  );
+  await database.db
+    .execute(sql`insert into experts (id, user_id, active, verified)
     values (${expertId}::uuid, ${expertUserId}::uuid, true, true)`);
-  await database.db.execute(sql`insert into admin_sessions (session_id_hash, admin_id, mfa_verified_at, expires_at)
+  await database.db
+    .execute(sql`insert into admin_sessions (session_id_hash, admin_id, mfa_verified_at, expires_at)
     values (${sessionIdHash}, ${adminId}::uuid, transaction_timestamp(), transaction_timestamp() + interval '1 day')`);
   await database.db.execute(sql`insert into admin_approvals (
     id, action, object_type, object_id, requester_id, expires_at, nonce
@@ -101,7 +105,8 @@ function messages(error: unknown): string {
   let current = error as { message?: unknown; cause?: unknown } | undefined;
   while (current !== undefined) {
     if (typeof current.message === "string") result.push(current.message);
-    current = current.cause as { message?: unknown; cause?: unknown } | undefined;
+    current = current.cause as
+      { message?: unknown; cause?: unknown } | undefined;
   }
   return result.join(" ");
 }
@@ -122,23 +127,29 @@ describe("residency provider deadline corrective upgrade", () => {
     await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(18) });
     const legacy = await seedGrantShortenedOrder(upgradeDb);
     await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(19) });
-    const after0019 = (await upgradeDb.db.execute<{
-      providerDeadline: Date | string | null;
-      paymentDeadline: Date | string;
-    }>(sql`
+    const after0019 = (
+      await upgradeDb.db.execute<{
+        providerDeadline: Date | string | null;
+        paymentDeadline: Date | string;
+      }>(sql`
       select provider_deadline as "providerDeadline", payment_deadline as "paymentDeadline"
       from expert_residency_orders
       where idempotency_key = ${legacy.idempotencyKey}
-    `)).rows[0];
+    `)
+    ).rows[0];
     if (after0019 === undefined) throw new Error("legacy_order_missing");
     expect(after0019.providerDeadline).not.toBeNull();
-    const effectivePaymentDeadline = after0019.paymentDeadline instanceof Date
-      ? after0019.paymentDeadline
-      : new Date(after0019.paymentDeadline);
-    const fabricatedProviderDeadline = after0019.providerDeadline instanceof Date
-      ? after0019.providerDeadline
-      : new Date(after0019.providerDeadline ?? 0);
-    expect(fabricatedProviderDeadline.getTime()).toBe(effectivePaymentDeadline.getTime());
+    const effectivePaymentDeadline =
+      after0019.paymentDeadline instanceof Date
+        ? after0019.paymentDeadline
+        : new Date(after0019.paymentDeadline);
+    const fabricatedProviderDeadline =
+      after0019.providerDeadline instanceof Date
+        ? after0019.providerDeadline
+        : new Date(after0019.providerDeadline ?? 0);
+    expect(fabricatedProviderDeadline.getTime()).toBe(
+      effectivePaymentDeadline.getTime(),
+    );
 
     const migrations = readMigrationFiles({ migrationsFolder });
     const original0019 = migrations[19];
@@ -146,66 +157,89 @@ describe("residency provider deadline corrective upgrade", () => {
     if (original0019 === undefined || corrective0020 === undefined) {
       throw new Error("provider_deadline_migration_metadata_missing");
     }
-    const metadataBefore = (await upgradeDb.db.execute<{
-      id: number;
-      hash: string;
-      createdAt: string;
-    }>(sql`
+    const metadataBefore = (
+      await upgradeDb.db.execute<{
+        id: number;
+        hash: string;
+        createdAt: string;
+      }>(sql`
       select id, hash, created_at::text as "createdAt"
       from drizzle.__drizzle_migrations
       order by id
-    `)).rows;
+    `)
+    ).rows;
     expect(metadataBefore).toHaveLength(20);
-    expect(metadataBefore.filter(
-      (row) => row.createdAt === String(original0019.folderMillis),
-    )).toEqual([{
-      id: 20,
-      hash: original0019.hash,
-      createdAt: String(original0019.folderMillis),
-    }]);
-    expect(metadataBefore.some(
-      (row) => row.createdAt === String(corrective0020.folderMillis),
-    )).toBe(false);
+    expect(
+      metadataBefore.filter(
+        (row) => row.createdAt === String(original0019.folderMillis),
+      ),
+    ).toEqual([
+      {
+        id: 20,
+        hash: original0019.hash,
+        createdAt: String(original0019.folderMillis),
+      },
+    ]);
+    expect(
+      metadataBefore.some(
+        (row) => row.createdAt === String(corrective0020.folderMillis),
+      ),
+    ).toBe(false);
 
     await upgradeDb.migrate();
-    const metadataAfter = (await upgradeDb.db.execute<{
-      id: number;
-      hash: string;
-      createdAt: string;
-    }>(sql`
+    const metadataAfter = (
+      await upgradeDb.db.execute<{
+        id: number;
+        hash: string;
+        createdAt: string;
+      }>(sql`
       select id, hash, created_at::text as "createdAt"
       from drizzle.__drizzle_migrations
       order by id
-    `)).rows;
+    `)
+    ).rows;
     expect(metadataAfter).toHaveLength(21);
-    expect(metadataAfter.filter(
-      (row) => row.createdAt === String(original0019.folderMillis),
-    )).toEqual(metadataBefore.slice(19));
-    expect(metadataAfter.filter(
-      (row) => row.createdAt === String(corrective0020.folderMillis),
-    )).toEqual([{
-      id: 21,
-      hash: corrective0020.hash,
-      createdAt: String(corrective0020.folderMillis),
-    }]);
+    expect(
+      metadataAfter.filter(
+        (row) => row.createdAt === String(original0019.folderMillis),
+      ),
+    ).toEqual(metadataBefore.slice(19));
+    expect(
+      metadataAfter.filter(
+        (row) => row.createdAt === String(corrective0020.folderMillis),
+      ),
+    ).toEqual([
+      {
+        id: 21,
+        hash: corrective0020.hash,
+        createdAt: String(corrective0020.folderMillis),
+      },
+    ]);
 
-    const after0020 = (await upgradeDb.db.execute<{
-      providerDeadline: Date | string | null;
-      paymentDeadline: Date | string;
-    }>(sql`
+    const after0020 = (
+      await upgradeDb.db.execute<{
+        providerDeadline: Date | string | null;
+        paymentDeadline: Date | string;
+      }>(sql`
       select provider_deadline as "providerDeadline", payment_deadline as "paymentDeadline"
       from expert_residency_orders
       where idempotency_key = ${legacy.idempotencyKey}
-    `)).rows[0];
-    if (after0020 === undefined) throw new Error("corrected_legacy_order_missing");
+    `)
+    ).rows[0];
+    if (after0020 === undefined)
+      throw new Error("corrected_legacy_order_missing");
     const repo = new PostgresExpertResidencyRepository(upgradeDb.db);
-    const futureProviderDeadline = (await upgradeDb.db.execute<{ providerDeadline: Date | string }>(sql`
+    const futureProviderDeadline = (
+      await upgradeDb.db.execute<{ providerDeadline: Date | string }>(sql`
       select transaction_timestamp() + interval '2 days' as "providerDeadline"
-    `)).rows[0]?.providerDeadline;
-    if (futureProviderDeadline === undefined) throw new Error("database_time_missing");
-    const providerDeadline = futureProviderDeadline instanceof Date
-      ? futureProviderDeadline
-      : new Date(futureProviderDeadline);
+    `)
+    ).rows[0]?.providerDeadline;
+    if (futureProviderDeadline === undefined)
+      throw new Error("database_time_missing");
+    const providerDeadline =
+      futureProviderDeadline instanceof Date
+        ? futureProviderDeadline
+        : new Date(futureProviderDeadline);
     const firstReplay = {
       expertId: legacy.expertId,
       tariffKey: "legacy-shortened",
@@ -214,16 +248,22 @@ describe("residency provider deadline corrective upgrade", () => {
     };
     const conflictingReplay = {
       ...firstReplay,
-      providerDeadline: new Date(firstReplay.providerDeadline.getTime() + 86_400_000),
+      providerDeadline: new Date(
+        firstReplay.providerDeadline.getTime() + 86_400_000,
+      ),
     };
 
     // Pre-0019 stored only this earlier effective deadline, not the candidate provider deadline.
     expect(after0020.providerDeadline).toBeNull();
-    expect(effectivePaymentDeadline.getTime()).toBeLessThan(providerDeadline.getTime());
+    expect(effectivePaymentDeadline.getTime()).toBeLessThan(
+      providerDeadline.getTime(),
+    );
     await expect(repo.createCheckoutOrder(firstReplay)).rejects.toMatchObject({
       code: "checkout_idempotency_legacy_ambiguity",
     });
-    await expect(repo.createCheckoutOrder(conflictingReplay)).rejects.toMatchObject({
+    await expect(
+      repo.createCheckoutOrder(conflictingReplay),
+    ).rejects.toMatchObject({
       code: "checkout_idempotency_legacy_ambiguity",
     });
 
@@ -240,7 +280,9 @@ describe("residency provider deadline corrective upgrade", () => {
     } catch (error) {
       insertError = error;
     }
-    expect(messages(insertError)).toContain("new expert residency orders require provider deadline");
+    expect(messages(insertError)).toContain(
+      "new expert residency orders require provider deadline",
+    );
 
     const postCorrectionCommand = {
       expertId: legacy.expertId,
@@ -248,13 +290,21 @@ describe("residency provider deadline corrective upgrade", () => {
       providerDeadline: new Date(providerDeadline.getTime() + 86_400_000),
       idempotencyKey: "post-0020-exact-replay",
     };
-    const postCorrectionOrder = await repo.createCheckoutOrder(postCorrectionCommand);
-    const postCorrectionDeadline = (await upgradeDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
+    const postCorrectionOrder = await repo.createCheckoutOrder(
+      postCorrectionCommand,
+    );
+    const postCorrectionDeadline = (
+      await upgradeDb.db.execute<{
+        providerDeadline: Date | string | null;
+      }>(sql`
       select provider_deadline as "providerDeadline" from expert_residency_orders
       where id = ${postCorrectionOrder.orderId}::uuid
-    `)).rows[0]?.providerDeadline;
+    `)
+    ).rows[0]?.providerDeadline;
     expect(postCorrectionDeadline).not.toBeNull();
-    await expect(repo.createCheckoutOrder(postCorrectionCommand)).resolves.toMatchObject({
+    await expect(
+      repo.createCheckoutOrder(postCorrectionCommand),
+    ).resolves.toMatchObject({
       orderId: postCorrectionOrder.orderId,
     });
   }, 120_000);

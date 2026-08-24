@@ -3,7 +3,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
 import { ExpertReferralTestkit } from "../../packages/db/src/testkit/expert-referral.js";
-import { startTestPostgres, type TestDatabase } from "../../packages/db/src/testkit/postgres.js";
+import {
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/testkit/postgres.js";
 
 let testDb: TestDatabase;
 let fixtures: ExpertReferralTestkit;
@@ -52,19 +55,24 @@ async function createActiveTariff(): Promise<void> {
 }
 
 async function databaseNow(): Promise<Date> {
-  const row = (await testDb.db.execute<{ now: Date | string }>(
-    sql`select transaction_timestamp() as now`,
-  )).rows[0];
+  const row = (
+    await testDb.db.execute<{ now: Date | string }>(
+      sql`select transaction_timestamp() as now`,
+    )
+  ).rows[0];
   if (row === undefined) throw new Error("database clock unavailable");
   return new Date(row.now);
 }
 
-async function seedGrant(expertId: string, input: {
-  grantId: string;
-  amountMinor: bigint;
-  grantedAt: Date;
-  expiresAt: Date;
-}): Promise<void> {
+async function seedGrant(
+  expertId: string,
+  input: {
+    grantId: string;
+    amountMinor: bigint;
+    grantedAt: Date;
+    expiresAt: Date;
+  },
+): Promise<void> {
   const invitee = await fixtures.createExpert();
   const referralId = randomUUID();
   const tariffId = randomUUID();
@@ -72,18 +80,27 @@ async function seedGrant(expertId: string, input: {
   const settlementId = randomUUID();
   const ledgerId = randomUUID();
   const evidence = await fixtures.createAdminEvidence(
-    "expert_residency.tariff_create", tariffId,
+    "expert_residency.tariff_create",
+    tariffId,
     { priceMinor: "1", durationSeconds: 86400 },
   );
   await testDb.db.transaction(async (tx) => {
     await tx.execute(sql`insert into expert_referral_code_batches (
       inviter_expert_id, requested_count, issued_by_admin_id, approval_id, admin_session_id_hash
     ) values (${expertId}::uuid, 1, ${evidence.adminId}::uuid, ${evidence.approvalId}::uuid, ${evidence.sessionIdHash})`);
-    const batch = (await tx.execute<{ id: string }>(sql`select id from expert_referral_code_batches order by created_at desc limit 1`)).rows[0]!;
+    const batch = (
+      await tx.execute<{ id: string }>(
+        sql`select id from expert_referral_code_batches order by created_at desc limit 1`,
+      )
+    ).rows[0]!;
     await tx.execute(sql`insert into expert_referral_codes (
       batch_id, inviter_expert_id, code_hash, masked_suffix, hmac_key_version
     ) values (${batch.id}::uuid, ${expertId}::uuid, ${`grant-${randomUUID()}`}, '…seed', 1)`);
-    const code = (await tx.execute<{ id: string }>(sql`select id from expert_referral_codes order by issued_at desc limit 1`)).rows[0]!;
+    const code = (
+      await tx.execute<{ id: string }>(
+        sql`select id from expert_referral_codes order by issued_at desc limit 1`,
+      )
+    ).rows[0]!;
     await tx.execute(sql`insert into expert_referrals (id, code_id, inviter_expert_id, invitee_expert_id)
       values (${referralId}::uuid, ${code.id}::uuid, ${expertId}::uuid, ${invitee.expertId}::uuid)`);
     await tx.execute(sql`insert into expert_residency_tariff_versions (
@@ -125,9 +142,13 @@ describe("expert residency checkout", () => {
     const expert = await fixtures.createExpert();
     const now = await databaseNow();
     const firstGrantedAt = new Date(now.getTime() - 2 * 86_400_000);
-    const firstExpiresAt = new Date(firstGrantedAt.getTime() + 365 * 86_400_000);
+    const firstExpiresAt = new Date(
+      firstGrantedAt.getTime() + 365 * 86_400_000,
+    );
     const secondGrantedAt = new Date(now.getTime() - 86_400_000);
-    const secondExpiresAt = new Date(secondGrantedAt.getTime() + 365 * 86_400_000);
+    const secondExpiresAt = new Date(
+      secondGrantedAt.getTime() + 365 * 86_400_000,
+    );
     const providerDeadline = new Date(now.getTime() + 10 * 86_400_000);
     await seedGrant(expert.expertId, {
       grantId: "00000000-0000-4000-8000-000000000101",
@@ -142,7 +163,12 @@ describe("expert residency checkout", () => {
       expiresAt: secondExpiresAt,
     });
 
-    expect(await repo.quote({ expertId: expert.expertId, tariffKey: "residency-month" })).toMatchObject({
+    expect(
+      await repo.quote({
+        expertId: expert.expertId,
+        tariffKey: "residency-month",
+      }),
+    ).toMatchObject({
       creditMinor: "125000",
       cashMinor: "125001",
     });
@@ -157,33 +183,46 @@ describe("expert residency checkout", () => {
       "00000000-0000-4000-8000-000000000101",
       "00000000-0000-4000-8000-000000000102",
     ]);
-    expect(order.allocations.map((row) => row.amountMinor)).toEqual(["100000", "25000"]);
+    expect(order.allocations.map((row) => row.amountMinor)).toEqual([
+      "100000",
+      "25000",
+    ]);
     expect(order.creditMinor).toBe("125000");
     expect(order.cashMinor).toBe("125001");
     expect(order).not.toHaveProperty("providerDeadline");
-    const persistedDeadline = (await testDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
+    const persistedDeadline = (
+      await testDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
       select provider_deadline as "providerDeadline" from expert_residency_orders
       where id = ${order.orderId}::uuid
-    `)).rows[0]?.providerDeadline;
+    `)
+    ).rows[0]?.providerDeadline;
     expect(persistedDeadline).not.toBeNull();
-    if (persistedDeadline === null || persistedDeadline === undefined) throw new Error("provider_deadline_missing");
-    const persistedDeadlineAt = persistedDeadline instanceof Date
-      ? persistedDeadline
-      : new Date(persistedDeadline);
+    if (persistedDeadline === null || persistedDeadline === undefined)
+      throw new Error("provider_deadline_missing");
+    const persistedDeadlineAt =
+      persistedDeadline instanceof Date
+        ? persistedDeadline
+        : new Date(persistedDeadline);
     expect(persistedDeadlineAt.getTime()).toBe(providerDeadline.getTime());
-    expect((await repo.balance(expert.expertId)).spendableBalanceMinor).toBe("75000");
-    await expect(repo.createCheckoutOrder({
-      expertId: expert.expertId,
-      tariffKey: "residency-month",
-      providerDeadline: new Date(providerDeadline.getTime() + 1_000),
-      idempotencyKey: "checkout-fifo",
-    })).rejects.toMatchObject({ code: "checkout_idempotency_conflict" });
+    expect((await repo.balance(expert.expertId)).spendableBalanceMinor).toBe(
+      "75000",
+    );
+    await expect(
+      repo.createCheckoutOrder({
+        expertId: expert.expertId,
+        tariffKey: "residency-month",
+        providerDeadline: new Date(providerDeadline.getTime() + 1_000),
+        idempotencyKey: "checkout-fifo",
+      }),
+    ).rejects.toMatchObject({ code: "checkout_idempotency_conflict" });
   });
 
   it("replays an identical checkout after its status becomes terminal", async () => {
     await createActiveTariff();
     const expert = await fixtures.createExpert();
-    const providerDeadline = new Date((await databaseNow()).getTime() + 86_400_000);
+    const providerDeadline = new Date(
+      (await databaseNow()).getTime() + 86_400_000,
+    );
     const command = {
       expertId: expert.expertId,
       tariffKey: "residency-month",
@@ -191,7 +230,9 @@ describe("expert residency checkout", () => {
       idempotencyKey: "terminal-replay",
     };
     const created = await repo.createCheckoutOrder(command);
-    await testDb.db.execute(sql`update expert_residency_orders set status = 'failed' where id = ${created.orderId}::uuid`);
+    await testDb.db.execute(
+      sql`update expert_residency_orders set status = 'failed' where id = ${created.orderId}::uuid`,
+    );
 
     await expect(repo.createCheckoutOrder(command)).resolves.toMatchObject({
       orderId: created.orderId,
