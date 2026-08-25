@@ -702,7 +702,8 @@ const isApprovedPaymentBoundaryImport = (
   ([
     "packages/integrations/src/expert-residency/disabled-payment-adapter.ts",
     "packages/integrations/src/expert-residency/verified-event.ts",
-  ].includes(path) && specifier === "./payment-port.js");
+  ].includes(path) &&
+    specifier === "./payment-port.js");
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
   if (ts.isIdentifier(node.expression)) {

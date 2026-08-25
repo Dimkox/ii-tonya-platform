@@ -313,7 +313,8 @@ describe("residency provider deadline corrective upgrade", () => {
     });
     let terminalMutationError: unknown;
     try {
-      await upgradeDb.db.execute(sql`update expert_residency_provider_event_inbox
+      await upgradeDb.db
+        .execute(sql`update expert_residency_provider_event_inbox
         set processing_result_code = 'changed_after_upgrade'
         where external_event_id = ${legacyTerminalEventId}`);
     } catch (error) {

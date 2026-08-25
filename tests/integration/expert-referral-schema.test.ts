@@ -647,7 +647,8 @@ describe("expert referral and residency schema", () => {
 
   it("makes terminal provider inbox outcomes immutable while allowing legal transitions", async () => {
     const terminalId = randomUUID();
-    await testDb.db.execute(sql`insert into expert_residency_provider_event_inbox (
+    await testDb.db
+      .execute(sql`insert into expert_residency_provider_event_inbox (
       id, provider, external_event_id, payload_digest, verification_id,
       verifier_key_version, verified_at, authenticated, event_kind,
       processing_status, processing_result_digest, processing_result_code,
@@ -705,7 +706,8 @@ describe("expert referral and residency schema", () => {
     );
 
     const transitioningId = randomUUID();
-    await testDb.db.execute(sql`insert into expert_residency_provider_event_inbox (
+    await testDb.db
+      .execute(sql`insert into expert_residency_provider_event_inbox (
       id, provider, external_event_id, payload_digest, verification_id,
       verifier_key_version, verified_at, authenticated, event_kind,
       processing_status
