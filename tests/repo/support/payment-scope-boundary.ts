@@ -628,9 +628,9 @@ const isApprovedExpertResidencyRuntimeAuditAction = (
   let owner: ts.Node | undefined = declaration.parent;
   while (owner !== undefined && !ts.isMethodDeclaration(owner)) {
     if (
-      ts.isFunctionDeclaration(owner) ||
-      ts.isFunctionExpression(owner) ||
-      ts.isArrowFunction(owner)
+      ts.isFunctionLike(owner) ||
+      ts.isClassLike(owner) ||
+      ts.isClassStaticBlockDeclaration(owner)
     ) {
       return false;
     }

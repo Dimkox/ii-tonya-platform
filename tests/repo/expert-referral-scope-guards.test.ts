@@ -160,6 +160,40 @@ describe("expert residency referral scope guards", () => {
       }`,
     ],
     [
+      "a settlement audit label in a nested class static block",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      `class PostgresExpertResidencyProviderInboxRepository {
+        private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+          class HiddenAdminContext {
+            static {
+              const action = result.kind === "settled"
+                ? "expert_residency.settled"
+                : "expert_residency.expired";
+              void action;
+            }
+          }
+          return HiddenAdminContext;
+        }
+      }`,
+    ],
+    [
+      "a settlement audit label in a nested class constructor",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      `class PostgresExpertResidencyProviderInboxRepository {
+        private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+          class HiddenAdminContext {
+            constructor() {
+              const action = result.kind === "settled"
+                ? "expert_residency.settled"
+                : "expert_residency.expired";
+              void action;
+            }
+          }
+          return HiddenAdminContext;
+        }
+      }`,
+    ],
+    [
       "an unreviewed expert referral feature flag destructured from process.env",
       "packages/config/src/expert-referrals.ts",
       "const { EXPERT_REFERRAL_EXPORT_ENABLED } = process.env;",
