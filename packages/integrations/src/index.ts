@@ -69,6 +69,17 @@ export {
   CallbackDataIntegrityError,
   CallbackInfrastructureError,
 } from "@ii-tonya/contracts";
+export { DisabledExpertResidencyPaymentAdapter } from "./expert-residency/disabled-payment-adapter.js";
+export {
+  DisabledExpertResidencyPaymentEventVerifier,
+  isVerifiedExpertResidencyPaymentEvent,
+  requireVerifiedExpertResidencyPaymentEvent,
+} from "./expert-residency/verified-event.js";
+export type {
+  ExpertResidencyPaymentEventVerifier,
+  ExpertResidencyPaymentPort,
+} from "./expert-residency/payment-port.js";
+export type { VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
 export {
   buildTelegramMethodUrl,
   redactTelegramUrl,

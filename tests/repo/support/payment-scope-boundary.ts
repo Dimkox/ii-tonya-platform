@@ -67,7 +67,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "aae290c279d85d85ae90714b6526e8cda4fba070632b188d567302bfa7062c43",
+    "83cedea6ac45982b8511c4cbf3227d3e7a155667a2681d942177ada420c26ef1",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -105,7 +105,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/db/package.json",
-    "a353472305685ce82b891a6dfc7eff4a015d9f4cc376191fde47ec6b89fb155a",
+    "a9b65824eca2d6040e235746e81e8f52b64d1ed887ca21e80dce8ecbff1d3c4d",
   ],
   [
     "packages/domain/package.json",
@@ -211,6 +211,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
     new Set([
       "@ii-tonya/contracts",
       "@ii-tonya/domain",
+      "@ii-tonya/integrations",
       "@testcontainers/postgresql",
       "@types/pg",
       "drizzle-kit",
@@ -358,6 +359,10 @@ const approvedMigrationHashes = new Map([
     "83b8baffd09624c47d036e79d998389af4bef1aa80b1a680fecc9d1755dbe40f",
   ],
   [
+    "packages/db/migrations/0021_expert-residency-verification-evidence.sql",
+    "b93c32dc069a777d15fdd5985fbb6c99c20e2bf5185eeb5d314729488f89026b",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -438,8 +443,12 @@ const approvedMigrationHashes = new Map([
     "3781420532d3244e2a635d246e2d10f6ec98eb50b1ef61a9642859af3722af0d",
   ],
   [
+    "packages/db/migrations/meta/0021_snapshot.json",
+    "65ef01b8af7e364ceb9f01f5fd723eba773270fcf05f83ac64976dec1142ff72",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "5856929ac99dc3d49ce798c45f18e0d9c2e45293415976a0227c5d61f71472ca",
+    "e808a119ac490e17a3559891f6a22ffe7ebb7fbcef98d4449fb43f3886fe1ec6",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -612,6 +621,9 @@ const isApprovedPaymentBoundaryImport = (
     [
       "./payment/disabled-payment-adapter.js",
       "./payment/payment-port.js",
+      "./expert-residency/disabled-payment-adapter.js",
+      "./expert-residency/payment-port.js",
+      "./expert-residency/verified-event.js",
       "./projections/make-projection-sink.js",
       "./projections/projection-port.js",
     ].includes(specifier)) ||

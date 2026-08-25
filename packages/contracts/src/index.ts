@@ -5,6 +5,17 @@ export type { EventEnvelope } from "./events.js";
 export { toUtcIso } from "./time.js";
 export type { Clock } from "./time.js";
 export {
+  expertResidencyCheckoutCommandSchema,
+  expertResidencyPaymentEventSchema,
+  expertResidencyVerificationEvidenceSchema,
+} from "./expert-residency.js";
+export type {
+  ExpertResidencyCheckoutCommand,
+  ExpertResidencyCheckoutOutcome,
+  ExpertResidencyPaymentEvent,
+  ExpertResidencyVerificationEvidence,
+} from "./expert-residency.js";
+export {
   CallbackConflictError,
   CallbackDataIntegrityError,
   CallbackInfrastructureError,

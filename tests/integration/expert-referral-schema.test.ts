@@ -593,22 +593,24 @@ describe("expert referral and residency schema", () => {
     const externalEventId = randomUUID();
     await testDb.db.execute(sql`
       insert into expert_residency_provider_event_inbox (
-        provider, external_event_id, payload_digest, authenticated,
-        event_kind, processing_status
+        provider, external_event_id, payload_digest, verification_id,
+        verifier_key_version, verified_at, authenticated, event_kind,
+        processing_status
       ) values (
-        ${provider}, ${externalEventId}, 'sha256:event', true,
-        'settlement', 'pending'
+        ${provider}, ${externalEventId}, 'sha256:event', 'verify-schema-event',
+        'schema-v1', transaction_timestamp(), true, 'settlement', 'pending'
       )
     `);
     await expectDatabaseError(
       () =>
         testDb.db.execute(sql`
           insert into expert_residency_provider_event_inbox (
-            provider, external_event_id, payload_digest, authenticated,
-            event_kind, processing_status
+            provider, external_event_id, payload_digest, verification_id,
+            verifier_key_version, verified_at, authenticated, event_kind,
+            processing_status
           ) values (
-            ${provider}, ${externalEventId}, 'sha256:other', true,
-            'settlement', 'pending'
+            ${provider}, ${externalEventId}, 'sha256:other', 'verify-schema-other',
+            'schema-v1', transaction_timestamp(), true, 'settlement', 'pending'
           )
         `),
       { code: "23505", constraint: "expert_provider_event_unique" },

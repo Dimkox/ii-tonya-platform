@@ -148,4 +148,9 @@ export {
   type ResidencyQuoteRequest,
   type RetireTariffVersion,
 } from "./repositories/expert-residency-repository.js";
+export {
+  ExpertResidencySettlementError,
+  PostgresExpertResidencyProviderInboxRepository,
+  type ExpertResidencySettlementResult,
+} from "./repositories/expert-residency-provider-inbox-repository.js";
 export * from "./schema/index.js";

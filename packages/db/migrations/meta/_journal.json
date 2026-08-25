@@ -148,6 +148,13 @@
       "when": 1787610883254,
       "tag": "0020_fat_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787642937995,
+      "tag": "0021_expert-residency-verification-evidence",
+      "breakpoints": true
     }
   ]
 }
