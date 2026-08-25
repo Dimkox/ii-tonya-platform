@@ -720,7 +720,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
     ) {
       throw new ExpertResidencySettlementError("payment_currency_mismatch");
     }
-    if (order.status !== "settled") {
+    const beforeSettlement =
+      order.status === "quoted" || order.status === "payment_pending";
+    if (!beforeSettlement && order.status !== "settled") {
       throw new ExpertResidencySettlementError("order_state_invalid");
     }
     const priorRefunded = bigint(
@@ -797,7 +799,14 @@ export class PostgresExpertResidencyProviderInboxRepository {
       }
       await tx.execute(sql`update expert_residency_orders set
         status = ${event.kind}, updated_at = clock_timestamp()
-        where id = ${order.orderId}::uuid and status = 'settled'`);
+        where id = ${order.orderId}::uuid
+          and status in ('quoted', 'payment_pending', 'settled')`);
+      if (beforeSettlement) {
+        await tx.execute(sql`update expert_residency_payment_attempts
+          set status = 'cancelled', updated_at = clock_timestamp()
+          where id = ${order.paymentAttemptId}::uuid
+            and status in ('created', 'pending', 'unknown_outcome')`);
+      }
     }
     const result: ExpertResidencyRefundResult = {
       kind: event.kind,
@@ -1308,7 +1317,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
       orderId: order.orderId,
       expertId: order.expertId,
       markerId,
-      outcome: result.kind,
+      result,
     };
     const idempotencyKey = `expert-residency-held-replay:${markerId}`;
     const reconciliationKey = `expert-residency:${order.orderId}`;

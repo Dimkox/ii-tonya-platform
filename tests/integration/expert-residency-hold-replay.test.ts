@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import type { ExpertResidencyPaymentEvent } from "../../packages/contracts/src/index.js";
@@ -12,6 +12,24 @@ import { verifiedEventFixture } from "../../packages/integrations/src/expert-res
 
 let testDb: TestDatabase;
 let fixtures: ExpertReferralTestkit;
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`;
+}
+
+function payloadHash(value: unknown): string {
+  return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
+}
 
 beforeAll(async () => {
   testDb = await startTestPostgres();
@@ -133,19 +151,38 @@ async function scenario(
   };
 }
 
-function terminatingRefund(scenario: HeldScenario) {
-  const event = {
-    kind: "charged_back" as const,
+function refundEvent(
+  scenario: HeldScenario,
+  input: {
+    readonly kind?: "refunded" | "charged_back";
+    readonly eventId?: string;
+    readonly amountMinor?: string;
+    readonly terminatesResidency?: boolean;
+    readonly digestCharacter?: string;
+  } = {},
+) {
+  const common = {
     provider: "sandbox",
-    eventId: `evt_chargeback_${randomUUID()}`,
+    eventId: input.eventId ?? `evt_refund_${randomUUID()}`,
     paymentId: scenario.paymentId,
     orderId: scenario.orderId,
-    amountMinor: "100000",
+    amountMinor: input.amountMinor ?? "100000",
     currency: "RUB" as const,
     occurredAt: "2026-08-03T00:00:02.000Z",
-    payloadDigest: `sha256:${"d".repeat(64)}`,
-    terminatesResidency: true as const,
+    payloadDigest: `sha256:${(input.digestCharacter ?? "d").repeat(64)}`,
   };
+  const event: ExpertResidencyPaymentEvent =
+    input.kind === "refunded"
+      ? {
+          ...common,
+          kind: "refunded",
+          terminatesResidency: input.terminatesResidency ?? true,
+        }
+      : {
+          ...common,
+          kind: "charged_back",
+          terminatesResidency: input.terminatesResidency ?? true,
+        };
   return verifiedEventFixture(event, {
     verificationId: `verify_${event.eventId}`,
     verifierKeyVersion: "sandbox-v1",
@@ -183,6 +220,138 @@ async function heldFacts(scenario: HeldScenario) {
 }
 
 describe("expert residency held reward replay", () => {
+  it.each(["refunded", "charged_back"] as const)(
+    "makes an early terminating %s durable and prevents delayed settlement",
+    async (kind) => {
+      const prepared = await scenario({ rewardEnabled: false });
+      const repo = new PostgresExpertResidencyProviderInboxRepository(
+        testDb.db,
+      );
+      const eventId = `evt_early_${kind}_${randomUUID()}`;
+      const event = refundEvent(prepared, { kind, eventId });
+
+      const first = await repo.refund(event);
+      await expect(repo.refund(event)).resolves.toEqual(first);
+      expect(first).toMatchObject({
+        kind,
+        cumulativeCashRefundedMinor: "100000",
+        residencyTerminated: true,
+        rewardReversed: false,
+        eligibilityStatus: "not_first_settlement",
+      });
+      await expect(
+        repo.refund(
+          refundEvent(prepared, {
+            kind,
+            eventId,
+            digestCharacter: "e",
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "provider_event_replay_conflict" });
+      await expect(repo.settle(prepared.settlement)).rejects.toMatchObject({
+        code: "order_state_invalid",
+      });
+      await expect(repo.settle(prepared.settlement)).rejects.toMatchObject({
+        code: "order_state_invalid",
+      });
+      await expect(
+        repo.replayHeldReward({
+          expertId: prepared.inviteeId,
+          qualifyingOrderId: prepared.orderId,
+        }),
+      ).rejects.toMatchObject({ code: "held_marker_not_found" });
+
+      const state = (
+        await testDb.db.execute<{
+          status: string;
+          settledAt: Date | null;
+          residencyStartsAt: Date | null;
+          residencyEndsAt: Date | null;
+          markers: number;
+          grants: number;
+          reversals: number;
+          refundInboxStatus: string;
+          settlementInboxStatus: string;
+        }>(sql`select
+          (select status::text from expert_residency_orders
+            where id = ${prepared.orderId}::uuid) as status,
+          (select settled_at from expert_residency_orders
+            where id = ${prepared.orderId}::uuid) as "settledAt",
+          (select residency_starts_at from expert_residency_orders
+            where id = ${prepared.orderId}::uuid) as "residencyStartsAt",
+          (select residency_ends_at from expert_residency_orders
+            where id = ${prepared.orderId}::uuid) as "residencyEndsAt",
+          (select count(*)::integer from expert_first_residency_settlements
+            where qualifying_order_id = ${prepared.orderId}::uuid) as markers,
+          (select count(*)::integer from expert_referral_reward_grants
+            where qualifying_order_id = ${prepared.orderId}::uuid) as grants,
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'reversal') as reversals,
+          (select processing_status::text
+            from expert_residency_provider_event_inbox
+            where external_event_id = ${eventId}) as "refundInboxStatus",
+          (select processing_status::text
+            from expert_residency_provider_event_inbox
+            where external_event_id = ${prepared.settlement.eventId})
+            as "settlementInboxStatus"`)
+      ).rows[0];
+      expect(state).toEqual({
+        status: kind,
+        settledAt: null,
+        residencyStartsAt: null,
+        residencyEndsAt: null,
+        markers: 0,
+        grants: 0,
+        reversals: 0,
+        refundInboxStatus: "processed",
+        settlementInboxStatus: "failed",
+      });
+    },
+  );
+
+  it("preserves an early active refund and includes it in a later terminating cumulative bound", async () => {
+    const prepared = await scenario();
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    const early = refundEvent(prepared, {
+      kind: "refunded",
+      amountMinor: "10000",
+      terminatesResidency: false,
+    });
+
+    const earlyResult = await repo.refund(early);
+    await expect(repo.refund(early)).resolves.toEqual(earlyResult);
+    expect(earlyResult).toMatchObject({
+      cumulativeCashRefundedMinor: "10000",
+      residencyTerminated: false,
+      rewardReversed: false,
+    });
+    await expect(repo.settle(prepared.settlement)).resolves.toMatchObject({
+      kind: "settled",
+      rewardEffect: { kind: "reward_granted", amountMinor: "100000" },
+    });
+    await expect(
+      repo.refund(
+        refundEvent(prepared, {
+          kind: "refunded",
+          amountMinor: "90000",
+          terminatesResidency: true,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      cumulativeCashRefundedMinor: "100000",
+      residencyTerminated: true,
+      rewardReversed: true,
+      removedCreditMinor: "100000",
+    });
+    expect(await heldFacts(prepared)).toMatchObject({
+      eligibility: "eligible",
+      grants: 1,
+      reversals: 1,
+      debtMinor: "0",
+      spendableMinor: "0",
+    });
+  });
+
   it("lets a terminating refund cancel a held marker permanently", async () => {
     const prepared = await scenario({ rewardEnabled: false });
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
@@ -191,9 +360,7 @@ describe("expert residency held reward replay", () => {
       rewardEffect: { kind: "none" },
     });
 
-    await expect(
-      repo.refund(terminatingRefund(prepared)),
-    ).resolves.toMatchObject({
+    await expect(repo.refund(refundEvent(prepared))).resolves.toMatchObject({
       residencyTerminated: true,
       eligibilityStatus: "cancelled_by_refund",
       rewardReversed: false,
@@ -295,6 +462,88 @@ describe("expert residency held reward replay", () => {
     });
   });
 
+  it("rejects a kind-only held reward outbox that omits the canonical reward amount", async () => {
+    const prepared = await scenario({ rewardEnabled: false });
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    await repo.settle(prepared.settlement);
+    const markerId = (
+      await testDb.db.execute<{ markerId: string }>(sql`select id as "markerId"
+        from expert_first_residency_settlements
+        where expert_id = ${prepared.inviteeId}::uuid`)
+    ).rows[0]!.markerId;
+    const incompletePayload = {
+      orderId: prepared.orderId,
+      expertId: prepared.inviteeId,
+      markerId,
+      outcome: "reward_granted",
+    };
+    await testDb.db.execute(sql`insert into integration_outbox (
+      idempotency_key, topic, payload, correlation_id, reconciliation_key,
+      payload_hash
+    ) values (${`expert-residency-held-replay:${markerId}`},
+      'expert_residency.held_reward_replayed',
+      ${JSON.stringify(incompletePayload)}::jsonb, ${`held-replay:${markerId}`},
+      ${`expert-residency:${prepared.orderId}`},
+      ${payloadHash(incompletePayload)})`);
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+
+    await expect(
+      repo.replayHeldReward({
+        expertId: prepared.inviteeId,
+        qualifyingOrderId: prepared.orderId,
+      }),
+    ).rejects.toMatchObject({ code: "outbox_replay_conflict" });
+    expect(await heldFacts(prepared)).toMatchObject({
+      eligibility: "pending_feature_hold",
+      grants: 0,
+      spendableMinor: "0",
+    });
+  });
+
+  it("rejects a kind-only held ineligibility outbox that omits the canonical reason", async () => {
+    const prepared = await scenario({ rewardEnabled: false });
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    await repo.settle(prepared.settlement);
+    await testDb.db.execute(sql`update expert_residency_orders set
+      residency_starts_at = transaction_timestamp() - interval '60 days',
+      residency_ends_at = transaction_timestamp() - interval '30 days'
+      where id = ${prepared.orderId}::uuid`);
+    const markerId = (
+      await testDb.db.execute<{ markerId: string }>(sql`select id as "markerId"
+        from expert_first_residency_settlements
+        where expert_id = ${prepared.inviteeId}::uuid`)
+    ).rows[0]!.markerId;
+    const incompletePayload = {
+      orderId: prepared.orderId,
+      expertId: prepared.inviteeId,
+      markerId,
+      outcome: "ineligible",
+    };
+    await testDb.db.execute(sql`insert into integration_outbox (
+      idempotency_key, topic, payload, correlation_id, reconciliation_key,
+      payload_hash
+    ) values (${`expert-residency-held-replay:${markerId}`},
+      'expert_residency.held_reward_replayed',
+      ${JSON.stringify(incompletePayload)}::jsonb, ${`held-replay:${markerId}`},
+      ${`expert-residency:${prepared.orderId}`},
+      ${payloadHash(incompletePayload)})`);
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+
+    await expect(
+      repo.replayHeldReward({
+        expertId: prepared.inviteeId,
+        qualifyingOrderId: prepared.orderId,
+      }),
+    ).rejects.toMatchObject({ code: "outbox_replay_conflict" });
+    expect(await heldFacts(prepared)).toMatchObject({
+      eligibility: "pending_feature_hold",
+      reason: "reward_grants_disabled",
+      grants: 0,
+    });
+  });
+
   it("serializes terminating refund against held replay without duplicate value", async () => {
     const prepared = await scenario({ rewardEnabled: false });
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
@@ -303,7 +552,7 @@ describe("expert residency held reward replay", () => {
       set reward_grants_enabled = true, version = version + 1`);
 
     await Promise.all([
-      repo.refund(terminatingRefund(prepared)),
+      repo.refund(refundEvent(prepared)),
       repo.replayHeldReward({
         expertId: prepared.inviteeId,
         qualifyingOrderId: prepared.orderId,

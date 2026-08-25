@@ -305,6 +305,53 @@ export class PostgresExpertResidencyRepository {
     await tx.execute(sql`select pg_advisory_xact_lock(
       hashtextextended(${`expert-referral:reward:${input.inviterExpertId}`}, 0)
     )`);
+    const existing = (
+      await tx.execute<{ id: string }>(sql`select reversal.id
+        from expert_referral_ledger_entries reversal
+        join expert_referral_reward_grants grant_row
+          on grant_row.id = reversal.source_id
+        where reversal.entry_kind = 'reversal'
+          and reversal.source_type = 'reward_grant'
+          and reversal.source_id = ${input.grantId}::uuid
+          and grant_row.inviter_expert_id = ${input.inviterExpertId}::uuid`)
+    ).rows[0];
+    if (existing !== undefined) {
+      return {
+        rewardReversed: false,
+        removedCreditMinor: 0n,
+        cancelledReservationMinor: 0n,
+        debtMinor: 0n,
+      };
+    }
+    const affectedOrders = (
+      await tx.execute<{ orderId: string }>(sql`select
+        order_row.id as "orderId"
+        from expert_referral_ledger_entries reservation
+        join expert_referral_ledger_allocations allocation
+          on allocation.ledger_entry_id = reservation.id
+          and allocation.reward_grant_id = ${input.grantId}::uuid
+        join expert_referral_reward_grants grant_row
+          on grant_row.id = allocation.reward_grant_id
+          and grant_row.inviter_expert_id = ${input.inviterExpertId}::uuid
+        join expert_residency_orders order_row
+          on order_row.id = reservation.source_id
+        where reservation.entry_kind = 'reservation'
+          and reservation.source_type = 'residency_order'
+          and order_row.status in ('quoted', 'payment_pending')
+          and not exists (select 1 from expert_referral_ledger_entries terminal
+            where terminal.original_entry_id = reservation.id
+              and terminal.entry_kind in ('release', 'spend'))
+        order by order_row.id, reservation.id for update of order_row`)
+    ).rows;
+    if (affectedOrders.length > 0) {
+      const affectedOrderIds = sql.join(
+        affectedOrders.map(({ orderId }) => sql`${orderId}::uuid`),
+        sql`, `,
+      );
+      await tx.execute(sql`select id from expert_residency_payment_attempts
+        where order_id in (${affectedOrderIds})
+        order by order_id, id for update`);
+    }
     const grant = (
       await tx.execute<{
         amountMinor: bigint | string;
@@ -325,12 +372,6 @@ export class PostgresExpertResidencyRepository {
     await tx.execute(sql`select id from expert_referral_ledger_entries
       where account_expert_id = ${input.inviterExpertId}::uuid
       order by created_at, id for update`);
-    const existing = (
-      await tx.execute<{ id: string }>(sql`select id
-        from expert_referral_ledger_entries where entry_kind = 'reversal'
-          and source_type = 'reward_grant' and source_id = ${input.grantId}::uuid
-        for update`)
-    ).rows[0];
     const totals = (
       await tx.execute<{
         expiredMinor: bigint | string;
@@ -408,14 +449,6 @@ export class PostgresExpertResidencyRepository {
       cancelledReservationMinor < 0n
     ) {
       throw new ExpertResidencyRepositoryError("reward_allocation_invalid");
-    }
-    if (existing !== undefined) {
-      return {
-        rewardReversed: true,
-        removedCreditMinor,
-        cancelledReservationMinor: 0n,
-        debtMinor: usedMinor,
-      };
     }
     for (const reservation of activeReservations) {
       const releaseId = randomUUID();

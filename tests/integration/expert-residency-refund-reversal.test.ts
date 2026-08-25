@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import type { ExpertResidencyPaymentEvent } from "../../packages/contracts/src/index.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
+import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
 import { ExpertReferralTestkit } from "../../packages/db/src/testkit/expert-referral.js";
 import {
   startTestPostgres,
@@ -28,6 +29,32 @@ interface RewardScenario {
   readonly paymentId: string;
   readonly grantId: string;
   readonly rewardEntryId: string;
+  readonly reservedOrderId?: string;
+  readonly reservedSettlement?: ReturnType<typeof verifiedEventFixture>;
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function waitForOrderLockWaiters(count: number): Promise<void> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const waiting = Number(
+      (
+        await testDb.db.execute<{ waiting: number | string }>(sql`select
+          count(*)::integer as waiting from pg_stat_activity
+          where wait_event_type = 'Lock'
+            and query like '%expert_residency_orders%'`)
+      ).rows[0]?.waiting ?? 0,
+    );
+    if (waiting >= count) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`expected_${count}_order_lock_waiters`);
 }
 
 async function seedRewardScenario(
@@ -57,6 +84,8 @@ async function seedRewardScenario(
     { priceMinor: "100000", durationSeconds: 63_072_000 },
   );
   const expiredMinor = input.expiredMinor ?? 0n;
+  let reservedOrderId: string | undefined;
+  let reservedSettlement: ReturnType<typeof verifiedEventFixture> | undefined;
   const settledAgo =
     expiredMinor > 0n || input.expiredGrant === true ? "400 days" : "1 day";
 
@@ -161,19 +190,30 @@ async function seedRewardScenario(
       ) values (${expiryId}::uuid, ${grantId}::uuid, ${expiredMinor})`);
     }
     if ((input.activeReservationMinor ?? 0n) > 0n) {
-      const reservedOrderId = randomUUID();
+      reservedOrderId = randomUUID();
       const reservationId = randomUUID();
+      const reservedAttemptId = randomUUID();
+      const reservedPaymentId = `pay_${randomUUID()}`;
+      const reservedCashMinor = 100_000n - input.activeReservationMinor!;
       await tx.execute(sql`insert into expert_residency_orders (
         id, expert_id, tariff_version_id, tariff_name, tariff_description,
         price_minor, currency, duration_seconds, credit_minor, cash_minor,
-        payment_deadline, provider_deadline, idempotency_key, status, quoted_at
+        payment_deadline, provider_deadline, idempotency_key, payment_provider,
+        provider_payment_id, status, quoted_at, payment_started_at
       ) values (${reservedOrderId}::uuid, ${inviter.expertId}::uuid,
         ${tariffId}::uuid, 'Reserved', 'Reserved fixture', 100000, 'RUB',
         63072000, ${input.activeReservationMinor!},
-        ${100000n - input.activeReservationMinor!},
+        ${reservedCashMinor},
         transaction_timestamp() + interval '1 day',
         transaction_timestamp() + interval '1 day',
-        ${`reserved-${reservedOrderId}`}, 'quoted', transaction_timestamp())`);
+        ${`reserved-${reservedOrderId}`}, 'sandbox', ${reservedPaymentId},
+        'payment_pending', transaction_timestamp(), transaction_timestamp())`);
+      await tx.execute(sql`insert into expert_residency_payment_attempts (
+        id, order_id, provider, provider_request_id, expected_amount_minor,
+        currency, status, idempotency_key
+      ) values (${reservedAttemptId}::uuid, ${reservedOrderId}::uuid, 'sandbox',
+        ${reservedPaymentId}, ${reservedCashMinor}, 'RUB', 'pending',
+        ${`reserved-attempt-${reservedAttemptId}`})`);
       await tx.execute(sql`insert into expert_referral_ledger_entries (
         id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
         idempotency_key
@@ -184,6 +224,23 @@ async function seedRewardScenario(
         ledger_entry_id, reward_grant_id, amount_minor
       ) values (${reservationId}::uuid, ${grantId}::uuid,
         ${input.activeReservationMinor!})`);
+      const settlementEvent: ExpertResidencyPaymentEvent = {
+        kind: "settled",
+        provider: "sandbox",
+        eventId: `evt_reserved_${randomUUID()}`,
+        paymentId: reservedPaymentId,
+        orderId: reservedOrderId,
+        amountMinor: reservedCashMinor.toString(),
+        currency: "RUB",
+        occurredAt: "2026-08-03T00:00:04.000Z",
+        payloadDigest: `sha256:${"f".repeat(64)}`,
+      };
+      reservedSettlement = verifiedEventFixture(settlementEvent, {
+        verificationId: `verify_${settlementEvent.eventId}`,
+        verifierKeyVersion: "sandbox-v1",
+        verifiedAt: "2026-08-03T00:00:05.000Z",
+        payloadDigest: settlementEvent.payloadDigest,
+      });
     }
   });
   return {
@@ -193,7 +250,85 @@ async function seedRewardScenario(
     paymentId,
     grantId,
     rewardEntryId,
+    ...(reservedOrderId === undefined
+      ? {}
+      : { reservedOrderId, reservedSettlement: reservedSettlement! }),
   };
+}
+
+async function futureRewardSettlement(inviterExpertId: string) {
+  const invitee = await fixtures.createExpert();
+  const tariffId = randomUUID();
+  const orderId = randomUUID();
+  const paymentAttemptId = randomUUID();
+  const paymentId = `pay_${randomUUID()}`;
+  const batchId = randomUUID();
+  const codeId = randomUUID();
+  const referralId = randomUUID();
+  const approval = await fixtures.createAdminEvidence(
+    "expert_residency.tariff_create",
+    tariffId,
+    { priceMinor: "100000", durationSeconds: 63_072_000 },
+  );
+  await testDb.db.transaction(async (tx) => {
+    await tx.execute(sql`insert into expert_referral_code_batches (
+      id, inviter_expert_id, requested_count, issued_by_admin_id, approval_id,
+      admin_session_id_hash
+    ) values (${batchId}::uuid, ${inviterExpertId}::uuid, 1,
+      ${approval.adminId}::uuid, ${approval.approvalId}::uuid,
+      ${approval.sessionIdHash})`);
+    await tx.execute(sql`insert into expert_referral_codes (
+      id, batch_id, inviter_expert_id, code_hash, masked_suffix,
+      hmac_key_version, status, redeemed_at
+    ) values (${codeId}::uuid, ${batchId}::uuid, ${inviterExpertId}::uuid,
+      ${`future-${codeId}`}, '…next', 1, 'redeemed', transaction_timestamp())`);
+    await tx.execute(sql`insert into expert_referrals (
+      id, code_id, inviter_expert_id, invitee_expert_id
+    ) values (${referralId}::uuid, ${codeId}::uuid, ${inviterExpertId}::uuid,
+      ${invitee.expertId}::uuid)`);
+    await tx.execute(sql`insert into expert_residency_tariff_versions (
+      id, tariff_key, version, display_name, description, price_minor,
+      currency, duration_seconds, active_from, created_by_admin_id, approval_id,
+      admin_session_id_hash
+    ) values (${tariffId}::uuid, ${`future-${tariffId}`}, 1, 'Future reward',
+      'Debt repayment fixture', 100000, 'RUB', 63072000,
+      transaction_timestamp() - interval '1 day', ${approval.adminId}::uuid,
+      ${approval.approvalId}::uuid, ${approval.sessionIdHash})`);
+    await tx.execute(sql`insert into expert_residency_orders (
+      id, expert_id, tariff_version_id, tariff_name, tariff_description,
+      price_minor, currency, duration_seconds, credit_minor, cash_minor,
+      payment_deadline, provider_deadline, idempotency_key, payment_provider,
+      provider_payment_id, status, quoted_at, payment_started_at
+    ) values (${orderId}::uuid, ${invitee.expertId}::uuid, ${tariffId}::uuid,
+      'Future reward', 'Debt repayment fixture', 100000, 'RUB', 63072000,
+      0, 100000, transaction_timestamp() + interval '1 day',
+      transaction_timestamp() + interval '1 day', ${`future-order-${orderId}`},
+      'sandbox', ${paymentId}, 'payment_pending', transaction_timestamp(),
+      transaction_timestamp())`);
+    await tx.execute(sql`insert into expert_residency_payment_attempts (
+      id, order_id, provider, provider_request_id, expected_amount_minor,
+      currency, status, idempotency_key
+    ) values (${paymentAttemptId}::uuid, ${orderId}::uuid, 'sandbox',
+      ${paymentId}, 100000, 'RUB', 'pending',
+      ${`future-attempt-${paymentAttemptId}`})`);
+  });
+  const event: ExpertResidencyPaymentEvent = {
+    kind: "settled",
+    provider: "sandbox",
+    eventId: `evt_future_${randomUUID()}`,
+    paymentId,
+    orderId,
+    amountMinor: "100000",
+    currency: "RUB",
+    occurredAt: "2026-08-03T00:00:06.000Z",
+    payloadDigest: `sha256:${"a".repeat(64)}`,
+  };
+  return verifiedEventFixture(event, {
+    verificationId: `verify_${event.eventId}`,
+    verifierKeyVersion: "sandbox-v1",
+    verifiedAt: "2026-08-03T00:00:07.000Z",
+    payloadDigest: event.payloadDigest,
+  });
 }
 
 function verifiedRefund(
@@ -314,6 +449,132 @@ describe("expert residency refund and reward reversal", () => {
       releases: 1,
       debtMinor: "60000",
       spendableMinor: "0",
+    });
+  });
+
+  it("locks an affected reservation order before ledger rows when reversal races settlement", async () => {
+    const scenario = await seedRewardScenario({
+      activeReservationMinor: 20_000n,
+    });
+    expect(scenario.reservedOrderId).toBeDefined();
+    expect(scenario.reservedSettlement).toBeDefined();
+    const providerRepo = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+    const residencyRepo = new PostgresExpertResidencyRepository(testDb.db);
+    const orderLocked = deferred();
+    const releaseOrder = deferred();
+    const blocker = testDb.db.transaction(async (tx) => {
+      await tx.execute(sql`select id from expert_residency_orders
+          where id = ${scenario.reservedOrderId!}::uuid for update`);
+      orderLocked.resolve();
+      await releaseOrder.promise;
+    });
+    await orderLocked.promise;
+    const settlement = providerRepo.settle(scenario.reservedSettlement!);
+    await waitForOrderLockWaiters(1);
+    const reversal = testDb.db.transaction((tx) =>
+      residencyRepo.reverseRewardGrant(tx, {
+        grantId: scenario.grantId,
+        inviterExpertId: scenario.inviterId,
+        reversedAt: new Date(),
+      }),
+    );
+    try {
+      await waitForOrderLockWaiters(2);
+    } finally {
+      releaseOrder.resolve();
+      await blocker;
+    }
+
+    await expect(settlement).resolves.toMatchObject({ kind: "settled" });
+    await expect(reversal).resolves.toMatchObject({
+      rewardReversed: true,
+      removedCreditMinor: 80_000n,
+      cancelledReservationMinor: 0n,
+      debtMinor: 20_000n,
+    });
+    const replay = await testDb.db.transaction((tx) =>
+      residencyRepo.reverseRewardGrant(tx, {
+        grantId: scenario.grantId,
+        inviterExpertId: scenario.inviterId,
+        reversedAt: new Date(),
+      }),
+    );
+    expect(replay).toEqual({
+      rewardReversed: false,
+      removedCreditMinor: 0n,
+      cancelledReservationMinor: 0n,
+      debtMinor: 0n,
+    });
+    const facts = (
+      await testDb.db.execute<{
+        reservedStatus: string;
+        reversals: number;
+        releases: number;
+        spends: number;
+        debtMinor: string;
+      }>(sql`select
+          (select status::text from expert_residency_orders
+            where id = ${scenario.reservedOrderId!}::uuid) as "reservedStatus",
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'reversal'
+              and source_id = ${scenario.grantId}::uuid) as reversals,
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'release'
+              and source_id = ${scenario.reservedOrderId!}::uuid) as releases,
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'spend'
+              and source_id = ${scenario.reservedOrderId!}::uuid) as spends,
+          (select debt_minor::text from expert_referral_balances
+            where expert_id = ${scenario.inviterId}::uuid) as "debtMinor"`)
+    ).rows[0];
+    expect(facts).toEqual({
+      reservedStatus: "settled",
+      reversals: 1,
+      releases: 0,
+      spends: 1,
+      debtMinor: "20000",
+    });
+  }, 30_000);
+
+  it("repays debt from a real reversal before a future reward becomes spendable", async () => {
+    const scenario = await seedRewardScenario({ spentMinor: 60_000n });
+    const providerRepo = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+
+    await expect(
+      providerRepo.refund(
+        verifiedRefund(scenario, {
+          amountMinor: "100000",
+          terminatesResidency: true,
+        }),
+      ),
+    ).resolves.toMatchObject({ debtMinor: "60000" });
+    await expect(
+      providerRepo.settle(await futureRewardSettlement(scenario.inviterId)),
+    ).resolves.toMatchObject({
+      kind: "settled",
+      rewardEffect: { kind: "debt_repaid", amountMinor: "60000" },
+    });
+    const balance = (
+      await testDb.db.execute<{
+        debtMinor: string;
+        spendableMinor: string;
+        repayments: number;
+      }>(sql`select debt_minor::text as "debtMinor",
+        spendable_balance_minor::text as "spendableMinor",
+        (select count(*)::integer from expert_referral_ledger_entries
+          where account_expert_id = ${scenario.inviterId}::uuid
+            and entry_kind = 'debt_repayment') as repayments
+        from expert_referral_balances
+        where expert_id = ${scenario.inviterId}::uuid`)
+    ).rows[0];
+    expect(balance).toEqual({
+      debtMinor: "0",
+      spendableMinor: "40000",
+      repayments: 1,
     });
   });
 
