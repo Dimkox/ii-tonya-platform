@@ -825,6 +825,70 @@ describe("expert referral and residency schema", () => {
     ).resolves.toBeDefined();
   });
 
+  it("allows only one tightly constrained held-marker terminal resolution", async () => {
+    const owner = await insertExpert();
+    const tariffVersionId = await insertTariff();
+    const orderId = await insertOrder({
+      expertId: owner.expertId,
+      tariffVersionId,
+      quotedAt: "2026-08-01T00:00:00Z",
+      paymentDeadline: "2026-09-01T00:00:00Z",
+    });
+    await settleOrder(orderId);
+    const markerId = randomUUID();
+    await testDb.db.execute(sql`insert into expert_first_residency_settlements (
+      id, expert_id, qualifying_order_id, eligibility_status,
+      eligibility_reason_code, expert_active, expert_verified, unique_identity,
+      abuse_cleared, settled_at
+    ) values (${markerId}::uuid, ${owner.expertId}::uuid, ${orderId}::uuid,
+      'pending_feature_hold', 'reward_grants_disabled', true, true, true, true,
+      '2026-08-15T00:00:00Z')`);
+
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_first_residency_settlements
+          set expert_verified = false, eligibility_status = 'ineligible',
+            eligibility_reason_code = 'held_snapshot_ineligible'
+          where id = ${markerId}::uuid`),
+      {
+        code: "55000",
+        constraint: "expert_first_settlement_pending_resolution",
+      },
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_first_residency_settlements
+          set eligibility_status = 'eligible', eligibility_reason_code = 'eligible'
+          where id = ${markerId}::uuid`),
+      {
+        code: "55000",
+        constraint: "expert_first_settlement_pending_resolution",
+      },
+    );
+    await testDb.db.execute(sql`update expert_first_residency_settlements
+      set eligibility_status = 'eligible',
+        eligibility_reason_code = 'eligible_after_feature_replay'
+      where id = ${markerId}::uuid`);
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_first_residency_settlements
+          set eligibility_reason_code = 'changed' where id = ${markerId}::uuid`),
+      {
+        code: "55000",
+        constraint: "expert_first_settlement_pending_resolution",
+      },
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`delete from expert_first_residency_settlements
+          where id = ${markerId}::uuid`),
+      {
+        code: "55000",
+        constraint: "expert_first_settlement_pending_resolution",
+      },
+    );
+  });
+
   it("binds one exact reward-ledger fact to its grant", async () => {
     await expectDatabaseError(
       () =>
@@ -1269,7 +1333,10 @@ describe("expert referral and residency schema", () => {
     ] as const) {
       await expectDatabaseError(() => testDb.db.execute(sql.raw(mutation)), {
         code: "55000",
-        constraint: `${relation}_append_only`,
+        constraint:
+          relation === "expert_first_residency_settlements"
+            ? "expert_first_settlement_pending_resolution"
+            : `${relation}_append_only`,
       });
     }
   });

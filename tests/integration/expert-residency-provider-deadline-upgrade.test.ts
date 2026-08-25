@@ -173,12 +173,14 @@ describe("residency provider deadline corrective upgrade", () => {
     const verification0021 = migrations[21];
     const durableOutcome0022 = migrations[22];
     const terminalImmutability0023 = migrations[23];
+    const heldMarkerResolution0024 = migrations[24];
     if (
       original0019 === undefined ||
       corrective0020 === undefined ||
       verification0021 === undefined ||
       durableOutcome0022 === undefined ||
-      terminalImmutability0023 === undefined
+      terminalImmutability0023 === undefined ||
+      heldMarkerResolution0024 === undefined
     ) {
       throw new Error("provider_deadline_migration_metadata_missing");
     }
@@ -223,7 +225,7 @@ describe("residency provider deadline corrective upgrade", () => {
       order by id
     `)
     ).rows;
-    expect(metadataAfter).toHaveLength(24);
+    expect(metadataAfter).toHaveLength(25);
     expect(
       metadataAfter.filter(
         (row) => row.createdAt === String(original0019.folderMillis),
@@ -238,6 +240,18 @@ describe("residency provider deadline corrective upgrade", () => {
         id: 21,
         hash: corrective0020.hash,
         createdAt: String(corrective0020.folderMillis),
+      },
+    ]);
+    expect(
+      metadataAfter.filter(
+        (row) =>
+          row.createdAt === String(heldMarkerResolution0024.folderMillis),
+      ),
+    ).toEqual([
+      {
+        id: 25,
+        hash: heldMarkerResolution0024.hash,
+        createdAt: String(heldMarkerResolution0024.folderMillis),
       },
     ]);
     expect(
@@ -415,5 +429,47 @@ describe("residency provider deadline corrective upgrade", () => {
     ).resolves.toMatchObject({
       orderId: postCorrectionOrder.orderId,
     });
+  }, 120_000);
+
+  it("upgrades a deployed pending marker without widening terminal immutability", async () => {
+    await upgradeDb?.stop();
+    upgradeDb = await startTestPostgres();
+    await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(18) });
+    const legacy = await seedGrantShortenedOrder(upgradeDb);
+    await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(23) });
+    const order = (
+      await upgradeDb.db.execute<{ orderId: string }>(sql`update
+        expert_residency_orders set status = 'settled',
+          settled_at = '2026-08-15T00:00:00Z',
+          residency_starts_at = '2026-08-15T00:00:00Z',
+          residency_ends_at = '2026-08-16T00:00:00Z'
+        where idempotency_key = ${legacy.idempotencyKey}
+        returning id as "orderId"`)
+    ).rows[0]!;
+    const markerId = randomUUID();
+    await upgradeDb.db
+      .execute(sql`insert into expert_first_residency_settlements (
+      id, expert_id, qualifying_order_id, eligibility_status,
+      eligibility_reason_code, expert_active, expert_verified, unique_identity,
+      abuse_cleared, settled_at
+    ) values (${markerId}::uuid, ${legacy.expertId}::uuid, ${order.orderId}::uuid,
+      'pending_feature_hold', 'reward_grants_disabled', true, true, true, true,
+      '2026-08-15T00:00:00Z')`);
+
+    await upgradeDb.migrate();
+    await upgradeDb.db.execute(sql`update expert_first_residency_settlements
+      set eligibility_status = 'cancelled_by_refund',
+        eligibility_reason_code = 'terminating_refund'
+      where id = ${markerId}::uuid`);
+    let mutationError: unknown;
+    try {
+      await upgradeDb.db.execute(sql`update expert_first_residency_settlements
+        set eligibility_reason_code = 'changed' where id = ${markerId}::uuid`);
+    } catch (error) {
+      mutationError = error;
+    }
+    expect(messages(mutationError)).toContain(
+      "expert first settlement marker transition is invalid",
+    );
   }, 120_000);
 });

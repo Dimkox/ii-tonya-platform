@@ -89,6 +89,19 @@ export type ExpiryReleaseResult =
   | { readonly kind: "settlement_allowed"; readonly released: false }
   | { readonly kind: "expired"; readonly released: boolean };
 
+export interface RewardReversalResult {
+  readonly rewardReversed: boolean;
+  readonly removedCreditMinor: bigint;
+  readonly cancelledReservationMinor: bigint;
+  readonly debtMinor: bigint;
+}
+
+export interface ReverseRewardGrant {
+  readonly grantId: string;
+  readonly inviterExpertId: string;
+  readonly reversedAt: Date;
+}
+
 export class ExpertResidencyRepositoryError extends Error {
   constructor(
     readonly code: string,
@@ -283,6 +296,172 @@ export class PostgresExpertResidencyRepository {
 
   constructor(private readonly db: DrizzleDb) {
     this.controls = new PostgresExpertReferralControlRepository(db);
+  }
+
+  async reverseRewardGrant(
+    tx: ExpertReferralTransaction,
+    input: ReverseRewardGrant,
+  ): Promise<RewardReversalResult> {
+    await tx.execute(sql`select pg_advisory_xact_lock(
+      hashtextextended(${`expert-referral:reward:${input.inviterExpertId}`}, 0)
+    )`);
+    const grant = (
+      await tx.execute<{
+        amountMinor: bigint | string;
+        expiresAt: Date | string;
+        rewardEntryId: string;
+      }>(sql`select g.amount_minor as "amountMinor", g.expires_at as "expiresAt",
+        reward.id as "rewardEntryId"
+        from expert_referral_reward_grants g
+        join expert_referral_ledger_entries reward
+          on reward.reward_grant_id = g.id and reward.entry_kind = 'reward_grant'
+        where g.id = ${input.grantId}::uuid
+          and g.inviter_expert_id = ${input.inviterExpertId}::uuid
+        for update of g, reward`)
+    ).rows[0];
+    if (grant === undefined) {
+      throw new ExpertResidencyRepositoryError("reward_grant_not_found");
+    }
+    await tx.execute(sql`select id from expert_referral_ledger_entries
+      where account_expert_id = ${input.inviterExpertId}::uuid
+      order by created_at, id for update`);
+    const existing = (
+      await tx.execute<{ id: string }>(sql`select id
+        from expert_referral_ledger_entries where entry_kind = 'reversal'
+          and source_type = 'reward_grant' and source_id = ${input.grantId}::uuid
+        for update`)
+    ).rows[0];
+    const totals = (
+      await tx.execute<{
+        expiredMinor: bigint | string;
+        usedMinor: bigint | string;
+      }>(sql`select
+        coalesce(sum(a.amount_minor) filter (where l.entry_kind = 'expiry'), 0)::bigint
+          as "expiredMinor",
+        coalesce(sum(a.amount_minor) filter (
+          where l.entry_kind in ('spend', 'debt_repayment')
+        ), 0)::bigint as "usedMinor"
+        from expert_referral_ledger_allocations a
+        join expert_referral_ledger_entries l on l.id = a.ledger_entry_id
+        where a.reward_grant_id = ${input.grantId}::uuid`)
+    ).rows[0]!;
+    const activeReservations = (
+      await tx.execute<{
+        reservationId: string;
+        accountExpertId: string;
+        amountMinor: bigint | string;
+        orderId: string;
+        grantAmountMinor: bigint | string;
+      }>(sql`select reservation.id as "reservationId",
+        reservation.account_expert_id as "accountExpertId",
+        reservation.amount_minor as "amountMinor", order_row.id as "orderId",
+        allocation.amount_minor as "grantAmountMinor"
+        from expert_referral_ledger_entries reservation
+        join expert_referral_ledger_allocations allocation
+          on allocation.ledger_entry_id = reservation.id
+          and allocation.reward_grant_id = ${input.grantId}::uuid
+        join expert_residency_orders order_row on order_row.id = reservation.source_id
+        where reservation.entry_kind = 'reservation'
+          and reservation.source_type = 'residency_order'
+          and order_row.status in ('quoted', 'payment_pending')
+          and not exists (select 1 from expert_referral_ledger_entries terminal
+            where terminal.original_entry_id = reservation.id
+              and terminal.entry_kind in ('release', 'spend'))
+        order by order_row.id, reservation.id for update of order_row, reservation`)
+    ).rows;
+    const cancelledReservationMinor = activeReservations.reduce(
+      (total, row) => total + bigint(row.grantAmountMinor),
+      0n,
+    );
+    let expiredMinor = bigint(totals.expiredMinor);
+    const usedMinor = bigint(totals.usedMinor);
+    const grantMinor = bigint(grant.amountMinor);
+    const expiredAtReversal =
+      date(grant.expiresAt).getTime() <= date(input.reversedAt).getTime();
+    if (expiredAtReversal) {
+      const expectedExpiredMinor = grantMinor - usedMinor;
+      if (expiredMinor === 0n && expectedExpiredMinor > 0n) {
+        const expiryId = randomUUID();
+        await tx.execute(sql`insert into expert_referral_ledger_entries (
+          id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+          original_entry_id, idempotency_key
+        ) values (${expiryId}::uuid, ${input.inviterExpertId}::uuid, 'expiry',
+          ${-expectedExpiredMinor}, 'reward_grant', ${input.grantId}::uuid,
+          ${grant.rewardEntryId}::uuid, ${`expert-referral-expiry:${input.grantId}`})`);
+        await tx.execute(sql`insert into expert_referral_ledger_allocations (
+          ledger_entry_id, reward_grant_id, amount_minor
+        ) values (${expiryId}::uuid, ${input.grantId}::uuid,
+          ${expectedExpiredMinor})`);
+        expiredMinor = expectedExpiredMinor;
+      } else if (expiredMinor !== expectedExpiredMinor) {
+        throw new ExpertResidencyRepositoryError("reward_allocation_invalid");
+      }
+    }
+    const reversalMinor = grantMinor - expiredMinor;
+    const removedCreditMinor = expiredAtReversal
+      ? 0n
+      : reversalMinor - usedMinor - cancelledReservationMinor;
+    if (
+      reversalMinor < 0n ||
+      removedCreditMinor < 0n ||
+      usedMinor < 0n ||
+      cancelledReservationMinor < 0n
+    ) {
+      throw new ExpertResidencyRepositoryError("reward_allocation_invalid");
+    }
+    if (existing !== undefined) {
+      return {
+        rewardReversed: true,
+        removedCreditMinor,
+        cancelledReservationMinor: 0n,
+        debtMinor: usedMinor,
+      };
+    }
+    for (const reservation of activeReservations) {
+      const releaseId = randomUUID();
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+        original_entry_id, idempotency_key
+      ) values (${releaseId}::uuid, ${reservation.accountExpertId}::uuid,
+        'release', ${-bigint(reservation.amountMinor)}, 'residency_order',
+        ${reservation.orderId}::uuid, ${reservation.reservationId}::uuid,
+        ${`refund-reservation-release:${reservation.reservationId}`})`);
+      const allocations = await this.reservationAllocations(
+        tx,
+        reservation.reservationId,
+      );
+      for (const allocation of allocations) {
+        await tx.execute(sql`insert into expert_referral_ledger_allocations (
+          ledger_entry_id, reward_grant_id, amount_minor
+        ) values (${releaseId}::uuid, ${allocation.grantId}::uuid,
+          ${bigint(allocation.amountMinor)})`);
+      }
+      await tx.execute(sql`update expert_residency_orders set status = 'failed',
+        updated_at = clock_timestamp() where id = ${reservation.orderId}::uuid
+          and status in ('quoted', 'payment_pending')`);
+      await tx.execute(sql`update expert_residency_payment_attempts
+        set status = 'cancelled', updated_at = clock_timestamp()
+        where order_id = ${reservation.orderId}::uuid
+          and status in ('created', 'pending', 'unknown_outcome')`);
+    }
+    if (reversalMinor > 0n) {
+      const reversalId = randomUUID();
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+        original_entry_id, idempotency_key
+      ) values (${reversalId}::uuid, ${input.inviterExpertId}::uuid,
+        'reversal', ${-reversalMinor}, 'reward_grant', ${input.grantId}::uuid,
+        ${grant.rewardEntryId}::uuid, ${`expert-referral-reversal:${input.grantId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${reversalId}::uuid, ${input.grantId}::uuid, ${reversalMinor})`);
+    }
+    return {
+      rewardReversed: true,
+      removedCreditMinor,
+      cancelledReservationMinor,
+      debtMinor: usedMinor,
+    };
   }
 
   async createTariffVersion(

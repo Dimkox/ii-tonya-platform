@@ -25,19 +25,34 @@ const utcTimestamp = z
   });
 const payloadDigest = z.string().regex(/^sha256:[0-9a-f]{64}$/u);
 
-export const expertResidencyPaymentEventSchema = z
-  .object({
-    kind: z.literal("settled"),
-    provider: boundedIdentifier.max(64),
-    eventId: boundedIdentifier,
-    paymentId: boundedIdentifier,
-    orderId: z.uuid(),
-    amountMinor: canonicalPositiveMinorUnits,
-    currency: z.string().regex(/^[A-Z]{3}$/u),
-    occurredAt: utcTimestamp,
-    payloadDigest,
-  })
-  .strict();
+const expertResidencyPaymentEventBase = z.object({
+  provider: boundedIdentifier.max(64),
+  eventId: boundedIdentifier,
+  paymentId: boundedIdentifier,
+  orderId: z.uuid(),
+  amountMinor: canonicalPositiveMinorUnits,
+  currency: z.string().regex(/^[A-Z]{3}$/u),
+  occurredAt: utcTimestamp,
+  payloadDigest,
+});
+
+export const expertResidencyPaymentEventSchema = z.discriminatedUnion("kind", [
+  expertResidencyPaymentEventBase
+    .extend({ kind: z.literal("settled") })
+    .strict(),
+  expertResidencyPaymentEventBase
+    .extend({
+      kind: z.literal("refunded"),
+      terminatesResidency: z.boolean(),
+    })
+    .strict(),
+  expertResidencyPaymentEventBase
+    .extend({
+      kind: z.literal("charged_back"),
+      terminatesResidency: z.boolean(),
+    })
+    .strict(),
+]);
 
 export const expertResidencyCheckoutCommandSchema = z
   .object({

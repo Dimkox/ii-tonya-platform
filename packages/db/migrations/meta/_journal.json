@@ -169,6 +169,13 @@
       "when": 1787648976533,
       "tag": "0023_expert-residency-inbox-terminal-immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787649700000,
+      "tag": "0024_expert-residency-held-marker-resolution",
+      "breakpoints": true
     }
   ]
 }

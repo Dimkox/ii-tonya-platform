@@ -10,6 +10,11 @@ import {
   type ExpertReferralEligibility,
   type ExpertReferralTransaction,
 } from "./expert-referral-control-repository.js";
+import {
+  ExpertResidencyRepositoryError,
+  PostgresExpertResidencyRepository,
+  type RewardReversalResult,
+} from "./expert-residency-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 const REWARD_MINOR = 100_000n;
@@ -33,6 +38,36 @@ export type ExpertResidencySettlementResult =
         | Readonly<{ kind: "reward_granted"; amountMinor: "100000" }>
         | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
     }>;
+
+export type ExpertResidencyRefundResult = Readonly<{
+  kind: "refunded" | "charged_back";
+  orderId: string;
+  cashRefundedMinor: string;
+  cumulativeCashRefundedMinor: string;
+  restoredCreditMinor: "0";
+  residencyTerminated: boolean;
+  rewardReversed: boolean;
+  removedCreditMinor: string;
+  cancelledReservationMinor: string;
+  debtMinor: string;
+  eligibilityStatus:
+    | "eligible"
+    | "ineligible"
+    | "pending_feature_hold"
+    | "cancelled_by_refund"
+    | "not_first_settlement";
+}>;
+
+export type HeldRewardReplayResult =
+  | Readonly<{ kind: "still_held" }>
+  | Readonly<{ kind: "cancelled_by_refund" }>
+  | Readonly<{ kind: "ineligible"; reason: string }>
+  | Readonly<{ kind: "terminated_after_grant" }>
+  | Readonly<{ kind: "reward_granted"; amountMinor: "100000" }>
+  | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
+
+type ExpertResidencyProviderEventResult =
+  ExpertResidencySettlementResult | ExpertResidencyRefundResult;
 
 export class ExpertResidencySettlementError extends Error {
   constructor(readonly code: string) {
@@ -90,7 +125,8 @@ interface OrderRow extends Record<string, unknown> {
 interface MarkerRow extends Record<string, unknown> {
   id: string;
   qualifyingOrderId: string;
-  eligibilityStatus: "eligible" | "ineligible" | "pending_feature_hold";
+  eligibilityStatus:
+    "eligible" | "ineligible" | "pending_feature_hold" | "cancelled_by_refund";
 }
 
 interface ReservationRow extends Record<string, unknown> {
@@ -154,6 +190,7 @@ function nestedDatabaseCode(error: unknown): string | null {
 
 function deterministicFailureCode(error: unknown): string | null {
   if (error instanceof ExpertResidencySettlementError) return error.code;
+  if (error instanceof ExpertResidencyRepositoryError) return error.code;
   const databaseCode = nestedDatabaseCode(error);
   if (databaseCode?.startsWith("23")) {
     return "settlement_effect_constraint_failed";
@@ -213,6 +250,47 @@ function isSettlementResult(
   );
 }
 
+function isCanonicalNonnegativeMinor(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^(?:0|[1-9][0-9]{0,18})$/u.test(value) &&
+    (value.length < 19 || value <= "9223372036854775807")
+  );
+}
+
+function isRefundResult(value: unknown): value is ExpertResidencyRefundResult {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    Object.keys(result).length === 11 &&
+    ["refunded", "charged_back"].includes(String(result.kind)) &&
+    typeof result.orderId === "string" &&
+    isCanonicalNonnegativeMinor(result.cashRefundedMinor) &&
+    isCanonicalNonnegativeMinor(result.cumulativeCashRefundedMinor) &&
+    result.restoredCreditMinor === "0" &&
+    typeof result.residencyTerminated === "boolean" &&
+    typeof result.rewardReversed === "boolean" &&
+    isCanonicalNonnegativeMinor(result.removedCreditMinor) &&
+    isCanonicalNonnegativeMinor(result.cancelledReservationMinor) &&
+    isCanonicalNonnegativeMinor(result.debtMinor) &&
+    [
+      "eligible",
+      "ineligible",
+      "pending_feature_hold",
+      "cancelled_by_refund",
+      "not_first_settlement",
+    ].includes(String(result.eligibilityStatus))
+  );
+}
+
+function isProviderEventResult(
+  value: unknown,
+): value is ExpertResidencyProviderEventResult {
+  return isSettlementResult(value) || isRefundResult(value);
+}
+
 function eventFingerprint(event: VerifiedExpertResidencyPaymentEvent): string {
   return hash({
     kind: event.kind,
@@ -224,6 +302,9 @@ function eventFingerprint(event: VerifiedExpertResidencyPaymentEvent): string {
     currency: event.currency,
     occurredAt: event.occurredAt,
     payloadDigest: event.payloadDigest,
+    ...(event.kind === "settled"
+      ? {}
+      : { terminatesResidency: event.terminatesResidency }),
     verification: event.verification,
   });
 }
@@ -249,15 +330,165 @@ function eligibilityDecision(eligibility: ExpertReferralEligibility): {
 
 export class PostgresExpertResidencyProviderInboxRepository {
   private readonly controls: PostgresExpertReferralControlRepository;
+  private readonly residency: PostgresExpertResidencyRepository;
 
   constructor(private readonly db: DrizzleDb) {
     this.controls = new PostgresExpertReferralControlRepository(db);
+    this.residency = new PostgresExpertResidencyRepository(db);
   }
 
   async settle(
     input: VerifiedExpertResidencyPaymentEvent,
   ): Promise<ExpertResidencySettlementResult> {
     const event = requireVerifiedExpertResidencyPaymentEvent(input);
+    if (event.kind !== "settled") {
+      throw new ExpertResidencySettlementError("settlement_event_required");
+    }
+    return (await this.processEvent(event, (tx, inboxId) =>
+      this.applySettlement(tx, event, inboxId),
+    )) as ExpertResidencySettlementResult;
+  }
+
+  async refund(
+    input: VerifiedExpertResidencyPaymentEvent,
+  ): Promise<ExpertResidencyRefundResult> {
+    const event = requireVerifiedExpertResidencyPaymentEvent(input);
+    if (event.kind !== "refunded" && event.kind !== "charged_back") {
+      throw new ExpertResidencySettlementError("refund_event_required");
+    }
+    return (await this.processEvent(event, (tx, inboxId) =>
+      this.applyRefund(tx, event, inboxId),
+    )) as ExpertResidencyRefundResult;
+  }
+
+  async replayHeldReward(
+    input: Readonly<{
+      expertId: string;
+      qualifyingOrderId: string;
+    }>,
+  ): Promise<HeldRewardReplayResult> {
+    return withSerializableRetry(() =>
+      this.db.transaction(async (tx) => {
+        await tx.execute(sql`set transaction isolation level serializable`);
+        const featureControl = await this.controls.lockFeatureControl(tx);
+        const order = await this.lockOrder(tx, input.qualifyingOrderId);
+        if (order === undefined || order.expertId !== input.expertId) {
+          throw new ExpertResidencySettlementError("held_order_not_found");
+        }
+        if (order.paymentAttemptId !== null) {
+          await tx.execute(sql`select id from expert_residency_payment_attempts
+            where id = ${order.paymentAttemptId}::uuid for update`);
+        }
+        await tx.execute(sql`select pg_advisory_xact_lock(
+          hashtextextended(${`expert-residency:settlement:${order.expertId}`}, 0)
+        )`);
+        await this.controls.lockEligibility(tx, order.expertId);
+        const referral = await this.lockReferral(tx, order.expertId);
+        await this.lockResidencyRows(tx, order.expertId);
+        const marker = await this.lockFirstMarker(tx, order.expertId);
+        if (
+          marker === undefined ||
+          marker.qualifyingOrderId !== order.orderId
+        ) {
+          throw new ExpertResidencySettlementError("held_marker_not_found");
+        }
+        if (marker.eligibilityStatus === "cancelled_by_refund") {
+          return { kind: "cancelled_by_refund" };
+        }
+        if (marker.eligibilityStatus === "ineligible") {
+          return { kind: "ineligible", reason: "permanently_ineligible" };
+        }
+        if (marker.eligibilityStatus === "eligible") {
+          if (order.status !== "settled") {
+            return { kind: "terminated_after_grant" };
+          }
+          const result = await this.heldRewardEffect(tx, order);
+          await this.auditHeldReplay(tx, order, marker.id, result);
+          return result;
+        }
+        const snapshot = (
+          await tx.execute<{
+            expertActive: boolean;
+            expertVerified: boolean;
+            uniqueIdentity: boolean;
+            abuseCleared: boolean;
+          }>(sql`select expert_active as "expertActive",
+            expert_verified as "expertVerified",
+            unique_identity as "uniqueIdentity", abuse_cleared as "abuseCleared"
+            from expert_first_residency_settlements
+            where id = ${marker.id}::uuid`)
+        ).rows[0]!;
+        const now = await this.databaseNow(tx);
+        let ineligibleReason: string | null = null;
+        if (
+          !snapshot.expertActive ||
+          !snapshot.expertVerified ||
+          !snapshot.uniqueIdentity ||
+          !snapshot.abuseCleared
+        ) {
+          ineligibleReason = "held_snapshot_ineligible";
+        } else if (order.status !== "settled") {
+          ineligibleReason = "held_order_not_settled";
+        } else if (
+          order.residencyEndsAt === null ||
+          date(order.residencyEndsAt).getTime() <= now.getTime()
+        ) {
+          ineligibleReason = "held_residency_not_active";
+        } else if (referral === undefined) {
+          ineligibleReason = "held_referral_missing";
+        }
+        if (ineligibleReason !== null) {
+          const eligibility =
+            order.status === "refunded" || order.status === "charged_back"
+              ? "cancelled_by_refund"
+              : "ineligible";
+          const reason =
+            eligibility === "cancelled_by_refund"
+              ? order.status === "refunded"
+                ? "terminating_refund"
+                : "terminating_chargeback"
+              : ineligibleReason;
+          await tx.execute(sql`update expert_first_residency_settlements set
+            eligibility_status = ${eligibility}, eligibility_reason_code = ${reason}
+            where id = ${marker.id}::uuid
+              and eligibility_status = 'pending_feature_hold'`);
+          const result: HeldRewardReplayResult =
+            eligibility === "cancelled_by_refund"
+              ? { kind: "cancelled_by_refund" }
+              : { kind: "ineligible", reason };
+          await this.auditHeldReplay(tx, order, marker.id, result);
+          return result;
+        }
+        if (!featureControl.rewardGrantsEnabled) {
+          return { kind: "still_held" };
+        }
+        await tx.execute(sql`update expert_first_residency_settlements set
+          eligibility_status = 'eligible',
+          eligibility_reason_code = 'eligible_after_feature_replay'
+          where id = ${marker.id}::uuid
+            and eligibility_status = 'pending_feature_hold'`);
+        await this.appendReward(
+          tx,
+          referral!,
+          order.orderId,
+          marker.id,
+          date(order.settledAt!),
+        );
+        await this.flushDeferredSettlementConstraints(tx);
+        const result = await this.heldRewardEffect(tx, order);
+        await this.auditHeldReplay(tx, order, marker.id, result);
+        return result;
+      }),
+    );
+  }
+
+  private async processEvent(
+    event: VerifiedExpertResidencyPaymentEvent,
+    apply: (
+      tx: ExpertReferralTransaction,
+      inboxId: string,
+    ) => Promise<ExpertResidencyProviderEventResult>,
+  ): Promise<ExpertResidencyProviderEventResult> {
     const outcome = await withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
@@ -284,11 +515,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
         }
         try {
           const result = await tx.transaction(async (effectsTx) => {
-            const applied = await this.applySettlement(
-              effectsTx,
-              event,
-              inbox.id,
-            );
+            const applied = await apply(effectsTx, inbox.id);
             await this.flushDeferredSettlementConstraints(effectsTx);
             await this.completeInbox(effectsTx, inbox.id, event, applied);
             return applied;
@@ -326,7 +553,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
     inbox: InboxRow,
     event: VerifiedExpertResidencyPaymentEvent,
   ):
-    | Readonly<{ result: ExpertResidencySettlementResult }>
+    | Readonly<{ result: ExpertResidencyProviderEventResult }>
     | Readonly<{ error: string }> {
     if (inbox.processingStatus === "failed") {
       const error = inbox.processingResultCode;
@@ -345,7 +572,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
     if (inbox.processingStatus === "processed") {
       const result = inbox.processingResult;
       if (
-        !isSettlementResult(result) ||
+        !isProviderEventResult(result) ||
         inbox.processingResultCode !== result.kind ||
         inbox.processingResultDigest !== this.resultDigest(event, { result })
       ) {
@@ -458,6 +685,133 @@ export class PostgresExpertResidencyProviderInboxRepository {
       residencyEndsAt: endsAt,
     };
     const result = await this.resultForOrder(tx, settledOrder);
+    await this.auditAndOutbox(tx, order.expertId, event, result);
+    return result;
+  }
+
+  private async applyRefund(
+    tx: ExpertReferralTransaction,
+    event: Extract<
+      VerifiedExpertResidencyPaymentEvent,
+      { kind: "refunded" | "charged_back" }
+    >,
+    inboxId: string,
+  ): Promise<ExpertResidencyRefundResult> {
+    await this.controls.lockFeatureControl(tx);
+    const order = await this.lockOrder(tx, event.orderId);
+    if (order === undefined) {
+      throw new ExpertResidencySettlementError("order_not_found");
+    }
+    if (order.paymentAttemptId !== null) {
+      await tx.execute(sql`select id from expert_residency_payment_attempts
+        where id = ${order.paymentAttemptId}::uuid for update`);
+    }
+    await tx.execute(sql`update expert_residency_provider_event_inbox
+      set order_id = ${order.orderId}::uuid,
+        payment_attempt_id = ${order.paymentAttemptId}::uuid
+      where id = ${inboxId}::uuid`);
+    const identityError = this.paymentIdentityError(order, event);
+    if (identityError !== null) {
+      throw new ExpertResidencySettlementError(identityError);
+    }
+    if (
+      event.currency !== order.currency ||
+      event.currency !== order.attemptCurrency
+    ) {
+      throw new ExpertResidencySettlementError("payment_currency_mismatch");
+    }
+    if (order.status !== "settled") {
+      throw new ExpertResidencySettlementError("order_state_invalid");
+    }
+    const priorRefunded = bigint(
+      (
+        await tx.execute<{ amountMinor: bigint | string }>(sql`select
+          coalesce(sum((processing_result ->> 'cashRefundedMinor')::bigint), 0)::bigint
+            as "amountMinor"
+          from expert_residency_provider_event_inbox
+          where order_id = ${order.orderId}::uuid
+            and processing_status = 'processed'
+            and event_kind in ('refunded', 'charged_back')`)
+      ).rows[0]!.amountMinor,
+    );
+    const refundMinor = bigint(event.amountMinor);
+    const cumulative = priorRefunded + refundMinor;
+    if (cumulative > bigint(order.cashMinor)) {
+      throw new ExpertResidencySettlementError("refund_cash_exceeded");
+    }
+    if (
+      event.kind === "refunded" &&
+      event.terminatesResidency &&
+      cumulative !== bigint(order.cashMinor)
+    ) {
+      throw new ExpertResidencySettlementError(
+        "terminating_refund_cash_incomplete",
+      );
+    }
+
+    let eligibilityStatus: ExpertResidencyRefundResult["eligibilityStatus"] =
+      "not_first_settlement";
+    let reversal: RewardReversalResult = {
+      rewardReversed: false,
+      removedCreditMinor: 0n,
+      cancelledReservationMinor: 0n,
+      debtMinor: 0n,
+    };
+    if (event.terminatesResidency) {
+      await tx.execute(sql`select pg_advisory_xact_lock(
+        hashtextextended(${`expert-residency:settlement:${order.expertId}`}, 0)
+      )`);
+      await this.controls.lockEligibility(tx, order.expertId);
+      const referral = await this.lockReferral(tx, order.expertId);
+      await this.lockResidencyRows(tx, order.expertId);
+      const marker = await this.lockFirstMarker(tx, order.expertId);
+      const qualifies = marker?.qualifyingOrderId === order.orderId;
+      if (qualifies && marker !== undefined) {
+        eligibilityStatus = marker.eligibilityStatus;
+        if (marker.eligibilityStatus === "pending_feature_hold") {
+          eligibilityStatus = "cancelled_by_refund";
+          await tx.execute(sql`update expert_first_residency_settlements set
+            eligibility_status = 'cancelled_by_refund',
+            eligibility_reason_code = ${event.kind === "refunded" ? "terminating_refund" : "terminating_chargeback"}
+            where id = ${marker.id}::uuid
+              and eligibility_status = 'pending_feature_hold'`);
+        } else if (
+          marker.eligibilityStatus === "eligible" &&
+          referral !== undefined
+        ) {
+          const grant = (
+            await tx.execute<{ grantId: string }>(sql`select id as "grantId"
+              from expert_referral_reward_grants
+              where qualifying_order_id = ${order.orderId}::uuid
+                and inviter_expert_id = ${referral.inviterExpertId}::uuid
+              for update`)
+          ).rows[0];
+          if (grant !== undefined) {
+            reversal = await this.residency.reverseRewardGrant(tx, {
+              grantId: grant.grantId,
+              inviterExpertId: referral.inviterExpertId,
+              reversedAt: await this.databaseNow(tx),
+            });
+          }
+        }
+      }
+      await tx.execute(sql`update expert_residency_orders set
+        status = ${event.kind}, updated_at = clock_timestamp()
+        where id = ${order.orderId}::uuid and status = 'settled'`);
+    }
+    const result: ExpertResidencyRefundResult = {
+      kind: event.kind,
+      orderId: order.orderId,
+      cashRefundedMinor: refundMinor.toString(),
+      cumulativeCashRefundedMinor: cumulative.toString(),
+      restoredCreditMinor: "0",
+      residencyTerminated: event.terminatesResidency,
+      rewardReversed: reversal.rewardReversed,
+      removedCreditMinor: reversal.removedCreditMinor.toString(),
+      cancelledReservationMinor: reversal.cancelledReservationMinor.toString(),
+      debtMinor: reversal.debtMinor.toString(),
+      eligibilityStatus,
+    };
     await this.auditAndOutbox(tx, order.expertId, event, result);
     return result;
   }
@@ -828,6 +1182,14 @@ export class PostgresExpertResidencyProviderInboxRepository {
     }
     const marker = await this.lockFirstMarker(tx, order.expertId);
     const qualifies = marker?.qualifyingOrderId === order.orderId;
+    const settlementEligibility = qualifies
+      ? marker!.eligibilityStatus
+      : "not_first_settlement";
+    if (settlementEligibility === "cancelled_by_refund") {
+      throw new ExpertResidencySettlementError(
+        "provider_event_replay_conflict",
+      );
+    }
     let rewardEffect: Extract<
       ExpertResidencySettlementResult,
       { kind: "settled" }
@@ -861,16 +1223,14 @@ export class PostgresExpertResidencyProviderInboxRepository {
       settledAt: date(order.settledAt).toISOString(),
       residencyStartsAt: date(order.residencyStartsAt).toISOString(),
       residencyEndsAt: date(order.residencyEndsAt).toISOString(),
-      eligibilityStatus: qualifies
-        ? marker!.eligibilityStatus
-        : "not_first_settlement",
+      eligibilityStatus: settlementEligibility,
       rewardEffect,
     };
   }
 
   private resultDigest(
     event: VerifiedExpertResidencyPaymentEvent,
-    outcome: { result: ExpertResidencySettlementResult } | { error: string },
+    outcome: { result: ExpertResidencyProviderEventResult } | { error: string },
   ): string {
     return hash({ eventFingerprint: eventFingerprint(event), ...outcome });
   }
@@ -909,7 +1269,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
     tx: ExpertReferralTransaction,
     inboxId: string,
     event: VerifiedExpertResidencyPaymentEvent,
-    result: ExpertResidencySettlementResult,
+    result: ExpertResidencyProviderEventResult,
   ): Promise<void> {
     await tx.execute(sql`update expert_residency_provider_event_inbox set
       processing_status = 'processed', processed_at = clock_timestamp(),
@@ -919,22 +1279,104 @@ export class PostgresExpertResidencyProviderInboxRepository {
       where id = ${inboxId}::uuid`);
   }
 
+  private async heldRewardEffect(
+    tx: ExpertReferralTransaction,
+    order: OrderRow,
+  ): Promise<HeldRewardReplayResult> {
+    const settlement = await this.resultForOrder(tx, order);
+    if (settlement.kind !== "settled") {
+      throw new ExpertResidencySettlementError("held_order_not_settled");
+    }
+    if (settlement.rewardEffect.kind === "reward_granted") {
+      return settlement.rewardEffect;
+    }
+    if (settlement.rewardEffect.kind === "debt_repaid") {
+      return settlement.rewardEffect;
+    }
+    throw new ExpertResidencySettlementError("held_reward_effect_missing");
+  }
+
+  private async auditHeldReplay(
+    tx: ExpertReferralTransaction,
+    order: OrderRow,
+    markerId: string,
+    result: HeldRewardReplayResult,
+  ): Promise<void> {
+    const action = "expert_residency.held_reward_replayed";
+    const correlationId = `held-replay:${markerId}`;
+    const payload = {
+      orderId: order.orderId,
+      expertId: order.expertId,
+      markerId,
+      outcome: result.kind,
+    };
+    const idempotencyKey = `expert-residency-held-replay:${markerId}`;
+    const reconciliationKey = `expert-residency:${order.orderId}`;
+    const payloadHash = hash(payload);
+    const inserted = (
+      await tx.execute<{ id: string }>(sql`insert into integration_outbox (
+        idempotency_key, topic, payload, correlation_id, reconciliation_key,
+        payload_hash
+      ) values (${idempotencyKey}, ${action}, ${JSON.stringify(payload)}::jsonb,
+        ${correlationId}, ${reconciliationKey}, ${payloadHash})
+        on conflict (idempotency_key) do nothing returning id`)
+    ).rows[0];
+    if (inserted === undefined) {
+      const existing = (
+        await tx.execute<{
+          topic: string;
+          payload: unknown;
+          correlationId: string;
+          reconciliationKey: string;
+          payloadHash: string;
+        }>(sql`select topic, payload, correlation_id as "correlationId",
+          reconciliation_key as "reconciliationKey", payload_hash as "payloadHash"
+          from integration_outbox where idempotency_key = ${idempotencyKey}
+          for update`)
+      ).rows[0];
+      if (
+        existing === undefined ||
+        existing.topic !== action ||
+        canonicalJson(existing.payload) !== canonicalJson(payload) ||
+        existing.correlationId !== correlationId ||
+        existing.reconciliationKey !== reconciliationKey ||
+        existing.payloadHash !== payloadHash
+      ) {
+        throw new ExpertResidencySettlementError("outbox_replay_conflict");
+      }
+      return;
+    }
+    await tx.execute(sql`insert into audit_events (
+      actor_type, actor_id, authenticated_session_id_hash, action, object_type,
+      object_id, decision, reason_code, correlation_id, occurred_at, metadata_hash
+    ) values ('system', ${order.expertId}::uuid, ${hash({ markerId })}, ${action},
+      'expert_first_residency_settlement', ${markerId}::uuid, 'allow',
+      ${result.kind}, ${correlationId}, clock_timestamp(), ${payloadHash})`);
+  }
+
   private async auditAndOutbox(
     tx: ExpertReferralTransaction,
     expertId: string,
     event: VerifiedExpertResidencyPaymentEvent,
-    result: ExpertResidencySettlementResult,
+    result: ExpertResidencyProviderEventResult,
   ): Promise<void> {
     const action =
       result.kind === "settled"
         ? "expert_residency.settled"
-        : "expert_residency.expired";
+        : result.kind === "expired"
+          ? "expert_residency.expired"
+          : result.kind === "refunded"
+            ? "expert_residency.refunded"
+            : "expert_residency.charged_back";
     const correlationId = `provider:${event.provider}:${event.eventId}`;
     const metadataHash = hash({
       orderId: event.orderId,
       kind: result.kind,
       payloadDigest: event.payloadDigest,
       verificationId: event.verification.verificationId,
+      ...(result.kind === "refunded" || result.kind === "charged_back"
+        ? { result }
+        : {}),
     });
     await tx.execute(sql`insert into audit_events (
       actor_type, actor_id, authenticated_session_id_hash, action, object_type,
@@ -943,12 +1385,18 @@ export class PostgresExpertResidencyProviderInboxRepository {
       ${hash({ verificationId: event.verification.verificationId })}, ${action},
       'expert_residency_order', ${event.orderId}::uuid, 'allow', ${result.kind},
       ${correlationId}, clock_timestamp(), ${metadataHash})`);
-    const payload = {
-      orderId: event.orderId,
-      expertId,
-      status: result.kind,
-    };
-    const idempotencyKey = `expert-residency-${result.kind}:${event.orderId}`;
+    const payload =
+      result.kind === "refunded" || result.kind === "charged_back"
+        ? { expertId, ...result, status: result.kind }
+        : {
+            orderId: event.orderId,
+            expertId,
+            status: result.kind,
+          };
+    const idempotencyKey =
+      result.kind === "settled" || result.kind === "expired"
+        ? `expert-residency-${result.kind}:${event.orderId}`
+        : `expert-residency-${result.kind}:${event.provider}:${event.eventId}`;
     const reconciliationKey = `expert-residency:${event.orderId}`;
     const payloadHash = hash(payload);
     const inserted = (

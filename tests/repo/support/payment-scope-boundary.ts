@@ -59,7 +59,10 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS = new Set([
+  "expert_residency.charged_back",
   "expert_residency.expired",
+  "expert_residency.held_reward_replayed",
+  "expert_residency.refunded",
   "expert_residency.settled",
 ]);
 
@@ -376,6 +379,10 @@ const approvedMigrationHashes = new Map([
     "ffb243224c9ad7a5d87d0648d6d184d5dd9e765fc88d4338a31ed96ee6391d2d",
   ],
   [
+    "packages/db/migrations/0024_expert-residency-held-marker-resolution.sql",
+    "96c9be4d695b40fa5959bcecb39b89e56f291267c5f3d2526bce551b8f973336",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -468,8 +475,12 @@ const approvedMigrationHashes = new Map([
     "55b86ccfd4967ac8948203599b8d317184ff928e309f0c8731b4cadbfb978240",
   ],
   [
+    "packages/db/migrations/meta/0024_snapshot.json",
+    "8b49d40d9e509d1b2ae3eb1ebac32168d1e01024cecad28b2eb40588d8f01754",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "e1bacb5ed35b3a99818aa585e46e3e49b8426fc46f6d0233c000e03bf97d489e",
+    "87073175dafafdf6726307ff6be69d9ea060226cf30952f8f93d30139b71b14b",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -614,14 +625,16 @@ const isApprovedExpertResidencyRuntimeAuditAction = (
   ) {
     return false;
   }
-  const conditional = node.parent;
-  if (!ts.isConditionalExpression(conditional)) return false;
-  const declaration = conditional.parent;
+  let initializer: ts.Node = node;
+  while (ts.isConditionalExpression(initializer.parent)) {
+    initializer = initializer.parent;
+  }
+  const declaration = initializer.parent;
   if (
     !ts.isVariableDeclaration(declaration) ||
     !ts.isIdentifier(declaration.name) ||
     declaration.name.text !== "action" ||
-    declaration.initializer !== conditional
+    declaration.initializer !== initializer
   ) {
     return false;
   }
@@ -639,7 +652,19 @@ const isApprovedExpertResidencyRuntimeAuditAction = (
   if (
     owner === undefined ||
     !ts.isIdentifier(owner.name) ||
-    owner.name.text !== "auditAndOutbox"
+    !["auditAndOutbox", "auditHeldReplay"].includes(owner.name.text)
+  ) {
+    return false;
+  }
+  if (
+    owner.name.text === "auditHeldReplay" &&
+    node.text !== "expert_residency.held_reward_replayed"
+  ) {
+    return false;
+  }
+  if (
+    owner.name.text === "auditAndOutbox" &&
+    node.text === "expert_residency.held_reward_replayed"
   ) {
     return false;
   }

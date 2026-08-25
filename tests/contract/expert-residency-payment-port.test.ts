@@ -36,6 +36,46 @@ describe("expert residency provider-neutral payment contract", () => {
     );
   });
 
+  it("accepts only explicit provider-neutral refund and chargeback termination facts", () => {
+    const partialRefund = {
+      ...rawEvent,
+      kind: "refunded",
+      eventId: "evt_refund_00000001",
+      amountMinor: "10000",
+      terminatesResidency: false,
+    };
+    const chargeback = {
+      ...rawEvent,
+      kind: "charged_back",
+      eventId: "evt_chargeback_00000001",
+      amountMinor: "50000",
+      terminatesResidency: true,
+    };
+
+    expect(expertResidencyPaymentEventSchema.parse(partialRefund)).toEqual(
+      partialRefund,
+    );
+    expect(expertResidencyPaymentEventSchema.parse(chargeback)).toEqual(
+      chargeback,
+    );
+    expect(
+      expertResidencyPaymentEventSchema.parse({
+        ...chargeback,
+        eventId: "evt_partial_chargeback_00000001",
+        terminatesResidency: false,
+      }),
+    ).toMatchObject({ kind: "charged_back", terminatesResidency: false });
+    for (const candidate of [
+      { ...partialRefund, terminatesResidency: undefined },
+      { ...partialRefund, terminatesResidency: "false" },
+      { ...rawEvent, terminatesResidency: false },
+    ]) {
+      expect(
+        expertResidencyPaymentEventSchema.safeParse(candidate).success,
+      ).toBe(false);
+    }
+  });
+
   it("rejects extra fields, raw payloads, malformed digests, and non-canonical money", () => {
     for (const candidate of [
       { ...rawEvent, rawPayload: { card: "unsafe" } },

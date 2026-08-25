@@ -70,6 +70,37 @@ describe("verified expert residency payment events", () => {
     ).toThrow("verification_precedes_event");
   });
 
+  it("brands provider-neutral refund and chargeback discriminants with their termination fact", () => {
+    for (const event of [
+      {
+        ...rawEvent,
+        kind: "refunded" as const,
+        eventId: "evt_refund_00000001",
+        terminatesResidency: false,
+      },
+      {
+        ...rawEvent,
+        kind: "charged_back" as const,
+        eventId: "evt_chargeback_00000001",
+        terminatesResidency: true,
+      },
+    ]) {
+      const verified = verifiedEventFixture(event, {
+        verificationId: `verify_${event.eventId}`,
+        verifierKeyVersion: "sandbox-v1",
+        verifiedAt: "2026-08-03T00:00:01.000Z",
+        payloadDigest: event.payloadDigest,
+      });
+
+      expect(
+        requireVerifiedExpertResidencyPaymentEvent(verified),
+      ).toMatchObject({
+        kind: event.kind,
+        terminatesResidency: event.terminatesResidency,
+      });
+    }
+  });
+
   it("keeps production verification disabled without inspecting raw input", async () => {
     let reads = 0;
     const input = new Proxy(

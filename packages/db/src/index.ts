@@ -143,6 +143,8 @@ export {
   type ExpiryReleaseResult,
   type ReferralCreditBalance,
   type ReleaseExpiredOrders,
+  type ReverseRewardGrant,
+  type RewardReversalResult,
   type ResidencyCheckoutOrder,
   type ResidencyQuote,
   type ResidencyQuoteRequest,
@@ -151,6 +153,8 @@ export {
 export {
   ExpertResidencySettlementError,
   PostgresExpertResidencyProviderInboxRepository,
+  type ExpertResidencyRefundResult,
   type ExpertResidencySettlementResult,
+  type HeldRewardReplayResult,
 } from "./repositories/expert-residency-provider-inbox-repository.js";
 export * from "./schema/index.js";

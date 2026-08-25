@@ -67,7 +67,10 @@ describe("expert residency referral scope guards", () => {
       "expert_residency.tariff_retire",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS]).toEqual([
+      "expert_residency.charged_back",
       "expert_residency.expired",
+      "expert_residency.held_reward_replayed",
+      "expert_residency.refunded",
       "expert_residency.settled",
     ]);
   });
