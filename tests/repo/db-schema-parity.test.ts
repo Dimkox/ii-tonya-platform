@@ -307,7 +307,7 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("keeps the hardened residency migrations and generated snapshot in parity", () => {
-    const path = "packages/db/migrations/meta/0021_snapshot.json";
+    const path = "packages/db/migrations/meta/0022_snapshot.json";
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
     const snapshot = JSON.parse(readFileSync(path, "utf8")) as {
@@ -337,6 +337,7 @@ describe("authoritative Drizzle schema parity", () => {
       "packages/db/migrations/0019_residency-checkout-request.sql",
       "packages/db/migrations/0020_fat_darkhawk.sql",
       "packages/db/migrations/0021_expert-residency-verification-evidence.sql",
+      "packages/db/migrations/0022_expert-residency-durable-outcome-debt.sql",
     ]
       .map((migrationPath) => readFileSync(migrationPath, "utf8"))
       .join("\n");
@@ -422,19 +423,20 @@ describe("authoritative Drizzle schema parity", () => {
     );
 
     const previousSnapshot = JSON.parse(
-      readFileSync("packages/db/migrations/meta/0020_snapshot.json", "utf8"),
+      readFileSync("packages/db/migrations/meta/0021_snapshot.json", "utf8"),
     ) as { id: string };
     expect(snapshot.prevId).toBe(previousSnapshot.id);
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; tag: string }> };
     expect(journal.entries.at(-1)).toMatchObject({
-      idx: 21,
-      tag: "0021_expert-residency-verification-evidence",
+      idx: 22,
+      tag: "0022_expert-residency-durable-outcome-debt",
     });
     expect(journal.entries.filter(({ idx }) => idx === 19)).toHaveLength(1);
     expect(journal.entries.filter(({ idx }) => idx === 20)).toHaveLength(1);
     expect(journal.entries.filter(({ idx }) => idx === 21)).toHaveLength(1);
+    expect(journal.entries.filter(({ idx }) => idx === 22)).toHaveLength(1);
 
     for (const hardenedName of [
       "experts_user_id_unique",
@@ -449,6 +451,9 @@ describe("authoritative Drizzle schema parity", () => {
       "verification_id",
       "verifier_key_version",
       "verified_at",
+      "processing_result_code",
+      "processing_result",
+      "expert_provider_event_result_code_bounded",
     ]) {
       expect(migration, hardenedName).toContain(hardenedName);
     }

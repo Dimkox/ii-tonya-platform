@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import {
@@ -14,7 +14,7 @@ import {
   startTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
-import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/testing.testkit.js";
 
 const keyring: ExpertCodeKeyring = {
   currentVersion: "v1",
@@ -50,7 +50,39 @@ function asDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
-async function seedSpendableGrant(expertId: string): Promise<void> {
+async function releaseActiveReservation(orderId: string): Promise<void> {
+  await testDb.db.transaction(async (tx) => {
+    const reservation = (
+      await tx.execute<{
+        id: string;
+        expertId: string;
+        amountMinor: string;
+      }>(sql`select id, account_expert_id as "expertId",
+        amount_minor::text as "amountMinor"
+        from expert_referral_ledger_entries
+        where source_type = 'residency_order' and source_id = ${orderId}::uuid
+          and entry_kind = 'reservation' for update`)
+    ).rows[0]!;
+    const releaseId = randomUUID();
+    await tx.execute(sql`insert into expert_referral_ledger_entries (
+      id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+      original_entry_id, idempotency_key
+    ) values (${releaseId}::uuid, ${reservation.expertId}::uuid, 'release',
+      ${-BigInt(reservation.amountMinor)}, 'residency_order', ${orderId}::uuid,
+      ${reservation.id}::uuid, ${`test-release:${orderId}`})`);
+    await tx.execute(sql`insert into expert_referral_ledger_allocations (
+      ledger_entry_id, reward_grant_id, amount_minor
+    ) select ${releaseId}::uuid, reward_grant_id, amount_minor
+      from expert_referral_ledger_allocations
+      where ledger_entry_id = ${reservation.id}::uuid`);
+  });
+}
+
+async function seedSpendableGrant(expertId: string): Promise<{
+  grantId: string;
+  ledgerId: string;
+  orderId: string;
+}> {
   const sourceInvitee = await fixtures.createExpert();
   const referralId = randomUUID();
   const tariffId = randomUUID();
@@ -115,6 +147,40 @@ async function seedSpendableGrant(expertId: string): Promise<void> {
       ledger_entry_id, reward_grant_id, amount_minor
     ) values (${ledgerId}::uuid, ${grantId}::uuid, 100000)`);
   });
+  return { grantId, ledgerId, orderId };
+}
+
+async function seedDebt(expertId: string, debtMinor: bigint): Promise<void> {
+  let remaining = debtMinor;
+  while (remaining > 0n) {
+    const amount = remaining > 100_000n ? 100_000n : remaining;
+    const grant = await seedSpendableGrant(expertId);
+    await testDb.db.transaction(async (tx) => {
+      const reservationId = randomUUID();
+      const spendId = randomUUID();
+      const reversalId = randomUUID();
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+        original_entry_id, idempotency_key
+      ) values
+        (${reservationId}::uuid, ${expertId}::uuid, 'reservation', -100000,
+          'residency_order', ${grant.orderId}::uuid, null,
+          ${`debt-reservation:${grant.orderId}`}),
+        (${spendId}::uuid, ${expertId}::uuid, 'spend', -100000,
+          'residency_order', ${grant.orderId}::uuid, ${reservationId}::uuid,
+          ${`debt-spend:${grant.orderId}`}),
+        (${reversalId}::uuid, ${expertId}::uuid, 'reversal', ${-amount},
+          'reward_grant', ${grant.grantId}::uuid, ${grant.ledgerId}::uuid,
+          ${`debt-reversal:${grant.grantId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values
+        (${reservationId}::uuid, ${grant.grantId}::uuid, 100000),
+        (${spendId}::uuid, ${grant.grantId}::uuid, 100000),
+        (${reversalId}::uuid, ${grant.grantId}::uuid, ${amount})`);
+    });
+    remaining -= amount;
+  }
 }
 
 interface Scenario {
@@ -128,6 +194,7 @@ interface Scenario {
 async function scenario(
   input: {
     credit?: boolean;
+    inviterDebtMinor?: bigint;
     rewardEnabled?: boolean;
   } = {},
 ): Promise<Scenario> {
@@ -160,6 +227,9 @@ async function scenario(
     provider: invitee.provider,
     externalId: invitee.externalId,
   });
+  if (input.inviterDebtMinor !== undefined) {
+    await seedDebt(inviter.expertId, input.inviterDebtMinor);
+  }
   if (input.credit) await seedSpendableGrant(invitee.expertId);
   if (input.rewardEnabled === false) {
     await testDb.db.execute(sql`update expert_referral_feature_controls
@@ -243,9 +313,7 @@ function verified(
     verifierKeyVersion: "sandbox-v1",
     verifiedAt: "2026-08-03T00:00:01.000Z",
     payloadDigest: event.payloadDigest,
-  }) as unknown as Parameters<
-    PostgresExpertResidencyProviderInboxRepository["settle"]
-  >[0];
+  });
 }
 
 describe("expert residency settlement", () => {
@@ -341,9 +409,12 @@ describe("expert residency settlement", () => {
         verifiedAt: Date | string;
         authenticated: boolean;
         payloadDigest: string;
+        resultCode: string;
+        result: unknown;
       }>(sql`select verification_id as "verificationId",
         verifier_key_version as "verifierKeyVersion", verified_at as "verifiedAt",
-        authenticated, payload_digest as "payloadDigest"
+        authenticated, payload_digest as "payloadDigest",
+        processing_result_code as "resultCode", processing_result as result
         from expert_residency_provider_event_inbox`)
     ).rows[0]!;
     expect(inbox).toMatchObject({
@@ -351,6 +422,8 @@ describe("expert residency settlement", () => {
       verifierKeyVersion: "sandbox-v1",
       authenticated: true,
       payloadDigest: prepared.event.payloadDigest,
+      resultCode: "settled",
+      result: first,
     });
     expect(asDate(inbox.verifiedAt).toISOString()).toBe(
       "2026-08-03T00:00:01.000Z",
@@ -444,6 +517,231 @@ describe("expert residency settlement", () => {
           and external_event_id = ${prepared.event.eventId}`)
     ).rows[0];
     expect(failedAfterReplay).toEqual(failedBeforeReplay);
+  });
+
+  it("rolls back financial effects but durably fails a missing reservation", async () => {
+    const prepared = await scenario({ credit: true });
+    await releaseActiveReservation(prepared.orderId);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    const event = verified(prepared.event);
+
+    await expect(repo.settle(event)).rejects.toThrow("reservation_mismatch");
+    await expect(repo.settle(event)).rejects.toThrow("reservation_mismatch");
+
+    const state = (
+      await testDb.db.execute<{
+        inbox: number;
+        inboxStatus: string | null;
+        orderStatus: string;
+        markers: number;
+        grants: number;
+        audits: number;
+        outbox: number;
+      }>(sql`select
+        (select count(*)::integer from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as inbox,
+        (select processing_status::text from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as "inboxStatus",
+        (select status::text from expert_residency_orders
+          where id = ${prepared.orderId}::uuid) as "orderStatus",
+        (select count(*)::integer from expert_first_residency_settlements
+          where expert_id = ${prepared.inviteeId}::uuid) as markers,
+        (select count(*)::integer from expert_referral_reward_grants
+          where qualifying_order_id = ${prepared.orderId}::uuid) as grants,
+        (select count(*)::integer from audit_events
+          where object_id = ${prepared.orderId}::uuid) as audits,
+        (select count(*)::integer from integration_outbox
+          where idempotency_key = ${`expert-residency-settled:${prepared.orderId}`}) as outbox`)
+    ).rows[0]!;
+    expect(state).toEqual({
+      inbox: 1,
+      inboxStatus: "failed",
+      orderStatus: "payment_pending",
+      markers: 0,
+      grants: 0,
+      audits: 0,
+      outbox: 0,
+    });
+  });
+
+  it("replays every deterministic order-state failure with its exact stored code", async () => {
+    const prepared = await scenario();
+    await testDb.db
+      .execute(sql`update expert_residency_orders set status = 'failed'
+      where id = ${prepared.orderId}::uuid`);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    const event = verified(prepared.event);
+
+    await expect(repo.settle(event)).rejects.toThrow("order_state_invalid");
+    await expect(repo.settle(event)).rejects.toThrow("order_state_invalid");
+    const stored = (
+      await testDb.db.execute<{ code: string; result: unknown }>(sql`
+        select processing_result_code as code, processing_result as result
+        from expert_residency_provider_event_inbox
+        where external_event_id = ${prepared.event.eventId}
+      `)
+    ).rows[0];
+    expect(stored).toEqual({ code: "order_state_invalid", result: null });
+  });
+
+  it("fails durably and rolls back settlement when an outbox key conflicts", async () => {
+    const prepared = await scenario();
+    const key = `expert-residency-settled:${prepared.orderId}`;
+    await testDb.db.execute(sql`insert into integration_outbox (
+      idempotency_key, topic, payload, correlation_id, reconciliation_key,
+      payload_hash
+    ) values (${key}, 'conflicting.topic', '{"wrong":true}'::jsonb,
+      'conflicting-correlation', 'conflicting-reconciliation',
+      ${`sha256:${"e".repeat(64)}`})`);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    const event = verified(prepared.event);
+
+    await expect(repo.settle(event)).rejects.toThrow("outbox_replay_conflict");
+    await expect(repo.settle(event)).rejects.toThrow("outbox_replay_conflict");
+
+    const state = (
+      await testDb.db.execute<{
+        inboxStatus: string | null;
+        orderStatus: string;
+        markers: number;
+        grants: number;
+        audits: number;
+        topic: string;
+      }>(sql`select
+        (select processing_status::text from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as "inboxStatus",
+        (select status::text from expert_residency_orders
+          where id = ${prepared.orderId}::uuid) as "orderStatus",
+        (select count(*)::integer from expert_first_residency_settlements
+          where expert_id = ${prepared.inviteeId}::uuid) as markers,
+        (select count(*)::integer from expert_referral_reward_grants
+          where qualifying_order_id = ${prepared.orderId}::uuid) as grants,
+        (select count(*)::integer from audit_events
+          where object_id = ${prepared.orderId}::uuid) as audits,
+        (select topic from integration_outbox where idempotency_key = ${key}) as topic`)
+    ).rows[0]!;
+    expect(state).toEqual({
+      inboxStatus: "failed",
+      orderStatus: "payment_pending",
+      markers: 0,
+      grants: 0,
+      audits: 0,
+      topic: "conflicting.topic",
+    });
+  });
+
+  it("accepts one exact pre-existing outbox fact without duplicating it", async () => {
+    const prepared = await scenario();
+    const key = `expert-residency-settled:${prepared.orderId}`;
+    const payload = {
+      expertId: prepared.inviteeId,
+      orderId: prepared.orderId,
+      status: "settled",
+    };
+    const payloadHash = `sha256:${createHash("sha256")
+      .update(JSON.stringify(payload))
+      .digest("hex")}`;
+    await testDb.db.execute(sql`insert into integration_outbox (
+      idempotency_key, topic, payload, correlation_id, reconciliation_key,
+      payload_hash
+    ) values (${key}, 'expert_residency.settled', ${JSON.stringify(payload)}::jsonb,
+      ${`provider:sandbox:${prepared.event.eventId}`},
+      ${`expert-residency:${prepared.orderId}`}, ${payloadHash})`);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+
+    await expect(repo.settle(verified(prepared.event))).resolves.toMatchObject({
+      kind: "settled",
+      orderId: prepared.orderId,
+    });
+    const stored = (
+      await testDb.db.execute<{ count: number; payloadHash: string }>(sql`
+        select count(*)::integer as count, max(payload_hash) as "payloadHash"
+        from integration_outbox where idempotency_key = ${key}
+      `)
+    ).rows[0];
+    expect(stored).toEqual({ count: 1, payloadHash });
+  });
+
+  it("replays a canonical nonzero-millisecond verified instant stably", async () => {
+    const prepared = await scenario();
+    const event = verifiedEventFixture(
+      { ...prepared.event, occurredAt: "2026-08-03T00:00:00.122Z" },
+      {
+        verificationId: `verify_${prepared.event.eventId}`,
+        verifierKeyVersion: "sandbox-v1",
+        verifiedAt: "2026-08-03T00:00:00.123Z",
+        payloadDigest: prepared.event.payloadDigest,
+      },
+    );
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+
+    const first = await repo.settle(event);
+    await expect(repo.settle(event)).resolves.toEqual(first);
+  });
+
+  it("applies rewards debt-first for partial, full, and remaining debt exactly once", async () => {
+    for (const expected of [
+      {
+        debtBefore: 50_000n,
+        repaidMinor: "50000",
+        debtAfter: "0",
+        spendableAfter: "50000",
+      },
+      {
+        debtBefore: 100_000n,
+        repaidMinor: "100000",
+        debtAfter: "0",
+        spendableAfter: "0",
+      },
+      {
+        debtBefore: 150_000n,
+        repaidMinor: "100000",
+        debtAfter: "50000",
+        spendableAfter: "0",
+      },
+    ]) {
+      const prepared = await scenario({
+        inviterDebtMinor: expected.debtBefore,
+      });
+      const repo = new PostgresExpertResidencyProviderInboxRepository(
+        testDb.db,
+      );
+      const event = verified(prepared.event);
+
+      const first = await repo.settle(event);
+      expect(first).toMatchObject({
+        kind: "settled",
+        rewardEffect: {
+          kind: "debt_repaid",
+          amountMinor: expected.repaidMinor,
+        },
+      });
+      await expect(repo.settle(event)).resolves.toEqual(first);
+
+      const balance = (
+        await testDb.db.execute<{
+          debtMinor: string;
+          spendableMinor: string;
+          grants: number;
+          repayments: number;
+        }>(sql`select debt_minor::text as "debtMinor",
+          spendable_balance_minor::text as "spendableMinor",
+          (select count(*)::integer from expert_referral_reward_grants
+            where qualifying_order_id = ${prepared.orderId}::uuid) as grants,
+          (select count(*)::integer from expert_referral_ledger_entries l
+            join expert_referral_reward_grants g on g.id = l.source_id
+            where l.entry_kind = 'debt_repayment'
+              and g.qualifying_order_id = ${prepared.orderId}::uuid) as repayments
+          from expert_referral_balances
+          where expert_id = ${prepared.inviterId}::uuid`)
+      ).rows[0]!;
+      expect(balance).toEqual({
+        debtMinor: expected.debtAfter,
+        spendableMinor: expected.spendableAfter,
+        grants: 1,
+        repayments: 1,
+      });
+    }
   });
 
   it("expires and releases at database deadline equality without settling", async () => {

@@ -55,6 +55,8 @@ interface InboxRow extends Record<string, unknown> {
   eventKind: string;
   processingStatus: "pending" | "processing" | "processed" | "failed";
   processingResultDigest: string | null;
+  processingResultCode: string | null;
+  processingResult: unknown;
 }
 
 interface OrderRow extends Record<string, unknown> {
@@ -118,8 +120,97 @@ function date(value: Date | string): Date {
   return parsed;
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`;
+}
+
 function hash(value: unknown): string {
-  return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
+  return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
+}
+
+function nestedDatabaseCode(error: unknown): string | null {
+  let current = error;
+  const seen = new Set<unknown>();
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
+    seen.add(current);
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+function deterministicFailureCode(error: unknown): string | null {
+  if (error instanceof ExpertResidencySettlementError) return error.code;
+  const databaseCode = nestedDatabaseCode(error);
+  if (databaseCode?.startsWith("23")) {
+    return "settlement_effect_constraint_failed";
+  }
+  if (
+    error instanceof Error &&
+    ["invalid_database_timestamp", "database_clock_unavailable"].includes(
+      error.message,
+    )
+  ) {
+    return "settlement_data_invalid";
+  }
+  return null;
+}
+
+function isSettlementResult(
+  value: unknown,
+): value is ExpertResidencySettlementResult {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  if (result.kind === "expired") {
+    return (
+      Object.keys(result).length === 2 && typeof result.orderId === "string"
+    );
+  }
+  if (
+    result.kind !== "settled" ||
+    Object.keys(result).length !== 7 ||
+    typeof result.orderId !== "string" ||
+    typeof result.settledAt !== "string" ||
+    typeof result.residencyStartsAt !== "string" ||
+    typeof result.residencyEndsAt !== "string" ||
+    ![
+      "eligible",
+      "ineligible",
+      "pending_feature_hold",
+      "not_first_settlement",
+    ].includes(String(result.eligibilityStatus)) ||
+    typeof result.rewardEffect !== "object" ||
+    result.rewardEffect === null ||
+    Array.isArray(result.rewardEffect)
+  ) {
+    return false;
+  }
+  const effect = result.rewardEffect as Record<string, unknown>;
+  return (
+    (effect.kind === "none" && Object.keys(effect).length === 1) ||
+    (effect.kind === "reward_granted" &&
+      effect.amountMinor === "100000" &&
+      Object.keys(effect).length === 2) ||
+    (effect.kind === "debt_repaid" &&
+      typeof effect.amountMinor === "string" &&
+      /^[1-9][0-9]{0,18}$/u.test(effect.amountMinor) &&
+      Object.keys(effect).length === 2)
+  );
 }
 
 function eventFingerprint(event: VerifiedExpertResidencyPaymentEvent): string {
@@ -188,156 +279,173 @@ export class PostgresExpertResidencyProviderInboxRepository {
         ).rows[0];
         const inbox = await this.lockInbox(tx, event.provider, event.eventId);
         this.assertInboxIdentity(inbox, event);
-
-        const order = await this.lockOrder(tx, event.orderId);
-        if (order === undefined) {
-          if (inserted === undefined)
-            this.assertFailedReplay(inbox, event, "order_not_found");
-          await this.failInbox(tx, inbox.id, event, "order_not_found");
-          return { error: "order_not_found" } as const;
-        }
-        if (order.paymentAttemptId !== null) {
-          await tx.execute(sql`select id from expert_residency_payment_attempts
-            where id = ${order.paymentAttemptId}::uuid for update`);
-        }
-        const paymentIdentityError = this.paymentIdentityError(order, event);
-
         if (inserted === undefined) {
-          if (inbox.processingStatus === "processed") {
-            const result = await this.resultForOrder(tx, order);
-            if (
-              inbox.processingResultDigest !==
-              this.resultDigest(event, { result })
-            ) {
-              throw new ExpertResidencySettlementError(
-                "provider_event_replay_conflict",
-              );
-            }
-            return { result } as const;
-          }
-          if (inbox.processingStatus === "failed") {
-            const error =
-              paymentIdentityError ?? this.validationError(order, event);
-            if (error === null) {
-              throw new ExpertResidencySettlementError(
-                "provider_event_replay_conflict",
-              );
-            }
-            this.assertFailedReplay(inbox, event, error);
-            return { error } as const;
-          }
-          throw new ExpertResidencySettlementError(
-            "provider_event_claim_conflict",
-          );
+          return this.replayOutcome(inbox, event);
         }
-
-        await tx.execute(sql`update expert_residency_provider_event_inbox
-          set order_id = ${order.orderId}::uuid,
-            payment_attempt_id = ${order.paymentAttemptId}::uuid
-          where id = ${inbox.id}::uuid`);
-        const validationError =
-          paymentIdentityError ?? this.validationError(order, event);
-        if (validationError !== null) {
-          await this.failInbox(tx, inbox.id, event, validationError);
-          return { error: validationError } as const;
-        }
-        if (order.status === "settled" || order.status === "expired") {
-          const result = await this.resultForOrder(tx, order);
-          await this.completeInbox(tx, inbox.id, event, result);
+        try {
+          const result = await tx.transaction(async (effectsTx) => {
+            const applied = await this.applySettlement(
+              effectsTx,
+              event,
+              inbox.id,
+            );
+            await this.completeInbox(effectsTx, inbox.id, event, applied);
+            return applied;
+          });
           return { result } as const;
+        } catch (error) {
+          const code = deterministicFailureCode(error);
+          if (code === null) throw error;
+          await this.linkFailedInbox(tx, inbox.id, event);
+          await this.failInbox(tx, inbox.id, event, code);
+          return { error: code } as const;
         }
-        if (order.status !== "payment_pending" && order.status !== "quoted") {
-          const error = "order_state_invalid";
-          await this.failInbox(tx, inbox.id, event, error);
-          return { error } as const;
-        }
-
-        const deadline = (
-          await tx.execute<{
-            decision: "settlement_allowed" | "expire_and_release";
-          }>(sql`
-            select expert_residency_payment_deadline_state(${date(order.paymentDeadline)}) as decision
-          `)
-        ).rows[0]?.decision;
-        if (deadline !== "settlement_allowed") {
-          await this.expireAndRelease(tx, order);
-          const result = { kind: "expired", orderId: order.orderId } as const;
-          await this.completeInbox(tx, inbox.id, event, result);
-          await this.auditAndOutbox(tx, order.expertId, event, result);
-          return { result } as const;
-        }
-
-        await tx.execute(sql`select pg_advisory_xact_lock(
-          hashtextextended(${`expert-residency:settlement:${order.expertId}`}, 0)
-        )`);
-        const eligibility = await this.controls.lockEligibility(
-          tx,
-          order.expertId,
-        );
-        const featureControl = await this.controls.lockFeatureControl(tx);
-        const referral = await this.lockReferral(tx, order.expertId);
-        await this.lockResidencyRows(tx, order.expertId);
-        const now = await this.databaseNow(tx);
-        const currentEnd = await this.currentResidencyEnd(tx, order.expertId);
-        const startsAt =
-          currentEnd !== null && currentEnd > now ? currentEnd : now;
-        const endsAt = new Date(
-          startsAt.getTime() + order.durationSeconds * 1_000,
-        );
-        await tx.execute(sql`update expert_residency_orders set
-          status = 'settled', settled_at = ${now}, residency_starts_at = ${startsAt},
-          residency_ends_at = ${endsAt}, updated_at = clock_timestamp()
-          where id = ${order.orderId}::uuid`);
-        await tx.execute(sql`update expert_residency_payment_attempts set
-          status = 'succeeded', updated_at = clock_timestamp()
-          where id = ${order.paymentAttemptId}::uuid`);
-        await this.commitReservation(tx, order);
-
-        const priorMarker = await this.lockFirstMarker(tx, order.expertId);
-        if (priorMarker === undefined) {
-          const decision = eligibilityDecision(eligibility);
-          const status = !decision.eligible
-            ? "ineligible"
-            : referral !== undefined && !featureControl.rewardGrantsEnabled
-              ? "pending_feature_hold"
-              : "eligible";
-          const reason =
-            status === "pending_feature_hold"
-              ? "reward_grants_disabled"
-              : decision.reason;
-          const markerId = randomUUID();
-          await tx.execute(sql`insert into expert_first_residency_settlements (
-            id, expert_id, qualifying_order_id, eligibility_status,
-            eligibility_reason_code, expert_active, expert_verified,
-            unique_identity, abuse_cleared, settled_at
-          ) values (
-            ${markerId}::uuid, ${order.expertId}::uuid, ${order.orderId}::uuid,
-            ${status}, ${reason}, ${eligibility.active && eligibility.userActive},
-            ${eligibility.verified}, ${eligibility.uniqueIdentity},
-            ${eligibility.abuseCleared}, ${now}
-          )`);
-          if (status === "eligible" && referral !== undefined) {
-            await this.appendReward(tx, referral, order.orderId, markerId, now);
-          }
-        }
-
-        const settledOrder: OrderRow = {
-          ...order,
-          status: "settled",
-          settledAt: now,
-          residencyStartsAt: startsAt,
-          residencyEndsAt: endsAt,
-        };
-        const result = await this.resultForOrder(tx, settledOrder);
-        await this.auditAndOutbox(tx, order.expertId, event, result);
-        await this.completeInbox(tx, inbox.id, event, result);
-        return { result } as const;
       }),
     );
     if ("error" in outcome) {
       throw new ExpertResidencySettlementError(outcome.error);
     }
     return outcome.result;
+  }
+
+  private replayOutcome(
+    inbox: InboxRow,
+    event: VerifiedExpertResidencyPaymentEvent,
+  ):
+    | Readonly<{ result: ExpertResidencySettlementResult }>
+    | Readonly<{ error: string }> {
+    if (inbox.processingStatus === "failed") {
+      const error = inbox.processingResultCode;
+      if (
+        error === null ||
+        !/^[a-z][a-z0-9_]{0,63}$/u.test(error) ||
+        inbox.processingResult !== null ||
+        inbox.processingResultDigest !== this.resultDigest(event, { error })
+      ) {
+        throw new ExpertResidencySettlementError(
+          "provider_event_replay_conflict",
+        );
+      }
+      return { error };
+    }
+    if (inbox.processingStatus === "processed") {
+      const result = inbox.processingResult;
+      if (
+        !isSettlementResult(result) ||
+        inbox.processingResultCode !== result.kind ||
+        inbox.processingResultDigest !== this.resultDigest(event, { result })
+      ) {
+        throw new ExpertResidencySettlementError(
+          "provider_event_replay_conflict",
+        );
+      }
+      return { result };
+    }
+    throw new ExpertResidencySettlementError("provider_event_claim_conflict");
+  }
+
+  private async applySettlement(
+    tx: ExpertReferralTransaction,
+    event: VerifiedExpertResidencyPaymentEvent,
+    inboxId: string,
+  ): Promise<ExpertResidencySettlementResult> {
+    const featureControl = await this.controls.lockFeatureControl(tx);
+    const order = await this.lockOrder(tx, event.orderId);
+    if (order === undefined) {
+      throw new ExpertResidencySettlementError("order_not_found");
+    }
+    if (order.paymentAttemptId !== null) {
+      await tx.execute(sql`select id from expert_residency_payment_attempts
+        where id = ${order.paymentAttemptId}::uuid for update`);
+    }
+    await tx.execute(sql`update expert_residency_provider_event_inbox
+      set order_id = ${order.orderId}::uuid,
+        payment_attempt_id = ${order.paymentAttemptId}::uuid
+      where id = ${inboxId}::uuid`);
+    const validationError =
+      this.paymentIdentityError(order, event) ??
+      this.validationError(order, event);
+    if (validationError !== null) {
+      throw new ExpertResidencySettlementError(validationError);
+    }
+    if (order.status === "settled" || order.status === "expired") {
+      return this.resultForOrder(tx, order);
+    }
+    if (order.status !== "payment_pending" && order.status !== "quoted") {
+      throw new ExpertResidencySettlementError("order_state_invalid");
+    }
+
+    const deadline = (
+      await tx.execute<{
+        decision: "settlement_allowed" | "expire_and_release";
+      }>(sql`
+        select expert_residency_payment_deadline_state(${date(order.paymentDeadline)}) as decision
+      `)
+    ).rows[0]?.decision;
+    if (deadline !== "settlement_allowed") {
+      await this.expireAndRelease(tx, order);
+      const result = { kind: "expired", orderId: order.orderId } as const;
+      await this.auditAndOutbox(tx, order.expertId, event, result);
+      return result;
+    }
+
+    await tx.execute(sql`select pg_advisory_xact_lock(
+      hashtextextended(${`expert-residency:settlement:${order.expertId}`}, 0)
+    )`);
+    const eligibility = await this.controls.lockEligibility(tx, order.expertId);
+    const referral = await this.lockReferral(tx, order.expertId);
+    await this.lockResidencyRows(tx, order.expertId);
+    const now = await this.databaseNow(tx);
+    const currentEnd = await this.currentResidencyEnd(tx, order.expertId);
+    const startsAt = currentEnd !== null && currentEnd > now ? currentEnd : now;
+    const endsAt = new Date(startsAt.getTime() + order.durationSeconds * 1_000);
+    await tx.execute(sql`update expert_residency_orders set
+      status = 'settled', settled_at = ${now}, residency_starts_at = ${startsAt},
+      residency_ends_at = ${endsAt}, updated_at = clock_timestamp()
+      where id = ${order.orderId}::uuid`);
+    await tx.execute(sql`update expert_residency_payment_attempts set
+      status = 'succeeded', updated_at = clock_timestamp()
+      where id = ${order.paymentAttemptId}::uuid`);
+    await this.commitReservation(tx, order);
+
+    const priorMarker = await this.lockFirstMarker(tx, order.expertId);
+    if (priorMarker === undefined) {
+      const decision = eligibilityDecision(eligibility);
+      const status = !decision.eligible
+        ? "ineligible"
+        : referral !== undefined && !featureControl.rewardGrantsEnabled
+          ? "pending_feature_hold"
+          : "eligible";
+      const reason =
+        status === "pending_feature_hold"
+          ? "reward_grants_disabled"
+          : decision.reason;
+      const markerId = randomUUID();
+      await tx.execute(sql`insert into expert_first_residency_settlements (
+        id, expert_id, qualifying_order_id, eligibility_status,
+        eligibility_reason_code, expert_active, expert_verified,
+        unique_identity, abuse_cleared, settled_at
+      ) values (
+        ${markerId}::uuid, ${order.expertId}::uuid, ${order.orderId}::uuid,
+        ${status}, ${reason}, ${eligibility.active && eligibility.userActive},
+        ${eligibility.verified}, ${eligibility.uniqueIdentity},
+        ${eligibility.abuseCleared}, ${now}
+      )`);
+      if (status === "eligible" && referral !== undefined) {
+        await this.appendReward(tx, referral, order.orderId, markerId, now);
+      }
+    }
+
+    const settledOrder: OrderRow = {
+      ...order,
+      status: "settled",
+      settledAt: now,
+      residencyStartsAt: startsAt,
+      residencyEndsAt: endsAt,
+    };
+    const result = await this.resultForOrder(tx, settledOrder);
+    await this.auditAndOutbox(tx, order.expertId, event, result);
+    return result;
   }
 
   private async lockInbox(
@@ -353,7 +461,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
         verifier_key_version as "verifierKeyVersion", verified_at as "verifiedAt",
         authenticated, event_kind as "eventKind",
         processing_status as "processingStatus",
-        processing_result_digest as "processingResultDigest"
+        processing_result_digest as "processingResultDigest",
+        processing_result_code as "processingResultCode",
+        processing_result as "processingResult"
         from expert_residency_provider_event_inbox
         where provider = ${provider} and external_event_id = ${eventId}
         for update`)
@@ -372,7 +482,8 @@ export class PostgresExpertResidencyProviderInboxRepository {
       inbox.payloadDigest !== event.payloadDigest ||
       inbox.verificationId !== event.verification.verificationId ||
       inbox.verifierKeyVersion !== event.verification.verifierKeyVersion ||
-      date(inbox.verifiedAt).toISOString() !== event.verification.verifiedAt ||
+      date(inbox.verifiedAt).getTime() !==
+        new Date(event.verification.verifiedAt).getTime() ||
       !inbox.authenticated ||
       inbox.eventKind !== event.kind
     ) {
@@ -723,19 +834,21 @@ export class PostgresExpertResidencyProviderInboxRepository {
     return hash({ eventFingerprint: eventFingerprint(event), ...outcome });
   }
 
-  private assertFailedReplay(
-    inbox: InboxRow,
+  private async linkFailedInbox(
+    tx: ExpertReferralTransaction,
+    inboxId: string,
     event: VerifiedExpertResidencyPaymentEvent,
-    error: string | null,
-  ): void {
-    if (
-      error === null ||
-      inbox.processingResultDigest !== this.resultDigest(event, { error })
-    ) {
-      throw new ExpertResidencySettlementError(
-        "provider_event_replay_conflict",
-      );
-    }
+  ): Promise<void> {
+    await tx.execute(sql`update expert_residency_provider_event_inbox inbox set
+      order_id = matching_order.id,
+      payment_attempt_id = matching_attempt.id
+      from expert_residency_orders matching_order
+      left join expert_residency_payment_attempts matching_attempt
+        on matching_attempt.order_id = matching_order.id
+        and matching_attempt.provider = ${event.provider}
+        and matching_attempt.provider_request_id = ${event.paymentId}
+      where inbox.id = ${inboxId}::uuid
+        and matching_order.id = ${event.orderId}::uuid`);
   }
 
   private async failInbox(
@@ -746,7 +859,8 @@ export class PostgresExpertResidencyProviderInboxRepository {
   ): Promise<void> {
     await tx.execute(sql`update expert_residency_provider_event_inbox set
       processing_status = 'failed', processed_at = clock_timestamp(),
-      processing_result_digest = ${this.resultDigest(event, { error })}
+      processing_result_digest = ${this.resultDigest(event, { error })},
+      processing_result_code = ${error}, processing_result = null
       where id = ${inboxId}::uuid`);
   }
 
@@ -758,7 +872,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
   ): Promise<void> {
     await tx.execute(sql`update expert_residency_provider_event_inbox set
       processing_status = 'processed', processed_at = clock_timestamp(),
-      processing_result_digest = ${this.resultDigest(event, { result })}
+      processing_result_digest = ${this.resultDigest(event, { result })},
+      processing_result_code = ${result.kind},
+      processing_result = ${JSON.stringify(result)}::jsonb
       where id = ${inboxId}::uuid`);
   }
 
@@ -791,12 +907,40 @@ export class PostgresExpertResidencyProviderInboxRepository {
       expertId,
       status: result.kind,
     };
-    await tx.execute(sql`insert into integration_outbox (
+    const idempotencyKey = `expert-residency-${result.kind}:${event.orderId}`;
+    const reconciliationKey = `expert-residency:${event.orderId}`;
+    const payloadHash = hash(payload);
+    const inserted = (
+      await tx.execute<{ id: string }>(sql`insert into integration_outbox (
       idempotency_key, topic, payload, correlation_id, reconciliation_key,
       payload_hash
-    ) values (${`expert-residency-${result.kind}:${event.orderId}`}, ${action},
+    ) values (${idempotencyKey}, ${action},
       ${JSON.stringify(payload)}::jsonb, ${correlationId},
-      ${`expert-residency:${event.orderId}`}, ${hash(payload)})
-      on conflict (idempotency_key) do nothing`);
+      ${reconciliationKey}, ${payloadHash})
+      on conflict (idempotency_key) do nothing returning id`)
+    ).rows[0];
+    if (inserted !== undefined) return;
+    const existing = (
+      await tx.execute<{
+        topic: string;
+        payload: unknown;
+        correlationId: string;
+        reconciliationKey: string;
+        payloadHash: string;
+      }>(sql`select topic, payload, correlation_id as "correlationId",
+        reconciliation_key as "reconciliationKey", payload_hash as "payloadHash"
+        from integration_outbox where idempotency_key = ${idempotencyKey}
+        for update`)
+    ).rows[0];
+    if (
+      existing === undefined ||
+      existing.topic !== action ||
+      canonicalJson(existing.payload) !== canonicalJson(payload) ||
+      existing.correlationId !== correlationId ||
+      existing.reconciliationKey !== reconciliationKey ||
+      existing.payloadHash !== payloadHash
+    ) {
+      throw new ExpertResidencySettlementError("outbox_replay_conflict");
+    }
   }
 }

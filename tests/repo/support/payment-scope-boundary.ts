@@ -56,6 +56,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
   "expert_residency.tariff_retire",
+  "expert_residency.expired",
+  "expert_residency.settled",
 ]);
 
 const approvedPaymentBoundaryPaths = new Set([
@@ -363,6 +365,10 @@ const approvedMigrationHashes = new Map([
     "b93c32dc069a777d15fdd5985fbb6c99c20e2bf5185eeb5d314729488f89026b",
   ],
   [
+    "packages/db/migrations/0022_expert-residency-durable-outcome-debt.sql",
+    "6b4eb6c0dde152dd74acc180e1ad9e2bd1dad9d75aa075be0c00b0496967a54a",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -447,8 +453,12 @@ const approvedMigrationHashes = new Map([
     "65ef01b8af7e364ceb9f01f5fd723eba773270fcf05f83ac64976dec1142ff72",
   ],
   [
+    "packages/db/migrations/meta/0022_snapshot.json",
+    "d1fa1060ab4b34e5dbc838b87f810ee234754e40f40af6c0eaea8ae47640516e",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "e808a119ac490e17a3559891f6a22ffe7ebb7fbcef98d4449fb43f3886fe1ec6",
+    "2828eb43879b968ff3a162dc9eee1c7e55091c10d0e22a950f6cfdcaacbf4b5e",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -628,7 +638,11 @@ const isApprovedPaymentBoundaryImport = (
       "./projections/projection-port.js",
     ].includes(specifier)) ||
   (path === "packages/integrations/src/payment/disabled-payment-adapter.ts" &&
-    specifier === "./payment-port.js");
+    specifier === "./payment-port.js") ||
+  ([
+    "packages/integrations/src/expert-residency/disabled-payment-adapter.ts",
+    "packages/integrations/src/expert-residency/verified-event.ts",
+  ].includes(path) && specifier === "./payment-port.js");
 
 const isNetworkCall = (node: ts.CallExpression): boolean => {
   if (ts.isIdentifier(node.expression)) {

@@ -7,6 +7,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   pgView,
@@ -418,6 +419,8 @@ export const expertResidencyProviderEventInbox = pgTable(
       .notNull()
       .default("pending"),
     processingResultDigest: text("processing_result_digest"),
+    processingResultCode: text("processing_result_code"),
+    processingResult: jsonb("processing_result"),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -431,9 +434,28 @@ export const expertResidencyProviderEventInbox = pgTable(
     check(
       "expert_provider_event_processing_result",
       sql`
-        (${table.processingStatus} in ('pending', 'processing') and ${table.processedAt} is null)
-        or (${table.processingStatus} in ('processed', 'failed') and ${table.processedAt} is not null and ${table.processingResultDigest} is not null)
+        (${table.processingStatus} in ('pending', 'processing')
+          and ${table.processedAt} is null
+          and ${table.processingResultDigest} is null
+          and ${table.processingResultCode} is null
+          and ${table.processingResult} is null)
+        or (${table.processingStatus} = 'failed'
+          and ${table.processedAt} is not null
+          and ${table.processingResultDigest} is not null
+          and ${table.processingResultCode} is not null
+          and ${table.processingResult} is null)
+        or (${table.processingStatus} = 'processed'
+          and ${table.processedAt} is not null
+          and ${table.processingResultDigest} is not null
+          and ${table.processingResultCode} is not null
+          and (${table.processingResult} is not null
+            or ${table.processingResultCode} = 'legacy_unreconstructable'))
       `,
+    ),
+    check(
+      "expert_provider_event_result_code_bounded",
+      sql`${table.processingResultCode} is null
+        or length(${table.processingResultCode}) between 1 and 64`,
     ),
     index("expert_provider_event_processing_queue").on(
       table.processingStatus,
@@ -775,14 +797,24 @@ export const expertReferralBalances = pgView("expert_referral_balances", {
     mode: "bigint",
   }).notNull(),
 }).as(sql`
-  with grant_positions as (
+  with debt_offsets as (
+    select reversal.source_id as grant_id,
+      coalesce(sum(repayment.amount_minor), 0)::bigint as repaid_minor
+    from expert_referral_ledger_entries repayment
+    join expert_referral_ledger_entries reversal
+      on reversal.id = repayment.original_entry_id
+      and reversal.entry_kind = 'reversal'
+    where repayment.entry_kind = 'debt_repayment'
+    group by reversal.source_id
+  ), grant_positions as (
     select
       g.id as grant_id,
       g.inviter_expert_id as expert_id,
       g.expires_at,
       coalesce(sum(
         case
-          when l.entry_kind in ('release', 'debt_repayment') then 0
+          when l.entry_kind = 'release' then 0
+          when l.entry_kind = 'debt_repayment' then -a.amount_minor
           when l.entry_kind = 'reservation' and exists (
             select 1
             from expert_referral_ledger_entries terminal
@@ -792,11 +824,12 @@ export const expertReferralBalances = pgView("expert_referral_balances", {
           when l.amount_minor < 0 then -a.amount_minor
           else a.amount_minor
         end
-      ), 0)::bigint as net_minor
+      ), 0)::bigint + coalesce(debt_offsets.repaid_minor, 0)::bigint as net_minor
     from expert_referral_reward_grants g
     left join expert_referral_ledger_allocations a on a.reward_grant_id = g.id
     left join expert_referral_ledger_entries l on l.id = a.ledger_entry_id
-    group by g.id, g.inviter_expert_id, g.expires_at
+    left join debt_offsets on debt_offsets.grant_id = g.id
+    group by g.id, g.inviter_expert_id, g.expires_at, debt_offsets.repaid_minor
   ), account_positions as (
     select
       e.id as expert_id,

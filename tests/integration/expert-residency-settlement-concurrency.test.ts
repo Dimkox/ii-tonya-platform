@@ -14,7 +14,7 @@ import {
   startTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
-import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/verified-event.js";
+import { verifiedEventFixture } from "../../packages/integrations/src/expert-residency/testing.testkit.js";
 
 const keyring: ExpertCodeKeyring = {
   currentVersion: "v1",
@@ -31,6 +31,29 @@ beforeAll(async () => {
 }, 120_000);
 beforeEach(async () => testDb.reset());
 afterAll(async () => testDb?.stop(), 120_000);
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function waitForFeatureControlWaiter(): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const waiting = (
+      await testDb.db.execute<{ waiting: boolean }>(sql`select exists (
+        select 1 from pg_stat_activity
+        where wait_event_type = 'Lock'
+          and query like '%expert_referral_feature_controls%'
+      ) as waiting`)
+    ).rows[0]?.waiting;
+    if (waiting) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error("settlement_did_not_wait_for_feature_control");
+}
 
 describe("expert residency settlement concurrency", () => {
   it("serializes renewals and creates exactly one first marker and reward", async () => {
@@ -128,20 +151,46 @@ describe("expert residency settlement concurrency", () => {
     }
 
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
-    const results = await Promise.all(
-      events.map((event) =>
-        repo.settle(
-          verifiedEventFixture(event, {
-            verificationId: `verify_${event.eventId}`,
-            verifierKeyVersion: "sandbox-v1",
-            verifiedAt: "2026-08-03T00:00:03.000Z",
-            payloadDigest: event.payloadDigest,
-          }) as unknown as Parameters<
-            PostgresExpertResidencyProviderInboxRepository["settle"]
-          >[0],
-        ),
-      ),
+    const verifiedEvents = events.map((event) =>
+      verifiedEventFixture(event, {
+        verificationId: `verify_${event.eventId}`,
+        verifierKeyVersion: "sandbox-v1",
+        verifiedAt: "2026-08-03T00:00:03.000Z",
+        payloadDigest: event.payloadDigest,
+      }),
     );
+    const controlLocked = deferred();
+    const releaseControl = deferred();
+    const blocker = testDb.db.transaction(async (tx) => {
+      await tx.execute(sql`select feature_key
+        from expert_referral_feature_controls
+        where feature_key = 'expert_referrals' for update`);
+      controlLocked.resolve();
+      await releaseControl.promise;
+    });
+    await controlLocked.promise;
+    const firstSettlement = repo.settle(verifiedEvents[0]!);
+    try {
+      await waitForFeatureControlWaiter();
+      const probe = await testDb.db.transaction(
+        async (tx) =>
+          (
+            await tx.execute<{
+              acquired: boolean;
+            }>(sql`select pg_try_advisory_xact_lock(
+            hashtextextended(${`expert-referral:${invitee.expertId}`}, 0)
+          ) as acquired`)
+          ).rows[0]?.acquired,
+      );
+      expect(probe).toBe(true);
+    } finally {
+      releaseControl.resolve();
+      await blocker;
+    }
+    const results = await Promise.all([
+      firstSettlement,
+      repo.settle(verifiedEvents[1]!),
+    ]);
 
     expect(results.map((result) => result.kind)).toEqual([
       "settled",

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import type { ExpertResidencyPaymentEvent } from "@ii-tonya/contracts";
-import { verifiedEventFixture } from "../../../integrations/src/expert-residency/verified-event.js";
+import { verifiedEventFixture } from "../../../integrations/src/expert-residency/testing.testkit.js";
 import { startTestPostgres, type TestDatabase } from "../testkit/postgres.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
 
@@ -35,9 +35,7 @@ describe("expert residency provider inbox", () => {
 
     await expect(
       new PostgresExpertResidencyProviderInboxRepository(testDb.db).settle(
-        verified as unknown as Parameters<
-          PostgresExpertResidencyProviderInboxRepository["settle"]
-        >[0],
+        verified,
       ),
     ).rejects.toThrow("order_not_found");
 

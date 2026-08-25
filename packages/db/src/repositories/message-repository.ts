@@ -193,7 +193,11 @@ export async function withSerializableRetry<T>(
     try {
       return await operation();
     } catch (error) {
-      if (attempt === attempts - 1 || !hasCode(error, "40001")) throw error;
+      if (
+        attempt === attempts - 1 ||
+        (!hasCode(error, "40001") && !hasCode(error, "40P01"))
+      )
+        throw error;
     }
   }
   throw new Error("Unreachable serialization retry state");
@@ -496,11 +500,7 @@ export class PostgresMessageRepository implements MessageRepository {
         let outcome = command.outcome;
         if (outcome.kind === "no_package") {
           if (
-            await this.packageAvailable(
-              tx,
-              command.userId,
-              event.occurredAt,
-            )
+            await this.packageAvailable(tx, command.userId, event.occurredAt)
           ) {
             return {
               kind: "retry" as const,

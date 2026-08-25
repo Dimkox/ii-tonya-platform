@@ -129,12 +129,20 @@ describe("residency provider deadline corrective upgrade", () => {
     await migrate(upgradeDb.db, { migrationsFolder: migrationsThrough(19) });
     const legacyInboxId = randomUUID();
     const legacyEventId = `legacy-${"x".repeat(256)}`;
+    const legacyTerminalEventId = randomUUID();
     await upgradeDb.db
       .execute(sql`insert into expert_residency_provider_event_inbox (
       id, provider, external_event_id, payload_digest, authenticated,
       event_kind, processing_status
     ) values (${legacyInboxId}::uuid, 'legacy-provider', ${legacyEventId}, 'sha256:legacy', true,
       'settlement', 'pending')`);
+    await upgradeDb.db
+      .execute(sql`insert into expert_residency_provider_event_inbox (
+      provider, external_event_id, payload_digest, authenticated,
+      event_kind, processing_status, processing_result_digest, processed_at
+    ) values ('legacy-provider', ${legacyTerminalEventId}, 'sha256:legacy-terminal',
+      true, 'settlement', 'failed', ${`sha256:${"d".repeat(64)}`},
+      transaction_timestamp())`);
     const after0019 = (
       await upgradeDb.db.execute<{
         providerDeadline: Date | string | null;
@@ -163,10 +171,12 @@ describe("residency provider deadline corrective upgrade", () => {
     const original0019 = migrations[19];
     const corrective0020 = migrations[20];
     const verification0021 = migrations[21];
+    const durableOutcome0022 = migrations[22];
     if (
       original0019 === undefined ||
       corrective0020 === undefined ||
-      verification0021 === undefined
+      verification0021 === undefined ||
+      durableOutcome0022 === undefined
     ) {
       throw new Error("provider_deadline_migration_metadata_missing");
     }
@@ -211,7 +221,7 @@ describe("residency provider deadline corrective upgrade", () => {
       order by id
     `)
     ).rows;
-    expect(metadataAfter).toHaveLength(22);
+    expect(metadataAfter).toHaveLength(23);
     expect(
       metadataAfter.filter(
         (row) => row.createdAt === String(original0019.folderMillis),
@@ -226,6 +236,17 @@ describe("residency provider deadline corrective upgrade", () => {
         id: 21,
         hash: corrective0020.hash,
         createdAt: String(corrective0020.folderMillis),
+      },
+    ]);
+    expect(
+      metadataAfter.filter(
+        (row) => row.createdAt === String(durableOutcome0022.folderMillis),
+      ),
+    ).toEqual([
+      {
+        id: 23,
+        hash: durableOutcome0022.hash,
+        createdAt: String(durableOutcome0022.folderMillis),
       },
     ]);
     expect(
@@ -261,6 +282,21 @@ describe("residency provider deadline corrective upgrade", () => {
     expect(new Date(legacyEvent!.verifiedAt).toISOString()).toBe(
       new Date(legacyEvent!.receivedAt).toISOString(),
     );
+    const legacyTerminal = (
+      await upgradeDb.db.execute<{
+        code: string;
+        result: unknown;
+        authenticated: boolean;
+      }>(sql`select processing_result_code as code,
+        processing_result as result, authenticated
+        from expert_residency_provider_event_inbox
+        where external_event_id = ${legacyTerminalEventId}`)
+    ).rows[0];
+    expect(legacyTerminal).toEqual({
+      code: "legacy_unreconstructable",
+      result: null,
+      authenticated: false,
+    });
 
     const after0020 = (
       await upgradeDb.db.execute<{
