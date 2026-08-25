@@ -56,6 +56,9 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
   "expert_residency.tariff_retire",
+]);
+
+export const EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS = new Set([
   "expert_residency.expired",
   "expert_residency.settled",
 ]);
@@ -600,6 +603,54 @@ const literalText = (node: ts.Expression | undefined): string | undefined =>
     ? node.text
     : undefined;
 
+const isApprovedExpertResidencyRuntimeAuditAction = (
+  path: string,
+  node: ts.StringLiteralLike,
+): boolean => {
+  if (
+    path !==
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts" ||
+    !EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS.has(node.text)
+  ) {
+    return false;
+  }
+  const conditional = node.parent;
+  if (!ts.isConditionalExpression(conditional)) return false;
+  const declaration = conditional.parent;
+  if (
+    !ts.isVariableDeclaration(declaration) ||
+    !ts.isIdentifier(declaration.name) ||
+    declaration.name.text !== "action" ||
+    declaration.initializer !== conditional
+  ) {
+    return false;
+  }
+  let owner: ts.Node | undefined = declaration.parent;
+  while (owner !== undefined && !ts.isMethodDeclaration(owner)) {
+    if (
+      ts.isFunctionDeclaration(owner) ||
+      ts.isFunctionExpression(owner) ||
+      ts.isArrowFunction(owner)
+    ) {
+      return false;
+    }
+    owner = owner.parent;
+  }
+  if (
+    owner === undefined ||
+    !ts.isIdentifier(owner.name) ||
+    owner.name.text !== "auditAndOutbox"
+  ) {
+    return false;
+  }
+  const repositoryClass = owner.parent;
+  return (
+    ts.isClassDeclaration(repositoryClass) &&
+    repositoryClass.name?.text ===
+      "PostgresExpertResidencyProviderInboxRepository"
+  );
+};
+
 const callMethodName = (
   expression: ts.LeftHandSideExpression,
 ): string | undefined => {
@@ -921,7 +972,8 @@ const inspectTypeScript = (
     if (
       (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
       expertResidencyAdminAction.test(node.text) &&
-      !EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS.has(node.text)
+      !EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS.has(node.text) &&
+      !isApprovedExpertResidencyRuntimeAuditAction(path, node)
     ) {
       violations.push(`unapproved expert residency admin action: ${node.text}`);
     }

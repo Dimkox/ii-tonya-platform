@@ -5,6 +5,7 @@ import {
   EXPERT_RESIDENCY_ALLOWED_PATHS,
   EXPERT_RESIDENCY_ALLOWED_RELATIONS,
   EXPERT_RESIDENCY_ALLOWED_ROUTES,
+  EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS,
   classifyPaymentScopeProbe,
 } from "./support/payment-scope-boundary.js";
 
@@ -64,6 +65,8 @@ describe("expert residency referral scope guards", () => {
       "expert_referral.feature_switch",
       "expert_residency.tariff_create",
       "expert_residency.tariff_retire",
+    ]);
+    expect([...EXPERT_RESIDENCY_ALLOWED_RUNTIME_AUDIT_ACTIONS]).toEqual([
       "expert_residency.expired",
       "expert_residency.settled",
     ]);
@@ -118,7 +121,43 @@ describe("expert residency referral scope guards", () => {
     [
       "an unreviewed expert residency audit action",
       "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
-      'export const action = "expert_residency.refunded";',
+      `class SettlementAudit {
+        private auditAndOutbox(result: { kind: "refunded" | "expired" }) {
+          const action = result.kind === "refunded"
+            ? "expert_residency.refunded"
+            : "expert_residency.expired";
+          return action;
+        }
+      }`,
+    ],
+    [
+      "a settlement audit label in an admin-command module",
+      "packages/application/src/expert-residency.ts",
+      `class SettlementAudit {
+        private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+          const action = result.kind === "settled"
+            ? "expert_residency.settled"
+            : "expert_residency.expired";
+          return action;
+        }
+      }`,
+    ],
+    [
+      "a settlement audit label outside the repository audit method",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      'export const action = "expert_residency.settled";',
+    ],
+    [
+      "a settlement audit label in a shadow repository class",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      `class ShadowSettlementAudit {
+        private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+          const action = result.kind === "settled"
+            ? "expert_residency.settled"
+            : "expert_residency.expired";
+          return action;
+        }
+      }`,
     ],
     [
       "an unreviewed expert referral feature flag destructured from process.env",
@@ -156,14 +195,16 @@ describe("expert residency referral scope guards", () => {
       'export const action = "expert_referral.code_revoke";',
     ],
     [
-      "expert residency expiry audit action",
+      "expert residency settlement and expiry audit actions",
       "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
-      'export const action = "expert_residency.expired";',
-    ],
-    [
-      "expert residency settlement audit action",
-      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
-      'export const action = "expert_residency.settled";',
+      `class PostgresExpertResidencyProviderInboxRepository {
+        private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+          const action = result.kind === "settled"
+            ? "expert_residency.settled"
+            : "expert_residency.expired";
+          return action;
+        }
+      }`,
     ],
     [
       "expert referral relation",
