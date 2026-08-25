@@ -44,6 +44,8 @@ interface HeldScenario {
   readonly inviteeId: string;
   readonly orderId: string;
   readonly paymentId: string;
+  readonly cashMinor: string;
+  readonly creditGrantId: string;
   readonly settlement: ReturnType<typeof verifiedEventFixture>;
 }
 
@@ -51,6 +53,7 @@ async function scenario(
   input: {
     readonly rewardEnabled?: boolean;
     readonly abuseHold?: boolean;
+    readonly creditMinor?: bigint;
   } = {},
 ): Promise<HeldScenario> {
   await fixtures.enableFeatureControl();
@@ -60,6 +63,10 @@ async function scenario(
   }
   const inviter = await fixtures.createExpert();
   const invitee = await fixtures.createExpert();
+  const creditMinor = input.creditMinor ?? 0n;
+  const cashMinor = 100_000n - creditMinor;
+  const creditSourceInvitee =
+    creditMinor > 0n ? await fixtures.createExpert() : undefined;
   const tariffId = randomUUID();
   const orderId = randomUUID();
   const attemptId = randomUUID();
@@ -67,11 +74,28 @@ async function scenario(
   const batchId = randomUUID();
   const codeId = randomUUID();
   const referralId = randomUUID();
+  const creditBatchId = randomUUID();
+  const creditCodeId = randomUUID();
+  const creditReferralId = randomUUID();
+  const creditOrderId = randomUUID();
+  const creditAttemptId = randomUUID();
+  const creditMarkerId = randomUUID();
+  const creditGrantId = randomUUID();
+  const creditRewardEntryId = randomUUID();
+  const creditPaymentId = `pay_${randomUUID()}`;
   const approval = await fixtures.createAdminEvidence(
     "expert_residency.tariff_create",
     tariffId,
     { priceMinor: "100000", durationSeconds: 2_592_000 },
   );
+  const creditApproval =
+    creditSourceInvitee === undefined
+      ? undefined
+      : await fixtures.createAdminEvidence(
+          "expert_referral.batch_generate",
+          creditBatchId,
+          { count: 1, overrideId: null },
+        );
   await testDb.db.transaction(async (tx) => {
     await tx.execute(sql`insert into expert_referral_code_batches (
       id, inviter_expert_id, requested_count, issued_by_admin_id, approval_id,
@@ -96,13 +120,79 @@ async function scenario(
       'Hold fixture', 100000, 'RUB', 2592000,
       transaction_timestamp() - interval '1 day', ${approval.adminId}::uuid,
       ${approval.approvalId}::uuid, ${approval.sessionIdHash})`);
+    if (creditSourceInvitee !== undefined) {
+      await tx.execute(sql`insert into expert_referral_code_batches (
+        id, inviter_expert_id, requested_count, issued_by_admin_id, approval_id,
+        admin_session_id_hash
+      ) values (${creditBatchId}::uuid, ${invitee.expertId}::uuid, 1,
+        ${creditApproval!.adminId}::uuid, ${creditApproval!.approvalId}::uuid,
+        ${creditApproval!.sessionIdHash})`);
+      await tx.execute(sql`insert into expert_referral_codes (
+        id, batch_id, inviter_expert_id, code_hash, masked_suffix,
+        hmac_key_version, status, redeemed_at
+      ) values (${creditCodeId}::uuid, ${creditBatchId}::uuid,
+        ${invitee.expertId}::uuid, ${`credit-${creditCodeId}`}, '…cred', 1,
+        'redeemed', transaction_timestamp())`);
+      await tx.execute(sql`insert into expert_referrals (
+        id, code_id, inviter_expert_id, invitee_expert_id
+      ) values (${creditReferralId}::uuid, ${creditCodeId}::uuid,
+        ${invitee.expertId}::uuid, ${creditSourceInvitee.expertId}::uuid)`);
+      await tx.execute(sql`insert into expert_residency_orders (
+        id, expert_id, tariff_version_id, tariff_name, tariff_description,
+        price_minor, currency, duration_seconds, credit_minor, cash_minor,
+        payment_deadline, provider_deadline, idempotency_key, payment_provider,
+        provider_payment_id, status, quoted_at, payment_started_at, settled_at,
+        residency_starts_at, residency_ends_at
+      ) values (${creditOrderId}::uuid, ${creditSourceInvitee.expertId}::uuid,
+        ${tariffId}::uuid, 'Credit source', 'Credit source fixture', 100000,
+        'RUB', 2592000, 0, 100000,
+        transaction_timestamp() + interval '1 day',
+        transaction_timestamp() + interval '1 day',
+        ${`credit-source-${creditOrderId}`}, 'sandbox', ${creditPaymentId},
+        'settled', transaction_timestamp() - interval '1 day',
+        transaction_timestamp() - interval '1 day',
+        transaction_timestamp() - interval '1 day',
+        transaction_timestamp() - interval '1 day',
+        transaction_timestamp() - interval '1 day' + interval '30 days')`);
+      await tx.execute(sql`insert into expert_residency_payment_attempts (
+        id, order_id, provider, provider_request_id, expected_amount_minor,
+        currency, status, idempotency_key
+      ) values (${creditAttemptId}::uuid, ${creditOrderId}::uuid, 'sandbox',
+        ${creditPaymentId}, 100000, 'RUB', 'succeeded',
+        ${`credit-attempt-${creditAttemptId}`})`);
+      await tx.execute(sql`insert into expert_first_residency_settlements (
+        id, expert_id, qualifying_order_id, eligibility_status,
+        eligibility_reason_code, expert_active, expert_verified,
+        unique_identity, abuse_cleared, settled_at
+      ) values (${creditMarkerId}::uuid, ${creditSourceInvitee.expertId}::uuid,
+        ${creditOrderId}::uuid, 'eligible', 'eligible', true, true, true, true,
+        transaction_timestamp() - interval '1 day')`);
+      await tx.execute(sql`insert into expert_referral_reward_grants (
+        id, inviter_expert_id, referral_id, qualifying_order_id,
+        first_settlement_id, amount_minor, granted_at, expires_at
+      ) values (${creditGrantId}::uuid, ${invitee.expertId}::uuid,
+        ${creditReferralId}::uuid, ${creditOrderId}::uuid,
+        ${creditMarkerId}::uuid, 100000,
+        transaction_timestamp() - interval '1 day',
+        transaction_timestamp() - interval '1 day' + interval '365 days')`);
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+        reward_grant_id, idempotency_key
+      ) values (${creditRewardEntryId}::uuid, ${invitee.expertId}::uuid,
+        'reward_grant', 100000, 'reward_grant', ${creditGrantId}::uuid,
+        ${creditGrantId}::uuid, ${`credit-reward-${creditGrantId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${creditRewardEntryId}::uuid, ${creditGrantId}::uuid, 100000)`);
+    }
     await tx.execute(sql`insert into expert_residency_orders (
       id, expert_id, tariff_version_id, tariff_name, tariff_description,
       price_minor, currency, duration_seconds, credit_minor, cash_minor,
       payment_deadline, provider_deadline, idempotency_key, payment_provider,
       provider_payment_id, status, quoted_at, payment_started_at
     ) values (${orderId}::uuid, ${invitee.expertId}::uuid, ${tariffId}::uuid,
-      'Hold', 'Hold fixture', 100000, 'RUB', 2592000, 0, 100000,
+      'Hold', 'Hold fixture', 100000, 'RUB', 2592000, ${creditMinor},
+      ${cashMinor},
       transaction_timestamp() + interval '1 day',
       transaction_timestamp() + interval '1 day', ${`hold-order-${orderId}`},
       'sandbox', ${paymentId}, 'payment_pending', transaction_timestamp(),
@@ -111,7 +201,19 @@ async function scenario(
       id, order_id, provider, provider_request_id, expected_amount_minor,
       currency, status, idempotency_key
     ) values (${attemptId}::uuid, ${orderId}::uuid, 'sandbox', ${paymentId},
-      100000, 'RUB', 'pending', ${`hold-attempt-${attemptId}`})`);
+      ${cashMinor}, 'RUB', 'pending', ${`hold-attempt-${attemptId}`})`);
+    if (creditMinor > 0n) {
+      const reservationId = randomUUID();
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+        idempotency_key
+      ) values (${reservationId}::uuid, ${invitee.expertId}::uuid,
+        'reservation', ${-creditMinor}, 'residency_order', ${orderId}::uuid,
+        ${`credit-reservation-${orderId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${reservationId}::uuid, ${creditGrantId}::uuid, ${creditMinor})`);
+    }
   });
   if (input.abuseHold === true) {
     const holdEvidence = await fixtures.createAdminEvidence(
@@ -132,7 +234,7 @@ async function scenario(
     eventId: `evt_settle_${randomUUID()}`,
     paymentId,
     orderId,
-    amountMinor: "100000",
+    amountMinor: cashMinor.toString(),
     currency: "RUB",
     occurredAt: "2026-08-03T00:00:00.000Z",
     payloadDigest: `sha256:${"c".repeat(64)}`,
@@ -142,6 +244,8 @@ async function scenario(
     inviteeId: invitee.expertId,
     orderId,
     paymentId,
+    cashMinor: cashMinor.toString(),
+    creditGrantId,
     settlement: verifiedEventFixture(raw, {
       verificationId: `verify_${raw.eventId}`,
       verifierKeyVersion: "sandbox-v1",
@@ -166,7 +270,7 @@ function refundEvent(
     eventId: input.eventId ?? `evt_refund_${randomUUID()}`,
     paymentId: scenario.paymentId,
     orderId: scenario.orderId,
-    amountMinor: input.amountMinor ?? "100000",
+    amountMinor: input.amountMinor ?? scenario.cashMinor,
     currency: "RUB" as const,
     occurredAt: "2026-08-03T00:00:02.000Z",
     payloadDigest: `sha256:${(input.digestCharacter ?? "d").repeat(64)}`,
@@ -221,9 +325,12 @@ async function heldFacts(scenario: HeldScenario) {
 
 describe("expert residency held reward replay", () => {
   it.each(["refunded", "charged_back"] as const)(
-    "makes an early terminating %s durable and prevents delayed settlement",
+    "releases credit for an early terminating %s and prevents delayed settlement",
     async (kind) => {
-      const prepared = await scenario({ rewardEnabled: false });
+      const prepared = await scenario({
+        rewardEnabled: false,
+        creditMinor: 50_000n,
+      });
       const repo = new PostgresExpertResidencyProviderInboxRepository(
         testDb.db,
       );
@@ -234,7 +341,7 @@ describe("expert residency held reward replay", () => {
       await expect(repo.refund(event)).resolves.toEqual(first);
       expect(first).toMatchObject({
         kind,
-        cumulativeCashRefundedMinor: "100000",
+        cumulativeCashRefundedMinor: "50000",
         residencyTerminated: true,
         rewardReversed: false,
         eligibilityStatus: "not_first_settlement",
@@ -272,6 +379,13 @@ describe("expert residency held reward replay", () => {
           reversals: number;
           refundInboxStatus: string;
           settlementInboxStatus: string;
+          attemptStatus: string;
+          releases: number;
+          releaseAllocationMinor: string;
+          releaseGrantId: string;
+          spends: number;
+          reservedMinor: string;
+          spendableMinor: string;
         }>(sql`select
           (select status::text from expert_residency_orders
             where id = ${prepared.orderId}::uuid) as status,
@@ -293,7 +407,33 @@ describe("expert residency held reward replay", () => {
           (select processing_status::text
             from expert_residency_provider_event_inbox
             where external_event_id = ${prepared.settlement.eventId})
-            as "settlementInboxStatus"`)
+            as "settlementInboxStatus",
+          (select status::text from expert_residency_payment_attempts
+            where order_id = ${prepared.orderId}::uuid) as "attemptStatus",
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'release'
+              and source_id = ${prepared.orderId}::uuid) as releases,
+          (select coalesce(sum(allocation.amount_minor), 0)::text
+            from expert_referral_ledger_entries release
+            join expert_referral_ledger_allocations allocation
+              on allocation.ledger_entry_id = release.id
+            where release.entry_kind = 'release'
+              and release.source_id = ${prepared.orderId}::uuid)
+            as "releaseAllocationMinor",
+          (select allocation.reward_grant_id::text
+            from expert_referral_ledger_entries release
+            join expert_referral_ledger_allocations allocation
+              on allocation.ledger_entry_id = release.id
+            where release.entry_kind = 'release'
+              and release.source_id = ${prepared.orderId}::uuid)
+            as "releaseGrantId",
+          (select count(*)::integer from expert_referral_ledger_entries
+            where entry_kind = 'spend'
+              and source_id = ${prepared.orderId}::uuid) as spends,
+          (select reserved_balance_minor::text from expert_referral_balances
+            where expert_id = ${prepared.inviteeId}::uuid) as "reservedMinor",
+          (select spendable_balance_minor::text from expert_referral_balances
+            where expert_id = ${prepared.inviteeId}::uuid) as "spendableMinor"`)
       ).rows[0];
       expect(state).toEqual({
         status: kind,
@@ -305,6 +445,13 @@ describe("expert residency held reward replay", () => {
         reversals: 0,
         refundInboxStatus: "processed",
         settlementInboxStatus: "failed",
+        attemptStatus: "cancelled",
+        releases: 1,
+        releaseAllocationMinor: "50000",
+        releaseGrantId: prepared.creditGrantId,
+        spends: 0,
+        reservedMinor: "0",
+        spendableMinor: "100000",
       });
     },
   );

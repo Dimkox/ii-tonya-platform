@@ -797,6 +797,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
           }
         }
       }
+      if (beforeSettlement) {
+        await this.releaseReservation(tx, order, true);
+      }
       await tx.execute(sql`update expert_residency_orders set
         status = ${event.kind}, updated_at = clock_timestamp()
         where id = ${order.orderId}::uuid
@@ -935,8 +938,27 @@ export class PostgresExpertResidencyProviderInboxRepository {
     await tx.execute(sql`update expert_residency_orders set status = 'expired',
       updated_at = clock_timestamp() where id = ${order.orderId}::uuid
         and status in ('quoted', 'payment_pending')`);
+    await this.releaseReservation(tx, order, false);
+  }
+
+  private async releaseReservation(
+    tx: ExpertReferralTransaction,
+    order: OrderRow,
+    requireExact: boolean,
+  ): Promise<void> {
     const reservation = await this.activeReservation(tx, order.orderId);
-    if (reservation === undefined) return;
+    if (reservation === undefined) {
+      if (requireExact && bigint(order.creditMinor) > 0n) {
+        throw new ExpertResidencySettlementError("reservation_mismatch");
+      }
+      return;
+    }
+    if (
+      requireExact &&
+      -bigint(reservation.amountMinor) !== bigint(order.creditMinor)
+    ) {
+      throw new ExpertResidencySettlementError("reservation_mismatch");
+    }
     const releaseId = randomUUID();
     await tx.execute(sql`insert into expert_referral_ledger_entries (
       id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
