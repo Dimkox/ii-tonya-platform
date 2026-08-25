@@ -369,6 +369,10 @@ const approvedMigrationHashes = new Map([
     "6b4eb6c0dde152dd74acc180e1ad9e2bd1dad9d75aa075be0c00b0496967a54a",
   ],
   [
+    "packages/db/migrations/0023_expert-residency-inbox-terminal-immutability.sql",
+    "ffb243224c9ad7a5d87d0648d6d184d5dd9e765fc88d4338a31ed96ee6391d2d",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -457,8 +461,12 @@ const approvedMigrationHashes = new Map([
     "d1fa1060ab4b34e5dbc838b87f810ee234754e40f40af6c0eaea8ae47640516e",
   ],
   [
+    "packages/db/migrations/meta/0023_snapshot.json",
+    "55b86ccfd4967ac8948203599b8d317184ff928e309f0c8731b4cadbfb978240",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "2828eb43879b968ff3a162dc9eee1c7e55091c10d0e22a950f6cfdcaacbf4b5e",
+    "e1bacb5ed35b3a99818aa585e46e3e49b8426fc46f6d0233c000e03bf97d489e",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

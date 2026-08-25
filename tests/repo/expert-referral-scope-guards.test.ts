@@ -64,6 +64,8 @@ describe("expert residency referral scope guards", () => {
       "expert_referral.feature_switch",
       "expert_residency.tariff_create",
       "expert_residency.tariff_retire",
+      "expert_residency.expired",
+      "expert_residency.settled",
     ]);
   });
 
@@ -114,6 +116,11 @@ describe("expert residency referral scope guards", () => {
       "export const action = `expert_referral.export`;",
     ],
     [
+      "an unreviewed expert residency audit action",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      'export const action = "expert_residency.refunded";',
+    ],
+    [
       "an unreviewed expert referral feature flag destructured from process.env",
       "packages/config/src/expert-referrals.ts",
       "const { EXPERT_REFERRAL_EXPORT_ENABLED } = process.env;",
@@ -147,6 +154,16 @@ describe("expert residency referral scope guards", () => {
       "expert referral code revocation action",
       "packages/application/src/expert-referrals.ts",
       'export const action = "expert_referral.code_revoke";',
+    ],
+    [
+      "expert residency expiry audit action",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      'export const action = "expert_residency.expired";',
+    ],
+    [
+      "expert residency settlement audit action",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      'export const action = "expert_residency.settled";',
     ],
     [
       "expert referral relation",

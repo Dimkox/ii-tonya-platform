@@ -162,6 +162,13 @@
       "when": 1787647026460,
       "tag": "0022_expert-residency-durable-outcome-debt",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787648976533,
+      "tag": "0023_expert-residency-inbox-terminal-immutability",
+      "breakpoints": true
     }
   ]
 }

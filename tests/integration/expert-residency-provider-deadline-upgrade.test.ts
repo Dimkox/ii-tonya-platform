@@ -172,11 +172,13 @@ describe("residency provider deadline corrective upgrade", () => {
     const corrective0020 = migrations[20];
     const verification0021 = migrations[21];
     const durableOutcome0022 = migrations[22];
+    const terminalImmutability0023 = migrations[23];
     if (
       original0019 === undefined ||
       corrective0020 === undefined ||
       verification0021 === undefined ||
-      durableOutcome0022 === undefined
+      durableOutcome0022 === undefined ||
+      terminalImmutability0023 === undefined
     ) {
       throw new Error("provider_deadline_migration_metadata_missing");
     }
@@ -221,7 +223,7 @@ describe("residency provider deadline corrective upgrade", () => {
       order by id
     `)
     ).rows;
-    expect(metadataAfter).toHaveLength(23);
+    expect(metadataAfter).toHaveLength(24);
     expect(
       metadataAfter.filter(
         (row) => row.createdAt === String(original0019.folderMillis),
@@ -258,6 +260,18 @@ describe("residency provider deadline corrective upgrade", () => {
         id: 22,
         hash: verification0021.hash,
         createdAt: String(verification0021.folderMillis),
+      },
+    ]);
+    expect(
+      metadataAfter.filter(
+        (row) =>
+          row.createdAt === String(terminalImmutability0023.folderMillis),
+      ),
+    ).toEqual([
+      {
+        id: 24,
+        hash: terminalImmutability0023.hash,
+        createdAt: String(terminalImmutability0023.folderMillis),
       },
     ]);
     const legacyEvent = (
@@ -297,6 +311,17 @@ describe("residency provider deadline corrective upgrade", () => {
       result: null,
       authenticated: false,
     });
+    let terminalMutationError: unknown;
+    try {
+      await upgradeDb.db.execute(sql`update expert_residency_provider_event_inbox
+        set processing_result_code = 'changed_after_upgrade'
+        where external_event_id = ${legacyTerminalEventId}`);
+    } catch (error) {
+      terminalMutationError = error;
+    }
+    expect(messages(terminalMutationError)).toContain(
+      "terminal expert provider event outcome is immutable",
+    );
 
     const after0020 = (
       await upgradeDb.db.execute<{

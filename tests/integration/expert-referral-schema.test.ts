@@ -645,6 +645,96 @@ describe("expert referral and residency schema", () => {
     );
   });
 
+  it("makes terminal provider inbox outcomes immutable while allowing legal transitions", async () => {
+    const terminalId = randomUUID();
+    await testDb.db.execute(sql`insert into expert_residency_provider_event_inbox (
+      id, provider, external_event_id, payload_digest, verification_id,
+      verifier_key_version, verified_at, authenticated, event_kind,
+      processing_status, processing_result_digest, processing_result_code,
+      processing_result, processed_at
+    ) values (${terminalId}::uuid, 'schema', ${`evt-${terminalId}`},
+      ${`sha256:${"a".repeat(64)}`}, ${`verify-${terminalId}`}, 'schema-v1',
+      transaction_timestamp(), true, 'settled', 'processed',
+      ${`sha256:${"b".repeat(64)}`}, 'settled', '{"kind":"settled"}'::jsonb,
+      transaction_timestamp())`);
+
+    const immutableError = {
+      code: "55000",
+      constraint: "expert_provider_event_terminal_immutable",
+    } as const;
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_residency_provider_event_inbox
+          set processing_status = 'processing'
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_residency_provider_event_inbox
+          set processing_result_code = 'expired'
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_residency_provider_event_inbox
+          set processing_result = '{"kind":"expired"}'::jsonb
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_residency_provider_event_inbox
+          set processing_result_digest = ${`sha256:${"c".repeat(64)}`}
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`update expert_residency_provider_event_inbox
+          set processed_at = processed_at + interval '1 second'
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+    await expectDatabaseError(
+      () =>
+        testDb.db.execute(sql`delete from expert_residency_provider_event_inbox
+          where id = ${terminalId}::uuid`),
+      immutableError,
+    );
+
+    const transitioningId = randomUUID();
+    await testDb.db.execute(sql`insert into expert_residency_provider_event_inbox (
+      id, provider, external_event_id, payload_digest, verification_id,
+      verifier_key_version, verified_at, authenticated, event_kind,
+      processing_status
+    ) values (${transitioningId}::uuid, 'schema', ${`evt-${transitioningId}`},
+      ${`sha256:${"d".repeat(64)}`}, ${`verify-${transitioningId}`}, 'schema-v1',
+      transaction_timestamp(), true, 'settled', 'pending')`);
+    await testDb.db.execute(sql`update expert_residency_provider_event_inbox
+      set processing_status = 'processing' where id = ${transitioningId}::uuid`);
+    await testDb.db.execute(sql`update expert_residency_provider_event_inbox
+      set processing_status = 'failed',
+        processing_result_digest = ${`sha256:${"e".repeat(64)}`},
+        processing_result_code = 'schema_failure',
+        processed_at = transaction_timestamp()
+      where id = ${transitioningId}::uuid`);
+    const statuses = (
+      await testDb.db.execute<{ id: string; status: string }>(sql`select
+        id, processing_status::text as status
+        from expert_residency_provider_event_inbox
+        where id in (${terminalId}::uuid, ${transitioningId}::uuid)
+        order by id`)
+    ).rows;
+    expect(statuses).toEqual(
+      [
+        { id: terminalId, status: "processed" },
+        { id: transitioningId, status: "failed" },
+      ].sort((left, right) => left.id.localeCompare(right.id)),
+    );
+  });
+
   it("rejects reused referral identities and an inviter bound to themselves", async () => {
     const inviter = await insertExpert();
     const invitee = await insertExpert();

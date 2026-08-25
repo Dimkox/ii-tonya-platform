@@ -289,6 +289,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
               event,
               inbox.id,
             );
+            await this.flushDeferredSettlementConstraints(effectsTx);
             await this.completeInbox(effectsTx, inbox.id, event, applied);
             return applied;
           });
@@ -306,6 +307,19 @@ export class PostgresExpertResidencyProviderInboxRepository {
       throw new ExpertResidencySettlementError(outcome.error);
     }
     return outcome.result;
+  }
+
+  private async flushDeferredSettlementConstraints(
+    tx: ExpertReferralTransaction,
+  ): Promise<void> {
+    await tx.execute(sql`set constraints
+      expert_ledger_entry_allocation_required,
+      expert_ledger_allocation_total,
+      expert_reward_grant_ledger_required immediate`);
+    await tx.execute(sql`set constraints
+      expert_ledger_entry_allocation_required,
+      expert_ledger_allocation_total,
+      expert_reward_grant_ledger_required deferred`);
   }
 
   private replayOutcome(
@@ -692,24 +706,51 @@ export class PostgresExpertResidencyProviderInboxRepository {
 
     await tx.execute(sql`select id from expert_referral_ledger_entries
       where account_expert_id = ${referral.inviterExpertId}::uuid
-        and entry_kind = 'reversal'
       order by created_at, id for update`);
     const debts = (
       await tx.execute<{
         reversalId: string;
         remainingMinor: bigint | string;
       }>(sql`
-        select reversal.id as "reversalId",
-          (abs(reversal.amount_minor) - coalesce(sum(repayment.amount_minor), 0))::bigint
-            as "remainingMinor"
-        from expert_referral_ledger_entries reversal
-        left join expert_referral_ledger_entries repayment
-          on repayment.original_entry_id = reversal.id
-          and repayment.entry_kind = 'debt_repayment'
-        where reversal.account_expert_id = ${referral.inviterExpertId}::uuid
+        with debt_offsets as (
+          select reversal.source_id as grant_id,
+            coalesce(sum(repayment.amount_minor), 0)::bigint as repaid_minor
+          from expert_referral_ledger_entries repayment
+          join expert_referral_ledger_entries reversal
+            on reversal.id = repayment.original_entry_id
+            and reversal.entry_kind = 'reversal'
+          where repayment.entry_kind = 'debt_repayment'
+            and repayment.account_expert_id = ${referral.inviterExpertId}::uuid
+          group by reversal.source_id
+        ), grant_positions as (
+          select g.id as grant_id,
+            coalesce(sum(case
+              when l.entry_kind = 'release' then 0
+              when l.entry_kind = 'debt_repayment' then -a.amount_minor
+              when l.entry_kind = 'reservation' and exists (
+                select 1 from expert_referral_ledger_entries terminal
+                where terminal.original_entry_id = l.id
+                  and terminal.entry_kind in ('release', 'spend')
+              ) then 0
+              when l.amount_minor < 0 then -a.amount_minor
+              else a.amount_minor
+            end), 0)::bigint + coalesce(debt_offsets.repaid_minor, 0)::bigint
+              as net_minor
+          from expert_referral_reward_grants g
+          left join expert_referral_ledger_allocations a
+            on a.reward_grant_id = g.id
+          left join expert_referral_ledger_entries l on l.id = a.ledger_entry_id
+          left join debt_offsets on debt_offsets.grant_id = g.id
+          where g.inviter_expert_id = ${referral.inviterExpertId}::uuid
+          group by g.id, debt_offsets.repaid_minor
+        )
+        select reversal.id as "reversalId", (-position.net_minor)::bigint
+          as "remainingMinor"
+        from grant_positions position
+        join expert_referral_ledger_entries reversal
+          on reversal.source_id = position.grant_id
           and reversal.entry_kind = 'reversal'
-        group by reversal.id, reversal.amount_minor, reversal.created_at
-        having abs(reversal.amount_minor) > coalesce(sum(repayment.amount_minor), 0)
+        where position.net_minor < 0
         order by reversal.created_at, reversal.id
       `)
     ).rows;

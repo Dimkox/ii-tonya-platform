@@ -78,7 +78,10 @@ async function releaseActiveReservation(orderId: string): Promise<void> {
   });
 }
 
-async function seedSpendableGrant(expertId: string): Promise<{
+async function seedSpendableGrant(
+  expertId: string,
+  input: { expired?: boolean } = {},
+): Promise<{
   grantId: string;
   ledgerId: string;
   orderId: string;
@@ -90,6 +93,11 @@ async function seedSpendableGrant(expertId: string): Promise<{
   const settlementId = randomUUID();
   const grantId = randomUUID();
   const ledgerId = randomUUID();
+  const now = await dbNow();
+  const grantedAt = input.expired
+    ? new Date(now.getTime() - 400 * 86_400_000)
+    : now;
+  const expiresAt = new Date(grantedAt.getTime() + 365 * 86_400_000);
   const evidence = await fixtures.createAdminEvidence(
     "expert_residency.tariff_create",
     tariffId,
@@ -136,8 +144,7 @@ async function seedSpendableGrant(expertId: string): Promise<{
       id, inviter_expert_id, referral_id, qualifying_order_id, first_settlement_id,
       amount_minor, granted_at, expires_at
     ) values (${grantId}::uuid, ${expertId}::uuid, ${referralId}::uuid, ${orderId}::uuid,
-      ${settlementId}::uuid, 100000, transaction_timestamp(),
-      transaction_timestamp() + interval '365 days')`);
+      ${settlementId}::uuid, 100000, ${grantedAt}, ${expiresAt})`);
     await tx.execute(sql`insert into expert_referral_ledger_entries (
       id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
       reward_grant_id, idempotency_key
@@ -148,6 +155,41 @@ async function seedSpendableGrant(expertId: string): Promise<{
     ) values (${ledgerId}::uuid, ${grantId}::uuid, 100000)`);
   });
   return { grantId, ledgerId, orderId };
+}
+
+async function seedHistoricallySpentReversedGrant(
+  expertId: string,
+  input: { spentMinor: bigint; expired?: boolean },
+): Promise<{ grantId: string; ledgerId: string }> {
+  const grant = await seedSpendableGrant(
+    expertId,
+    input.expired === true ? { expired: true } : {},
+  );
+  await testDb.db.transaction(async (tx) => {
+    const reservationId = randomUUID();
+    const spendId = randomUUID();
+    const reversalId = randomUUID();
+    await tx.execute(sql`insert into expert_referral_ledger_entries (
+      id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
+      original_entry_id, idempotency_key
+    ) values
+      (${reservationId}::uuid, ${expertId}::uuid, 'reservation',
+        ${-input.spentMinor}, 'residency_order', ${grant.orderId}::uuid, null,
+        ${`historical-reservation:${grant.orderId}`}),
+      (${spendId}::uuid, ${expertId}::uuid, 'spend', ${-input.spentMinor},
+        'residency_order', ${grant.orderId}::uuid, ${reservationId}::uuid,
+        ${`historical-spend:${grant.orderId}`}),
+      (${reversalId}::uuid, ${expertId}::uuid, 'reversal', -100000,
+        'reward_grant', ${grant.grantId}::uuid, ${grant.ledgerId}::uuid,
+        ${`historical-reversal:${grant.grantId}`})`);
+    await tx.execute(sql`insert into expert_referral_ledger_allocations (
+      ledger_entry_id, reward_grant_id, amount_minor
+    ) values
+      (${reservationId}::uuid, ${grant.grantId}::uuid, ${input.spentMinor}),
+      (${spendId}::uuid, ${grant.grantId}::uuid, ${input.spentMinor}),
+      (${reversalId}::uuid, ${grant.grantId}::uuid, 100000)`);
+  });
+  return { grantId: grant.grantId, ledgerId: grant.ledgerId };
 }
 
 async function seedDebt(expertId: string, debtMinor: bigint): Promise<void> {
@@ -564,6 +606,89 @@ describe("expert residency settlement", () => {
     });
   });
 
+  it("flushes real deferred ledger constraints inside the settlement savepoint", async () => {
+    const prepared = await scenario({ credit: true });
+    await testDb.db.execute(sql`
+      create function test_skip_settlement_spend_allocation()
+      returns trigger language plpgsql as $$
+      begin
+        if exists (
+          select 1 from expert_referral_ledger_entries entry
+          where entry.id = new.ledger_entry_id and entry.entry_kind = 'spend'
+        ) then
+          return null;
+        end if;
+        return new;
+      end;
+      $$
+    `);
+    await testDb.db.execute(sql`
+      create trigger test_skip_settlement_spend_allocation
+      before insert on expert_referral_ledger_allocations
+      for each row execute function test_skip_settlement_spend_allocation()
+    `);
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    const event = verified(prepared.event);
+    try {
+      await expect(repo.settle(event)).rejects.toThrow(
+        "settlement_effect_constraint_failed",
+      );
+    } finally {
+      await testDb.db.execute(sql`drop trigger if exists
+        test_skip_settlement_spend_allocation
+        on expert_referral_ledger_allocations`);
+      await testDb.db.execute(
+        sql`drop function if exists test_skip_settlement_spend_allocation()`,
+      );
+    }
+    await expect(repo.settle(event)).rejects.toThrow(
+      "settlement_effect_constraint_failed",
+    );
+
+    const state = (
+      await testDb.db.execute<{
+        inbox: number;
+        inboxStatus: string | null;
+        resultCode: string | null;
+        orderStatus: string;
+        spends: number;
+        markers: number;
+        grants: number;
+        audits: number;
+        outbox: number;
+      }>(sql`select
+        (select count(*)::integer from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as inbox,
+        (select processing_status::text from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as "inboxStatus",
+        (select processing_result_code from expert_residency_provider_event_inbox
+          where external_event_id = ${prepared.event.eventId}) as "resultCode",
+        (select status::text from expert_residency_orders
+          where id = ${prepared.orderId}::uuid) as "orderStatus",
+        (select count(*)::integer from expert_referral_ledger_entries
+          where source_id = ${prepared.orderId}::uuid and entry_kind = 'spend') as spends,
+        (select count(*)::integer from expert_first_residency_settlements
+          where expert_id = ${prepared.inviteeId}::uuid) as markers,
+        (select count(*)::integer from expert_referral_reward_grants
+          where qualifying_order_id = ${prepared.orderId}::uuid) as grants,
+        (select count(*)::integer from audit_events
+          where object_id = ${prepared.orderId}::uuid) as audits,
+        (select count(*)::integer from integration_outbox
+          where idempotency_key = ${`expert-residency-settled:${prepared.orderId}`}) as outbox`)
+    ).rows[0]!;
+    expect(state).toEqual({
+      inbox: 1,
+      inboxStatus: "failed",
+      resultCode: "settlement_effect_constraint_failed",
+      orderStatus: "payment_pending",
+      spends: 0,
+      markers: 0,
+      grants: 0,
+      audits: 0,
+      outbox: 0,
+    });
+  });
+
   it("replays every deterministic order-state failure with its exact stored code", async () => {
     const prepared = await scenario();
     await testDb.db
@@ -740,6 +865,105 @@ describe("expert residency settlement", () => {
         spendableMinor: expected.spendableAfter,
         grants: 1,
         repayments: 1,
+      });
+    }
+  });
+
+  it("repays only the actual net debt and leaves reward remainder on the new grant", async () => {
+    for (const expiredOldGrant of [false, true]) {
+      const prepared = await scenario();
+      const oldGrant = await seedHistoricallySpentReversedGrant(
+        prepared.inviterId,
+        { spentMinor: 40_000n, expired: expiredOldGrant },
+      );
+      const before = (
+        await testDb.db.execute<{
+          debtMinor: string;
+          spendableMinor: string;
+        }>(sql`select debt_minor::text as "debtMinor",
+          spendable_balance_minor::text as "spendableMinor"
+          from expert_referral_balances
+          where expert_id = ${prepared.inviterId}::uuid`)
+      ).rows[0];
+      expect(before).toEqual({ debtMinor: "40000", spendableMinor: "0" });
+
+      const repo = new PostgresExpertResidencyProviderInboxRepository(
+        testDb.db,
+      );
+      const event = verified(prepared.event);
+      const first = await repo.settle(event);
+      expect(first).toMatchObject({
+        kind: "settled",
+        rewardEffect: { kind: "debt_repaid", amountMinor: "40000" },
+      });
+      await expect(repo.settle(event)).resolves.toEqual(first);
+
+      const facts = (
+        await testDb.db.execute<{
+          debtMinor: string;
+          spendableMinor: string;
+          repaymentCount: number;
+          repaidMinor: string;
+          repaymentAllocationMinor: string;
+          newGrantNetMinor: string;
+          oldGrantNetMinor: string;
+          newGrantLifetimeSeconds: string;
+        }>(sql`
+          with new_grant as (
+            select id, granted_at, expires_at
+            from expert_referral_reward_grants
+            where qualifying_order_id = ${prepared.orderId}::uuid
+          ), repayment as (
+            select l.id, l.amount_minor, l.source_id, reversal.source_id as old_grant_id
+            from expert_referral_ledger_entries l
+            join expert_referral_ledger_entries reversal
+              on reversal.id = l.original_entry_id
+            where l.entry_kind = 'debt_repayment'
+              and l.source_id = (select id from new_grant)
+          ), old_base as (
+            select coalesce(sum(case
+              when l.entry_kind = 'release' then 0
+              when l.entry_kind = 'debt_repayment' then -a.amount_minor
+              when l.entry_kind = 'reservation' and exists (
+                select 1 from expert_referral_ledger_entries terminal
+                where terminal.original_entry_id = l.id
+                  and terminal.entry_kind in ('release', 'spend')
+              ) then 0
+              when l.amount_minor < 0 then -a.amount_minor
+              else a.amount_minor end), 0)::bigint as net_minor
+            from expert_referral_ledger_allocations a
+            join expert_referral_ledger_entries l on l.id = a.ledger_entry_id
+            where a.reward_grant_id = ${oldGrant.grantId}::uuid
+          ) select
+            balance.debt_minor::text as "debtMinor",
+            balance.spendable_balance_minor::text as "spendableMinor",
+            (select count(*)::integer from repayment) as "repaymentCount",
+            (select coalesce(sum(amount_minor), 0)::text from repayment) as "repaidMinor",
+            (select coalesce(sum(a.amount_minor), 0)::text
+              from repayment r join expert_referral_ledger_allocations a
+                on a.ledger_entry_id = r.id
+              where a.reward_grant_id = (select id from new_grant))
+              as "repaymentAllocationMinor",
+            (select (100000 - coalesce(sum(r.amount_minor), 0))::text
+              from repayment r) as "newGrantNetMinor",
+            (select (old_base.net_minor + coalesce(sum(r.amount_minor), 0))::text
+              from old_base cross join repayment r group by old_base.net_minor)
+              as "oldGrantNetMinor",
+            (select extract(epoch from (expires_at - granted_at))::bigint::text
+              from new_grant) as "newGrantLifetimeSeconds"
+          from expert_referral_balances balance
+          where balance.expert_id = ${prepared.inviterId}::uuid
+        `)
+      ).rows[0];
+      expect(facts).toEqual({
+        debtMinor: "0",
+        spendableMinor: "60000",
+        repaymentCount: 1,
+        repaidMinor: "40000",
+        repaymentAllocationMinor: "40000",
+        newGrantNetMinor: "60000",
+        oldGrantNetMinor: "0",
+        newGrantLifetimeSeconds: "31536000",
       });
     }
   });

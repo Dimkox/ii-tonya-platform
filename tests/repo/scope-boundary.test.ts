@@ -321,6 +321,11 @@ describe("MVP scope boundary", () => {
       "packages/db/migrations/0022_expert-residency-durable-outcome-debt.sql",
     ],
     ["snapshot", "packages/db/migrations/meta/0022_snapshot.json"],
+    [
+      "migration",
+      "packages/db/migrations/0023_expert-residency-inbox-terminal-immutability.sql",
+    ],
+    ["snapshot", "packages/db/migrations/meta/0023_snapshot.json"],
     ["journal", "packages/db/migrations/meta/_journal.json"],
   ])(
     "pins and mutation-checks the final expert referral %s",
