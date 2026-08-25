@@ -647,7 +647,8 @@ const isApprovedExpertResidencyRuntimeAuditAction = (
   return (
     ts.isClassDeclaration(repositoryClass) &&
     repositoryClass.name?.text ===
-      "PostgresExpertResidencyProviderInboxRepository"
+      "PostgresExpertResidencyProviderInboxRepository" &&
+    ts.isSourceFile(repositoryClass.parent)
   );
 };
 

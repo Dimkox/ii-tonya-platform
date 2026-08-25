@@ -160,6 +160,21 @@ describe("expert residency referral scope guards", () => {
       }`,
     ],
     [
+      "a settlement audit label in a nested same-name repository class",
+      "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
+      `function hiddenAuditContext() {
+        class PostgresExpertResidencyProviderInboxRepository {
+          private auditAndOutbox(result: { kind: "settled" | "expired" }) {
+            const action = result.kind === "settled"
+              ? "expert_residency.settled"
+              : "expert_residency.expired";
+            return action;
+          }
+        }
+        return PostgresExpertResidencyProviderInboxRepository;
+      }`,
+    ],
+    [
       "a settlement audit label in a nested class static block",
       "packages/db/src/repositories/expert-residency-provider-inbox-repository.ts",
       `class PostgresExpertResidencyProviderInboxRepository {
