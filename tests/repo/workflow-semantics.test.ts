@@ -52,6 +52,13 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain(".claw-client-conversation-node-modules");
     expect(runner).toContain("CLAW_SOURCE_SHA");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("integration_outbox");
+    const gate = read("scripts/assert-client-conversation-postgres.mjs");
+    expect(gate).toContain("information_schema.columns");
+    expect(gate).toContain("pg_constraint");
+    expect(gate).toContain("provider_attempts");
+    expect(gate).toContain("billing_attempts");
+    expect(gate).toContain("outbox_topic_set_mismatch");
+    expect(gate).toContain("invocation_identity_bound");
     expect(runner).toContain("docs/test-evidence/claw/$source_sha");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("160015");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).not.toMatch(/console\.log\(.*url/u);

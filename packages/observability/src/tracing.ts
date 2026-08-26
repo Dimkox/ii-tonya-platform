@@ -1,5 +1,4 @@
-import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
-import { sanitizeTelemetry } from "./logger.js";
+import { SpanStatusCode, trace, type Exception, type Span } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("ii-tonya");
 let shutdownHandler: () => Promise<void> = async () => undefined;
@@ -12,13 +11,10 @@ export async function shutdownTelemetry(): Promise<void> {
   await shutdownHandler();
 }
 
-export function sanitizeTraceException(error: unknown): Record<string, string> {
-  const value = error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError", message: String(error) };
-  const sanitized = sanitizeTelemetry(value) as Record<string, unknown>;
-  return {
-    name: typeof sanitized.name === "string" ? sanitized.name : "[REDACTED]",
-    message: typeof sanitized.message === "string" ? sanitized.message : "[REDACTED]",
-  };
+export function sanitizeTraceException(_error: unknown): Exception {
+  // OTel exporters receive this object verbatim. Never project arbitrary Error
+  // fields: even a non-secret free-text message is untrusted telemetry.
+  return { name: "ClientConversationError", message: "operation_failed" };
 }
 
 export async function traced<T>(name: string, operation: (span: Span) => Promise<T>): Promise<T> {

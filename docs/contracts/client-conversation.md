@@ -461,7 +461,7 @@ authorized.
 
 Development may run and repeat focused/property/concurrency tests as needed without calling the
 Claw/PG release gate. After independent review closes every Critical/Important finding, one total
-immutable `client-conversation` Claw/PostgreSQL 17.5 release-evidence invocation is permitted for
+immutable `client-conversation` Claw/PostgreSQL 16.15 (`server_version_num=160015`) release-evidence invocation is permitted for
 the reviewed SHA/invocation identity. Pass ends the gate. Failure is preserved and blocks this
 story; remediation requires an explicitly approved successor verification identity, new clean
 SHA, delta review and separate authorization, never a silent rerun.

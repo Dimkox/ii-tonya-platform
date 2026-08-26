@@ -21,6 +21,9 @@ Booking implementation must merge/be reviewed before the one next-actual
 migration and combined interface receives Booking/Security approval.
 # Task 6 local implementation status
 
+Local closure fixes are implemented and verified on the successor working tree; the
+immutable Claw/release invocation remains blocked and was not run.
+
 - Privacy/observability and immutable gate changes are locally implemented and structurally verified.
 - Mandatory real-incident AI regressions, prior-release distribution diff, named Product/Safety/Security signoff, broader message-event anonymization, and 35-day backup receipt remain **BLOCKED**.
 - The one `client-conversation` Claw/PostgreSQL invocation is **NOT RUN** and requires separate authorization on the reviewed exact SHA.

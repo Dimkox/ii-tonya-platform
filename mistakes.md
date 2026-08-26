@@ -23,3 +23,11 @@ Root cause: the catalog contract was changed to accept any bounded trimmed non-c
 ## 2026-08-26 — Made a runtime-required alarm optional in the type contract
 
 Root cause: encryption and nonce-collision alarm capabilities were typed as two independent optional properties even though the tool path requires them together. Model coupled capabilities as a discriminated option union so invalid repository composition fails during typechecking.
+
+## 2026-08-26 — Accepted incomplete Task 6 evidence
+
+Root cause: the initial Task 6 owner relied on focused tests and string-only structural assertions and claimed typecheck green without preserving/verifying the actual command result, allowing an incompatible OpenTelemetry type and incomplete gate/privacy evidence.
+
+## 2026-08-26 — Embedded interpolation inside a Drizzle SQL literal
+
+Root cause: a new privacy fixture placed template interpolation inside a quoted SQL string, producing a prepared-statement parameter mismatch. Keep dynamic SQL values as outer tagged-template parameters.
