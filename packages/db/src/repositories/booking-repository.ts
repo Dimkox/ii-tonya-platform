@@ -8,7 +8,7 @@ import {
 } from "@ii-tonya/domain";
 import type {
   ConversationBookingRepository,
-  ConversationBookingResult,
+  ConversationBookingRepositoryResult,
 } from "../../../application/src/client-booking-service.js";
 import type { ClientConversationOperationClaimDetails } from "../../../application/src/client-conversation-authority.js";
 import { frameClientConversationOperation } from "../../../application/src/client-conversation-operation-crypto.js";
@@ -849,7 +849,7 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
 
   async reserveConversation(
     claim: ClientConversationOperationClaimDetails,
-  ): Promise<ConversationBookingResult> {
+  ): Promise<ConversationBookingRepositoryResult> {
     if (!this.conversationBookingEnabled) {
       return { kind: "rejected", code: "feature_disabled" };
     }
@@ -874,7 +874,7 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
         where o.id=${claim.operationId}::uuid
       `)
     ).rows[0];
-    if (candidate === undefined) return { kind: "rejected", code: "not_found" };
+    if (candidate === undefined) return { kind: "authorization_denied" };
 
     try {
       return await this.runSerializable(async (tx) => {
@@ -893,7 +893,7 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
             `)
           ).rows[0];
           if (user?.active !== true) {
-            return { kind: "rejected", code: "not_found" } as const;
+            return { kind: "authorization_denied" } as const;
           }
           const mapping = (
             await tx.execute<ConversationBookingMapping>(sql`
@@ -914,7 +914,7 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
             !CONVERSATION_TOKEN_PATTERN.test(mapping.subjectToken) ||
             Number(mapping.tokenVersion) !== 1
           ) {
-            return { kind: "rejected", code: "not_found" } as const;
+            return { kind: "authorization_denied" } as const;
           }
           const grant = (
             await tx.execute<{
@@ -943,7 +943,7 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
             !Number.isFinite(lockedGrantExpiresAt.getTime()) ||
             lockedGrantExpiresAt.getTime() <= grantNow.getTime()
           ) {
-            return { kind: "rejected", code: "not_found" } as const;
+            return { kind: "authorization_denied" } as const;
           }
           const operation = (
             await tx.execute<{
@@ -959,6 +959,9 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
               claimToken: string | null;
               claimFence: number | string;
               leaseUntil: Date | string | null;
+              reconciliationOwnerId: string | null;
+              reconciliationClaimToken: string | null;
+              reconciliationLeaseUntil: Date | string | null;
               databaseNow: Date | string;
             }>(sql`
               select message_event_id as "messageEventId",binding_id as "bindingId",
@@ -967,6 +970,9 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
                 payload_expires_at as "payloadExpiresAt",status,
                 claim_owner_id as "claimOwnerId",claim_token as "claimToken",
                 claim_fence as "claimFence",lease_until as "leaseUntil",
+                reconciliation_owner_id as "reconciliationOwnerId",
+                reconciliation_claim_token as "reconciliationClaimToken",
+                reconciliation_lease_until as "reconciliationLeaseUntil",
                 clock_timestamp() as "databaseNow"
               from client_conversation_operations
               where id=${claim.operationId}::uuid
@@ -980,6 +986,11 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
             operation?.leaseUntil === null || operation === undefined
               ? null
               : new Date(operation.leaseUntil);
+          const reconciliationLeaseUntil =
+            operation?.reconciliationLeaseUntil === null ||
+            operation === undefined
+              ? null
+              : new Date(operation.reconciliationLeaseUntil);
           const payloadExpiresAt =
             operation === undefined
               ? null
@@ -987,24 +998,36 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
           if (
             operation === undefined ||
             databaseNow === null ||
-            leaseUntil === null ||
             payloadExpiresAt === null ||
             !Number.isFinite(databaseNow.getTime()) ||
             !Number.isFinite(grantExpiresAt.getTime()) ||
-            !Number.isFinite(leaseUntil.getTime()) ||
             !Number.isFinite(payloadExpiresAt.getTime()) ||
             !UUID_PATTERN.test(operation.messageEventId) ||
-            operation.status !== "processing" ||
             operation.bindingId !== candidate.bindingId ||
-            operation.toolKind !== "start_booking" ||
-            operation.requiredScope !== "client_booking:write" ||
-            operation.claimOwnerId !== claim.claimOwnerId ||
-            operation.claimToken !== claim.claimToken ||
             !Number.isSafeInteger(Number(operation.claimFence)) ||
             Number(operation.claimFence) !== claim.claimFence ||
             grantExpiresAt.getTime() <= databaseNow.getTime() ||
-            leaseUntil.getTime() <= databaseNow.getTime() ||
-            payloadExpiresAt.getTime() <= databaseNow.getTime() ||
+            !(
+              (operation.status === "processing" &&
+                operation.claimOwnerId === claim.claimOwnerId &&
+                operation.claimToken === claim.claimToken &&
+                leaseUntil !== null &&
+                Number.isFinite(leaseUntil.getTime()) &&
+                leaseUntil.getTime() > databaseNow.getTime()) ||
+              (operation.status === "reconciling" &&
+                operation.reconciliationOwnerId === claim.claimOwnerId &&
+                operation.reconciliationClaimToken === claim.claimToken &&
+                reconciliationLeaseUntil !== null &&
+                Number.isFinite(reconciliationLeaseUntil.getTime()) &&
+                reconciliationLeaseUntil.getTime() > databaseNow.getTime())
+            ) ||
+            payloadExpiresAt.getTime() <= databaseNow.getTime()
+          ) {
+            return { kind: "authorization_denied" } as const;
+          }
+          if (
+            operation.toolKind !== "start_booking" ||
+            operation.requiredScope !== "client_booking:write" ||
             operation.payloadKeyId === null ||
             !KEY_ID_PATTERN.test(operation.payloadKeyId) ||
             !HASH_PATTERN.test(operation.proposalDigest)

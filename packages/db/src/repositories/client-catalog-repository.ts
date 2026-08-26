@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 
 import type {
   ConversationCatalogRepository,
-  ConversationCatalogResult,
+  ConversationCatalogRepositoryResult,
 } from "../../../application/src/client-catalog-service.js";
 import type { ClientConversationOperationClaimDetails } from "../../../application/src/client-conversation-authority.js";
 import { frameClientConversationOperation } from "../../../application/src/client-conversation-operation-crypto.js";
@@ -420,7 +420,7 @@ export class PostgresClientCatalogRepository
 
   async requestConversation(
     claim: ClientConversationOperationClaimDetails,
-  ): Promise<ConversationCatalogResult> {
+  ): Promise<ConversationCatalogRepositoryResult> {
     if (this.options.conversationCatalogEnabled === false) {
       return { kind: "rejected", code: "feature_disabled" };
     }
@@ -441,7 +441,7 @@ export class PostgresClientCatalogRepository
         where o.id=${claim.operationId}::uuid
       `)
     ).rows[0];
-    if (candidate === undefined) return { kind: "rejected", code: "not_found" };
+    if (candidate === undefined) return { kind: "authorization_denied" };
     const requestDigest = catalogRequestDigest(
       candidate.userId,
       serviceCode,
@@ -450,7 +450,7 @@ export class PostgresClientCatalogRepository
 
     try {
       return await withSerializableRetry(() =>
-        this.db.transaction(async (tx): Promise<ConversationCatalogResult> => {
+        this.db.transaction(async (tx) => {
           await tx.execute(sql`set transaction isolation level serializable`);
           await this.lockRequestPrelock(tx, candidate.userId, requestDigest);
           await tx.execute(sql`set local statement_timeout='2s'`);
@@ -464,8 +464,7 @@ export class PostgresClientCatalogRepository
               select active from users where id=${candidate.userId}::uuid for update
             `)
           ).rows[0];
-          if (user?.active !== true)
-            return { kind: "rejected", code: "not_found" };
+          if (user?.active !== true) return { kind: "authorization_denied" };
 
           const mapping = (
             await tx.execute<ConversationMapping>(sql`
@@ -486,7 +485,7 @@ export class PostgresClientCatalogRepository
             !CONVERSATION_TOKEN_PATTERN.test(mapping.subjectToken) ||
             Number(mapping.tokenVersion) !== 1
           ) {
-            return { kind: "rejected", code: "not_found" };
+            return { kind: "authorization_denied" };
           }
 
           const grant = (
@@ -516,7 +515,7 @@ export class PostgresClientCatalogRepository
             !Number.isFinite(grantExpiresAt.getTime()) ||
             grantExpiresAt.getTime() <= databaseNow.getTime()
           ) {
-            return { kind: "rejected", code: "not_found" };
+            return { kind: "authorization_denied" };
           }
 
           const operation = (
@@ -533,6 +532,9 @@ export class PostgresClientCatalogRepository
               claimToken: string | null;
               claimFence: number | string;
               leaseUntil: Date | string | null;
+              reconciliationOwnerId: string | null;
+              reconciliationClaimToken: string | null;
+              reconciliationLeaseUntil: Date | string | null;
               databaseNow: Date | string;
             }>(sql`
               select message_event_id as "messageEventId",binding_id as "bindingId",
@@ -541,6 +543,9 @@ export class PostgresClientCatalogRepository
                 payload_expires_at as "payloadExpiresAt",status,
                 claim_owner_id as "claimOwnerId",claim_token as "claimToken",
                 claim_fence as "claimFence",lease_until as "leaseUntil",
+                reconciliation_owner_id as "reconciliationOwnerId",
+                reconciliation_claim_token as "reconciliationClaimToken",
+                reconciliation_lease_until as "reconciliationLeaseUntil",
                 clock_timestamp() as "databaseNow"
               from client_conversation_operations
               where id=${claim.operationId}::uuid
@@ -553,6 +558,11 @@ export class PostgresClientCatalogRepository
             operation?.leaseUntil === null || operation === undefined
               ? null
               : new Date(operation.leaseUntil);
+          const reconciliationLeaseUntil =
+            operation?.reconciliationLeaseUntil === null ||
+            operation === undefined
+              ? null
+              : new Date(operation.reconciliationLeaseUntil);
           const payloadExpiresAt =
             operation === undefined
               ? null
@@ -560,23 +570,35 @@ export class PostgresClientCatalogRepository
           if (
             operation === undefined ||
             operationNow === null ||
-            leaseUntil === null ||
             payloadExpiresAt === null ||
             !Number.isFinite(operationNow.getTime()) ||
-            !Number.isFinite(leaseUntil.getTime()) ||
             !Number.isFinite(payloadExpiresAt.getTime()) ||
             !UUID_PATTERN.test(operation.messageEventId) ||
-            operation.status !== "processing" ||
             operation.bindingId !== candidate.bindingId ||
-            operation.toolKind !== "show_catalog" ||
-            operation.requiredScope !== "client_catalog:read" ||
-            operation.claimOwnerId !== claim.claimOwnerId ||
-            operation.claimToken !== claim.claimToken ||
             !Number.isSafeInteger(Number(operation.claimFence)) ||
             Number(operation.claimFence) !== claim.claimFence ||
-            leaseUntil.getTime() <= operationNow.getTime() ||
+            !(
+              (operation.status === "processing" &&
+                operation.claimOwnerId === claim.claimOwnerId &&
+                operation.claimToken === claim.claimToken &&
+                leaseUntil !== null &&
+                Number.isFinite(leaseUntil.getTime()) &&
+                leaseUntil.getTime() > operationNow.getTime()) ||
+              (operation.status === "reconciling" &&
+                operation.reconciliationOwnerId === claim.claimOwnerId &&
+                operation.reconciliationClaimToken === claim.claimToken &&
+                reconciliationLeaseUntil !== null &&
+                Number.isFinite(reconciliationLeaseUntil.getTime()) &&
+                reconciliationLeaseUntil.getTime() > operationNow.getTime())
+            ) ||
             payloadExpiresAt.getTime() <= operationNow.getTime() ||
-            grantExpiresAt.getTime() <= operationNow.getTime() ||
+            grantExpiresAt.getTime() <= operationNow.getTime()
+          ) {
+            return { kind: "authorization_denied" };
+          }
+          if (
+            operation.toolKind !== "show_catalog" ||
+            operation.requiredScope !== "client_catalog:read" ||
             operation.payloadKeyId === null ||
             !KEY_ID_PATTERN.test(operation.payloadKeyId) ||
             !HASH_PATTERN.test(operation.proposalDigest)

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  createConversationCatalogGateway,
+  ClientBookingUnauthorizedError,
+  ClientCatalogUnauthorizedError,
   createClientConversationOperationAuthority,
   type ClaimedConversationOperation,
 } from "../../../packages/application/src/index.js";
@@ -119,6 +120,7 @@ describe("client conversation operation job", () => {
       recorded: 2,
       retryWait: 0,
       unknownOutcome: 0,
+      denied: 0,
       deadLetter: 0,
       stale: 0,
     });
@@ -262,35 +264,41 @@ describe("client conversation operation job", () => {
     expect(operations.recordRetryWait).not.toHaveBeenCalled();
   });
 
-  it("dead-letters a forged repository claim without entering either gateway repository", async () => {
-    const claim = operationClaim("show_catalog");
-    const forged = {
-      ...claim,
-      claim: { operationId: claim.operationId } as ClaimedConversationOperation,
-    };
-    const operations = repository({ dispatch: [forged] });
-    const catalogRepository = { requestConversation: vi.fn() };
-    const catalogGateway = createConversationCatalogGateway({
-      authority,
-      repository: catalogRepository,
-    });
-    const job = createClientConversationOperationsJob({
-      repository: operations,
-      catalogGateway,
-      bookingGateway: { reserve: vi.fn() },
-      ownerId: "worker-1",
-      batchSize: 1,
-    });
+  it.each([
+    ["catalog", "show_catalog", new ClientCatalogUnauthorizedError()],
+    ["booking", "start_booking", new ClientBookingUnauthorizedError()],
+  ] as const)(
+    "records a typed fresh %s authorization denial as grant denied",
+    async (_name, toolKind, authorizationError) => {
+      const claim = operationClaim(toolKind);
+      const operations = repository({ dispatch: [claim] });
+      const job = createClientConversationOperationsJob({
+        repository: operations,
+        catalogGateway: {
+          request: vi.fn(async () => {
+            throw authorizationError;
+          }),
+        },
+        bookingGateway: {
+          reserve: vi.fn(async () => {
+            throw authorizationError;
+          }),
+        },
+        ownerId: "worker-1",
+        batchSize: 1,
+      });
 
-    await job.runDispatch();
+      await expect(job.runDispatch()).resolves.toMatchObject({
+        claimed: 1,
+        denied: 1,
+        deadLetter: 0,
+      });
 
-    expect(operations.recordDeadLetter).toHaveBeenCalledWith(
-      forged,
-      "invalid_operation",
-    );
-    expect(operations.recordUnknownOutcome).not.toHaveBeenCalled();
-    expect(catalogRepository.requestConversation).not.toHaveBeenCalled();
-  });
+      expect(operations.recordGrantDenied).toHaveBeenCalledWith(claim);
+      expect(operations.recordDeadLetter).not.toHaveBeenCalled();
+      expect(operations.recordUnknownOutcome).not.toHaveBeenCalled();
+    },
+  );
 
   it("runs recovery before privacy cleanup without entering an outbox path", async () => {
     const calls: string[] = [];

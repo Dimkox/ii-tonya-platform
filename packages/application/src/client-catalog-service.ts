@@ -35,10 +35,13 @@ export interface ConversationCatalogGateway {
   ): Promise<ConversationCatalogResult>;
 }
 
+export type ConversationCatalogRepositoryResult =
+  ConversationCatalogResult | Readonly<{ kind: "authorization_denied" }>;
+
 export interface ConversationCatalogRepository {
   requestConversation(
     claim: ClientConversationOperationClaimDetails,
-  ): Promise<ConversationCatalogResult>;
+  ): Promise<ConversationCatalogRepositoryResult>;
 }
 
 export const createConversationCatalogGateway = (deps: {
@@ -55,7 +58,12 @@ export const createConversationCatalogGateway = (deps: {
     request(claim: ClaimedConversationOperation) {
       const details = deps.authority.catalog.read(claim);
       if (details === null) throw new ClientCatalogUnauthorizedError();
-      return deps.repository.requestConversation(details);
+      return deps.repository.requestConversation(details).then((result) => {
+        if (result.kind === "authorization_denied") {
+          throw new ClientCatalogUnauthorizedError();
+        }
+        return result;
+      });
     },
   });
 

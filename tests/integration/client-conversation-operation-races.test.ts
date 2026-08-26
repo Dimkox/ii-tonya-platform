@@ -11,6 +11,12 @@ import {
   type ClientConversationOperationKey,
 } from "../../packages/application/src/client-conversation-operation-crypto.js";
 import { createClientConversationOperationAuthority } from "../../packages/application/src/client-conversation-authority.js";
+import { createConversationCatalogGateway } from "../../packages/application/src/client-catalog-service.js";
+import {
+  createClientConversationOperationsJob,
+  type ClientConversationOperationWorkerRepository,
+} from "../../apps/worker/src/client-conversation-operations.js";
+import { PostgresClientCatalogRepository } from "../../packages/db/src/repositories/client-catalog-repository.js";
 import { PostgresClientConversationOperationRepository } from "../../packages/db/src/repositories/client-conversation-operation-repository.js";
 
 let db: TestDatabase;
@@ -35,6 +41,21 @@ const crypto = createClientConversationOperationCrypto({
 const authority = createClientConversationOperationAuthority();
 const repo = () =>
   new PostgresClientConversationOperationRepository(db.db, crypto, authority);
+const workerRepository = (
+  operations: PostgresClientConversationOperationRepository,
+): ClientConversationOperationWorkerRepository => ({
+  claimDispatch: (input) => operations.claimDispatch(input),
+  claimReconciliation: (input) => operations.claimReconciliation(input),
+  recordResult: (claim, result) => operations.recordResult(claim, result),
+  recordGrantDenied: (claim) => operations.recordGrantDenied(claim),
+  recordRetryWait: (claim) => operations.recordRetryWait(claim),
+  recordUnknownOutcome: (claim) => operations.recordUnknownOutcome(claim),
+  recordDeadLetter: (claim, reason) =>
+    operations.recordDeadLetter(claim, reason),
+  recoverExpired: (input) => operations.recoverExpired(input),
+  cleanupExpired: (input) => operations.cleanupExpired(input),
+  heartbeatRuntime: (input) => operations.heartbeatRuntime(input),
+});
 const expectedResultDigest = (
   operationId: string,
   toolKind: string,
@@ -119,6 +140,47 @@ async function seed(
   );
   return operation;
 }
+async function seedWorkerCatalog(suffix: string) {
+  const operationId = await seed(`worker-${suffix}`);
+  const row = (
+    await db.db.execute<{ bindingId: string }>(sql`
+      select binding_id as "bindingId"
+      from client_conversation_operations
+      where id=${operationId}::uuid
+    `)
+  ).rows[0]!;
+  await db.db.execute(sql`
+    insert into client_conversation_grants (
+      provider_subject_mapping_id,scope,expires_at
+    ) values (
+      ${row.bindingId}::uuid,'client_catalog:read',
+      clock_timestamp()+interval '1 hour'
+    )
+  `);
+  return { operationId, bindingId: row.bindingId };
+}
+const catalogGateway = () =>
+  createConversationCatalogGateway({
+    authority,
+    repository: new PostgresClientCatalogRepository(db.db),
+  });
+const operationState = async (operationId: string) =>
+  (
+    await db.db.execute<{
+      status: string;
+      terminalReason: string | null;
+      ciphertext: Buffer | null;
+      cases: string;
+      catalogRequests: string;
+    }>(sql`
+      select status,terminal_reason as "terminalReason",
+        payload_ciphertext as ciphertext,
+        (select count(*)::text from client_conversation_operation_cases
+          where operation_id=${operationId}::uuid) as cases,
+        (select count(*)::text from client_catalog_requests) as "catalogRequests"
+      from client_conversation_operations where id=${operationId}::uuid
+    `)
+  ).rows[0]!;
 beforeAll(async () => {
   db = await startTestPostgres();
   await db.migrate();
@@ -127,6 +189,168 @@ beforeEach(async () => db.reset());
 afterAll(async () => db.stop(), 60000);
 
 describe("client conversation operation races (real PostgreSQL)", () => {
+  it.each(["revoked", "expired", "missing"] as const)(
+    "runDispatch records a %s catalog grant as denied/grant_denied",
+    async (grantState) => {
+      const fixture = await seedWorkerCatalog(grantState);
+      if (grantState === "revoked") {
+        await db.db.execute(sql`
+          update client_conversation_grants set revoked_at=clock_timestamp()
+          where provider_subject_mapping_id=${fixture.bindingId}::uuid
+        `);
+      } else if (grantState === "expired") {
+        await db.db.execute(sql`
+          update client_conversation_grants
+          set created_at=clock_timestamp()-interval '2 hours',
+            expires_at=clock_timestamp()-interval '1 hour'
+          where provider_subject_mapping_id=${fixture.bindingId}::uuid
+        `);
+      } else {
+        await db.db.execute(sql`
+          delete from client_conversation_grants
+          where provider_subject_mapping_id=${fixture.bindingId}::uuid
+        `);
+      }
+      const operations = repo();
+      const job = createClientConversationOperationsJob({
+        repository: workerRepository(operations),
+        catalogGateway: catalogGateway(),
+        bookingGateway: {
+          reserve: async () => ({ kind: "rejected", code: "conflict" }),
+        },
+        ownerId: "dispatch-worker",
+        batchSize: 1,
+      });
+
+      await expect(job.runDispatch()).resolves.toMatchObject({
+        claimed: 1,
+        denied: 1,
+        deadLetter: 0,
+      });
+      expect(await operationState(fixture.operationId)).toMatchObject({
+        status: "denied",
+        terminalReason: "grant_denied",
+        ciphertext: null,
+        cases: "1",
+        catalogRequests: "0",
+      });
+    },
+  );
+
+  it("reconciles the exact frozen call after downstream commit then throw", async () => {
+    const fixture = await seedWorkerCatalog("commit-then-throw");
+    const actualGateway = catalogGateway();
+    const calls: Array<ReturnType<typeof authority.catalog.read>> = [];
+    let throwAfterCommit = true;
+    const gateway = {
+      async request(claim: Parameters<typeof actualGateway.request>[0]) {
+        calls.push(authority.catalog.read(claim));
+        const result = await actualGateway.request(claim);
+        if (throwAfterCommit) {
+          throwAfterCommit = false;
+          throw new Error("receipt_ack_lost");
+        }
+        return result;
+      },
+    };
+    const operations = repo();
+    const job = createClientConversationOperationsJob({
+      repository: workerRepository(operations),
+      catalogGateway: gateway,
+      bookingGateway: {
+        reserve: async () => ({ kind: "rejected", code: "conflict" }),
+      },
+      ownerId: "dispatch-worker",
+      batchSize: 1,
+    });
+
+    await expect(job.runDispatch()).resolves.toMatchObject({
+      unknownOutcome: 1,
+    });
+    expect(await operationState(fixture.operationId)).toMatchObject({
+      status: "unknown_outcome",
+      terminalReason: null,
+      catalogRequests: "1",
+    });
+    expect(
+      (await operationState(fixture.operationId)).ciphertext,
+    ).not.toBeNull();
+
+    await expect(job.runReconciliation()).resolves.toMatchObject({
+      claimed: 1,
+      recorded: 1,
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toMatchObject({
+      operationId: calls[0]!.operationId,
+      toolKind: calls[0]!.toolKind,
+      requiredScope: calls[0]!.requiredScope,
+      frozenInput: calls[0]!.frozenInput,
+    });
+    expect(await operationState(fixture.operationId)).toMatchObject({
+      status: "succeeded",
+      ciphertext: null,
+      catalogRequests: "1",
+    });
+  });
+
+  it("does not overwrite succeeded after recordResult commits then throws", async () => {
+    const fixture = await seedWorkerCatalog("record-ack-loss");
+    const operations = repo();
+    const delegated = workerRepository(operations);
+    const ackLossRepository: ClientConversationOperationWorkerRepository = {
+      ...delegated,
+      async recordResult(claim, result) {
+        expect(await operations.recordResult(claim, result)).toBe("committed");
+        throw new Error("database_ack_lost");
+      },
+    };
+    const job = createClientConversationOperationsJob({
+      repository: ackLossRepository,
+      catalogGateway: catalogGateway(),
+      bookingGateway: {
+        reserve: async () => ({ kind: "rejected", code: "conflict" }),
+      },
+      ownerId: "dispatch-worker",
+      batchSize: 1,
+    });
+
+    await expect(job.runDispatch()).resolves.toMatchObject({
+      recorded: 0,
+      unknownOutcome: 0,
+      stale: 1,
+    });
+    expect(await operationState(fixture.operationId)).toMatchObject({
+      status: "succeeded",
+      terminalReason: null,
+      ciphertext: null,
+      catalogRequests: "1",
+    });
+  });
+
+  it("keeps a worker success terminal after grant revocation commits later", async () => {
+    const fixture = await seedWorkerCatalog("mutation-first");
+    const operations = repo();
+    const job = createClientConversationOperationsJob({
+      repository: workerRepository(operations),
+      catalogGateway: catalogGateway(),
+      bookingGateway: {
+        reserve: async () => ({ kind: "rejected", code: "conflict" }),
+      },
+      ownerId: "dispatch-worker",
+      batchSize: 1,
+    });
+    await expect(job.runDispatch()).resolves.toMatchObject({ recorded: 1 });
+    await db.db.execute(sql`
+      update client_conversation_grants set revoked_at=clock_timestamp()
+      where provider_subject_mapping_id=${fixture.bindingId}::uuid
+    `);
+    expect(await operationState(fixture.operationId)).toMatchObject({
+      status: "succeeded",
+      terminalReason: null,
+      catalogRequests: "1",
+    });
+  });
   it("claims exactly once under concurrent dispatch", async () => {
     await seed("one");
     const [a, b] = await Promise.all([

@@ -8,7 +8,10 @@ import {
   type ClaimedConversationOperation,
 } from "../../packages/application/src/client-conversation-authority.js";
 import { frameClientConversationOperation } from "../../packages/application/src/client-conversation-operation-crypto.js";
-import { createConversationCatalogGateway } from "../../packages/application/src/client-catalog-service.js";
+import {
+  ClientCatalogUnauthorizedError,
+  createConversationCatalogGateway,
+} from "../../packages/application/src/client-catalog-service.js";
 import {
   ConversationCatalogRetryableError,
   PostgresClientCatalogRepository,
@@ -247,13 +250,9 @@ describe("conversation catalog gateway (real PostgreSQL)", () => {
   ])("denies %s with no catalog mutation", async (_name, mutate) => {
     const fixture = await seed(randomUUID());
     await mutate(fixture);
-    expect(await gateway().request(fixture.claim)).toEqual({
-      kind: "rejected",
-      code:
-        _name === "stale fence" || _name === "expired lease"
-          ? "conflict"
-          : "not_found",
-    });
+    await expect(gateway().request(fixture.claim)).rejects.toBeInstanceOf(
+      ClientCatalogUnauthorizedError,
+    );
     expect(await mutationCount()).toBe(0);
   });
 
@@ -278,10 +277,9 @@ describe("conversation catalog gateway (real PostgreSQL)", () => {
       set provider='other-provider',tenant_token=null,token_version=null
       where id=${wrongMapping.bindingId}::uuid
     `);
-    expect(await gateway().request(wrongMapping.claim)).toEqual({
-      kind: "rejected",
-      code: "not_found",
-    });
+    await expect(gateway().request(wrongMapping.claim)).rejects.toBeInstanceOf(
+      ClientCatalogUnauthorizedError,
+    );
 
     const tampered = await seed("tampered-proposal");
     await testDb.db.execute(sql`

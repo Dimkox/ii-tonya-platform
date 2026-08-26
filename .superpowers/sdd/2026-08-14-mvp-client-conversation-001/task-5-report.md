@@ -239,3 +239,37 @@ GREEN evidence:
 Changed files: `apps/worker/src/client-conversation-operations.ts`, `apps/worker/src/client-conversation-operations.test.ts`, `apps/worker/src/main.ts`, `apps/worker/src/main.test.ts`, `apps/worker/src/runtime.ts`, `apps/worker/src/runtime.test.ts`, `apps/worker/src/index.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/client-conversation-operation-repository.ts`, `tests/integration/client-conversation-operation-races.test.ts`, this report.
 
 Concern: live dispatch remains intentionally fail-closed unless the production factory is supplied an approved operation-crypto capability plus exact build SHA and instance ID. No secret source, provider, release, push or external state was added in this slice.
+
+## Final whole-Task-5 review fix wave
+
+Status: GREEN
+
+RED evidence:
+
+- `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts` — 1 file, 2 failed / 15 passed. A typed `ClientCatalogUnauthorizedError` incremented `deadLetter` and called `recordDeadLetter(..., "invalid_operation")`; the report had no denied count.
+- `corepack pnpm exec vitest run tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 2 files, 15 failed / 20 passed. Fresh revoked, expired or missing/wrong grants, inactive users, erased/wrong mappings and stale claim fences resolved as ordinary `not_found`/`conflict` business results instead of typed authorization denial.
+- The first migration-backed worker run of `tests/integration/client-conversation-operation-races.test.ts` exposed a second state-machine fault: downstream catalog mutation committed and dispatch correctly became `unknown_outcome`, but reconciliation was denied because both gateways checked only the dispatch `processing` tuple and ignored the live reconciliation owner/token/lease tuple.
+
+Implementation:
+
+- Dispatch and reconciliation now map the existing catalog/booking typed authorization errors to fenced `recordGrantDenied`, report the denied transition, and leave `invalid_operation` to operation claim shape/crypto validation before claims are emitted.
+- The application repository seam has an internal `authorization_denied` outcome. Catalog and booking PostgreSQL repositories use it only for freshly locked user/mapping/grant and owner/token/fence/lease/payload authority failure; application gateways convert it to their existing typed unauthorized errors. Downstream `not_found`, `conflict`, and `feature_disabled` results remain ordinary business results recorded as `succeeded`.
+- Both gateway transactions now accept exactly one live authority tuple: dispatch `processing` plus dispatch owner/token/lease, or reconciliation `reconciling` plus reconciliation owner/token/lease. Tool/scope/proposal shape failures remain rejected claim-validation outcomes and do not get relabeled as lifecycle denial.
+- Real PostgreSQL worker evidence covers revoked, expired and missing grants becoming `denied/grant_denied` with crypto cleared and one operator case; post-downstream-commit exception becoming `unknown_outcome` with crypto retained; exact frozen reconciliation replay producing one idempotent catalog request and final success; and `recordResult` commit/ACK loss leaving the fallback unknown write stale so it cannot overwrite `succeeded`.
+- Lifecycle ordering is explicit at worker state level: revocation committed first yields denied with no catalog mutation, while catalog mutation/result committed first remains succeeded after later revocation.
+
+GREEN evidence:
+
+- Final fingerprint-bound run: `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/application/src/client-catalog-service.test.ts packages/application/src/client-booking-service.test.ts tests/integration/client-conversation-operation-races.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 8 files, 116 tests passed.
+- `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts packages/application/src/client-catalog-service.test.ts packages/application/src/client-booking-service.test.ts tests/integration/client-conversation-operation-races.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 6 files, 93 tests passed, including 52 migration-backed PostgreSQL operation/catalog/booking tests.
+- `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts` — 3 files, 39 tests passed.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed after removing three unused type/test parameters; no suppressions.
+- Prettier over every changed TypeScript file and `git diff --check` — passed.
+
+The root `corepack pnpm typecheck` launcher itself cannot find its nested bare `pnpm` in this shell (`sh: 1: pnpm: not found`), so the two exact commands comprising that script were run through Corepack and passed as recorded above.
+
+Changed files: `apps/worker/src/client-conversation-operations.ts`, `apps/worker/src/client-conversation-operations.test.ts`, `packages/application/src/client-catalog-service.ts`, `packages/application/src/client-booking-service.ts`, `packages/db/src/repositories/client-catalog-repository.ts`, `packages/db/src/repositories/booking-repository.ts`, `tests/integration/client-conversation-operation-races.test.ts`, `tests/integration/client-conversation-catalog-gateway.test.ts`, `tests/integration/client-conversation-booking-gateway.test.ts`, this report.
+
+Concern: no new provider, outbox topic, worker registry path, release action or external state was introduced. The gateway repository-only authorization outcome is intentionally not part of the public conversation operation result union.

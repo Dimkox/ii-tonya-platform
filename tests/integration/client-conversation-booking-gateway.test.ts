@@ -8,7 +8,10 @@ import {
   type ClaimedConversationOperation,
 } from "../../packages/application/src/client-conversation-authority.js";
 import { frameClientConversationOperation } from "../../packages/application/src/client-conversation-operation-crypto.js";
-import { createConversationBookingGateway } from "../../packages/application/src/client-booking-service.js";
+import {
+  ClientBookingUnauthorizedError,
+  createConversationBookingGateway,
+} from "../../packages/application/src/client-booking-service.js";
 import {
   ConversationBookingRetryableError,
   PostgresBookingRepository,
@@ -277,10 +280,9 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
     async (kind) => {
       const fixture = await seed(`first-${kind}`);
       await runLifecycle(fixture, kind);
-      await expect(gateway().reserve(fixture.claim)).resolves.toEqual({
-        kind: "rejected",
-        code: "not_found",
-      });
+      await expect(gateway().reserve(fixture.claim)).rejects.toBeInstanceOf(
+        ClientBookingUnauthorizedError,
+      );
       expect(await counts()).toMatchObject({
         reservations: "0",
         receipts: "0",
@@ -298,7 +300,6 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
             expires_at=clock_timestamp()-interval '1 hour'
           where provider_subject_mapping_id=${f.bindingId}::uuid
         `),
-      "not_found",
     ],
     [
       "wrong grant",
@@ -316,7 +317,6 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
           )
         `);
       },
-      "not_found",
     ],
     [
       "wrong mapping",
@@ -326,7 +326,6 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
           set provider='other-provider',tenant_token=null,token_version=null
           where id=${f.bindingId}::uuid
         `),
-      "not_found",
     ],
     [
       "stale fence",
@@ -335,7 +334,6 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
           update client_conversation_operations set claim_fence=2
           where id=${f.operationId}::uuid
         `),
-      "conflict",
     ],
     [
       "expired lease",
@@ -345,15 +343,13 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
           set lease_until=clock_timestamp()-interval '1 second'
           where id=${f.operationId}::uuid
         `),
-      "conflict",
     ],
-  ])("denies %s before booking mutation", async (_name, mutate, code) => {
+  ])("denies %s before booking mutation", async (_name, mutate) => {
     const fixture = await seed(randomUUID());
     await mutate(fixture);
-    await expect(gateway().reserve(fixture.claim)).resolves.toEqual({
-      kind: "rejected",
-      code,
-    });
+    await expect(gateway().reserve(fixture.claim)).rejects.toBeInstanceOf(
+      ClientBookingUnauthorizedError,
+    );
     expect(await counts()).toMatchObject({ reservations: "0", receipts: "0" });
   });
 

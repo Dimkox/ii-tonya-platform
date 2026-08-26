@@ -49,6 +49,7 @@ export type ClientConversationOperationRunReport = Readonly<{
   recorded: number;
   retryWait: number;
   unknownOutcome: number;
+  denied: number;
   deadLetter: number;
   stale: number;
 }>;
@@ -58,6 +59,7 @@ type MutableRunReport = {
   recorded: number;
   retryWait: number;
   unknownOutcome: number;
+  denied: number;
   deadLetter: number;
   stale: number;
 };
@@ -67,6 +69,7 @@ const emptyRunReport = (claimed: number): MutableRunReport => ({
   recorded: 0,
   retryWait: 0,
   unknownOutcome: 0,
+  denied: 0,
   deadLetter: 0,
   stale: 0,
 });
@@ -87,7 +90,7 @@ const isPreCallRetry = (error: unknown): boolean =>
   error instanceof ConversationCatalogRetryableError ||
   error instanceof ConversationBookingRetryableError;
 
-const isInvalidClaim = (error: unknown): boolean =>
+const isAuthorizationDenied = (error: unknown): boolean =>
   error instanceof ClientCatalogUnauthorizedError ||
   error instanceof ClientBookingUnauthorizedError;
 
@@ -115,11 +118,11 @@ export function createClientConversationOperationsJob(deps: {
         await deps.repository.recordResult(claim, result),
       );
     } catch (error) {
-      if (isInvalidClaim(error)) {
+      if (isAuthorizationDenied(error)) {
         recordTransition(
           report,
-          "deadLetter",
-          await deps.repository.recordDeadLetter(claim, "invalid_operation"),
+          "denied",
+          await deps.repository.recordGrantDenied(claim),
         );
       } else if (isPreCallRetry(error)) {
         recordTransition(
@@ -149,11 +152,11 @@ export function createClientConversationOperationsJob(deps: {
         await deps.repository.recordResult(claim, result),
       );
     } catch (error) {
-      if (isInvalidClaim(error)) {
+      if (isAuthorizationDenied(error)) {
         recordTransition(
           report,
-          "deadLetter",
-          await deps.repository.recordDeadLetter(claim, "invalid_operation"),
+          "denied",
+          await deps.repository.recordGrantDenied(claim),
         );
       } else {
         recordTransition(

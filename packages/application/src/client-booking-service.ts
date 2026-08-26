@@ -81,10 +81,13 @@ export interface ConversationBookingGateway {
   ): Promise<ConversationBookingResult>;
 }
 
+export type ConversationBookingRepositoryResult =
+  ConversationBookingResult | Readonly<{ kind: "authorization_denied" }>;
+
 export interface ConversationBookingRepository {
   reserveConversation(
     claim: ClientConversationOperationClaimDetails,
-  ): Promise<ConversationBookingResult>;
+  ): Promise<ConversationBookingRepositoryResult>;
 }
 
 export const createConversationBookingGateway = (deps: {
@@ -101,7 +104,12 @@ export const createConversationBookingGateway = (deps: {
     reserve(claim: ClaimedConversationOperation) {
       const details = deps.authority.booking.read(claim);
       if (details === null) throw new ClientBookingUnauthorizedError();
-      return deps.repository.reserveConversation(details);
+      return deps.repository.reserveConversation(details).then((result) => {
+        if (result.kind === "authorization_denied") {
+          throw new ClientBookingUnauthorizedError();
+        }
+        return result;
+      });
     },
   });
 
