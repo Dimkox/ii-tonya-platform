@@ -72,8 +72,7 @@ describe("conversation message repository", () => {
       correlationId: "ignored-on-authoritative-replay",
       outcome: {
         kind: "start_booking",
-        topic: "booking.start",
-        payload: { expertId: "different-request" },
+        payload: { choiceHandle: `ch1.${"A".repeat(43)}` },
       },
     });
 

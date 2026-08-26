@@ -386,6 +386,7 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0019_expert_order_provider_deadline.sql",
     "packages/db/migrations/0021_expert_settlement_snapshot.sql",
     "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+    "packages/db/migrations/0032_client_conversation.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {

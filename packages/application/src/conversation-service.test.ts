@@ -3,10 +3,77 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ConversationServiceError,
   createConversationService,
+  validateIntentProposal,
 } from "./conversation-service.js";
 import { conversationFixture } from "./conversation-service.testkit.js";
 
 describe("conversation workflow", () => {
+  const validAuthorization = {
+    allowedExpertIds: ["b7ab91db-4988-4ec6-bf23-42d2ea3333a1"],
+    allowedServiceCodes: ["consultation"],
+  } as const;
+
+  it("accepts only an opaque choice handle for a booking tool proposal", () => {
+    const proposal = {
+      kind: "start_booking",
+      choiceHandle: `ch1.${"A".repeat(43)}`,
+    };
+
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
+      accepted: true,
+      proposal,
+    });
+  });
+
+  it("accepts catalog language without introducing provider or user identity", () => {
+    const proposal = {
+      kind: "show_catalog",
+      serviceCode: "consultation",
+      language: "ru",
+    };
+
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
+      accepted: true,
+      proposal,
+    });
+  });
+
+  it("accepts trimmed non-control catalog values at the exact contract boundary", () => {
+    const proposal = {
+      kind: "show_catalog",
+      serviceCode: "deep tissue",
+      language: "pt_BR",
+    };
+
+    expect(
+      validateIntentProposal(proposal, {
+        ...validAuthorization,
+        allowedServiceCodes: ["deep tissue"],
+      }),
+    ).toEqual({ accepted: true, proposal });
+  });
+
+  it.each([
+    { kind: "start_booking", expertId: "b7ab91db-4988-4ec6-bf23-42d2ea3333a1" },
+    {
+      kind: "start_booking",
+      choiceHandle: `ch1.${"A".repeat(43)}`,
+      userId: "user-1",
+    },
+    { kind: "show_catalog", providerId: "provider-1" },
+    { kind: "show_catalog", internalId: "row-1" },
+    { kind: "show_catalog", amount: 100 },
+    { kind: "show_catalog", paymentId: "payment-1" },
+    { kind: "show_catalog", url: "https://provider.invalid/catalog" },
+    { kind: "show_catalog", idempotencyKey: "model-key" },
+    { kind: "show_catalog", choiceHandle: `ch1.${"A".repeat(43)}` },
+  ])("rejects forbidden or mixed tool proposal keys %#", (proposal) => {
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
+      accepted: false,
+      reasonCode: "invalid_shape",
+    });
+  });
+
   it("validates bounded canonical input before every effect", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
     const service = createConversationService(deps);
@@ -377,13 +444,11 @@ describe("conversation workflow", () => {
       const deps = conversationFixture({ balance: 0, safety: "ordinary" });
       if (source === "deterministic") {
         deps.deterministicSafety.detect = (() =>
-          "arbitrary_reason") as unknown as
-          typeof deps.deterministicSafety.detect;
+          "arbitrary_reason") as unknown as typeof deps.deterministicSafety.detect;
       } else {
-        deps.typedSafety.classify = vi
-          .fn()
-          .mockResolvedValue({ risk: "arbitrary_reason" }) as unknown as
-          typeof deps.typedSafety.classify;
+        deps.typedSafety.classify = vi.fn().mockResolvedValue({
+          risk: "arbitrary_reason",
+        }) as unknown as typeof deps.typedSafety.classify;
       }
 
       const result = await createConversationService(deps).handleInbound(
@@ -645,9 +710,9 @@ describe("conversation workflow", () => {
   it("keeps current runtime outbound billing disabled even for delivered telemetry", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
 
-    const result = await createConversationService(
-      deps,
-    ).handleOutboundDelivery(deps.delivery);
+    const result = await createConversationService(deps).handleOutboundDelivery(
+      deps.delivery,
+    );
 
     expect(result).toEqual({ kind: "billing_disabled", chargedMessages: 0 });
     expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
@@ -660,7 +725,11 @@ describe("conversation workflow", () => {
       ...deps,
       handoffOwnerId: "bad owner",
       handoffAcknowledgeWithinMs: 0,
-      clock: { now: () => { throw new Error("clock unavailable"); } },
+      clock: {
+        now: () => {
+          throw new Error("clock unavailable");
+        },
+      },
     });
 
     const result = await service.handleOutboundDelivery(deps.delivery);
@@ -751,7 +820,7 @@ describe("conversation workflow", () => {
     expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
   });
 
-  it("omits an absent optional service code from the durable payload", async () => {
+  it("keeps a catalog proposal out of the integration outbox", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
     deps.intentEngine.propose = vi
       .fn()
@@ -762,10 +831,8 @@ describe("conversation workflow", () => {
     );
 
     expect(result).toEqual({ kind: "catalog_requested", chargedMessages: 1 });
-    expect(deps.outbox.payloads()[0]).not.toHaveProperty("serviceCode");
-    expect(deps.outbox.payloads()[0]).toMatchObject({
-      allowedServiceCodes: ["consultation"],
-    });
+    expect(deps.outbox.topics()).toEqual([]);
+    expect(deps.outbox.payloads()).toEqual([]);
   });
 
   it("classifies port failures without exposing credentials", async () => {

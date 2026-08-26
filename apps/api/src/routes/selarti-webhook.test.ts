@@ -110,6 +110,7 @@ describe("Selarti client conversation webhook", () => {
       providerEventId: event.providerEventId,
       providerMessageId: event.providerMessageId,
       userId: "10000000-0000-4000-8000-000000000002",
+      bindingId: "10000000-0000-4000-8000-000000000001",
       text: "hello",
     });
     expect(command).not.toHaveProperty("channelUserId");

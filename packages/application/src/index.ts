@@ -6,6 +6,7 @@ export * from "./client-catalog-service.js";
 export * from "./client-booking-service.js";
 export * from "./client-session-service.js";
 export * from "./client-conversation-authority.js";
+export * from "./client-conversation-operation-crypto.js";
 export * from "./conversation-service.js";
 export * from "./ports.js";
 export * from "./privacy-service.js";

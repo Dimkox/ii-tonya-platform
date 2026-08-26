@@ -69,9 +69,7 @@ export interface ConversationFixture extends ConversationDependencies {
 export const conversationFixture = (input: {
   readonly balance: number;
   readonly safety: "ordinary" | "crisis";
-  readonly outboundBillingMode?:
-    | "disabled"
-    | "provider_delivery_event";
+  readonly outboundBillingMode?: "disabled" | "provider_delivery_event";
 }): ConversationFixture => {
   const calls: string[] = [];
   let balance = input.balance;
@@ -183,10 +181,7 @@ export const conversationFixture = (input: {
         };
       }
 
-      if (
-        command.outcome.kind === "no_package" &&
-        balance > 0
-      ) {
+      if (command.outcome.kind === "no_package" && balance > 0) {
         return {
           kind: "retry" as const,
           messageEventId: command.messageEventId,
@@ -209,16 +204,20 @@ export const conversationFixture = (input: {
       }
       pending.state = "completed";
       messageAuditActions.push("conversation.inbound_completed");
-      const outboxKey =
-        `${command.messageEventId}:${committedOutcome.topic}`;
-      outboxByKey.set(outboxKey, {
-        topic: committedOutcome.topic,
-        charge: 0,
-        payload: {
-          messageEventId: command.messageEventId,
-          ...committedOutcome.payload,
-        },
-      });
+      if (
+        committedOutcome.kind !== "show_catalog" &&
+        committedOutcome.kind !== "start_booking"
+      ) {
+        const outboxKey = `${command.messageEventId}:${committedOutcome.topic}`;
+        outboxByKey.set(outboxKey, {
+          topic: committedOutcome.topic,
+          charge: 0,
+          payload: {
+            messageEventId: command.messageEventId,
+            ...committedOutcome.payload,
+          },
+        });
+      }
       if (committedOutcome.kind === "human_handoff") {
         handoff = {
           status: "opened",
@@ -288,7 +287,9 @@ export const conversationFixture = (input: {
       ).length,
     grantMessages(count) {
       if (!Number.isSafeInteger(count) || count <= 0) {
-        throw new Error("Granted message count must be a positive safe integer");
+        throw new Error(
+          "Granted message count must be a positive safe integer",
+        );
       }
       balance += count;
     },
@@ -331,6 +332,7 @@ export const conversationFixture = (input: {
       providerEventId: "inbound-event-1",
       providerMessageId: "provider-message-in-1",
       userId: "user-1",
+      bindingId: "10000000-0000-4000-8000-000000000003",
       text: "Мне нужна консультация",
       locale: "ru-RU",
       countryCode: "RU",

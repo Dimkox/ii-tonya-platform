@@ -184,6 +184,7 @@ export const selartiWebhookRoutes: FastifyPluginAsync<{
             providerEventId: authenticated.event.providerEventId,
             providerMessageId: authenticated.event.providerMessageId,
             userId: identity.identity.userId,
+            bindingId: identity.identity.bindingId,
             text: authenticated.event.text,
             locale: "ru",
             countryCode: "RU",

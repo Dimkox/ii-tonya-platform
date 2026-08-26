@@ -46,16 +46,14 @@ export type InboundCompletionOutcome =
     }
   | {
       kind: "show_catalog";
-      topic: "catalog.show";
       payload: {
         serviceCode?: string;
-        allowedServiceCodes: readonly string[];
+        language?: string;
       };
     }
   | {
       kind: "start_booking";
-      topic: "booking.start";
-      payload: { expertId: string };
+      payload: { choiceHandle: `ch1.${string}` };
     }
   | {
       kind: "human_handoff";
@@ -68,6 +66,7 @@ export type InboundCompletionOutcome =
 
 export interface CompleteInboundCommand {
   messageEventId: string;
+  bindingId?: string;
   userId: string;
   correlationId: string;
   outcome: InboundCompletionOutcome;
@@ -138,12 +137,44 @@ export interface MessageRepository {
   ): Promise<{ ledgerBalance: number }>;
 }
 
-export interface MessageRepositoryOptions {
+interface MessageRepositoryHooks {
   beforeCompleteCommit?: () => void | Promise<void>;
   afterCompleteCommit?: (
     result: Extract<CompleteInboundResult, { kind: "completed" }>,
   ) => void | Promise<void>;
 }
+
+interface ConversationOperationCrypto {
+  encrypt(input: {
+    operationId: string;
+    messageEventId: string;
+    bindingId: string;
+    payloadExpiresAt: string;
+    proposal:
+      | { kind: "show_catalog"; serviceCode?: string; language?: string }
+      | { kind: "start_booking"; choiceHandle: `ch1.${string}` };
+  }): Promise<{
+    envelopeVersion: 1;
+    keyId: string;
+    nonce: Buffer;
+    ciphertext: Buffer;
+    tag: Buffer;
+    requiredScope: "client_catalog:read" | "client_booking:write";
+    proposalDigest: string;
+  }>;
+}
+
+export type MessageRepositoryOptions = MessageRepositoryHooks &
+  (
+    | {
+        conversationOperationCrypto?: undefined;
+        onConversationOperationNonceCollision?: undefined;
+      }
+    | {
+        conversationOperationCrypto: ConversationOperationCrypto;
+        onConversationOperationNonceCollision: () => void;
+      }
+  );
 
 type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   transaction: infer T,
@@ -165,6 +196,14 @@ type CompletionEvent = {
 
 export class CompensationConflictError extends Error {}
 export class ConversationCompletionDataError extends Error {}
+export class ConversationOperationNonceCollisionError extends Error {
+  readonly code = "conversation_operation_nonce_collision" as const;
+
+  constructor() {
+    super("Client conversation operation nonce collision");
+    this.name = "ConversationOperationNonceCollisionError";
+  }
+}
 
 function hash(parts: unknown): string {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
@@ -180,6 +219,23 @@ function hasCode(error: unknown, code: string): boolean {
   ) {
     seen.add(current);
     if ((current as { code?: unknown }).code === code) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+function hasConstraint(error: unknown, constraint: string): boolean {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
+    seen.add(current);
+    if ((current as { constraint?: unknown }).constraint === constraint) {
+      return true;
+    }
     current = (current as { cause?: unknown }).cause;
   }
   return false;
@@ -279,35 +335,6 @@ function parseStoredCompletion(
     };
   } else if (outcomeKind === "no_package" && topic === "client.no_package") {
     outcome = { kind: "no_package", topic, payload: {} };
-  } else if (outcomeKind === "show_catalog" && topic === "catalog.show") {
-    const serviceCode = payload.serviceCode;
-    if (serviceCode !== undefined && typeof serviceCode !== "string") {
-      throw new ConversationCompletionDataError(
-        "Stored conversation completion serviceCode is invalid",
-      );
-    }
-    if (
-      !Array.isArray(payload.allowedServiceCodes) ||
-      payload.allowedServiceCodes.some((value) => typeof value !== "string")
-    ) {
-      throw new ConversationCompletionDataError(
-        "Stored conversation completion allowedServiceCodes is invalid",
-      );
-    }
-    outcome = {
-      kind: "show_catalog",
-      topic,
-      payload: {
-        ...(serviceCode === undefined ? {} : { serviceCode }),
-        allowedServiceCodes: payload.allowedServiceCodes as string[],
-      },
-    };
-  } else if (outcomeKind === "start_booking" && topic === "booking.start") {
-    outcome = {
-      kind: "start_booking",
-      topic,
-      payload: { expertId: storedString(payload.expertId, "expertId") },
-    };
   } else if (
     outcomeKind === "human_handoff" &&
     topic === "human_handoff.opened"
@@ -456,15 +483,17 @@ export class PostgresMessageRepository implements MessageRepository {
   async completeInbound(
     command: CompleteInboundCommand,
   ): Promise<CompleteInboundResult> {
-    const result = await withSerializableRetry(() =>
-      this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
-        );
-        const event = one(
-          (
-            await tx.execute<CompletionEvent>(sql`
+    let result: CompleteInboundResult;
+    try {
+      result = await withSerializableRetry(() =>
+        this.db.transaction(async (tx) => {
+          await tx.execute(sql`set transaction isolation level serializable`);
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
+          );
+          const event = one(
+            (
+              await tx.execute<CompletionEvent>(sql`
               select
                 e.user_id as "userId",
                 e.provider,
@@ -478,82 +507,99 @@ export class PostgresMessageRepository implements MessageRepository {
                 and e.direction = 'inbound'
               for update of e, i
             `)
-          ).rows,
-          "a prepared inbound message",
-        );
-        if (event.userId !== command.userId) {
-          throw new ConversationCompletionDataError(
-            "Prepared inbound message belongs to another user",
+            ).rows,
+            "a prepared inbound message",
           );
-        }
-        const existing = await this.storedCompletion(
-          tx,
-          command.messageEventId,
-        );
-        if (existing !== undefined) {
-          return {
-            kind: "duplicate" as const,
-            messageEventId: existing.messageEventId,
-          };
-        }
-        if (await this.hasAccountingFact(tx, command.messageEventId)) {
-          throw new ConversationCompletionDataError(
-            "Inbound accounting fact exists without a completion outbox record",
-          );
-        }
-
-        let charged:
-          { packageId: string | null; ledgerBalance: number } | undefined;
-        let outcome = command.outcome;
-        if (outcome.kind === "no_package") {
-          if (
-            await this.packageAvailable(tx, command.userId, event.occurredAt)
-          ) {
-            return {
-              kind: "retry" as const,
-              messageEventId: command.messageEventId,
-              packageAvailable: true as const,
-            };
+          if (event.userId !== command.userId) {
+            throw new ConversationCompletionDataError(
+              "Prepared inbound message belongs to another user",
+            );
           }
-          charged = await this.free(tx, command.messageEventId, "inbound");
-        } else {
-          charged = await this.debit(
+          const existing = await this.storedCompletion(
             tx,
-            command.userId,
-            event.occurredAt,
             command.messageEventId,
-            "inbound",
-            `inbound:${event.provider}:${event.externalMessageId}`,
           );
-          if (charged.packageId === null) {
-            charged = await this.free(tx, command.messageEventId, "inbound");
-            outcome = {
-              kind: "no_package",
-              topic: "client.no_package",
-              payload: {},
+          if (existing !== undefined) {
+            return {
+              kind: "duplicate" as const,
+              messageEventId: existing.messageEventId,
             };
           }
+          if (await this.hasAccountingFact(tx, command.messageEventId)) {
+            throw new ConversationCompletionDataError(
+              "Inbound accounting fact exists without a completion outbox record",
+            );
+          }
+
+          let charged:
+            { packageId: string | null; ledgerBalance: number } | undefined;
+          let outcome = command.outcome;
+          if (outcome.kind === "no_package") {
+            if (
+              await this.packageAvailable(tx, command.userId, event.occurredAt)
+            ) {
+              return {
+                kind: "retry" as const,
+                messageEventId: command.messageEventId,
+                packageAvailable: true as const,
+              };
+            }
+            charged = await this.free(tx, command.messageEventId, "inbound");
+          } else {
+            charged = await this.debit(
+              tx,
+              command.userId,
+              event.occurredAt,
+              command.messageEventId,
+              "inbound",
+              `inbound:${event.provider}:${event.externalMessageId}`,
+            );
+            if (charged.packageId === null) {
+              charged = await this.free(tx, command.messageEventId, "inbound");
+              outcome = {
+                kind: "no_package",
+                topic: "client.no_package",
+                payload: {},
+              };
+            }
+          }
+          if (outcome.kind === "human_handoff") {
+            await this.persistHandoff(tx, command, event.payloadHash, outcome);
+          }
+          if (
+            outcome.kind === "show_catalog" ||
+            outcome.kind === "start_booking"
+          ) {
+            await this.persistConversationOperation(tx, command, outcome);
+          }
+          await this.auditCompletionAndOutbox(
+            tx,
+            command,
+            event,
+            outcome,
+            charged,
+          );
+          await this.options.beforeCompleteCommit?.();
+          return {
+            kind: "completed" as const,
+            messageEventId: command.messageEventId,
+            packageId: charged.packageId,
+            ledgerBalance: charged.ledgerBalance,
+            result: committedResultFor(outcome),
+          };
+        }),
+      );
+    } catch (error) {
+      if (hasConstraint(error, "client_conversation_operations_nonce_unique")) {
+        try {
+          this.options.onConversationOperationNonceCollision?.();
+        } catch {
+          // Preserve the fixed fail-closed collision result.
         }
-        if (outcome.kind === "human_handoff") {
-          await this.persistHandoff(tx, command, event.payloadHash, outcome);
-        }
-        await this.auditCompletionAndOutbox(
-          tx,
-          command,
-          event,
-          outcome,
-          charged,
-        );
-        await this.options.beforeCompleteCommit?.();
-        return {
-          kind: "completed" as const,
-          messageEventId: command.messageEventId,
-          packageId: charged.packageId,
-          ledgerBalance: charged.ledgerBalance,
-          result: committedResultFor(outcome),
-        };
-      }),
-    );
+        throw new ConversationOperationNonceCollisionError();
+      }
+      throw error;
+    }
     if (result.kind === "completed") {
       await this.options.afterCompleteCommit?.(result);
     }
@@ -688,7 +734,7 @@ export class PostgresMessageRepository implements MessageRepository {
   private async storedCompletion(
     tx: Transaction,
     messageEventId: string,
-  ): Promise<StoredCompletion | undefined> {
+  ): Promise<{ messageEventId: string } | undefined> {
     const stored = (
       await tx.execute<{ topic: string; payload: unknown }>(sql`
         select topic, payload
@@ -696,9 +742,97 @@ export class PostgresMessageRepository implements MessageRepository {
         where idempotency_key = ${`conversation:${messageEventId}`}
       `)
     ).rows[0];
-    return stored === undefined
-      ? undefined
-      : parseStoredCompletion(messageEventId, stored.topic, stored.payload);
+    if (stored !== undefined) {
+      return parseStoredCompletion(
+        messageEventId,
+        stored.topic,
+        stored.payload,
+      );
+    }
+    const operation = (
+      await tx.execute<{ messageEventId: string }>(sql`
+        select message_event_id as "messageEventId"
+        from client_conversation_operations
+        where message_event_id=${messageEventId}::uuid
+      `)
+    ).rows[0];
+    return operation;
+  }
+
+  private async persistConversationOperation(
+    tx: Transaction,
+    command: CompleteInboundCommand,
+    outcome: Extract<
+      InboundCompletionOutcome,
+      { kind: "show_catalog" | "start_booking" }
+    >,
+  ): Promise<void> {
+    if (
+      command.bindingId === undefined ||
+      this.options.conversationOperationCrypto === undefined ||
+      this.options.onConversationOperationNonceCollision === undefined
+    ) {
+      throw new ConversationCompletionDataError(
+        "Conversation operation capability is unavailable",
+      );
+    }
+    one(
+      (
+        await tx.execute<{ bindingId: string }>(sql`
+          select m.id as "bindingId"
+          from users u
+          join provider_subject_mappings m on m.user_id=u.id
+          where u.id=${command.userId}::uuid
+            and u.active=true
+            and m.id=${command.bindingId}::uuid
+            and m.provider='selarti.client-thread.v1'
+          for update of u,m
+        `)
+      ).rows,
+      "an active client conversation binding",
+    );
+    const identity = one(
+      (
+        await tx.execute<{
+          operationId: string;
+          payloadExpiresAt: Date | string;
+        }>(sql`
+          select
+            gen_random_uuid() as "operationId",
+            transaction_timestamp()+interval '24 hours' as "payloadExpiresAt"
+        `)
+      ).rows,
+      "a conversation operation identity",
+    );
+    const payloadExpiresAt = new Date(identity.payloadExpiresAt);
+    if (!Number.isFinite(payloadExpiresAt.getTime())) {
+      throw new ConversationCompletionDataError(
+        "Conversation operation expiry is invalid",
+      );
+    }
+    const encrypted = await this.options.conversationOperationCrypto.encrypt({
+      operationId: identity.operationId,
+      messageEventId: command.messageEventId,
+      bindingId: command.bindingId,
+      payloadExpiresAt: payloadExpiresAt.toISOString(),
+      proposal:
+        outcome.kind === "show_catalog"
+          ? { kind: "show_catalog", ...outcome.payload }
+          : { kind: "start_booking", ...outcome.payload },
+    });
+    await tx.execute(sql`
+      insert into client_conversation_operations (
+        id,message_event_id,binding_id,required_scope,tool_kind,proposal_digest,
+        payload_envelope_version,payload_key_id,payload_nonce,payload_ciphertext,
+        payload_tag,payload_expires_at,status
+      ) values (
+        ${identity.operationId}::uuid,${command.messageEventId}::uuid,
+        ${command.bindingId}::uuid,${encrypted.requiredScope},${outcome.kind},
+        ${encrypted.proposalDigest},${encrypted.envelopeVersion},${encrypted.keyId},
+        ${encrypted.nonce},${encrypted.ciphertext},${encrypted.tag},
+        ${payloadExpiresAt},'pending'
+      )
+    `);
   }
 
   private async persistHandoff(
@@ -824,6 +958,9 @@ export class PostgresMessageRepository implements MessageRepository {
         ${completionHash}
       )
     `);
+    if (outcome.kind === "show_catalog" || outcome.kind === "start_booking") {
+      return;
+    }
     await tx.execute(sql`
       insert into integration_outbox (
         idempotency_key,

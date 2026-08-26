@@ -202,7 +202,9 @@ export async function startMvpHarness(input: {
         select expires_at as "expiresAt" from message_packages
         where id = ${result.packageId}::uuid
       `);
-      return { expiresAt: postgresInstant(stored.rows[0]!.expiresAt).toISOString() };
+      return {
+        expiresAt: postgresInstant(stored.rows[0]!.expiresAt).toISOString(),
+      };
     },
 
     async acceptOrdinaryInbound(command: {
@@ -215,6 +217,7 @@ export async function startMvpHarness(input: {
         providerEventId: command.providerEventId,
         providerMessageId: `${command.providerEventId}:message`,
         userId: command.client.userId,
+        bindingId: "10000000-0000-4000-8000-000000000003",
         text: command.text,
         locale: "ru-RU",
         countryCode: "RU",

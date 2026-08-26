@@ -24,6 +24,13 @@ const stableKey = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const locale = /^[a-z]{2}(?:-[A-Z]{2})?$/u;
 const countryCode = /^[A-Z]{2}$/u;
 const boundedCode = /^[a-z][a-z0-9_-]{0,63}$/u;
+const choiceHandle = /^ch1\.[A-Za-z0-9_-]{43}$/u;
+const proposalControlCharacters = /[\u0000-\u001F\u007F-\u009F]/u;
+const boundedProposalValue = (value: string, maximum: number): boolean =>
+  value.length >= 1 &&
+  value.length <= maximum &&
+  value.trim() === value &&
+  !proposalControlCharacters.test(value);
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const instructionOverride =
@@ -69,9 +76,7 @@ export type IntentProposalValidation =
 export class ConversationServiceError extends Error {
   readonly retryable: boolean;
 
-  constructor(
-    readonly code: "invalid_input" | "dependency_unavailable",
-  ) {
+  constructor(readonly code: "invalid_input" | "dependency_unavailable") {
     super(
       code === "invalid_input"
         ? "Invalid conversation input"
@@ -112,11 +117,10 @@ const validateAuthorizationScope = (
     ) ||
     !value.allowedServiceCodes.every(
       (code): code is string =>
-        typeof code === "string" && boundedCode.test(code),
+        typeof code === "string" && boundedProposalValue(code, 64),
     ) ||
     new Set(value.allowedExpertIds).size !== value.allowedExpertIds.length ||
-    new Set(value.allowedServiceCodes).size !==
-      value.allowedServiceCodes.length
+    new Set(value.allowedServiceCodes).size !== value.allowedServiceCodes.length
   ) {
     return null;
   }
@@ -150,15 +154,6 @@ const validateIntentProposalUnsafe = (
   if (!isRecord(value) || typeof value.kind !== "string") {
     return { accepted: false, reasonCode: "invalid_shape" };
   }
-  const earlyRejection = capabilityRejection(
-    Object.values(value).filter(
-      (part): part is string => typeof part === "string",
-    ),
-  );
-  if (earlyRejection) {
-    return { accepted: false, reasonCode: earlyRejection };
-  }
-
   let proposal: IntentProposal;
   if (value.kind === "answer") {
     if (
@@ -166,35 +161,44 @@ const validateIntentProposalUnsafe = (
       typeof value.text !== "string" ||
       value.text.trim().length === 0 ||
       value.text.length > MAX_ANSWER_TEXT_LENGTH ||
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(
-        value.text,
-      )
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value.text)
     ) {
       return { accepted: false, reasonCode: "invalid_shape" };
     }
     proposal = { kind: "answer", text: value.text };
   } else if (value.kind === "show_catalog") {
     if (
-      !hasExactKeys(value, ["kind"], ["serviceCode"]) ||
+      !hasExactKeys(value, ["kind"], ["serviceCode", "language"]) ||
       (value.serviceCode !== undefined &&
         (typeof value.serviceCode !== "string" ||
-          !boundedCode.test(value.serviceCode)))
+          !boundedProposalValue(value.serviceCode, 64))) ||
+      (value.language !== undefined &&
+        (typeof value.language !== "string" ||
+          !boundedProposalValue(value.language, 32)))
     ) {
       return { accepted: false, reasonCode: "invalid_shape" };
     }
-    proposal =
-      value.serviceCode === undefined
-        ? { kind: "show_catalog" }
-        : { kind: "show_catalog", serviceCode: value.serviceCode as string };
+    proposal = {
+      kind: "show_catalog",
+      ...(value.serviceCode === undefined
+        ? {}
+        : { serviceCode: value.serviceCode as string }),
+      ...(value.language === undefined
+        ? {}
+        : { language: value.language as string }),
+    };
   } else if (value.kind === "start_booking") {
     if (
-      !hasExactKeys(value, ["kind", "expertId"]) ||
-      typeof value.expertId !== "string" ||
-      !uuid.test(value.expertId)
+      !hasExactKeys(value, ["kind", "choiceHandle"]) ||
+      typeof value.choiceHandle !== "string" ||
+      !choiceHandle.test(value.choiceHandle)
     ) {
       return { accepted: false, reasonCode: "invalid_shape" };
     }
-    proposal = { kind: "start_booking", expertId: value.expertId };
+    proposal = {
+      kind: "start_booking",
+      choiceHandle: value.choiceHandle as `ch1.${string}`,
+    };
   } else if (value.kind === "human_handoff") {
     if (
       !hasExactKeys(value, ["kind", "reasonCode"]) ||
@@ -216,12 +220,6 @@ const validateIntentProposalUnsafe = (
   if (rejection) return { accepted: false, reasonCode: rejection };
   const authorized = validateAuthorizationScope(authorization);
   if (authorized === null) {
-    return { accepted: false, reasonCode: "unauthorized_scope" };
-  }
-  if (
-    proposal.kind === "start_booking" &&
-    !authorized.allowedExpertIds.includes(proposal.expertId)
-  ) {
     return { accepted: false, reasonCode: "unauthorized_scope" };
   }
   if (
@@ -256,6 +254,7 @@ const validateInbound = (command: HandleInboundCommand): void => {
       "providerEventId",
       "providerMessageId",
       "userId",
+      "bindingId",
       "text",
       "locale",
       "countryCode",
@@ -272,6 +271,8 @@ const validateInbound = (command: HandleInboundCommand): void => {
     !stableKey.test(command.providerMessageId) ||
     typeof command.userId !== "string" ||
     !stableKey.test(command.userId) ||
+    typeof command.bindingId !== "string" ||
+    !uuid.test(command.bindingId) ||
     typeof command.text !== "string" ||
     command.text.trim().length === 0 ||
     command.text.length > MAX_INBOUND_TEXT_LENGTH ||
@@ -323,9 +324,14 @@ const validateOutbound = (event: CanonicalOutboundDelivery): void => {
     typeof event.correlationId !== "string" ||
     !stableKey.test(event.correlationId) ||
     typeof event.status !== "string" ||
-    !["accepted", "queued", "sent", "delivered", "failed", "ambiguous"].includes(
-      event.status,
-    )
+    ![
+      "accepted",
+      "queued",
+      "sent",
+      "delivered",
+      "failed",
+      "ambiguous",
+    ].includes(event.status)
   ) {
     throw new ConversationServiceError("invalid_input");
   }
@@ -341,9 +347,7 @@ interface RuntimeConfig {
   readonly approvedSafetyContactIds: ReadonlySet<string>;
 }
 
-const readRuntimeConfig = (
-  deps: ConversationDependencies,
-): RuntimeConfig => {
+const readRuntimeConfig = (deps: ConversationDependencies): RuntimeConfig => {
   if (
     typeof deps.handoffOwnerId !== "string" ||
     !uuid.test(deps.handoffOwnerId) ||
@@ -356,18 +360,13 @@ const readRuntimeConfig = (
     ) ||
     new Set(deps.approvedSafetyContactIds).size !==
       deps.approvedSafetyContactIds.length ||
-    !["disabled", "provider_delivery_event"].includes(
-      deps.outboundBillingMode,
-    )
+    !["disabled", "provider_delivery_event"].includes(deps.outboundBillingMode)
   ) {
     throw dependencyFailure();
   }
   try {
     const now = deps.clock.now();
-    if (
-      !(now instanceof Date) ||
-      !Number.isFinite(now.getTime())
-    ) {
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
       throw dependencyFailure();
     }
     const stableNow = new Date(now.getTime());
@@ -435,9 +434,8 @@ const selectSafetyContacts = async (
   readonly contacts: readonly VerifiedSafetyContact[];
   readonly directoryState: "fresh" | "no_fresh_contact" | "unavailable";
 }> => {
-  const risk = reasonCode === "classifier_unavailable"
-    ? "uncertain"
-    : reasonCode;
+  const risk =
+    reasonCode === "classifier_unavailable" ? "uncertain" : reasonCode;
   try {
     const candidates = await deps.safetyDirectory.list({
       countryCode: command.countryCode,
@@ -448,7 +446,7 @@ const selectSafetyContacts = async (
     });
     const contacts = candidates
       .filter((candidate) =>
-        isVerifiedSafetyContact(candidate, command, risk, runtime)
+        isVerifiedSafetyContact(candidate, command, risk, runtime),
       )
       .map(({ id, label, channel, value }) => ({
         id,
@@ -510,6 +508,7 @@ const completeInbound = async (
   try {
     const completed = await deps.messageRepository.completeInbound({
       messageEventId,
+      bindingId: command.bindingId,
       userId: command.userId,
       correlationId: command.correlationId,
       outcome,
@@ -533,6 +532,7 @@ const completeNoPackage = async (
   try {
     const completed = await deps.messageRepository.completeInbound({
       messageEventId,
+      bindingId: command.bindingId,
       userId: command.userId,
       correlationId: command.correlationId,
       outcome: {
@@ -561,9 +561,13 @@ export const createConversationService = (
 
     let risk: "ordinary" | SafetyRisk;
     try {
-      const deterministic: unknown =
-        deps.deterministicSafety.detect(command.text);
-      if (deterministic !== null && !safetyRisks.has(deterministic as SafetyRisk)) {
+      const deterministic: unknown = deps.deterministicSafety.detect(
+        command.text,
+      );
+      if (
+        deterministic !== null &&
+        !safetyRisks.has(deterministic as SafetyRisk)
+      ) {
         throw new Error("Invalid deterministic safety result");
       }
       const classified: unknown =
@@ -618,35 +622,25 @@ export const createConversationService = (
       });
       const validated = validateAuthorizationScope(candidate);
       if (validated === null) {
-        return completeInbound(
-          deps,
-          command,
-          prepared.messageEventId,
-          {
-            kind: "human_handoff",
-            topic: "human_handoff.opened",
-            payload: { reasonCode: "unauthorized_scope" },
-            ownerId: runtime.handoffOwnerId,
-            openedAt: runtime.now,
-            acknowledgeBy: runtime.acknowledgeBy,
-          },
-        );
-      }
-      authorization = validated;
-    } catch {
-      return completeInbound(
-        deps,
-        command,
-        prepared.messageEventId,
-        {
+        return completeInbound(deps, command, prepared.messageEventId, {
           kind: "human_handoff",
           topic: "human_handoff.opened",
-          payload: { reasonCode: "intent_unavailable" },
+          payload: { reasonCode: "unauthorized_scope" },
           ownerId: runtime.handoffOwnerId,
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
-        },
-      );
+        });
+      }
+      authorization = validated;
+    } catch {
+      return completeInbound(deps, command, prepared.messageEventId, {
+        kind: "human_handoff",
+        topic: "human_handoff.opened",
+        payload: { reasonCode: "intent_unavailable" },
+        ownerId: runtime.handoffOwnerId,
+        openedAt: runtime.now,
+        acknowledgeBy: runtime.acknowledgeBy,
+      });
     }
 
     let validation: IntentProposalValidation;
@@ -659,56 +653,38 @@ export const createConversationService = (
         dataSubjectUserId: command.userId,
         authorization,
       });
-      validation = validateIntentProposal(
-        proposal,
-        authorization,
-      );
+      validation = validateIntentProposal(proposal, authorization);
     } catch {
-      return completeInbound(
-        deps,
-        command,
-        prepared.messageEventId,
-        {
-          kind: "human_handoff",
-          topic: "human_handoff.opened",
-          payload: { reasonCode: "intent_unavailable" },
-          ownerId: runtime.handoffOwnerId,
-          openedAt: runtime.now,
-          acknowledgeBy: runtime.acknowledgeBy,
-        },
-      );
+      return completeInbound(deps, command, prepared.messageEventId, {
+        kind: "human_handoff",
+        topic: "human_handoff.opened",
+        payload: { reasonCode: "intent_unavailable" },
+        ownerId: runtime.handoffOwnerId,
+        openedAt: runtime.now,
+        acknowledgeBy: runtime.acknowledgeBy,
+      });
     }
     if (!validation.accepted) {
-      return completeInbound(
-        deps,
-        command,
-        prepared.messageEventId,
-        {
-          kind: "human_handoff",
-          topic: "human_handoff.opened",
-          payload: { reasonCode: validation.reasonCode },
-          ownerId: runtime.handoffOwnerId,
-          openedAt: runtime.now,
-          acknowledgeBy: runtime.acknowledgeBy,
-        },
-      );
+      return completeInbound(deps, command, prepared.messageEventId, {
+        kind: "human_handoff",
+        topic: "human_handoff.opened",
+        payload: { reasonCode: validation.reasonCode },
+        ownerId: runtime.handoffOwnerId,
+        openedAt: runtime.now,
+        acknowledgeBy: runtime.acknowledgeBy,
+      });
     }
 
     const proposal = validation.proposal;
     if (proposal.kind === "human_handoff") {
-      return completeInbound(
-        deps,
-        command,
-        prepared.messageEventId,
-        {
-          kind: "human_handoff",
-          topic: "human_handoff.opened",
-          payload: { reasonCode: proposal.reasonCode },
-          ownerId: runtime.handoffOwnerId,
-          openedAt: runtime.now,
-          acknowledgeBy: runtime.acknowledgeBy,
-        },
-      );
+      return completeInbound(deps, command, prepared.messageEventId, {
+        kind: "human_handoff",
+        topic: "human_handoff.opened",
+        payload: { reasonCode: proposal.reasonCode },
+        ownerId: runtime.handoffOwnerId,
+        openedAt: runtime.now,
+        acknowledgeBy: runtime.acknowledgeBy,
+      });
     }
 
     const outcome: InboundCompletionOutcome =
@@ -721,30 +697,23 @@ export const createConversationService = (
         : proposal.kind === "show_catalog"
           ? {
               kind: "show_catalog",
-              topic: "catalog.show",
               payload: {
-                allowedServiceCodes: authorization.allowedServiceCodes,
                 ...(proposal.serviceCode === undefined
                   ? {}
                   : { serviceCode: proposal.serviceCode }),
+                ...(proposal.language === undefined
+                  ? {}
+                  : { language: proposal.language }),
               },
             }
           : {
               kind: "start_booking",
-              topic: "booking.start",
-              payload: { expertId: proposal.expertId },
+              payload: { choiceHandle: proposal.choiceHandle },
             };
-    return completeInbound(
-      deps,
-      command,
-      prepared.messageEventId,
-      outcome,
-    );
+    return completeInbound(deps, command, prepared.messageEventId, outcome);
   },
 
-  async handleOutboundDelivery(
-    event,
-  ): Promise<OutboundDeliveryResult> {
+  async handleOutboundDelivery(event): Promise<OutboundDeliveryResult> {
     validateOutbound(event);
     if (
       !["disabled", "provider_delivery_event"].includes(

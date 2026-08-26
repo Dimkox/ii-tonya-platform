@@ -5,6 +5,8 @@ import type {
   SafetyRisk,
 } from "@ii-tonya/domain";
 
+import type { ClientConversationToolProposal } from "./client-conversation-operation-crypto.js";
+
 export interface IntentInput {
   readonly text: string;
   readonly locale: string;
@@ -25,8 +27,7 @@ export type ExpertIntentProposal =
 
 export type IntentProposal =
   | { readonly kind: "answer"; readonly text: string }
-  | { readonly kind: "show_catalog"; readonly serviceCode?: string }
-  | { readonly kind: "start_booking"; readonly expertId: string }
+  | ClientConversationToolProposal
   | { readonly kind: "human_handoff"; readonly reasonCode: string };
 
 export interface IntentEngine {
@@ -58,6 +59,7 @@ export interface HandleInboundCommand {
   readonly providerEventId: string;
   readonly providerMessageId: string;
   readonly userId: string;
+  readonly bindingId: string;
   readonly text: string;
   readonly locale: string;
   readonly countryCode: string;
@@ -123,16 +125,14 @@ export type InboundCompletionOutcome =
     }
   | {
       readonly kind: "show_catalog";
-      readonly topic: "catalog.show";
       readonly payload: {
         readonly serviceCode?: string;
-        readonly allowedServiceCodes: readonly string[];
+        readonly language?: string;
       };
     }
   | {
       readonly kind: "start_booking";
-      readonly topic: "booking.start";
-      readonly payload: { readonly expertId: string };
+      readonly payload: { readonly choiceHandle: `ch1.${string}` };
     }
   | {
       readonly kind: "human_handoff";
@@ -145,6 +145,7 @@ export type InboundCompletionOutcome =
 
 export interface CompleteInboundInput {
   readonly messageEventId: string;
+  readonly bindingId: string;
   readonly userId: string;
   readonly correlationId: string;
   readonly outcome: InboundCompletionOutcome;

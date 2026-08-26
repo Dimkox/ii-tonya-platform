@@ -631,6 +631,10 @@ const approvedMigrationHashes = new Map([
     "b625de5a14c3aa542116b4ad7c88df6ddeab99b893fdbda83bca0f6d8c1f4529",
   ],
   [
+    "packages/db/migrations/0032_client_conversation.sql",
+    "5d473cfa05f281f91db173a3d21257f2f6b4afe6247c3e8eb10048dee1f13330",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -708,7 +712,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "946ea5ba29dab55ed8865dc42a9fc2c64651b63d4b2440f29315867d6bbdd8ce",
+    "7de05562500109181defb7b9d3ebcf6e2298111788f8d54d38efd29da516bc15",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -721,6 +725,10 @@ const approvedDatabaseRelations = new Set([
   "channel_identities",
   "client_booking_erasure_work",
   "client_booking_receipts",
+  "client_conversation_grants",
+  "client_conversation_operation_cases",
+  "client_conversation_operations",
+  "client_conversation_runtime_leases",
   "client_catalog_choices",
   "client_catalog_erasure_index",
   "client_catalog_requests",

@@ -62,6 +62,7 @@ export {
 export {
   CompensationConflictError,
   ConversationCompletionDataError,
+  ConversationOperationNonceCollisionError,
   PostgresMessageRepository,
   type AcceptInboundCommand,
   type AcceptInboundResult,
