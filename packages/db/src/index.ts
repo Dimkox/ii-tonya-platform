@@ -55,6 +55,11 @@ export {
   type ClientSessionRevocation,
 } from "./repositories/client-session-repository.js";
 export {
+  PostgresClientConversationPrincipalRepository,
+  type ClientConversationIdentityFact,
+  type ClientConversationIdentityLookup,
+} from "./repositories/client-conversation-principal-repository.js";
+export {
   CompensationConflictError,
   ConversationCompletionDataError,
   PostgresMessageRepository,
