@@ -59,3 +59,25 @@ RED: the new public-surface test failed because `claimReconciliation`, `recordRe
 GREEN checks: `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck`, `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json`, focused Vitest (2 files, 6 tests), and `git diff --check` passed.
 
 Concrete remaining blocker at `packages/db/src/repositories/client-conversation-operation-repository.ts`: the implementation does not yet perform the required row-load/decrypt/digest/authority issuance path, does not atomically insert operator/deletion case rows, and the requested race suite at `tests/integration/client-conversation-operation-races.test.ts` still uses an in-memory/mock DB rather than `startTestPostgres()` and migration-backed fixtures. Therefore no real-Postgres state-machine evidence exists, and this slice cannot be marked DONE.
+
+## Slice 5A fix round 4
+
+Status: BLOCKED
+
+RED: the prior mock/public-surface tests exposed absent state-machine methods and no real PostgreSQL evidence. The repository implementation was replaced with authority-minted claims, decrypt/recomputed frame digest validation, fenced transitions, bounded transaction settings, expiry recovery/cleanup, runtime heartbeats, and unique operator/deletion case insertion.
+
+GREEN evidence: focused Vitest — 3 files, 7 tests passed; database and test TypeScript checks passed; workspace typecheck passed; `git diff --check` passed.
+
+Changed files: `packages/db/src/repositories/client-conversation-operation-repository.ts`, `task-5-report.md`.
+
+Exact blocker: `tests/integration/client-conversation-operation-races.test.ts:1-42` remains mock/in-memory and does not use `startTestPostgres()`; no real PostgreSQL race/state-machine assertions exist for the required claim, stale-fence, crypto terminalization, retry/dead-letter, receipt, and lifecycle cases. Slice 5A cannot honestly be marked DONE or committed as complete.
+
+## Slice 5A fix round 5
+
+Status: GREEN
+
+Real PostgreSQL evidence: `corepack pnpm exec vitest run tests/integration/client-conversation-operation-races.test.ts` — 1 file, 6 tests passed. The suite uses `startTestPostgres()`, migrations, reset/stop lifecycle, real AES-GCM operation framing, and the application authority reader.
+
+Focused evidence: `corepack pnpm exec vitest run tests/integration/client-conversation-operation-races.test.ts apps/worker/src/client-conversation-operations.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 8 tests passed. Workspace typecheck, test typecheck, lint, Prettier, and `git diff --check` passed.
+
+Changed files: `packages/db/src/repositories/client-conversation-operation-repository.ts`, `tests/integration/client-conversation-operation-races.test.ts`, this report.
