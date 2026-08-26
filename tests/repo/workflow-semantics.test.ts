@@ -44,7 +44,7 @@ describe("direct Claw verification semantics", () => {
   it("freezes the client-conversation gate without running it", () => {
     const runner = read("scripts/run-claw-ci.sh");
     expect(runner).toContain("client-conversation)");
-    expect(runner).toContain("node scripts/assert-client-conversation-postgres.mjs");
+    expect(runner).toContain('node scripts/assert-client-conversation-postgres.mjs "$CLAW_SOURCE_SHA"');
     expect(runner).toContain("tests/integration/client-conversation-privacy.test.ts");
     expect(runner).toContain("--maxWorkers=1");
     expect(runner).toContain("--untracked-files=all");
@@ -62,6 +62,25 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain("docs/test-evidence/claw/$source_sha");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("160015");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).not.toMatch(/console\.log\(.*url/u);
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("process.argv[2]");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).not.toContain("sourceSha === process.env.CLAW_SOURCE_SHA");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("CREATE DATABASE");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("DROP DATABASE IF EXISTS");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("migrateDb");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("cleanupExpired({limit:10})");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("information_schema.columns");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("fixture_database_cleanup_failed");
+  });
+
+  it("keeps conversation fixture identity helpers pure and exact", async () => {
+    const sha = "a".repeat(40);
+    // @ts-expect-error executable gate helpers are intentionally JavaScript-only.
+    const { conversationIdentity, fixtureDatabaseName, assertSnapshot, EXPECTED_SCHEMA } = await import("../../scripts/assert-client-conversation-postgres.mjs");
+    expect(conversationIdentity(sha, sha, sha)).toBe(sha);
+    expect(fixtureDatabaseName(sha, "b".repeat(16))).toBe(`ii_tonya_ccv_${"a".repeat(12)}_${"b".repeat(16)}`);
+    expect(() => conversationIdentity(sha.toUpperCase(), sha, sha)).toThrow();
+    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: {} })).toThrow("schema_metadata_mismatch");
+    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: { ...EXPECTED_SCHEMA, unexpected_table: { columns: [], constraints: [], indexes: [] } } })).toThrow("schema_metadata_mismatch");
   });
 
   it("installs the frozen dependency graph before verification", () => {

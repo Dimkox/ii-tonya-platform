@@ -191,11 +191,24 @@ case "$CLAW_GATE_MODE" in
     test -d /seed/node_modules/.pnpm
     ln -s /seed/node_modules/.pnpm node_modules/.pnpm
     test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm
-    for package_name in drizzle-orm pg pino fastify vitest zod; do
-      test -e "/seed/node_modules/$package_name"
-      ln -s "/seed/node_modules/$package_name" "node_modules/$package_name"
+    resolve_seed_package() {
+      local package_name="$1" package_version="$2" pnpm_prefix="$3" candidate
+      local -a candidates
+      shopt -s nullglob; candidates=(/seed/node_modules/.pnpm/"$pnpm_prefix"*/node_modules/"$package_name"); shopt -u nullglob
+      test "${#candidates[@]}" -eq 1
+      candidate="${candidates[0]}"; test -f "$candidate/package.json"
+      node -e 'const fs=require("node:fs");const [f,n,v]=process.argv.slice(1);const p=JSON.parse(fs.readFileSync(f));if(p.name!==n||p.version!==v)process.exit(1)' "$candidate/package.json" "$package_name" "$package_version"
+      printf '%s\n' "$candidate"
+    }
+    for package_spec in "drizzle-orm|0.45.2|drizzle-orm@" "pg|8.22.0|pg@" "pino|9.14.0|pino@" "fastify|5.10.0|fastify@" "vitest|3.2.7|vitest@" "zod|4.4.3|zod@"; do
+      IFS='|' read -r package_name package_version pnpm_prefix <<< "$package_spec"
+      package_path="$(resolve_seed_package "$package_name" "$package_version" "$pnpm_prefix")"
+      ln -s "$package_path" "node_modules/$package_name"
     done
-    node scripts/assert-client-conversation-postgres.mjs
+    mkdir -p node_modules/@ii-tonya
+    for package_name in db application contracts domain config integrations observability worker; do ln -s "/workspace/source/packages/$package_name" "node_modules/@ii-tonya/$package_name"; done
+    for package_name in db application contracts domain config integrations observability worker; do (cd "packages/$package_name" && /seed/node_modules/.bin/tsup src/index.ts --format esm --clean --tsconfig ../../tsconfig.base.json); done
+    node scripts/assert-client-conversation-postgres.mjs "$CLAW_SOURCE_SHA"
     /seed/node_modules/.bin/vitest run tests/integration/client-conversation-privacy.test.ts tests/integration/client-conversation-operation-races.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
     ;;
 esac

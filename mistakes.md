@@ -1,5 +1,7 @@
 # Mistakes
 
+- 2026-08-26 — Treated empty-state, allowlist, and self-comparison checks as release evidence. Root cause: the gate did not seed an invocation-bound lifecycle fixture or compare identity against independent git/argument facts; it now asserts expected state and cleans an isolated temporary fixture.
+
 - Task 5’s initial repository type imported the application package from the database package, creating an unavailable build-order dependency. The root cause was coupling the DB seam to a higher layer; the repository now owns its structural claim-detail types.
 
 - The first runtime claim implementation called a method through a mutable class prototype, so WeakSet provenance did not protect the returned details from prototype tampering. The root cause was treating genuine object identity as equivalent to immutable behavior; regression tests now cover prototype mutation and the class prototype is frozen.
