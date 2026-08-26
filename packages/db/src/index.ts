@@ -60,6 +60,11 @@ export {
   type ClientConversationIdentityLookup,
 } from "./repositories/client-conversation-principal-repository.js";
 export {
+  PostgresClientConversationOperationRepository,
+  type ConversationOperationClaimRepository,
+  type ClientConversationOperationClaimDetails,
+} from "./repositories/client-conversation-operation-repository.js";
+export {
   CompensationConflictError,
   ConversationCompletionDataError,
   ConversationOperationNonceCollisionError,

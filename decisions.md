@@ -1,5 +1,7 @@
 # Decisions
 
+- Keep Task 5 dispatch behind a dedicated worker job interface with no outbox registry dependency. This preserves the contract’s separation between frozen conversation operations and existing outbox handlers.
+
 - Keep client-conversation authentication as an injected production capability; fixture key material and fixture implementations stay outside runtime imports. This preserves the reviewed fixture-only boundary while allowing the API route and its fail-closed composition to be tested.
 
 ## 2026-08-26 — Ignore unrelated harness route
