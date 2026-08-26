@@ -180,4 +180,54 @@ describe("client conversation authority", () => {
       if (tampered) Object.defineProperty(prototype, "details", original);
     }
   });
+
+  it("uses the exact trimmed non-control v2 catalog grammar", () => {
+    const authority = createClientConversationOperationAuthority();
+    for (const [serviceCode, language] of [
+      ["career coaching", "pt-BR"],
+      ["x".repeat(64), "y".repeat(32)],
+      ["punctuation / & +", "русский"],
+    ] satisfies readonly (readonly [string, string])[]) {
+      expect(
+        authority.catalog.read(
+          authority.issuer.issue({
+            operationId: "40000000-0000-4000-8000-000000000001",
+            claimToken: "40000000-0000-4000-8000-000000000002",
+            claimOwnerId: "worker-1",
+            claimFence: 1,
+            toolKind: "show_catalog",
+            requiredScope: "client_catalog:read",
+            frozenInput: { serviceCode, language },
+          }),
+        ),
+      ).toMatchObject({ frozenInput: { serviceCode, language } });
+    }
+    for (const frozenInput of [
+      { serviceCode: "" },
+      { serviceCode: " leading" },
+      { serviceCode: "trailing " },
+      { serviceCode: "bad\u0000control" },
+      { serviceCode: "x".repeat(65) },
+      { language: "" },
+      { language: " leading" },
+      { language: "trailing " },
+      { language: "bad\u007fcontrol" },
+      { language: "x".repeat(33) },
+      { serviceCode: 1 },
+      { language: null },
+      { nested: {} },
+    ]) {
+      expect(() =>
+        authority.issuer.issue({
+          operationId: "40000000-0000-4000-8000-000000000001",
+          claimToken: "40000000-0000-4000-8000-000000000002",
+          claimOwnerId: "worker-1",
+          claimFence: 1,
+          toolKind: "show_catalog",
+          requiredScope: "client_catalog:read",
+          frozenInput: frozenInput as never,
+        }),
+      ).toThrow("client_conversation_claim_invalid");
+    }
+  });
 });

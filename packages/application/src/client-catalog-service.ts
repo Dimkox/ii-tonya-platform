@@ -6,6 +6,10 @@ import type {
   ClientCatalogService,
   ClientPrincipal,
 } from "./ports.js";
+import type {
+  ClaimedConversationOperation,
+  ClientConversationOperationClaimDetails,
+} from "./client-conversation-authority.js";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -17,6 +21,43 @@ export class ClientCatalogUnauthorizedError extends Error {
     this.name = "ClientCatalogUnauthorizedError";
   }
 }
+
+export type ConversationCatalogResult =
+  | Readonly<{ kind: "applied"; downstreamReceiptDigest: string }>
+  | Readonly<{
+      kind: "rejected";
+      code: "not_found" | "conflict" | "feature_disabled";
+    }>;
+
+export interface ConversationCatalogGateway {
+  request(
+    claim: ClaimedConversationOperation,
+  ): Promise<ConversationCatalogResult>;
+}
+
+export interface ConversationCatalogRepository {
+  requestConversation(
+    claim: ClientConversationOperationClaimDetails,
+  ): Promise<ConversationCatalogResult>;
+}
+
+export const createConversationCatalogGateway = (deps: {
+  readonly authority: {
+    readonly catalog: {
+      read(
+        claim: ClaimedConversationOperation,
+      ): ClientConversationOperationClaimDetails | null;
+    };
+  };
+  readonly repository: ConversationCatalogRepository;
+}): ConversationCatalogGateway =>
+  Object.freeze({
+    request(claim: ClaimedConversationOperation) {
+      const details = deps.authority.catalog.read(claim);
+      if (details === null) throw new ClientCatalogUnauthorizedError();
+      return deps.repository.requestConversation(details);
+    },
+  });
 
 const requirePrincipal = (value: unknown): ClientPrincipal => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

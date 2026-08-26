@@ -42,8 +42,10 @@ export {
   type PublicCatalogServiceRecord,
 } from "./repositories/catalog-repository.js";
 export {
+  ConversationCatalogRetryableError,
   PostgresClientCatalogRepository,
   type ClientCatalogCard,
+  type ClientCatalogRepositoryOptions,
   type ClientCatalogRequestRepository,
   type ClientCatalogSlot,
   type ClientCatalogSnapshot,

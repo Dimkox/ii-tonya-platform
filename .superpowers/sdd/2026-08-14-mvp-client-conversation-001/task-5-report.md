@@ -119,3 +119,35 @@ Exact GREEN commands:
 - `corepack pnpm exec vitest run tests/integration/client-conversation-operation-races.test.ts apps/worker/src/client-conversation-operations.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 9 tests passed.
 - `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
 - `git diff --check` — passed.
+
+## Slice 5B1 — conversation catalog gateway and shared catalog prelock
+
+Status: GREEN
+
+RED evidence:
+
+- `corepack pnpm exec vitest run packages/application/src/client-conversation-authority.test.ts packages/application/src/client-catalog-service.test.ts` — 2 files, 3 tests failed: the frozen catalog grammar rejected valid trimmed v2 values and the conversation gateway factory did not exist.
+- `corepack pnpm exec vitest run tests/integration/client-conversation-catalog-gateway.test.ts` — 1 file, 10 tests failed with `deps.repository.requestConversation is not a function`, proving the migration-backed PostgreSQL conversation transaction seam was absent.
+
+Implementation:
+
+- Frozen `show_catalog` claims now accept only exact trimmed, non-control v2 `serviceCode`/`language` values (1–64/1–32), including hostile runtime rejection coverage.
+- `ConversationCatalogGateway.request(claim)` authenticates only authority-local genuine catalog claims synchronously. Forged, spread, cloned, cross-authority and booking claims fail before repository access; no `ClientPrincipal` is constructed.
+- Ordinary and conversation catalog requests call one repository-owned advisory prelock helper with the exact PostgreSQL expression `hashtextextended(userId || ':' || requestDigest,0)`, then share the existing request/idempotency/local `catalog.show` outbox transaction seam.
+- The conversation transaction performs candidate-only preliminary lookup, prelock-first ordering, three 2-second transaction-local bounds, and fresh `users -> mapping -> client_catalog:read grant -> operation` row locks. It uses PostgreSQL clock time and validates active user, exact provider tokens/version, live grant, owner/token/fence/tool/scope, proposal digest, lease and payload before mutation.
+- Applied/replayed calls return the same exact 64-lowercase-hex owner request receipt. `not_found`, `conflict`, and `feature_disabled` are the only rejection outcomes. Lock/statement cancellation is normalized as `ConversationCatalogRetryableError` before downstream invocation.
+- The worker outbox contract explicitly excludes conversation/provider/Selarti topics; no new topic or provider runner was added.
+
+GREEN evidence:
+
+- `corepack pnpm exec vitest run packages/application/src/client-conversation-authority.test.ts packages/application/src/client-catalog-service.test.ts packages/contracts/src/worker-outbox.test.ts packages/db/src/repositories/outbox-repository-client-catalog.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-catalog-repository.test.ts tests/integration/client-catalog-final-gate.test.ts` — 7 files, 47 tests passed, including 17 migration-backed conversation catalog PostgreSQL tests.
+- The PostgreSQL suite proves genuine/replayed receipt behavior; revoked/expired/wrong grants; inactive users; erased/wrong mappings; stale fence/lease; wrong tool/scope; tampered proposal; forged claim; feature disablement; identical ordinary/conversation advisory-key blocking; bounded lock timeout classification; and both commit orders for grant revoke, user deactivation and mapping erasure without deadlock.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed.
+- `corepack pnpm exec prettier --check packages/application/src/client-catalog-service.ts packages/application/src/client-catalog-service.test.ts packages/application/src/client-conversation-authority.ts packages/application/src/client-conversation-authority.test.ts packages/contracts/src/worker-outbox.test.ts packages/db/src/index.ts packages/db/src/repositories/client-catalog-repository.ts tests/integration/client-conversation-catalog-gateway.test.ts` — passed.
+- `git diff --check` — passed.
+
+Changed files: `packages/application/src/client-catalog-service.ts`, `packages/application/src/client-catalog-service.test.ts`, `packages/application/src/client-conversation-authority.ts`, `packages/application/src/client-conversation-authority.test.ts`, `packages/contracts/src/worker-outbox.test.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/client-catalog-repository.ts`, `tests/integration/client-conversation-catalog-gateway.test.ts`, this report.
+
+Concern: `tests/integration/client-catalog-booking-choice.test.ts` contains a separately gated PostgreSQL describe that requires `II_TONYA_TEST_POSTGRES_ADMIN_URL`; including that unrelated file produced `Error: external PostgreSQL is required`. The clean final catalog command above excludes that environment-gated booking slice. Booking gateway/runtime composition remains intentionally untouched for Slice 5B2.

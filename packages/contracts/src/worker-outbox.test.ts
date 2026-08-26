@@ -16,7 +16,7 @@ describe("worker outbox provider isolation", () => {
       "catalog.show",
     ]);
     expect(CLIENT_CATALOG_OUTBOX_TOPICS.join("\n")).not.toMatch(
-      /booking|planerka|telegram/iu,
+      /booking|conversation|planerka|provider|selarti|telegram/iu,
     );
   });
 });

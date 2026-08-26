@@ -2,6 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
+import type {
+  ConversationCatalogRepository,
+  ConversationCatalogResult,
+} from "../../../application/src/client-catalog-service.js";
+import type { ClientConversationOperationClaimDetails } from "../../../application/src/client-conversation-authority.js";
+import { frameClientConversationOperation } from "../../../application/src/client-conversation-operation-crypto.js";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
 
@@ -80,6 +86,8 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const CHOICE_HANDLE_PATTERN = /^ch1\.[A-Za-z0-9_-]{43}$/u;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
+const CONVERSATION_TOKEN_PATTERN = /^hmac-sha256:v1:[0-9a-f]{64}$/u;
+const KEY_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/u;
 
 const optionalFilter = (
   value: string | undefined,
@@ -198,6 +206,57 @@ const databaseErrorConstraint = (error: unknown): string | undefined => {
 const terminalOutboxStatus = (status: string): boolean =>
   status === "succeeded" || status === "dead_letter";
 
+const catalogRequestDigest = (
+  userId: string,
+  serviceCode: string | undefined,
+  language: string | undefined,
+): string =>
+  createHash("sha256")
+    .update(
+      `client-catalog-booking-v1\0${userId}\0${serviceCode ?? ""}\0${language ?? ""}`,
+    )
+    .digest("hex");
+
+const lp = (value: string): Buffer => {
+  const bytes = Buffer.from(value, "utf8");
+  const length = Buffer.allocUnsafe(4);
+  length.writeUInt32BE(bytes.length);
+  return Buffer.concat([length, bytes]);
+};
+
+const conversationCatalogReceipt = (catalogRequestId: string): string =>
+  createHash("sha256")
+    .update("ii-tonya/client-conversation-catalog-receipt/v1\0", "utf8")
+    .update(lp(catalogRequestId))
+    .digest("hex");
+
+const databaseErrorCode = (error: unknown): string | undefined => {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (
+    typeof current === "object" &&
+    current !== null &&
+    !seen.has(current)
+  ) {
+    seen.add(current);
+    const evidence = current as { code?: unknown; cause?: unknown };
+    if (typeof evidence.code === "string") return evidence.code;
+    current = evidence.cause;
+  }
+  return undefined;
+};
+
+export class ConversationCatalogRetryableError extends Error {
+  constructor() {
+    super("client_conversation_catalog_retryable");
+    this.name = "ConversationCatalogRetryableError";
+  }
+}
+
+export interface ClientCatalogRepositoryOptions {
+  readonly conversationCatalogEnabled?: boolean;
+}
+
 async function deleteCatalogOutbox(
   tx: Transaction,
   outboxId: string,
@@ -232,8 +291,95 @@ async function lockCatalogChoices(
   `);
 }
 
-export class PostgresClientCatalogRepository implements ClientCatalogRequestRepository {
-  constructor(private readonly db: DrizzleDb) {}
+type ValidatedCatalogRequest = Readonly<{
+  userId: string;
+  requestDigest: string;
+  serviceCode?: string;
+  language?: string;
+  correlationId: string;
+  version: 1 | 2;
+}>;
+
+type ConversationCandidate = Readonly<{
+  bindingId: string;
+  userId: string;
+}>;
+
+type ConversationMapping = ConversationCandidate &
+  Readonly<{
+    provider: string;
+    tenantToken: string | null;
+    subjectToken: string;
+    tokenVersion: number | null;
+  }>;
+
+export class PostgresClientCatalogRepository
+  implements ClientCatalogRequestRepository, ConversationCatalogRepository
+{
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly options: ClientCatalogRepositoryOptions = {},
+  ) {}
+
+  private async lockRequestPrelock(
+    tx: Transaction,
+    userId: string,
+    requestDigest: string,
+  ): Promise<void> {
+    await tx.execute(sql`
+      select pg_advisory_xact_lock(
+        hashtextextended(${userId} || ':' || ${requestDigest},0)
+      )
+    `);
+  }
+
+  private async createOrReplayInTransaction(
+    tx: Transaction,
+    input: ValidatedCatalogRequest,
+  ): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
+    const existing = (
+      await tx.execute<{ catalogRequestId: string; state: string }>(sql`
+        select id as "catalogRequestId",state
+        from client_catalog_requests
+        where user_id=${input.userId}::uuid
+          and request_digest=${input.requestDigest}
+        for update
+      `)
+    ).rows[0];
+    if (existing !== undefined) {
+      return {
+        catalogRequestId: existing.catalogRequestId,
+        state: state(existing.state),
+      };
+    }
+
+    const catalogRequestId = randomUUID();
+    await tx.execute(sql`
+      insert into client_catalog_requests (
+        id,user_id,request_digest,service_code,language
+      ) values (
+        ${catalogRequestId}::uuid,${input.userId}::uuid,${input.requestDigest},
+        ${input.serviceCode ?? null},${input.language ?? null}
+      )
+    `);
+    await tx.execute(sql`
+      insert into client_catalog_erasure_index (request_id,subject_key,expires_at)
+      select id,${clientCatalogErasureSubjectKey(input.userId)},expires_at
+      from client_catalog_requests where id=${catalogRequestId}::uuid
+    `);
+    const payload = canonicalPayload(catalogRequestId, input.version);
+    const payloadHash = createHash("sha256").update(payload).digest("hex");
+    await tx.execute(sql`
+      insert into integration_outbox (
+        idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
+      ) values (
+        ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
+        ${input.correlationId},${`client-catalog:${catalogRequestId}:v${input.version}`},
+        ${payloadHash}
+      )
+    `);
+    return { catalogRequestId, state: "pending" };
+  }
 
   createOrReplay(input: {
     userId: string;
@@ -244,7 +390,6 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
     version?: 1 | 2;
   }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
     const userId = canonicalUuid(input.userId);
-    const subjectKey = clientCatalogErasureSubjectKey(userId);
     if (
       !HASH_PATTERN.test(input.requestDigest) ||
       input.correlationId.length < 1
@@ -260,51 +405,221 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${input.requestDigest}`}, 0))`,
-        );
-        const existing = (
-          await tx.execute<{ catalogRequestId: string; state: string }>(sql`
-            select id as "catalogRequestId",state
-            from client_catalog_requests
-            where user_id=${userId}::uuid and request_digest=${input.requestDigest}
-            for update
-          `)
-        ).rows[0];
-        if (existing !== undefined) {
-          return {
-            catalogRequestId: existing.catalogRequestId,
-            state: state(existing.state),
-          };
-        }
-
-        const catalogRequestId = randomUUID();
-        await tx.execute(sql`
-          insert into client_catalog_requests (
-            id,user_id,request_digest,service_code,language
-          ) values (
-            ${catalogRequestId}::uuid,${userId}::uuid,${input.requestDigest},
-            ${serviceCode ?? null},${language ?? null}
-          )
-        `);
-        await tx.execute(sql`
-          insert into client_catalog_erasure_index (request_id,subject_key,expires_at)
-          select id,${subjectKey},expires_at from client_catalog_requests
-          where id=${catalogRequestId}::uuid
-        `);
-        const payload = canonicalPayload(catalogRequestId, version);
-        const payloadHash = createHash("sha256").update(payload).digest("hex");
-        await tx.execute(sql`
-          insert into integration_outbox (
-            idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
-          ) values (
-            ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
-            ${input.correlationId},${`client-catalog:${catalogRequestId}:v${version}`},${payloadHash}
-          )
-        `);
-        return { catalogRequestId, state: "pending" as const };
+        await this.lockRequestPrelock(tx, userId, input.requestDigest);
+        return this.createOrReplayInTransaction(tx, {
+          userId,
+          requestDigest: input.requestDigest,
+          ...(serviceCode === undefined ? {} : { serviceCode }),
+          ...(language === undefined ? {} : { language }),
+          correlationId: input.correlationId,
+          version,
+        });
       }),
     );
+  }
+
+  async requestConversation(
+    claim: ClientConversationOperationClaimDetails,
+  ): Promise<ConversationCatalogResult> {
+    if (this.options.conversationCatalogEnabled === false) {
+      return { kind: "rejected", code: "feature_disabled" };
+    }
+    if (
+      claim.toolKind !== "show_catalog" ||
+      claim.requiredScope !== "client_catalog:read" ||
+      "choiceHandle" in claim.frozenInput
+    ) {
+      return { kind: "rejected", code: "conflict" };
+    }
+    const serviceCode = optionalFilter(claim.frozenInput.serviceCode, 64);
+    const language = optionalFilter(claim.frozenInput.language, 32);
+    const candidate = (
+      await this.db.execute<ConversationCandidate>(sql`
+        select m.id as "bindingId",m.user_id as "userId"
+        from client_conversation_operations o
+        join provider_subject_mappings m on m.id=o.binding_id
+        where o.id=${claim.operationId}::uuid
+      `)
+    ).rows[0];
+    if (candidate === undefined) return { kind: "rejected", code: "not_found" };
+    const requestDigest = catalogRequestDigest(
+      candidate.userId,
+      serviceCode,
+      language,
+    );
+
+    try {
+      return await withSerializableRetry(() =>
+        this.db.transaction(async (tx): Promise<ConversationCatalogResult> => {
+          await tx.execute(sql`set transaction isolation level serializable`);
+          await this.lockRequestPrelock(tx, candidate.userId, requestDigest);
+          await tx.execute(sql`set local statement_timeout='2s'`);
+          await tx.execute(sql`set local lock_timeout='2s'`);
+          await tx.execute(
+            sql`set local idle_in_transaction_session_timeout='2s'`,
+          );
+
+          const user = (
+            await tx.execute<{ active: boolean }>(sql`
+              select active from users where id=${candidate.userId}::uuid for update
+            `)
+          ).rows[0];
+          if (user?.active !== true)
+            return { kind: "rejected", code: "not_found" };
+
+          const mapping = (
+            await tx.execute<ConversationMapping>(sql`
+              select id as "bindingId",user_id as "userId",provider,
+                tenant_token as "tenantToken",subject_token as "subjectToken",
+                token_version as "tokenVersion"
+              from provider_subject_mappings
+              where id=${candidate.bindingId}::uuid
+              for update
+            `)
+          ).rows[0];
+          if (
+            mapping === undefined ||
+            mapping.userId !== candidate.userId ||
+            mapping.provider !== "selarti.client-thread.v1" ||
+            mapping.tenantToken === null ||
+            !CONVERSATION_TOKEN_PATTERN.test(mapping.tenantToken) ||
+            !CONVERSATION_TOKEN_PATTERN.test(mapping.subjectToken) ||
+            Number(mapping.tokenVersion) !== 1
+          ) {
+            return { kind: "rejected", code: "not_found" };
+          }
+
+          const grant = (
+            await tx.execute<{
+              expiresAt: Date | string;
+              revokedAt: Date | string | null;
+              databaseNow: Date | string;
+            }>(sql`
+              select expires_at as "expiresAt",revoked_at as "revokedAt",
+                clock_timestamp() as "databaseNow"
+              from client_conversation_grants
+              where provider_subject_mapping_id=${candidate.bindingId}::uuid
+                and scope='client_catalog:read'
+              for update
+            `)
+          ).rows[0];
+          const databaseNow =
+            grant === undefined ? null : new Date(grant.databaseNow);
+          const grantExpiresAt =
+            grant === undefined ? null : new Date(grant.expiresAt);
+          if (
+            grant === undefined ||
+            grant.revokedAt !== null ||
+            databaseNow === null ||
+            grantExpiresAt === null ||
+            !Number.isFinite(databaseNow.getTime()) ||
+            !Number.isFinite(grantExpiresAt.getTime()) ||
+            grantExpiresAt.getTime() <= databaseNow.getTime()
+          ) {
+            return { kind: "rejected", code: "not_found" };
+          }
+
+          const operation = (
+            await tx.execute<{
+              messageEventId: string;
+              bindingId: string | null;
+              requiredScope: string;
+              toolKind: string;
+              proposalDigest: string;
+              payloadKeyId: string | null;
+              payloadExpiresAt: Date | string;
+              status: string;
+              claimOwnerId: string | null;
+              claimToken: string | null;
+              claimFence: number | string;
+              leaseUntil: Date | string | null;
+              databaseNow: Date | string;
+            }>(sql`
+              select message_event_id as "messageEventId",binding_id as "bindingId",
+                required_scope as "requiredScope",tool_kind as "toolKind",
+                proposal_digest as "proposalDigest",payload_key_id as "payloadKeyId",
+                payload_expires_at as "payloadExpiresAt",status,
+                claim_owner_id as "claimOwnerId",claim_token as "claimToken",
+                claim_fence as "claimFence",lease_until as "leaseUntil",
+                clock_timestamp() as "databaseNow"
+              from client_conversation_operations
+              where id=${claim.operationId}::uuid
+              for update
+            `)
+          ).rows[0];
+          const operationNow =
+            operation === undefined ? null : new Date(operation.databaseNow);
+          const leaseUntil =
+            operation?.leaseUntil === null || operation === undefined
+              ? null
+              : new Date(operation.leaseUntil);
+          const payloadExpiresAt =
+            operation === undefined
+              ? null
+              : new Date(operation.payloadExpiresAt);
+          if (
+            operation === undefined ||
+            operationNow === null ||
+            leaseUntil === null ||
+            payloadExpiresAt === null ||
+            !Number.isFinite(operationNow.getTime()) ||
+            !Number.isFinite(leaseUntil.getTime()) ||
+            !Number.isFinite(payloadExpiresAt.getTime()) ||
+            !UUID_PATTERN.test(operation.messageEventId) ||
+            operation.status !== "processing" ||
+            operation.bindingId !== candidate.bindingId ||
+            operation.toolKind !== "show_catalog" ||
+            operation.requiredScope !== "client_catalog:read" ||
+            operation.claimOwnerId !== claim.claimOwnerId ||
+            operation.claimToken !== claim.claimToken ||
+            !Number.isSafeInteger(Number(operation.claimFence)) ||
+            Number(operation.claimFence) !== claim.claimFence ||
+            leaseUntil.getTime() <= operationNow.getTime() ||
+            payloadExpiresAt.getTime() <= operationNow.getTime() ||
+            grantExpiresAt.getTime() <= operationNow.getTime() ||
+            operation.payloadKeyId === null ||
+            !KEY_ID_PATTERN.test(operation.payloadKeyId) ||
+            !HASH_PATTERN.test(operation.proposalDigest)
+          ) {
+            return { kind: "rejected", code: "conflict" };
+          }
+          const framed = frameClientConversationOperation({
+            operationId: claim.operationId,
+            messageEventId: operation.messageEventId,
+            bindingId: candidate.bindingId,
+            keyId: operation.payloadKeyId,
+            payloadExpiresAt: payloadExpiresAt.toISOString(),
+            proposal: {
+              kind: "show_catalog",
+              ...(serviceCode === undefined ? {} : { serviceCode }),
+              ...(language === undefined ? {} : { language }),
+            },
+          });
+          if (framed.proposalDigest !== operation.proposalDigest) {
+            return { kind: "rejected", code: "conflict" };
+          }
+          const request = await this.createOrReplayInTransaction(tx, {
+            userId: candidate.userId,
+            requestDigest,
+            ...(serviceCode === undefined ? {} : { serviceCode }),
+            ...(language === undefined ? {} : { language }),
+            correlationId: `client-conversation:${claim.operationId}`,
+            version: 2,
+          });
+          return {
+            kind: "applied",
+            downstreamReceiptDigest: conversationCatalogReceipt(
+              request.catalogRequestId,
+            ),
+          };
+        }),
+      );
+    } catch (error) {
+      if (["55P03", "57014"].includes(databaseErrorCode(error) ?? "")) {
+        throw new ConversationCatalogRetryableError();
+      }
+      throw error;
+    }
   }
 
   async getOwned(input: {

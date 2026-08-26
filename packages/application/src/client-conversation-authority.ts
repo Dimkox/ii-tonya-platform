@@ -71,6 +71,13 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const boundedCodePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const choiceHandlePattern = /^ch1\.[A-Za-z0-9_-]{43}$/u;
+const controlPattern = /[\u0000-\u001f\u007f-\u009f]/u;
+const validCatalogFilter = (value: unknown, maximum: number): value is string =>
+  typeof value === "string" &&
+  value.length >= 1 &&
+  value.length <= maximum &&
+  value.trim() === value &&
+  !controlPattern.test(value);
 
 const exactPlainRecord = (
   value: unknown,
@@ -184,11 +191,9 @@ const freezeInput = (
       const record = value as Record<string, unknown>;
       if (
         (record.serviceCode !== undefined &&
-          (typeof record.serviceCode !== "string" ||
-            !boundedCodePattern.test(record.serviceCode))) ||
+          !validCatalogFilter(record.serviceCode, 64)) ||
         (record.language !== undefined &&
-          (typeof record.language !== "string" ||
-            !boundedCodePattern.test(record.language)))
+          !validCatalogFilter(record.language, 32))
       ) {
         return null;
       }
