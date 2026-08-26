@@ -76,14 +76,14 @@ const testExpertApi = (
 });
 
 describe("API boundary", () => {
-  it("rejects unverified webhooks before application dispatch", async () => {
+  it("does not expose client conversation webhooks by default", async () => {
     const app = await buildTestApp();
     const response = await app.inject({
       method: "POST",
       url: "/v1/webhooks/selarti",
       payload: { event: "message" },
     });
-    expect(response.statusCode).toBe(401);
+    expect(response.statusCode).toBe(404);
     expect(app.services.conversation.handleInbound).not.toHaveBeenCalled();
     await app.close();
   });
@@ -265,7 +265,7 @@ describe("API boundary", () => {
     await app.close();
   });
 
-  it("rejects stale verified Selarti events before quota and dispatch", async () => {
+  it("does not let an injected legacy Selarti event expose the disabled route", async () => {
     const now = Date.parse("2026-08-01T12:00:00.000Z");
     const app = await buildTestApp({
       now: () => now,
@@ -286,12 +286,12 @@ describe("API boundary", () => {
           payload: {},
         })
       ).statusCode,
-    ).toBe(401);
+    ).toBe(404);
     expect(app.services.conversation.handleInbound).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("lets the authoritative Selarti transaction retry after dispatch failure", async () => {
+  it("does not invoke legacy Selarti dispatch while conversation ingress is disabled", async () => {
     const now = Date.parse("2026-08-01T12:00:00.000Z");
     const event = {
       kind: "inbound_message" as const,
@@ -314,7 +314,7 @@ describe("API boundary", () => {
           payload: {},
         })
       ).statusCode,
-    ).toBe(500);
+    ).toBe(404);
     expect(
       (
         await app.inject({
@@ -323,8 +323,8 @@ describe("API boundary", () => {
           payload: {},
         })
       ).statusCode,
-    ).toBe(200);
-    expect(app.services.conversation.handleInbound.mock.calls).toHaveLength(2);
+    ).toBe(404);
+    expect(app.services.conversation.handleInbound).not.toHaveBeenCalled();
     await app.close();
   });
 

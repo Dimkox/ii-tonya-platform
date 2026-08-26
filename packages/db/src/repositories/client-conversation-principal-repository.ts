@@ -10,8 +10,8 @@ export interface ClientConversationIdentityFact {
 
 export interface ClientConversationIdentityLookup {
   readonly provider: "selarti.client-thread.v1";
-  readonly tenantToken: `hmac-sha256:v1:${string}`;
-  readonly subjectToken: `hmac-sha256:v1:${string}`;
+  readonly tenantToken: string;
+  readonly subjectToken: string;
   readonly tokenVersion: 1;
 }
 

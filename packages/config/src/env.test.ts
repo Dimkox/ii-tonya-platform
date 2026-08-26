@@ -25,6 +25,8 @@ describe("loadEnv", () => {
     expect(config.rawConversationLogging).toBe(false);
     expect(config.features).toEqual({
       workerOutboxDelivery: false,
+      clientConversation: false,
+      clientConversationToolDispatch: false,
       clientCatalog: false,
       clientSession: false,
       clientBooking: false,
@@ -43,6 +45,38 @@ describe("loadEnv", () => {
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
     ).toThrow("Raw conversation logging is prohibited");
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
+  });
+
+  it("defaults client conversation and tool dispatch off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.clientConversation).toBe(false);
+    expect(loadEnv(localEnv()).features.clientConversationToolDispatch).toBe(
+      false,
+    );
+    expect(
+      loadEnv(localEnv({ CLIENT_CONVERSATION_ENABLED: "true" })).features
+        .clientConversation,
+    ).toBe(true);
+    expect(
+      loadEnv(
+        localEnv({
+          CLIENT_CONVERSATION_ENABLED: "true",
+          CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED: "true",
+        }),
+      ).features.clientConversationToolDispatch,
+    ).toBe(true);
+    for (const invalid of ["TRUE", "1", "", "fixture"]) {
+      expect(() =>
+        loadEnv(localEnv({ CLIENT_CONVERSATION_ENABLED: invalid })),
+      ).toThrow();
+      expect(() =>
+        loadEnv(
+          localEnv({ CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED: invalid }),
+        ),
+      ).toThrow();
+    }
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED: "true" })),
+    ).toThrow("client_conversation_configuration_incomplete");
   });
 
   it("defaults worker outbox delivery off and accepts only exact booleans", () => {

@@ -72,6 +72,10 @@ const schema = z
       .enum(["true", "false"])
       .default("false"),
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_CONVERSATION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -175,6 +179,16 @@ const schema = z
       }
     }
     if (
+      value.CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED === "true" &&
+      value.CLIENT_CONVERSATION_ENABLED !== "true"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED"],
+        message: "client_conversation_configuration_incomplete",
+      });
+    }
+    if (
       (value.CLIENT_BOOKING_ENABLED === "true" &&
         (value.CLIENT_SESSION_ENABLED !== "true" ||
           value.CLIENT_CATALOG_ENABLED !== "true" ||
@@ -273,6 +287,8 @@ export type RuntimeConfig = {
   displayTimezone: string;
   features: {
     workerOutboxDelivery: boolean;
+    clientConversation?: boolean;
+    clientConversationToolDispatch?: boolean;
     clientSession?: boolean;
     clientCatalog: boolean;
     clientBooking?: boolean;
@@ -337,6 +353,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     displayTimezone: value.DISPLAY_TIMEZONE,
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
+      clientConversation: value.CLIENT_CONVERSATION_ENABLED === "true",
+      clientConversationToolDispatch:
+        value.CLIENT_CONVERSATION_TOOL_DISPATCH_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",

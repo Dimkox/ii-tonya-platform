@@ -4,6 +4,7 @@ import type {
   CatalogService,
   ClientCatalogService,
   ClientBookingService,
+  ClientConversationIdentityResolver,
   ClientPrincipalResolver,
   ClientSessionService,
   ConversationService,
@@ -55,6 +56,7 @@ import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import type { AuthenticatedConversationInboundCapability } from "./client-conversation-inbound.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -96,6 +98,11 @@ export interface AppDependencies {
   clientPrincipal?: ClientPrincipalResolver;
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
+  clientConversationInbound?: AuthenticatedConversationInboundCapability;
+  clientConversationIdentity?: ClientConversationIdentityResolver;
+  clientConversationRuntime?: {
+    assertReady(): Promise<void>;
+  };
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -128,6 +135,16 @@ export async function buildApp(
     deps.expertApi === undefined
   ) {
     throw new Error("Expert API runtime capability is required");
+  }
+  if (deps.config.features.clientConversation === true) {
+    if (
+      deps.clientConversationInbound === undefined ||
+      deps.clientConversationIdentity === undefined ||
+      deps.clientConversationRuntime === undefined
+    ) {
+      throw new Error("Client conversation runtime capability is required");
+    }
+    await deps.clientConversationRuntime.assertReady();
   }
   if (
     deps.config.features.clientBooking === true &&
@@ -225,13 +242,21 @@ export async function buildApp(
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }
-  await app.register(selartiWebhookRoutes, {
-    selarti: deps.selarti,
-    conversation: deps.conversationService,
-    logger: deps.logger,
-    rateLimiter: deps.rateLimiter,
-    ...(deps.now === undefined ? {} : { now: deps.now }),
-  });
+  if (
+    deps.config.features.clientConversation === true &&
+    deps.clientConversationInbound !== undefined &&
+    deps.clientConversationIdentity !== undefined
+  ) {
+    await app.register(selartiWebhookRoutes, {
+      inbound: deps.clientConversationInbound,
+      identities: deps.clientConversationIdentity,
+      conversation: deps.conversationService,
+      logger: deps.logger,
+      rateLimiter: deps.rateLimiter,
+      runtime: deps.clientConversationRuntime!,
+      ...(deps.now === undefined ? {} : { now: deps.now }),
+    });
+  }
   await app.register(telegramWebhookRoutes, {
     secret: deps.telegramWebhookSecret,
     callbacks: deps.telegramCallbacks,

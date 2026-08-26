@@ -15,6 +15,8 @@ const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalExpertKeys = process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
 const originalClientSessionEnabled = process.env.CLIENT_SESSION_ENABLED;
 const originalClientCatalogEnabled = process.env.CLIENT_CATALOG_ENABLED;
+const originalClientConversationEnabled =
+  process.env.CLIENT_CONVERSATION_ENABLED;
 afterEach(() => {
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
@@ -27,6 +29,10 @@ afterEach(() => {
   if (originalClientCatalogEnabled === undefined)
     delete process.env.CLIENT_CATALOG_ENABLED;
   else process.env.CLIENT_CATALOG_ENABLED = originalClientCatalogEnabled;
+  if (originalClientConversationEnabled === undefined)
+    delete process.env.CLIENT_CONVERSATION_ENABLED;
+  else
+    process.env.CLIENT_CONVERSATION_ENABLED = originalClientConversationEnabled;
 });
 const disabled = new Proxy(
   {},
@@ -38,6 +44,21 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("rejects enabled client conversation before migration when runtime capability is absent", async () => {
+    process.env.DATABASE_URL =
+      "postgresql://placeholder.invalid/test?sslmode=require";
+    process.env.CLIENT_CONVERSATION_ENABLED = "true";
+    const migrate = vi.fn(async () => undefined);
+    const lifecycle: ServerLifecycle = {
+      ...createDefaultLifecycle(),
+      migrate,
+    };
+
+    await expect(composeServer(lifecycle, {} as DrizzleDb)).rejects.toThrow(
+      "Client conversation runtime capability is required",
+    );
+    expect(migrate).not.toHaveBeenCalled();
+  });
   it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),
@@ -264,7 +285,7 @@ describe("server composition", () => {
           payload: {},
         })
       ).statusCode,
-    ).toBe(401);
+    ).toBe(404);
     expect(
       (
         await app.inject({

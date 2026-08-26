@@ -4,6 +4,7 @@ import {
   createAdminService,
   createClientCatalogService,
   createClientBookingService,
+  createClientConversationIdentityResolver,
   createClientSessionService,
   createExpertReferralAdminService,
   createOperatorCaseService,
@@ -32,6 +33,7 @@ import {
   PostgresClientCatalogRepository,
   PostgresBookingRepository,
   PostgresClientSessionRepository,
+  PostgresClientConversationPrincipalRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -58,6 +60,7 @@ import {
   clientSessionTokenHash,
   createClientSessionToken,
 } from "./client-session-token.js";
+import type { AuthenticatedConversationInboundCapability } from "./client-conversation-inbound.js";
 
 export interface ServerLifecycle {
   preflight(config: ReturnType<typeof loadEnv>): void;
@@ -111,9 +114,20 @@ export const createDefaultLifecycle = (
     clientSessionComposition?: {
       readonly verifier: IdentityProofVerifier;
     };
+    clientConversationComposition?: {
+      readonly inbound: AuthenticatedConversationInboundCapability;
+      readonly conversation: ConversationService;
+      readonly runtime: { assertReady(): Promise<void> };
+    };
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (
+      config.features.clientConversation === true &&
+      options.clientConversationComposition === undefined
+    ) {
+      throw new Error("Client conversation runtime capability is required");
+    }
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -124,6 +138,12 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (
+      config.features.clientConversation === true &&
+      options.clientConversationComposition === undefined
+    ) {
+      throw new Error("Client conversation runtime capability is required");
+    }
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -219,12 +239,19 @@ export const createDefaultLifecycle = (
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
         : undefined;
+    const clientConversationIdentity =
+      config.features.clientConversation === true &&
+      options.clientConversationComposition !== undefined
+        ? createClientConversationIdentityResolver(
+            new PostgresClientConversationPrincipalRepository(db),
+          )
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
-      conversationService: disabledService<ConversationService>(
-        "conversation ingress",
-      ),
+      conversationService:
+        options.clientConversationComposition?.conversation ??
+        disabledService<ConversationService>("conversation ingress"),
       bookingService: disabledService<BookingService>("booking ingress"),
       catalogService: disabledService<CatalogService>("catalog ingress"),
       privacyService: disabledService<PrivacyService>("privacy ingress"),
@@ -265,6 +292,16 @@ export const createDefaultLifecycle = (
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
       telegramWebhookSecret: randomBytes(32).toString("base64url"),
+      ...(options.clientConversationComposition === undefined ||
+      clientConversationIdentity === undefined
+        ? {}
+        : {
+            clientConversationInbound:
+              options.clientConversationComposition.inbound,
+            clientConversationIdentity,
+            clientConversationRuntime:
+              options.clientConversationComposition.runtime,
+          }),
       ...(clientCatalogService === undefined
         ? {}
         : {
