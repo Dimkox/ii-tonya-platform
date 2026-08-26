@@ -70,6 +70,9 @@ export {
   PostgresClientConversationOperationRepository,
   type ConversationOperationClaimRepository,
   type ClientConversationOperationClaimDetails,
+  type FencedWriteResult,
+  type OperationClaim,
+  type OperationResult,
 } from "./repositories/client-conversation-operation-repository.js";
 export {
   CompensationConflictError,

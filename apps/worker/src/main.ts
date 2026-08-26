@@ -4,6 +4,14 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
 import {
+  createClientConversationOperationAuthority,
+  createConversationBookingGateway,
+  createConversationCatalogGateway,
+} from "../../../packages/application/src/index.js";
+import { PostgresClientConversationOperationRepository } from "../../../packages/db/src/repositories/client-conversation-operation-repository.js";
+import { PostgresBookingRepository as ConversationPostgresBookingRepository } from "../../../packages/db/src/repositories/booking-repository.js";
+import { PostgresClientCatalogRepository as ConversationPostgresClientCatalogRepository } from "../../../packages/db/src/repositories/client-catalog-repository.js";
+import {
   createDb,
   PostgresCatalogRepository,
   PostgresBookingRepository,
@@ -30,8 +38,21 @@ import {
 import {
   createProductionWorkerRuntime,
   disabledExpertResidencyProviderReader,
+  type ClientConversationRuntimeJobs,
   type WorkerRuntime,
 } from "./runtime.js";
+import {
+  createClientConversationOperationsJob,
+  createClientConversationRuntimeLeaseController,
+  preflightClientConversationWorker,
+  type ClientConversationIntervalScheduler,
+  type ClientConversationOperationWorkerRepository,
+  type ClientConversationWorkerCapabilities,
+} from "./client-conversation-operations.js";
+import type {
+  ConversationBookingGateway,
+  ConversationCatalogGateway,
+} from "../../../packages/application/src/index.js";
 import {
   boundedFullJitterDelay,
   createLocalOperatorCaseOutboxRegistry,
@@ -57,6 +78,12 @@ export interface ProductionWorkerRuntimeFactoryDependencies {
     db: DrizzleDb,
     config: RuntimeConfig,
   ) => WorkerOutboxRegistry;
+  readonly clientConversationOperationCrypto?: ConstructorParameters<
+    typeof PostgresClientConversationOperationRepository
+  >[1];
+  readonly clientConversationBuildSha?: string;
+  readonly clientConversationInstanceId?: string;
+  readonly clientConversationScheduler?: ClientConversationIntervalScheduler;
 }
 export interface WorkerLoopOptions {
   readonly signal: AbortSignal;
@@ -70,6 +97,60 @@ export interface WorkerMainOptions {
   readonly pollIntervalMs?: number;
   readonly shutdownGraceMs?: number;
   readonly hardExit?: (status: number) => void;
+}
+
+export function composeClientConversationWorker(
+  features: Readonly<{
+    clientConversation?: boolean;
+    clientConversationToolDispatch?: boolean;
+  }>,
+  capabilities: ClientConversationWorkerCapabilities &
+    Readonly<{
+      operationRepository?: ClientConversationOperationWorkerRepository;
+      catalogGateway?: ConversationCatalogGateway;
+      bookingGateway?: ConversationBookingGateway;
+      batchSize?: number;
+      scheduler?: ClientConversationIntervalScheduler;
+    }>,
+):
+  | Readonly<{
+      start(): Promise<void>;
+      runtimeJobs: ClientConversationRuntimeJobs;
+    }>
+  | undefined {
+  const status = preflightClientConversationWorker(features, capabilities);
+  if (status === "disabled") return undefined;
+  const batchSize = capabilities.batchSize ?? 100;
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 1_000) {
+    throw new Error("client_conversation_worker_configuration_incomplete");
+  }
+  const repository = capabilities.operationRepository!;
+  const job = createClientConversationOperationsJob({
+    repository,
+    catalogGateway: capabilities.catalogGateway!,
+    bookingGateway: capabilities.bookingGateway!,
+    ownerId: capabilities.instanceId!,
+    batchSize,
+  });
+  const runtimeLeases = createClientConversationRuntimeLeaseController({
+    heartbeat: () =>
+      repository.heartbeatRuntime({
+        instanceId: capabilities.instanceId!,
+        buildSha: capabilities.buildSha!,
+      }),
+    ...(capabilities.scheduler === undefined
+      ? {}
+      : { scheduler: capabilities.scheduler }),
+  });
+  return Object.freeze({
+    start: () => runtimeLeases.start(),
+    runtimeJobs: Object.freeze({
+      dispatch: () => job.runDispatch(),
+      reconciliation: () => job.runReconciliation(),
+      cleanup: () => job.runCleanup(),
+      runtimeLeases,
+    }),
+  });
 }
 
 const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
@@ -239,7 +320,65 @@ export function createProductionWorkerRuntimeFactory(
         config,
         deps.yookassaReader,
       );
+      if (
+        config.features.clientConversationToolDispatch === true &&
+        (deps.clientConversationOperationCrypto === undefined ||
+          typeof deps.clientConversationBuildSha !== "string" ||
+          !/^[0-9a-f]{40}$/u.test(deps.clientConversationBuildSha) ||
+          typeof deps.clientConversationInstanceId !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(
+            deps.clientConversationInstanceId,
+          ))
+      ) {
+        throw new Error("client_conversation_worker_configuration_incomplete");
+      }
       const db = createDb(config.databaseUrl);
+      let clientConversation:
+        ReturnType<typeof composeClientConversationWorker> | undefined;
+      if (config.features.clientConversationToolDispatch === true) {
+        const operationCrypto = deps.clientConversationOperationCrypto;
+        if (operationCrypto === undefined) {
+          throw new Error(
+            "client_conversation_worker_configuration_incomplete",
+          );
+        }
+        const authority = createClientConversationOperationAuthority();
+        const operationRepository =
+          new PostgresClientConversationOperationRepository(
+            db,
+            operationCrypto,
+            authority,
+          );
+        const catalogGateway = createConversationCatalogGateway({
+          authority,
+          repository: new ConversationPostgresClientCatalogRepository(db, {
+            conversationCatalogEnabled: config.features.clientCatalog === true,
+          }),
+        });
+        const bookingGateway = createConversationBookingGateway({
+          authority,
+          repository: new ConversationPostgresBookingRepository(db, {
+            conversationBookingEnabled: config.features.clientBooking === true,
+          }),
+        });
+        clientConversation = composeClientConversationWorker(config.features, {
+          crypto: operationCrypto,
+          operationRepository,
+          catalogGateway,
+          bookingGateway,
+          ...(deps.clientConversationBuildSha === undefined
+            ? {}
+            : { buildSha: deps.clientConversationBuildSha }),
+          ...(deps.clientConversationInstanceId === undefined
+            ? {}
+            : { instanceId: deps.clientConversationInstanceId }),
+          ...(deps.clientConversationScheduler === undefined
+            ? {}
+            : { scheduler: deps.clientConversationScheduler }),
+        });
+      } else {
+        composeClientConversationWorker(config.features, {});
+      }
       const workerOutboxRegistry = selectWorkerOutboxRegistry(
         config,
         deps.workerOutboxRegistryFactory === undefined
@@ -284,7 +423,7 @@ export function createProductionWorkerRuntimeFactory(
           : undefined;
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
-      return createProductionWorkerRuntime({
+      const runtime = createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
           new PostgresExpertReferralWorkerRepository(db),
@@ -305,10 +444,20 @@ export function createProductionWorkerRuntimeFactory(
           ? {}
           : { clientSessionRetention }),
         ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
+        ...(clientConversation === undefined
+          ? {}
+          : { clientConversation: clientConversation.runtimeJobs }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),
       });
+      try {
+        await clientConversation?.start();
+        return runtime;
+      } catch (error) {
+        await runtime.close();
+        throw error;
+      }
     },
   };
 }

@@ -384,7 +384,7 @@ describe("client conversation operation races (real PostgreSQL)", () => {
     const claim = (
       await repo().claimReconciliation({ ownerId: "recon", limit: 1 })
     )[0]!;
-    expect(await repo().recordRetryWait(claim)).toBe("committed");
+    expect(await repo().recordUnknownOutcome(claim)).toBe("committed");
     const row = await db.db.execute<{
       status: string;
       reason: string;

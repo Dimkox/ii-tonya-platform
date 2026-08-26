@@ -270,4 +270,74 @@ describe("worker main", () => {
     expect(runtime.close).toHaveBeenCalledOnce();
     expect(hardExit).not.toHaveBeenCalled();
   });
+
+  it("composes dedicated conversation jobs and starts leases outside the worker cycle", async () => {
+    const { composeClientConversationWorker } = await import("./main.js");
+    const operationRepository = {
+      claimDispatch: vi.fn(async () => []),
+      claimReconciliation: vi.fn(async () => []),
+      recordResult: vi.fn(async () => "committed" as const),
+      recordGrantDenied: vi.fn(async () => "committed" as const),
+      recordRetryWait: vi.fn(async () => "committed" as const),
+      recordUnknownOutcome: vi.fn(async () => "committed" as const),
+      recordDeadLetter: vi.fn(async () => "committed" as const),
+      recoverExpired: vi.fn(async () => ({ recovered: 1 })),
+      cleanupExpired: vi.fn(async () => ({ expired: 2 })),
+      heartbeatRuntime: vi.fn(async () => undefined),
+    };
+    const scheduler = {
+      setInterval: vi.fn(() => "conversation-lease"),
+      clearInterval: vi.fn(),
+    };
+
+    const composition = composeClientConversationWorker(
+      {
+        clientConversation: true,
+        clientConversationToolDispatch: true,
+      },
+      {
+        crypto: { decrypt: vi.fn() },
+        operationRepository,
+        catalogGateway: { request: vi.fn() },
+        bookingGateway: { reserve: vi.fn() },
+        buildSha: "a".repeat(40),
+        instanceId: "worker-1",
+        batchSize: 10,
+        scheduler,
+      },
+    );
+    if (composition === undefined) throw new Error("expected composition");
+
+    await composition.start();
+    await composition.runtimeJobs.cleanup();
+    await composition.runtimeJobs.reconciliation();
+    await composition.runtimeJobs.dispatch();
+
+    expect(operationRepository.heartbeatRuntime).toHaveBeenCalledWith({
+      buildSha: "a".repeat(40),
+      instanceId: "worker-1",
+    });
+    expect(operationRepository.recoverExpired).toHaveBeenCalledOnce();
+    expect(operationRepository.cleanupExpired).toHaveBeenCalledOnce();
+    expect(operationRepository.claimReconciliation).toHaveBeenCalledOnce();
+    expect(operationRepository.claimDispatch).toHaveBeenCalledOnce();
+    await composition.runtimeJobs.runtimeLeases.stop();
+    expect(scheduler.clearInterval).toHaveBeenCalledWith("conversation-lease");
+  });
+
+  it("fails enabled conversation dispatch before runtime creation when identity and crypto are absent", async () => {
+    const { createProductionWorkerRuntimeFactory } = await import("./main.js");
+    const factory = createProductionWorkerRuntimeFactory();
+
+    await expect(
+      factory.create({
+        databaseUrl:
+          "postgresql://worker:worker@localhost/worker?sslmode=require",
+        features: {
+          clientConversation: true,
+          clientConversationToolDispatch: true,
+        },
+      } as never),
+    ).rejects.toThrow("client_conversation_worker_configuration_incomplete");
+  });
 });

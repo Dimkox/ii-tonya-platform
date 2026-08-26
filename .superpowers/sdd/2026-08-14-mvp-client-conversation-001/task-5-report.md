@@ -207,3 +207,35 @@ GREEN evidence:
 - Prettier and `git diff --check` — passed.
 
 Changed files: `packages/db/src/repositories/booking-repository.ts`, `tests/integration/client-conversation-booking-gateway.test.ts`, this report.
+
+## Slice 5B3 — dedicated worker dispatch, reconciliation, cleanup and runtime leases
+
+Status: GREEN
+
+RED evidence:
+
+- `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts tests/integration/client-conversation-operation-races.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 17 tests failed / 11 passed. The worker still called stub `claim`/`reconcile` methods, had no preflight or lease controller, cleanup skipped recovery, and the real PostgreSQL fifth reconciliation exception remained `unknown_outcome` instead of `attempts_exhausted` dead letter.
+- `corepack pnpm exec vitest run apps/worker/src/runtime.test.ts` — 1 file, 2 tests failed / 6 passed because dedicated conversation jobs were absent from the cycle report/runtime and lease failure did not withdraw job execution.
+- `corepack pnpm exec vitest run apps/worker/src/main.test.ts` — 1 file, 1 test failed / 12 passed because the dedicated production composition seam did not exist.
+
+Implementation:
+
+- Replaced the worker stub and duplicate structural claim/gateway types with application/DB imports. The bounded job claims one batch from `PostgresClientConversationOperationRepository`, routes genuine `show_catalog` and `start_booking` claims to their exact gateways, records every known applied/business-rejected result, classifies typed pre-call contention as retry wait, and records every other post-invocation exception as unknown outcome. Invalid authority claims dead-letter as `invalid_operation`; stale fenced writes are counted and never retried in the same run.
+- Reconciliation claims only repository-minted unknown outcomes and replays the exact same frozen claim through the same gateway/idempotency seam. Known results use `recordResult`; unresolved calls use `recordUnknownOutcome`. The repository now atomically fences fifth reconciliation failure into `attempts_exhausted` dead letter with one operator case.
+- Cleanup runs `recoverExpired` before `cleanupExpired`, with no outbox registry, provider or outbound-billing path. Existing operation crypto/expiry/fence behavior remains repository-owned.
+- Added pure fail-closed worker preflight. `CLIENT_CONVERSATION_ENABLED` alone remains disabled; dispatch requires its exact tool flag, crypto decrypt capability, complete operation repository API, both exact gateways, 40-lowercase-hex build SHA and bounded instance ID. Existing config defaults remain false.
+- Production worker composition creates one authority, operation repository, catalog gateway and booking gateway from the injected crypto/build/instance capabilities. The dedicated cleanup/reconciliation/dispatch jobs extend the cycle report without replacing existing jobs and each run exactly once per cycle.
+- Runtime leases start only after the dedicated runtime/jobs are assembled. An injectable scheduler performs an immediate DB heartbeat and independent 10-second cadence through repository `heartbeatRuntime`, whose real PostgreSQL evidence proves exact `dispatch_v1`/`cleanup_v1`, contract version 1, build SHA and DB-time 30-second intervals. Failure cancels cadence and withdraws readiness; close cancels the timer before waiting for the cycle or closing PostgreSQL.
+- Worker exports include the dedicated job, preflight, lease controller and runtime job types. No new outbox topic or provider runner was added.
+
+GREEN evidence:
+
+- `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/config/src/env.test.ts packages/contracts/src/worker-outbox.test.ts packages/application/src/client-conversation-authority.test.ts packages/application/src/client-catalog-service.test.ts packages/application/src/client-booking-service.test.ts tests/integration/client-conversation-operation-races.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 11 files, 138 tests passed, including 46 migration-backed PostgreSQL state-machine/gateway tests.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed.
+- Prettier and `git diff --check` — passed.
+
+Changed files: `apps/worker/src/client-conversation-operations.ts`, `apps/worker/src/client-conversation-operations.test.ts`, `apps/worker/src/main.ts`, `apps/worker/src/main.test.ts`, `apps/worker/src/runtime.ts`, `apps/worker/src/runtime.test.ts`, `apps/worker/src/index.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/client-conversation-operation-repository.ts`, `tests/integration/client-conversation-operation-races.test.ts`, this report.
+
+Concern: live dispatch remains intentionally fail-closed unless the production factory is supplied an approved operation-crypto capability plus exact build SHA and instance ID. No secret source, provider, release, push or external state was added in this slice.

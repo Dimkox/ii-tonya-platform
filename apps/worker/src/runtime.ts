@@ -10,6 +10,9 @@ import {
 
 export interface WorkerCycleReport {
   readonly safetyHandoffs: unknown;
+  readonly clientConversationCleanup: unknown;
+  readonly clientConversationReconciliation: unknown;
+  readonly clientConversationDispatch: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
@@ -36,6 +39,16 @@ export const disabledExpertResidencyProviderReader: ExpertResidencyProviderReade
 
 type BoundedJob = () => Promise<unknown>;
 
+export interface ClientConversationRuntimeJobs {
+  readonly dispatch: BoundedJob;
+  readonly reconciliation: BoundedJob;
+  readonly cleanup: BoundedJob;
+  readonly runtimeLeases: {
+    assertReady(): void;
+    stop(): Promise<void>;
+  };
+}
+
 export interface WorkerRuntimeDependencies {
   /** Dedicated safety repository/dispatcher path; never a Planerka or intent-model call. */
   readonly safetyHandoffs: BoundedJob;
@@ -49,6 +62,7 @@ export interface WorkerRuntimeDependencies {
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
+  readonly clientConversation?: ClientConversationRuntimeJobs;
   readonly closeDatabase: () => Promise<void>;
   readonly closeTelemetry: () => Promise<void>;
   readonly shutdownTimeoutMs?: number;
@@ -62,6 +76,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly clientConversation?: ClientConversationRuntimeJobs;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -142,7 +157,20 @@ export function createWorkerRuntime(
       return Promise.reject(new Error("Worker cycle is already running"));
     }
     const cycle = (async (): Promise<WorkerCycleReport> => {
+      deps.clientConversation?.runtimeLeases.assertReady();
       const safetyHandoffs = await deps.safetyHandoffs();
+      const clientConversationCleanup =
+        deps.clientConversation === undefined
+          ? { processed: 0, reason: "capability_disabled" }
+          : await deps.clientConversation.cleanup();
+      const clientConversationReconciliation =
+        deps.clientConversation === undefined
+          ? { processed: 0, reason: "capability_disabled" }
+          : await deps.clientConversation.reconciliation();
+      const clientConversationDispatch =
+        deps.clientConversation === undefined
+          ? { processed: 0, reason: "capability_disabled" }
+          : await deps.clientConversation.dispatch();
       const expiredLeaseRecovery = await deps.recoverExpiredLeases();
       const unknownOutcomeReconciliation =
         await deps.reconcileUnknownOutcomes();
@@ -158,6 +186,9 @@ export function createWorkerRuntime(
       const providerReconciliation = await deps.providerReconciliation();
       return {
         safetyHandoffs,
+        clientConversationCleanup,
+        clientConversationReconciliation,
+        clientConversationDispatch,
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
         reservationExpiry,
@@ -184,6 +215,16 @@ export function createWorkerRuntime(
     acceptingClaims = false;
     closePromise = (async () => {
       let failure: unknown;
+      try {
+        if (deps.clientConversation !== undefined) {
+          await beforeDeadline(
+            deps.clientConversation.runtimeLeases.stop(),
+            shutdownTimeoutMs,
+          );
+        }
+      } catch (error) {
+        failure = error;
+      }
       try {
         if (currentCycle !== null) {
           await beforeDeadline(currentCycle, shutdownTimeoutMs);
@@ -307,6 +348,9 @@ export function createProductionWorkerRuntime(
       projectionRepairs: 0,
       provider: "disabled",
     }),
+    ...(deps.clientConversation === undefined
+      ? {}
+      : { clientConversation: deps.clientConversation }),
     closeDatabase: deps.closeDatabase,
     closeTelemetry: deps.closeTelemetry,
     ...(deps.shutdownTimeoutMs === undefined

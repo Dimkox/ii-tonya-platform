@@ -1,6 +1,7 @@
 export {
   createProductionWorkerRuntime,
   createWorkerRuntime,
+  type ClientConversationRuntimeJobs,
   type ProductionWorkerRuntimeDependencies,
   type WorkerCycleReport,
   type WorkerRuntime,
@@ -15,3 +16,13 @@ export {
   type ClientCatalogPublicSource,
   type ClientCatalogSourceReader,
 } from "./client-catalog-outbox.js";
+export {
+  createClientConversationOperationsJob,
+  createClientConversationRuntimeLeaseController,
+  preflightClientConversationWorker,
+  type ClientConversationIntervalScheduler,
+  type ClientConversationOperationRunReport,
+  type ClientConversationOperationWorkerRepository,
+  type ClientConversationRuntimeLeaseController,
+  type ClientConversationWorkerCapabilities,
+} from "./client-conversation-operations.js";

@@ -440,6 +440,14 @@ export class PostgresClientConversationOperationRepository {
     );
   }
   async recordUnknownOutcome(c: OperationClaim) {
+    if (c.phase === "reconciliation") {
+      const row = await this.db.execute<{ reconciliationAttempt: number }>(
+        sql`select reconciliation_attempt as "reconciliationAttempt" from client_conversation_operations where id=${c.operationId}::uuid and claim_fence=${c.claimFence}`,
+      );
+      if (Number(row.rows[0]?.reconciliationAttempt ?? 0) >= 5) {
+        return this.fenced(c, "dead_letter", "attempts_exhausted");
+      }
+    }
     return this.fenced(c, "unknown_outcome");
   }
   async recordDeadLetter(

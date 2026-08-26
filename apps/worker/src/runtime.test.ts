@@ -335,4 +335,99 @@ describe("worker runtime", () => {
       dispatched: 2,
     });
   });
+
+  it("runs each dedicated conversation job once and stops leases before database close", async () => {
+    const calls: string[] = [];
+    const job = (name: string) =>
+      vi.fn(async () => {
+        calls.push(name);
+        return { name };
+      });
+    const noop = job("existing");
+    const dispatch = job("conversation-dispatch");
+    const reconciliation = job("conversation-reconciliation");
+    const cleanup = job("conversation-cleanup");
+    const runtimeLeases = {
+      assertReady: vi.fn(() => calls.push("lease-ready")),
+      stop: vi.fn(async () => {
+        calls.push("lease-stop");
+      }),
+    };
+    const closeDatabase = vi.fn(async () => {
+      calls.push("database-close");
+    });
+    const runtime = createWorkerRuntime({
+      safetyHandoffs: noop,
+      recoverExpiredLeases: noop,
+      reconcileUnknownOutcomes: noop,
+      reservationExpiry: noop,
+      expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
+      expertResidencyReconciliation: noop,
+      expertReferralHoldReplay: noop,
+      deliverConfirmedOutbox: noop,
+      processorPrivacy: noop,
+      providerReconciliation: noop,
+      clientConversation: {
+        dispatch,
+        reconciliation,
+        cleanup,
+        runtimeLeases,
+      },
+      closeDatabase,
+      closeTelemetry: vi.fn(async () => undefined),
+    });
+
+    await expect(runtime.runOnce()).resolves.toMatchObject({
+      clientConversationDispatch: { name: "conversation-dispatch" },
+      clientConversationReconciliation: {
+        name: "conversation-reconciliation",
+      },
+      clientConversationCleanup: { name: "conversation-cleanup" },
+    });
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(reconciliation).toHaveBeenCalledOnce();
+    expect(cleanup).toHaveBeenCalledOnce();
+    await runtime.close();
+    expect(calls.indexOf("lease-stop")).toBeLessThan(
+      calls.indexOf("database-close"),
+    );
+  });
+
+  it("withdraws dedicated job execution when runtime lease readiness fails", async () => {
+    const noop = vi.fn(async () => ({}));
+    const dispatch = vi.fn(async () => ({}));
+    const runtime = createWorkerRuntime({
+      safetyHandoffs: noop,
+      recoverExpiredLeases: noop,
+      reconcileUnknownOutcomes: noop,
+      reservationExpiry: noop,
+      expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
+      expertResidencyReconciliation: noop,
+      expertReferralHoldReplay: noop,
+      deliverConfirmedOutbox: noop,
+      processorPrivacy: noop,
+      providerReconciliation: noop,
+      clientConversation: {
+        dispatch,
+        reconciliation: vi.fn(async () => ({})),
+        cleanup: vi.fn(async () => ({})),
+        runtimeLeases: {
+          assertReady() {
+            throw new Error("client conversation runtime lease unavailable");
+          },
+          stop: vi.fn(async () => undefined),
+        },
+      },
+      closeDatabase: vi.fn(async () => undefined),
+      closeTelemetry: vi.fn(async () => undefined),
+    });
+
+    await expect(runtime.runOnce()).rejects.toThrow(
+      "runtime lease unavailable",
+    );
+    expect(dispatch).not.toHaveBeenCalled();
+    await runtime.close();
+  });
 });
