@@ -3,9 +3,19 @@ import { describe, expect, it } from "vitest";
 import {
   operationalMetrics,
   clientSessionMetricLabels,
+  clientConversationMetricLabels,
   referralMetricLabels,
   workerOutboxMetricLabels,
 } from "./metrics.js";
+
+describe("client conversation metric labels", () => {
+  it("accepts only the contract vocabulary", () => {
+    expect(clientConversationMetricLabels({ operation: "freeze", outcome: "accepted" })).toEqual({ operation: "freeze", outcome: "accepted" });
+  });
+  it("rejects identifiers and unknown dimensions", () => {
+    expect(() => clientConversationMetricLabels({ operation: "dispatch", outcome: "ok", userId: randomUUID() })).toThrow("invalid_client_conversation_metric_labels");
+  });
+});
 
 describe("client session metric labels", () => {
   it("accepts only fixed operation and outcome labels", () => {

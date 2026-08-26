@@ -15,3 +15,7 @@ Generate the operation identity and expiry from PostgreSQL, then invoke an injec
 ## 2026-08-26 — Share transaction timestamp semantics for the 24-hour envelope
 
 Derive `payload_expires_at` from `transaction_timestamp()+24h`, matching the table's `created_at DEFAULT now()` semantics. This satisfied the exact database constraint without clock drift or application-time assumptions.
+
+## 2026-08-26 — Reconcile the Task 6 PostgreSQL evidence target
+
+Use PostgreSQL 16.15 (`server_version_num=160015`) for the executable Task 6 gate because the plan and pinned test host require that exact value; stale 17.5 prose describes deployment configuration, not this test target. This keeps immutable evidence aligned with the actual verification environment.

@@ -17,6 +17,7 @@ export const operationalMetrics = {
   clientCatalog: meter.createCounter("ii_tonya_client_catalog"),
   clientSession: meter.createCounter("ii_tonya_client_session"),
   clientBooking: meter.createCounter("ii_tonya_client_booking"),
+  clientConversation: meter.createCounter("ii_tonya_client_conversation"),
   providerCircuitState: meter.createUpDownCounter(
     "ii_tonya_provider_circuit_state",
   ),
@@ -54,6 +55,34 @@ export const operationalMetrics = {
     "ii_tonya_expert_residency_job_duration_ms",
   ),
 } as const;
+
+const clientConversationOperations = new Set([
+  "authenticate", "resolve", "freeze", "dispatch", "reconcile", "cleanup",
+]);
+const clientConversationOutcomes = new Set([
+  "accepted", "duplicate", "denied", "conflict", "rate_limited",
+  "retry", "unknown", "succeeded", "dead_letter", "unavailable", "failed",
+]);
+
+export type ClientConversationMetricLabels = Readonly<{
+  operation: "authenticate" | "resolve" | "freeze" | "dispatch" | "reconcile" | "cleanup";
+  outcome: "accepted" | "duplicate" | "denied" | "conflict" | "rate_limited" | "retry" | "unknown" | "succeeded" | "dead_letter" | "unavailable" | "failed";
+}>;
+
+export function clientConversationMetricLabels(value: unknown): ClientConversationMetricLabels {
+  if (!isRecord(value) || Object.keys(value).length !== 2 ||
+      Object.keys(value).some((key) => key !== "operation" && key !== "outcome") ||
+      typeof value.operation !== "string" || !clientConversationOperations.has(value.operation) ||
+      typeof value.outcome !== "string" || !clientConversationOutcomes.has(value.outcome)) {
+    throw new Error("invalid_client_conversation_metric_labels");
+  }
+  return value as ClientConversationMetricLabels;
+}
+
+export function recordClientConversationMetric(labels: ClientConversationMetricLabels, count = 1): void {
+  if (!Number.isSafeInteger(count) || count < 1) throw new Error("invalid_client_conversation_metric_count");
+  operationalMetrics.clientConversation.add(count, clientConversationMetricLabels(labels));
+}
 
 const clientSessionOperations = new Set([
   "issue",

@@ -19,3 +19,8 @@ and freshly recheck the separate exact channel booking-write grant/fence; lifecy
 preserve the existing protected-choice advisory prelock before the shared lifecycle row order.
 Booking implementation must merge/be reviewed before the one next-actual
 migration and combined interface receives Booking/Security approval.
+# Task 6 local implementation status
+
+- Privacy/observability and immutable gate changes are locally implemented and structurally verified.
+- Mandatory real-incident AI regressions, prior-release distribution diff, named Product/Safety/Security signoff, broader message-event anonymization, and 35-day backup receipt remain **BLOCKED**.
+- The one `client-conversation` Claw/PostgreSQL invocation is **NOT RUN** and requires separate authorization on the reviewed exact SHA.

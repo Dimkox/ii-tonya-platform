@@ -15,7 +15,7 @@ describe("direct Claw verification semantics", () => {
 
   it("runs CI and database gates directly on Claw without Actions context", () => {
     const runner = read("scripts/run-claw-ci.sh");
-    expect(runner).toContain("<ci|database|release|client-booking>");
+    expect(runner).toContain("<ci|database|release|client-booking|client-conversation>");
     expect(runner).toContain(
       'source_root="$(realpath "${SOURCE_ROOT:?SOURCE_ROOT is required}")"',
     );
@@ -39,6 +39,22 @@ describe("direct Claw verification semantics", () => {
     );
     expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
     expect(runner).not.toMatch(/GITHUB_|actions-runner|workflow_dispatch/u);
+  });
+
+  it("freezes the client-conversation gate without running it", () => {
+    const runner = read("scripts/run-claw-ci.sh");
+    expect(runner).toContain("client-conversation)");
+    expect(runner).toContain("node scripts/assert-client-conversation-postgres.mjs");
+    expect(runner).toContain("tests/integration/client-conversation-privacy.test.ts");
+    expect(runner).toContain("--maxWorkers=1");
+    expect(runner).toContain("--untracked-files=all");
+    expect(runner).toContain("-e II_TONYA_TEST_POSTGRES_ADMIN_URL");
+    expect(runner).toContain(".claw-client-conversation-node-modules");
+    expect(runner).toContain("CLAW_SOURCE_SHA");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("integration_outbox");
+    expect(runner).toContain("docs/test-evidence/claw/$source_sha");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("160015");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).not.toMatch(/console\.log\(.*url/u);
   });
 
   it("installs the frozen dependency graph before verification", () => {

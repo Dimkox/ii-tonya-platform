@@ -9,6 +9,8 @@ export {
   clientCatalogMetricLabels,
   clientBookingMetricLabels,
   clientSessionMetricLabels,
+  clientConversationMetricLabels,
+  recordClientConversationMetric,
   recordClientCatalogMetric,
   recordClientBookingMetric,
   recordClientSessionMetric,
@@ -25,5 +27,6 @@ export {
 export {
   registerTelemetryShutdown,
   shutdownTelemetry,
+  sanitizeTraceException,
   traced,
 } from "./tracing.js";

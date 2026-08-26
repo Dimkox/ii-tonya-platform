@@ -3,8 +3,8 @@ set -Eeuo pipefail
 
 mode="${1:-}"
 case "$mode" in
-  ci | database | release | client-booking) ;;
-  *) printf 'usage: %s <ci|database|release|client-booking>\n' "$0" >&2; exit 2 ;;
+  ci | database | release | client-booking | client-conversation) ;;
+  *) printf 'usage: %s <ci|database|release|client-booking|client-conversation>\n' "$0" >&2; exit 2 ;;
 esac
 
 [[ "$(hostname -s)" == "claw" ]] || {
@@ -20,10 +20,11 @@ source_sha="${SOURCE_SHA:?SOURCE_SHA is required}"
 }
 test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
-if [[ "$mode" == client-booking ]]; then
+if [[ "$mode" == client-booking || "$mode" == client-conversation ]]; then
   test -z "$(git -C "$source_root" status --porcelain --untracked-files=all)"
   test ! -e "$source_root/node_modules"
   test ! -e "$source_root/.claw-client-booking-node-modules"
+  test ! -e "$source_root/.claw-client-conversation-node-modules"
   : "${II_TONYA_TEST_POSTGRES_ADMIN_URL:?II_TONYA_TEST_POSTGRES_ADMIN_URL is required}"
 fi
 missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=print | sed -n '/^?/ { p; q; }')"
@@ -54,6 +55,9 @@ cleanup() {
   if [[ "$mode" == client-booking && -f "$source_root/.claw-client-booking-node-modules" ]]; then
     rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"
   fi
+  if [[ "$mode" == client-conversation && -f "$source_root/.claw-client-conversation-node-modules" ]]; then
+    rm -rf "$source_root/node_modules" "$source_root/.claw-client-conversation-node-modules"
+  fi
   cd "$compose_root"
   docker compose --profile test rm -f -s ii-tonya-test >/dev/null 2>&1 || true
 }
@@ -64,7 +68,9 @@ set -Eeuo pipefail
 cd /workspace/source
 export CI=true
 if [[ "$CLAW_GATE_MODE" != client-booking ]]; then
-  pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+  if [[ "$CLAW_GATE_MODE" != client-conversation ]]; then
+    pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+  fi
 fi
 case "$CLAW_GATE_MODE" in
   ci)
@@ -179,6 +185,19 @@ case "$CLAW_GATE_MODE" in
     done
     /seed/node_modules/.bin/vitest run tests/integration/client-booking-schema.test.ts tests/repo/db-schema-parity.test.ts tests/integration/client-catalog-booking-choice.test.ts tests/integration/client-booking-repository.test.ts tests/integration/client-booking-privacy.test.ts tests/e2e/client-booking-boundary.test.ts tests/repo/client-booking-boundaries.test.ts apps/api/src/client-booking-principal-resolver.test.ts apps/api/src/routes/client-booking.test.ts packages/worker/src/client-booking-erasure.test.ts packages/contracts/src/worker-outbox.test.ts apps/worker/src/main.test.ts apps/worker/src/runtime.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
     ;;
+  client-conversation)
+    mkdir node_modules
+    : > .claw-client-conversation-node-modules
+    test -d /seed/node_modules/.pnpm
+    ln -s /seed/node_modules/.pnpm node_modules/.pnpm
+    test "$(readlink -f node_modules/.pnpm)" = /seed/node_modules/.pnpm
+    for package_name in drizzle-orm pg pino fastify vitest zod; do
+      test -e "/seed/node_modules/$package_name"
+      ln -s "/seed/node_modules/$package_name" "node_modules/$package_name"
+    done
+    node scripts/assert-client-conversation-postgres.mjs
+    /seed/node_modules/.bin/vitest run tests/integration/client-conversation-privacy.test.ts tests/integration/client-conversation-operation-races.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts packages/observability/src/logger.test.ts packages/observability/src/metrics.test.ts tests/repo/workflow-semantics.test.ts --maxWorkers=1
+    ;;
 esac
 SCRIPT
 
@@ -199,7 +218,7 @@ compose_args=(
 if [[ -n "$claw_syft" ]]; then
   compose_args+=( -v "$claw_syft:/usr/local/bin/syft:ro" )
 fi
-if [[ "$mode" == client-booking ]]; then
+if [[ "$mode" == client-booking || "$mode" == client-conversation ]]; then
   compose_args+=( -e II_TONYA_TEST_POSTGRES_ADMIN_URL )
 fi
 

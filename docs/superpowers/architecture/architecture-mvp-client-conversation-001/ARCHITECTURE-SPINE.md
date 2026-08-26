@@ -117,7 +117,7 @@ Repository-pinned or repository-declared versions inspected at the exact base; n
 | TypeScript | 5.8.3 range `^5.8.3` |
 | Fastify | 5.5.0 range `^5.5.0` |
 | Drizzle ORM | 0.45.2 range `^0.45.2` |
-| PostgreSQL evidence target | 17.5 (`server_version_num=170005`) |
+| PostgreSQL evidence target | 16.15 (`server_version_num=160015`) |
 
 ## Structural Seed
 

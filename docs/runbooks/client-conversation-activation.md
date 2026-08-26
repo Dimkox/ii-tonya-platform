@@ -26,7 +26,7 @@ provider authorization.
 | Privacy/Legal | Privacy/Legal | approved bases/retention, raw-content prohibition, export/erasure and 35-day backup receipt | absent; blocked |
 | AI behavior | Product/Safety/Security | incident regressions, prior-release distribution diff, named human spot-check for the mandatory tool-schema change | absent; blocked |
 | Interface/security review | Independent reviewer | zero unresolved Critical/Important findings with file/line evidence | docs approved: 0/0/0; implementation/live still blocked |
-| Focused gate | Verification | one immutable `client-conversation` Claw invocation, exact clean SHA, external PG 17.5, counts/cleanup, `repeat_limit: 1` | not run; blocked |
+| Focused gate | Verification | one immutable `client-conversation` Claw invocation, exact clean SHA, external PostgreSQL 16.15 (`server_version_num=160015`), counts/cleanup, `repeat_limit: 1` | not run; blocked |
 | Provider delivery | Provider/Operations | stable authenticated delivery identity, measured limits, timeout/idempotency/reconciliation and unknown-outcome drill | absent; blocked |
 | Deployment | Deployment owner | separate target authorization, immutable artifact, telemetry and rollback evidence | absent; blocked |
 
@@ -42,7 +42,7 @@ provider authorization.
    hostile crypto/SQL shapes and both lifecycle/mutation commit orders.
 4. Obtain independent interface/security review and close every Critical/Important finding.
 5. Run one total immutable `run-claw-ci.sh client-conversation` release-evidence invocation for the
-   reviewed clean SHA/identity with approved external PostgreSQL. Assert 17.5 without logging its
+   reviewed clean SHA/identity with approved external PostgreSQL. Assert `server_version_num=160015` without logging its
    URL. Pass ends the gate. Failure is preserved and blocks this story; any successor requires a
    new SHA, delta review, verification identity and explicit authorization.
 6. Separately approve the live Selarti contract, mapping provisioner, crypto key custody,
