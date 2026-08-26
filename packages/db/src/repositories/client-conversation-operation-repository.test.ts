@@ -36,4 +36,14 @@ describe("client conversation operation PostgreSQL state machine", () => {
     expect(sql).toContain("cleanup_v1");
     expect(sql).toContain("transaction_timestamp");
   });
+
+  it("exposes all fenced phases and terminal writes", () => {
+    const repo = new PostgresClientConversationOperationRepository(database(), {} as never, {} as never);
+    expect(typeof repo.claimReconciliation).toBe("function");
+    expect(typeof repo.recordResult).toBe("function");
+    expect(typeof repo.recordGrantDenied).toBe("function");
+    expect(typeof repo.recordRetryWait).toBe("function");
+    expect(typeof repo.recordUnknownOutcome).toBe("function");
+    expect(typeof repo.recordDeadLetter).toBe("function");
+  });
 });

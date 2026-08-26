@@ -49,3 +49,13 @@ RED evidence: the replacement repository tests initially failed four assertions:
 The timeout statement was corrected to three separate `SET LOCAL` statements. The focused tests pass after the correction, and workspace/test typechecks pass.
 
 Concrete blocker: the existing repository has no established method/signature for decrypt-capability injection, fenced result transitions, grant recheck, or operator/deletion receipt insertion. The migration defines columns/tables but no application port; implementing these requires choosing a new public repository API and corresponding real-Postgres fixture setup. The current test harness was still mock-based and therefore was not counted as completion evidence. The missing core remains unimplemented; no DONE claim is made.
+
+## Slice 5A fix round 3
+
+Status: BLOCKED
+
+RED: the new public-surface test failed because `claimReconciliation`, `recordResult`, `recordGrantDenied`, `recordRetryWait`, `recordUnknownOutcome`, and `recordDeadLetter` were absent.
+
+GREEN checks: `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck`, `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json`, focused Vitest (2 files, 6 tests), and `git diff --check` passed.
+
+Concrete remaining blocker at `packages/db/src/repositories/client-conversation-operation-repository.ts`: the implementation does not yet perform the required row-load/decrypt/digest/authority issuance path, does not atomically insert operator/deletion case rows, and the requested race suite at `tests/integration/client-conversation-operation-races.test.ts` still uses an in-memory/mock DB rather than `startTestPostgres()` and migration-backed fixtures. Therefore no real-Postgres state-machine evidence exists, and this slice cannot be marked DONE.
