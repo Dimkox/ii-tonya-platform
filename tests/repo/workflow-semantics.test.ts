@@ -70,22 +70,41 @@ describe("direct Claw verification semantics", () => {
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("cleanupExpired({limit:10})");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("information_schema.columns");
     expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("fixture_database_cleanup_failed");
+    expect(runner).toContain("CLAW_INVOCATION_IDENTITY=$claw_invocation_identity");
+    expect(runner).toContain('sha256sum "$source_root/scripts/run-claw-ci.sh"');
+    expect(runner).toContain('sha256sum "$source_root/scripts/assert-client-conversation-postgres.mjs"');
+    expect(runner).toContain('sha256sum "$source_root/packages/db/migrations/0032_client_conversation.sql"');
+    expect(runner).toContain('sha256sum "$source_root/tests/repo/workflow-semantics.test.ts"');
+    expect(gate).toContain("invocation_digest_mismatch");
+    expect(gate).toContain("isolated_migrated_database:true");
+    expect(gate).toContain("pristine_outbox_rows:3");
   });
 
   it("keeps conversation fixture identity helpers pure and exact", async () => {
     const sha = "a".repeat(40);
     // @ts-expect-error executable gate helpers are intentionally JavaScript-only.
-    const { conversationIdentity, fixtureDatabaseName, assertSnapshot, EXPECTED_SCHEMA } = await import("../../scripts/assert-client-conversation-postgres.mjs");
+    const { conversationIdentity, fixtureDatabaseName, invocationIdentity, normalizeMetadata, assertSnapshot, EXPECTED_SCHEMA } = await import("../../scripts/assert-client-conversation-postgres.mjs");
     expect(EXPECTED_SCHEMA.client_conversation_grants.indexes).toContain("client_conversation_grants_pkey");
     expect(EXPECTED_SCHEMA.client_conversation_runtime_leases.indexes).toContain("client_conversation_runtime_leases_pkey");
-    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("projected ? allConstraints.filter");
-    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("projected ? allIndexes.filter");
+    expect(EXPECTED_SCHEMA.provider_subject_mappings).toEqual({
+      columns: ["id","user_id","provider","subject_token","subject_ciphertext","created_at","updated_at","tenant_token","token_version"],
+      constraints: ["provider_subject_mappings_pkey","provider_subject_mappings_provider_token_unique","provider_subject_mappings_user_id_users_id_fk","provider_subject_mappings_conversation_token_check"],
+      indexes: ["provider_subject_mappings_pkey","provider_subject_mappings_provider_token_unique","provider_subject_mappings_conversation_lookup_idx"],
+    });
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).not.toContain("projected ?");
     expect(conversationIdentity(sha, sha, sha)).toBe(sha);
     expect(fixtureDatabaseName(sha, "b".repeat(16))).toBe(`ii_tonya_ccv_${"a".repeat(12)}_${"b".repeat(16)}`);
     expect(() => conversationIdentity(sha.toUpperCase(), sha, sha)).toThrow();
-    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: {} })).toThrow("schema_metadata_mismatch");
-    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: { ...EXPECTED_SCHEMA, unexpected_table: { columns: [], constraints: [], indexes: [] } } })).toThrow("schema_metadata_mismatch");
-    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: { client_conversation_grants: EXPECTED_SCHEMA.client_conversation_grants, client_conversation_operations: EXPECTED_SCHEMA.client_conversation_operations, client_conversation_runtime_leases: EXPECTED_SCHEMA.client_conversation_runtime_leases, client_conversation_operation_cases: EXPECTED_SCHEMA.client_conversation_operation_cases } })).toThrow("schema_metadata_mismatch");
+    expect(invocationIdentity(sha, (path: string) => Buffer.from(path))).toMatch(/^[0-9a-f]{64}$/u);
+    expect(() => invocationIdentity("A".repeat(40), () => Buffer.alloc(0))).toThrow("invalid_reviewed_sha");
+    const metadata = Object.fromEntries(Object.entries(EXPECTED_SCHEMA).map(([key, value]) => [key, normalizeMetadata(value)]));
+    const base = { serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, pristineOutboxRows: 3, totalOutboxRows: 3, isolatedMigratedDatabase: true, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata };
+    expect(() => assertSnapshot({ ...base, providerAttempts: 1 })).toThrow("outbound_attempts_present");
+    expect(() => assertSnapshot({ ...base, pristineOutboxRows: 2 })).toThrow("outbox_fixture_not_pristine");
+    expect(() => assertSnapshot({ ...base, metadata: { ...metadata, unexpected_table: { columns: [], constraints: [], indexes: [] } } })).toThrow("schema_metadata_mismatch");
+    const missingProviderIndex = { ...metadata, provider_subject_mappings: { ...metadata.provider_subject_mappings, indexes: metadata.provider_subject_mappings.indexes.slice(1) } };
+    expect(() => assertSnapshot({ ...base, metadata: missingProviderIndex })).toThrow("schema_metadata_mismatch");
+    expect(() => assertSnapshot(base)).not.toThrow();
   });
 
   it("installs the frozen dependency graph before verification", () => {

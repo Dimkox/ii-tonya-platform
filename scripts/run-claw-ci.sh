@@ -27,6 +27,17 @@ if [[ "$mode" == client-booking || "$mode" == client-conversation ]]; then
   test ! -e "$source_root/.claw-client-conversation-node-modules"
   : "${II_TONYA_TEST_POSTGRES_ADMIN_URL:?II_TONYA_TEST_POSTGRES_ADMIN_URL is required}"
 fi
+claw_invocation_identity=""
+if [[ "$mode" == client-conversation ]]; then
+  invocation_hashes=(
+    "$(sha256sum "$source_root/scripts/run-claw-ci.sh" | awk '{print $1}')"
+    "$(sha256sum "$source_root/scripts/assert-client-conversation-postgres.mjs" | awk '{print $1}')"
+    "$(sha256sum "$source_root/packages/db/migrations/0032_client_conversation.sql" | awk '{print $1}')"
+    "$(sha256sum "$source_root/tests/repo/workflow-semantics.test.ts" | awk '{print $1}')"
+  )
+  claw_invocation_identity="$(printf '%s\n%s\n%s\n%s\n%s\n' "$source_sha" "${invocation_hashes[@]}" | sha256sum | awk '{print $1}')"
+  [[ "$claw_invocation_identity" =~ ^[0-9a-f]{64}$ ]]
+fi
 missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=print | sed -n '/^?/ { p; q; }')"
 [[ -z "$missing_git_object" ]] || {
   printf 'Git history is incomplete; refusing security scan.\n' >&2
@@ -233,6 +244,9 @@ if [[ -n "$claw_syft" ]]; then
 fi
 if [[ "$mode" == client-booking || "$mode" == client-conversation ]]; then
   compose_args+=( -e II_TONYA_TEST_POSTGRES_ADMIN_URL )
+fi
+if [[ "$mode" == client-conversation ]]; then
+  compose_args+=( -e "CLAW_INVOCATION_IDENTITY=$claw_invocation_identity" )
 fi
 
 II_TONYA_SOURCE_SHA="$test_image" docker compose "${compose_args[@]}" \

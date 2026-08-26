@@ -19,3 +19,6 @@ Derive `payload_expires_at` from `transaction_timestamp()+24h`, matching the tab
 ## 2026-08-26 — Reconcile the Task 6 PostgreSQL evidence target
 
 Use PostgreSQL 16.15 (`server_version_num=160015`) for the executable Task 6 gate because the plan and pinned test host require that exact value; stale 17.5 prose describes deployment configuration, not this test target. This keeps immutable evidence aligned with the actual verification environment.
+## 2026-08-26 — Bind the conversation gate to an independently recomputed invocation digest
+
+Pattern: hash a fixed ordered tuple of reviewed SHA and fixed gate/migration/test file hashes on the outer host, then recompute the same tuple inside the isolated gate. This worked because it binds the invocation to both Git identity and the exact executable evidence surface without accepting a mutable manifest.
