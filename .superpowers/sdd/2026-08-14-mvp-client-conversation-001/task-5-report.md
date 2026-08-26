@@ -14,6 +14,33 @@ Status: NEEDS_CONTEXT
 - `corepack pnpm exec vitest run apps/worker/src/client-conversation-operations.test.ts tests/integration/client-conversation-operation-races.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 3 tests passed.
 - `git diff --check` — passed.
 
+## Task 5A review fix round 1
+
+Status: GREEN
+
+RED evidence:
+
+- The blocked-decrypt PostgreSQL regression showed validation remained inside the claim transaction, preventing recovery from winning and allowing unfenced failure terminalization.
+- The hostile rejection regression showed `{ kind: "rejected", code: "arbitrary" }` committed instead of producing a normalized stale result with no write.
+- The independent v1 result-digest assertion exposed a literal backslash-zero domain separator instead of the contract NUL byte.
+
+Fix:
+
+- Claim transactions now commit before decrypt/shape validation. Validation failure terminalization runs in a fresh bounded transaction with exact phase owner/token/fence/status/unexpired-lease and payload-expiry predicates; the operator case is inserted only after exactly one updated row.
+- Operation rows are normalized and runtime-validated before casts/decrypt, including exact tool/scope pairing, UUIDs, owner, fence, digest, envelope, key, nonce, ciphertext, tag and expiry shapes.
+- Result objects are exact-shape runtime validated; only `not_found|conflict|feature_disabled` rejection codes are accepted. The exact result digest now uses the v1 NUL domain separator.
+
+GREEN evidence:
+
+- `corepack pnpm exec prettier --check packages/db/src/repositories/client-conversation-operation-repository.ts packages/db/src/repositories/client-conversation-operation-repository.test.ts tests/integration/client-conversation-operation-races.test.ts` — all matched files use Prettier style.
+- `corepack pnpm exec vitest run packages/db/src/repositories/client-conversation-operation-repository.test.ts tests/integration/client-conversation-operation-races.test.ts apps/worker/src/client-conversation-operations.test.ts packages/contracts/src/worker-outbox.test.ts` — 4 files, 18 tests passed, including 11 real PostgreSQL tests.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed.
+- `git diff --check` — passed.
+
+Changed files: `packages/db/src/repositories/client-conversation-operation-repository.ts`, `packages/db/src/repositories/client-conversation-operation-repository.test.ts`, `tests/integration/client-conversation-operation-races.test.ts`, this report.
+
 ## Changed files
 
 - `apps/worker/src/client-conversation-operations.ts`

@@ -6,6 +6,7 @@ import {
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
 import {
+  ClientConversationOperationCryptoError,
   createClientConversationOperationCrypto,
   type ClientConversationOperationKey,
 } from "../../packages/application/src/client-conversation-operation-crypto.js";
@@ -34,6 +35,30 @@ const crypto = createClientConversationOperationCrypto({
 const authority = createClientConversationOperationAuthority();
 const repo = () =>
   new PostgresClientConversationOperationRepository(db.db, crypto, authority);
+const expectedResultDigest = (
+  operationId: string,
+  toolKind: string,
+  outcomeCode: string,
+  receipt: string,
+) => {
+  const lp = (value: string) => {
+    const bytes = Buffer.from(value, "utf8");
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(bytes.length);
+    return Buffer.concat([length, bytes]);
+  };
+  return createHash("sha256")
+    .update(
+      Buffer.concat([
+        Buffer.from("ii-tonya/client-conversation-result/v1\0", "utf8"),
+        lp(operationId),
+        lp(toolKind),
+        lp(outcomeCode),
+        lp(receipt),
+      ]),
+    )
+    .digest("hex");
+};
 async function seed(
   suffix: string,
   status = "pending",
@@ -159,6 +184,56 @@ describe("client conversation operation races (real PostgreSQL)", () => {
       ciphertext: null,
     });
   });
+  it("cannot terminalize a validation failure after recovery wins its expired lease", async () => {
+    const id = await seed("validation-recovery");
+    let releaseDecrypt!: () => void;
+    let decryptStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      decryptStarted = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseDecrypt = resolve;
+    });
+    const blocked = new PostgresClientConversationOperationRepository(
+      db.db,
+      {
+        async decrypt() {
+          decryptStarted();
+          await release;
+          throw new ClientConversationOperationCryptoError();
+        },
+      },
+      authority,
+    );
+    const claiming = blocked.claimDispatch({ ownerId: "blocked", limit: 1 });
+    await started;
+    const recovery = (async () => {
+      await db.db.execute(
+        sql`update client_conversation_operations set lease_until=transaction_timestamp()-interval '1 second' where id=${id}::uuid`,
+      );
+      return repo().recoverExpired({ limit: 1 });
+    })();
+    const recoveryWon = await Promise.race([
+      recovery.then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 500)),
+    ]);
+    releaseDecrypt();
+    await claiming;
+    await recovery;
+    const row = await db.db.execute<{
+      status: string;
+      cases: string;
+      ciphertext: Buffer | null;
+    }>(
+      sql`select status,payload_ciphertext ciphertext,(select count(*)::text from client_conversation_operation_cases where operation_id=${id}::uuid)cases from client_conversation_operations where id=${id}::uuid`,
+    );
+    expect(recoveryWon).toBe(true);
+    expect(row.rows[0]).toMatchObject({
+      status: "unknown_outcome",
+      cases: "0",
+    });
+    expect(row.rows[0]?.ciphertext).not.toBeNull();
+  });
   it("recovers expired processing and claims reconciliation", async () => {
     await seed("four", "processing", "1 hour");
     await db.db.execute(
@@ -194,14 +269,56 @@ describe("client conversation operation races (real PostgreSQL)", () => {
       const r = await db.db.execute<{
         status: string;
         ciphertext: Buffer | null;
+        resultDigest: string;
       }>(
-        sql`select status,payload_ciphertext ciphertext from client_conversation_operations where id=${id}::uuid`,
+        sql`select status,payload_ciphertext ciphertext,result_digest "resultDigest" from client_conversation_operations where id=${id}::uuid`,
       );
       expect(r.rows[0]).toMatchObject({
         status: "succeeded",
         ciphertext: null,
+        resultDigest: expectedResultDigest(
+          id,
+          "show_catalog",
+          result,
+          result === "applied" ? "b".repeat(64) : "",
+        ),
       });
     }
+  });
+  it("rejects a hostile business result without writing", async () => {
+    const id = await seed("hostile-result");
+    const claim = (
+      await repo().claimDispatch({ ownerId: "worker", limit: 1 })
+    )[0]!;
+    expect(
+      await repo().recordResult(claim, {
+        kind: "rejected",
+        code: "arbitrary",
+      } as never),
+    ).toBe("stale");
+    const row = await db.db.execute<{ status: string; digest: string | null }>(
+      sql`select status,result_digest digest from client_conversation_operations where id=${id}::uuid`,
+    );
+    expect(row.rows[0]).toEqual({ status: "processing", digest: null });
+  });
+  it("rejects a result write after its lease expires", async () => {
+    const id = await seed("expired-result");
+    const claim = (
+      await repo().claimDispatch({ ownerId: "worker", limit: 1 })
+    )[0]!;
+    await db.db.execute(
+      sql`update client_conversation_operations set lease_until=transaction_timestamp()-interval '1 second' where id=${id}::uuid`,
+    );
+    expect(
+      await repo().recordResult(claim, {
+        kind: "applied",
+        downstreamReceiptDigest: "c".repeat(64),
+      }),
+    ).toBe("stale");
+    const row = await db.db.execute<{ status: string; digest: string | null }>(
+      sql`select status,result_digest digest from client_conversation_operations where id=${id}::uuid`,
+    );
+    expect(row.rows[0]).toEqual({ status: "processing", digest: null });
   });
   it("cleanup expires with two cases and heartbeat creates two leases", async () => {
     const id = await seed("cleanup", "pending", "-1 second");
@@ -214,10 +331,28 @@ describe("client conversation operation races (real PostgreSQL)", () => {
       instanceId: "runtime",
       buildSha: "a".repeat(40),
     });
-    const leases = await db.db.execute<{ count: string; seconds: string }>(
-      sql`select count(*)::text,count(extract(epoch from lease_until-heartbeat_at))::text seconds from client_conversation_runtime_leases where instance_id='runtime'`,
+    const leases = await db.db.execute<{
+      capability: string;
+      contractVersion: number;
+      buildSha: string;
+      seconds: string;
+    }>(
+      sql`select capability,contract_version "contractVersion",build_sha "buildSha",extract(epoch from lease_until-heartbeat_at)::text seconds from client_conversation_runtime_leases where instance_id='runtime' order by capability`,
     );
-    expect(leases.rows[0]).toMatchObject({ count: "2", seconds: "2" });
+    expect(leases.rows).toEqual([
+      {
+        capability: "cleanup_v1",
+        contractVersion: 1,
+        buildSha: "a".repeat(40),
+        seconds: "30.000000",
+      },
+      {
+        capability: "dispatch_v1",
+        contractVersion: 1,
+        buildSha: "a".repeat(40),
+        seconds: "30.000000",
+      },
+    ]);
   });
   it("dead-letters an attempt-five retry with one operator case", async () => {
     const id = await seed("attempt-five", "pending", "1 hour", 4);
@@ -236,6 +371,28 @@ describe("client conversation operation races (real PostgreSQL)", () => {
       sql`select status,terminal_reason reason,(select count(*)::text from client_conversation_operation_cases where operation_id=${id}::uuid) cases from client_conversation_operations where id=${id}::uuid`,
     );
     expect(row.rows[0]).toMatchObject({
+      status: "dead_letter",
+      reason: "attempts_exhausted",
+      cases: "1",
+    });
+  });
+  it("dead-letters a fifth reconciliation failure with one operator case", async () => {
+    const id = await seed("reconciliation-five");
+    await db.db.execute(
+      sql`update client_conversation_operations set status='unknown_outcome',reconciliation_attempt=4 where id=${id}::uuid`,
+    );
+    const claim = (
+      await repo().claimReconciliation({ ownerId: "recon", limit: 1 })
+    )[0]!;
+    expect(await repo().recordRetryWait(claim)).toBe("committed");
+    const row = await db.db.execute<{
+      status: string;
+      reason: string;
+      cases: string;
+    }>(
+      sql`select status,terminal_reason reason,(select count(*)::text from client_conversation_operation_cases where operation_id=${id}::uuid)cases from client_conversation_operations where id=${id}::uuid`,
+    );
+    expect(row.rows[0]).toEqual({
       status: "dead_letter",
       reason: "attempts_exhausted",
       cases: "1",

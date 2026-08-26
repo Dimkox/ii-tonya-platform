@@ -50,25 +50,32 @@ export interface ConversationOperationClaimRepository {
   }): Promise<{ recovered: number }>;
 }
 
-type Row = {
+type Row = Record<string, unknown>;
+type ValidRow = {
   id: string;
   messageEventId: string;
-  bindingId: string | null;
-  requiredScope: string;
-  toolKind: string;
+  bindingId: string;
+  requiredScope: "client_catalog:read" | "client_booking:write";
+  toolKind: "show_catalog" | "start_booking";
   proposalDigest: string;
-  payloadEnvelopeVersion: number;
+  payloadEnvelopeVersion: 1;
   payloadKeyId: string;
   payloadNonce: Buffer;
   payloadCiphertext: Buffer;
   payloadTag: Buffer;
-  payloadExpiresAt: Date;
+  payloadExpiresAt: string;
   claimOwnerId: string;
   claimToken: string;
   claimFence: number;
 };
+type ClaimFence = Pick<
+  ValidRow,
+  "id" | "claimOwnerId" | "claimToken" | "claimFence"
+>;
 const limitOk = (n: number) => Number.isSafeInteger(n) && n > 0 && n <= 1000;
 const digestPattern = /^[0-9a-f]{64}$/u;
+const ownerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+const keyIdPattern = /^[A-Za-z0-9_-]{1,32}$/u;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const frozen = (
@@ -80,8 +87,84 @@ const frozen = (
         ...(p.language === undefined ? {} : { language: p.language }),
       }
     : { choiceHandle: p.choiceHandle };
-const iso = (value: Date | string) =>
-  value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+const canonicalInstant = (value: unknown): string | null => {
+  try {
+    const instant =
+      value instanceof Date
+        ? value.toISOString()
+        : typeof value === "string"
+          ? new Date(value).toISOString()
+          : null;
+    return instant !== null && Number.isFinite(Date.parse(instant))
+      ? instant
+      : null;
+  } catch {
+    return null;
+  }
+};
+const normalizeFence = (row: Row): ClaimFence | null => {
+  const claimFence = Number(row.claimFence);
+  return typeof row.id === "string" &&
+    uuidPattern.test(row.id) &&
+    typeof row.claimOwnerId === "string" &&
+    ownerPattern.test(row.claimOwnerId) &&
+    typeof row.claimToken === "string" &&
+    uuidPattern.test(row.claimToken) &&
+    Number.isSafeInteger(claimFence) &&
+    claimFence >= 1
+    ? {
+        id: row.id,
+        claimOwnerId: row.claimOwnerId,
+        claimToken: row.claimToken,
+        claimFence,
+      }
+    : null;
+};
+const normalizeRow = (row: Row): ValidRow | null => {
+  const fence = normalizeFence(row);
+  const payloadExpiresAt = canonicalInstant(row.payloadExpiresAt);
+  const toolScope =
+    (row.toolKind === "show_catalog" &&
+      row.requiredScope === "client_catalog:read") ||
+    (row.toolKind === "start_booking" &&
+      row.requiredScope === "client_booking:write");
+  if (
+    fence === null ||
+    typeof row.messageEventId !== "string" ||
+    !uuidPattern.test(row.messageEventId) ||
+    typeof row.bindingId !== "string" ||
+    !uuidPattern.test(row.bindingId) ||
+    !toolScope ||
+    typeof row.proposalDigest !== "string" ||
+    !digestPattern.test(row.proposalDigest) ||
+    row.payloadEnvelopeVersion !== 1 ||
+    typeof row.payloadKeyId !== "string" ||
+    !keyIdPattern.test(row.payloadKeyId) ||
+    !Buffer.isBuffer(row.payloadNonce) ||
+    row.payloadNonce.length !== 12 ||
+    !Buffer.isBuffer(row.payloadCiphertext) ||
+    row.payloadCiphertext.length === 0 ||
+    !Buffer.isBuffer(row.payloadTag) ||
+    row.payloadTag.length !== 16 ||
+    payloadExpiresAt === null
+  ) {
+    return null;
+  }
+  return {
+    ...fence,
+    messageEventId: row.messageEventId,
+    bindingId: row.bindingId,
+    toolKind: row.toolKind as ValidRow["toolKind"],
+    requiredScope: row.requiredScope as ValidRow["requiredScope"],
+    proposalDigest: row.proposalDigest,
+    payloadEnvelopeVersion: 1,
+    payloadKeyId: row.payloadKeyId,
+    payloadNonce: row.payloadNonce,
+    payloadCiphertext: row.payloadCiphertext,
+    payloadTag: row.payloadTag,
+    payloadExpiresAt,
+  };
+};
 const resultDigest = (c: OperationClaim, code: string, receipt: string) => {
   const lp = (v: string) => {
     const b = Buffer.from(v);
@@ -92,7 +175,7 @@ const resultDigest = (c: OperationClaim, code: string, receipt: string) => {
   return createHash("sha256")
     .update(
       Buffer.concat([
-        Buffer.from("ii-tonya/client-conversation-result/v1\\0"),
+        Buffer.from("ii-tonya/client-conversation-result/v1\0"),
         lp(c.operationId),
         lp(c.toolKind),
         lp(code),
@@ -100,6 +183,37 @@ const resultDigest = (c: OperationClaim, code: string, receipt: string) => {
       ]),
     )
     .digest("hex");
+};
+const validOperationResult = (value: unknown): value is OperationResult => {
+  try {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (record.kind === "applied") {
+      return (
+        keys.length === 2 &&
+        keys.includes("kind") &&
+        keys.includes("downstreamReceiptDigest") &&
+        typeof record.downstreamReceiptDigest === "string" &&
+        digestPattern.test(record.downstreamReceiptDigest)
+      );
+    }
+    return (
+      record.kind === "rejected" &&
+      keys.length === 2 &&
+      keys.includes("kind") &&
+      keys.includes("code") &&
+      (record.code === "not_found" ||
+        record.code === "conflict" ||
+        record.code === "feature_disabled")
+    );
+  } catch {
+    return false;
+  }
 };
 
 export class PostgresClientConversationOperationRepository {
@@ -139,28 +253,51 @@ export class PostgresClientConversationOperationRepository {
       return f(t as unknown as DrizzleDb);
     });
   }
+  private async terminalizeValidationFailure(
+    row: ClaimFence,
+    phase: OperationClaimPhase,
+    reason: "invalid_operation" | "crypto_invalid",
+  ): Promise<void> {
+    await this.tx(async (t) => {
+      const lease =
+        phase === "dispatch"
+          ? sql`claim_owner_id=${row.claimOwnerId} and claim_token=${row.claimToken}::uuid and status='processing' and lease_until>transaction_timestamp()`
+          : sql`reconciliation_owner_id=${row.claimOwnerId} and reconciliation_claim_token=${row.claimToken}::uuid and status='reconciling' and reconciliation_lease_until>transaction_timestamp()`;
+      const updated = await t.execute(
+        sql`update client_conversation_operations set status='dead_letter',terminal_reason=${reason},claim_fence=claim_fence+1,claim_owner_id=null,claim_token=null,lease_until=null,reconciliation_owner_id=null,reconciliation_claim_token=null,reconciliation_lease_until=null,next_attempt_at=null,payload_envelope_version=null,payload_key_id=null,payload_nonce=null,payload_ciphertext=null,payload_tag=null,updated_at=transaction_timestamp() where id=${row.id}::uuid and claim_fence=${row.claimFence} and payload_expires_at>transaction_timestamp() and ${lease}`,
+      );
+      if ((updated.rowCount ?? 0) === 1) {
+        await t.execute(
+          sql`insert into client_conversation_operation_cases(operation_id,case_kind,reason)values(${row.id}::uuid,'operator_case',${reason})on conflict(operation_id,case_kind)do nothing`,
+        );
+      }
+    });
+  }
   private async validate(
-    t: DrizzleDb,
-    r: Row,
+    raw: Row,
     phase: OperationClaimPhase,
   ): Promise<OperationClaim | null> {
+    const fence = normalizeFence(raw);
+    const r = normalizeRow(raw);
+    if (r === null) {
+      if (fence !== null) {
+        await this.terminalizeValidationFailure(
+          fence,
+          phase,
+          "invalid_operation",
+        );
+      }
+      return null;
+    }
     try {
-      if (
-        !r.bindingId ||
-        !uuidPattern.test(r.id) ||
-        !uuidPattern.test(r.messageEventId) ||
-        !uuidPattern.test(r.claimToken)
-      )
-        throw new Error("invalid_operation");
       const p = await this.crypto.decrypt({
         operationId: r.id,
         messageEventId: r.messageEventId,
         bindingId: r.bindingId,
-        toolKind: r.toolKind as "show_catalog" | "start_booking",
-        requiredScope: r.requiredScope as
-          "client_catalog:read" | "client_booking:write",
+        toolKind: r.toolKind,
+        requiredScope: r.requiredScope,
         proposalDigest: r.proposalDigest,
-        payloadExpiresAt: iso(r.payloadExpiresAt),
+        payloadExpiresAt: r.payloadExpiresAt,
         envelopeVersion: r.payloadEnvelopeVersion,
         keyId: r.payloadKeyId,
         nonce: r.payloadNonce,
@@ -172,7 +309,7 @@ export class PostgresClientConversationOperationRepository {
         messageEventId: r.messageEventId,
         bindingId: r.bindingId,
         keyId: r.payloadKeyId,
-        payloadExpiresAt: iso(r.payloadExpiresAt),
+        payloadExpiresAt: r.payloadExpiresAt,
         proposal: p,
       });
       if (framed.proposalDigest !== r.proposalDigest)
@@ -196,7 +333,7 @@ export class PostgresClientConversationOperationRepository {
         claimFence: Number(r.claimFence),
         toolKind: p.kind,
         requiredScope: framed.requiredScope,
-        payloadExpiresAt: iso(r.payloadExpiresAt),
+        payloadExpiresAt: r.payloadExpiresAt,
       };
     } catch (e) {
       const reason =
@@ -204,12 +341,7 @@ export class PostgresClientConversationOperationRepository {
         (e instanceof Error && e.message === "crypto_invalid")
           ? "crypto_invalid"
           : "invalid_operation";
-      await t.execute(
-        sql`update client_conversation_operations set status='dead_letter',terminal_reason=${reason},claim_fence=claim_fence+1,claim_owner_id=null,claim_token=null,lease_until=null,reconciliation_owner_id=null,reconciliation_claim_token=null,reconciliation_lease_until=null,payload_envelope_version=null,payload_key_id=null,payload_nonce=null,payload_ciphertext=null,payload_tag=null,updated_at=transaction_timestamp() where id=${r.id}::uuid and claim_owner_id=${r.claimOwnerId} and claim_token=${r.claimToken}::uuid and claim_fence=${r.claimFence} and status=${phase === "dispatch" ? "processing" : "reconciling"}`,
-      );
-      await t.execute(
-        sql`insert into client_conversation_operation_cases(operation_id,case_kind,reason)values(${r.id}::uuid,'operator_case',${reason})on conflict(operation_id,case_kind)do nothing`,
-      );
+      await this.terminalizeValidationFailure(r, phase, reason);
       return null;
     }
   }
@@ -218,34 +350,36 @@ export class PostgresClientConversationOperationRepository {
   ): Promise<readonly OperationClaim[]> {
     if (!i.ownerId || !limitOk(i.limit))
       throw new Error("client_conversation_claim_invalid");
-    return this.tx(async (t) => {
+    const rows = await this.tx(async (t) => {
       const q = await t.execute<Row>(
         sql`with c as(select id from client_conversation_operations where status in('pending','retry_wait') and(status='pending'or next_attempt_at<=transaction_timestamp())and payload_expires_at>=transaction_timestamp()+interval '30 seconds' and attempt<5 order by payload_expires_at,id for update skip locked limit ${i.limit})update client_conversation_operations o set status='processing',claim_owner_id=${i.ownerId},claim_token=gen_random_uuid(),claim_fence=o.claim_fence+1,attempt=o.attempt+1,lease_until=least(transaction_timestamp()+interval '5 minutes',o.payload_expires_at),next_attempt_at=null,updated_at=transaction_timestamp()from c where o.id=c.id returning o.id,o.message_event_id as "messageEventId",o.binding_id as "bindingId",o.required_scope as "requiredScope",o.tool_kind as "toolKind",o.proposal_digest as "proposalDigest",o.payload_envelope_version as "payloadEnvelopeVersion",o.payload_key_id as "payloadKeyId",o.payload_nonce as "payloadNonce",o.payload_ciphertext as "payloadCiphertext",o.payload_tag as "payloadTag",o.payload_expires_at as "payloadExpiresAt",o.claim_owner_id as "claimOwnerId",o.claim_token as "claimToken",o.claim_fence as "claimFence"`,
       );
-      const out: OperationClaim[] = [];
-      for (const r of q.rows) {
-        const c = await this.validate(t, r, "dispatch");
-        if (c) out.push(c);
-      }
-      return out;
+      return q.rows;
     });
+    const out: OperationClaim[] = [];
+    for (const row of rows) {
+      const claim = await this.validate(row, "dispatch");
+      if (claim !== null) out.push(claim);
+    }
+    return out;
   }
   async claimReconciliation(
     i: DispatchClaimInput,
   ): Promise<readonly OperationClaim[]> {
     if (!i.ownerId || !limitOk(i.limit))
       throw new Error("client_conversation_claim_invalid");
-    return this.tx(async (t) => {
+    const rows = await this.tx(async (t) => {
       const q = await t.execute<Row>(
         sql`with c as(select id from client_conversation_operations where status='unknown_outcome' and reconciliation_attempt<5 and payload_expires_at>=transaction_timestamp()+interval '30 seconds' order by payload_expires_at,id for update skip locked limit ${i.limit})update client_conversation_operations o set status='reconciling',reconciliation_owner_id=${i.ownerId},reconciliation_claim_token=gen_random_uuid(),claim_fence=o.claim_fence+1,reconciliation_attempt=o.reconciliation_attempt+1,reconciliation_lease_until=least(transaction_timestamp()+interval '5 minutes',o.payload_expires_at),updated_at=transaction_timestamp()from c where o.id=c.id returning o.id,o.message_event_id as "messageEventId",o.binding_id as "bindingId",o.required_scope as "requiredScope",o.tool_kind as "toolKind",o.proposal_digest as "proposalDigest",o.payload_envelope_version as "payloadEnvelopeVersion",o.payload_key_id as "payloadKeyId",o.payload_nonce as "payloadNonce",o.payload_ciphertext as "payloadCiphertext",o.payload_tag as "payloadTag",o.payload_expires_at as "payloadExpiresAt",o.reconciliation_owner_id as "claimOwnerId",o.reconciliation_claim_token as "claimToken",o.claim_fence as "claimFence"`,
       );
-      const out: OperationClaim[] = [];
-      for (const r of q.rows) {
-        const c = await this.validate(t, r, "reconciliation");
-        if (c) out.push(c);
-      }
-      return out;
+      return q.rows;
     });
+    const out: OperationClaim[] = [];
+    for (const row of rows) {
+      const claim = await this.validate(row, "reconciliation");
+      if (claim !== null) out.push(claim);
+    }
+    return out;
   }
   private async fenced(
     c: OperationClaim,
@@ -277,9 +411,8 @@ export class PostgresClientConversationOperationRepository {
     });
   }
   async recordResult(c: OperationClaim, r: OperationResult) {
+    if (!validOperationResult(r)) return "stale" as const;
     const receipt = r.kind === "applied" ? r.downstreamReceiptDigest : "";
-    if (r.kind === "applied" && !digestPattern.test(receipt))
-      return "stale" as const;
     return this.fenced(
       c,
       "succeeded",
