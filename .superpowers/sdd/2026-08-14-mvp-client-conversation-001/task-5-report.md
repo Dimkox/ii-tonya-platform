@@ -183,3 +183,27 @@ GREEN evidence:
 Changed files: `packages/application/src/client-booking-service.ts`, `packages/application/src/client-booking-service.test.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/booking-repository.ts`, `packages/db/src/repositories/client-conversation-lifecycle-locks.ts`, `packages/db/src/repositories/admin-repository.ts`, `packages/db/src/repositories/privacy-repository.ts`, `tests/integration/client-conversation-booking-gateway.test.ts`, this report and the progress ledger.
 
 Concern: the older booking repository/choice/lock/privacy integration files use the separately gated `II_TONYA_TEST_POSTGRES_ADMIN_URL` harness and cannot run in this environment without that external variable. Slice 5B2's required evidence instead uses the repository-standard migration-backed `startTestPostgres()` lifecycle and covers both the ordinary shared prelock and conversation transaction. Worker runtime composition remains intentionally deferred.
+
+## Slice 5B2 review fix round 1 — bounded choice prelock
+
+Status: GREEN
+
+RED evidence:
+
+- On commit `2c7ab31`, `corepack pnpm exec vitest run tests/integration/client-conversation-booking-gateway.test.ts` — 1 file failed, 17 tests passed / 1 failed. The exact choice advisory key remained blocked beyond the test's 3.5-second bound: expected `rejected`, received `timed_out` at `tests/integration/client-conversation-booking-gateway.test.ts:487`.
+
+Fix:
+
+- The conversation booking transaction now sets its separate 2-second statement, lock and idle-in-transaction deadlines before invoking the unchanged repository-owned choice prelock helper. These statements do not acquire an authoritative lock; the exact `hashtextextended('choice:' || choiceDigest,0)` prelock remains the first authoritative lock.
+- The existing PostgreSQL `55P03`/`57014` normalization boundary now encloses the shared prelock and all subsequent transaction work, producing `ConversationBookingRetryableError` on bounded cancellation.
+- The migration-backed regression holds the exact advisory key, requires normalized rejection within 3.5 seconds, drains the request safely, and verifies zero reservation/receipt mutation. Reverting the production ordering to `2c7ab31` makes this test fail.
+
+GREEN evidence:
+
+- `corepack pnpm exec vitest run packages/application/src/booking-service.test.ts packages/application/src/client-booking-service.test.ts packages/db/src/repositories/privacy-repository.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 4 files, 33 tests passed, including 18 real PostgreSQL conversation-booking tests.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed.
+- Prettier and `git diff --check` — passed.
+
+Changed files: `packages/db/src/repositories/booking-repository.ts`, `tests/integration/client-conversation-booking-gateway.test.ts`, this report.

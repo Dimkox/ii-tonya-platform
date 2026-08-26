@@ -878,13 +878,13 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
 
     try {
       return await this.runSerializable(async (tx) => {
-        await this.lockProtectedChoicePrelock(tx, choiceDigest);
+        await tx.execute(sql`set local statement_timeout='2s'`);
+        await tx.execute(sql`set local lock_timeout='2s'`);
+        await tx.execute(
+          sql`set local idle_in_transaction_session_timeout='2s'`,
+        );
         try {
-          await tx.execute(sql`set local statement_timeout='2s'`);
-          await tx.execute(sql`set local lock_timeout='2s'`);
-          await tx.execute(
-            sql`set local idle_in_transaction_session_timeout='2s'`,
-          );
+          await this.lockProtectedChoicePrelock(tx, choiceDigest);
           const user = (
             await tx.execute<{ active: boolean }>(sql`
               select active from users
@@ -1027,42 +1027,41 @@ export class PostgresBookingRepository implements ConversationBookingRepository 
           if (proposalDigest !== operation.proposalDigest) {
             return { kind: "rejected", code: "conflict" } as const;
           }
+          const result = await this.reserveProtectedChoiceInTransaction(tx, {
+            userId: candidate.userId,
+            choiceDigest,
+            idempotencyKey: createHash("sha256")
+              .update(
+                `client-booking-reserve-v1\0${candidate.userId}\0${choiceDigest}`,
+              )
+              .digest("hex"),
+            bookingHandle: conversationBookingHandle(
+              claim.operationId,
+              choiceDigest,
+            ),
+            correlationId: `client-conversation:${claim.operationId}`,
+            minimumLeadMs: MINIMUM_LEAD_MS,
+            slotFreshnessMs: SLOT_FRESHNESS_MS,
+            confirmationBufferMs: 3_600_000,
+          });
+          if (result.kind === "reserved" || result.kind === "replayed") {
+            return {
+              kind: "applied",
+              downstreamReceiptDigest: conversationBookingReceipt(
+                result.bookingHandle,
+              ),
+            } as const;
+          }
+          return {
+            kind: "rejected",
+            code: result.kind === "not_found" ? "not_found" : "conflict",
+          } as const;
         } catch (error) {
           if (["55P03", "57014"].includes(sqlState(error) ?? "")) {
             throw new ConversationBookingRetryableError();
           }
           throw error;
         }
-
-        const result = await this.reserveProtectedChoiceInTransaction(tx, {
-          userId: candidate.userId,
-          choiceDigest,
-          idempotencyKey: createHash("sha256")
-            .update(
-              `client-booking-reserve-v1\0${candidate.userId}\0${choiceDigest}`,
-            )
-            .digest("hex"),
-          bookingHandle: conversationBookingHandle(
-            claim.operationId,
-            choiceDigest,
-          ),
-          correlationId: `client-conversation:${claim.operationId}`,
-          minimumLeadMs: MINIMUM_LEAD_MS,
-          slotFreshnessMs: SLOT_FRESHNESS_MS,
-          confirmationBufferMs: 3_600_000,
-        });
-        if (result.kind === "reserved" || result.kind === "replayed") {
-          return {
-            kind: "applied",
-            downstreamReceiptDigest: conversationBookingReceipt(
-              result.bookingHandle,
-            ),
-          } as const;
-        }
-        return {
-          kind: "rejected",
-          code: result.kind === "not_found" ? "not_found" : "conflict",
-        } as const;
       });
     } catch (error) {
       if (

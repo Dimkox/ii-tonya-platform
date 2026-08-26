@@ -456,6 +456,48 @@ describe("conversation booking gateway (real PostgreSQL)", () => {
     }
   });
 
+  it("bounds and normalizes contention on the conversation choice prelock", async () => {
+    const fixture = await seed("bounded-choice-prelock");
+    const blocker = await testDb.db.$client.connect();
+    try {
+      await blocker.query("begin");
+      await blocker.query(
+        "select pg_advisory_xact_lock(hashtextextended('choice:' || $1,0))",
+        [fixture.choiceDigest],
+      );
+
+      const startedAt = Date.now();
+      const request = gateway()
+        .reserve(fixture.claim)
+        .then(
+          (result) => ({ kind: "resolved" as const, result }),
+          (error: unknown) => ({ kind: "rejected" as const, error }),
+        );
+      const bounded = await Promise.race([
+        request,
+        new Promise<{ kind: "timed_out" }>((resolve) =>
+          setTimeout(() => resolve({ kind: "timed_out" }), 3_500),
+        ),
+      ]);
+      const elapsedMs = Date.now() - startedAt;
+
+      await blocker.query("rollback");
+      await request;
+
+      expect(bounded.kind).toBe("rejected");
+      if (bounded.kind !== "rejected") return;
+      expect(bounded.error).toBeInstanceOf(ConversationBookingRetryableError);
+      expect(elapsedMs).toBeLessThan(3_500);
+      expect(await counts()).toMatchObject({
+        reservations: "0",
+        receipts: "0",
+      });
+    } finally {
+      await blocker.query("rollback").catch(() => undefined);
+      blocker.release();
+    }
+  }, 10_000);
+
   it("does not let catalog choice cleanup cross an in-flight booking prelock", async () => {
     const fixture = await seed("cleanup-prelock");
     let releasePrelock!: () => void;
