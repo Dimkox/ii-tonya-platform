@@ -76,11 +76,16 @@ describe("direct Claw verification semantics", () => {
     const sha = "a".repeat(40);
     // @ts-expect-error executable gate helpers are intentionally JavaScript-only.
     const { conversationIdentity, fixtureDatabaseName, assertSnapshot, EXPECTED_SCHEMA } = await import("../../scripts/assert-client-conversation-postgres.mjs");
+    expect(EXPECTED_SCHEMA.client_conversation_grants.indexes).toContain("client_conversation_grants_pkey");
+    expect(EXPECTED_SCHEMA.client_conversation_runtime_leases.indexes).toContain("client_conversation_runtime_leases_pkey");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("projected ? allConstraints.filter");
+    expect(read("scripts/assert-client-conversation-postgres.mjs")).toContain("projected ? allIndexes.filter");
     expect(conversationIdentity(sha, sha, sha)).toBe(sha);
     expect(fixtureDatabaseName(sha, "b".repeat(16))).toBe(`ii_tonya_ccv_${"a".repeat(12)}_${"b".repeat(16)}`);
     expect(() => conversationIdentity(sha.toUpperCase(), sha, sha)).toThrow();
     expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: {} })).toThrow("schema_metadata_mismatch");
     expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: { ...EXPECTED_SCHEMA, unexpected_table: { columns: [], constraints: [], indexes: [] } } })).toThrow("schema_metadata_mismatch");
+    expect(() => assertSnapshot({ serverVersion: "160015", identity: sha, sourceSha: sha, topics: { "catalog.show": 1, "selarti.send": 1, "client.no_package": 1 }, providerAttempts: 0, billingAttempts: 0, expired: 1, secondCleanup: 0, status: "privacy_expired", fence: 1, cryptoNulls: 5, operatorCases: 1, deletionReceipts: 1, schemaParity: true, metadata: { client_conversation_grants: EXPECTED_SCHEMA.client_conversation_grants, client_conversation_operations: EXPECTED_SCHEMA.client_conversation_operations, client_conversation_runtime_leases: EXPECTED_SCHEMA.client_conversation_runtime_leases, client_conversation_operation_cases: EXPECTED_SCHEMA.client_conversation_operation_cases } })).toThrow("schema_metadata_mismatch");
   });
 
   it("installs the frozen dependency graph before verification", () => {
