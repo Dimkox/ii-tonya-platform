@@ -39,3 +39,13 @@ Status: DONE_WITH_CONCERNS
 RED: the focused Vitest command failed 4 tests because `claimDispatch`, `recoverExpired`, and `heartbeatRuntime` were absent and cleanup emitted no transition SQL.
 
 GREEN: workspace typecheck, test typecheck, 2 focused files / 5 tests, and `git diff --check` passed. Added Drizzle SQL for bounded dispatch claims, expired-lease recovery, expiry cleanup, and paired runtime heartbeats. Decrypt/claim issuance, reconciliation, result transitions, retries/dead-letter, receipts, and real PostgreSQL race assertions remain for the next slice.
+
+## Slice 5A fix round
+
+Status: NEEDS_CONTEXT
+
+RED evidence: the replacement repository tests initially failed four assertions: `claimDispatch`, `recoverExpired`, and `heartbeatRuntime` were missing, and cleanup emitted no required transition SQL.
+
+The timeout statement was corrected to three separate `SET LOCAL` statements. The focused tests pass after the correction, and workspace/test typechecks pass.
+
+Concrete blocker: the existing repository has no established method/signature for decrypt-capability injection, fenced result transitions, grant recheck, or operator/deletion receipt insertion. The migration defines columns/tables but no application port; implementing these requires choosing a new public repository API and corresponding real-Postgres fixture setup. The current test harness was still mock-based and therefore was not counted as completion evidence. The missing core remains unimplemented; no DONE claim is made.

@@ -20,7 +20,9 @@ export class PostgresClientConversationOperationRepository implements Conversati
   async claimDispatch(input: DispatchClaimInput): Promise<readonly EncryptedOperationRow[]> {
     if (!input.ownerId || !bounded(input.limit)) throw new Error("client_conversation_claim_invalid");
     return this.db.transaction(async (tx) => {
-      await tx.execute(sql`set local statement_timeout='2000ms'; set local lock_timeout='2000ms'; set local idle_in_transaction_session_timeout='2000ms'`);
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='2000ms'`);
+      await tx.execute(sql`set local idle_in_transaction_session_timeout='2000ms'`);
       const result = await tx.execute<EncryptedOperationRow>(sql`with candidates as (select id from client_conversation_operations where status in ('pending','retry_wait') and (status='pending' or next_attempt_at <= transaction_timestamp()) and payload_expires_at >= transaction_timestamp()+interval '30 seconds' order by payload_expires_at,id for update skip locked limit ${input.limit}) update client_conversation_operations o set status='processing',claim_owner_id=${input.ownerId},claim_token=gen_random_uuid(),claim_fence=o.claim_fence+1,attempt=o.attempt+1,lease_until=least(transaction_timestamp()+interval '5 minutes',o.payload_expires_at),next_attempt_at=null,updated_at=transaction_timestamp() from candidates c where o.id=c.id returning o.*`);
       return result.rows;
     });
