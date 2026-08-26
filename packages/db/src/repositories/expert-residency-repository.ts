@@ -257,6 +257,16 @@ function isKnown(error: unknown): boolean {
   );
 }
 
+function requireResidencyCommandsEnabled(control: {
+  readonly newCommandsEnabled: boolean;
+}): void {
+  if (!control.newCommandsEnabled) {
+    throw new ExpertResidencyRepositoryError(
+      "expert_residency_commands_disabled",
+    );
+  }
+}
+
 function tariffResult(
   row: TariffRow,
   creditMinor: bigint,
@@ -658,6 +668,9 @@ export class PostgresExpertResidencyRepository {
     requireText(request.expertId, "invalid_expert_id");
     requireText(request.tariffKey, "invalid_tariff_key");
     return this.db.transaction(async (tx) => {
+      requireResidencyCommandsEnabled(
+        await this.controls.lockFeatureControl(tx),
+      );
       const eligibility = await this.controls.lockEligibility(
         tx,
         request.expertId,
@@ -699,6 +712,9 @@ export class PostgresExpertResidencyRepository {
       return await withSerializableRetry(() =>
         this.db.transaction(async (tx) => {
           await tx.execute(sql`set transaction isolation level serializable`);
+          requireResidencyCommandsEnabled(
+            await this.controls.lockFeatureControl(tx),
+          );
           await tx.execute(
             sql`select pg_advisory_xact_lock(hashtextextended(${`expert-residency:checkout:${command.expertId}`}, 0))`,
           );

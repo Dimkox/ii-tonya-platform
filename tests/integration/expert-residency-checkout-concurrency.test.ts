@@ -77,6 +77,7 @@ async function seedGrant(expertId: string, amountMinor: bigint): Promise<void> {
 
 describe("expert residency checkout concurrency", () => {
   it("reconciles all concurrent checkout reservations exactly to the ledger grant", async () => {
+    await fixtures.enableFeatureControl();
     const expert = await fixtures.createExpert();
     const tariffId = randomUUID();
     const now = await databaseNow();

@@ -54,10 +54,21 @@ const schema = z
     PAYMENT_PROVIDER: z.literal("disabled").default("disabled"),
     LLM_PROVIDER: z.literal("disabled").default("disabled"),
     MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
+    EXPERT_REFERRAL_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_RESIDENCY_BILLING_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    EXPERT_REFERRAL_HMAC_KEY_VERSION: z
+      .string()
+      .regex(/^v[1-9]\d*$/u)
+      .optional(),
+    EXPERT_REFERRAL_HMAC_KEY_REF: z
+      .literal("env://EXPERT_REFERRAL_HMAC_KEYS_JSON")
+      .optional(),
     RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
     DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),
   })
-  .passthrough()
+  .strict()
   .superRefine((value, context) => {
     if (
       !isPostgresUrl(
@@ -72,7 +83,54 @@ const schema = z
           "DATABASE_URL must be a hierarchical Postgres URL with an unambiguous TLS mode unless explicit local evidence mode is enabled",
       });
     }
+    if (value.EXPERT_REFERRAL_ENABLED === "true") {
+      if (value.EXPERT_REFERRAL_HMAC_KEY_VERSION === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["EXPERT_REFERRAL_HMAC_KEY_VERSION"],
+          message: "expert_referral_key_version_required",
+        });
+      }
+      if (value.EXPERT_REFERRAL_HMAC_KEY_REF === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["EXPERT_REFERRAL_HMAC_KEY_REF"],
+          message: "expert_referral_key_reference_required",
+        });
+      }
+    }
   });
+
+const ownedConfigKeys = [
+  "DATABASE_URL",
+  "ALLOW_INSECURE_LOCAL_DATABASE",
+  "SELARTI_ENABLED",
+  "SELARTI_OUTBOUND_BILLING_MODE",
+  "PLANERKA_ENABLED",
+  "TELEGRAM_ENABLED",
+  "LLM_ENABLED",
+  "MAKE_PROJECTION_ENABLED",
+  "GOOGLE_SHEETS_PROJECTION_ENABLED",
+  "INTENT_MODEL_ENABLED",
+  "PAYMENTS_ENABLED",
+  "PAYMENT_PROVIDER",
+  "LLM_PROVIDER",
+  "MINOR_ONBOARDING_ENABLED",
+  "EXPERT_REFERRAL_ENABLED",
+  "EXPERT_RESIDENCY_BILLING_ENABLED",
+  "EXPERT_REFERRAL_HMAC_KEY_VERSION",
+  "EXPERT_REFERRAL_HMAC_KEY_REF",
+  "RAW_CONVERSATION_LOGGING",
+  "DISPLAY_TIMEZONE",
+] as const;
+
+const allowedExpertEnvironmentKeys = new Set([
+  "EXPERT_REFERRAL_ENABLED",
+  "EXPERT_RESIDENCY_BILLING_ENABLED",
+  "EXPERT_REFERRAL_HMAC_KEY_VERSION",
+  "EXPERT_REFERRAL_HMAC_KEY_REF",
+  "EXPERT_REFERRAL_HMAC_KEYS_JSON",
+]);
 
 export type RuntimeConfig = {
   databaseUrl: string;
@@ -88,10 +146,28 @@ export type RuntimeConfig = {
   rawConversationLogging: false;
   selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
+  features: {
+    expertReferral: boolean;
+    expertResidencyBilling: boolean;
+  };
+  expertReferralKeys: {
+    currentVersion: string;
+    reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON";
+  } | null;
 };
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
-  const value = schema.parse(source);
+  for (const key of Object.keys(source)) {
+    if (
+      /^EXPERT_(?:REFERRAL|RESIDENCY)_/u.test(key) &&
+      !allowedExpertEnvironmentKeys.has(key)
+    ) {
+      throw new Error(`unknown_expert_commercial_flag:${key}`);
+    }
+  }
+  const selected: Record<string, string | undefined> = {};
+  for (const key of ownedConfigKeys) selected[key] = source[key];
+  const value = schema.parse(selected);
 
   if (value.RAW_CONVERSATION_LOGGING === "true") {
     throw new Error("Raw conversation logging is prohibited");
@@ -111,5 +187,16 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     rawConversationLogging: false,
     selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
+    features: {
+      expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
+      expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
+    },
+    expertReferralKeys:
+      value.EXPERT_REFERRAL_ENABLED === "true"
+        ? {
+            currentVersion: value.EXPERT_REFERRAL_HMAC_KEY_VERSION!,
+            reference: value.EXPERT_REFERRAL_HMAC_KEY_REF!,
+          }
+        : null,
   };
 }

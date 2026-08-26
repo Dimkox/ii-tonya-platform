@@ -19,7 +19,16 @@ beforeEach(async () => testDb.reset());
 afterAll(async () => testDb?.stop(), 120_000);
 
 describe("expert residency tariffs and quotes", () => {
+  it("fails quote closed while durable new commands are disabled", async () => {
+    const expert = await fixtures.createExpert();
+
+    await expect(
+      repo.quote({ expertId: expert.expertId, tariffKey: "residency-month" }),
+    ).rejects.toMatchObject({ code: "expert_residency_commands_disabled" });
+  });
+
   it("creates one active tariff version and exposes a string-money quote", async () => {
+    await fixtures.enableFeatureControl();
     const tariffVersionId = randomUUID();
     const evidence = await fixtures.createAdminEvidence(
       "expert_residency.tariff_create",

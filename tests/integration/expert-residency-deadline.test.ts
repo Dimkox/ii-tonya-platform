@@ -97,6 +97,7 @@ describe("expert residency deadline", () => {
   });
 
   it("expires and releases a reservation when database time equals the deadline", async () => {
+    await fixtures.enableFeatureControl();
     const expert = await fixtures.createExpert();
     const tariffId = randomUUID();
     const now = await databaseNow();

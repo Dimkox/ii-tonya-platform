@@ -100,6 +100,11 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
+      features: {
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
+      expertReferralKeys: null,
     };
     const app = await (
       await import("./app.js")
@@ -118,6 +123,142 @@ describe("server composition", () => {
     ).toBe(401);
     await app.close();
     await lifecycle.close(fakeDb);
+  });
+
+  it("does not query issued versions or resolve HMAC material while referral is disabled", async () => {
+    let versionReads = 0;
+    let secretReads = 0;
+    const lifecycle = createDefaultLifecycle({
+      activeIssuedCodeKeyVersions: async () => {
+        versionReads += 1;
+        throw new Error("disabled startup queried issued versions");
+      },
+      expertCodeSecretResolver: {
+        resolve() {
+          secretReads += 1;
+          throw new Error("disabled startup resolved secret material");
+        },
+      },
+    });
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      features: {
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
+      expertReferralKeys: null,
+    };
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+    } as unknown as DrizzleDb;
+
+    await lifecycle.dependencies(config, fakeDb);
+    expect(versionReads).toBe(0);
+    expect(secretReads).toBe(0);
+  });
+
+  it("validates current and active issued-code keys during startup composition", async () => {
+    const order: string[] = [];
+    const lifecycle = createDefaultLifecycle({
+      activeIssuedCodeKeyVersions: async () => {
+        order.push("active-versions");
+        return ["v1"];
+      },
+      expertCodeSecretResolver: {
+        resolve(input) {
+          order.push("resolve");
+          expect(input).toEqual({
+            currentVersion: "v2",
+            reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+            requiredVersions: ["v1"],
+          });
+          return {
+            currentVersion: "v2",
+            versions: ["v2", "v1"],
+            key: (version) => new Uint8Array(32).fill(version === "v2" ? 2 : 1),
+          };
+        },
+      },
+    });
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      features: {
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
+      expertReferralKeys: {
+        currentVersion: "v2",
+        reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      },
+    };
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+    } as unknown as DrizzleDb;
+
+    await lifecycle.dependencies(config, fakeDb);
+    expect(order).toEqual(["active-versions", "resolve"]);
+  });
+
+  it("fails startup before dependencies are returned when key resolution is unavailable", async () => {
+    const lifecycle = createDefaultLifecycle({
+      activeIssuedCodeKeyVersions: async () => ["v3"],
+      expertCodeSecretResolver: {
+        resolve() {
+          throw new Error("expert_referral_key_unavailable");
+        },
+      },
+    });
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      features: {
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
+      expertReferralKeys: {
+        currentVersion: "v2",
+        reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      },
+    };
+
+    await expect(
+      lifecycle.dependencies(config, {} as DrizzleDb),
+    ).rejects.toThrow("expert_referral_key_unavailable");
   });
 
   it("closes Fastify then telemetry/database exactly once when listen fails", async () => {

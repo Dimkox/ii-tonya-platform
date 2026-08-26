@@ -151,4 +151,86 @@ describe("loadEnv", () => {
       ),
     ).toThrow();
   });
+
+  it("defaults expert referral and residency ceilings off without key configuration", () => {
+    const config = loadEnv(localEnv());
+
+    expect(config.features).toEqual({
+      expertReferral: false,
+      expertResidencyBilling: false,
+    });
+    expect(config.expertReferralKeys).toBeNull();
+  });
+
+  it("accepts only the reviewed enabled referral key reference metadata", () => {
+    const config = loadEnv(
+      localEnv({
+        EXPERT_REFERRAL_ENABLED: "true",
+        EXPERT_REFERRAL_HMAC_KEY_VERSION: "v2",
+        EXPERT_REFERRAL_HMAC_KEY_REF: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+      }),
+    );
+
+    expect(config.features.expertReferral).toBe(true);
+    expect(config.expertReferralKeys).toEqual({
+      currentVersion: "v2",
+      reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+    });
+    expect(() =>
+      loadEnv(
+        localEnv({
+          EXPERT_REFERRAL_ENABLED: "true",
+          EXPERT_REFERRAL_HMAC_KEY_VERSION: "legacy",
+          EXPERT_REFERRAL_HMAC_KEY_REF: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      loadEnv(
+        localEnv({
+          EXPERT_REFERRAL_ENABLED: "true",
+          EXPERT_REFERRAL_HMAC_KEY_VERSION: "v1",
+          EXPERT_REFERRAL_HMAC_KEY_REF: "file:///tmp/referral-keys.json",
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("does not read or expose referral HMAC secret material while disabled", () => {
+    const secret = '{"v1":"never-copy-this-secret"}';
+    let secretReads = 0;
+    const source = new Proxy(localEnv(), {
+      ownKeys(target) {
+        return [...Reflect.ownKeys(target), "EXPERT_REFERRAL_HMAC_KEYS_JSON"];
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (property === "EXPERT_REFERRAL_HMAC_KEYS_JSON") {
+          return { configurable: true, enumerable: true };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+      get(target, property, receiver) {
+        if (property === "EXPERT_REFERRAL_HMAC_KEYS_JSON") {
+          secretReads += 1;
+          return secret;
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    const config = loadEnv(source);
+
+    expect(secretReads).toBe(0);
+    expect(JSON.stringify(config)).not.toContain(secret);
+    expect(config.expertReferralKeys).toBeNull();
+  });
+
+  it("rejects unknown legacy expert commercial flags", () => {
+    expect(() =>
+      loadEnv(localEnv({ EXPERT_REFERRAL_CODES_ENABLED: "false" })),
+    ).toThrow("unknown_expert_commercial_flag");
+    expect(() =>
+      loadEnv(localEnv({ EXPERT_RESIDENCY_PAYMENT_ENABLED: "false" })),
+    ).toThrow("unknown_expert_commercial_flag");
+  });
 });

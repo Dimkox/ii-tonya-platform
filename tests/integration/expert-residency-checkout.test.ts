@@ -137,7 +137,21 @@ async function seedGrant(
 }
 
 describe("expert residency checkout", () => {
+  it("fails checkout closed while durable new commands are disabled", async () => {
+    const expert = await fixtures.createExpert();
+
+    await expect(
+      repo.createCheckoutOrder({
+        expertId: expert.expertId,
+        tariffKey: "residency-month",
+        providerDeadline: new Date(Date.now() + 86_400_000),
+        idempotencyKey: "checkout-disabled",
+      }),
+    ).rejects.toMatchObject({ code: "expert_residency_commands_disabled" });
+  });
+
   it("quotes the exact 50 percent cap and reserves eligible credit FIFO", async () => {
+    await fixtures.enableFeatureControl();
     await createActiveTariff();
     const expert = await fixtures.createExpert();
     const now = await databaseNow();
@@ -218,6 +232,7 @@ describe("expert residency checkout", () => {
   });
 
   it("replays an identical checkout after its status becomes terminal", async () => {
+    await fixtures.enableFeatureControl();
     await createActiveTariff();
     const expert = await fixtures.createExpert();
     const providerDeadline = new Date(

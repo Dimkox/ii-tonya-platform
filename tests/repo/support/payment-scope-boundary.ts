@@ -75,7 +75,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "83cedea6ac45982b8511c4cbf3227d3e7a155667a2681d942177ada420c26ef1",
+    "a046d7bce8aa8ac191d456b94d01022d8ec672b883440d3ba738cd0e2380d8a4",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -155,7 +155,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "fd44cf8a73a6e8e8403d49b0415696b38b756e051da3533775c25cca92b35a40",
+    "cba62ba033d8d0cc3fe6de4220a335b5b70354c0aa729a657035597a8c110f23",
   ],
   [
     "dockerfile",
@@ -163,7 +163,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "compose.yaml",
-    "dbb4863e1bf51df3bc655aec6a6381ba5b9d41c6480ab1c2455f15440200ac15",
+    "abc343cc072a3eb1ce2ad2fdc953e9850b03fd257fc61e3aa616aa58b5f1e11d",
   ],
 ]);
 const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([

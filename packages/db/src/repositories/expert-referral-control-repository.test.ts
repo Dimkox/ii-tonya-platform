@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
 import { PostgresExpertReferralControlRepository } from "./expert-referral-control-repository.js";
 import {
   EXPERT_REFERRAL_FEATURE_CONTROL_TEST_OBJECT_ID,
@@ -32,6 +33,47 @@ describe("expert referral durable controls", () => {
       newCommandsEnabled: false,
       rewardGrantsEnabled: false,
     });
+  });
+
+  it("reads the durable command control afresh for each application call", async () => {
+    const repo = new PostgresExpertReferralControlRepository(testDb.db);
+
+    await expect(repo.readForCommand()).resolves.toMatchObject({
+      version: 0,
+      newCommandsEnabled: false,
+    });
+    await fixtures.enableFeatureControl();
+    await expect(repo.readForCommand()).resolves.toMatchObject({
+      version: 1,
+      newCommandsEnabled: true,
+    });
+  });
+
+  it("lists only distinct key versions retained by active issued codes", async () => {
+    const expert = await fixtures.createExpert();
+    await fixtures.seedIssuedQuota(expert.expertId, 3);
+    const codes = await fixtures.storedCodes();
+    const first = codes[0];
+    const second = codes[1];
+    const third = codes[2];
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error("issued code fixture incomplete");
+    }
+    await testDb.db.execute(sql`
+      update expert_referral_codes set hmac_key_version = 2
+      where id = ${second.id}::uuid
+    `);
+    await testDb.db.execute(sql`
+      update expert_referral_codes set hmac_key_version = 3, status = 'redeemed',
+        redeemed_at = clock_timestamp()
+      where id = ${third.id}::uuid
+    `);
+    const repo = new PostgresExpertReferralControlRepository(testDb.db);
+
+    await expect(repo.activeIssuedCodeKeyVersions()).resolves.toEqual([
+      "v1",
+      "v2",
+    ]);
   });
 
   it("updates feature state only at the expected durable version", async () => {

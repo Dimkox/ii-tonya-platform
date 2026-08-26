@@ -81,6 +81,12 @@ export type {
 } from "./expert-residency/payment-port.js";
 export type { VerifiedExpertResidencyPaymentEvent } from "./expert-residency/verified-event.js";
 export {
+  EnvironmentExpertCodeSecretResolver,
+  ExpertCodeSecretResolutionError,
+  type EnvironmentExpertCodeKeyring,
+  type EnvironmentExpertCodeSecretResolution,
+} from "./expert-residency/environment-secret-resolver.js";
+export {
   buildTelegramMethodUrl,
   redactTelegramUrl,
   TelegramAdapter,

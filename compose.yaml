@@ -2,6 +2,11 @@ name: ii-tonya-local-evidence
 
 x-disabled-runtime: &disabled-runtime
   MINOR_ONBOARDING_ENABLED: "false"
+  EXPERT_REFERRAL_ENABLED: "false"
+  EXPERT_RESIDENCY_BILLING_ENABLED: "false"
+  EXPERT_REFERRAL_HMAC_KEY_VERSION: v1
+  EXPERT_REFERRAL_HMAC_KEY_REF: env://EXPERT_REFERRAL_HMAC_KEYS_JSON
+  # EXPERT_REFERRAL_HMAC_KEYS_JSON is secret-managed and intentionally absent.
   SELARTI_ENABLED: "false"
   SELARTI_OUTBOUND_BILLING_MODE: disabled
   PLANERKA_ENABLED: "false"

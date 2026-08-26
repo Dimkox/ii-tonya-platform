@@ -72,6 +72,10 @@ interface FeatureRow extends Record<string, unknown> {
   rewardGrantsEnabled: boolean;
 }
 
+interface ActiveKeyVersionRow extends Record<string, unknown> {
+  keyVersion: number;
+}
+
 interface EligibilityRow extends Record<string, unknown> {
   expertId: string;
   userId: string;
@@ -295,6 +299,20 @@ function requireReason(reasonCode: string): void {
 
 export class PostgresExpertReferralControlRepository {
   constructor(private readonly db: DrizzleDb) {}
+
+  readForCommand(): Promise<ExpertReferralFeatureControl> {
+    return this.db.transaction((tx) => this.lockFeatureControl(tx));
+  }
+
+  async activeIssuedCodeKeyVersions(): Promise<readonly string[]> {
+    const result = await this.db.execute<ActiveKeyVersionRow>(sql`
+      select distinct hmac_key_version as "keyVersion"
+      from expert_referral_codes
+      where status = 'issued'
+      order by hmac_key_version
+    `);
+    return result.rows.map((row) => `v${row.keyVersion}`);
+  }
 
   async lockFeatureControl(
     tx: ExpertReferralTransaction,
