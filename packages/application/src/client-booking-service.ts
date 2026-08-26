@@ -3,6 +3,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { ReservationStatus } from "@ii-tonya/domain";
 
 import type { ClientPrincipal } from "./ports.js";
+import type {
+  ClaimedConversationOperation,
+  ClientConversationOperationClaimDetails,
+} from "./client-conversation-authority.js";
 
 export type ClientBookingPublicState =
   "reserved" | "booked" | "cancelled" | "expired" | "completed" | "no_show";
@@ -63,6 +67,43 @@ export class ClientBookingUnauthorizedError extends Error {
     this.name = "ClientBookingUnauthorizedError";
   }
 }
+
+export type ConversationBookingResult =
+  | Readonly<{ kind: "applied"; downstreamReceiptDigest: string }>
+  | Readonly<{
+      kind: "rejected";
+      code: "not_found" | "conflict" | "feature_disabled";
+    }>;
+
+export interface ConversationBookingGateway {
+  reserve(
+    claim: ClaimedConversationOperation,
+  ): Promise<ConversationBookingResult>;
+}
+
+export interface ConversationBookingRepository {
+  reserveConversation(
+    claim: ClientConversationOperationClaimDetails,
+  ): Promise<ConversationBookingResult>;
+}
+
+export const createConversationBookingGateway = (deps: {
+  readonly authority: {
+    readonly booking: {
+      read(
+        claim: ClaimedConversationOperation,
+      ): ClientConversationOperationClaimDetails | null;
+    };
+  };
+  readonly repository: ConversationBookingRepository;
+}): ConversationBookingGateway =>
+  Object.freeze({
+    reserve(claim: ClaimedConversationOperation) {
+      const details = deps.authority.booking.read(claim);
+      if (details === null) throw new ClientBookingUnauthorizedError();
+      return deps.repository.reserveConversation(details);
+    },
+  });
 
 export class ClientBookingInvalidRequestError extends Error {
   readonly code = "client_booking_invalid_request";

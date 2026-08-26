@@ -151,3 +151,35 @@ GREEN evidence:
 Changed files: `packages/application/src/client-catalog-service.ts`, `packages/application/src/client-catalog-service.test.ts`, `packages/application/src/client-conversation-authority.ts`, `packages/application/src/client-conversation-authority.test.ts`, `packages/contracts/src/worker-outbox.test.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/client-catalog-repository.ts`, `tests/integration/client-conversation-catalog-gateway.test.ts`, this report.
 
 Concern: `tests/integration/client-catalog-booking-choice.test.ts` contains a separately gated PostgreSQL describe that requires `II_TONYA_TEST_POSTGRES_ADMIN_URL`; including that unrelated file produced `Error: external PostgreSQL is required`. The clean final catalog command above excludes that environment-gated booking slice. Booking gateway/runtime composition remains intentionally untouched for Slice 5B2.
+
+## Slice 5B2 — protected booking conversation gateway and lifecycle races
+
+Status: GREEN
+
+RED evidence:
+
+- `corepack pnpm exec vitest run packages/application/src/client-booking-service.test.ts` — 1 file, 2 failed / 6 passed because `createConversationBookingGateway` did not exist.
+- `corepack pnpm exec vitest run tests/integration/client-conversation-booking-gateway.test.ts` — 1 file, 17 tests failed because the conversation repository/gateway and shared lifecycle lock path did not exist.
+
+Implementation:
+
+- `ConversationBookingGateway.reserve(claim)` accepts only a genuine authority-local `start_booking` claim. Forged, spread, cloned, cross-authority and catalog claims fail synchronously before repository access, and the path never constructs `ClientPrincipal`.
+- The repository derives `choiceDigest`, idempotency key, booking handle, correlation and downstream receipt entirely from the frozen claim/operation. Ordinary and conversation booking call one repository-owned prelock helper with the unchanged expression `hashtextextended('choice:' || choiceDigest,0)`.
+- The conversation transaction performs candidate-only lookup, shared prelock first, separate 2-second transaction-local bounds, then fresh PostgreSQL-time locks/checks in `users -> mapping -> client_booking:write grant -> operation -> protected choice/receipt/slot/client/expert` order before entering the existing reservation seam. Existing protected receipt, audit and dormant provider outbox behavior is preserved.
+- Grant revocation, client deactivation and privacy erasure now share the lifecycle ordering helper `users -> mapping -> grant -> operation`, skip missing ancestors, and never acquire the choice prelock. Privacy erasure retains its existing data-clearing semantics.
+- Applied and replayed reservations return the same independently derived 64-lowercase-hex receipt digest. Pre-call PostgreSQL lock/statement cancellation is classified as `ConversationBookingRetryableError`; downstream errors remain available for later unknown-outcome handling by the operation worker.
+- No worker runtime, outbox registry, conversation topic or provider runner was changed.
+
+GREEN evidence:
+
+- `corepack pnpm exec vitest run packages/application/src/booking-service.test.ts packages/application/src/client-booking-service.test.ts` — 2 files, 14 tests passed.
+- `corepack pnpm exec vitest run packages/application/src/booking-service.test.ts packages/application/src/client-booking-service.test.ts packages/contracts/src/worker-outbox.test.ts packages/db/src/repositories/privacy-repository.test.ts tests/integration/client-conversation-catalog-gateway.test.ts tests/integration/client-conversation-booking-gateway.test.ts` — 6 files, 50 tests passed, including 17 migration-backed booking and 17 migration-backed catalog PostgreSQL tests.
+- The booking PostgreSQL suite proves genuine/replay behavior with one reservation/receipt and no provider execution; revoked/expired/wrong grants; inactive/erased/wrong mappings; stale fence/lease; wrong tool/scope/proposal; forgery; feature disablement; identical ordinary/conversation advisory locking; choice-cleanup exclusion; bounded timeout classification; and both commit orders for revoke, deactivate and erase without deadlock.
+- `corepack pnpm --workspace-concurrency=1 -r --sort run typecheck` — 13 workspace projects passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `corepack pnpm lint` — passed.
+- Prettier formatting and `git diff --check` — passed.
+
+Changed files: `packages/application/src/client-booking-service.ts`, `packages/application/src/client-booking-service.test.ts`, `packages/db/src/index.ts`, `packages/db/src/repositories/booking-repository.ts`, `packages/db/src/repositories/client-conversation-lifecycle-locks.ts`, `packages/db/src/repositories/admin-repository.ts`, `packages/db/src/repositories/privacy-repository.ts`, `tests/integration/client-conversation-booking-gateway.test.ts`, this report and the progress ledger.
+
+Concern: the older booking repository/choice/lock/privacy integration files use the separately gated `II_TONYA_TEST_POSTGRES_ADMIN_URL` harness and cannot run in this environment without that external variable. Slice 5B2's required evidence instead uses the repository-standard migration-backed `startTestPostgres()` lifecycle and covers both the ordinary shared prelock and conversation transaction. Worker runtime composition remains intentionally deferred.

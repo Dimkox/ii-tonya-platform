@@ -7,6 +7,7 @@ import {
   type ClientCatalogCard,
 } from "./client-catalog-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { lockClientConversationLifecycle } from "./client-conversation-lifecycle-locks.js";
 
 export interface WithdrawConsentCommand {
   readonly targetUserId: string;
@@ -428,26 +429,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
-        await tx.execute(sql`
-        select pg_advisory_xact_lock(
-          hashtextextended('choice:' || c.choice_digest,0)
-        )
-        from client_catalog_choices c
-        join client_catalog_requests r on r.id=c.request_id
-        where r.user_id=${command.targetUserId}::uuid
-        order by c.choice_digest
-      `);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`,
         );
-        const subject = (
-          await tx.execute<{ userId: string }>(sql`
-        select id as "userId" from users
-        where id=${command.targetUserId}::uuid
-        for update
-      `)
-        ).rows[0];
-        if (subject === undefined)
+        if (!(await lockClientConversationLifecycle(tx, command.targetUserId)))
           throw new Error("Privacy subject is unavailable");
         await tx.execute(sql`
         update users set active=false,updated_at=clock_timestamp()

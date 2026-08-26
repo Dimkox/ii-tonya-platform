@@ -18,6 +18,7 @@ export {
   BookingDataIntegrityError,
   BookingIdempotencyConflictError,
   BookingSerializationExhaustedError,
+  ConversationBookingRetryableError,
   PostgresBookingRepository,
   type BookingRepositoryOptions,
   type BookingExpertScheduleRecord,
@@ -61,6 +62,10 @@ export {
   type ClientConversationIdentityFact,
   type ClientConversationIdentityLookup,
 } from "./repositories/client-conversation-principal-repository.js";
+export {
+  lockClientConversationLifecycle,
+  type ClientConversationLifecycleTransaction,
+} from "./repositories/client-conversation-lifecycle-locks.js";
 export {
   PostgresClientConversationOperationRepository,
   type ConversationOperationClaimRepository,

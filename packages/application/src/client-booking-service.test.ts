@@ -5,9 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ClientBookingConflictError,
   ClientBookingNotFoundError,
+  ClientBookingUnauthorizedError,
+  createConversationBookingGateway,
   createClientBookingService,
 } from "./client-booking-service.js";
 import { createBookingService } from "./booking-service.js";
+import { createClientConversationOperationAuthority } from "./client-conversation-authority.js";
 
 const userId = "00000000-0000-4000-8000-000000000101";
 const choiceHandle = `ch1.${"A".repeat(43)}` as const;
@@ -202,5 +205,92 @@ describe("client booking application boundary", () => {
       bookingHandle,
       correlationId: "cancel-correlation",
     });
+  });
+});
+
+describe("conversation booking gateway", () => {
+  it("passes only genuine local booking claim details to the repository", async () => {
+    const authority = createClientConversationOperationAuthority();
+    const reserveConversation = vi.fn(async () => ({
+      kind: "applied" as const,
+      downstreamReceiptDigest: "c".repeat(64),
+    }));
+    const gateway = createConversationBookingGateway({
+      authority,
+      repository: { reserveConversation },
+    });
+    const claim = authority.issuer.issue({
+      operationId: "60000000-0000-4000-8000-000000000001",
+      claimToken: "60000000-0000-4000-8000-000000000002",
+      claimOwnerId: "worker-1",
+      claimFence: 1,
+      toolKind: "start_booking",
+      requiredScope: "client_booking:write",
+      frozenInput: { choiceHandle },
+    });
+
+    await expect(gateway.reserve(claim)).resolves.toEqual({
+      kind: "applied",
+      downstreamReceiptDigest: "c".repeat(64),
+    });
+    expect(reserveConversation).toHaveBeenCalledWith({
+      operationId: "60000000-0000-4000-8000-000000000001",
+      claimToken: "60000000-0000-4000-8000-000000000002",
+      claimOwnerId: "worker-1",
+      claimFence: 1,
+      toolKind: "start_booking",
+      requiredScope: "client_booking:write",
+      frozenInput: { choiceHandle },
+    });
+  });
+
+  it("synchronously rejects forged, cloned, cross-authority and catalog claims", () => {
+    const authority = createClientConversationOperationAuthority();
+    const other = createClientConversationOperationAuthority();
+    const reserveConversation = vi.fn();
+    const gateway = createConversationBookingGateway({
+      authority,
+      repository: { reserveConversation },
+    });
+    const booking = authority.issuer.issue({
+      operationId: "60000000-0000-4000-8000-000000000001",
+      claimToken: "60000000-0000-4000-8000-000000000002",
+      claimOwnerId: "worker-1",
+      claimFence: 1,
+      toolKind: "start_booking",
+      requiredScope: "client_booking:write",
+      frozenInput: { choiceHandle },
+    });
+    const catalog = authority.issuer.issue({
+      operationId: "60000000-0000-4000-8000-000000000003",
+      claimToken: "60000000-0000-4000-8000-000000000004",
+      claimOwnerId: "worker-1",
+      claimFence: 1,
+      toolKind: "show_catalog",
+      requiredScope: "client_catalog:read",
+      frozenInput: {},
+    });
+    const crossAuthority = other.issuer.issue({
+      operationId: "60000000-0000-4000-8000-000000000005",
+      claimToken: "60000000-0000-4000-8000-000000000006",
+      claimOwnerId: "worker-1",
+      claimFence: 1,
+      toolKind: "start_booking",
+      requiredScope: "client_booking:write",
+      frozenInput: { choiceHandle },
+    });
+
+    for (const hostile of [
+      { operationId: booking.operationId },
+      { ...booking },
+      structuredClone(booking),
+      crossAuthority,
+      catalog,
+    ]) {
+      expect(() => gateway.reserve(hostile as never)).toThrow(
+        ClientBookingUnauthorizedError,
+      );
+    }
+    expect(reserveConversation).not.toHaveBeenCalled();
   });
 });
