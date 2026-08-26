@@ -81,3 +81,14 @@ Real PostgreSQL evidence: `corepack pnpm exec vitest run tests/integration/clien
 Focused evidence: `corepack pnpm exec vitest run tests/integration/client-conversation-operation-races.test.ts apps/worker/src/client-conversation-operations.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 8 tests passed. Workspace typecheck, test typecheck, lint, Prettier, and `git diff --check` passed.
 
 Changed files: `packages/db/src/repositories/client-conversation-operation-repository.ts`, `tests/integration/client-conversation-operation-races.test.ts`, this report.
+
+## Slice 5A round 5 verification correction
+
+The independent lint finding was fixed in `packages/db/src/repositories/client-conversation-operation-repository.test.ts:5-12,14,24,34` by replacing the untyped database mock/casts with inferred Vitest mock types and explicit `unknown` query input. No suppressions or disable comments were added.
+
+Exact GREEN commands:
+
+- `corepack pnpm lint` — passed.
+- `corepack pnpm exec vitest run tests/integration/client-conversation-operation-races.test.ts apps/worker/src/client-conversation-operations.test.ts packages/contracts/src/worker-outbox.test.ts` — 3 files, 9 tests passed.
+- `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` — passed.
+- `git diff --check` — passed.
