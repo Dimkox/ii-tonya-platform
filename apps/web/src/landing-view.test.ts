@@ -15,6 +15,7 @@ describe("promotional landing view", () => {
       "clients",
       "experts",
       "tariffs",
+      "payment",
       "faq",
       "contacts",
       "legal",
@@ -40,15 +41,35 @@ describe("promotional landing view", () => {
     }
   });
 
-  it("contains no form, authentication, payment, or tracking surface", () => {
+  it("explains the bot-only payment flow and provider-hosted card entry", () => {
+    expect(html).toContain("Оплата — только в Telegram-боте");
+    expect(html).toContain("ЮKassa");
+    expect(html).toContain("Т-Банк");
+    expect(html).toContain('src="/payments/yookassa.svg"');
+    expect(html).toContain('src="/payments/tbank.svg"');
+    expect(html).toContain(
+      "не получает и не хранит полный номер банковской карты и CVV/CVC",
+    );
+    expect(html).toContain("электронный кассовый чек");
+    expect(html).toContain("Условия отмены и возврата");
+    expect(html).toContain(
+      "Стоимость Базового тарифа и тарифа «Эксклюзив» фиксирована",
+    );
+    expect(html).toContain("Первый заказ — 15 000 ₽");
+    expect(html).toContain("Первый заказ — 23 000 ₽");
+    expect(html).not.toContain("Стоимость указана для ориентира");
+    expect(html).not.toContain("Персональный расчёт");
+  });
+
+  it("contains no on-site form, authentication, card entry, or tracking surface", () => {
     expect(html).not.toMatch(
-      /<form\b|<input\b|authorization|bearer|checkout|yookassa|payment|analytics|pixel/iu,
+      /<form\b|<input\b|authorization|bearer|checkout|cardholder|analytics|pixel/iu,
     );
     expect(html).not.toMatch(/on(?:click|submit|load)=/iu);
     expect(html).not.toMatch(/mc\.yandex|google-analytics|fonts\.googleapis/iu);
     expect(html).not.toMatch(
       /тест клиент|тест эксперт|пакет(?:ы|а)? сообщений|купон/iu,
     );
-    expect(html).toContain("Платёжных элементов на этой странице нет");
+    expect(html).toContain("На сайте нет формы оплаты");
   });
 });

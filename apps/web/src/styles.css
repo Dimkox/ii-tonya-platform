@@ -803,12 +803,26 @@ footer nav a {
   line-height: 1.05;
 }
 
-.tariff-card > p:not(.tariff-number, .tariff-price, .tariff-setup) {
+.tariff-card
+  > p:not(.tariff-number, .tariff-price, .tariff-setup, .tariff-delivery) {
   color: var(--muted);
 }
 
-.featured > p:not(.tariff-number, .tariff-price, .tariff-setup) {
+.featured
+  > p:not(.tariff-number, .tariff-price, .tariff-setup, .tariff-delivery) {
   color: rgba(255, 255, 255, 0.75);
+}
+
+.tariff-delivery {
+  padding-top: 1rem;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+
+.featured .tariff-delivery {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .tariff-setup {
@@ -858,6 +872,89 @@ footer nav a {
   padding: 0.4rem 0;
   color: var(--terracotta-dark);
   font-weight: 800;
+}
+
+.payment {
+  background:
+    linear-gradient(135deg, rgba(49, 85, 74, 0.08), transparent 45%),
+    var(--paper);
+}
+
+.payment-flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0;
+  margin: clamp(3rem, 6vw, 6rem) 0 2rem;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.payment-flow li {
+  min-height: 15rem;
+  padding: 1.4rem;
+  border-right: 1px solid var(--line);
+}
+
+.payment-flow li:last-child {
+  border-right: 0;
+}
+
+.payment-flow span {
+  display: block;
+  margin-bottom: 2.4rem;
+  color: var(--terracotta-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.payment-flow strong {
+  display: block;
+  margin-bottom: 0.8rem;
+  font-size: 1.05rem;
+}
+
+.payment-flow p,
+.payment-facts p {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.payment-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.payment-facts > div {
+  padding: clamp(1.4rem, 3vw, 2.3rem);
+  background: var(--paper-light);
+}
+
+.payment-facts a {
+  color: var(--terracotta-dark);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.provider-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.3rem;
+  align-items: center;
+  min-height: 4rem;
+  margin-bottom: 1rem;
+}
+
+.provider-logos img {
+  width: auto;
+  max-width: 9.75rem;
+  height: 2.5rem;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .faq {
@@ -1179,6 +1276,22 @@ summary:focus-visible {
   .tariff-card.featured {
     transform: none;
   }
+
+  .payment-flow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .payment-flow li:nth-child(2) {
+    border-right: 0;
+  }
+
+  .payment-flow li:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .payment-facts {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1227,7 +1340,8 @@ summary:focus-visible {
   .boundary,
   .expert-columns,
   .expert-steps,
-  .tariff-details {
+  .tariff-details,
+  .payment-flow {
     grid-template-columns: 1fr;
   }
 
@@ -1236,15 +1350,22 @@ summary:focus-visible {
   .boundary > *,
   .boundary > *:nth-child(2),
   .expert-steps li,
-  .expert-steps li:nth-child(2) {
+  .expert-steps li:nth-child(2),
+  .payment-flow li,
+  .payment-flow li:nth-child(2) {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 
   .principles p:last-child,
   .boundary > *:last-child,
-  .expert-steps li:last-child {
+  .expert-steps li:last-child,
+  .payment-flow li:last-child {
     border-bottom: 0;
+  }
+
+  .payment-flow li {
+    min-height: auto;
   }
 
   .principles p {

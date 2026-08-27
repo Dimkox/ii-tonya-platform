@@ -7,9 +7,27 @@ describe("public legal documents", () => {
     expect(legalDocuments.oferta.text).toContain(
       "РАЗДЕЛ 11. ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ",
     );
-    expect(legalDocuments.oferta.text).toContain("21 августа 2026 года");
+    expect(legalDocuments.oferta.text).toContain("22 августа 2026 года");
     expect(legalDocuments.oferta.text).toContain(
-      "Платёжные элементы на Сайте отсутствуют",
+      "Оплата оформляется только в Telegram-боте",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "ЮKassa, Т-Банка или иного подключённого платёжного оператора",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "полный номер банковской карты и CVV/CVC не получает и не хранит",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "Базовый тариф — 12 000 рублей за 30 календарных дней",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "первого заказа по Базовому тарифу составляет 15 000 рублей",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "за вычетом возвратов денежных средств участникам",
+    );
+    expect(legalDocuments.oferta.text).toContain(
+      "в течение пяти рабочих дней после мероприятия",
     );
     expect(legalDocuments.oferta.text).toContain(
       "заключается Клиентом непосредственно с выбранным Экспертом",
@@ -22,6 +40,13 @@ describe("public legal documents", () => {
     );
     expect(legalDocuments.privacy.text).toContain(
       "не считается согласием на обработку",
+    );
+    expect(legalDocuments.privacy.text).toContain("ЮKassa и Т-Банк");
+    expect(legalDocuments.privacy.text).toContain(
+      "полный номер банковской карты и CVV/CVC Оператору не передаются",
+    );
+    expect(legalDocuments.privacy.text).toContain(
+      "маскированные сведения о способе оплаты",
     );
   });
 
