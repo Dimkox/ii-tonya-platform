@@ -18,7 +18,7 @@
     "start": "node dist/server.js",
     "build": "tsup --config tsup.config.ts",
     "build:bounded": "tsup --config tsup.config.ts",
-    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ii-tonya/api": "workspace:*",

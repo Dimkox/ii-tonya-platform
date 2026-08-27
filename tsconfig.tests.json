@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ii-tonya/api": ["apps/api/src/index.ts"],
+      "@ii-tonya/*": ["packages/*/src/index.ts"]
+    }
+  },
+  "include": [
+    "apps/**/*.test.ts",
+    "apps/**/*.testkit.ts",
+    "apps/**/src/testkit/**/*.ts",
+    "packages/**/*.test.ts",
+    "packages/**/*.testkit.ts",
+    "packages/**/src/testkit/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

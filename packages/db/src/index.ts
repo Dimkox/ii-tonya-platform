@@ -6,6 +6,7 @@ export {
   migrateDb,
   type DrizzleDb,
 } from "./client.js";
+export { sql } from "drizzle-orm";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
@@ -21,7 +22,12 @@ export {
   type BookingRepositoryOptions,
   type BookingExpertScheduleRecord,
   type BookingSlotView,
+  type CancelBookingForErasureCommand,
+  type CancelOwnedBookingCommand,
+  type ProtectedClientBookingCancelResult,
+  type ProtectedClientBookingReserveResult,
   type ReservationAction,
+  type ReserveProtectedChoiceCommand,
   type ReserveSlotCommand,
   type ReserveSlotResult,
   type TransitionReservationCommand,
@@ -32,7 +38,22 @@ export {
   PostgresCatalogRepository,
   type CatalogEligibilityQuery,
   type CatalogExpertRecord,
+  type BookingAwareAvailabilitySlot,
+  type PublicCatalogServiceRecord,
 } from "./repositories/catalog-repository.js";
+export {
+  PostgresClientCatalogRepository,
+  type ClientCatalogCard,
+  type ClientCatalogRequestRepository,
+  type ClientCatalogSlot,
+  type ClientCatalogSnapshot,
+  type ProtectedCatalogChoiceInput,
+} from "./repositories/client-catalog-repository.js";
+export {
+  PostgresClientSessionRepository,
+  type ClientSessionResolution,
+  type ClientSessionRevocation,
+} from "./repositories/client-session-repository.js";
 export {
   CompensationConflictError,
   ConversationCompletionDataError,
@@ -54,6 +75,7 @@ export {
   OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
+  type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
 export {
   PostgresTelegramCallbackRepository,
@@ -112,6 +134,16 @@ export {
   PostgresWebhookInboxRepository,
   WebhookInboxClaimLostError,
 } from "./repositories/webhook-inbox-repository.js";
+export {
+  PostgresExpertAiRequestReceiptStore,
+  type ExpertAiReceiptClaim,
+  type ExpertAiStoredOutcome,
+} from "./repositories/expert-ai-request-receipt-repository.js";
+export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
+export {
+  PostgresOperatorCaseOutboxRepository,
+  type OperatorCaseOutboxMessage,
+} from "./repositories/operator-case-outbox-repository.js";
 export {
   ExpertReferralCommandError,
   ExpertReferralDataIntegrityError,
@@ -178,6 +210,12 @@ export {
   type DbExpertTelegramStats,
   type ExpertTelegramQueryRepositoryOptions,
 } from "./repositories/expert-telegram-query-repository.js";
+export {
+  PostgresExpertTelegramResidencyCallbackRepository,
+  type ExpertResidencyCallbackClaims,
+  type ExpertResidencyCheckoutClaim,
+  type ExpertResidencyCheckoutOutcome,
+} from "./repositories/expert-telegram-residency-callback-repository.js";
 export {
   PostgresExpertReferralWorkerRepository,
   type ExpertReferralHoldReplayBatchResult,

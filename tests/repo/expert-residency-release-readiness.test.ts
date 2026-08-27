@@ -92,7 +92,8 @@ describe("expert residency referral release readiness", () => {
   it("composes the expert residency worker with a disabled provider reader", () => {
     const main = read("apps/worker/src/main.ts");
     expect(main).toContain("disabledExpertResidencyProviderReader");
-    expect(main).toContain('kind: "disabled"');
-    expect(main).not.toMatch(/\b(?:fetch|axios|stripe|yookassa)\b/u);
+    expect(main).toContain("return disabledExpertResidencyProviderReader");
+    expect(main).toContain("config.features.yookassa !== true");
+    expect(main).not.toMatch(/from\s+["'](?:axios|stripe|yookassa)(?:[\/"'])/u);
   });
 });

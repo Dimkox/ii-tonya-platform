@@ -3,6 +3,7 @@ import {
   bigint as pgBigint,
   bigserial,
   boolean,
+  char,
   check,
   foreignKey,
   index,
@@ -17,6 +18,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { adminApprovals, adminSessions } from "./audit.js";
 import { experts } from "./catalog.js";
@@ -348,6 +350,76 @@ export const expertResidencyTariffVersions = pgTable(
       sql`${table.activeTo} > ${table.activeFrom}`,
     ),
     index("expert_tariff_lookup_idx").on(table.tariffKey, table.activeFrom),
+  ],
+);
+
+export const expertTelegramResidencyCallbacks = pgTable(
+  "expert_telegram_residency_callbacks",
+  {
+    tokenHash: char("token_hash", { length: 64 }).primaryKey(),
+    expertId: uuid("expert_id")
+      .notNull()
+      .references(() => experts.id),
+    telegramUserId: varchar("telegram_user_id", { length: 20 }).notNull(),
+    tariffVersionId: uuid("tariff_version_id")
+      .notNull()
+      .references(() => expertResidencyTariffVersions.id),
+    action: text("action").notNull().default("start_residency_checkout"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    checkoutStatus: text("checkout_status").notNull().default("issued"),
+    checkoutUrl: varchar("checkout_url", { length: 2048 }),
+    processingFence: uuid("processing_fence"),
+    processingLeaseUntil: timestamp("processing_lease_until", {
+      withTimezone: true,
+    }),
+    outcomeRecordedAt: timestamp("outcome_recorded_at", {
+      withTimezone: true,
+    }),
+    createdAt,
+  },
+  (table) => [
+    unique("expert_telegram_residency_callbacks_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_action_check",
+      sql`${table.action} = 'start_residency_checkout'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_token_hash_check",
+      sql`${table.tokenHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_telegram_id_check",
+      sql`${table.telegramUserId} ~ '^[1-9][0-9]{0,19}$'`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_checkout_state_check",
+      sql`(${table.checkoutStatus} = 'issued' and ${table.consumedAt} is null) or (${table.checkoutStatus} <> 'issued' and ${table.consumedAt} is not null)`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_processing_lease_check",
+      sql`(${table.checkoutStatus} = 'processing' and ${table.processingFence} is not null and ${table.processingLeaseUntil} is not null) or (${table.checkoutStatus} <> 'processing' and ${table.processingFence} is null and ${table.processingLeaseUntil} is null)`,
+    ),
+    check(
+      "expert_telegram_residency_callbacks_checkout_outcome_check",
+      sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is not null and char_length(${table.checkoutUrl}) between 1 and 2048 and ${table.checkoutUrl} ~* '^https://[^[:space:]]+$')`,
+    ),
+    index("expert_telegram_residency_callbacks_expiry_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.consumedAt} is null`),
+    index("expert_telegram_residency_callbacks_processing_lease_idx")
+      .on(table.processingLeaseUntil)
+      .where(sql`${table.checkoutStatus} = 'processing'`),
+    index("expert_telegram_residency_callbacks_url_cleanup_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.checkoutUrl} is not null`),
   ],
 );
 

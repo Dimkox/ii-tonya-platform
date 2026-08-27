@@ -162,6 +162,11 @@ for mismatches. It does not poll unbounded payment history or use webhook payloa
 authority. The current reader can reconcile only operations with a durably bound provider
 object ID. It does not autonomously recover an unbound POST outcome; YKP-016 remains an
 activation blocker until exact-body encrypted recovery is implemented and approved.
+authority. Bound objects use authoritative GET reconciliation. A separate default-off
+YKP-016 job may recover an unbound POST only from its encrypted exact original body,
+original idempotency key, AEAD operation context, and lease-fenced completion. It binds
+the recovered provider object as pending and never settles financial state. Activation
+remains blocked until the key resolver, policy inputs, and provider evidence are approved.
 
 ## 5. Data flow
 

@@ -114,7 +114,8 @@ export class PostgresWorkerJobsRepository {
           (select count(*) from due) - (select count(*) from expired) as failed
       `);
       const row = result.rows[0];
-      if (row === undefined) throw new Error("PostgreSQL expiry batch returned no count");
+      if (row === undefined)
+        throw new Error("PostgreSQL expiry batch returned no count");
       return {
         examined: count(row.examined),
         changed: count(row.changed),
@@ -207,7 +208,8 @@ export class PostgresWorkerJobsRepository {
             - (select count(*) from transitioned where prior_status = 'assigned') as unchanged
       `);
       const row = result.rows[0];
-      if (row === undefined) throw new Error("PostgreSQL safety batch returned no count");
+      if (row === undefined)
+        throw new Error("PostgreSQL safety batch returned no count");
       return {
         examined: count(row.examined),
         escalated: count(row.escalated),
@@ -221,9 +223,16 @@ export class PostgresWorkerJobsRepository {
     readonly operatorId: string;
     readonly authenticatedSessionIdHash: string;
     readonly expectedVersion: number;
-  }): Promise<{ readonly kind: "acknowledged"; readonly version: number } | { readonly kind: "conflict" }> {
+  }): Promise<
+    | { readonly kind: "acknowledged"; readonly version: number }
+    | { readonly kind: "conflict" }
+  > {
     return this.db.transaction(async (tx) => {
-      const result = await tx.execute<{ id: string; version: number; acknowledgedAt: Date }>(sql`
+      const result = await tx.execute<{
+        id: string;
+        version: number;
+        acknowledgedAt: Date;
+      }>(sql`
         update human_escalations
         set
           status = 'acknowledged',
@@ -262,35 +271,95 @@ export class PostgresWorkerJobsRepository {
     });
   }
 
-  async deliverSafetyEscalationsBatch(batchSize: number): Promise<{ delivered: number }> {
+  async materializeOperatorCasesBatch(
+    batchSize: number,
+  ): Promise<{ materialized: number }> {
+    if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 1_000)
+      throw new Error("operator_case_batch_invalid");
     return this.db.transaction(async (tx) => {
-      const result = await tx.execute<{ delivered: number | string }>(sql`
+      const result = await tx.execute<{
+        materialized?: number | string;
+        delivered?: number | string;
+      }>(sql`
         with claimed as materialized (
-          select id
+          select id,topic,payload,created_at
           from integration_outbox
-          where topic = 'safety.operator_escalation'
+          where topic in (
+            'safety.operator_escalation','admin.negative_feedback'
+          )
             and status in ('pending', 'retry_wait')
             and (next_attempt_at is null or next_attempt_at <= clock_timestamp())
           order by created_at, id
           for update skip locked
           limit ${batchSize}
-        ), queued as (
-          insert into outbox_operator_alerts (outbox_id, reason_code)
-          select id, 'safety_operator_escalation'
+        ), case_rows as (
+          select
+            id as outbox_id,
+            'safety'::text as case_type,
+            'safety_operator_escalation'::text as reason_code,
+            'safety_operator_escalation'::text as case_reason_code,
+            null::integer as rating,
+            null::text as content_hash,
+            null::text as policy_version,
+            created_at
           from claimed
-          on conflict (outbox_id, reason_code) do nothing
+          where topic='safety.operator_escalation'
+          union all
+          select
+            claimed.id,
+            case when feedback.id is null
+              then 'delivery_failure' else 'negative_feedback' end,
+            case when feedback.id is null
+              then 'negative_feedback_source_invalid'
+              else 'negative_feedback_policy' end,
+            case when feedback.id is null
+              then 'negative_feedback_source_invalid'
+              else 'negative_feedback_policy' end,
+            feedback.rating,
+            feedback.content_hash,
+            feedback.negative_policy_version,
+            claimed.created_at
+          from claimed
+          left join feedback on feedback.id=case
+            when claimed.payload->>'feedbackId' ~
+              '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+            then (claimed.payload->>'feedbackId')::uuid
+          end
+          where claimed.topic='admin.negative_feedback'
+        ), queued as (
+          insert into outbox_operator_alerts (
+            outbox_id,reason_code,case_type,case_reason_code,status,rating,content_hash,
+            policy_version,created_at,updated_at
+          )
+          select
+            outbox_id,reason_code,case_type,case_reason_code,'open',rating,content_hash,
+            policy_version,created_at,created_at
+          from case_rows
+          on conflict (outbox_id, reason_code) do update
+            set outbox_id=excluded.outbox_id
           returning outbox_id
-        ), delivered as (
+        ), completed as (
           update integration_outbox o
           set status = 'succeeded', updated_at = clock_timestamp()
-          from claimed
-          where o.id = claimed.id
+          from queued
+          where o.id = queued.outbox_id
           returning o.id
         )
-        select count(*) as delivered from delivered
+        select count(*) as materialized from completed
       `);
-      return { delivered: count(result.rows[0]?.delivered ?? 0) };
+      return {
+        materialized: count(
+          result.rows[0]?.materialized ?? result.rows[0]?.delivered ?? 0,
+        ),
+      };
     });
+  }
+
+  async deliverSafetyEscalationsBatch(
+    batchSize: number,
+  ): Promise<{ delivered: number }> {
+    const result = await this.materializeOperatorCasesBatch(batchSize);
+    return { delivered: result.materialized };
   }
 
   async listLocalReservations(
@@ -319,7 +388,9 @@ export class PostgresWorkerJobsRepository {
     return result.rows;
   }
 
-  async recordObservation(observation: ReconciliationObservation): Promise<void> {
+  async recordObservation(
+    observation: ReconciliationObservation,
+  ): Promise<void> {
     if (observation.projectionRepairs.length > 0) {
       throw new Error("Projection repair repository is not bound");
     }

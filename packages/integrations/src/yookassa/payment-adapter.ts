@@ -201,6 +201,15 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         idempotencyKey: operation.idempotencyKey,
       };
       await this.attachRecoverySnapshot(operation, serializeYooKassaPaymentRequest(providerCommand));
+    const providerCommand = {
+      ...request,
+      idempotencyKey: operation.idempotencyKey,
+    };
+    await this.attachRecoverySnapshot(
+      operation,
+      serializeYooKassaPaymentRequest(providerCommand),
+    );
+    try {
       const payment = await this.deps.client.createPayment(providerCommand);
       if (
         payment.metadata.order_id !== command.orderId ||
@@ -286,6 +295,15 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         idempotencyKey: operation.idempotencyKey,
       };
       await this.attachRecoverySnapshot(operation, serializeYooKassaRefundRequest(providerCommand));
+    const providerCommand = {
+      ...request,
+      idempotencyKey: operation.idempotencyKey,
+    };
+    await this.attachRecoverySnapshot(
+      operation,
+      serializeYooKassaRefundRequest(providerCommand),
+    );
+    try {
       const refund = await this.deps.client.createRefund(providerCommand);
       await this.deps.operations.bindProviderObject(operation.id, refund.id);
       return { kind: "pending", refundId: refund.id };

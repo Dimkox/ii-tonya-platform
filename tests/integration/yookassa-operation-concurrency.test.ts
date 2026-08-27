@@ -54,6 +54,24 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       "utf8",
     );
     await db.execute(sql.raw(migration));
+    const recoveryMigration = await readFile(
+      "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
+      "utf8",
+    );
+    for (const statement of recoveryMigration
+      .split("--> statement-breakpoint")
+      .map((value) => value.trim())
+      .filter(
+        (value) =>
+          value.startsWith(
+            'ALTER TABLE "expert_residency_provider_operations"',
+          ) ||
+          value.startsWith(
+            'CREATE INDEX "expert_provider_operations_unbound_recovery_idx"',
+          ),
+      )) {
+      await db.execute(sql.raw(statement));
+    }
   });
 
   beforeEach(async () => {
@@ -265,5 +283,24 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
     await repository.bindRecoveredProviderObject(claimed.id, lease!.leaseToken, providerId);
     await expect(repository.findByProviderObject(providerId, "create_payment"))
       .resolves.toMatchObject({ id: claimed.id, providerObjectId: providerId, status: "pending" });
+    const [lease] = await repository.claimUnboundRecoveryBatch({
+      limit: 1,
+      leaseSeconds: 60,
+      maxAttempts: 3,
+    });
+    expect(lease?.operationId).toBe(claimed.id);
+    const providerId = randomUUID();
+    await repository.bindRecoveredProviderObject(
+      claimed.id,
+      lease!.leaseToken,
+      providerId,
+    );
+    await expect(
+      repository.findByProviderObject(providerId, "create_payment"),
+    ).resolves.toMatchObject({
+      id: claimed.id,
+      providerObjectId: providerId,
+      status: "pending",
+    });
   });
 });

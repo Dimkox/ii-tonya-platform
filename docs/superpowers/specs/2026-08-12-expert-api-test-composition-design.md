@@ -37,9 +37,8 @@ application without creating a second listener.
 - Mapping a verified Telegram identity into the expert HTTP principal.
 - Payment-provider deadline acquisition and payment-session creation.
 - Runtime dispatch of expert LLM proposals.
-- Resolution of `start_residency_checkout.orderId` versus the HTTP
-  `tariffVersionId` command. Until that contract is approved, prompt proposals remain
-  validation-only and cannot execute financial commands.
+- ER-AI-001 resolves the unused `start_residency_checkout.orderId` shape to
+  `tariffVersionId`, matching the authoritative application checkout command.
 
 ## Safety and acceptance criteria
 

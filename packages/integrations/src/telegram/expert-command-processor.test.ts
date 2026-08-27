@@ -3,16 +3,23 @@ import { describe, expect, it, vi } from "vitest";
 import { createExpertCommandProcessor } from "./expert-command-processor.js";
 import type {
   ExpertTelegramQueryViewPort,
+  ExpertTelegramViewPort,
   TelegramSendOutcome,
 } from "./telegram-adapter.js";
 
 const principal = {
+  userId: "00000000-0000-4000-8000-000000000100",
   expertId: "00000000-0000-4000-8000-000000000101",
   telegramUserId: "123456789",
   timezone: "Europe/Moscow",
 };
 
-const build = (enabled = true) => {
+const build = (
+  enabled = true,
+  financialViewsEnabled = false,
+  referralMutationsEnabled = false,
+  checkoutReadiness = false,
+) => {
   const schedule = vi.fn(async () => ({
     expertId: principal.expertId,
     timezone: principal.timezone,
@@ -39,6 +46,37 @@ const build = (enabled = true) => {
     startsAt: new Date("2026-08-14T09:00:00.000Z"),
     serviceName: "Consultation",
   }));
+  const referralSummary = vi.fn(async () => ({
+    availableMinor: "100000",
+    reservedMinor: "25000",
+    debtMinor: "0",
+    nearestExpiry: "2027-08-14T00:00:00.000Z",
+  }));
+  const redeemCode = vi.fn(async () => ({
+    kind: "redeemed" as const,
+    referralId: "00000000-0000-4000-8000-000000000401",
+  }));
+  const residencyQuote = vi.fn(async () => ({
+    tariffVersionId: "00000000-0000-4000-8000-000000000301",
+    displayName: "Резидентство на месяц",
+    priceMinor: "200000",
+    creditMinor: "100000",
+    cashMinor: "100000",
+    currency: "RUB" as const,
+    durationSeconds: 2_592_000,
+  }));
+  const residencyTariffs = vi.fn(async () => [
+    {
+      tariffVersionId: "00000000-0000-4000-8000-000000000301",
+      displayName: "Резидентство на месяц",
+      priceMinor: "200000",
+      currency: "RUB" as const,
+      durationSeconds: 2_592_000,
+    },
+  ]);
+  const issueCheckout = vi.fn(async () =>
+    "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  );
   const sendQuerySchedule = vi.fn<
     ExpertTelegramQueryViewPort["sendQuerySchedule"]
   >(async () => ({
@@ -69,6 +107,30 @@ const build = (enabled = true) => {
       providerOperationId: "5",
     }),
   );
+  const sendReferralSummary = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "7",
+  }));
+  const sendResidencyQuote = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "8",
+  }));
+  const sendResidencyTariffs = vi.fn<
+    ExpertTelegramViewPort["sendResidencyTariffs"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "10",
+  }));
+  const sendResidencyCheckoutLink = vi.fn<
+    ExpertTelegramViewPort["sendResidencyCheckoutLink"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "11",
+  }));
+  const sendReferralRedeemed = vi.fn(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "9",
+  }));
   const answerCallbackQuery = vi.fn<
     ExpertTelegramQueryViewPort["answerCallbackQuery"]
   >(async (): Promise<TelegramSendOutcome> => ({
@@ -82,17 +144,36 @@ const build = (enabled = true) => {
     sendStats,
     sendUnsupported,
     answerCallbackQuery,
+    sendReferralSummary,
+    sendResidencyQuote,
+    sendResidencyTariffs,
+    sendResidencyCheckoutLink,
+    sendReferralRedeemed,
   };
   return {
     processor: createExpertCommandProcessor({
       enabled,
       queries: { schedule, clientChoices, stats, clientView },
       views,
+      financialViewsEnabled,
+      referralMutationsEnabled,
+      checkoutReadiness,
+      checkout: { issue: issueCheckout },
+      referral: { summary: referralSummary, redeemCode },
+      residency: {
+        listActiveTariffs: residencyTariffs,
+        quote: residencyQuote,
+      },
     }),
     schedule,
     clientChoices,
     stats,
     clientView,
+    referralSummary,
+    redeemCode,
+    residencyQuote,
+    residencyTariffs,
+    issueCheckout,
     views,
   };
 };
@@ -106,6 +187,209 @@ const command = (text: string) => ({
 });
 
 describe("expert Telegram command processor", () => {
+  it("redeems an exact opaque expert code with server idempotency and never renders it", async () => {
+    const state = build(true, true, true);
+    const code = "EXR_aZ09-opaque_token_12345";
+
+    await expect(
+      state.processor.processCommand(command(`/redeem ${code}`)),
+    ).resolves.toEqual({ kind: "processed", deliveryOutcome: "applied" });
+    expect(state.redeemCode).toHaveBeenCalledWith(
+      {
+        authenticated: true,
+        userId: principal.userId,
+        expertId: principal.expertId,
+      },
+      code,
+      "telegram-update-1",
+    );
+    expect(state.views.sendReferralRedeemed).toHaveBeenCalledWith({
+      idempotencyKey: "telegram-update-1:redeem:delivery",
+      telegramUserId: principal.telegramUserId,
+    });
+    expect(
+      JSON.stringify(state.views.sendReferralRedeemed.mock.calls),
+    ).not.toContain(code);
+  });
+
+  it.each([
+    "/redeem",
+    "/redeem EXR_",
+    "/redeem EXR_too-short",
+    "/redeem EXR_bad value",
+    "/redeem CLIENT_opaque",
+  ])(
+    "rejects malformed or non-expert redeem command without mutation: %s",
+    async (text) => {
+      const state = build(true, true, true);
+      await state.processor.processCommand(command(text));
+      expect(state.redeemCode).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps referral mutation independently disabled", async () => {
+    const state = build(true, true, false);
+    await state.processor.processCommand(
+      command("/redeem EXR_opaque-token-123456789"),
+    );
+    expect(state.redeemCode).not.toHaveBeenCalled();
+    expect(state.views.sendReferralRedeemed).not.toHaveBeenCalled();
+  });
+  it("renders the authenticated expert's server-derived referral summary", async () => {
+    const state = build(true, true);
+
+    await expect(
+      state.processor.processCommand(command("/referral")),
+    ).resolves.toEqual({ kind: "processed", deliveryOutcome: "applied" });
+    expect(state.referralSummary).toHaveBeenCalledWith({
+      authenticated: true,
+      userId: principal.userId,
+      expertId: principal.expertId,
+    });
+    expect(state.views.sendReferralSummary).toHaveBeenCalledWith({
+      idempotencyKey: "telegram-update-1",
+      telegramUserId: principal.telegramUserId,
+      availableMinor: "100000",
+      reservedMinor: "25000",
+      debtMinor: "0",
+      nearestExpiry: "2027-08-14T00:00:00.000Z",
+    });
+  });
+
+  it("quotes only an exact server-issued tariff UUID with no client price fields", async () => {
+    const state = build(true, true);
+    const tariffVersionId = "00000000-0000-4000-8000-000000000301";
+
+    await state.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+    expect(state.residencyQuote).toHaveBeenCalledWith(
+      {
+        authenticated: true,
+        userId: principal.userId,
+        expertId: principal.expertId,
+      },
+      tariffVersionId,
+    );
+    expect(state.views.sendResidencyQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tariffVersionId,
+        priceMinor: "200000",
+        creditMinor: "100000",
+        cashMinor: "100000",
+      }),
+    );
+    for (const text of [
+      `/residency ${tariffVersionId} 1`,
+      "/residency not-a-uuid",
+      "/referral anything",
+    ]) {
+      await state.processor.processCommand(command(text));
+    }
+    expect(state.residencyQuote).toHaveBeenCalledTimes(1);
+    expect(state.referralSummary).not.toHaveBeenCalled();
+  });
+
+  it("lists authoritative active tariffs for the exact private /residency command", async () => {
+    const state = build(true, true);
+
+    await expect(
+      state.processor.processCommand(command("/residency")),
+    ).resolves.toEqual({ kind: "processed", deliveryOutcome: "applied" });
+    expect(state.residencyTariffs).toHaveBeenCalledWith({
+      authenticated: true,
+      userId: principal.userId,
+      expertId: principal.expertId,
+    });
+    expect(state.views.sendResidencyTariffs).toHaveBeenCalledWith({
+      idempotencyKey: "telegram-update-1",
+      telegramUserId: principal.telegramUserId,
+      tariffs: [
+        {
+          tariffVersionId: "00000000-0000-4000-8000-000000000301",
+          displayName: "Резидентство на месяц",
+          priceMinor: "200000",
+          currency: "RUB",
+          durationSeconds: 2_592_000,
+        },
+      ],
+    });
+    expect(state.residencyQuote).not.toHaveBeenCalled();
+    expect(state.issueCheckout).not.toHaveBeenCalled();
+  });
+
+  it("keeps tariff discovery behind the financial-view flag", async () => {
+    const state = build(true, false);
+    await expect(
+      state.processor.processCommand(command("/residency")),
+    ).resolves.toMatchObject({ kind: "unsupported" });
+    expect(state.residencyTariffs).not.toHaveBeenCalled();
+    expect(state.views.sendResidencyTariffs).not.toHaveBeenCalled();
+  });
+
+  it("issues an opaque checkout button only when readiness is composed", async () => {
+    const tariffVersionId = "00000000-0000-4000-8000-000000000301";
+    const disabled = build(true, true, false, false);
+    const enabled = build(true, true, false, true);
+
+    await disabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+    await enabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+
+    expect(disabled.issueCheckout).not.toHaveBeenCalled();
+    expect(enabled.issueCheckout).toHaveBeenCalledWith({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram-update-1:checkout:issue",
+    });
+    expect(enabled.views.sendResidencyQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checkoutCallbackData:
+          "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      }),
+    );
+  });
+
+  it("keeps financial views independently disabled with no service or view call", async () => {
+    const state = build(true, false);
+    await expect(
+      state.processor.processCommand(command("/referral")),
+    ).resolves.toMatchObject({ kind: "unsupported" });
+    expect(state.referralSummary).not.toHaveBeenCalled();
+    expect(state.views.sendReferralSummary).not.toHaveBeenCalled();
+  });
+
+  it("fails closed at composition when enabled financial services are missing", () => {
+    const state = build();
+    expect(() =>
+      createExpertCommandProcessor({
+        enabled: true,
+        financialViewsEnabled: true,
+        queries: {
+          schedule: state.schedule,
+          clientChoices: state.clientChoices,
+          stats: state.stats,
+          clientView: state.clientView,
+        },
+        views: state.views,
+      }),
+    ).toThrow("Expert Telegram financial query capability is required");
+  });
+
+  it.each(["forbidden", "disabled"] as const)(
+    "fails closed without rendering a %s referral result",
+    async (kind) => {
+      const state = build(true, true);
+      state.referralSummary.mockResolvedValueOnce({ kind } as never);
+      await expect(
+        state.processor.processCommand(command("/referral")),
+      ).rejects.toThrow("expert_query_unavailable");
+      expect(state.views.sendReferralSummary).not.toHaveBeenCalled();
+    },
+  );
   it.each(["/schedule", "/client", "/stats"] as const)(
     "dispatches the exact %s command",
     async (text) => {

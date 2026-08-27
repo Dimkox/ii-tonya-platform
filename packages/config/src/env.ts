@@ -61,6 +61,31 @@ const schema = z
       .enum(["true", "false"])
       .default("false"),
     EXPERT_TELEGRAM_QUERIES_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    EXPERT_AI_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_TELEGRAM_REFERRAL_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    EXPERT_TELEGRAM_CHECKOUT_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: z
+      .string()
+      .regex(/^\d+$/u)
+      .default("60")
+      .refine((raw) => {
+        const minutes = Number(raw);
+        return (
+          Number.isSafeInteger(minutes) && minutes >= 1 && minutes <= 4_320
+        );
+      }, "booking confirmation buffer must be between 1 and 4320 minutes"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
     PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
@@ -149,6 +174,23 @@ const schema = z
         });
       }
     }
+    if (
+      (value.CLIENT_BOOKING_ENABLED === "true" &&
+        (value.CLIENT_SESSION_ENABLED !== "true" ||
+          value.CLIENT_CATALOG_ENABLED !== "true" ||
+          value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true")) ||
+      (value.CLIENT_BOOKING_RESERVE_ENABLED === "true" &&
+        (value.CLIENT_SESSION_ENABLED !== "true" ||
+          value.CLIENT_CATALOG_ENABLED !== "true" ||
+          value.CLIENT_BOOKING_ENABLED !== "true" ||
+          value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true"))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_BOOKING_ENABLED"],
+        message: "client_booking_configuration_incomplete",
+      });
+    }
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||
@@ -197,6 +239,27 @@ const schema = z
         !Number.isInteger(windowHours) || windowHours < 1 || windowHours > 168
       ) {
         context.addIssue({ code: "custom", path: ["YOOKASSA_UNBOUND_RECOVERY_ENABLED"], message: "yookassa_recovery_configuration_incomplete" });
+        !/^[a-z][a-z0-9_.:-]{2,127}$/u.test(
+          value.YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE ?? "",
+        ) ||
+        !/^v[1-9]\d{0,8}$/u.test(
+          value.YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION ?? "",
+        ) ||
+        !/^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$/u.test(
+          value.YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE ?? "",
+        ) ||
+        !Number.isInteger(retention) ||
+        retention < 1 ||
+        retention > 365 ||
+        !Number.isInteger(windowHours) ||
+        windowHours < 1 ||
+        windowHours > 168
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["YOOKASSA_UNBOUND_RECOVERY_ENABLED"],
+          message: "yookassa_recovery_configuration_incomplete",
+        });
       }
     }
   });
@@ -216,11 +279,21 @@ export type RuntimeConfig = {
   selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
   features: {
+    workerOutboxDelivery: boolean;
+    clientSession?: boolean;
+    clientCatalog: boolean;
+    clientBooking?: boolean;
+    clientBookingReserve?: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
+    expertTelegramFinancialViews?: boolean;
+    expertAiIngress?: boolean;
+    expertTelegramReferral?: boolean;
+    expertTelegramCheckout?: boolean;
     yookassa?: boolean;
   };
+  clientBookingConfirmationBufferMs?: number;
   expertReferralKey?: {
     currentVersion: string;
     reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON";
@@ -244,6 +317,16 @@ export type RuntimeConfig = {
     retentionDays: number;
     windowHours: number;
   };
+  yookassaRecovery:
+    | { enabled: false }
+    | {
+        enabled: true;
+        consentPurpose: string;
+        policyVersion: string;
+        encryptionKeyReference: string;
+        retentionDays: number;
+        windowHours: number;
+      };
 };
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
@@ -268,6 +351,11 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
     features: {
+      workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
+      clientSession: value.CLIENT_SESSION_ENABLED === "true",
+      clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
+      clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
+      clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
@@ -283,6 +371,27 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
           windowHours: Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS),
         }
       : { enabled: false },
+      expertTelegramFinancialViews:
+        value.EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED === "true",
+      expertAiIngress: value.EXPERT_AI_INGRESS_ENABLED === "true",
+      expertTelegramReferral: value.EXPERT_TELEGRAM_REFERRAL_ENABLED === "true",
+      expertTelegramCheckout: value.EXPERT_TELEGRAM_CHECKOUT_ENABLED === "true",
+      yookassa: value.YOOKASSA_ENABLED === "true",
+    },
+    clientBookingConfirmationBufferMs:
+      Number(value.CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES) * 60 * 1_000,
+    yookassaRecovery:
+      value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true"
+        ? {
+            enabled: true,
+            consentPurpose: value.YOOKASSA_RECEIPT_CONTACT_CONSENT_PURPOSE!,
+            policyVersion: value.YOOKASSA_RECEIPT_CONTACT_POLICY_VERSION!,
+            encryptionKeyReference:
+              value.YOOKASSA_RECOVERY_ENCRYPTION_KEY_REFERENCE!,
+            retentionDays: Number(value.YOOKASSA_RECOVERY_RETENTION_DAYS),
+            windowHours: Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS),
+          }
+        : { enabled: false },
     ...(value.EXPERT_REFERRAL_ENABLED === "true"
       ? {
           expertReferralKey: {

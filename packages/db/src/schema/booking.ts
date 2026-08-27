@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  char,
   index,
   integer,
   pgEnum,
@@ -12,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { experts, expertServices, slots } from "./catalog.js";
+import { privacyDeletionJobs } from "./audit.js";
 import { users } from "./identity.js";
 
 const mutableTimestamps = {
@@ -76,6 +78,79 @@ export const reservations = pgTable(
   ],
 );
 
+export const clientBookingReceipts = pgTable(
+  "client_booking_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    choiceDigest: char("choice_digest", { length: 71 }).notNull(),
+    bookingHandle: char("booking_handle", { length: 47 }).notNull(),
+    reservationId: uuid("reservation_id")
+      .notNull()
+      .references(() => reservations.id, { onDelete: "cascade" }),
+    createdAt: mutableTimestamps.createdAt,
+  },
+  (table) => [
+    unique("client_booking_receipts_user_choice_unique").on(
+      table.userId,
+      table.choiceDigest,
+    ),
+    unique("client_booking_receipts_booking_handle_unique").on(
+      table.bookingHandle,
+    ),
+    unique("client_booking_receipts_reservation_unique").on(
+      table.reservationId,
+    ),
+    check(
+      "client_booking_receipts_choice_digest_check",
+      sql`${table.choiceDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      "client_booking_receipts_booking_handle_check",
+      sql`${table.bookingHandle} ~ '^bk1\.[A-Za-z0-9_-]{43}$'`,
+    ),
+    index("client_booking_receipts_owner_handle_idx").on(
+      table.userId,
+      table.bookingHandle,
+    ),
+  ],
+);
+
+export const clientBookingErasureWork = pgTable(
+  "client_booking_erasure_work",
+  {
+    deletionJobId: uuid("deletion_job_id")
+      .primaryKey()
+      .references(() => privacyDeletionJobs.id, { onDelete: "cascade" }),
+    phase: text("phase").notNull().default("cancel_active"),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "client_booking_erasure_work_phase_check",
+      sql`${table.phase} in ('cancel_active','cleanup_public','complete','dead_letter')`,
+    ),
+    check(
+      "client_booking_erasure_work_attempt_count_check",
+      sql`${table.attemptCount} between 0 and 5`,
+    ),
+    check(
+      "client_booking_erasure_work_lease_check",
+      sql`(${table.leaseToken} is null) = (${table.leaseUntil} is null)`,
+    ),
+    index("client_booking_erasure_work_claim_idx")
+      .on(table.phase, table.leaseUntil, table.updatedAt)
+      .where(sql`${table.phase} in ('cancel_active','cleanup_public')`),
+  ],
+);
+
 export const notifications = pgTable(
   "notifications",
   {
@@ -108,7 +183,9 @@ export const feedback = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     reservationId: uuid("reservation_id").references(() => reservations.id),
-    userId: uuid("user_id").notNull().references(() => users.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
     rating: integer("rating").notNull(),
     commentRef: text("comment_ref"),
     sourceEventId: text("source_event_id").notNull(),

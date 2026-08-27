@@ -6,10 +6,11 @@ to activate YooKassa.
 ## Current boundary
 
 The repository contains a default-off YooKassa Merchant API client, adapter, verifier,
-PostgreSQL operation mapping, webhook seam, and worker reconciliation seam. The API and
-worker default composition supplies no merchant capability. Credentials are empty
-placeholders and `YOOKASSA_ENABLED=false`; do not add a credential, enable a flag, or
-deploy while hoster maintenance is active.
+PostgreSQL operation mapping, webhook seam, worker reconciliation, consent-bound receipt
+contact boundary, and encrypted exact-body recovery runtime. The API and worker default
+composition supplies no merchant capability or recovery key resolver. Credentials and
+recovery-policy inputs are empty placeholders and `YOOKASSA_ENABLED=false`; do not add a
+credential, enable a flag, or deploy while hoster maintenance is active.
 
 Production is native: systemd API and worker services, the single existing system
 PostgreSQL database, and nginx/TLS. There are no production containers. Claw uses a
@@ -38,15 +39,18 @@ All items require named owner and independent review before a separate activatio
 - For a timeout, 429, or 5xx, classify the operation as unknown. If a provider object ID
   was durably bound, re-read that exact provider object before settlement/reversal
   delivery or another mutation.
-- An unbound unknown outcome cannot be found by the current reconciliation reader. The
-  only safe path currently represented in code is a **user-command retry only**: replay
-  the POST with the same idempotency key and exact request body through the original
-  checkout command. This is not an autonomous worker capability and must stay within the
-  provider idempotency window. Never infer absence from an unbound local row, scan payment
-  history, or create a new idempotency key.
-- Automated replay requires encrypted persistence of the exact request body plus an
-  approved retention/recovery policy. Until YKP-015 and YKP-016 are implemented and
-  independently approved, autonomous unbound recovery remains BLOCKED.
+- An unbound unknown outcome cannot be found through payment-history scanning. The
+  default operator path remains a user-command retry with the same idempotency key and
+  exact request body. Never infer provider absence, scan payment history, or create a new
+  idempotency key.
+- The repository contains a default-off bounded worker that can replay only the encrypted
+  exact original body with its original key, AEAD operation context, active lease, and
+  fenced completion. It binds the recovered provider object as pending; authoritative
+  GET verification and canonical delivery still own settlement or reversal.
+- Autonomous recovery remains **BLOCKED** until an independently reviewed key-reference
+  resolver, approved purpose/policy/retention/window values, provider idempotency-window
+  evidence, and test-shop evidence are supplied. Empty inputs perform no crypto or
+  provider I/O.
 - Treat webhook content as a signal: validate it, use trusted nginx peer information,
   then perform the authenticated authoritative read before durable delivery.
 - For a credential incident, disable the feature, rotate only through the approved secret

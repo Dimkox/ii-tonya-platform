@@ -18,7 +18,10 @@ export type ExpertIntentProposal =
   | { readonly kind: "redeem_expert_referral"; readonly code: string }
   | { readonly kind: "view_referral_summary" }
   | { readonly kind: "quote_residency"; readonly tariffVersionId: string }
-  | { readonly kind: "start_residency_checkout"; readonly orderId: string };
+  | {
+      readonly kind: "start_residency_checkout";
+      readonly tariffVersionId: string;
+    };
 
 export type IntentProposal =
   | { readonly kind: "answer"; readonly text: string }
@@ -83,12 +86,7 @@ export interface AcceptInboundInput {
 }
 
 export type OutboundDeliveryStatus =
-  | "accepted"
-  | "queued"
-  | "sent"
-  | "delivered"
-  | "failed"
-  | "ambiguous";
+  "accepted" | "queued" | "sent" | "delivered" | "failed" | "ambiguous";
 
 export interface CanonicalOutboundDelivery {
   readonly kind: "outbound_delivery";
@@ -181,9 +179,7 @@ export type CompleteInboundResult =
 export interface ConversationMessageRepository {
   prepareInbound(input: AcceptInboundInput): Promise<PreparedInbound>;
   completeInbound(input: CompleteInboundInput): Promise<CompleteInboundResult>;
-  recordOutboundDelivery(
-    input: RecordOutboundDeliveryInput,
-  ): Promise<
+  recordOutboundDelivery(input: RecordOutboundDeliveryInput): Promise<
     | { readonly kind: "duplicate"; readonly messageEventId: string }
     | {
         readonly kind: "accepted";
@@ -224,10 +220,7 @@ export interface AcceptSafetyHandoffInput {
   readonly reasonCode: SafetyRisk | "classifier_unavailable";
   readonly ownerId: string;
   readonly acknowledgeBy: Date;
-  readonly directoryState:
-    | "fresh"
-    | "no_fresh_contact"
-    | "unavailable";
+  readonly directoryState: "fresh" | "no_fresh_contact" | "unavailable";
   readonly contacts: readonly VerifiedSafetyContact[];
 }
 
@@ -255,9 +248,7 @@ export interface ConversationDependencies {
   readonly clock: Clock;
   readonly handoffOwnerId: string;
   readonly handoffAcknowledgeWithinMs: number;
-  readonly outboundBillingMode:
-    | "disabled"
-    | "provider_delivery_event";
+  readonly outboundBillingMode: "disabled" | "provider_delivery_event";
   readonly approvedSafetyContactIds: readonly string[];
 }
 
@@ -285,4 +276,75 @@ export interface ConversationService {
   handleOutboundDelivery(
     event: CanonicalOutboundDelivery,
   ): Promise<OutboundDeliveryResult>;
+}
+
+export interface ClientPrincipal {
+  readonly authenticated: true;
+  readonly active: true;
+  readonly userId: string;
+}
+
+export type ClientPrincipalResolution =
+  | { readonly kind: "resolved"; readonly principal: ClientPrincipal }
+  | { readonly kind: "denied" }
+  | { readonly kind: "unavailable" };
+
+export interface ClientPrincipalResolver {
+  resolve(authorization: string): Promise<ClientPrincipalResolution>;
+}
+
+export interface CatalogFilters {
+  readonly serviceCode?: string;
+  readonly language?: string;
+}
+
+export interface CatalogRequestReceipt {
+  readonly catalogRequestId: string;
+  readonly state: "pending" | "ready";
+}
+
+export type CatalogSnapshotSlot =
+  | Readonly<{ startsAt: string }>
+  | Readonly<{ startsAt: string; choiceHandle: `ch1.${string}` }>;
+
+export interface CatalogSnapshotCard {
+  readonly displayName: string;
+  readonly serviceCode: string;
+  readonly language: string;
+  readonly availability: "catalog_only" | "fresh_slots";
+  readonly slots: readonly CatalogSnapshotSlot[];
+}
+
+export type OwnedCatalogSnapshot =
+  | Readonly<{ catalogRequestId: string; state: "pending" }>
+  | Readonly<{
+      catalogRequestId: string;
+      state: "ready";
+      cards: readonly CatalogSnapshotCard[];
+    }>;
+
+export interface ClientCatalogRepository {
+  createOrReplay(input: {
+    userId: string;
+    requestDigest: string;
+    serviceCode?: string;
+    language?: string;
+    correlationId: string;
+    version?: 1 | 2;
+  }): Promise<CatalogRequestReceipt>;
+  getOwned(input: {
+    userId: string;
+    catalogRequestId: string;
+  }): Promise<OwnedCatalogSnapshot | null>;
+}
+
+export interface ClientCatalogService {
+  request(
+    principal: ClientPrincipal,
+    filters: CatalogFilters,
+  ): Promise<CatalogRequestReceipt>;
+  get(
+    principal: ClientPrincipal,
+    catalogRequestId: string,
+  ): Promise<OwnedCatalogSnapshot | null>;
 }

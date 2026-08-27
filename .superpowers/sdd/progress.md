@@ -40,6 +40,24 @@
 - Live payments stay disabled until a provider and legal rules are selected.
 - Existing Telegram credentials belong to an unrelated bot and are not reusable.
 - Live provider mutations remain disabled until contract fixtures and staging checks pass.
+
+## MVP-WORKER-OUTBOX-001 extension
+
+- Plan: `docs/superpowers/plans/2026-08-14-mvp-worker-outbox-001.md`
+- Branch: `codex/mvp-worker-outbox-001`
+- Exact merged base: `0bfb6efc4b2145dfc5f4ba4763fa6264f422f842`
+- Scope: exactly `safety.operator_escalation` and
+  `admin.negative_feedback`; false by default; no provider activation,
+  migration, image build, deployment, push, or merge.
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| 1. Config and composition | complete | Claw 30/30 at `9f0db2a` |
+| 2. Registry and decoders | complete | Claw 24/24 at `5a06de3` |
+| 3. Filtered repository ownership | complete | Claw PostgreSQL 19/19 at `c1b8fa4` |
+| 4. Idempotent local mutation | complete | Claw PostgreSQL 7/7 at `7563e13` |
+| 5. Exclusive runtime and metrics | complete | Claw 17/17 at `58d63c7` |
+| 6. Boundaries, review, final gate | complete | APPROVED `9f5d258`; final Claw 1/1; cleanup 0/0 |
 - Privacy mutations and workers are explicitly fail-closed by default. Production
   enablement requires real exact-four provider target capture, bound envelope
   encryption/KMS, provider reconciliation proof, crash-safe retention leases and

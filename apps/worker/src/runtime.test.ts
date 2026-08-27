@@ -18,6 +18,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: job("unknown-reconciliation"),
       reservationExpiry: job("expiry"),
       expertResidencyExpiry: job("expert-residency-expiry"),
+      expertTelegramCheckoutCleanup: job("expert-telegram-checkout-cleanup"),
       expertResidencyReconciliation: job("expert-residency-reconciliation"),
       expertReferralHoldReplay: job("expert-referral-hold-replay"),
       deliverConfirmedOutbox: job("outbox"),
@@ -35,6 +36,7 @@ describe("worker runtime", () => {
       "unknown-reconciliation",
       "expiry",
       "expert-residency-expiry",
+      "expert-telegram-checkout-cleanup",
       "expert-residency-reconciliation",
       "expert-referral-hold-replay",
       "outbox",
@@ -43,6 +45,9 @@ describe("worker runtime", () => {
     ]);
     expect(report.expertResidencyExpiry).toEqual({
       name: "expert-residency-expiry",
+    });
+    expect(report.expertTelegramCheckoutCleanup).toEqual({
+      name: "expert-telegram-checkout-cleanup",
     });
     expect(report.expertResidencyReconciliation).toEqual({
       name: "expert-residency-reconciliation",
@@ -69,6 +74,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: noop,
       reservationExpiry: noop,
       expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
       expertResidencyReconciliation: noop,
       expertReferralHoldReplay: noop,
       deliverConfirmedOutbox: noop,
@@ -102,6 +108,7 @@ describe("worker runtime", () => {
       reconcileUnknownOutcomes: noop,
       reservationExpiry: noop,
       expertResidencyExpiry: noop,
+      expertTelegramCheckoutCleanup: noop,
       expertResidencyReconciliation: noop,
       expertReferralHoldReplay: noop,
       deliverConfirmedOutbox: noop,
@@ -134,7 +141,7 @@ describe("worker runtime", () => {
       listLocalReservations: vi.fn(async () => []),
       recordObservation: vi.fn(async () => undefined),
       recordProviderUnavailable: vi.fn(async () => undefined),
-      deliverSafetyEscalationsBatch: vi.fn(async () => ({ delivered: 1 })),
+      materializeOperatorCasesBatch: vi.fn(async () => ({ materialized: 2 })),
     };
     const expertReferralJobsRepository = {
       expireDueBatch: vi.fn(async () => ({
@@ -166,9 +173,13 @@ describe("worker runtime", () => {
       recoverExpiredDispatchLeases: vi.fn(async () => 1),
       recoverExpiredReconciliationLeases: vi.fn(async () => 2),
     };
+    const expertTelegramCheckoutRepository = {
+      clearExpiredCheckoutUrls: vi.fn(async () => 3),
+    };
     const runtime = createProductionWorkerRuntime({
       jobsRepository,
       expertReferralJobsRepository,
+      expertTelegramCheckoutRepository,
       expertResidencyProviderReader,
       outboxRepository,
       closeDatabase: vi.fn(async () => undefined),
@@ -188,6 +199,7 @@ describe("worker runtime", () => {
       changed: 1,
       failed: 0,
     });
+    expect(report.expertTelegramCheckoutCleanup).toEqual({ cleared: 3 });
     expect(report.expertResidencyReconciliation).toEqual({
       examined: 1,
       matched: 0,
@@ -203,7 +215,125 @@ describe("worker runtime", () => {
       dispatch: 1,
       reconciliation: 2,
     });
-    expect(report.confirmedOutboxDelivery).toEqual({ delivered: 1 });
+    expect(jobsRepository.materializeOperatorCasesBatch).toHaveBeenCalledOnce();
+    expect(report.confirmedOutboxDelivery).toEqual({ materialized: 2 });
+  });
+
+  it("uses the disabled expert residency provider reader when no capability is injected", async () => {
+    const jobsRepository = {
+      processDueBatch: vi.fn(async () => ({})),
+      expireDueBatch: vi.fn(async () => ({})),
+      listLocalReservations: vi.fn(async () => []),
+      recordProviderUnavailable: vi.fn(async () => undefined),
+      materializeOperatorCasesBatch: vi.fn(async () => ({})),
+    };
+    const expertReferralJobsRepository = {
+      expireDueBatch: vi.fn(async () => ({
+        examined: 0,
+        changed: 0,
+        failed: 0,
+      })),
+      replayDueBatch: vi.fn(async () => ({
+        examined: 0,
+        granted: 0,
+        cancelled: 0,
+      })),
+      listReconciliationBatch: vi.fn(async () => []),
+      recordReconciliationMismatches: vi.fn(async () => undefined),
+    };
+    const runtime = createProductionWorkerRuntime({
+      jobsRepository,
+      expertReferralJobsRepository,
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: vi.fn(async () => 0),
+      },
+      outboxRepository: {
+        recoverExpiredDispatchLeases: vi.fn(async () => 0),
+        recoverExpiredReconciliationLeases: vi.fn(async () => 0),
+      },
+      closeDatabase: vi.fn(async () => undefined),
+      closeTelemetry: vi.fn(async () => undefined),
+      now: () => new Date("2026-08-14T10:00:00.000Z"),
+    });
+
+    await expect(runtime.runOnce()).resolves.toMatchObject({
+      expertResidencyReconciliation: { provider: "disabled" },
+    });
+  });
+
+  it("gives registered rows to exactly one runtime owner", async () => {
+    const productionDeps = () => ({
+      jobsRepository: {
+        processDueBatch: vi.fn(async () => ({})),
+        expireDueBatch: vi.fn(async () => ({})),
+        listLocalReservations: vi.fn(async () => []),
+        recordProviderUnavailable: vi.fn(async () => undefined),
+        materializeOperatorCasesBatch: vi.fn(async () => ({ materialized: 2 })),
+      },
+      expertReferralJobsRepository: {
+        expireDueBatch: vi.fn(async () => ({
+          examined: 0,
+          changed: 0,
+          failed: 0,
+        })),
+        replayDueBatch: vi.fn(async () => ({
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+        })),
+        listReconciliationBatch: vi.fn(async () => []),
+        recordReconciliationMismatches: vi.fn(async () => undefined),
+      },
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: vi.fn(async () => 0),
+      },
+      outboxRepository: {
+        recoverExpiredDispatchLeases: vi.fn(async () => 0),
+        recoverExpiredReconciliationLeases: vi.fn(async () => 0),
+      },
+      closeDatabase: vi.fn(async () => undefined),
+      closeTelemetry: vi.fn(async () => undefined),
+      now: () => new Date("2026-08-14T10:00:00.000Z"),
+    });
+    const disabled = productionDeps();
+    await createProductionWorkerRuntime(disabled).runOnce();
+    expect(
+      disabled.jobsRepository.materializeOperatorCasesBatch,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).toHaveBeenCalledOnce();
+    expect(
+      disabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).toHaveBeenCalledOnce();
+
+    const enabled = productionDeps();
+    const workerOutboxRunner = vi.fn(async () => ({
+      reconciled: 1,
+      dispatched: 2,
+    }));
+    const report = await createProductionWorkerRuntime({
+      ...enabled,
+      workerOutboxRegistry: {
+        topics: ["safety.operator_escalation", "admin.negative_feedback"],
+      },
+      workerOutboxRunner,
+    } as never).runOnce();
+
+    expect(workerOutboxRunner).toHaveBeenCalledOnce();
+    expect(
+      enabled.jobsRepository.materializeOperatorCasesBatch,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredDispatchLeases,
+    ).not.toHaveBeenCalled();
+    expect(
+      enabled.outboxRepository.recoverExpiredReconciliationLeases,
+    ).not.toHaveBeenCalled();
+    expect(report.confirmedOutboxDelivery).toEqual({
+      reconciled: 1,
+      dispatched: 2,
+    });
   });
 
   it("uses the disabled expert residency provider reader when no capability is injected", async () => {

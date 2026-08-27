@@ -187,3 +187,24 @@ export {
   createExpertCommandProcessor,
   type ExpertCommandProcessor,
 } from "./telegram/expert-command-processor.js";
+export {
+  createExpertTelegramIngress,
+  type ExpertTelegramIngressFactoryDependencies,
+} from "./telegram/expert-ingress-factory.js";
+export {
+  authenticateResidencyCheckoutCallback,
+  inspectResidencyCheckoutCallback,
+  issueResidencyCheckoutCallback,
+  ResidencyCheckoutCallbackVerificationError,
+  type ResidencyCheckoutCallbackClaims,
+  type ResidencyCheckoutCallbackStore,
+  type ResidencyCheckoutStateClaim,
+  type ResidencyCheckoutStateStore,
+  type ResidencyCheckoutStoredOutcome,
+} from "./telegram/residency-checkout-callback-token.js";
+export {
+  createExpertResidencyCheckoutCapability,
+  type ExpertTelegramCheckoutCapability,
+  type ExpertTelegramCheckoutPrincipal,
+  type ExpertTelegramCheckoutResult,
+} from "./telegram/expert-residency-checkout.js";

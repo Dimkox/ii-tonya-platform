@@ -9,6 +9,7 @@ describe("YooKassa encrypted recovery schema", () => {
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; tag: string }> };
     expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries.find((entry) => entry.idx === 24)).toMatchObject({
       idx: 24,
       tag: "0024_yookassa_encrypted_recovery",
     });
