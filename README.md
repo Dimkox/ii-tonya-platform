@@ -5,6 +5,12 @@ authoritative ии-Тоня source document.
 
 ## Status
 
+MVP-CLIENT-CONVERSATION-001 is locally implemented and independently reviewed with 0
+Critical / 0 Important findings. All conversation, provider, AI, and related feature flags
+remain default-off; the immutable `client-conversation` gate is implemented but **NOT RUN**.
+External AI, Product, Safety, Security, Privacy/Legal, and backup evidence remains blocked.
+This is not released or live.
+
 Native production runtime deployed; live-provider activation remains closed. The exact
 release `233f3cf72e45e47117948ad5615b603252801e40` runs on the dedicated Ubuntu server as
 systemd-managed API and worker services with system PostgreSQL, nginx, and HTTPS for

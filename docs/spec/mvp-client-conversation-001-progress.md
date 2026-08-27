@@ -9,7 +9,7 @@
 | Canonical contract/spec/architecture/design/plan/runbook | complete                                                                                                                             | this branch's documentation set                                                                                                             |
 | Independent docs/security review                         | APPROVED FOR IMPLEMENTATION PLANNING: final 0/0/0; newer booking delta found 0C/1I/0M and closure returned 0/0/0; live remains NO-GO | `reviews/review-final.md`; `reviews/review-booking-delta.md`; `reviews/review-booking-delta-closure.md` under the architecture workspace    |
 | Migration allocation                                     | complete                                                                                                                             | journal tail verified as `0031_client_booking_references`; Task 1 allocates `0032_client_conversation`                                      |
-| Code, migration, focused tests                           | in progress                                                                                                                          | Tasks 1-3 complete; Task 3 at `425ad66` has 91 focused tests green and independent review 0 Critical/Important; no release run              |
+| Code, migration, focused tests                           | locally implemented, tested, and reviewed                                                                                            | Tasks 1-6 implementation at reviewed SHA `685947c44e18c6e9e21b3021d427857d68605deb`; independent closure review 0 Critical/0 Important; no release run |
 | Provider/network/Actions/push/merge/deploy/prod/Obsidian | not run by instruction                                                                                                               | prohibited scope                                                                                                                            |
 | Live activation                                          | NO-GO                                                                                                                                | provider, identity, privacy, AI, Product, Security and deployment gates absent                                                              |
 
@@ -23,6 +23,9 @@ migration and combined interface receives Booking/Security approval.
 
 Local closure fixes are implemented and verified on the successor working tree; the
 immutable Claw/release invocation remains blocked and was not run.
+
+The reviewed implementation and gate are complete at `685947c44e18c6e9e21b3021d427857d68605deb`;
+this documentation synchronization is a separate docs-only change on top of that SHA.
 
 - Privacy/observability and immutable gate changes are locally implemented and structurally verified.
 - Mandatory real-incident AI regressions, prior-release distribution diff, named Product/Safety/Security signoff, broader message-event anonymization, and 35-day backup receipt remain **BLOCKED**.

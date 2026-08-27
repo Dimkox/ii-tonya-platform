@@ -110,9 +110,11 @@ remains operable through this file and `docs/agents` if an IDE does not load ski
 
 ## Current continuation point
 
-Expert residency referral Tasks 1–12 are present on `main`; their live-provider and
-release gates remain separate. The next approved product increment is Story 24.1,
-expert Telegram `/schedule`, `/client`, and `/stats` queries, specified in
-`docs/superpowers/specs/2026-08-13-expert-telegram-queries-design.md`. Confirm the active
-branch, story status, PR head, and checks live; do not rely on a stale SHA copied from
-documentation.
+Expert residency referral Tasks 1–12 remain historical residency work; their live-provider
+and release gates remain separate. The current checkpoint is MVP-CLIENT-CONVERSATION-001:
+its implementation is locally complete and independently reviewed, while the immutable
+client-conversation gate and external AI/Product/Safety/Security/Privacy/backup evidence
+remain pending. Continue from the exact reviewed implementation SHA recorded in the
+project progress/traceability documents; do not treat this documentation sync as that
+reviewed SHA or as a release. Story 24.1 remains historical until this checkpoint is
+closed or explicitly superseded.

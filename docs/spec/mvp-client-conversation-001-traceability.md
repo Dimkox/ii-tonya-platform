@@ -1,6 +1,6 @@
 # MVP-CLIENT-CONVERSATION-001 Traceability
 
-Status: specified and planned; not implemented, tested, activated, deployed, or provider-bound.
+Status: locally implemented, tested, and independently reviewed at `685947c44e18c6e9e21b3021d427857d68605deb`; not activated, deployed, or provider-bound. This docs-only synchronization is on top of that reviewed SHA.
 
 | Requirement | Future implementation | Verification / evidence | Release, telemetry, recovery |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ Status: specified and planned; not implemented, tested, activated, deployed, or 
 | `MVP-CLIENT-CATALOG-001` at base `dad7e3a` | owner-scoped typed request and local `catalog.show` worker authority |
 | `MVP-CLIENT-BOOKING-001` worktree at `e5efdb2` | implemented protected `ch1` choice, server idempotency, exact advisory/row locks, migration 0031 and provider-disabled boundary; still unmerged here |
 | `docs/contracts/client-conversation.md` | exact inbound, binding, replay, tools, privacy, rate, and unknown-delivery contract |
-| Task 6 local evidence | privacy race entrypoint, sanitized telemetry, deterministic AI blocker, immutable gate structure | local tests pass; external release evidence and human signoffs blocked |
+| Task 6 local evidence | privacy race entrypoint, sanitized telemetry, deterministic AI blocker, immutable gate structure | locally tested and independently reviewed 0 Critical/0 Important; external release evidence and human signoffs blocked; gate NOT RUN |
 
 No current CI, Claw, provider, staging, production, or deployment result is evidence for this
-slice. Implementation and activation are both `BLOCKED`.
+slice. Implementation is locally complete; activation and release remain `BLOCKED`.
