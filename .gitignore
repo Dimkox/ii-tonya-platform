@@ -16,3 +16,6 @@ Thumbs.db
 .superpowers/
 .worktrees/
 work/
+
+/*.bundle
+/packages/db/packages/
