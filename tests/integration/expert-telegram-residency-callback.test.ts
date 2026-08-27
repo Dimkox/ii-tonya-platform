@@ -6,6 +6,10 @@ import { closeDb, createDb } from "../../packages/db/src/client.js";
 import { PostgresExpertTelegramResidencyCallbackRepository } from "../../packages/db/src/repositories/expert-telegram-residency-callback-repository.js";
 
 const schema = "expert_telegram_xr1_test";
+const connectionString =
+  process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL ?? process.env.DATABASE_URL;
+if (!connectionString) throw new Error("test_database_unavailable");
+const isolatedUrl = new URL(connectionString);
 const connectionString = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
 const isolatedUrl = new URL(connectionString ?? "postgresql://invalid");
 isolatedUrl.searchParams.set("options", `-c search_path=${schema},public`);
@@ -15,6 +19,7 @@ const expertId = "00000000-0000-4000-8000-000000000101";
 const userId = "00000000-0000-4000-8000-000000000100";
 const tariffVersionId = "00000000-0000-4000-8000-000000000301";
 
+describe("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
 const describeShared = connectionString === undefined ? describe.skip : describe;
 
 describeShared("expert Telegram xr1 repository on shared Claw PostgreSQL", () => {
@@ -30,6 +35,15 @@ describeShared("expert Telegram xr1 repository on shared Claw PostgreSQL", () =>
       insert into channel_identities values ('${userId}','telegram','123456789');
       insert into expert_residency_tariff_versions values ('${tariffVersionId}');`),
     );
+    const migration = await readFile(
+      "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
+      "utf8",
+    );
+    for (const statement of migration
+      .split("--> statement-breakpoint")
+      .map((value) => value.trim())
+      .filter(Boolean))
+      await db.execute(sql.raw(statement));
     for (const path of [
       "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
       "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",

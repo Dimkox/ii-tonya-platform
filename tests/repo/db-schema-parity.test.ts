@@ -142,6 +142,7 @@ describe("authoritative Drizzle schema parity", () => {
     expect(requiredTable("expertTelegramResidencyCallbacks")).toMatchObject({
       checks: [
         "expert_telegram_residency_callbacks_action_check",
+        "expert_telegram_residency_callbacks_expiry_check",
         "expert_telegram_residency_callbacks_checkout_outcome_check",
         "expert_telegram_residency_callbacks_checkout_state_check",
         "expert_telegram_residency_callbacks_expiry_check",
@@ -153,6 +154,7 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_telegram_residency_callbacks_expert_id_experts_id_fk",
         "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
       ],
+      indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
       indexes: [
         "expert_telegram_residency_callbacks_expiry_idx",
         "expert_telegram_residency_callbacks_processing_lease_idx",

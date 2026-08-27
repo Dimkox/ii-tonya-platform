@@ -157,6 +157,8 @@ const build = (
       views,
       financialViewsEnabled,
       referralMutationsEnabled,
+      referral: { summary: referralSummary, redeemCode },
+      residency: { quote: residencyQuote },
       checkoutReadiness,
       checkout: { issue: issueCheckout },
       referral: { summary: referralSummary, redeemCode },

@@ -216,6 +216,10 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           return reply.code(403).send({ error: "invalid_callback" });
         }
         if (data.startsWith("xr1.")) {
+          // ER-TG-002 storage/authentication is isolated from ct2/cv1. Checkout
+          // dispatch remains unavailable until a provider-neutral readiness
+          // capability is explicitly composed.
+          return { accepted: true, unsupported: true };
           if (
             deps.expertCheckoutEnabled !== true ||
             deps.expertQueries === undefined

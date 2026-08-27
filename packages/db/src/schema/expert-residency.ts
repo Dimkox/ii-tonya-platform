@@ -399,6 +399,9 @@ export const expertTelegramResidencyCallbacks = pgTable(
       "expert_telegram_residency_callbacks_expiry_check",
       sql`${table.expiresAt} > ${table.createdAt}`,
     ),
+    index("expert_telegram_residency_callbacks_expiry_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.consumedAt} is null`),
     check(
       "expert_telegram_residency_callbacks_checkout_state_check",
       sql`(${table.checkoutStatus} = 'issued' and ${table.consumedAt} is null) or (${table.checkoutStatus} <> 'issued' and ${table.consumedAt} is not null)`,

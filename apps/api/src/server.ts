@@ -162,6 +162,7 @@ export const createDefaultLifecycle = (
     const telegramEnabled =
       config.features.expertTelegramQueries === true ||
       config.features.expertTelegramFinancialViews === true ||
+      config.features.expertTelegramReferral === true;
       config.features.expertTelegramReferral === true ||
       config.features.expertTelegramCheckout === true;
     const expertTelegramQueries =

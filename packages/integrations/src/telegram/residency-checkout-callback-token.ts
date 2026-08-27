@@ -1,3 +1,9 @@
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const PREFIX = "xr1.";
@@ -140,6 +146,9 @@ export async function issueResidencyCheckoutCallback(
   secret: Uint8Array,
   store: ResidencyCheckoutCallbackStore,
 ): Promise<string> {
+  if (!valid(claims) || secret.byteLength < 32 || idempotencyKey.length < 1)
+    throw new ResidencyCheckoutCallbackVerificationError();
+  const nonce = randomBytes(16);
   if (
     !valid(claims) ||
     secret.byteLength < 32 ||
@@ -161,6 +170,25 @@ export async function authenticateResidencyCheckoutCallback(
   now: Date,
 ) {
   try {
+    if (
+      !token.startsWith(PREFIX) ||
+      secret.byteLength < 32 ||
+      !Number.isFinite(now.getTime())
+    )
+      throw new Error();
+    const payload = Buffer.from(token.slice(PREFIX.length), "base64url");
+    if (
+      payload.length !== 32 ||
+      token !== `${PREFIX}${payload.toString("base64url")}`
+    )
+      throw new Error();
+    const nonce = payload.subarray(0, 16);
+    if (!timingSafeEqual(payload.subarray(16), mac(nonce, binding, secret)))
+      throw new Error();
+    const claims = await store.consume(digest(nonce), binding, now);
+    if (claims === null || claims.expiresAt.getTime() <= now.getTime())
+      throw new Error();
+    return { tokenHash: digest(nonce), claims };
     if (secret.byteLength < 32 || !Number.isFinite(now.getTime()))
       throw new Error();
     const decoded = decode(token);

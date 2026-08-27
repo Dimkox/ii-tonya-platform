@@ -349,6 +349,7 @@ describe("server composition", () => {
             summary: referralSummary,
             redeemCode: async () => ({ kind: "disabled" as const }),
           },
+          residency: { quote: async () => ({ kind: "disabled" as const }) },
           residency: {
             listActiveTariffs: async () => ({ kind: "disabled" as const }),
             quote: async () => ({ kind: "disabled" as const }),

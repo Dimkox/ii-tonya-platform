@@ -708,6 +708,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
+    "1d5f407bf64f5959bcbb65f9e4c4df5737af1450e7d45d6efa7d6948e37b6915",
     "946ea5ba29dab55ed8865dc42a9fc2c64651b63d4b2440f29315867d6bbdd8ce",
   ],
 ]);
