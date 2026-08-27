@@ -250,8 +250,14 @@ const roots = [
 describe("workspace layout", () => {
   it("contains a private package and source entrypoint for every module", () => {
     const missing = roots.filter((root) => {
-      if (!existsSync(join(root, "package.json")) || !existsSync(join(root, "src/index.ts"))) return true;
-      const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { private?: boolean };
+      if (
+        !existsSync(join(root, "package.json")) ||
+        !existsSync(join(root, "src/index.ts"))
+      )
+        return true;
+      const manifest = JSON.parse(
+        readFileSync(join(root, "package.json"), "utf8"),
+      ) as { private?: boolean };
       return manifest.private !== true;
     });
     expect(missing).toEqual([]);
@@ -335,7 +341,9 @@ git commit -m "chore: bootstrap ii-tonya monorepo"
 export type UserId = string & { readonly __brand: "UserId" };
 export type ReservationId = string & { readonly __brand: "ReservationId" };
 export type EventId = string & { readonly __brand: "EventId" };
-export interface Clock { now(): Date }
+export interface Clock {
+  now(): Date;
+}
 export interface EventEnvelope<TType extends string, TPayload> {
   eventId: EventId;
   eventType: TType;
@@ -371,8 +379,15 @@ describe("canonical contracts", () => {
       payload: { reservationId: "r-1" },
     };
     expect(eventEnvelopeSchema.parse(valid)).toEqual(valid);
-    expect(() => eventEnvelopeSchema.parse({ ...valid, occurredAt: "2026-07-28T13:00:00+03:00" })).toThrow();
-    expect(toUtcIso(new Date("2026-07-28T13:00:00+03:00"))).toBe("2026-07-28T10:00:00.000Z");
+    expect(() =>
+      eventEnvelopeSchema.parse({
+        ...valid,
+        occurredAt: "2026-07-28T13:00:00+03:00",
+      }),
+    ).toThrow();
+    expect(toUtcIso(new Date("2026-07-28T13:00:00+03:00"))).toBe(
+      "2026-07-28T10:00:00.000Z",
+    );
   });
 });
 ```
@@ -385,7 +400,8 @@ import { loadEnv } from "./env.js";
 describe("loadEnv", () => {
   it("defaults dangerous integrations to disabled and rejects raw transcript logging", () => {
     const config = loadEnv({
-      DATABASE_URL: "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
+      DATABASE_URL:
+        "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
     });
     expect(config.integrations).toEqual({
       selarti: false,
@@ -398,14 +414,20 @@ describe("loadEnv", () => {
     expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
-    expect(() => loadEnv({
-      DATABASE_URL: "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
-      RAW_CONVERSATION_LOGGING: "true",
-    })).toThrow("Raw conversation logging is prohibited");
-    expect(() => loadEnv({
-      DATABASE_URL: "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
-      SELARTI_ENABLED: "true",
-    })).toThrow();
+    expect(() =>
+      loadEnv({
+        DATABASE_URL:
+          "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
+        RAW_CONVERSATION_LOGGING: "true",
+      }),
+    ).toThrow("Raw conversation logging is prohibited");
+    expect(() =>
+      loadEnv({
+        DATABASE_URL:
+          "postgres://ii_tonya:__PLACEHOLDER_DB_PASSWORD__@localhost:5432/ii_tonya",
+        SELARTI_ENABLED: "true",
+      }),
+    ).toThrow();
   });
 });
 ```
@@ -416,19 +438,23 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const parseEnv = (text: string): Record<string, string> => Object.fromEntries(
-  text.split(/\r?\n/)
-    .filter((line) => line.length > 0 && !line.startsWith("#"))
-    .map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
-);
+const parseEnv = (text: string): Record<string, string> =>
+  Object.fromEntries(
+    text
+      .split(/\r?\n/)
+      .filter((line) => line.length > 0 && !line.startsWith("#"))
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      }),
+  );
 
 describe("environment credential policy", () => {
   it("tracks only a placeholder example and keeps every live flag false", () => {
     const ignored = readFileSync(".gitignore", "utf8").split(/\r?\n/);
-    expect(ignored).toEqual(expect.arrayContaining([".env", ".env.*", "!.env.example"]));
+    expect(ignored).toEqual(
+      expect.arrayContaining([".env", ".env.*", "!.env.example"]),
+    );
 
     const example = parseEnv(readFileSync(".env.example", "utf8"));
     const liveFlags = [
@@ -439,15 +465,28 @@ describe("environment credential policy", () => {
       "INTENT_MODEL_ENABLED",
       "PAYMENTS_ENABLED",
     ];
-    expect(liveFlags.map((key) => example[key])).toEqual(liveFlags.map(() => "false"));
+    expect(liveFlags.map((key) => example[key])).toEqual(
+      liveFlags.map(() => "false"),
+    );
 
-    const secretKeys = Object.keys(example).filter((key) =>
-      /(PASSWORD|TOKEN|SECRET|API_KEY|HMAC_KEY)$/.test(key) || key === "DATABASE_URL");
+    const secretKeys = Object.keys(example).filter(
+      (key) =>
+        /(PASSWORD|TOKEN|SECRET|API_KEY|HMAC_KEY)$/.test(key) ||
+        key === "DATABASE_URL",
+    );
     expect(secretKeys.length).toBeGreaterThan(0);
-    expect(secretKeys.every((key) => example[key]?.includes("__PLACEHOLDER_"))).toBe(true);
+    expect(
+      secretKeys.every((key) => example[key]?.includes("__PLACEHOLDER_")),
+    ).toBe(true);
 
-    const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" }).split(/\r?\n/);
-    expect(tracked.filter((path) => /^\.env(?:\.|$)/.test(path) && path !== ".env.example")).toEqual([]);
+    const tracked = execFileSync("git", ["ls-files"], {
+      encoding: "utf8",
+    }).split(/\r?\n/);
+    expect(
+      tracked.filter(
+        (path) => /^\.env(?:\.|$)/.test(path) && path !== ".env.example",
+      ),
+    ).toEqual([]);
   });
 });
 ```
@@ -464,13 +503,15 @@ Expected: FAIL because the contract and environment modules, `.gitignore`, and `
 // packages/contracts/src/events.ts
 import { z } from "zod";
 
-export const eventEnvelopeSchema = z.object({
-  eventId: z.uuid(),
-  eventType: z.string().min(1),
-  occurredAt: z.string().regex(/Z$/).datetime(),
-  correlationId: z.string().min(1).max(128),
-  payload: z.unknown(),
-}).strict();
+export const eventEnvelopeSchema = z
+  .object({
+    eventId: z.uuid(),
+    eventType: z.string().min(1),
+    occurredAt: z.string().regex(/Z$/).datetime(),
+    correlationId: z.string().min(1).max(128),
+    payload: z.unknown(),
+  })
+  .strict();
 
 export type EventEnvelope<TType extends string, TPayload> = {
   eventId: string & { readonly __brand: "EventId" };
@@ -480,15 +521,19 @@ export type EventEnvelope<TType extends string, TPayload> = {
   payload: TPayload;
 };
 
-export const canonicalOutboundDeliverySchema = z.object({
-  kind: z.literal("outbound_delivery"),
-  provider: z.literal("selarti"),
-  providerEventId: z.string().min(1).max(128),
-  providerMessageId: z.string().min(1).max(128),
-  occurredAt: z.string().regex(/Z$/).datetime(),
-  status: z.literal("delivered"),
-}).strict();
-export type CanonicalOutboundDelivery = z.infer<typeof canonicalOutboundDeliverySchema>;
+export const canonicalOutboundDeliverySchema = z
+  .object({
+    kind: z.literal("outbound_delivery"),
+    provider: z.literal("selarti"),
+    providerEventId: z.string().min(1).max(128),
+    providerMessageId: z.string().min(1).max(128),
+    occurredAt: z.string().regex(/Z$/).datetime(),
+    status: z.literal("delivered"),
+  })
+  .strict();
+export type CanonicalOutboundDelivery = z.infer<
+  typeof canonicalOutboundDeliverySchema
+>;
 ```
 
 ```ts
@@ -504,19 +549,21 @@ export const toUtcIso = (value: Date): string => value.toISOString();
 // packages/config/src/env.ts
 import { z } from "zod";
 
-const schema = z.object({
-  DATABASE_URL: z.url().startsWith("postgres"),
-  SELARTI_ENABLED: z.literal("false").default("false"),
-  SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
-  PLANERKA_ENABLED: z.literal("false").default("false"),
-  TELEGRAM_ENABLED: z.literal("false").default("false"),
-  MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
-  INTENT_MODEL_ENABLED: z.literal("false").default("false"),
-  PAYMENTS_ENABLED: z.literal("false").default("false"),
-  MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
-  RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
-  DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),
-}).passthrough();
+const schema = z
+  .object({
+    DATABASE_URL: z.url().startsWith("postgres"),
+    SELARTI_ENABLED: z.literal("false").default("false"),
+    SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
+    PLANERKA_ENABLED: z.literal("false").default("false"),
+    TELEGRAM_ENABLED: z.literal("false").default("false"),
+    MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
+    INTENT_MODEL_ENABLED: z.literal("false").default("false"),
+    PAYMENTS_ENABLED: z.literal("false").default("false"),
+    MINOR_ONBOARDING_ENABLED: z.literal("false").default("false"),
+    RAW_CONVERSATION_LOGGING: z.enum(["true", "false"]).default("false"),
+    DISPLAY_TIMEZONE: z.string().default("Europe/Moscow"),
+  })
+  .passthrough();
 
 export type RuntimeConfig = {
   databaseUrl: string;
@@ -536,7 +583,8 @@ export type RuntimeConfig = {
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
-  if (value.RAW_CONVERSATION_LOGGING === "true") throw new Error("Raw conversation logging is prohibited");
+  if (value.RAW_CONVERSATION_LOGGING === "true")
+    throw new Error("Raw conversation logging is prohibited");
   return {
     databaseUrl: value.DATABASE_URL,
     integrations: {
@@ -649,8 +697,15 @@ export type ReservationAction =
   | "expire"
   | "complete"
   | "mark_no_show";
-export function computeReservedUntil(createdAt: Date, slotStartsAt: Date, confirmationBufferMs: number): Date;
-export function transitionReservation(status: ReservationStatus, action: ReservationAction): ReservationStatus;
+export function computeReservedUntil(
+  createdAt: Date,
+  slotStartsAt: Date,
+  confirmationBufferMs: number,
+): Date;
+export function transitionReservation(
+  status: ReservationStatus,
+  action: ReservationAction,
+): ReservationStatus;
 ```
 
 Every external import owner is declared in its consuming workspace, internal dependencies use `workspace:*`, and root owns tooling only. Runtime source imports are parsed and compared with the owning manifest on every run. Every `packages/*` runtime workspace emits `dist/index.js` plus `dist/index.d.ts`, exports only those artifacts, and lists `dist` in `files`; no production package exports TypeScript source. `pnpm-workspace.yaml` sets `injectWorkspacePackages: true` so the Task 21 deploy output contains built internal dependencies. `pnpm test:repeat -- <count> <test-path...>` invokes `scripts/repeat-vitest.mjs` through the shared host launcher. This task does not claim app deployability: `apps/worker/src/main.ts` and `apps/api/src/server.ts` are created with their real compositions in Tasks 19 and 20.
@@ -669,21 +724,39 @@ const required = {
   ".": {
     dependencies: [],
     devDependencies: [
-      "@eslint/js", "@types/node", "@vitest/coverage-v8", "eslint", "globals",
-      "prettier", "tsup", "tsx", "typescript", "typescript-eslint", "vitest", "yaml",
+      "@eslint/js",
+      "@types/node",
+      "@vitest/coverage-v8",
+      "eslint",
+      "globals",
+      "prettier",
+      "tsup",
+      "tsx",
+      "typescript",
+      "typescript-eslint",
+      "vitest",
+      "yaml",
     ],
   },
   "apps/api": {
     dependencies: [
-      "@fastify/rate-limit", "@ii-tonya/application", "@ii-tonya/config",
-      "@ii-tonya/db", "@ii-tonya/integrations", "@ii-tonya/observability", "fastify",
+      "@fastify/rate-limit",
+      "@ii-tonya/application",
+      "@ii-tonya/config",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "@ii-tonya/observability",
+      "fastify",
     ],
     devDependencies: [],
   },
   "apps/worker": {
     dependencies: [
-      "@ii-tonya/config", "@ii-tonya/db", "@ii-tonya/integrations",
-      "@ii-tonya/observability", "@ii-tonya/worker",
+      "@ii-tonya/config",
+      "@ii-tonya/db",
+      "@ii-tonya/integrations",
+      "@ii-tonya/observability",
+      "@ii-tonya/worker",
     ],
     devDependencies: [],
   },
@@ -694,7 +767,12 @@ const required = {
   "packages/config": { dependencies: ["zod"], devDependencies: [] },
   "packages/contracts": { dependencies: ["zod"], devDependencies: [] },
   "packages/db": {
-    dependencies: ["@ii-tonya/contracts", "@ii-tonya/domain", "drizzle-orm", "pg"],
+    dependencies: [
+      "@ii-tonya/contracts",
+      "@ii-tonya/domain",
+      "drizzle-orm",
+      "pg",
+    ],
     devDependencies: ["@testcontainers/postgresql", "@types/pg", "drizzle-kit"],
   },
   "packages/domain": { dependencies: [], devDependencies: ["fast-check"] },
@@ -708,29 +786,42 @@ const required = {
   },
   "packages/worker": {
     dependencies: [
-      "@ii-tonya/application", "@ii-tonya/contracts", "@ii-tonya/db",
-      "@ii-tonya/domain", "@ii-tonya/integrations",
+      "@ii-tonya/application",
+      "@ii-tonya/contracts",
+      "@ii-tonya/db",
+      "@ii-tonya/domain",
+      "@ii-tonya/integrations",
     ],
     devDependencies: [],
   },
 } as const;
 
-const manifestAt = (root: string) => JSON.parse(
-  readFileSync(root === "." ? "package.json" : `${root}/package.json`, "utf8"),
-) as {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  scripts?: Record<string, string>;
-  exports?: { "."?: { import?: string; types?: string } };
-  files?: string[];
-  main?: string;
-  types?: string;
-  packageManager?: string;
-};
+const manifestAt = (root: string) =>
+  JSON.parse(
+    readFileSync(
+      root === "." ? "package.json" : `${root}/package.json`,
+      "utf8",
+    ),
+  ) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    scripts?: Record<string, string>;
+    exports?: { "."?: { import?: string; types?: string } };
+    files?: string[];
+    main?: string;
+    types?: string;
+    packageManager?: string;
+  };
 
 const runtimePackageRoots = [
-  "packages/application", "packages/config", "packages/contracts", "packages/db",
-  "packages/domain", "packages/integrations", "packages/observability", "packages/worker",
+  "packages/application",
+  "packages/config",
+  "packages/contracts",
+  "packages/db",
+  "packages/domain",
+  "packages/integrations",
+  "packages/observability",
+  "packages/worker",
 ] as const;
 
 const importOwner = (specifier: string): string =>
@@ -743,16 +834,26 @@ const nodeBuiltins = new Set([
 ]);
 
 describe("workspace dependency ownership remediation", () => {
-  it.each(Object.entries(required))("%s owns every current and planned import", (root, expected) => {
-    const manifest = manifestAt(root);
-    for (const name of expected.dependencies) {
-      expect(manifest.dependencies?.[name], `${root} runtime ${name}`).toBeDefined();
-      if (name.startsWith("@ii-tonya/")) expect(manifest.dependencies?.[name]).toBe("workspace:*");
-    }
-    for (const name of expected.devDependencies) {
-      expect(manifest.devDependencies?.[name], `${root} development ${name}`).toBeDefined();
-    }
-  });
+  it.each(Object.entries(required))(
+    "%s owns every current and planned import",
+    (root, expected) => {
+      const manifest = manifestAt(root);
+      for (const name of expected.dependencies) {
+        expect(
+          manifest.dependencies?.[name],
+          `${root} runtime ${name}`,
+        ).toBeDefined();
+        if (name.startsWith("@ii-tonya/"))
+          expect(manifest.dependencies?.[name]).toBe("workspace:*");
+      }
+      for (const name of expected.devDependencies) {
+        expect(
+          manifest.devDependencies?.[name],
+          `${root} development ${name}`,
+        ).toBeDefined();
+      }
+    },
+  );
 
   it("does not hide package runtime imports in root development dependencies", () => {
     const root = manifestAt(".");
@@ -761,7 +862,9 @@ describe("workspace dependency ownership remediation", () => {
     expect(root.packageManager).toBe("pnpm@11.9.0");
     expect(root.scripts?.build).toBe("pnpm -r --sort run build");
     expect(root.scripts?.typecheck).toBe("pnpm -r --sort run typecheck");
-    expect(root.scripts?.["test:repeat"]).toBe("node scripts/repeat-vitest.mjs");
+    expect(root.scripts?.["test:repeat"]).toBe(
+      "node scripts/repeat-vitest.mjs",
+    );
     expect(root.scripts?.["verify:clean-workspace"]).toBe(
       "node scripts/verify-clean-workspace.mjs",
     );
@@ -775,18 +878,25 @@ describe("workspace dependency ownership remediation", () => {
     const files = [
       ...globSync("apps/*/src/**/*.ts"),
       ...globSync("packages/*/src/**/*.ts"),
-    ]
-      .filter((file) => !/(\.test|\.testkit)\.ts$/.test(file));
+    ].filter((file) => !/(\.test|\.testkit)\.ts$/.test(file));
     for (const file of files) {
       const [top, workspace] = file.replaceAll("\\", "/").split("/");
       const root = `${top}/${workspace}`;
       const dependencies = manifestAt(root).dependencies ?? {};
-      const imported = preProcessFile(readFileSync(file, "utf8"), true, true).importedFiles;
+      const imported = preProcessFile(
+        readFileSync(file, "utf8"),
+        true,
+        true,
+      ).importedFiles;
       for (const { fileName } of imported) {
         if (fileName.startsWith(".") || nodeBuiltins.has(fileName)) continue;
         const owner = importOwner(fileName);
-        if (dependencies[owner] === undefined) missing.push(`${file} -> ${owner}`);
-        if (owner.startsWith("@ii-tonya/") && dependencies[owner] !== "workspace:*") {
+        if (dependencies[owner] === undefined)
+          missing.push(`${file} -> ${owner}`);
+        if (
+          owner.startsWith("@ii-tonya/") &&
+          dependencies[owner] !== "workspace:*"
+        ) {
           missing.push(`${file} -> ${owner} must use workspace:*`);
         }
       }
@@ -811,7 +921,9 @@ describe("workspace dependency ownership remediation", () => {
       expect(manifest.types).toBe("./dist/index.d.ts");
       expect(manifest.files).toContain("dist");
     }
-    expect(manifestAt("apps/api").dependencies?.["@ii-tonya/db"]).toBe("workspace:*");
+    expect(manifestAt("apps/api").dependencies?.["@ii-tonya/db"]).toBe(
+      "workspace:*",
+    );
     const workspace = parse(readFileSync("pnpm-workspace.yaml", "utf8")) as {
       injectWorkspacePackages?: boolean;
       syncInjectedDepsAfterScripts?: string[];
@@ -830,25 +942,31 @@ import { computeReservedUntil, transitionReservation } from "./reservation.js";
 describe("reservation policy", () => {
   it("uses the earlier of 72 hours and slot start minus the one-hour buffer", () => {
     const createdAt = new Date("2026-07-28T10:00:00.000Z");
-    expect(computeReservedUntil(
-      createdAt,
-      new Date("2026-07-30T12:00:00.000Z"),
-      60 * 60 * 1_000,
-    ).toISOString()).toBe("2026-07-30T11:00:00.000Z");
+    expect(
+      computeReservedUntil(
+        createdAt,
+        new Date("2026-07-30T12:00:00.000Z"),
+        60 * 60 * 1_000,
+      ).toISOString(),
+    ).toBe("2026-07-30T11:00:00.000Z");
   });
 
   it("rejects a deadline that is not after creation", () => {
-    expect(() => computeReservedUntil(
-      new Date("2026-07-28T10:00:00.000Z"),
-      new Date("2026-07-28T11:00:00.000Z"),
-      60 * 60 * 1_000,
-    )).toThrow("Reservation deadline has already passed");
+    expect(() =>
+      computeReservedUntil(
+        new Date("2026-07-28T10:00:00.000Z"),
+        new Date("2026-07-28T11:00:00.000Z"),
+        60 * 60 * 1_000,
+      ),
+    ).toThrow("Reservation deadline has already passed");
   });
 
   it("allows only normative transitions", () => {
     expect(transitionReservation("reserved", "expert_confirm")).toBe("booked");
     expect(transitionReservation("reserved", "expire")).toBe("expired");
-    expect(() => transitionReservation("expired", "expert_confirm")).toThrow("Invalid reservation transition");
+    expect(() => transitionReservation("expired", "expert_confirm")).toThrow(
+      "Invalid reservation transition",
+    );
     expect(transitionReservation("booked", "mark_no_show")).toBe("no_show");
   });
 });
@@ -864,19 +982,19 @@ Expected: FAIL because current package manifests keep runtime `zod` at root inst
 
 Apply this ownership table in the listed `package.json` files before adding more imports:
 
-| Workspace | Runtime dependencies | Development dependencies |
-|---|---|---|
-| root | none | `@eslint/js`, `@types/node`, `@vitest/coverage-v8`, `eslint`, `globals`, `prettier`, `tsup`, `tsx`, `typescript`, `typescript-eslint`, `vitest`, `yaml` |
-| `apps/api` | `@fastify/rate-limit`, `@ii-tonya/application`, `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `fastify` | none |
-| `apps/worker` | `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `@ii-tonya/worker` | none |
-| `packages/application` | `@ii-tonya/contracts`, `@ii-tonya/domain` | none |
-| `packages/config` | `zod` | none |
-| `packages/contracts` | `zod` | none |
-| `packages/db` | `@ii-tonya/contracts`, `@ii-tonya/domain`, `drizzle-orm`, `pg` | `@testcontainers/postgresql`, `@types/pg`, `drizzle-kit` |
-| `packages/domain` | none | `fast-check` |
-| `packages/integrations` | `@ii-tonya/contracts`, `zod` | none |
-| `packages/observability` | `@opentelemetry/api`, `@opentelemetry/sdk-node`, `pino` | none |
-| `packages/worker` | `@ii-tonya/application`, `@ii-tonya/contracts`, `@ii-tonya/db`, `@ii-tonya/domain`, `@ii-tonya/integrations` | none |
+| Workspace                | Runtime dependencies                                                                                                                               | Development dependencies                                                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| root                     | none                                                                                                                                               | `@eslint/js`, `@types/node`, `@vitest/coverage-v8`, `eslint`, `globals`, `prettier`, `tsup`, `tsx`, `typescript`, `typescript-eslint`, `vitest`, `yaml` |
+| `apps/api`               | `@fastify/rate-limit`, `@ii-tonya/application`, `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `fastify` | none                                                                                                                                                    |
+| `apps/worker`            | `@ii-tonya/config`, `@ii-tonya/db`, `@ii-tonya/integrations`, `@ii-tonya/observability`, `@ii-tonya/worker`                                        | none                                                                                                                                                    |
+| `packages/application`   | `@ii-tonya/contracts`, `@ii-tonya/domain`                                                                                                          | none                                                                                                                                                    |
+| `packages/config`        | `zod`                                                                                                                                              | none                                                                                                                                                    |
+| `packages/contracts`     | `zod`                                                                                                                                              | none                                                                                                                                                    |
+| `packages/db`            | `@ii-tonya/contracts`, `@ii-tonya/domain`, `drizzle-orm`, `pg`                                                                                     | `@testcontainers/postgresql`, `@types/pg`, `drizzle-kit`                                                                                                |
+| `packages/domain`        | none                                                                                                                                               | `fast-check`                                                                                                                                            |
+| `packages/integrations`  | `@ii-tonya/contracts`, `zod`                                                                                                                       | none                                                                                                                                                    |
+| `packages/observability` | `@opentelemetry/api`, `@opentelemetry/sdk-node`, `pino`                                                                                            | none                                                                                                                                                    |
+| `packages/worker`        | `@ii-tonya/application`, `@ii-tonya/contracts`, `@ii-tonya/db`, `@ii-tonya/domain`, `@ii-tonya/integrations`                                       | none                                                                                                                                                    |
 
 Remove `zod` from root `devDependencies`; add it to the runtime `dependencies` of `packages/config`, `packages/contracts`, and `packages/integrations`. Add `@ii-tonya/db: "workspace:*"` to `apps/api`. Use `workspace:*` for every `@ii-tonya/*` dependency. For all eight `packages/*` workspaces set:
 
@@ -908,14 +1026,17 @@ const safeCmdToken = /^[-A-Za-z0-9_@./:=,*]+$/;
 
 export function runPnpm(args, options = {}) {
   if (!Array.isArray(args) || args.some((arg) => !safeCmdToken.test(arg))) {
-    throw new Error("pnpm launcher accepts only fixed, shell-safe argument tokens");
+    throw new Error(
+      "pnpm launcher accepts only fixed, shell-safe argument tokens",
+    );
   }
-  const child = process.platform === "win32"
-    ? {
-        file: process.env.ComSpec ?? "cmd.exe",
-        args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
-      }
-    : { file: "pnpm", args };
+  const child =
+    process.platform === "win32"
+      ? {
+          file: process.env.ComSpec ?? "cmd.exe",
+          args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+        }
+      : { file: "pnpm", args };
   const result = spawnSync(child.file, child.args, {
     cwd: options.cwd,
     env: options.env ?? process.env,
@@ -925,7 +1046,9 @@ export function runPnpm(args, options = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`pnpm ${args.join(" ")} exited with ${String(result.status)}`);
+    throw new Error(
+      `pnpm ${args.join(" ")} exited with ${String(result.status)}`,
+    );
   }
   return result;
 }
@@ -938,22 +1061,28 @@ On Windows this always launches the already-installed `pnpm` command through `%C
 import { readFileSync } from "node:fs";
 import { runPnpm } from "./lib/run-pnpm.mjs";
 
-const expectedVersion = JSON.parse(readFileSync("package.json", "utf8"))
-  .packageManager.replace(/^pnpm@/, "");
+const expectedVersion = JSON.parse(
+  readFileSync("package.json", "utf8"),
+).packageManager.replace(/^pnpm@/, "");
 const outputs = [];
 for (let childExecution = 1; childExecution <= 2; childExecution += 1) {
   const result = runPnpm(["--version"], { encoding: "utf8", stdio: "pipe" });
   const version = result.stdout.trim();
-  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`invalid pnpm version: ${version}`);
+  if (!/^\d+\.\d+\.\d+$/.test(version))
+    throw new Error(`invalid pnpm version: ${version}`);
   if (version !== expectedVersion) {
-    throw new Error(`pnpm version mismatch: expected ${expectedVersion}, received ${version}`);
+    throw new Error(
+      `pnpm version mismatch: expected ${expectedVersion}, received ${version}`,
+    );
   }
   outputs.push({ childExecution, version });
 }
 if (outputs.length !== 2 || outputs.some((item) => item.childExecution < 1)) {
   throw new Error("launcher did not complete exactly two child executions");
 }
-process.stdout.write(`${JSON.stringify({ childExecutions: outputs.length, outputs })}\n`);
+process.stdout.write(
+  `${JSON.stringify({ childExecutions: outputs.length, outputs })}\n`,
+);
 ```
 
 ```js
@@ -963,7 +1092,9 @@ import { runPnpm } from "./lib/run-pnpm.mjs";
 const [countText, ...testPaths] = process.argv.slice(2);
 const count = Number.parseInt(countText ?? "", 10);
 if (!Number.isInteger(count) || count < 1 || testPaths.length === 0) {
-  throw new Error("Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]");
+  throw new Error(
+    "Usage: pnpm test:repeat -- <positive-count> <test-path> [test-path]",
+  );
 }
 for (let index = 1; index <= count; index += 1) {
   runPnpm(["exec", "vitest", "run", ...testPaths], {
@@ -983,7 +1114,13 @@ import { runPnpm } from "./lib/run-pnpm.mjs";
 const sourceRoot = process.cwd();
 const scratch = mkdtempSync(join(tmpdir(), "ii-tonya-clean-"));
 const copyRoot = join(scratch, "repo");
-const excluded = new Set([".git", "node_modules", "dist", "coverage", ".turbo"]);
+const excluded = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "coverage",
+  ".turbo",
+]);
 
 const run = (args) => {
   runPnpm(args, { cwd: copyRoot });
@@ -1000,24 +1137,39 @@ try {
       return name === ".env.example" || !name.startsWith(".env");
     },
   });
-  if (!run(["install", "--frozen-lockfile"])) throw new Error("clean install failed");
+  if (!run(["install", "--frozen-lockfile"]))
+    throw new Error("clean install failed");
   if (!run(["build"])) throw new Error("clean build failed");
   if (!run(["typecheck"])) throw new Error("clean typecheck failed");
   for (const packageRoot of [
-    "application", "config", "contracts", "db",
-    "domain", "integrations", "observability", "worker",
+    "application",
+    "config",
+    "contracts",
+    "db",
+    "domain",
+    "integrations",
+    "observability",
+    "worker",
   ]) {
     const result = spawnSync(
       process.execPath,
       ["--input-type=module", "--eval", "await import('./dist/index.js')"],
-      { cwd: join(copyRoot, "packages", packageRoot), stdio: "inherit", shell: false },
+      {
+        cwd: join(copyRoot, "packages", packageRoot),
+        stdio: "inherit",
+        shell: false,
+      },
     );
     if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`clean runtime import failed: ${packageRoot}`);
+    if (result.status !== 0)
+      throw new Error(`clean runtime import failed: ${packageRoot}`);
   }
 } finally {
   const relativeScratch = relative(tmpdir(), scratch);
-  if (!relativeScratch.startsWith("ii-tonya-clean-") || relativeScratch.includes(sep)) {
+  if (
+    !relativeScratch.startsWith("ii-tonya-clean-") ||
+    relativeScratch.includes(sep)
+  ) {
     throw new Error("refusing to remove an unexpected path");
   }
   rmSync(scratch, { recursive: true, force: true });
@@ -1027,13 +1179,27 @@ try {
 ```ts
 // packages/domain/src/reservation.ts
 export type ReservationStatus =
-  | "reserved" | "booked" | "cancelled_by_client" | "cancelled_by_expert"
-  | "expired" | "completed" | "no_show";
+  | "reserved"
+  | "booked"
+  | "cancelled_by_client"
+  | "cancelled_by_expert"
+  | "expired"
+  | "completed"
+  | "no_show";
 export type ReservationAction =
-  | "expert_confirm" | "client_cancel" | "expert_cancel" | "expire"
-  | "complete" | "mark_no_show";
+  | "expert_confirm"
+  | "client_cancel"
+  | "expert_cancel"
+  | "expire"
+  | "complete"
+  | "mark_no_show";
 
-const transitions: Partial<Record<ReservationStatus, Partial<Record<ReservationAction, ReservationStatus>>>> = {
+const transitions: Partial<
+  Record<
+    ReservationStatus,
+    Partial<Record<ReservationAction, ReservationStatus>>
+  >
+> = {
   reserved: {
     expert_confirm: "booked",
     client_cancel: "cancelled_by_client",
@@ -1053,15 +1219,21 @@ export function computeReservedUntil(
   slotStartsAt: Date,
   confirmationBufferMs: number,
 ): Date {
-  const deadline = new Date(Math.min(
-    createdAt.getTime() + 72 * 60 * 60 * 1_000,
-    slotStartsAt.getTime() - confirmationBufferMs,
-  ));
-  if (deadline.getTime() <= createdAt.getTime()) throw new Error("Reservation deadline has already passed");
+  const deadline = new Date(
+    Math.min(
+      createdAt.getTime() + 72 * 60 * 60 * 1_000,
+      slotStartsAt.getTime() - confirmationBufferMs,
+    ),
+  );
+  if (deadline.getTime() <= createdAt.getTime())
+    throw new Error("Reservation deadline has already passed");
   return deadline;
 }
 
-export function transitionReservation(status: ReservationStatus, action: ReservationAction): ReservationStatus {
+export function transitionReservation(
+  status: ReservationStatus,
+  action: ReservationAction,
+): ReservationStatus {
   const next = transitions[status]?.[action];
   if (!next) throw new Error("Invalid reservation transition");
   return next;
@@ -1105,7 +1277,8 @@ git commit -m "fix: own workspace dependencies and define reservation policy"
 **Interfaces:**
 
 ```ts
-export type MessageClass = "ordinary_inbound" | "ordinary_outbound" | "system" | "safety" | "error";
+export type MessageClass =
+  "ordinary_inbound" | "ordinary_outbound" | "system" | "safety" | "error";
 export type PackageKind = "admin" | "paid" | "intro";
 export interface AvailablePackage {
   id: string;
@@ -1119,10 +1292,18 @@ export type LedgerFact =
   | { sequence: number; kind: "debit"; delta: -1; idempotencyKey: string }
   | { sequence: number; kind: "free"; delta: 0; idempotencyKey: string }
   | { sequence: number; kind: "compensation"; delta: 1; idempotencyKey: string }
-  | { sequence: number; kind: "revocation"; delta: number; idempotencyKey: string };
+  | {
+      sequence: number;
+      kind: "revocation";
+      delta: number;
+      idempotencyKey: string;
+    };
 export function chargeDelta(messageClass: MessageClass): -1 | 0;
 export function derivePackageBalance(facts: readonly LedgerFact[]): number;
-export function choosePackage(packages: readonly AvailablePackage[], at: Date): AvailablePackage | null;
+export function choosePackage(
+  packages: readonly AvailablePackage[],
+  at: Date,
+): AvailablePackage | null;
 ```
 
 - [ ] **Step 1: Write failing billing-policy tests**
@@ -1133,7 +1314,12 @@ import { describe, expect, it } from "vitest";
 import { chargeDelta, choosePackage, derivePackageBalance } from "./billing.js";
 
 const at = new Date("2026-07-28T10:00:00.000Z");
-const pkg = (id: string, kind: "admin" | "paid" | "intro", ledgerBalance: number, expiresAt: string | null) => ({
+const pkg = (
+  id: string,
+  kind: "admin" | "paid" | "intro",
+  ledgerBalance: number,
+  expiresAt: string | null,
+) => ({
   id,
   kind,
   ledgerBalance,
@@ -1151,28 +1337,48 @@ describe("message charging", () => {
   });
 
   it("uses earliest expiry and keeps intro packages last", () => {
-    const chosen = choosePackage([
-      pkg("intro", "intro", 10, "2026-07-29T00:00:00.000Z"),
-      pkg("late", "admin", 10, "2026-08-10T00:00:00.000Z"),
-      pkg("early", "paid", 10, "2026-08-01T00:00:00.000Z"),
-    ], at);
+    const chosen = choosePackage(
+      [
+        pkg("intro", "intro", 10, "2026-07-29T00:00:00.000Z"),
+        pkg("late", "admin", 10, "2026-08-10T00:00:00.000Z"),
+        pkg("early", "paid", 10, "2026-08-01T00:00:00.000Z"),
+      ],
+      at,
+    );
     expect(chosen?.id).toBe("early");
   });
 
   it("ignores empty and expired packages", () => {
-    expect(choosePackage([
-      pkg("empty", "admin", 0, "2026-08-01T00:00:00.000Z"),
-      pkg("expired", "paid", 4, "2026-07-28T09:59:59.999Z"),
-    ], at)).toBeNull();
+    expect(
+      choosePackage(
+        [
+          pkg("empty", "admin", 0, "2026-08-01T00:00:00.000Z"),
+          pkg("expired", "paid", 4, "2026-07-28T09:59:59.999Z"),
+        ],
+        at,
+      ),
+    ).toBeNull();
   });
 
   it("derives balance only from immutable grant, debit, compensation, and revocation facts", () => {
-    expect(derivePackageBalance([
-      { sequence: 1, kind: "grant", delta: 3, idempotencyKey: "grant-1" },
-      { sequence: 2, kind: "debit", delta: -1, idempotencyKey: "debit-1" },
-      { sequence: 3, kind: "compensation", delta: 1, idempotencyKey: "compensate-1" },
-      { sequence: 4, kind: "revocation", delta: -3, idempotencyKey: "revoke-1" },
-    ])).toBe(0);
+    expect(
+      derivePackageBalance([
+        { sequence: 1, kind: "grant", delta: 3, idempotencyKey: "grant-1" },
+        { sequence: 2, kind: "debit", delta: -1, idempotencyKey: "debit-1" },
+        {
+          sequence: 3,
+          kind: "compensation",
+          delta: 1,
+          idempotencyKey: "compensate-1",
+        },
+        {
+          sequence: 4,
+          kind: "revocation",
+          delta: -3,
+          idempotencyKey: "revoke-1",
+        },
+      ]),
+    ).toBe(0);
   });
 });
 ```
@@ -1185,37 +1391,48 @@ import { derivePackageBalance, type LedgerFact } from "./billing.js";
 
 describe("ledger conservation", () => {
   it("rebuilds the same non-negative balance from append-only facts", () => {
-    fc.assert(fc.property(
-      fc.integer({ min: 1, max: 200 }),
-      fc.array(fc.constantFrom<"debit" | "compensation">("debit", "compensation"), { maxLength: 400 }),
-      (grant, operations) => {
-        const facts: LedgerFact[] = [
-          { sequence: 1, kind: "grant", delta: grant, idempotencyKey: "grant" },
-        ];
-        let expected = grant;
-        for (const operation of operations) {
-          if (operation === "debit" && expected > 0) {
-            expected -= 1;
-            facts.push({
-              sequence: facts.length + 1,
-              kind: "debit",
-              delta: -1,
-              idempotencyKey: `debit-${facts.length}`,
-            });
-          } else if (operation === "compensation" && expected < grant) {
-            expected += 1;
-            facts.push({
-              sequence: facts.length + 1,
-              kind: "compensation",
-              delta: 1,
-              idempotencyKey: `compensation-${facts.length}`,
-            });
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 200 }),
+        fc.array(
+          fc.constantFrom<"debit" | "compensation">("debit", "compensation"),
+          { maxLength: 400 },
+        ),
+        (grant, operations) => {
+          const facts: LedgerFact[] = [
+            {
+              sequence: 1,
+              kind: "grant",
+              delta: grant,
+              idempotencyKey: "grant",
+            },
+          ];
+          let expected = grant;
+          for (const operation of operations) {
+            if (operation === "debit" && expected > 0) {
+              expected -= 1;
+              facts.push({
+                sequence: facts.length + 1,
+                kind: "debit",
+                delta: -1,
+                idempotencyKey: `debit-${facts.length}`,
+              });
+            } else if (operation === "compensation" && expected < grant) {
+              expected += 1;
+              facts.push({
+                sequence: facts.length + 1,
+                kind: "compensation",
+                delta: 1,
+                idempotencyKey: `compensation-${facts.length}`,
+              });
+            }
           }
-        }
-        expect(derivePackageBalance(facts)).toBe(expected);
-        expect(derivePackageBalance(facts)).toBeGreaterThanOrEqual(0);
-      },
-    ), { numRuns: 500 });
+          expect(derivePackageBalance(facts)).toBe(expected);
+          expect(derivePackageBalance(facts)).toBeGreaterThanOrEqual(0);
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 });
 ```
@@ -1230,7 +1447,8 @@ Expected: FAIL because `billing.ts` does not exist.
 
 ```ts
 // packages/domain/src/billing.ts
-export type MessageClass = "ordinary_inbound" | "ordinary_outbound" | "system" | "safety" | "error";
+export type MessageClass =
+  "ordinary_inbound" | "ordinary_outbound" | "system" | "safety" | "error";
 export type PackageKind = "admin" | "paid" | "intro";
 export interface AvailablePackage {
   id: string;
@@ -1244,37 +1462,60 @@ export type LedgerFact =
   | { sequence: number; kind: "debit"; delta: -1; idempotencyKey: string }
   | { sequence: number; kind: "free"; delta: 0; idempotencyKey: string }
   | { sequence: number; kind: "compensation"; delta: 1; idempotencyKey: string }
-  | { sequence: number; kind: "revocation"; delta: number; idempotencyKey: string };
+  | {
+      sequence: number;
+      kind: "revocation";
+      delta: number;
+      idempotencyKey: string;
+    };
 
 export const chargeDelta = (messageClass: MessageClass): -1 | 0 =>
-  messageClass === "ordinary_inbound" || messageClass === "ordinary_outbound" ? -1 : 0;
+  messageClass === "ordinary_inbound" || messageClass === "ordinary_outbound"
+    ? -1
+    : 0;
 
 export function derivePackageBalance(facts: readonly LedgerFact[]): number {
   const seen = new Set<string>();
   let balance = 0;
-  for (const fact of facts.toSorted((left, right) => left.sequence - right.sequence)) {
+  for (const fact of facts.toSorted(
+    (left, right) => left.sequence - right.sequence,
+  )) {
     if (seen.has(fact.idempotencyKey)) continue;
     seen.add(fact.idempotencyKey);
     const next = balance + fact.delta;
-    if (next < 0) throw new Error("Ledger fact would make package balance negative");
+    if (next < 0)
+      throw new Error("Ledger fact would make package balance negative");
     balance = next;
   }
   return balance;
 }
 
-export function choosePackage(packages: readonly AvailablePackage[], at: Date): AvailablePackage | null {
-  return packages
-    .filter((value) =>
-      value.ledgerBalance > 0
-      && (value.expiresAt === null || value.expiresAt.getTime() > at.getTime()))
-    .toSorted((left, right) => {
-      const introOrder = Number(left.kind === "intro") - Number(right.kind === "intro");
-      if (introOrder !== 0) return introOrder;
-      const leftExpiry = left.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const rightExpiry = right.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return leftExpiry - rightExpiry || left.grantedAt.getTime() - right.grantedAt.getTime()
-        || left.id.localeCompare(right.id);
-    })[0] ?? null;
+export function choosePackage(
+  packages: readonly AvailablePackage[],
+  at: Date,
+): AvailablePackage | null {
+  return (
+    packages
+      .filter(
+        (value) =>
+          value.ledgerBalance > 0 &&
+          (value.expiresAt === null ||
+            value.expiresAt.getTime() > at.getTime()),
+      )
+      .toSorted((left, right) => {
+        const introOrder =
+          Number(left.kind === "intro") - Number(right.kind === "intro");
+        if (introOrder !== 0) return introOrder;
+        const leftExpiry = left.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const rightExpiry =
+          right.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return (
+          leftExpiry - rightExpiry ||
+          left.grantedAt.getTime() - right.grantedAt.getTime() ||
+          left.id.localeCompare(right.id)
+        );
+      })[0] ?? null
+  );
 }
 ```
 
@@ -1307,14 +1548,28 @@ git commit -m "feat: add deterministic message billing policy"
 
 ```ts
 export type ConsentPurpose = "client_profile" | "expert_note" | "follow_up";
-export interface ConsentGrant { purpose: ConsentPurpose; granted: boolean; recordedAt: Date }
-export function buildProfilePatch(input: ProfileInput, grants: readonly ConsentGrant[]): ProfilePatch;
+export interface ConsentGrant {
+  purpose: ConsentPurpose;
+  granted: boolean;
+  recordedAt: Date;
+}
+export function buildProfilePatch(
+  input: ProfileInput,
+  grants: readonly ConsentGrant[],
+): ProfilePatch;
 export function buildExpertView(reservation: ReservationViewInput): ExpertView;
-export type SafetyRisk = "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
+export type SafetyRisk =
+  "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
 export type AgeBand = "minor" | "adult" | "unknown";
-export interface DeterministicSafetyGuard { detect(text: string): SafetyRisk | null }
-export interface SafetyClassifier { classify(text: string): Promise<"ordinary" | SafetyRisk> }
-export interface SafetyDirectory { list(): readonly SafetyContact[] }
+export interface DeterministicSafetyGuard {
+  detect(text: string): SafetyRisk | null;
+}
+export interface SafetyClassifier {
+  classify(text: string): Promise<"ordinary" | SafetyRisk>;
+}
+export interface SafetyDirectory {
+  list(): readonly SafetyContact[];
+}
 export interface SafetyContact {
   id: string;
   label: string;
@@ -1328,8 +1583,17 @@ export interface SafetyContact {
   verifiedAt: Date;
   validUntil: Date;
 }
-export async function evaluateSafety(input: SafetyInput, guard: DeterministicSafetyGuard, classifier: SafetyClassifier, directory: SafetyDirectory): Promise<SafetyDecision>;
-export function transitionHandoff(state: HandoffState, action: HandoffAction, now: Date): HandoffState;
+export async function evaluateSafety(
+  input: SafetyInput,
+  guard: DeterministicSafetyGuard,
+  classifier: SafetyClassifier,
+  directory: SafetyDirectory,
+): Promise<SafetyDecision>;
+export function transitionHandoff(
+  state: HandoffState,
+  action: HandoffAction,
+  now: Date,
+): HandoffState;
 ```
 
 - [ ] **Step 1: Write failing privacy and safety tests**
@@ -1341,21 +1605,29 @@ import { buildExpertView, buildProfilePatch } from "./consent.js";
 
 describe("privacy minimization", () => {
   it("drops optional profile data without a current explicit grant", () => {
-    expect(buildProfilePatch(
-      { displayName: "Аня", goals: "снизить тревогу", expertNote: "предпочитает утро" },
-      [],
-    )).toEqual({ displayName: "Аня" });
+    expect(
+      buildProfilePatch(
+        {
+          displayName: "Аня",
+          goals: "снизить тревогу",
+          expertNote: "предпочитает утро",
+        },
+        [],
+      ),
+    ).toEqual({ displayName: "Аня" });
   });
 
   it("shows the expert appointment data and only the consented note", () => {
-    expect(buildExpertView({
-      reservationId: "r-1",
-      startsAt: "2026-08-01T09:00:00.000Z",
-      displayTimezone: "Europe/Moscow",
-      clientDisplayName: "Аня",
-      expertNote: "предпочитает утро",
-      expertNoteConsent: false,
-    })).not.toHaveProperty("expertNote");
+    expect(
+      buildExpertView({
+        reservationId: "r-1",
+        startsAt: "2026-08-01T09:00:00.000Z",
+        displayTimezone: "Europe/Moscow",
+        clientDisplayName: "Аня",
+        expertNote: "предпочитает утро",
+        expertNoteConsent: false,
+      }),
+    ).not.toHaveProperty("expertNote");
   });
 });
 ```
@@ -1382,22 +1654,35 @@ describe("safety evaluation", () => {
   };
 
   it("SAFE-01 runs deterministic high-risk guards before a model that says ordinary", async () => {
-    const classifier = { classify: vi.fn().mockResolvedValue("ordinary" as const) };
+    const classifier = {
+      classify: vi.fn().mockResolvedValue("ordinary" as const),
+    };
     const guard = { detect: vi.fn().mockReturnValue("self_harm" as const) };
-    const decision = await evaluateSafety({
-      text: "guard fixture",
-      countryCode: "RU",
-      regionCode: "MOW",
-      ageBand: "adult",
-      ledgerBalance: 0,
-      now,
-    }, guard, classifier, { list: () => [freshContact] });
+    const decision = await evaluateSafety(
+      {
+        text: "guard fixture",
+        countryCode: "RU",
+        regionCode: "MOW",
+        ageBand: "adult",
+        ledgerBalance: 0,
+        now,
+      },
+      guard,
+      classifier,
+      { list: () => [freshContact] },
+    );
     expect(classifier.classify).not.toHaveBeenCalled();
-    expect(decision).toMatchObject({ kind: "human_handoff", reason: "self_harm", charge: 0 });
+    expect(decision).toMatchObject({
+      kind: "human_handoff",
+      reason: "self_harm",
+      charge: 0,
+    });
   });
 
   it("SAFE-02 returns a free handoff with a fresh scoped contact at zero balance", async () => {
-    const classifier = { classify: vi.fn().mockResolvedValue("self_harm" as const) };
+    const classifier = {
+      classify: vi.fn().mockResolvedValue("self_harm" as const),
+    };
     const guard = { detect: vi.fn().mockReturnValue(null) };
     const decision = await evaluateSafety(
       {
@@ -1418,15 +1703,23 @@ describe("safety evaluation", () => {
 
   it("SAFE-03 rejects stale or wrong-scope contacts", async () => {
     const guard = { detect: vi.fn().mockReturnValue("self_harm" as const) };
-    const stale = { ...freshContact, validUntil: new Date("2026-07-27T00:00:00.000Z") };
-    const decision = await evaluateSafety({
-      text: "guard fixture",
-      countryCode: "RU",
-      regionCode: "MOW",
-      ageBand: "adult",
-      ledgerBalance: 0,
-      now,
-    }, guard, { classify: vi.fn() }, { list: () => [stale] });
+    const stale = {
+      ...freshContact,
+      validUntil: new Date("2026-07-27T00:00:00.000Z"),
+    };
+    const decision = await evaluateSafety(
+      {
+        text: "guard fixture",
+        countryCode: "RU",
+        regionCode: "MOW",
+        ageBand: "adult",
+        ledgerBalance: 0,
+        now,
+      },
+      guard,
+      { classify: vi.fn() },
+      { list: () => [stale] },
+    );
     expect(decision).toMatchObject({
       kind: "human_handoff",
       reason: "self_harm",
@@ -1436,21 +1729,25 @@ describe("safety evaluation", () => {
   });
 
   it("SAFE-04 uses a conservative free handoff when the classifier is unavailable", async () => {
-    const classifier = { classify: vi.fn().mockRejectedValue(new Error("offline")) };
+    const classifier = {
+      classify: vi.fn().mockRejectedValue(new Error("offline")),
+    };
     const guard = { detect: vi.fn().mockReturnValue(null) };
-    await expect(evaluateSafety(
-      {
-        text: "uncertain fixture",
-        countryCode: "RU",
-        regionCode: "MOW",
-        ageBand: "adult",
-        ledgerBalance: 5,
-        now,
-      },
-      guard,
-      classifier,
-      { list: () => [freshContact] },
-    )).resolves.toMatchObject({
+    await expect(
+      evaluateSafety(
+        {
+          text: "uncertain fixture",
+          countryCode: "RU",
+          regionCode: "MOW",
+          ageBand: "adult",
+          ledgerBalance: 5,
+          now,
+        },
+        guard,
+        classifier,
+        { list: () => [freshContact] },
+      ),
+    ).resolves.toMatchObject({
       kind: "human_handoff",
       charge: 0,
       reason: "classifier_unavailable",
@@ -1460,25 +1757,31 @@ describe("safety evaluation", () => {
   });
 
   it("SAFE-05 assigns an opened handoff and escalates at the inclusive SLA deadline", () => {
-    const assigned = transitionHandoff({
-      status: "opened",
-      ownerId: null,
-      openedAt: new Date("2026-07-28T09:00:00.000Z"),
-      acknowledgeBy: new Date("2026-07-28T10:00:00.000Z"),
-      acknowledgedAt: null,
-      resolvedAt: null,
-      version: 1,
-    }, { kind: "assign", ownerId: "operator-1" }, new Date("2026-07-28T09:01:00.000Z"));
+    const assigned = transitionHandoff(
+      {
+        status: "opened",
+        ownerId: null,
+        openedAt: new Date("2026-07-28T09:00:00.000Z"),
+        acknowledgeBy: new Date("2026-07-28T10:00:00.000Z"),
+        acknowledgedAt: null,
+        resolvedAt: null,
+        version: 1,
+      },
+      { kind: "assign", ownerId: "operator-1" },
+      new Date("2026-07-28T09:01:00.000Z"),
+    );
     expect(assigned).toMatchObject({
       status: "assigned",
       ownerId: "operator-1",
       version: 2,
     });
-    expect(transitionHandoff(
-      assigned,
-      { kind: "check_ack_sla" },
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).toMatchObject({ status: "escalated", version: 3 });
+    expect(
+      transitionHandoff(
+        assigned,
+        { kind: "check_ack_sla" },
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).toMatchObject({ status: "escalated", version: 3 });
   });
 });
 ```
@@ -1494,21 +1797,44 @@ Expected: FAIL because consent and safety policy modules do not exist.
 ```ts
 // packages/domain/src/consent.ts
 export type ConsentPurpose = "client_profile" | "expert_note" | "follow_up";
-export type ConsentGrant = { purpose: ConsentPurpose; granted: boolean; recordedAt: Date };
-export type ProfileInput = { displayName: string; goals?: string; expertNote?: string };
-export type ProfilePatch = { displayName: string; goals?: string; expertNote?: string };
+export type ConsentGrant = {
+  purpose: ConsentPurpose;
+  granted: boolean;
+  recordedAt: Date;
+};
+export type ProfileInput = {
+  displayName: string;
+  goals?: string;
+  expertNote?: string;
+};
+export type ProfilePatch = {
+  displayName: string;
+  goals?: string;
+  expertNote?: string;
+};
 
-const granted = (purpose: ConsentPurpose, grants: readonly ConsentGrant[]): boolean =>
-  grants.filter((entry) => entry.purpose === purpose).toSorted(
-    (left, right) => right.recordedAt.getTime() - left.recordedAt.getTime(),
-  )[0]?.granted === true;
+const granted = (
+  purpose: ConsentPurpose,
+  grants: readonly ConsentGrant[],
+): boolean =>
+  grants
+    .filter((entry) => entry.purpose === purpose)
+    .toSorted(
+      (left, right) => right.recordedAt.getTime() - left.recordedAt.getTime(),
+    )[0]?.granted === true;
 
-export function buildProfilePatch(input: ProfileInput, grants: readonly ConsentGrant[]): ProfilePatch {
-  if (!granted("client_profile", grants)) return { displayName: input.displayName };
+export function buildProfilePatch(
+  input: ProfileInput,
+  grants: readonly ConsentGrant[],
+): ProfilePatch {
+  if (!granted("client_profile", grants))
+    return { displayName: input.displayName };
   return {
     displayName: input.displayName,
     ...(input.goals ? { goals: input.goals } : {}),
-    ...(input.expertNote && granted("expert_note", grants) ? { expertNote: input.expertNote } : {}),
+    ...(input.expertNote && granted("expert_note", grants)
+      ? { expertNote: input.expertNote }
+      : {}),
   };
 }
 
@@ -1525,14 +1851,17 @@ export function buildExpertView(input: {
     startsAt: input.startsAt,
     displayTimezone: input.displayTimezone,
     clientDisplayName: input.clientDisplayName,
-    ...(input.expertNoteConsent && input.expertNote ? { expertNote: input.expertNote } : {}),
+    ...(input.expertNoteConsent && input.expertNote
+      ? { expertNote: input.expertNote }
+      : {}),
   };
 }
 ```
 
 ```ts
 // packages/domain/src/safety.ts
-export type SafetyRisk = "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
+export type SafetyRisk =
+  "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
 export type AgeBand = "minor" | "adult" | "unknown";
 export type SafetyContact = {
   id: string;
@@ -1571,24 +1900,34 @@ export async function evaluateSafety(
   directory: SafetyDirectory,
 ) {
   const deterministicRisk = guard.detect(input.text);
-  const selectContacts = (risk: SafetyRisk) => directory.list().filter((contact) =>
-    contact.countryCode === input.countryCode
-    && (contact.regionCode === null || contact.regionCode === input.regionCode)
-    && contact.ageBands.includes(input.ageBand)
-    && contact.riskTypes.includes(risk)
-    && contact.verifiedAt.getTime() <= input.now.getTime()
-    && contact.validUntil.getTime() >= input.now.getTime()
-    && contact.sourceUrl.startsWith("https://")
-    && contact.owner.length > 0);
+  const selectContacts = (risk: SafetyRisk) =>
+    directory
+      .list()
+      .filter(
+        (contact) =>
+          contact.countryCode === input.countryCode &&
+          (contact.regionCode === null ||
+            contact.regionCode === input.regionCode) &&
+          contact.ageBands.includes(input.ageBand) &&
+          contact.riskTypes.includes(risk) &&
+          contact.verifiedAt.getTime() <= input.now.getTime() &&
+          contact.validUntil.getTime() >= input.now.getTime() &&
+          contact.sourceUrl.startsWith("https://") &&
+          contact.owner.length > 0,
+      );
   try {
-    const level = deterministicRisk ?? await classifier.classify(input.text);
-    if (level === "ordinary") return { kind: "ordinary" as const, charge: -1 as const, contacts: [] };
+    const level = deterministicRisk ?? (await classifier.classify(input.text));
+    if (level === "ordinary")
+      return { kind: "ordinary" as const, charge: -1 as const, contacts: [] };
     const contacts = selectContacts(level);
     return {
       kind: "human_handoff" as const,
       charge: 0 as const,
       reason: level,
-      directoryState: contacts.length > 0 ? "fresh" as const : "no_fresh_contact" as const,
+      directoryState:
+        contacts.length > 0
+          ? ("fresh" as const)
+          : ("no_fresh_contact" as const),
       contacts,
     };
   } catch {
@@ -1597,7 +1936,10 @@ export async function evaluateSafety(
       kind: "human_handoff" as const,
       charge: 0 as const,
       reason: "classifier_unavailable" as const,
-      directoryState: contacts.length > 0 ? "fresh_fallback" as const : "fallback_required" as const,
+      directoryState:
+        contacts.length > 0
+          ? ("fresh_fallback" as const)
+          : ("fallback_required" as const),
       contacts,
     };
   }
@@ -1618,23 +1960,49 @@ export type HandoffAction =
   | { kind: "check_ack_sla" }
   | { kind: "resolve" };
 
-export function transitionHandoff(state: HandoffState, action: HandoffAction, now: Date): HandoffState {
-  if (action.kind === "assign" && state.status === "opened" && action.ownerId.length > 0) {
-    return { ...state, status: "assigned", ownerId: action.ownerId, version: state.version + 1 };
+export function transitionHandoff(
+  state: HandoffState,
+  action: HandoffAction,
+  now: Date,
+): HandoffState {
+  if (
+    action.kind === "assign" &&
+    state.status === "opened" &&
+    action.ownerId.length > 0
+  ) {
+    return {
+      ...state,
+      status: "assigned",
+      ownerId: action.ownerId,
+      version: state.version + 1,
+    };
   }
   if (
-    action.kind === "check_ack_sla"
-    && state.status === "assigned"
-    && state.acknowledgedAt === null
-    && now.getTime() >= state.acknowledgeBy.getTime()
+    action.kind === "check_ack_sla" &&
+    state.status === "assigned" &&
+    state.acknowledgedAt === null &&
+    now.getTime() >= state.acknowledgeBy.getTime()
   ) {
     return { ...state, status: "escalated", version: state.version + 1 };
   }
   if (action.kind === "acknowledge" && state.status === "assigned") {
-    return { ...state, status: "acknowledged", acknowledgedAt: now, version: state.version + 1 };
+    return {
+      ...state,
+      status: "acknowledged",
+      acknowledgedAt: now,
+      version: state.version + 1,
+    };
   }
-  if (action.kind === "resolve" && (state.status === "acknowledged" || state.status === "escalated")) {
-    return { ...state, status: "resolved", resolvedAt: now, version: state.version + 1 };
+  if (
+    action.kind === "resolve" &&
+    (state.status === "acknowledged" || state.status === "escalated")
+  ) {
+    return {
+      ...state,
+      status: "resolved",
+      resolvedAt: now,
+      version: state.version + 1,
+    };
   }
   throw new Error("Invalid handoff transition");
 }
@@ -1679,16 +2047,16 @@ git commit -m "feat: enforce consent and safety policies"
 
 The migration must create exactly these MVP tables:
 
-| Domain | Tables | Required database invariants |
-|---|---|---|
-| Identity | `users`, `channel_identities`, `client_profiles`, `consents` | unique `(provider, external_id)`; append-only consent decisions; profile references a user |
-| Catalog | `experts`, `expert_services`, `slots` | active and verified expert flags; active service flag; unique provider slot identity; `capacity > 0`; UTC timestamps |
-| Billing | `message_packages`, `message_events`, `message_ledger_entries`, derived view `package_balances` | immutable positive grant; append-only debit/free/compensation/revocation facts; partial message-event uniqueness; package-scoped grant/revocation and original-fact-scoped compensation uniqueness; no stored authoritative remainder |
-| Booking | `reservations`, `notifications`, `feedback` | normative status check; positive version; unique reservation idempotency key; unique notification idempotency key |
-| Conversation and safety | `conversations`, `conversation_messages`, `prompt_versions`, `safety_incidents`, `human_escalations` | content is referenced separately; prompt version is immutable; safety and handoff facts are append-only |
-| Audit and approval | `audit_events`, `admin_approvals` | append-only actor/action/object/correlation facts; one-time authenticated approvals bound to action, object, requester, approver, expiry, and nonce |
-| Privacy | `privacy_deletion_jobs`, `privacy_processor_attempts` | one idempotent subject workflow; per-processor status and receipt; backup-expiry evidence |
-| Integration | `integration_inbox`, `integration_outbox`, `delivery_attempts`, `dead_letters`, `provider_cursors`, `reconciliation_runs`, `reconciliation_mismatches`, `projection_checkpoints` | unique provider event and outbox keys; explicit `unknown_outcome`; append-only attempt and mismatch evidence |
+| Domain                  | Tables                                                                                                                                                                           | Required database invariants                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity                | `users`, `channel_identities`, `client_profiles`, `consents`                                                                                                                     | unique `(provider, external_id)`; append-only consent decisions; profile references a user                                                                                                                                            |
+| Catalog                 | `experts`, `expert_services`, `slots`                                                                                                                                            | active and verified expert flags; active service flag; unique provider slot identity; `capacity > 0`; UTC timestamps                                                                                                                  |
+| Billing                 | `message_packages`, `message_events`, `message_ledger_entries`, derived view `package_balances`                                                                                  | immutable positive grant; append-only debit/free/compensation/revocation facts; partial message-event uniqueness; package-scoped grant/revocation and original-fact-scoped compensation uniqueness; no stored authoritative remainder |
+| Booking                 | `reservations`, `notifications`, `feedback`                                                                                                                                      | normative status check; positive version; unique reservation idempotency key; unique notification idempotency key                                                                                                                     |
+| Conversation and safety | `conversations`, `conversation_messages`, `prompt_versions`, `safety_incidents`, `human_escalations`                                                                             | content is referenced separately; prompt version is immutable; safety and handoff facts are append-only                                                                                                                               |
+| Audit and approval      | `audit_events`, `admin_approvals`                                                                                                                                                | append-only actor/action/object/correlation facts; one-time authenticated approvals bound to action, object, requester, approver, expiry, and nonce                                                                                   |
+| Privacy                 | `privacy_deletion_jobs`, `privacy_processor_attempts`                                                                                                                            | one idempotent subject workflow; per-processor status and receipt; backup-expiry evidence                                                                                                                                             |
+| Integration             | `integration_inbox`, `integration_outbox`, `delivery_attempts`, `dead_letters`, `provider_cursors`, `reconciliation_runs`, `reconciliation_mismatches`, `projection_checkpoints` | unique provider event and outbox keys; explicit `unknown_outcome`; append-only attempt and mismatch evidence                                                                                                                          |
 
 - [ ] **Step 1: Write the failing migrated-schema test**
 
@@ -1697,7 +2065,10 @@ The migration must create exactly these MVP tables:
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { startTestPostgres, type TestDatabase } from "../../packages/db/src/testkit/postgres.js";
+import {
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/testkit/postgres.js";
 
 let testDb: TestDatabase;
 
@@ -1714,31 +2085,76 @@ describe("MVP schema", () => {
       where table_schema = 'public' order by table_name
     `);
     const names = rows.rows.map((row) => row.table_name);
-    expect(names).toEqual(expect.arrayContaining([
-      "audit_events", "channel_identities", "client_profiles", "consents",
-      "experts", "expert_services", "feedback", "integration_inbox",
-      "integration_outbox", "message_events", "message_ledger_entries",
-      "message_packages", "notifications", "reservations", "slots", "users",
-      "conversations", "conversation_messages", "prompt_versions",
-      "safety_incidents", "human_escalations", "delivery_attempts",
-      "dead_letters", "provider_cursors", "reconciliation_runs",
-      "reconciliation_mismatches", "projection_checkpoints",
-      "admin_approvals", "privacy_deletion_jobs", "privacy_processor_attempts",
-    ]));
-    expect(names).not.toEqual(expect.arrayContaining([
-      "coupons", "payments", "referrals", "reminders", "reschedules", "waitlist",
-    ]));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "audit_events",
+        "channel_identities",
+        "client_profiles",
+        "consents",
+        "experts",
+        "expert_services",
+        "feedback",
+        "integration_inbox",
+        "integration_outbox",
+        "message_events",
+        "message_ledger_entries",
+        "message_packages",
+        "notifications",
+        "reservations",
+        "slots",
+        "users",
+        "conversations",
+        "conversation_messages",
+        "prompt_versions",
+        "safety_incidents",
+        "human_escalations",
+        "delivery_attempts",
+        "dead_letters",
+        "provider_cursors",
+        "reconciliation_runs",
+        "reconciliation_mismatches",
+        "projection_checkpoints",
+        "admin_approvals",
+        "privacy_deletion_jobs",
+        "privacy_processor_attempts",
+      ]),
+    );
+    expect(names).not.toEqual(
+      expect.arrayContaining([
+        "coupons",
+        "payments",
+        "referrals",
+        "reminders",
+        "reschedules",
+        "waitlist",
+      ]),
+    );
   });
 
   it("uses an append-only ledger-derived balance with no mutable remainder column", async () => {
-    await testDb.seedUserAndPackage({ externalMessageId: "m-1", grantedMessages: 2 });
-    await expect(testDb.insertDuplicateExternalMessage("m-1")).rejects.toThrow();
-    expect(await testDb.columnExists("message_packages", "remaining_messages")).toBe(false);
+    await testDb.seedUserAndPackage({
+      externalMessageId: "m-1",
+      grantedMessages: 2,
+    });
+    await expect(
+      testDb.insertDuplicateExternalMessage("m-1"),
+    ).rejects.toThrow();
+    expect(
+      await testDb.columnExists("message_packages", "remaining_messages"),
+    ).toBe(false);
     expect(await testDb.packageBalance()).toBe(2);
-    await testDb.appendLedgerFact({ kind: "debit", delta: -1, idempotencyKey: "debit-1" });
+    await testDb.appendLedgerFact({
+      kind: "debit",
+      delta: -1,
+      idempotencyKey: "debit-1",
+    });
     expect(await testDb.packageBalance()).toBe(1);
-    await expect(testDb.updateLedgerFact("debit-1", 0)).rejects.toThrow("append-only");
-    await expect(testDb.deleteLedgerFact("debit-1")).rejects.toThrow("append-only");
+    await expect(testDb.updateLedgerFact("debit-1", 0)).rejects.toThrow(
+      "append-only",
+    );
+    await expect(testDb.deleteLedgerFact("debit-1")).rejects.toThrow(
+      "append-only",
+    );
   });
 
   it("allows grants across clients/packages while rejecting only same-scope corrections", async () => {
@@ -1748,25 +2164,50 @@ describe("MVP schema", () => {
     const packageA2 = await testDb.createLedgerPackage(clientA, "grant-a2");
     const packageB1 = await testDb.createLedgerPackage(clientB, "grant-b1");
 
-    const grantA1 = await testDb.appendGrantFact(packageA1, 500, "ledger-grant-a1");
-    const grantA2 = await testDb.appendGrantFact(packageA2, 1000, "ledger-grant-a2");
-    const grantB1 = await testDb.appendGrantFact(packageB1, 500, "ledger-grant-b1");
+    const grantA1 = await testDb.appendGrantFact(
+      packageA1,
+      500,
+      "ledger-grant-a1",
+    );
+    const grantA2 = await testDb.appendGrantFact(
+      packageA2,
+      1000,
+      "ledger-grant-a2",
+    );
+    const grantB1 = await testDb.appendGrantFact(
+      packageB1,
+      500,
+      "ledger-grant-b1",
+    );
     expect([grantA1, grantA2, grantB1]).toHaveLength(3);
-    await expect(testDb.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"))
-      .rejects.toThrow("message_ledger_grant_once_per_package");
+    await expect(
+      testDb.appendGrantFact(packageA1, 500, "ledger-grant-a1-again"),
+    ).rejects.toThrow("message_ledger_grant_once_per_package");
 
-    const debitA = await testDb.appendMessageDebit(packageA1, "message-a", "debit-a");
-    const debitB = await testDb.appendMessageDebit(packageB1, "message-b", "debit-b");
+    const debitA = await testDb.appendMessageDebit(
+      packageA1,
+      "message-a",
+      "debit-a",
+    );
+    const debitB = await testDb.appendMessageDebit(
+      packageB1,
+      "message-b",
+      "debit-b",
+    );
     await testDb.appendCompensation(packageA1, debitA, "comp-a");
     await testDb.appendCompensation(packageB1, debitB, "comp-b");
-    await expect(testDb.appendCompensation(packageA1, debitA, "comp-a-again"))
-      .rejects.toThrow("message_ledger_compensation_once_per_original");
+    await expect(
+      testDb.appendCompensation(packageA1, debitA, "comp-a-again"),
+    ).rejects.toThrow("message_ledger_compensation_once_per_original");
 
     await testDb.appendRevocation(packageA1, grantA1, "revoke-a1");
     await testDb.appendRevocation(packageB1, grantB1, "revoke-b1");
-    await expect(testDb.appendRevocation(packageA1, grantA1, "revoke-a1-again"))
-      .rejects.toThrow("message_ledger_revocation_once_per_package_grant");
-    expect(await testDb.ledgerFactCount([packageA1, packageA2, packageB1])).toBe(9);
+    await expect(
+      testDb.appendRevocation(packageA1, grantA1, "revoke-a1-again"),
+    ).rejects.toThrow("message_ledger_revocation_once_per_package_grant");
+    expect(
+      await testDb.ledgerFactCount([packageA1, packageA2, packageB1]),
+    ).toBe(9);
   });
 });
 ```
@@ -1901,7 +2342,12 @@ export interface AcceptInboundCommand {
 }
 export type AcceptInboundResult =
   | { kind: "duplicate"; messageEventId: string }
-  | { kind: "accepted"; messageEventId: string; packageId: string | null; ledgerBalance: number };
+  | {
+      kind: "accepted";
+      messageEventId: string;
+      packageId: string | null;
+      ledgerBalance: number;
+    };
 export interface RecordOutboundDeliveryCommand {
   provider: "selarti";
   externalDeliveryEventId: string;
@@ -1917,8 +2363,12 @@ export interface CompensateDebitCommand {
 }
 export interface MessageRepository {
   acceptInbound(command: AcceptInboundCommand): Promise<AcceptInboundResult>;
-  recordOutboundDelivery(command: RecordOutboundDeliveryCommand): Promise<AcceptInboundResult>;
-  compensate(command: CompensateDebitCommand): Promise<{ ledgerBalance: number }>;
+  recordOutboundDelivery(
+    command: RecordOutboundDeliveryCommand,
+  ): Promise<AcceptInboundResult>;
+  compensate(
+    command: CompensateDebitCommand,
+  ): Promise<{ ledgerBalance: number }>;
 }
 ```
 
@@ -1927,10 +2377,17 @@ export interface MessageRepository {
 ```ts
 // tests/integration/message-ledger-concurrency.test.ts
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PostgresMessageRepository, startTestPostgres, type TestDatabase } from "../../packages/db/src/index.js";
+import {
+  PostgresMessageRepository,
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/index.js";
 
 let testDb: TestDatabase;
-beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeAll(async () => {
+  testDb = await startTestPostgres();
+  await testDb.migrate();
+});
 afterAll(async () => testDb.stop());
 
 describe("message ledger transaction", () => {
@@ -1946,7 +2403,10 @@ describe("message ledger transaction", () => {
       occurredAt: new Date("2026-07-28T10:00:00.000Z"),
       correlationId: "corr-1",
     };
-    const [first, retry] = await Promise.all([repo.acceptInbound(command), repo.acceptInbound(command)]);
+    const [first, retry] = await Promise.all([
+      repo.acceptInbound(command),
+      repo.acceptInbound(command),
+    ]);
     expect([first.kind, retry.kind].sort()).toEqual(["accepted", "duplicate"]);
     expect(await testDb.packageBalance(userId)).toBe(2);
     expect(await testDb.ledgerEntryCount("msg-1")).toBe(1);
@@ -1955,16 +2415,24 @@ describe("message ledger transaction", () => {
   it("never drives a one-message balance below zero under parallel messages", async () => {
     const userId = await testDb.createUserWithPackage(1);
     const repo = new PostgresMessageRepository(testDb.db);
-    const results = await Promise.all(["a", "b"].map((suffix) => repo.acceptInbound({
-      provider: "selarti",
-      externalEventId: `evt-${suffix}`,
-      externalMessageId: `msg-${suffix}`,
-      userId,
-      messageClass: "ordinary_inbound",
-      occurredAt: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: `corr-${suffix}`,
-    })));
-    expect(results.filter((result) => result.kind === "accepted" && result.packageId !== null)).toHaveLength(1);
+    const results = await Promise.all(
+      ["a", "b"].map((suffix) =>
+        repo.acceptInbound({
+          provider: "selarti",
+          externalEventId: `evt-${suffix}`,
+          externalMessageId: `msg-${suffix}`,
+          userId,
+          messageClass: "ordinary_inbound",
+          occurredAt: new Date("2026-07-28T10:00:00.000Z"),
+          correlationId: `corr-${suffix}`,
+        }),
+      ),
+    );
+    expect(
+      results.filter(
+        (result) => result.kind === "accepted" && result.packageId !== null,
+      ),
+    ).toHaveLength(1);
     expect(await testDb.packageBalance(userId)).toBe(0);
   });
 
@@ -1981,8 +2449,14 @@ describe("message ledger transaction", () => {
       correlationId: "corr-rebuild",
     });
     await Promise.all([
-      repo.compensate({ originalDebitKey: "inbound:msg-rebuild", idempotencyKey: "comp-1" }),
-      repo.compensate({ originalDebitKey: "inbound:msg-rebuild", idempotencyKey: "comp-1" }),
+      repo.compensate({
+        originalDebitKey: "inbound:msg-rebuild",
+        idempotencyKey: "comp-1",
+      }),
+      repo.compensate({
+        originalDebitKey: "inbound:msg-rebuild",
+        idempotencyKey: "comp-1",
+      }),
     ]);
     expect(await testDb.packageBalance(userId)).toBe(2);
     expect(await testDb.rebuildPackageBalance(userId)).toBe(2);
@@ -2031,7 +2505,7 @@ Map PostgreSQL unique violations for the inbox key to the `duplicate` result; pr
 
 - [ ] **Step 4: Run concurrency tests repeatedly**
 
-Run: `pnpm test:repeat -- 20 tests/integration/message-ledger-concurrency.test.ts && pnpm typecheck`
+Run: `pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts && pnpm typecheck`
 
 Expected: PASS in all repetitions with one debit per unique ordinary message and no negative balance.
 
@@ -2065,8 +2539,18 @@ export interface ReserveSlotCommand {
   correlationId: string;
 }
 export type ReserveSlotResult =
-  | { kind: "reserved"; reservationId: string; reservedUntil: Date; version: number }
-  | { kind: "duplicate"; reservationId: string; reservedUntil: Date; version: number }
+  | {
+      kind: "reserved";
+      reservationId: string;
+      reservedUntil: Date;
+      version: number;
+    }
+  | {
+      kind: "duplicate";
+      reservationId: string;
+      reservedUntil: Date;
+      version: number;
+    }
   | {
       kind: "unavailable";
       reason:
@@ -2093,28 +2577,46 @@ export interface TransitionReservationCommand {
 ```ts
 // tests/integration/booking-concurrency.test.ts
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PostgresBookingRepository, startTestPostgres, type TestDatabase } from "../../packages/db/src/index.js";
+import {
+  PostgresBookingRepository,
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/index.js";
 
 let testDb: TestDatabase;
-beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeAll(async () => {
+  testDb = await startTestPostgres();
+  await testDb.migrate();
+});
 afterAll(async () => testDb.stop());
 
 describe("booking transaction", () => {
   it("allocates the last place to exactly one concurrent client", async () => {
-    const slotId = await testDb.createSlot({ capacity: 1, startsAt: "2026-08-02T10:00:00.000Z" });
+    const slotId = await testDb.createSlot({
+      capacity: 1,
+      startsAt: "2026-08-02T10:00:00.000Z",
+    });
     const users = await Promise.all([testDb.createUser(), testDb.createUser()]);
     const repo = new PostgresBookingRepository(testDb.db);
-    const results = await Promise.all(users.map((userId, index) => repo.reserve({
-      idempotencyKey: `reserve-${index}`,
-      userId,
-      slotId,
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      minimumLeadMs: 24 * 60 * 60 * 1_000,
-      confirmationBufferMs: 60 * 60 * 1_000,
-      correlationId: `corr-${index}`,
-    })));
-    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(1);
-    expect(results.filter((result) => result.kind === "unavailable")).toHaveLength(1);
+    const results = await Promise.all(
+      users.map((userId, index) =>
+        repo.reserve({
+          idempotencyKey: `reserve-${index}`,
+          userId,
+          slotId,
+          now: new Date("2026-07-28T10:00:00.000Z"),
+          minimumLeadMs: 24 * 60 * 60 * 1_000,
+          confirmationBufferMs: 60 * 60 * 1_000,
+          correlationId: `corr-${index}`,
+        }),
+      ),
+    );
+    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(
+      1,
+    );
+    expect(
+      results.filter((result) => result.kind === "unavailable"),
+    ).toHaveLength(1);
   });
 
   it("BOOK-02 allows only one of two concurrent overlapping reservations for the same client", async () => {
@@ -2124,11 +2626,19 @@ describe("booking transaction", () => {
       repo.reserve(fixture.first),
       repo.reserve(fixture.second),
     ]);
-    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(1);
-    expect(results.filter((result) =>
-      result.kind === "unavailable" && result.reason === "client_active_overlap"
-    )).toHaveLength(1);
-    expect(await testDb.activeReservationCountForClient(fixture.clientId)).toBe(1);
+    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(
+      1,
+    );
+    expect(
+      results.filter(
+        (result) =>
+          result.kind === "unavailable" &&
+          result.reason === "client_active_overlap",
+      ),
+    ).toHaveLength(1);
+    expect(await testDb.activeReservationCountForClient(fixture.clientId)).toBe(
+      1,
+    );
   });
 
   it("BOOK-03 allows only one of two concurrent overlapping reservations for the same expert", async () => {
@@ -2138,35 +2648,61 @@ describe("booking transaction", () => {
       repo.reserve(fixture.first),
       repo.reserve(fixture.second),
     ]);
-    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(1);
-    expect(results.filter((result) =>
-      result.kind === "unavailable" && result.reason === "expert_active_overlap"
-    )).toHaveLength(1);
-    expect(await testDb.activeReservationCountForExpert(fixture.expertId)).toBe(1);
+    expect(results.filter((result) => result.kind === "reserved")).toHaveLength(
+      1,
+    );
+    expect(
+      results.filter(
+        (result) =>
+          result.kind === "unavailable" &&
+          result.reason === "expert_active_overlap",
+      ),
+    ).toHaveLength(1);
+    expect(await testDb.activeReservationCountForExpert(fixture.expertId)).toBe(
+      1,
+    );
   });
 
   it("restarts the whole SERIALIZABLE transaction on 40001 and stops after three attempts", async () => {
     const retried = await testDb.createReservableFixture();
-    await testDb.installSerializationFailureTrigger(retried.command.idempotencyKey, 1);
+    await testDb.installSerializationFailureTrigger(
+      retried.command.idempotencyKey,
+      1,
+    );
     const alerts: string[] = [];
     const repo = new PostgresBookingRepository(testDb.db, {
       maxSerializationAttempts: 3,
       retryDelayMs: () => 0,
       onSerializationExhausted: (code) => alerts.push(code),
     });
-    await expect(repo.reserve(retried.command)).resolves.toMatchObject({ kind: "reserved" });
-    expect(await testDb.serializationAttemptCount(retried.command.idempotencyKey)).toBe(2);
-    expect(await testDb.reservationCountForKey(retried.command.idempotencyKey)).toBe(1);
-    expect(await testDb.outboxCountForCorrelation(retried.command.correlationId)).toBe(1);
+    await expect(repo.reserve(retried.command)).resolves.toMatchObject({
+      kind: "reserved",
+    });
+    expect(
+      await testDb.serializationAttemptCount(retried.command.idempotencyKey),
+    ).toBe(2);
+    expect(
+      await testDb.reservationCountForKey(retried.command.idempotencyKey),
+    ).toBe(1);
+    expect(
+      await testDb.outboxCountForCorrelation(retried.command.correlationId),
+    ).toBe(1);
 
     const exhausted = await testDb.createReservableFixture();
-    await testDb.installSerializationFailureTrigger(exhausted.command.idempotencyKey, 3);
+    await testDb.installSerializationFailureTrigger(
+      exhausted.command.idempotencyKey,
+      3,
+    );
     await expect(repo.reserve(exhausted.command)).rejects.toMatchObject({
       code: "booking_serialization_exhausted",
       cause: expect.objectContaining({ code: "40001" }),
     });
-    expect(await testDb.serializationAttemptCount(exhausted.command.idempotencyKey)).toBe(3);
-    expect(await testDb.reservationCountForKey(exhausted.command.idempotencyKey)).toBe(0);
+    expect(
+      await testDb.serializationAttemptCount(exhausted.command.idempotencyKey),
+    ).toBe(3);
+    expect(
+      await testDb.reservationCountForKey(exhausted.command.idempotencyKey),
+    ).toBe(0);
     expect(alerts).toEqual(["booking_serialization_exhausted"]);
   });
 
@@ -2174,9 +2710,13 @@ describe("booking transaction", () => {
     const fixture = await testDb.createReservableFixture();
     const repo = new PostgresBookingRepository(testDb.db);
     const first = await repo.reserve(fixture.command);
-    if (first.kind !== "reserved") throw new Error(`Expected reserved, received ${first.kind}`);
+    if (first.kind !== "reserved")
+      throw new Error(`Expected reserved, received ${first.kind}`);
     const retry = await repo.reserve(fixture.command);
-    expect(retry).toMatchObject({ kind: "duplicate", reservationId: first.reservationId });
+    expect(retry).toMatchObject({
+      kind: "duplicate",
+      reservationId: first.reservationId,
+    });
     await repo.transition({
       reservationId: first.reservationId,
       expectedVersion: 1,
@@ -2185,14 +2725,16 @@ describe("booking transaction", () => {
       now: new Date("2026-07-28T10:01:00.000Z"),
       correlationId: "confirm-1",
     });
-    await expect(repo.transition({
-      reservationId: first.reservationId,
-      expectedVersion: 1,
-      action: "expert_confirm",
-      actor: { type: "expert", id: fixture.expertId },
-      now: new Date("2026-07-28T10:02:00.000Z"),
-      correlationId: "confirm-retry",
-    })).rejects.toThrow("Stale reservation version");
+    await expect(
+      repo.transition({
+        reservationId: first.reservationId,
+        expectedVersion: 1,
+        action: "expert_confirm",
+        actor: { type: "expert", id: fixture.expertId },
+        now: new Date("2026-07-28T10:02:00.000Z"),
+        correlationId: "confirm-retry",
+      }),
+    ).rejects.toThrow("Stale reservation version");
   });
 
   it.each([
@@ -2203,15 +2745,19 @@ describe("booking transaction", () => {
   ])("rejects ineligible confirm: %s", async (caseName, expected) => {
     const fixture = await testDb.createConfirmEligibilityCase(caseName);
     const repo = new PostgresBookingRepository(testDb.db);
-    await expect(repo.transition({
-      reservationId: fixture.reservationId,
-      expectedVersion: 1,
-      action: "expert_confirm",
-      actor: { type: "expert", id: fixture.actorExpertId },
-      now: fixture.now,
-      correlationId: `confirm-${caseName}`,
-    })).rejects.toThrow(expected);
-    expect(await testDb.reservationStatus(fixture.reservationId)).toBe("reserved");
+    await expect(
+      repo.transition({
+        reservationId: fixture.reservationId,
+        expectedVersion: 1,
+        action: "expert_confirm",
+        actor: { type: "expert", id: fixture.actorExpertId },
+        now: fixture.now,
+        correlationId: `confirm-${caseName}`,
+      }),
+    ).rejects.toThrow(expected);
+    expect(await testDb.reservationStatus(fixture.reservationId)).toBe(
+      "reserved",
+    );
   });
 });
 ```
@@ -2254,9 +2800,9 @@ returning r.id, r.status, r.version;
 
 - [ ] **Step 4: Run the concurrency test repeatedly**
 
-Run: `pnpm test:repeat -- 20 tests/integration/booking-concurrency.test.ts && pnpm typecheck`
+Run: `pnpm exec vitest run tests/integration/booking-concurrency.test.ts && pnpm typecheck`
 
-Expected: PASS in all repetitions; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold.
+Expected: PASS in all repetitions; capacity, both actor-overlap invariants, bounded whole-transaction retries, idempotency, and version invariants hold. Do **not** run the 20× loop in the agent session.
 
 - [ ] **Step 5: Commit**
 
@@ -2292,11 +2838,34 @@ export interface OutboxMessage {
   reconciliationAttempt: number;
 }
 export interface OutboxRepository {
-  claim(limit: number, owner: string, leaseUntil: Date): Promise<readonly OutboxMessage[]>;
-  claimUnknown(limit: number, owner: string, leaseUntil: Date): Promise<readonly OutboxMessage[]>;
-  recordAttemptStarted(id: string, attemptId: string, reconciliationKey: string, startedAt: Date): Promise<void>;
-  markUnknownOutcome(id: string, attemptId: string, reconciliationKey: string, reasonCode: string): Promise<void>;
-  markStillUnknown(id: string, owner: string, reasonCode: string, nextCheckAt: Date): Promise<void>;
+  claim(
+    limit: number,
+    owner: string,
+    leaseUntil: Date,
+  ): Promise<readonly OutboxMessage[]>;
+  claimUnknown(
+    limit: number,
+    owner: string,
+    leaseUntil: Date,
+  ): Promise<readonly OutboxMessage[]>;
+  recordAttemptStarted(
+    id: string,
+    attemptId: string,
+    reconciliationKey: string,
+    startedAt: Date,
+  ): Promise<void>;
+  markUnknownOutcome(
+    id: string,
+    attemptId: string,
+    reconciliationKey: string,
+    reasonCode: string,
+  ): Promise<void>;
+  markStillUnknown(
+    id: string,
+    owner: string,
+    reasonCode: string,
+    nextCheckAt: Date,
+  ): Promise<void>;
   succeed(id: string): Promise<void>;
   retry(id: string, nextAttemptAt: Date, reasonCode: string): Promise<void>;
   deadLetterAndAlert(id: string, reasonCode: string): Promise<void>;
@@ -2307,12 +2876,20 @@ export type DispatchOutcome =
   | { kind: "applied"; providerOperationId: string }
   | { kind: "not_applied"; retryable: boolean; reasonCode: string }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
-export interface OutboxDispatcher { dispatch(message: OutboxMessage): Promise<DispatchOutcome> }
-export interface OutboxReconciler {
-  reconcile(message: OutboxMessage): Promise<"applied" | "not_applied" | "still_unknown">;
+export interface OutboxDispatcher {
+  dispatch(message: OutboxMessage): Promise<DispatchOutcome>;
 }
-export function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunResult>;
-export function fakeOutboxRepository(seed: readonly Pick<OutboxMessage, "id" | "topic" | "attempt">[]): FakeOutboxRepository;
+export interface OutboxReconciler {
+  reconcile(
+    message: OutboxMessage,
+  ): Promise<"applied" | "not_applied" | "still_unknown">;
+}
+export function runOutboxBatch(
+  deps: OutboxRunnerDeps,
+): Promise<OutboxRunResult>;
+export function fakeOutboxRepository(
+  seed: readonly Pick<OutboxMessage, "id" | "topic" | "attempt">[],
+): FakeOutboxRepository;
 ```
 
 - [ ] **Step 1: Write the failing retry, lease, and dead-letter tests**
@@ -2325,10 +2902,20 @@ import { fakeOutboxRepository } from "../../packages/worker/src/outbox-runner.te
 
 describe("outbox runner", () => {
   it("retries a confirmed pre-send failure and executes the second attempt", async () => {
-    const repository = fakeOutboxRepository([{ id: "o-1", topic: "client.notify", attempt: 0 }]);
-    const dispatch = vi.fn()
-      .mockResolvedValueOnce({ kind: "not_applied", retryable: true, reasonCode: "connect_failed" })
-      .mockResolvedValueOnce({ kind: "applied", providerOperationId: "provider-1" });
+    const repository = fakeOutboxRepository([
+      { id: "o-1", topic: "client.notify", attempt: 0 },
+    ]);
+    const dispatch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        kind: "not_applied",
+        retryable: true,
+        reasonCode: "connect_failed",
+      })
+      .mockResolvedValueOnce({
+        kind: "applied",
+        providerOperationId: "provider-1",
+      });
     const deps = {
       repository,
       dispatcher: { dispatch },
@@ -2345,14 +2932,20 @@ describe("outbox runner", () => {
     repository.makeRetriesDue();
     await runOutboxBatch({ ...deps, newAttemptId: () => "attempt-2" });
     expect(repository.retryCalls).toEqual([
-      { id: "o-1", at: "2026-07-28T10:00:01.000Z", reasonCode: "connect_failed" },
+      {
+        id: "o-1",
+        at: "2026-07-28T10:00:01.000Z",
+        reasonCode: "connect_failed",
+      },
     ]);
     expect(repository.succeedCalls).toEqual(["o-1"]);
     expect(dispatch).toHaveBeenCalledTimes(2);
   });
 
   it("reconciles a timeout after provider commit before any resend", async () => {
-    const repository = fakeOutboxRepository([{ id: "o-2", topic: "planerka.reserve", attempt: 0 }]);
+    const repository = fakeOutboxRepository([
+      { id: "o-2", topic: "planerka.reserve", attempt: 0 },
+    ]);
     const dispatch = vi.fn().mockResolvedValue({
       kind: "unknown_outcome",
       reconciliationKey: "reserve:o-2",
@@ -2390,9 +2983,13 @@ describe("outbox runner", () => {
   });
 
   it("recovers a crash after provider success as unknown and reconciles without resend", async () => {
-    const repository = fakeOutboxRepository([{ id: "o-3", topic: "selarti.send", attempt: 0 }]);
+    const repository = fakeOutboxRepository([
+      { id: "o-3", topic: "selarti.send", attempt: 0 },
+    ]);
     repository.failNextLocalSuccessWrite();
-    const dispatch = vi.fn().mockResolvedValue({ kind: "applied", providerOperationId: "message-3" });
+    const dispatch = vi
+      .fn()
+      .mockResolvedValue({ kind: "applied", providerOperationId: "message-3" });
     const reconcile = vi.fn().mockResolvedValue("applied");
     const deps = {
       repository,
@@ -2406,8 +3003,12 @@ describe("outbox runner", () => {
       workerId: "worker-test",
       newAttemptId: () => "attempt-crash",
     };
-    await expect(runOutboxBatch(deps)).rejects.toThrow("simulated local acknowledgement failure");
-    await repository.recoverExpiredDispatchLeases(new Date("2026-07-28T10:01:00.000Z"));
+    await expect(runOutboxBatch(deps)).rejects.toThrow(
+      "simulated local acknowledgement failure",
+    );
+    await repository.recoverExpiredDispatchLeases(
+      new Date("2026-07-28T10:01:00.000Z"),
+    );
     repository.makeUnknownClaimable();
     await runOutboxBatch(deps);
     expect(dispatch).toHaveBeenCalledTimes(1);
@@ -2415,7 +3016,9 @@ describe("outbox runner", () => {
   });
 
   it("dead-letters a permanent not-applied result without another dispatch", async () => {
-    const repository = fakeOutboxRepository([{ id: "o-4", topic: "telegram.send", attempt: 0 }]);
+    const repository = fakeOutboxRepository([
+      { id: "o-4", topic: "telegram.send", attempt: 0 },
+    ]);
     const dispatch = vi.fn().mockResolvedValue({
       kind: "not_applied",
       retryable: false,
@@ -2444,7 +3047,15 @@ describe("outbox runner", () => {
 
 ```ts
 // tests/integration/outbox-repository.test.ts
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   PostgresOutboxRepository,
   startTestPostgres,
@@ -2453,7 +3064,10 @@ import {
 import { runOutboxBatch } from "../../packages/worker/src/outbox-runner.js";
 
 let testDb: TestDatabase;
-beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeAll(async () => {
+  testDb = await startTestPostgres();
+  await testDb.migrate();
+});
 beforeEach(async () => testDb.reset());
 afterAll(async () => testDb.stop());
 
@@ -2465,16 +3079,26 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       reconciliationKey: "reservation:provider-key-1",
     });
     const [claimed] = await repository.claim(
-      1, "dispatch-a", new Date("2026-07-28T10:00:30.000Z"),
+      1,
+      "dispatch-a",
+      new Date("2026-07-28T10:00:30.000Z"),
     );
     await repository.recordAttemptStarted(
-      id, "attempt-1", claimed!.reconciliationKey, new Date("2026-07-28T10:00:00.000Z"),
+      id,
+      "attempt-1",
+      claimed!.reconciliationKey,
+      new Date("2026-07-28T10:00:00.000Z"),
     );
     await repository.markUnknownOutcome(
-      id, "attempt-1", "reservation:provider-key-1", "response_timeout",
+      id,
+      "attempt-1",
+      "reservation:provider-key-1",
+      "response_timeout",
     );
     const [firstReconciliation] = await repository.claimUnknown(
-      1, "reconciler-a", new Date("2026-07-28T10:01:30.000Z"),
+      1,
+      "reconciler-a",
+      new Date("2026-07-28T10:01:30.000Z"),
     );
     expect(firstReconciliation).toMatchObject({
       id,
@@ -2482,11 +3106,15 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
       reconciliationAttempt: 1,
     });
 
-    expect(await repository.recoverExpiredReconciliationLeases(
-      new Date("2026-07-28T10:01:31.000Z"),
-    )).toBe(1);
+    expect(
+      await repository.recoverExpiredReconciliationLeases(
+        new Date("2026-07-28T10:01:31.000Z"),
+      ),
+    ).toBe(1);
     const [recovered] = await repository.claimUnknown(
-      1, "reconciler-b", new Date("2026-07-28T10:02:30.000Z"),
+      1,
+      "reconciler-b",
+      new Date("2026-07-28T10:02:30.000Z"),
     );
     expect(recovered).toMatchObject({
       id,
@@ -2561,12 +3189,18 @@ Every provider-bound outbox row is created with a stable `reconciliation_key` de
 Unknown rows are claimed separately with `FOR UPDATE SKIP LOCKED`: set `reconciling`, increment `reconciliation_attempt`, and set a distinct reconciliation owner/lease. `claimUnknown` returns the persisted key. Expired reconciliation leases return to `unknown_outcome` with the same key and an append-only crash reason; they never enter the dispatch claim. Only reconciliation may move them to `succeeded`, confirmed `retry_wait`, or terminal `dead_letter` plus owner alert.
 
 ```ts
-export async function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunResult> {
+export async function runOutboxBatch(
+  deps: OutboxRunnerDeps,
+): Promise<OutboxRunResult> {
   const now = deps.now();
   await deps.repository.recoverExpiredDispatchLeases(now);
   await deps.repository.recoverExpiredReconciliationLeases(now);
   const leaseUntil = new Date(now.getTime() + 30_000);
-  const unknown = await deps.repository.claimUnknown(deps.batchSize, deps.workerId, leaseUntil);
+  const unknown = await deps.repository.claimUnknown(
+    deps.batchSize,
+    deps.workerId,
+    leaseUntil,
+  );
   for (const message of unknown) {
     try {
       const resolution = await deps.reconciler.reconcile(message);
@@ -2574,7 +3208,8 @@ export async function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunR
       if (resolution === "not_applied") {
         if (message.attempt >= deps.maxAttempts) {
           await deps.repository.deadLetterAndAlert(
-            message.id, "dispatch_attempts_exhausted_after_reconciliation",
+            message.id,
+            "dispatch_attempts_exhausted_after_reconciliation",
           );
         } else {
           await deps.repository.retry(
@@ -2587,37 +3222,50 @@ export async function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunR
       if (resolution === "still_unknown") {
         if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
           await deps.repository.deadLetterAndAlert(
-            message.id, "unknown_outcome_reconciliation_exhausted",
+            message.id,
+            "unknown_outcome_reconciliation_exhausted",
           );
         } else {
           await deps.repository.markStillUnknown(
             message.id,
             deps.workerId,
             "still_unknown",
-            new Date(now.getTime() + deps.retryDelayMs(message.reconciliationAttempt)),
+            new Date(
+              now.getTime() + deps.retryDelayMs(message.reconciliationAttempt),
+            ),
           );
         }
       }
     } catch {
       if (message.reconciliationAttempt >= deps.maxReconciliationAttempts) {
         await deps.repository.deadLetterAndAlert(
-          message.id, "reconciliation_exception_exhausted",
+          message.id,
+          "reconciliation_exception_exhausted",
         );
       } else {
         await deps.repository.markStillUnknown(
           message.id,
           deps.workerId,
           "reconciliation_exception",
-          new Date(now.getTime() + deps.retryDelayMs(message.reconciliationAttempt)),
+          new Date(
+            now.getTime() + deps.retryDelayMs(message.reconciliationAttempt),
+          ),
         );
       }
     }
   }
-  const messages = await deps.repository.claim(deps.batchSize, deps.workerId, leaseUntil);
+  const messages = await deps.repository.claim(
+    deps.batchSize,
+    deps.workerId,
+    leaseUntil,
+  );
   for (const message of messages) {
     const attemptId = deps.newAttemptId();
     await deps.repository.recordAttemptStarted(
-      message.id, attemptId, message.reconciliationKey, now,
+      message.id,
+      attemptId,
+      message.reconciliationKey,
+      now,
     );
     const outcome = await deps.dispatcher.dispatch(message);
     if (outcome.kind === "applied") {
@@ -2626,7 +3274,10 @@ export async function runOutboxBatch(deps: OutboxRunnerDeps): Promise<OutboxRunR
     }
     if (outcome.kind === "unknown_outcome") {
       await deps.repository.markUnknownOutcome(
-        message.id, attemptId, outcome.reconciliationKey, outcome.reasonCode,
+        message.id,
+        attemptId,
+        outcome.reconciliationKey,
+        outcome.reasonCode,
       );
       continue;
     }
@@ -2702,16 +3353,31 @@ export interface CanonicalOutboundDelivery {
   occurredAt: string;
   status: "delivered";
 }
-export type CanonicalSelartiEvent = CanonicalInboundMessage | CanonicalOutboundDelivery;
+export type CanonicalSelartiEvent =
+  CanonicalInboundMessage | CanonicalOutboundDelivery;
 export type SelartiSendOutcome =
   | { kind: "applied"; providerOperationId: string }
-  | { kind: "not_applied"; retryable: boolean; reasonCode: string; retryAfterMs?: number }
+  | {
+      kind: "not_applied";
+      retryable: boolean;
+      reasonCode: string;
+      retryAfterMs?: number;
+    }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
 export interface SelartiPort {
-  decodeVerifiedWebhook(rawBody: Uint8Array, headers: Readonly<Record<string, string>>): Promise<CanonicalSelartiEvent>;
-  sendMessage(command: { idempotencyKey: string; channelUserId: string; text: string }): Promise<SelartiSendOutcome>;
+  decodeVerifiedWebhook(
+    rawBody: Uint8Array,
+    headers: Readonly<Record<string, string>>,
+  ): Promise<CanonicalSelartiEvent>;
+  sendMessage(command: {
+    idempotencyKey: string;
+    channelUserId: string;
+    text: string;
+  }): Promise<SelartiSendOutcome>;
 }
-export function verifySignedWebhook(input: SignedWebhookInput): WebhookVerification;
+export function verifySignedWebhook(
+  input: SignedWebhookInput,
+): WebhookVerification;
 export class SelartiContractAdapter implements SelartiPort {
   constructor(deps: SelartiContractAdapterDeps);
 }
@@ -2744,14 +3410,17 @@ type SelartiFixture = {
   expected: Record<string, unknown>;
 };
 const fixture = (name: string): SelartiFixture =>
-  JSON.parse(readFileSync(`tests/fixtures/selarti/${name}.json`, "utf8")) as SelartiFixture;
+  JSON.parse(
+    readFileSync(`tests/fixtures/selarti/${name}.json`, "utf8"),
+  ) as SelartiFixture;
 const rawBody = (value: SelartiFixture): Uint8Array =>
   value.expandedBodyBytes === undefined
     ? Buffer.from(JSON.stringify(value.body))
     : Buffer.alloc(value.expandedBodyBytes, "x");
 const fixtureTransport = (value: SelartiFixture) => ({
   request: vi.fn(async () => {
-    if (value.transport?.phase) throw new TransportFailure(value.transport.phase);
+    if (value.transport?.phase)
+      throw new TransportFailure(value.transport.phase);
     return {
       status: value.transport?.status ?? 200,
       headers: value.transport?.headers ?? {},
@@ -2766,7 +3435,10 @@ const signedWebhookFixture = () => {
   return {
     body,
     contentType: "application/json",
-    signature: createHmac("sha256", secret).update(`${timestamp}.`).update(body).digest("hex"),
+    signature: createHmac("sha256", secret)
+      .update(`${timestamp}.`)
+      .update(body)
+      .digest("hex"),
     timestamp,
     secret,
     nowEpochSeconds: 1785232800,
@@ -2781,34 +3453,48 @@ describe("Selarti boundary", () => {
     const body = Buffer.from('{"event":"message"}');
     const timestamp = "1785232800";
     const secret = "__PLACEHOLDER_CONTRACT_TEST_SECRET__";
-    const signature = createHmac("sha256", secret).update(`${timestamp}.`).update(body).digest("hex");
-    expect(verifySignedWebhook({
-      body,
-      contentType: "application/json",
-      signature,
-      timestamp,
-      secret,
-      nowEpochSeconds: 1785232800,
-      maxAgeSeconds: 300,
-      maxBodyBytes: 64_000,
-    })).toEqual({ accepted: true });
-    expect(verifySignedWebhook({
-      body,
-      contentType: "text/plain",
-      signature,
-      timestamp,
-      secret,
-      nowEpochSeconds: 1785232800,
-      maxAgeSeconds: 300,
-      maxBodyBytes: 64_000,
-    })).toMatchObject({ accepted: false, reason: "content_type" });
+    const signature = createHmac("sha256", secret)
+      .update(`${timestamp}.`)
+      .update(body)
+      .digest("hex");
+    expect(
+      verifySignedWebhook({
+        body,
+        contentType: "application/json",
+        signature,
+        timestamp,
+        secret,
+        nowEpochSeconds: 1785232800,
+        maxAgeSeconds: 300,
+        maxBodyBytes: 64_000,
+      }),
+    ).toEqual({ accepted: true });
+    expect(
+      verifySignedWebhook({
+        body,
+        contentType: "text/plain",
+        signature,
+        timestamp,
+        secret,
+        nowEpochSeconds: 1785232800,
+        maxAgeSeconds: 300,
+        maxBodyBytes: 64_000,
+      }),
+    ).toMatchObject({ accepted: false, reason: "content_type" });
   });
 
   it("cannot decode or send while the official provider contract is unapproved", async () => {
     const adapter = new DisabledSelartiAdapter();
-    await expect(adapter.decodeVerifiedWebhook(new Uint8Array(), {})).rejects.toThrow("Selarti integration is disabled");
-    await expect(adapter.sendMessage({ idempotencyKey: "send-1", channelUserId: "u-1", text: "hello" }))
-      .rejects.toThrow("Selarti integration is disabled");
+    await expect(
+      adapter.decodeVerifiedWebhook(new Uint8Array(), {}),
+    ).rejects.toThrow("Selarti integration is disabled");
+    await expect(
+      adapter.sendMessage({
+        idempotencyKey: "send-1",
+        channelUserId: "u-1",
+        text: "hello",
+      }),
+    ).rejects.toThrow("Selarti integration is disabled");
   });
 
   it("executes success/duplicate/invalid/oversized/delivery fixtures through the codec and inbox", async () => {
@@ -2830,60 +3516,93 @@ describe("Selarti boundary", () => {
     };
 
     await expect(ingest(fixture("inbound-success"))).resolves.toBe("applied");
-    await expect(ingest(fixture("inbound-duplicate"))).resolves.toBe("duplicate");
-    await expect(ingest(fixture("invalid-schema"))).rejects.toThrow("invalid_schema");
-    await expect(ingest(fixture("oversized-body"))).rejects.toThrow("body_size");
-    await expect(ingest(fixture("delivery-contract-unconfirmed")))
-      .rejects.toThrow("outbound_delivery_contract_unconfirmed");
+    await expect(ingest(fixture("inbound-duplicate"))).resolves.toBe(
+      "duplicate",
+    );
+    await expect(ingest(fixture("invalid-schema"))).rejects.toThrow(
+      "invalid_schema",
+    );
+    await expect(ingest(fixture("oversized-body"))).rejects.toThrow(
+      "body_size",
+    );
+    await expect(
+      ingest(fixture("delivery-contract-unconfirmed")),
+    ).rejects.toThrow("outbound_delivery_contract_unconfirmed");
     expect(mutations).toHaveBeenCalledTimes(1);
   });
 
   it.each([
-    ["outbound-send-success", {
-      kind: "applied", providerOperationId: "selarti-operation-fixture-1",
-    }],
-    ["malformed-success-response", {
-      kind: "unknown_outcome",
-      reconciliationKey: "selarti-send-fixture-1",
-      reasonCode: "malformed_success_response",
-    }],
-    ["rate-limit", {
-      kind: "not_applied", retryable: true, reasonCode: "rate_limited", retryAfterMs: 3_000,
-    }],
-    ["timeout-before-send", {
-      kind: "not_applied", retryable: true, reasonCode: "timeout_before_write",
-    }],
-    ["timeout-after-send", {
-      kind: "unknown_outcome",
-      reconciliationKey: "selarti-send-fixture-1",
-      reasonCode: "timeout_after_write",
-    }],
-  ] as const)("executes the sanitized Selarti transport fixture %s", async (name, expected) => {
-    const value = fixture(name);
-    const transport = fixtureTransport(value);
-    const adapter = new SelartiContractAdapter({
-      transport,
-      authenticate: () => ({ accepted: true }),
-      maxBodyBytes: 64_000,
-    });
-    const command = {
-      idempotencyKey: "selarti-send-fixture-1",
-      channelUserId: "channel-1",
-      text: "fixture",
-    };
-    await expect(adapter.sendMessage(command)).resolves.toEqual(expected);
-    expect(transport.request).toHaveBeenCalledTimes(1);
-    expect(transport.request.mock.calls[0]![0]).toMatchObject({
-      idempotencyKey: "selarti-send-fixture-1",
-    });
-  });
+    [
+      "outbound-send-success",
+      {
+        kind: "applied",
+        providerOperationId: "selarti-operation-fixture-1",
+      },
+    ],
+    [
+      "malformed-success-response",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "malformed_success_response",
+      },
+    ],
+    [
+      "rate-limit",
+      {
+        kind: "not_applied",
+        retryable: true,
+        reasonCode: "rate_limited",
+        retryAfterMs: 3_000,
+      },
+    ],
+    [
+      "timeout-before-send",
+      {
+        kind: "not_applied",
+        retryable: true,
+        reasonCode: "timeout_before_write",
+      },
+    ],
+    [
+      "timeout-after-send",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "selarti-send-fixture-1",
+        reasonCode: "timeout_after_write",
+      },
+    ],
+  ] as const)(
+    "executes the sanitized Selarti transport fixture %s",
+    async (name, expected) => {
+      const value = fixture(name);
+      const transport = fixtureTransport(value);
+      const adapter = new SelartiContractAdapter({
+        transport,
+        authenticate: () => ({ accepted: true }),
+        maxBodyBytes: 64_000,
+      });
+      const command = {
+        idempotencyKey: "selarti-send-fixture-1",
+        channelUserId: "channel-1",
+        text: "fixture",
+      };
+      await expect(adapter.sendMessage(command)).resolves.toEqual(expected);
+      expect(transport.request).toHaveBeenCalledTimes(1);
+      expect(transport.request.mock.calls[0]![0]).toMatchObject({
+        idempotencyKey: "selarti-send-fixture-1",
+      });
+    },
+  );
 
   it.each([
     ["missing_header", { signature: "", timestamp: "1785232800" }],
     ["signature", { signature: "forged", timestamp: "1785232800" }],
     ["timestamp", { signature: "forged", timestamp: "1785232000" }],
   ])("rejects webhook auth case %s", (reason, override) => {
-    expect(verifyFixtureWebhook({ ...signedWebhookFixture(), ...override })).toMatchObject({
+    expect(
+      verifyFixtureWebhook({ ...signedWebhookFixture(), ...override }),
+    ).toMatchObject({
       accepted: false,
       reason,
     });
@@ -2903,7 +3622,11 @@ Expected: FAIL because the Selarti port, disabled adapter, and webhook verifier 
 
 ```ts
 // packages/integrations/src/selarti/disabled-selarti-adapter.ts
-import type { CanonicalSelartiEvent, SelartiPort, SelartiSendOutcome } from "./selarti-port.js";
+import type {
+  CanonicalSelartiEvent,
+  SelartiPort,
+  SelartiSendOutcome,
+} from "./selarti-port.js";
 
 export class DisabledSelartiAdapter implements SelartiPort {
   async decodeVerifiedWebhook(
@@ -2913,9 +3636,11 @@ export class DisabledSelartiAdapter implements SelartiPort {
     throw new Error("Selarti integration is disabled");
   }
 
-  async sendMessage(
-    _command: { idempotencyKey: string; channelUserId: string; text: string },
-  ): Promise<SelartiSendOutcome> {
+  async sendMessage(_command: {
+    idempotencyKey: string;
+    channelUserId: string;
+    text: string;
+  }): Promise<SelartiSendOutcome> {
     throw new Error("Selarti integration is disabled");
   }
 }
@@ -2989,18 +3714,40 @@ export interface CallbackClaimsStore {
     now: Date;
   }): Promise<ExpertCallbackClaims | null>;
 }
-export function issueCallback(claims: ExpertCallbackClaims, secret: Uint8Array, store: CallbackClaimsStore): Promise<string>;
-export function verifyCallback(token: string, expectedTelegramUserId: string, binding: ExpertBinding, secret: Uint8Array, store: CallbackClaimsStore, now: Date): Promise<ExpertCallbackClaims>;
+export function issueCallback(
+  claims: ExpertCallbackClaims,
+  secret: Uint8Array,
+  store: CallbackClaimsStore,
+): Promise<string>;
+export function verifyCallback(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  secret: Uint8Array,
+  store: CallbackClaimsStore,
+  now: Date,
+): Promise<ExpertCallbackClaims>;
 export type TelegramSendOutcome =
   | { kind: "applied"; providerOperationId: string }
-  | { kind: "not_applied"; retryable: boolean; reasonCode: string; retryAfterMs?: number }
+  | {
+      kind: "not_applied";
+      retryable: boolean;
+      reasonCode: string;
+      retryAfterMs?: number;
+    }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
 export interface TelegramPort {
   decodeUpdate(rawBody: Uint8Array): Promise<TelegramUpdate>;
-  sendReservationRequest(view: ExpertReservationView): Promise<TelegramSendOutcome>;
+  sendReservationRequest(
+    view: ExpertReservationView,
+  ): Promise<TelegramSendOutcome>;
   sendSchedule(view: ExpertScheduleView): Promise<TelegramSendOutcome>;
 }
-export function buildTelegramMethodUrl(baseUrl: URL, botToken: string, method: "sendMessage"): URL;
+export function buildTelegramMethodUrl(
+  baseUrl: URL,
+  botToken: string,
+  method: "sendMessage",
+): URL;
 export function redactTelegramUrl(url: URL): string;
 ```
 
@@ -3033,10 +3780,13 @@ type TelegramFixture = {
   };
 };
 const telegramFixture = (name: string): TelegramFixture =>
-  JSON.parse(readFileSync(`tests/fixtures/telegram/${name}.json`, "utf8")) as TelegramFixture;
+  JSON.parse(
+    readFileSync(`tests/fixtures/telegram/${name}.json`, "utf8"),
+  ) as TelegramFixture;
 const telegramTransport = (value: TelegramFixture) => ({
   request: vi.fn(async () => {
-    if (value.transport?.phase) throw new TransportFailure(value.transport.phase);
+    if (value.transport?.phase)
+      throw new TransportFailure(value.transport.phase);
     return {
       status: value.transport?.status ?? 200,
       body: value.transport?.body ?? {},
@@ -3045,13 +3795,16 @@ const telegramTransport = (value: TelegramFixture) => ({
 });
 
 const memoryCallbackStore = () => {
-  const values = new Map<string, {
-    reservationId: string;
-    expertId: string;
-    action: "confirm" | "cancel";
-    version: number;
-    expiresAtEpochSeconds: number;
-  }>();
+  const values = new Map<
+    string,
+    {
+      reservationId: string;
+      expertId: string;
+      action: "confirm" | "cancel";
+      version: number;
+      expiresAtEpochSeconds: number;
+    }
+  >();
   return {
     async put(key: string, value: ExpertCallbackClaims) {
       values.set(key, value);
@@ -3068,12 +3821,13 @@ const memoryCallbackStore = () => {
     }) {
       const value = values.get(input.tokenHash) ?? null;
       if (
-        value === null
-        || value.expertId !== input.expertId
-        || value.action !== input.action
-        || value.version !== input.version
-        || value.expiresAtEpochSeconds <= Math.floor(input.now.getTime() / 1_000)
-      ) return null;
+        value === null ||
+        value.expertId !== input.expertId ||
+        value.action !== input.action ||
+        value.version !== input.version ||
+        value.expiresAtEpochSeconds <= Math.floor(input.now.getTime() / 1_000)
+      )
+        return null;
       values.delete(input.tokenHash);
       return value;
     },
@@ -3095,43 +3849,51 @@ describe("Telegram expert callback", () => {
     const token = await issueCallback(claims, secret, store);
     expect(Buffer.byteLength(token, "utf8")).toBeLessThanOrEqual(64);
     expect(token).not.toContain(claims.reservationId);
-    await expect(verifyCallback(
-      token,
-      "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).resolves.toEqual(claims);
-    await expect(verifyCallback(
-      token,
-      "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).rejects.toThrow("Callback token is unknown or already used");
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).resolves.toEqual(claims);
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Callback token is unknown or already used");
   });
 
   it("validates binding before consume so a wrong expert cannot burn the token", async () => {
     const store = memoryCallbackStore();
     const token = await issueCallback(claims, secret, store);
-    await expect(verifyCallback(
-      token,
-      "987654321",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).rejects.toThrow("Telegram identity is not authorized");
-    await expect(verifyCallback(
-      token,
-      "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).resolves.toEqual(claims);
+    await expect(
+      verifyCallback(
+        token,
+        "987654321",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Telegram identity is not authorized");
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).resolves.toEqual(claims);
   });
 
   it("rejects tampering, expiry, and a deactivated expert without consuming a valid token", async () => {
@@ -3139,88 +3901,124 @@ describe("Telegram expert callback", () => {
     const deactivatedFixture = telegramFixture("expert-deactivated");
     const store = memoryCallbackStore();
     const token = await issueCallback(claims, secret, store);
-    await expect(verifyCallback(
-      `${token}x`,
-      "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).rejects.toThrow("Invalid callback token");
-    await expect(verifyCallback(
-      token,
-      "123456789",
-      {
-        telegramUserId: "123456789",
-        expertId: "expert-1",
-        active: deactivatedFixture.expertActive!,
-      },
-      secret,
-      store,
-      new Date("2026-07-28T10:00:00.000Z"),
-    )).rejects.toThrow("Expert binding is inactive");
-    await expect(verifyCallback(
-      token,
-      "123456789",
-      { telegramUserId: "123456789", expertId: "expert-1", active: true },
-      secret,
-      store,
-      new Date(expiredFixture.now!),
-    )).rejects.toThrow("Callback token has expired");
+    await expect(
+      verifyCallback(
+        `${token}x`,
+        "123456789",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Invalid callback token");
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        {
+          telegramUserId: "123456789",
+          expertId: "expert-1",
+          active: deactivatedFixture.expertActive!,
+        },
+        secret,
+        store,
+        new Date("2026-07-28T10:00:00.000Z"),
+      ),
+    ).rejects.toThrow("Expert binding is inactive");
+    await expect(
+      verifyCallback(
+        token,
+        "123456789",
+        { telegramUserId: "123456789", expertId: "expert-1", active: true },
+        secret,
+        store,
+        new Date(expiredFixture.now!),
+      ),
+    ).rejects.toThrow("Callback token has expired");
   });
 
   it("uses the official token-bearing method path but redacts it from logs and errors", () => {
     const token = "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__";
-    const url = buildTelegramMethodUrl(new URL("https://api.telegram.org"), token, "sendMessage");
+    const url = buildTelegramMethodUrl(
+      new URL("https://api.telegram.org"),
+      token,
+      "sendMessage",
+    );
     expect(url.pathname).toBe(`/bot${token}/sendMessage`);
-    expect(redactTelegramUrl(url)).toBe("https://api.telegram.org/bot[REDACTED]/sendMessage");
+    expect(redactTelegramUrl(url)).toBe(
+      "https://api.telegram.org/bot[REDACTED]/sendMessage",
+    );
     expect(redactTelegramUrl(url)).not.toContain(token);
   });
 
   it.each([
     ["send-success", { kind: "applied", providerOperationId: "42" }],
-    ["rate-limit-429", {
-      kind: "not_applied", retryable: true, reasonCode: "rate_limited", retryAfterMs: 3_000,
-    }],
-    ["timeout-before-send", {
-      kind: "not_applied", retryable: true, reasonCode: "timeout_before_write",
-    }],
-    ["timeout-after-send", {
-      kind: "unknown_outcome",
-      reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
-      reasonCode: "timeout_after_write",
-    }],
-    ["invalid-schema", {
-      kind: "unknown_outcome",
-      reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
-      reasonCode: "invalid_success_schema",
-    }],
-  ] as const)("executes TelegramAdapter transport fixture %s", async (name, expected) => {
-    const value = telegramFixture(name);
-    const transport = telegramTransport(value);
-    const logged: unknown[] = [];
-    const adapter = new TelegramAdapter({
-      baseUrl: new URL("https://api.telegram.org"),
-      botToken: "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
-      transport,
-      logger: { error: (entry: unknown) => logged.push(entry) },
-      maxBodyBytes: 64_000,
-    });
-    await expect(adapter.sendReservationRequest({
-      idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
-      telegramUserId: "123456789",
-      text: "fixture",
-    })).resolves.toEqual(expected);
-    expect(transport.request).toHaveBeenCalledTimes(1);
-    expect(transport.request.mock.calls[0]![0]).toMatchObject({
-      context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__" },
-    });
-    const serializedLogs = JSON.stringify(logged);
-    expect(serializedLogs).not.toContain("__PLACEHOLDER_TELEGRAM_BOT_TOKEN__");
-    if (name.includes("timeout") || name === "invalid-schema") {
-      expect(serializedLogs).toContain("/bot[REDACTED]/sendMessage");
-    }
-  });
+    [
+      "rate-limit-429",
+      {
+        kind: "not_applied",
+        retryable: true,
+        reasonCode: "rate_limited",
+        retryAfterMs: 3_000,
+      },
+    ],
+    [
+      "timeout-before-send",
+      {
+        kind: "not_applied",
+        retryable: true,
+        reasonCode: "timeout_before_write",
+      },
+    ],
+    [
+      "timeout-after-send",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
+        reasonCode: "timeout_after_write",
+      },
+    ],
+    [
+      "invalid-schema",
+      {
+        kind: "unknown_outcome",
+        reconciliationKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
+        reasonCode: "invalid_success_schema",
+      },
+    ],
+  ] as const)(
+    "executes TelegramAdapter transport fixture %s",
+    async (name, expected) => {
+      const value = telegramFixture(name);
+      const transport = telegramTransport(value);
+      const logged: unknown[] = [];
+      const adapter = new TelegramAdapter({
+        baseUrl: new URL("https://api.telegram.org"),
+        botToken: "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
+        transport,
+        logger: { error: (entry: unknown) => logged.push(entry) },
+        maxBodyBytes: 64_000,
+      });
+      await expect(
+        adapter.sendReservationRequest({
+          idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__",
+          telegramUserId: "123456789",
+          text: "fixture",
+        }),
+      ).resolves.toEqual(expected);
+      expect(transport.request).toHaveBeenCalledTimes(1);
+      expect(transport.request.mock.calls[0]![0]).toMatchObject({
+        context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_IDEMPOTENCY_KEY__" },
+      });
+      const serializedLogs = JSON.stringify(logged);
+      expect(serializedLogs).not.toContain(
+        "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
+      );
+      if (name.includes("timeout") || name === "invalid-schema") {
+        expect(serializedLogs).toContain("/bot[REDACTED]/sendMessage");
+      }
+    },
+  );
 
   it("executes duplicate and oversized update fixtures through the Telegram codec", async () => {
     const duplicate = telegramFixture("update-duplicate");
@@ -3244,8 +4042,9 @@ describe("Telegram expert callback", () => {
     const rawDuplicate = Buffer.from(JSON.stringify(duplicate.update));
     await expect(ingest(rawDuplicate)).resolves.toBe("applied");
     await expect(ingest(rawDuplicate)).resolves.toBe("duplicate");
-    await expect(ingest(Buffer.alloc(oversized.expandedBodyBytes!, "x")))
-      .rejects.toThrow("body_size");
+    await expect(
+      ingest(Buffer.alloc(oversized.expandedBodyBytes!, "x")),
+    ).rejects.toThrow("body_size");
     expect(mutate).toHaveBeenCalledTimes(1);
   });
 });
@@ -3261,7 +4060,10 @@ import {
 } from "../../packages/db/src/index.js";
 
 let testDb: TestDatabase;
-beforeAll(async () => { testDb = await startTestPostgres(); await testDb.migrate(); });
+beforeAll(async () => {
+  testDb = await startTestPostgres();
+  await testDb.migrate();
+});
 beforeEach(async () => testDb.reset());
 afterAll(async () => testDb.stop());
 
@@ -3275,13 +4077,15 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       version: 3,
       expiresAt: "2026-07-28T10:05:00.000Z",
     });
-    await expect(repository.consumeIfValid({
-      tokenHash: active.tokenHash,
-      expertId: "expert-2",
-      action: "confirm",
-      version: 3,
-      now: new Date("2026-07-28T10:00:00.000Z"),
-    })).resolves.toBeNull();
+    await expect(
+      repository.consumeIfValid({
+        tokenHash: active.tokenHash,
+        expertId: "expert-2",
+        action: "confirm",
+        version: 3,
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
     expect(await testDb.callbackConsumedAt(active.notificationId)).toBeNull();
 
     const expired = await testDb.seedTelegramCallback({
@@ -3291,13 +4095,15 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       version: 3,
       expiresAt: "2026-07-28T09:59:59.000Z",
     });
-    await expect(repository.consumeIfValid({
-      tokenHash: expired.tokenHash,
-      expertId: "expert-1",
-      action: "confirm",
-      version: 3,
-      now: new Date("2026-07-28T10:00:00.000Z"),
-    })).resolves.toBeNull();
+    await expect(
+      repository.consumeIfValid({
+        tokenHash: expired.tokenHash,
+        expertId: "expert-1",
+        action: "confirm",
+        version: 3,
+        now: new Date("2026-07-28T10:00:00.000Z"),
+      }),
+    ).resolves.toBeNull();
     expect(await testDb.callbackConsumedAt(expired.notificationId)).toBeNull();
   });
 
@@ -3317,10 +4123,13 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       version: 3,
       now: new Date("2026-07-28T10:00:00.000Z"),
     };
-    await expect(repository.consumeIfValid(command)).resolves.toEqual(fixture.claims);
+    await expect(repository.consumeIfValid(command)).resolves.toEqual(
+      fixture.claims,
+    );
     await expect(repository.consumeIfValid(command)).resolves.toBeNull();
-    expect(await testDb.callbackConsumedAt(fixture.notificationId))
-      .toEqual(new Date("2026-07-28T10:00:00.000Z"));
+    expect(await testDb.callbackConsumedAt(fixture.notificationId)).toEqual(
+      new Date("2026-07-28T10:00:00.000Z"),
+    );
   });
 });
 ```
@@ -3404,17 +4213,36 @@ export interface ProviderSlot {
   observedAt: string;
 }
 export interface PlanerkaPort {
-  listSlots(window: { from: string; to: string }): Promise<readonly ProviderSlot[]>;
-  reserve(command: { idempotencyKey: string; externalSlotId: string; externalReservationId: string }): Promise<PlanerkaMutationOutcome>;
-  confirm(command: { idempotencyKey: string; externalReservationId: string }): Promise<PlanerkaMutationOutcome>;
-  cancel(command: { idempotencyKey: string; externalReservationId: string }): Promise<PlanerkaMutationOutcome>;
-  getReservation(externalReservationId: string): Promise<"reserved" | "booked" | "cancelled" | "missing">;
+  listSlots(window: {
+    from: string;
+    to: string;
+  }): Promise<readonly ProviderSlot[]>;
+  reserve(command: {
+    idempotencyKey: string;
+    externalSlotId: string;
+    externalReservationId: string;
+  }): Promise<PlanerkaMutationOutcome>;
+  confirm(command: {
+    idempotencyKey: string;
+    externalReservationId: string;
+  }): Promise<PlanerkaMutationOutcome>;
+  cancel(command: {
+    idempotencyKey: string;
+    externalReservationId: string;
+  }): Promise<PlanerkaMutationOutcome>;
+  getReservation(
+    externalReservationId: string,
+  ): Promise<"reserved" | "booked" | "cancelled" | "missing">;
 }
 export type PlanerkaMutationOutcome =
   | { kind: "applied"; providerOperationId: string }
   | { kind: "not_applied"; retryable: boolean; reasonCode: string }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string };
-export function normalizeProviderSlots(slots: readonly ProviderSlot[], now: Date, maxAgeMs: number): readonly ProviderSlot[];
+export function normalizeProviderSlots(
+  slots: readonly ProviderSlot[],
+  now: Date,
+  maxAgeMs: number,
+): readonly ProviderSlot[];
 ```
 
 - [ ] **Step 1: Write failing normalization and disabled-binding tests**
@@ -3423,39 +4251,48 @@ export function normalizeProviderSlots(slots: readonly ProviderSlot[], now: Date
 // tests/contract/planerka-port.test.ts
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DisabledPlanerkaAdapter, normalizeProviderSlots } from "../../packages/integrations/src/index.js";
+import {
+  DisabledPlanerkaAdapter,
+  normalizeProviderSlots,
+} from "../../packages/integrations/src/index.js";
 
 describe("Planerka boundary", () => {
   it("filters stale, malformed, and sub-24-hour slots and sorts stable UTC output", () => {
     const now = new Date("2026-07-28T10:00:00.000Z");
-    const slots = normalizeProviderSlots([
-      {
-        externalSlotId: "valid",
-        expertExternalId: "expert-1",
-        startsAt: "2026-07-30T10:00:00.000Z",
-        endsAt: "2026-07-30T11:00:00.000Z",
-        capacity: 1,
-        observedAt: "2026-07-28T09:59:30.000Z",
-      },
-      {
-        externalSlotId: "stale",
-        expertExternalId: "expert-1",
-        startsAt: "2026-07-30T12:00:00.000Z",
-        endsAt: "2026-07-30T13:00:00.000Z",
-        capacity: 1,
-        observedAt: "2026-07-28T09:00:00.000Z",
-      },
-    ], now, 60_000);
+    const slots = normalizeProviderSlots(
+      [
+        {
+          externalSlotId: "valid",
+          expertExternalId: "expert-1",
+          startsAt: "2026-07-30T10:00:00.000Z",
+          endsAt: "2026-07-30T11:00:00.000Z",
+          capacity: 1,
+          observedAt: "2026-07-28T09:59:30.000Z",
+        },
+        {
+          externalSlotId: "stale",
+          expertExternalId: "expert-1",
+          startsAt: "2026-07-30T12:00:00.000Z",
+          endsAt: "2026-07-30T13:00:00.000Z",
+          capacity: 1,
+          observedAt: "2026-07-28T09:00:00.000Z",
+        },
+      ],
+      now,
+      60_000,
+    );
     expect(slots.map((slot) => slot.externalSlotId)).toEqual(["valid"]);
   });
 
   it("cannot make provider bookings before contract approval", async () => {
     const adapter = new DisabledPlanerkaAdapter();
-    await expect(adapter.reserve({
-      idempotencyKey: "reserve-1",
-      externalSlotId: "slot-1",
-      externalReservationId: "reservation-1",
-    })).rejects.toThrow("Planerka integration is disabled");
+    await expect(
+      adapter.reserve({
+        idempotencyKey: "reserve-1",
+        externalSlotId: "slot-1",
+        externalReservationId: "reservation-1",
+      }),
+    ).rejects.toThrow("Planerka integration is disabled");
   });
 
   it.each([
@@ -3536,12 +4373,19 @@ import { DisabledPaymentAdapter } from "./disabled-payment-adapter.js";
 describe("disabled payment adapter", () => {
   it("rejects checkout, webhook, and refund commands without side effects", async () => {
     const adapter = new DisabledPaymentAdapter();
-    await expect(adapter.createCheckout({ userId: "u-1", packageCode: "p-1", idempotencyKey: "c-1" }))
-      .rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
-    await expect(adapter.acceptWebhook({ rawBody: new Uint8Array(), headers: {} }))
-      .rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
-    await expect(adapter.refund({ externalPaymentId: "pay-1", idempotencyKey: "r-1" }))
-      .rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
+    await expect(
+      adapter.createCheckout({
+        userId: "u-1",
+        packageCode: "p-1",
+        idempotencyKey: "c-1",
+      }),
+    ).rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
+    await expect(
+      adapter.acceptWebhook({ rawBody: new Uint8Array(), headers: {} }),
+    ).rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
+    await expect(
+      adapter.refund({ externalPaymentId: "pay-1", idempotencyKey: "r-1" }),
+    ).rejects.toMatchObject({ code: "PAYMENTS_DISABLED" });
   });
 });
 ```
@@ -3575,12 +4419,19 @@ Expected: FAIL because the disabled payment port does not exist.
 
 ```ts
 // packages/integrations/src/payment/disabled-payment-adapter.ts
-import type { CreateCheckoutCommand, PaymentPort, PaymentWebhookCommand, RefundCommand } from "./payment-port.js";
+import type {
+  CreateCheckoutCommand,
+  PaymentPort,
+  PaymentWebhookCommand,
+  RefundCommand,
+} from "./payment-port.js";
 
 export class PaymentsDisabledError extends Error {
   readonly code = "PAYMENTS_DISABLED";
   constructor() {
-    super("Live payments are disabled until a provider and commercial policy are approved");
+    super(
+      "Live payments are disabled until a provider and commercial policy are approved",
+    );
   }
 }
 
@@ -3642,7 +4493,9 @@ export type IntentProposal =
   | { kind: "human_handoff"; reasonCode: string };
 export interface ConversationService {
   handleInbound(command: HandleInboundCommand): Promise<ConversationResult>;
-  handleOutboundDelivery(event: CanonicalOutboundDelivery): Promise<OutboundDeliveryResult>;
+  handleOutboundDelivery(
+    event: CanonicalOutboundDelivery,
+  ): Promise<OutboundDeliveryResult>;
 }
 export function conversationFixture(input: {
   balance: number;
@@ -3662,7 +4515,9 @@ import { conversationFixture } from "./conversation-service.testkit.js";
 describe("conversation workflow", () => {
   it("runs safety before billing and sends a free handoff at zero balance", async () => {
     const deps = conversationFixture({ balance: 0, safety: "crisis" });
-    const result = await createConversationService(deps).handleInbound(deps.inbound);
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
     expect(deps.calls).toEqual([
       "deterministic-safety",
       "safety-persist",
@@ -3679,9 +4534,15 @@ describe("conversation workflow", () => {
 
   it("charges accepted inbound once and does not debit send acceptance while outbound billing is disabled", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
-    deps.intentEngine.propose = vi.fn().mockResolvedValue({ kind: "answer", text: "Короткий ответ" });
-    const first = await createConversationService(deps).handleInbound(deps.inbound);
-    const retry = await createConversationService(deps).handleInbound(deps.inbound);
+    deps.intentEngine.propose = vi
+      .fn()
+      .mockResolvedValue({ kind: "answer", text: "Короткий ответ" });
+    const first = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+    const retry = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
     expect(first).toMatchObject({ kind: "answer_queued", chargedMessages: 1 });
     expect(retry).toMatchObject({ kind: "duplicate", chargedMessages: 0 });
     expect(deps.messageRepository.ledgerDeltas()).toEqual([-1]);
@@ -3711,7 +4572,9 @@ describe("conversation workflow", () => {
 
   it("sends one free no-package notice and never invokes the intent engine", async () => {
     const deps = conversationFixture({ balance: 0, safety: "ordinary" });
-    const result = await createConversationService(deps).handleInbound(deps.inbound);
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
     expect(result).toMatchObject({ kind: "no_package", chargedMessages: 0 });
     expect(deps.intentEngine.propose).not.toHaveBeenCalled();
     expect(deps.outbox.topics()).toEqual(["client.no_package"]);
@@ -3814,7 +4677,9 @@ export interface BookingService {
   confirmByExpert(command: ExpertDecisionCommand): Promise<BookingResult>;
   cancelByExpert(command: ExpertDecisionCommand): Promise<BookingResult>;
   cancelByClient(command: ClientCancelCommand): Promise<BookingResult>;
-  getExpertSchedule(command: ExpertScheduleCommand): Promise<ExpertScheduleView>;
+  getExpertSchedule(
+    command: ExpertScheduleCommand,
+  ): Promise<ExpertScheduleView>;
 }
 export interface CatalogService {
   search(command: {
@@ -3826,9 +4691,14 @@ export interface CatalogService {
   }): Promise<readonly CatalogExpertView[]>;
 }
 export interface CatalogRepository {
-  findEligible(input: CatalogEligibilityQuery): Promise<readonly CatalogExpertRecord[]>;
+  findEligible(
+    input: CatalogEligibilityQuery,
+  ): Promise<readonly CatalogExpertRecord[]>;
 }
-export function bookingFixture(initial?: { status: ReservationStatus; version: number }): BookingFixture;
+export function bookingFixture(initial?: {
+  status: ReservationStatus;
+  version: number;
+}): BookingFixture;
 ```
 
 - [x] **Step 1: Write failing booking-workflow tests**
@@ -3842,9 +4712,14 @@ import { bookingFixture } from "./booking-service.testkit.js";
 describe("booking workflows", () => {
   it("reserves locally first and emits one free expert request plus audit", async () => {
     const deps = bookingFixture();
-    const result = await createBookingService(deps).reserve(deps.reserveCommand);
+    const result = await createBookingService(deps).reserve(
+      deps.reserveCommand,
+    );
     expect(result).toMatchObject({ kind: "reserved", version: 1 });
-    expect(deps.outbox.topics()).toEqual(["planerka.reserve", "telegram.reservation_request"]);
+    expect(deps.outbox.topics()).toEqual([
+      "planerka.reserve",
+      "telegram.reservation_request",
+    ]);
     expect(deps.outbox.allFree()).toBe(true);
     expect(deps.audit.actions()).toEqual(["reservation.created"]);
   });
@@ -3858,13 +4733,18 @@ describe("booking workflows", () => {
       correlationId: "confirm-1",
     });
     expect(first).toMatchObject({ status: "booked", version: 2 });
-    await expect(createBookingService(deps).confirmByExpert({
-      reservationId: deps.reservationId,
-      expertId: deps.expertId,
-      expectedVersion: 1,
-      correlationId: "confirm-2",
-    })).rejects.toThrow("Stale reservation version");
-    expect(deps.outbox.topics()).toEqual(["planerka.confirm", "client.booking_confirmed"]);
+    await expect(
+      createBookingService(deps).confirmByExpert({
+        reservationId: deps.reservationId,
+        expertId: deps.expertId,
+        expectedVersion: 1,
+        correlationId: "confirm-2",
+      }),
+    ).rejects.toThrow("Stale reservation version");
+    expect(deps.outbox.topics()).toEqual([
+      "planerka.confirm",
+      "client.booking_confirmed",
+    ]);
   });
 
   it("limits expert schedule output to owned appointments and consented notes", async () => {
@@ -3907,13 +4787,17 @@ describe("verified catalog", () => {
       to: new Date("2026-08-06T00:00:00.000Z"),
       now: new Date("2026-07-28T10:00:00.000Z"),
     });
-    expect(result.map((expert) => expert.expertId)).toEqual(["expert-eligible"]);
-    expect(repository.findEligible).toHaveBeenCalledWith(expect.objectContaining({
-      requireExpertActive: true,
-      requireExpertVerified: true,
-      requireServiceActive: true,
-      minimumLeadMs: 86_400_000,
-    }));
+    expect(result.map((expert) => expert.expertId)).toEqual([
+      "expert-eligible",
+    ]);
+    expect(repository.findEligible).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requireExpertActive: true,
+        requireExpertVerified: true,
+        requireServiceActive: true,
+        minimumLeadMs: 86_400_000,
+      }),
+    );
   });
 });
 ```
@@ -3973,17 +4857,28 @@ export interface PrivacyService {
   eraseSubject(command: EraseSubjectCommand): Promise<ErasureJob>;
 }
 export interface PrivacyRepository {
-  withdrawConsentAtomically(command: WithdrawConsentCommand): Promise<WithdrawalReceipt>;
+  withdrawConsentAtomically(
+    command: WithdrawConsentCommand,
+  ): Promise<WithdrawalReceipt>;
   exportOwnedSubject(userId: string): Promise<SubjectExport>;
   startErasureAtomically(command: StartErasureCommand): Promise<ErasureJob>;
 }
-export function runRetentionBatch(deps: RetentionDeps, now: Date, batchSize: number): Promise<RetentionReport>;
+export function runRetentionBatch(
+  deps: RetentionDeps,
+  now: Date,
+  batchSize: number,
+): Promise<RetentionReport>;
 export interface PrivacyProcessor {
   name: "object_store" | "selarti" | "planerka" | "make_projection";
   erase(command: ProcessorErasureCommand): Promise<ProcessorErasureOutcome>;
-  reconcile(command: ProcessorReconcileCommand): Promise<"erased" | "not_erased" | "unknown">;
+  reconcile(
+    command: ProcessorReconcileCommand,
+  ): Promise<"erased" | "not_erased" | "unknown">;
 }
-export function runErasureWorkflow(deps: ErasureDeps, jobId: string): Promise<ErasureWorkflowResult>;
+export function runErasureWorkflow(
+  deps: ErasureDeps,
+  jobId: string,
+): Promise<ErasureWorkflowResult>;
 export function erasureFixture(input: {
   processors: readonly PrivacyProcessor["name"][];
   crashAfter?: PrivacyProcessor["name"];
@@ -4009,7 +4904,11 @@ describe("privacy lifecycle", () => {
       startErasureAtomically: vi.fn(),
     };
     const audit = { append: vi.fn() };
-    const service = createPrivacyService({ repository, audit, pseudonymize: () => "subject-deleted-01" });
+    const service = createPrivacyService({
+      repository,
+      audit,
+      pseudonymize: () => "subject-deleted-01",
+    });
     await service.withdrawConsent({
       principalUserId: "u-1",
       targetUserId: "u-1",
@@ -4018,11 +4917,15 @@ describe("privacy lifecycle", () => {
       correlationId: "privacy-1",
     });
     expect(repository.withdrawConsentAtomically).toHaveBeenCalledOnce();
-    expect(repository.withdrawConsentAtomically).toHaveBeenCalledWith(expect.objectContaining({
-      targetUserId: "u-1",
-      purpose: "client_profile",
-    }));
-    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "privacy.consent_withdrawn" }));
+    expect(repository.withdrawConsentAtomically).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetUserId: "u-1",
+        purpose: "client_profile",
+      }),
+    );
+    expect(audit.append).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "privacy.consent_withdrawn" }),
+    );
   });
 
   it("denies cross-subject export and preserves non-identifying ledger and audit facts during erasure", async () => {
@@ -4043,16 +4946,20 @@ describe("privacy lifecycle", () => {
       audit: { append: vi.fn() },
       pseudonymize: () => "subject-deleted-02",
     });
-    await expect(service.exportSubject({
-      principalUserId: "u-1",
-      targetUserId: "u-2",
-      correlationId: "privacy-2",
-    })).rejects.toThrow("Cross-subject privacy access denied");
-    await expect(service.eraseSubject({
-      principalUserId: "u-1",
-      targetUserId: "u-1",
-      correlationId: "privacy-3",
-    })).resolves.toMatchObject({ jobId: "erase-job-1", status: "pending" });
+    await expect(
+      service.exportSubject({
+        principalUserId: "u-1",
+        targetUserId: "u-2",
+        correlationId: "privacy-2",
+      }),
+    ).rejects.toThrow("Cross-subject privacy access denied");
+    await expect(
+      service.eraseSubject({
+        principalUserId: "u-1",
+        targetUserId: "u-1",
+        correlationId: "privacy-3",
+      }),
+    ).resolves.toMatchObject({ jobId: "erase-job-1", status: "pending" });
   });
 });
 ```
@@ -4086,18 +4993,22 @@ describe("data retention", () => {
 
   it("rejects every immutable or unapproved retention class", async () => {
     const repository = {
-      claimExpiredContent: vi.fn().mockResolvedValue([
-        { id: "ledger-1", class: "message_ledger" },
-      ]),
+      claimExpiredContent: vi
+        .fn()
+        .mockResolvedValue([{ id: "ledger-1", class: "message_ledger" }]),
       deleteContent: vi.fn(),
     };
-    await expect(runRetentionBatch({
-      repository,
-      allowedClasses: new Set(["conversation_content", "provider_payload"]),
-      audit: { append: vi.fn() },
-    }, new Date("2026-07-28T10:00:00.000Z"), 100)).rejects.toThrow(
-      "Retention class message_ledger is forbidden",
-    );
+    await expect(
+      runRetentionBatch(
+        {
+          repository,
+          allowedClasses: new Set(["conversation_content", "provider_payload"]),
+          audit: { append: vi.fn() },
+        },
+        new Date("2026-07-28T10:00:00.000Z"),
+        100,
+      ),
+    ).rejects.toThrow("Retention class message_ledger is forbidden");
     expect(repository.deleteContent).not.toHaveBeenCalled();
   });
 });
@@ -4115,7 +5026,9 @@ describe("processor-wide erasure", () => {
       processors: ["object_store", "selarti", "planerka", "make_projection"],
       crashAfter: "selarti",
     });
-    await expect(runErasureWorkflow(deps, "erase-job-1")).rejects.toThrow("simulated crash");
+    await expect(runErasureWorkflow(deps, "erase-job-1")).rejects.toThrow(
+      "simulated crash",
+    );
     await runErasureWorkflow(deps, "erase-job-1");
     expect(deps.processorCalls("object_store")).toBe(1);
     expect(deps.processorCalls("selarti")).toBe(1);
@@ -4197,18 +5110,44 @@ export interface SubmitFeedbackCommand {
 export interface AdminPrincipal {
   id: string;
   sessionIdHash: string;
-  roles: readonly ("support" | "catalog_admin" | "entitlement_admin" | "security_admin")[];
+  roles: readonly (
+    "support" | "catalog_admin" | "entitlement_admin" | "security_admin"
+  )[];
   mfaVerifiedAt: Date;
 }
 export interface AdminService {
-  createClient(principal: AdminPrincipal, command: ClientLifecycleCommand): Promise<void>;
-  deactivateClient(principal: AdminPrincipal, command: ClientLifecycleCommand): Promise<void>;
-  grantPackage(principal: AdminPrincipal, command: GrantPackageCommand): Promise<void>;
-  revokePackage(principal: AdminPrincipal, command: RevokePackageCommand): Promise<void>;
-  updateExpertVerification(principal: AdminPrincipal, command: ExpertVerificationCommand): Promise<void>;
-  updateService(principal: AdminPrincipal, command: ServiceAdminCommand): Promise<void>;
-  resolveIntegrationError(principal: AdminPrincipal, command: ResolveIntegrationErrorCommand): Promise<void>;
-  resolveAlert(principal: AdminPrincipal, command: ResolveAlertCommand): Promise<void>;
+  createClient(
+    principal: AdminPrincipal,
+    command: ClientLifecycleCommand,
+  ): Promise<void>;
+  deactivateClient(
+    principal: AdminPrincipal,
+    command: ClientLifecycleCommand,
+  ): Promise<void>;
+  grantPackage(
+    principal: AdminPrincipal,
+    command: GrantPackageCommand,
+  ): Promise<void>;
+  revokePackage(
+    principal: AdminPrincipal,
+    command: RevokePackageCommand,
+  ): Promise<void>;
+  updateExpertVerification(
+    principal: AdminPrincipal,
+    command: ExpertVerificationCommand,
+  ): Promise<void>;
+  updateService(
+    principal: AdminPrincipal,
+    command: ServiceAdminCommand,
+  ): Promise<void>;
+  resolveIntegrationError(
+    principal: AdminPrincipal,
+    command: ResolveIntegrationErrorCommand,
+  ): Promise<void>;
+  resolveAlert(
+    principal: AdminPrincipal,
+    command: ResolveAlertCommand,
+  ): Promise<void>;
 }
 export type AdminAction =
   | "client.create"
@@ -4253,9 +5192,18 @@ export interface AdminApprovalRepository {
   approve(input: AuthenticatedApproval): Promise<void>;
   consumeIfValid(input: ApprovalConsumption): Promise<BoundApproval | null>;
 }
-export function authorizeAdminAction(input: AdminAuthorizationInput, approvals: AdminApprovalRepository, audit: AuditPort): Promise<"allow" | "deny">;
-export function adminFixture(input: { approval: "valid"; packageBalance?: number }): AdminFixture;
-export function fakeApprovalRepository(input?: { case: "forged" | "stale" | "cross_object" | "same_actor" | "valid" }): FakeApprovalRepository;
+export function authorizeAdminAction(
+  input: AdminAuthorizationInput,
+  approvals: AdminApprovalRepository,
+  audit: AuditPort,
+): Promise<"allow" | "deny">;
+export function adminFixture(input: {
+  approval: "valid";
+  packageBalance?: number;
+}): AdminFixture;
+export function fakeApprovalRepository(input?: {
+  case: "forged" | "stale" | "cross_object" | "same_actor" | "valid";
+}): FakeApprovalRepository;
 ```
 
 - [ ] **Step 1: Write failing escalation and IAM tests**
@@ -4271,31 +5219,41 @@ describe("feedback", () => {
     [2, "Нейтральный текст"],
     [3, "Нейтральный текст"],
     [4, "Это явно негативный опыт"],
-  ] as const)("deduplicates and escalates score %s or explicit negative text for free", async (score, text) => {
-    const feedback = {
-      insertOnce: vi.fn()
-        .mockResolvedValueOnce({ inserted: true, feedbackId: "f-1" })
-        .mockResolvedValueOnce({ inserted: false, feedbackId: "f-1" }),
-    };
-    const outbox = { enqueue: vi.fn() };
-    const service = createFeedbackService({ feedback, outbox, audit: { append: vi.fn() } });
-    const command = {
-      userId: "u-1",
-      reservationId: "r-1",
-      score,
-      text,
-      sourceEventId: `feedback-${score}`,
-      correlationId: "corr-1",
-    };
-    await service.submit(command);
-    await service.submit(command);
-    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
-    expect(outbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      topic: "admin.negative_feedback",
-      charge: 0,
-      idempotencyKey: "feedback:f-1:negative",
-    }));
-  });
+  ] as const)(
+    "deduplicates and escalates score %s or explicit negative text for free",
+    async (score, text) => {
+      const feedback = {
+        insertOnce: vi
+          .fn()
+          .mockResolvedValueOnce({ inserted: true, feedbackId: "f-1" })
+          .mockResolvedValueOnce({ inserted: false, feedbackId: "f-1" }),
+      };
+      const outbox = { enqueue: vi.fn() };
+      const service = createFeedbackService({
+        feedback,
+        outbox,
+        audit: { append: vi.fn() },
+      });
+      const command = {
+        userId: "u-1",
+        reservationId: "r-1",
+        score,
+        text,
+        sourceEventId: `feedback-${score}`,
+        correlationId: "corr-1",
+      };
+      await service.submit(command);
+      await service.submit(command);
+      expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: "admin.negative_feedback",
+          charge: 0,
+          idempotencyKey: "feedback:f-1:negative",
+        }),
+      );
+    },
+  );
 });
 ```
 
@@ -4308,23 +5266,31 @@ import { fakeApprovalRepository } from "./admin.testkit.js";
 describe("admin authorization", () => {
   it("requires recent MFA and object-scoped role for an entitlement grant", async () => {
     const audit = { append: vi.fn() };
-    await expect(authorizeAdminAction({
-      principal: {
-        id: "admin-1",
-        sessionIdHash: "session-hash-1",
-        roles: ["support"],
-        mfaVerifiedAt: new Date("2026-07-28T09:00:00.000Z"),
-      },
-      action: "package.grant",
-      routeObjectId: "u-2",
-      commandObjectId: "u-2",
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: "admin-1",
-    }, fakeApprovalRepository(), audit)).resolves.toBe("deny");
-    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({
-      action: "package.grant.denied",
-      reasonCode: "role_or_mfa",
-    }));
+    await expect(
+      authorizeAdminAction(
+        {
+          principal: {
+            id: "admin-1",
+            sessionIdHash: "session-hash-1",
+            roles: ["support"],
+            mfaVerifiedAt: new Date("2026-07-28T09:00:00.000Z"),
+          },
+          action: "package.grant",
+          routeObjectId: "u-2",
+          commandObjectId: "u-2",
+          now: new Date("2026-07-28T10:00:00.000Z"),
+          correlationId: "admin-1",
+        },
+        fakeApprovalRepository(),
+        audit,
+      ),
+    ).resolves.toBe("deny");
+    expect(audit.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "package.grant.denied",
+        reasonCode: "role_or_mfa",
+      }),
+    );
   });
 
   it.each([
@@ -4332,57 +5298,76 @@ describe("admin authorization", () => {
     ["stale", "approval_expired"],
     ["cross_object", "approval_binding"],
     ["same_actor", "dual_control"],
-  ])("rejects invalid server-resolved approval: %s", async (approvalCase, reasonCode) => {
-    const audit = { append: vi.fn() };
-    const approvals = fakeApprovalRepository({ case: approvalCase });
-    await expect(authorizeAdminAction({
-      principal: {
-        id: "admin-1",
-        sessionIdHash: "session-hash-1",
-        roles: ["entitlement_admin"],
-        mfaVerifiedAt: new Date("2026-07-28T09:55:00.000Z"),
-      },
-      action: "package.grant",
-      routeObjectId: "u-2",
-      commandObjectId: "u-2",
-      approvalId: `approval-${approvalCase}`,
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: "admin-2",
-    }, approvals, audit)).resolves.toBe("deny");
-    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: "admin-1",
-      objectType: "user",
-      objectId: "u-2",
-      decision: "denied",
-      reasonCode,
-      occurredAt: new Date("2026-07-28T10:00:00.000Z"),
-    }));
-  });
+  ])(
+    "rejects invalid server-resolved approval: %s",
+    async (approvalCase, reasonCode) => {
+      const audit = { append: vi.fn() };
+      const approvals = fakeApprovalRepository({ case: approvalCase });
+      await expect(
+        authorizeAdminAction(
+          {
+            principal: {
+              id: "admin-1",
+              sessionIdHash: "session-hash-1",
+              roles: ["entitlement_admin"],
+              mfaVerifiedAt: new Date("2026-07-28T09:55:00.000Z"),
+            },
+            action: "package.grant",
+            routeObjectId: "u-2",
+            commandObjectId: "u-2",
+            approvalId: `approval-${approvalCase}`,
+            now: new Date("2026-07-28T10:00:00.000Z"),
+            correlationId: "admin-2",
+          },
+          approvals,
+          audit,
+        ),
+      ).resolves.toBe("deny");
+      expect(audit.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorId: "admin-1",
+          objectType: "user",
+          objectId: "u-2",
+          decision: "denied",
+          reasonCode,
+          occurredAt: new Date("2026-07-28T10:00:00.000Z"),
+        }),
+      );
+    },
+  );
 
   it("consumes one fresh distinct bound approval and records a complete allow audit", async () => {
     const audit = { append: vi.fn() };
     const approvals = fakeApprovalRepository({ case: "valid" });
-    await expect(authorizeAdminAction({
-      principal: {
-        id: "admin-requester",
-        sessionIdHash: "session-hash-valid",
-        roles: ["entitlement_admin"],
-        mfaVerifiedAt: new Date("2026-07-28T09:55:00.000Z"),
-      },
-      action: "package.grant",
-      routeObjectId: "u-2",
-      commandObjectId: "u-2",
-      approvalId: "approval-valid",
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: "admin-valid",
-    }, approvals, audit)).resolves.toBe("allow");
+    await expect(
+      authorizeAdminAction(
+        {
+          principal: {
+            id: "admin-requester",
+            sessionIdHash: "session-hash-valid",
+            roles: ["entitlement_admin"],
+            mfaVerifiedAt: new Date("2026-07-28T09:55:00.000Z"),
+          },
+          action: "package.grant",
+          routeObjectId: "u-2",
+          commandObjectId: "u-2",
+          approvalId: "approval-valid",
+          now: new Date("2026-07-28T10:00:00.000Z"),
+          correlationId: "admin-valid",
+        },
+        approvals,
+        audit,
+      ),
+    ).resolves.toBe("allow");
     expect(approvals.consumeIfValid).toHaveBeenCalledTimes(1);
-    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: "admin-requester",
-      action: "package.grant.allowed",
-      objectId: "u-2",
-      decision: "allowed",
-    }));
+    expect(audit.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: "admin-requester",
+        action: "package.grant.allowed",
+        objectId: "u-2",
+        decision: "allowed",
+      }),
+    );
   });
 });
 ```
@@ -4394,33 +5379,40 @@ import { createAdminService } from "./admin-service.js";
 import { adminFixture } from "./admin-service.testkit.js";
 
 describe("package administration", () => {
-  it.each([500, 1000, 1500, 2000] as const)("grants allowed size %s for exactly 60 days", async (units) => {
-    const deps = adminFixture({ approval: "valid" });
-    await createAdminService(deps).grantPackage(deps.principal, {
-      userId: "u-1",
-      units,
-      idempotencyKey: `grant-${units}`,
-      approvalId: `approval-${units}`,
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: `corr-${units}`,
-    });
-    expect(deps.ledger.facts()).toContainEqual(expect.objectContaining({
-      kind: "grant",
-      delta: units,
-      expiresAt: new Date("2026-09-26T10:00:00.000Z"),
-    }));
-  });
+  it.each([500, 1000, 1500, 2000] as const)(
+    "grants allowed size %s for exactly 60 days",
+    async (units) => {
+      const deps = adminFixture({ approval: "valid" });
+      await createAdminService(deps).grantPackage(deps.principal, {
+        userId: "u-1",
+        units,
+        idempotencyKey: `grant-${units}`,
+        approvalId: `approval-${units}`,
+        now: new Date("2026-07-28T10:00:00.000Z"),
+        correlationId: `corr-${units}`,
+      });
+      expect(deps.ledger.facts()).toContainEqual(
+        expect.objectContaining({
+          kind: "grant",
+          delta: units,
+          expiresAt: new Date("2026-09-26T10:00:00.000Z"),
+        }),
+      );
+    },
+  );
 
   it("rejects an unapproved size and revokes through one append-only ledger fact", async () => {
     const deps = adminFixture({ approval: "valid", packageBalance: 500 });
-    await expect(createAdminService(deps).grantPackage(deps.principal, {
-      userId: "u-1",
-      units: 750,
-      idempotencyKey: "grant-invalid",
-      approvalId: "approval-invalid",
-      now: new Date("2026-07-28T10:00:00.000Z"),
-      correlationId: "corr-invalid",
-    })).rejects.toThrow("Package size is not allowed");
+    await expect(
+      createAdminService(deps).grantPackage(deps.principal, {
+        userId: "u-1",
+        units: 750,
+        idempotencyKey: "grant-invalid",
+        approvalId: "approval-invalid",
+        now: new Date("2026-07-28T10:00:00.000Z"),
+        correlationId: "corr-invalid",
+      }),
+    ).rejects.toThrow("Package size is not allowed");
     await createAdminService(deps).revokePackage(deps.principal, {
       userId: "u-1",
       packageId: "package-1",
@@ -4429,10 +5421,12 @@ describe("package administration", () => {
       now: new Date("2026-07-28T10:00:00.000Z"),
       correlationId: "corr-revoke",
     });
-    expect(deps.ledger.facts()).toContainEqual(expect.objectContaining({
-      kind: "revocation",
-      delta: -500,
-    }));
+    expect(deps.ledger.facts()).toContainEqual(
+      expect.objectContaining({
+        kind: "revocation",
+        delta: -500,
+      }),
+    );
   });
 });
 ```
@@ -4449,12 +5443,12 @@ Feedback insertion uses a unique source event ID. Scores `1`, `2`, or `3`, or te
 
 Admin routes resolve principals from platform sessions, require MFA within 15 minutes, and never accept actor/approver IDs from a request body. High-risk commands first persist an approval request bound to action, object type/ID, canonical payload hash, requester principal/session, nonce, and five-minute expiry. A second authenticated principal with the required role approves it. Execution atomically consumes that exact approval once; forged IDs, same actor, stale approval, replay, payload change, action change, or object change deny.
 
-| Action | Required role | Object rule |
-|---|---|---|
-| Grant/revoke admin package | `entitlement_admin` | user ID in route must equal command target |
-| Verify/unverify expert | `catalog_admin` | expert ID in route must equal command target |
-| Read safety case | `security_admin` | explicit case assignment |
-| Read negative feedback | `support` | assigned queue |
+| Action                     | Required role       | Object rule                                  |
+| -------------------------- | ------------------- | -------------------------------------------- |
+| Grant/revoke admin package | `entitlement_admin` | user ID in route must equal command target   |
+| Verify/unverify expert     | `catalog_admin`     | expert ID in route must equal command target |
+| Read safety case           | `security_admin`    | explicit case assignment                     |
+| Read negative feedback     | `support`           | assigned queue                               |
 
 `AdminService` implements every MVP-FR-015 operation with exact repository methods: create/deactivate client, verify/suspend expert, activate/deactivate service, grant/revoke package, resolve integration error, and acknowledge/resolve feedback or safety alert. Package grant accepts only `500 | 1000 | 1500 | 2000`, creates immutable package metadata expiring at `now + 60 days`, and appends the positive grant fact in one transaction. Intro grant is a separately authorized `100`-unit, no-expiry command. Revoke locks the package and its grant fact, derives its ledger balance, and appends a non-positive revocation fact referencing that grant through `original_entry_id`; it never updates or deletes prior facts.
 
@@ -4504,7 +5498,9 @@ export interface ProjectionEvent {
   schemaVersion: 1;
   data: Readonly<Record<string, string | number | boolean | null>>;
 }
-export interface ProjectionSink { publish(event: ProjectionEvent): Promise<void> }
+export interface ProjectionSink {
+  publish(event: ProjectionEvent): Promise<void>;
+}
 ```
 
 - [ ] **Step 1: Write failing projection contract and no-command-path tests**
@@ -4530,9 +5526,13 @@ describe("Make projection sink", () => {
       schemaVersion: 1,
       data: { reservationId: "r-1", status: "reserved", expertId: "e-1" },
     });
-    expect(post).toHaveBeenCalledWith(expect.objectContaining({
-      headers: expect.objectContaining({ "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__" }),
-    }));
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
+        }),
+      }),
+    );
     expect(JSON.stringify(post.mock.calls[0])).not.toContain("rawConversation");
   });
 });
@@ -4550,13 +5550,24 @@ import { describe, expect, it } from "vitest";
 describe("projection architecture boundary", () => {
   it("allows projection imports only in worker delivery composition", () => {
     const violations: string[] = [];
-    for (const file of globSync(["apps/**/*.ts", "packages/**/*.ts"], { exclude: ["**/*.test.ts", "**/*.testkit.ts"] })) {
-      const imports = ts.preProcessFile(readFileSync(file, "utf8")).importedFiles.map((value) => value.fileName);
+    for (const file of globSync(["apps/**/*.ts", "packages/**/*.ts"], {
+      exclude: ["**/*.test.ts", "**/*.testkit.ts"],
+    })) {
+      const imports = ts
+        .preProcessFile(readFileSync(file, "utf8"))
+        .importedFiles.map((value) => value.fileName);
       if (
-        imports.some((value) => value.includes("/projections/") || value.includes("projection-port"))
-        && !file.replaceAll("\\", "/").startsWith("packages/worker/")
-        && !file.replaceAll("\\", "/").includes("packages/integrations/src/projections/")
-      ) violations.push(file);
+        imports.some(
+          (value) =>
+            value.includes("/projections/") ||
+            value.includes("projection-port"),
+        ) &&
+        !file.replaceAll("\\", "/").startsWith("packages/worker/") &&
+        !file
+          .replaceAll("\\", "/")
+          .includes("packages/integrations/src/projections/")
+      )
+        violations.push(file);
     }
     expect(violations).toEqual([]);
   });
@@ -4573,12 +5584,12 @@ Expected: FAIL because the projection port and sink do not exist.
 
 Validate the exact topic union and schema version, reject extra fields per topic, sign each HTTPS request, set the event ID as the idempotency key, use a five-second timeout, and normalize status codes into retryable/permanent failures. The accepted fields are:
 
-| Topic | Fields |
-|---|---|
-| `reservation_projection.v1` | `reservationId`, `status`, `expertId`, `slotStartsAt`, `updatedAt` |
-| `package_balance_projection.v1` | `userId`, `packageId`, `ledgerDerivedBalance`, `expiresAt`, `updatedAt` |
-| `feedback_projection.v1` | `feedbackId`, `score`, `escalated`, `createdAt` |
-| `integration_health_projection.v1` | `provider`, `state`, `lagSeconds`, `checkedAt` |
+| Topic                              | Fields                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `reservation_projection.v1`        | `reservationId`, `status`, `expertId`, `slotStartsAt`, `updatedAt`      |
+| `package_balance_projection.v1`    | `userId`, `packageId`, `ledgerDerivedBalance`, `expiresAt`, `updatedAt` |
+| `feedback_projection.v1`           | `feedbackId`, `score`, `escalated`, `createdAt`                         |
+| `integration_health_projection.v1` | `provider`, `state`, `lagSeconds`, `checkedAt`                          |
 
 Do not send client names, channel IDs, profile text, feedback text, conversation content, meeting URLs, credentials, or safety narratives. Balance projection reads the derived SQL view only. Sheets are updated by Make from these events; the platform has no Sheets credential and no readback logic. The semantic boundary test parses the actual TypeScript import graph rather than searching route text; Task 20 adds runtime 404 assertions against the composed API. Contract tests use an injected fake HTTP function and placeholder authorization; runtime composition keeps `MAKE_PROJECTION_ENABLED=false`.
 
@@ -4616,16 +5627,33 @@ git commit -m "feat: add read only operational projections"
 **Interfaces:**
 
 ```ts
-export function expireDueReservations(deps: ExpiryDeps, now: Date, batchSize: number): Promise<JobResult>;
-export function reconcileProviderReservations(deps: ReconciliationDeps, window: ReconciliationWindow): Promise<ReconciliationReport>;
-export function processSafetyHandoffs(deps: SafetyHandoffDeps, now: Date, batchSize: number): Promise<SafetyHandoffReport>;
+export function expireDueReservations(
+  deps: ExpiryDeps,
+  now: Date,
+  batchSize: number,
+): Promise<JobResult>;
+export function reconcileProviderReservations(
+  deps: ReconciliationDeps,
+  window: ReconciliationWindow,
+): Promise<ReconciliationReport>;
+export function processSafetyHandoffs(
+  deps: SafetyHandoffDeps,
+  now: Date,
+  batchSize: number,
+): Promise<SafetyHandoffReport>;
 export interface WorkerRuntime {
   runOnce(): Promise<WorkerCycleReport>;
   close(): Promise<void>;
 }
-export function expiryFixture(seed: readonly ReservationExpirySeed[]): ExpiryFixture;
-export function reconciliationFixture(seed: ReconciliationSeed): ReconciliationFixture;
-export function safetyHandoffFixture(seed: readonly HandoffSeed[]): SafetyHandoffFixture;
+export function expiryFixture(
+  seed: readonly ReservationExpirySeed[],
+): ExpiryFixture;
+export function reconciliationFixture(
+  seed: ReconciliationSeed,
+): ReconciliationFixture;
+export function safetyHandoffFixture(
+  seed: readonly HandoffSeed[],
+): SafetyHandoffFixture;
 ```
 
 - [ ] **Step 1: Write failing expiry and reconciliation tests**
@@ -4639,13 +5667,36 @@ import { expiryFixture } from "./worker-jobs.testkit.js";
 describe("reservation expiry", () => {
   it("expires only due reserved rows and emits one free cancellation flow", async () => {
     const deps = expiryFixture([
-      { id: "due", status: "reserved", reservedUntil: "2026-07-28T09:59:59.000Z", version: 1 },
-      { id: "future", status: "reserved", reservedUntil: "2026-07-28T10:00:01.000Z", version: 1 },
-      { id: "booked", status: "booked", reservedUntil: "2026-07-28T09:00:00.000Z", version: 2 },
+      {
+        id: "due",
+        status: "reserved",
+        reservedUntil: "2026-07-28T09:59:59.000Z",
+        version: 1,
+      },
+      {
+        id: "future",
+        status: "reserved",
+        reservedUntil: "2026-07-28T10:00:01.000Z",
+        version: 1,
+      },
+      {
+        id: "booked",
+        status: "booked",
+        reservedUntil: "2026-07-28T09:00:00.000Z",
+        version: 2,
+      },
     ]);
-    const result = await expireDueReservations(deps, new Date("2026-07-28T10:00:00.000Z"), 100);
+    const result = await expireDueReservations(
+      deps,
+      new Date("2026-07-28T10:00:00.000Z"),
+      100,
+    );
     expect(result).toEqual({ examined: 1, changed: 1, failed: 0 });
-    expect(deps.outbox.topics()).toEqual(["planerka.cancel", "client.reservation_expired", "expert.reservation_expired"]);
+    expect(deps.outbox.topics()).toEqual([
+      "planerka.cancel",
+      "client.reservation_expired",
+      "expert.reservation_expired",
+    ]);
     expect(deps.outbox.allFree()).toBe(true);
   });
 });
@@ -4708,7 +5759,9 @@ describe("provider reconciliation", () => {
       from: "2026-07-28T00:00:00.000Z",
       to: "2026-07-29T00:00:00.000Z",
     });
-    expect(report.mismatches).toEqual([{ reservationId: "r-1", local: "reserved", provider: "booked" }]);
+    expect(report.mismatches).toEqual([
+      { reservationId: "r-1", local: "reserved", provider: "booked" },
+    ]);
     expect(deps.transitions).toHaveLength(0);
     expect(deps.alerts).toEqual(["reservation_state_drift"]);
   });
@@ -4807,20 +5860,30 @@ describe("API boundary", () => {
 
   it("rejects unauthenticated Telegram requests before protected quota accounting", async () => {
     const app = await buildTestApp();
-    const unauthenticated = await Promise.all(Array.from({ length: 11 }, (_, updateId) => app.inject({
-      method: "POST",
-      url: "/v1/webhooks/telegram",
-      headers: { "content-type": "application/json", "x-correlation-id": "corr-1" },
-      payload: { update_id: updateId },
-    })));
-    expect(unauthenticated.every((response) => response.statusCode === 401)).toBe(true);
+    const unauthenticated = await Promise.all(
+      Array.from({ length: 11 }, (_, updateId) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "content-type": "application/json",
+            "x-correlation-id": "corr-1",
+          },
+          payload: { update_id: updateId },
+        }),
+      ),
+    );
+    expect(
+      unauthenticated.every((response) => response.statusCode === 401),
+    ).toBe(true);
     const authenticated = await app.inject({
       method: "POST",
       url: "/v1/webhooks/telegram",
       headers: {
         "content-type": "application/json",
         "x-correlation-id": "corr-auth",
-        "x-telegram-bot-api-secret-token": "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+        "x-telegram-bot-api-secret-token":
+          "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
       },
       payload: { update_id: 100 },
     });
@@ -4831,27 +5894,52 @@ describe("API boundary", () => {
     const app = await buildTestApp();
     const headers = {
       "content-type": "application/json",
-      "x-telegram-bot-api-secret-token": "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+      "x-telegram-bot-api-secret-token":
+        "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
     };
     const duplicate = await Promise.all([
-      app.inject({ method: "POST", url: "/v1/webhooks/telegram", headers, payload: { update_id: 1 } }),
-      app.inject({ method: "POST", url: "/v1/webhooks/telegram", headers, payload: { update_id: 1 } }),
+      app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: { update_id: 1 },
+      }),
+      app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: { update_id: 1 },
+      }),
     ]);
-    expect(duplicate.map((response) => response.statusCode).sort()).toEqual([200, 200]);
+    expect(duplicate.map((response) => response.statusCode).sort()).toEqual([
+      200, 200,
+    ]);
     expect(app.services.telegram.processedUpdateCount("1")).toBe(1);
-    const responses = await Promise.all(Array.from({ length: 11 }, (_, index) => app.inject({
-      method: "POST",
-      url: "/v1/webhooks/telegram",
-      headers,
-      payload: { update_id: index + 10 },
-    })));
-    expect(responses.some((response) => response.statusCode === 429)).toBe(true);
+    const responses = await Promise.all(
+      Array.from({ length: 11 }, (_, index) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers,
+          payload: { update_id: index + 10 },
+        }),
+      ),
+    );
+    expect(responses.some((response) => response.statusCode === 429)).toBe(
+      true,
+    );
   });
 
   it("exposes no Make, Sheets, or projection command route", async () => {
     const app = await buildTestApp();
-    for (const url of ["/v1/webhooks/make", "/v1/webhooks/sheets", "/v1/projections/command"]) {
-      expect((await app.inject({ method: "POST", url, payload: {} })).statusCode).toBe(404);
+    for (const url of [
+      "/v1/webhooks/make",
+      "/v1/webhooks/sheets",
+      "/v1/projections/command",
+    ]) {
+      expect(
+        (await app.inject({ method: "POST", url, payload: {} })).statusCode,
+      ).toBe(404);
     }
   });
 });
@@ -4868,14 +5956,18 @@ describe("logger redaction", () => {
     const output = new PassThrough();
     const chunks: Buffer[] = [];
     output.on("data", (chunk: Buffer) => chunks.push(chunk));
-    createLogger(output).info({
-      authorization: "Bearer __PLACEHOLDER_TEST_AUTH_TOKEN__",
-      rawBody: "private message",
-      clientProfile: { goals: "private" },
-      meetingUrl: "https://meeting.invalid/private",
-      providerUrl: "https://api.telegram.org/bot__PLACEHOLDER_TELEGRAM_BOT_TOKEN__/sendMessage",
-      correlationId: "corr-1",
-    }, "request");
+    createLogger(output).info(
+      {
+        authorization: "Bearer __PLACEHOLDER_TEST_AUTH_TOKEN__",
+        rawBody: "private message",
+        clientProfile: { goals: "private" },
+        meetingUrl: "https://meeting.invalid/private",
+        providerUrl:
+          "https://api.telegram.org/bot__PLACEHOLDER_TELEGRAM_BOT_TOKEN__/sendMessage",
+        correlationId: "corr-1",
+      },
+      "request",
+    );
     await new Promise((resolve) => output.once("data", resolve));
     const line = Buffer.concat(chunks).toString("utf8");
     expect(line).not.toContain("__PLACEHOLDER_TEST_AUTH_TOKEN__");
@@ -5005,9 +6097,14 @@ describe("AC-025 exact MVP chain", () => {
         startsAfter: "2026-07-29T10:00:00.000Z",
       });
       expect(matches.length).toBeGreaterThan(0);
-      expect(matches.every((match) =>
-        match.expert.active && match.expert.verified && match.service.active
-      )).toBe(true);
+      expect(
+        matches.every(
+          (match) =>
+            match.expert.active &&
+            match.expert.verified &&
+            match.service.active,
+        ),
+      ).toBe(true);
 
       const reservation = await app.reserve({
         client,
@@ -5028,8 +6125,16 @@ describe("AC-025 exact MVP chain", () => {
 
       expect(await app.notificationLedgerFacts(reservation.id)).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ reason: "reservation_confirmed", kind: "free", delta: 0 }),
-          expect.objectContaining({ reason: "reservation_cancelled", kind: "free", delta: 0 }),
+          expect.objectContaining({
+            reason: "reservation_confirmed",
+            kind: "free",
+            delta: 0,
+          }),
+          expect.objectContaining({
+            reason: "reservation_cancelled",
+            kind: "free",
+            delta: 0,
+          }),
         ]),
       );
       expect(await app.balance(client.userId)).toBe(498);
@@ -5043,14 +6148,16 @@ describe("AC-025 exact MVP chain", () => {
         newInboxRows: 0,
         newOutboxRows: 0,
       });
-      await expect(app.assertExactlyOnce([
-        "package.granted",
-        "message.inbound.accepted",
-        "message.outbound.delivered",
-        "reservation.created",
-        "reservation.booked",
-        "reservation.cancelled_by_client",
-      ])).resolves.toBeUndefined();
+      await expect(
+        app.assertExactlyOnce([
+          "package.granted",
+          "message.inbound.accepted",
+          "message.outbound.delivered",
+          "reservation.created",
+          "reservation.booked",
+          "reservation.cancelled_by_client",
+        ]),
+      ).resolves.toBeUndefined();
     } finally {
       await app.close();
     }
@@ -5071,12 +6178,14 @@ describe("CI and release workflow semantics", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];
     const install = steps.findIndex((step) =>
-      step.run?.includes("pnpm install --frozen-lockfile")
+      step.run?.includes("pnpm install --frozen-lockfile"),
     );
     const build = steps.findIndex((step) => step.run?.trim() === "pnpm build");
     const executable = steps
       .map((step, index) => ({ index, run: step.run ?? "" }))
-      .filter(({ run }) => /\bpnpm (exec|verify|test|lint|typecheck)\b/.test(run));
+      .filter(({ run }) =>
+        /\bpnpm (exec|verify|test|lint|typecheck)\b/.test(run),
+      );
     expect(install).toBeGreaterThanOrEqual(0);
     expect(build).toBeGreaterThan(install);
     expect(executable.every(({ index }) => index > build)).toBe(true);
@@ -5084,12 +6193,16 @@ describe("CI and release workflow semantics", () => {
   });
 
   it("deploys only a tested digest after explicit evidence gates", () => {
-    const workflow = parse(readFileSync(".github/workflows/release.yml", "utf8"));
+    const workflow = parse(
+      readFileSync(".github/workflows/release.yml", "utf8"),
+    );
     expect(workflow.jobs.release.needs).toEqual(
       expect.arrayContaining(["verify_digest", "staging", "evidence_gate"]),
     );
     expect(JSON.stringify(workflow.jobs.release)).toContain("image_digest");
-    expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain("Release status: GO");
+    expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain(
+      "Release status: GO",
+    );
     expect(JSON.stringify(workflow.jobs.evidence_gate)).toContain(
       "Provider staging status: PASS",
     );
@@ -5130,7 +6243,9 @@ describe("release assets", () => {
     expect(evidence).toContain("Release status: NO-GO");
     expect(evidence).toContain("Live payments: disabled");
     expect(providerEvidence).toContain("Provider staging status: BLOCKED");
-    expect(providerEvidence).toContain("Project-owned authenticated sessions: unavailable");
+    expect(providerEvidence).toContain(
+      "Project-owned authenticated sessions: unavailable",
+    );
     expect(providerEvidence).not.toContain("Provider staging status: PASS");
   });
 });
@@ -5142,26 +6257,44 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-const run = (file, args) => execFileSync(file, args, {
-  cwd: process.cwd(),
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "pipe"],
-});
+const run = (file, args) =>
+  execFileSync(file, args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 const compose = (args) => run("docker", ["compose", ...args]);
 
 test("boots portable final images and imports emitted internal packages", async () => {
   try {
     compose(["up", "--build", "--wait"]);
-    run(process.execPath, ["scripts/smoke.mjs", "--base-url=http://localhost:3000"]);
+    run(process.execPath, [
+      "scripts/smoke.mjs",
+      "--base-url=http://localhost:3000",
+    ]);
     for (const [service, command, packages] of [
-      ["api", "dist/server.js", [
-        "@ii-tonya/application", "@ii-tonya/config", "@ii-tonya/db",
-        "@ii-tonya/integrations", "@ii-tonya/observability",
-      ]],
-      ["worker", "dist/main.js", [
-        "@ii-tonya/config", "@ii-tonya/db", "@ii-tonya/integrations",
-        "@ii-tonya/observability", "@ii-tonya/worker",
-      ]],
+      [
+        "api",
+        "dist/server.js",
+        [
+          "@ii-tonya/application",
+          "@ii-tonya/config",
+          "@ii-tonya/db",
+          "@ii-tonya/integrations",
+          "@ii-tonya/observability",
+        ],
+      ],
+      [
+        "worker",
+        "dist/main.js",
+        [
+          "@ii-tonya/config",
+          "@ii-tonya/db",
+          "@ii-tonya/integrations",
+          "@ii-tonya/observability",
+          "@ii-tonya/worker",
+        ],
+      ],
     ]) {
       const id = compose(["ps", "-q", service]).trim();
       assert.notEqual(id, "");
@@ -5196,8 +6329,14 @@ test("boots portable final images and imports emitted internal packages", async 
           `await import('${packageName}');`,
         ].join("");
         run("docker", [
-          "compose", "exec", "-T", service, "node",
-          "--input-type=module", "--eval", probe,
+          "compose",
+          "exec",
+          "-T",
+          service,
+          "node",
+          "--input-type=module",
+          "--eval",
+          probe,
         ]);
       }
     }
@@ -5272,11 +6411,11 @@ pnpm test:container:
 
 Keep the three evidence classes explicit:
 
-| Evidence class | File/command | Initial status | What it proves |
-|---|---|---|---|
-| Local application | `tests/e2e/mvp-smoke.test.ts` | executable after implementation | exact AC-025 domain/application/repository chain with sanitized events |
-| Built container | `pnpm test:container` | executable after implementation | packaged API/worker entrypoints, health, UID, read-only filesystem, disabled flags |
-| Provider-connected staging | `docs/runbooks/provider-staging-evidence.md` | `BLOCKED` | only future project-owned Selarti, Planerka, and Telegram sandbox sessions with official contracts and captured receipts |
+| Evidence class             | File/command                                 | Initial status                  | What it proves                                                                                                           |
+| -------------------------- | -------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Local application          | `tests/e2e/mvp-smoke.test.ts`                | executable after implementation | exact AC-025 domain/application/repository chain with sanitized events                                                   |
+| Built container            | `pnpm test:container`                        | executable after implementation | packaged API/worker entrypoints, health, UID, read-only filesystem, disabled flags                                       |
+| Provider-connected staging | `docs/runbooks/provider-staging-evidence.md` | `BLOCKED`                       | only future project-owned Selarti, Planerka, and Telegram sandbox sessions with official contracts and captured receipts |
 
 `provider-staging-evidence.md` contains one row per provider for official contract/version, authenticated project-owned account ID hash, sanitized request/response fixture checksum, ingress-auth result, idempotency result, pre-send failure, post-send unknown-outcome reconciliation, rate-limit result, reviewer, date, and evidence URI. Initialize every result to `not executed`, record `Project-owned authenticated sessions: unavailable`, and set `Provider staging status: BLOCKED`. No skipped or mocked test changes that status.
 
@@ -5318,42 +6457,42 @@ git commit -m "ci: add verified mvp delivery pipeline"
 
 ## Adversarial review closure matrix
 
-| Finding | Plan closure | Executable or blocking evidence |
-|---|---|---|
-| P0-01 workspace dependencies absent | Forward remediation in Task 3 assigns every current and planned external/internal dependency to one manifest and tests the workspace graph | `tests/repo/workspace-dependencies.test.ts`; frozen install, typecheck, and build |
-| P0-02 API/worker not executable | Forward implementation in Tasks 19, 20, and 21 creates real entrypoints, start scripts, built targets, health, and runtime inspection | API/worker builds plus `pnpm test:container` |
-| P0-03 mutable balance authority | Tasks 4, 6, and 7 use append-only ledger facts and a rebuildable SQL sum view; update/delete are rejected | property, schema, immutability, and parallel-debit tests |
-| P0-04 invalid or overlapping booking | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation | BOOK-01 through BOOK-04 plus 20-repeat PostgreSQL concurrency |
-| P0-05 safety order/directory/handoff weak | Tasks 5, 14, and 19 run deterministic safety first, validate versioned locale contacts, fail safely on classifier outage, and persist SLA lifecycle | SAFE-01 through SAFE-05 and worker SLA tests |
-| P0-06 outbound billing lacks stable event | Tasks 2, 7, 10, 14, and 21 keep runtime billing disabled and define debit only from a stable inbox-deduplicated delivery event | contract-disabled runtime plus test-only synthetic AC-025 delivery; provider gate remains blocked |
-| P1-01 invalid Vitest/CI order | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` and prohibit repository commands before frozen install | repeat runner and parsed workflow-order test |
-| P1-02 ambiguous provider outcomes retried | Tasks 9 through 12 separate `not_applied`, `unknown_outcome`, and reconciliation; local acknowledgement failure is ambiguous | retry, timeout, lease-recovery, reconcile, and dead-letter tests |
-| P1-03 catalog/admin paths absent | Tasks 15 and 17 add eligible search/recommendation plus every FR-015 operation | catalog unit/integration tests and audited admin-ledger integration |
-| P1-04 feedback threshold wrong | Task 17 escalates scores 1–3 or explicit negative text | score table plus negative-text score-4 test |
-| P1-05 AC-025/mock overclaim | Task 21 implements the exact chain and splits local, built-container, and provider-connected evidence | exact E2E, actual container test, separate `BLOCKED` provider record |
-| P1-06 privacy non-transactional/incomplete | Task 16 makes withdrawal and erasure transactional, tracks every processor, resumes crashes, and verifies backup expiry | PRIV-01 through PRIV-05 PostgreSQL workflow tests |
-| P1-07 forgeable dual control/incomplete audit | Tasks 6 and 17 resolve one-time server-side approvals bound to session/action/object/payload/nonce and require complete audit fields | forged, stale, replay, cross-object, same-actor, and valid approval tests |
-| P1-08 fixture/LLM/Telegram gaps | Tasks 10 through 12 and 14 add success/duplicate/schema/429/pre/post-send fixtures, LLM-01 through LLM-04, official Bot API path, and URL redaction | provider contract fixtures and prompt-safety tests |
-| P2-01 callback consumed before validation | Task 11 peeks, validates identity/expert/action/version/expiry, then consumes conditionally | wrong-expert cannot burn token; single SQL conditional consume |
-| P2-02 shallow text-only evidence/order ambiguity | Tasks 18, 20, and 21 add TypeScript import-graph analysis, separated auth/rate-limit tests, YAML workflow parsing, and actual container inspection | semantic repository tests and built-image smoke |
+| Finding                                          | Plan closure                                                                                                                                          | Executable or blocking evidence                                                                   |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| P0-01 workspace dependencies absent              | Forward remediation in Task 3 assigns every current and planned external/internal dependency to one manifest and tests the workspace graph            | `tests/repo/workspace-dependencies.test.ts`; frozen install, typecheck, and build                 |
+| P0-02 API/worker not executable                  | Forward implementation in Tasks 19, 20, and 21 creates real entrypoints, start scripts, built targets, health, and runtime inspection                 | API/worker builds plus `pnpm test:container`                                                      |
+| P0-03 mutable balance authority                  | Tasks 4, 6, and 7 use append-only ledger facts and a rebuildable SQL sum view; update/delete are rejected                                             | property, schema, immutability, and parallel-debit tests                                          |
+| P0-04 invalid or overlapping booking             | Tasks 8 and 15 lock capacity and both actors, recheck expiry/service/expert eligibility, and reject past/ineligible/overlapping confirmation          | BOOK-01 through BOOK-04 plus 20-repeat PostgreSQL concurrency                                     |
+| P0-05 safety order/directory/handoff weak        | Tasks 5, 14, and 19 run deterministic safety first, validate versioned locale contacts, fail safely on classifier outage, and persist SLA lifecycle   | SAFE-01 through SAFE-05 and worker SLA tests                                                      |
+| P0-06 outbound billing lacks stable event        | Tasks 2, 7, 10, 14, and 21 keep runtime billing disabled and define debit only from a stable inbox-deduplicated delivery event                        | contract-disabled runtime plus test-only synthetic AC-025 delivery; provider gate remains blocked |
+| P1-01 invalid Vitest/CI order                    | Tasks 3 and 21 replace the unsupported Vitest repetition flag with `scripts/repeat-vitest.mjs` and prohibit repository commands before frozen install | repeat runner and parsed workflow-order test                                                      |
+| P1-02 ambiguous provider outcomes retried        | Tasks 9 through 12 separate `not_applied`, `unknown_outcome`, and reconciliation; local acknowledgement failure is ambiguous                          | retry, timeout, lease-recovery, reconcile, and dead-letter tests                                  |
+| P1-03 catalog/admin paths absent                 | Tasks 15 and 17 add eligible search/recommendation plus every FR-015 operation                                                                        | catalog unit/integration tests and audited admin-ledger integration                               |
+| P1-04 feedback threshold wrong                   | Task 17 escalates scores 1–3 or explicit negative text                                                                                                | score table plus negative-text score-4 test                                                       |
+| P1-05 AC-025/mock overclaim                      | Task 21 implements the exact chain and splits local, built-container, and provider-connected evidence                                                 | exact E2E, actual container test, separate `BLOCKED` provider record                              |
+| P1-06 privacy non-transactional/incomplete       | Task 16 makes withdrawal and erasure transactional, tracks every processor, resumes crashes, and verifies backup expiry                               | PRIV-01 through PRIV-05 PostgreSQL workflow tests                                                 |
+| P1-07 forgeable dual control/incomplete audit    | Tasks 6 and 17 resolve one-time server-side approvals bound to session/action/object/payload/nonce and require complete audit fields                  | forged, stale, replay, cross-object, same-actor, and valid approval tests                         |
+| P1-08 fixture/LLM/Telegram gaps                  | Tasks 10 through 12 and 14 add success/duplicate/schema/429/pre/post-send fixtures, LLM-01 through LLM-04, official Bot API path, and URL redaction   | provider contract fixtures and prompt-safety tests                                                |
+| P2-01 callback consumed before validation        | Task 11 peeks, validates identity/expert/action/version/expiry, then consumes conditionally                                                           | wrong-expert cannot burn token; single SQL conditional consume                                    |
+| P2-02 shallow text-only evidence/order ambiguity | Tasks 18, 20, and 21 add TypeScript import-graph analysis, separated auth/rate-limit tests, YAML workflow parsing, and actual container inspection    | semantic repository tests and built-image smoke                                                   |
 
 ## Requirement and threat-test traceability
 
-| Requirement or gate | Primary tasks | Executable evidence |
-|---|---:|---|
-| MVP-FR-001, AC-001, WH-01, WH-02 | 6, 7, 10, 20 | inbox uniqueness, webhook firewall, duplicate-message integration test |
-| MVP-FR-002, AC-018, AC-021, PRIV-01 through PRIV-05 | 5, 6, 15, 16, 21 | consent filtering, expert-view minimization, retention and deletion evidence |
-| MVP-FR-003, MVP-FR-004 | 6, 14, 15 | verified catalog schema, typed catalog intent, eligible-slot query |
-| MVP-FR-005, MVP-FR-006, AC-002 through AC-006, BILL-01 through BILL-04 | 4, 6, 7, 14 | package policy, ledger constraints, parallel debit, conversation workflow |
-| MVP-FR-007 through MVP-FR-012, AC-007 through AC-017, BOOK-01 through BOOK-04 | 3, 6, 8, 11, 12, 15, 19 | reservation state machine, last-place race, callback version, expiry and reconciliation |
-| MVP-FR-013, AC-019 | 17 | feedback deduplication and negative-score escalation |
-| MVP-FR-014, AC-020, SAFE-01 through SAFE-05 | 5, 14, 19, 21 | provider-independent safety, zero-balance handoff, safety runbook and smoke |
-| MVP-FR-015, AC-022, IAM-01, IAM-02 | 6, 17, 20 | scoped role/MFA tests and immutable allow/deny audit |
-| MVP-FR-016, AC-015, AC-023, AC-024, RES-01 through RES-03, SEC-01 | 7, 9, 10, 12, 18 through 21 | inbox/outbox, redaction, dead letter, reconciliation, recovery and CI evidence |
-| PAY-01 and live-payment release boundary | 2, 13, 20, 21 | unconditional disabled adapter, absent routes/tables, config literal false, release evidence |
-| LLM-01 through LLM-04 | 5, 14, 20 | typed intent union, no infrastructure capability, unsafe-output rejection, redacted telemetry |
-| Make/Sheets non-authority | 6, 18, 20 | outbound-only projection tests, absent inbound routes, PostgreSQL readiness |
-| Deferred MVP boundaries | 6, 13, 21 | absent tables/modules/routes and repository scope test |
+| Requirement or gate                                                           |               Primary tasks | Executable evidence                                                                           |
+| ----------------------------------------------------------------------------- | --------------------------: | --------------------------------------------------------------------------------------------- |
+| MVP-FR-001, AC-001, WH-01, WH-02                                              |                6, 7, 10, 20 | inbox uniqueness, webhook firewall, duplicate-message integration test                        |
+| MVP-FR-002, AC-018, AC-021, PRIV-01 through PRIV-05                           |            5, 6, 15, 16, 21 | consent filtering, expert-view minimization, retention and deletion evidence                  |
+| MVP-FR-003, MVP-FR-004                                                        |                   6, 14, 15 | verified catalog schema, typed catalog intent, eligible-slot query                            |
+| MVP-FR-005, MVP-FR-006, AC-002 through AC-006, BILL-01 through BILL-04        |                 4, 6, 7, 14 | package policy, ledger constraints, parallel debit, conversation workflow                     |
+| MVP-FR-007 through MVP-FR-012, AC-007 through AC-017, BOOK-01 through BOOK-04 |     3, 6, 8, 11, 12, 15, 19 | reservation state machine, last-place race, callback version, expiry and reconciliation       |
+| MVP-FR-013, AC-019                                                            |                          17 | feedback deduplication and negative-score escalation                                          |
+| MVP-FR-014, AC-020, SAFE-01 through SAFE-05                                   |               5, 14, 19, 21 | provider-independent safety, zero-balance handoff, safety runbook and smoke                   |
+| MVP-FR-015, AC-022, IAM-01, IAM-02                                            |                   6, 17, 20 | scoped role/MFA tests and immutable allow/deny audit                                          |
+| MVP-FR-016, AC-015, AC-023, AC-024, RES-01 through RES-03, SEC-01             | 7, 9, 10, 12, 18 through 21 | inbox/outbox, redaction, dead letter, reconciliation, recovery and CI evidence                |
+| PAY-01 and live-payment release boundary                                      |               2, 13, 20, 21 | unconditional disabled adapter, absent routes/tables, config literal false, release evidence  |
+| LLM-01 through LLM-04                                                         |                   5, 14, 20 | typed intent union, no infrastructure capability, unsafe-output rejection, redacted telemetry |
+| Make/Sheets non-authority                                                     |                   6, 18, 20 | outbound-only projection tests, absent inbound routes, PostgreSQL readiness                   |
+| Deferred MVP boundaries                                                       |                   6, 13, 21 | absent tables/modules/routes and repository scope test                                        |
 
 ## Execution completion criteria
 
