@@ -3,65 +3,39 @@ import { legalDocuments, normalizeLegalDocument } from "./legal-content.js";
 
 describe("public legal documents", () => {
   it("publishes complete offer and privacy documents for the current public boundary", () => {
-    expect(legalDocuments.oferta.title).toBe("Договор-оферта");
-    expect(legalDocuments.oferta.text).toContain(
-      "РАЗДЕЛ 11. ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ",
-    );
-    expect(legalDocuments.oferta.text).toContain("22 августа 2026 года");
-    expect(legalDocuments.oferta.text).toContain(
-      "Оплата оформляется только в Telegram-боте",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "ЮKassa, Т-Банка или иного подключённого платёжного оператора",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "полный номер банковской карты и CVV/CVC не получает и не хранит",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "Базовый тариф — 12 000 рублей за 30 календарных дней",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "первого заказа по Базовому тарифу составляет 15 000 рублей",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "за вычетом возвратов денежных средств участникам",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "в течение пяти рабочих дней после мероприятия",
-    );
-    expect(legalDocuments.oferta.text).toContain(
-      "заключается Клиентом непосредственно с выбранным Экспертом",
-    );
+    expect(legalDocuments.oferta.text.startsWith("ДОГОВОР-ОФЕРТА\n")).toBe(true);
+    for (let section = 1; section <= 13; section += 1) {
+      expect(legalDocuments.oferta.text).toContain(`РАЗДЕЛ ${section}.`);
+    }
+    expect(legalDocuments.oferta.text).toContain("5.6.8.");
+    expect(legalDocuments.oferta.text).toContain("РАЗДЕЛ 13");
     expect(legalDocuments.privacy.title).toBe("Политика конфиденциальности");
-    expect(legalDocuments.privacy.text).toContain("12. РЕКВИЗИТЫ ОПЕРАТОРА");
+    expect(legalDocuments.privacy.text.startsWith("ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ\n")).toBe(true);
+    for (let section = 1; section <= 17; section += 1) {
+      expect(legalDocuments.privacy.text).toMatch(new RegExp(`(?:^|\\n)${section}\\. [А-ЯЁ]`, "u"));
+    }
+    expect(legalDocuments.privacy.text).toContain("17. РЕКВИЗИТЫ ОПЕРАТОРА");
     expect(legalDocuments.privacy.text).toContain("ii-tonya@yandex.ru");
-    expect(legalDocuments.privacy.text).toContain(
-      "Сайт не устанавливает файлы Cookies",
-    );
-    expect(legalDocuments.privacy.text).toContain(
-      "не считается согласием на обработку",
-    );
-    expect(legalDocuments.privacy.text).toContain("ЮKassa и Т-Банк");
-    expect(legalDocuments.privacy.text).toContain(
-      "полный номер банковской карты и CVV/CVC Оператору не передаются",
-    );
-    expect(legalDocuments.privacy.text).toContain(
-      "маскированные сведения о способе оплаты",
-    );
+    expect(legalDocuments.privacy.text).toContain("не осуществляет трансграничную передачу");
+    expect(legalDocuments.privacy.text).toContain("21 августа 2026 года");
+    expect(legalDocuments.oferta.text).toContain("Настоящая Оферта вступает в силу с 21 августа 2026 года и действует до её отзыва Исполнителем.");
+    expect(legalDocuments.privacy.text).toContain("Настоящая Политика вступает в силу с 21 августа 2026 года и действует до её отзыва или замены новой редакцией.");
+    for (const requisite of ["ИНН: 683102264735", "ОГРНИП: 326680000031840", "БИК банка: 044525974"]) {
+      expect(legalDocuments.oferta.text).toContain(requisite);
+      expect(legalDocuments.privacy.text).toContain(requisite);
+    }
   });
 
   it("removes source-chat and citation artefacts without rewriting legal copy", () => {
     expect(legalDocuments.oferta.text).not.toContain("Принято! Вношу");
+    expect(legalDocuments.oferta.text).not.toContain("[reference:0]");
+    expect(legalDocuments.oferta.text).not.toContain("Принято!");
     expect(legalDocuments.privacy.text).not.toContain("[reference:0]");
+    expect(legalDocuments.privacy.text).not.toContain("Принято!");
     expect(normalizeLegalDocument("\ufeffA\r\nB")).toBe("A\nB");
   });
 
-  it("does not publish contracts for inactive client commerce or unsupported providers", () => {
-    expect(legalDocuments.oferta.text).not.toMatch(
-      /Пакет сообщений|Купон|реферальн|72 час|VK|WhatsApp|Viber/iu,
-    );
-    expect(legalDocuments.privacy.text).not.toMatch(
-      /используя Сайт.{0,80}согласи|не осуществляет трансграничную передачу/iu,
-    );
+  it("publishes the supplied package, coupon, referral, and messenger terms", () => {
+    expect(legalDocuments.oferta.text).toMatch(/Пакет сообщений|Купон|реферальн|72 час|VK|WhatsApp|Viber/iu);
   });
 });

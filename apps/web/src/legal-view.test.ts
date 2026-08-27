@@ -6,10 +6,8 @@ describe("legal page", () => {
     const html = renderLegalPage("privacy");
     expect(html).toContain("<h1>Политика конфиденциальности</h1>");
     expect(html).toContain('href="/"');
-    expect(html).toContain(
-      "<h2>11. COOKIES, ИЗМЕНЕНИЯ И ДОСТУПНОСТЬ ПОЛИТИКИ</h2>",
-    );
-    expect(html).toContain("<h2>12. РЕКВИЗИТЫ ОПЕРАТОРА</h2>");
+    expect(html).toContain("<h2>14. ИСПОЛЬЗОВАНИЕ ФАЙЛОВ COOKIES</h2>");
+    expect(html).toContain("<h2>17. РЕКВИЗИТЫ ОПЕРАТОРА</h2>");
     expect(html).not.toContain("[reference:0]");
   });
 });

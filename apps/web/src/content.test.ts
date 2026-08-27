@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { landingContent } from "./content.js";
 
 describe("landing content", () => {
@@ -6,69 +7,69 @@ describe("landing content", () => {
     expect(landingContent.brand).toBe("ии-Тоня");
     expect(landingContent.hero.title).toBe("Привет, я ии-Тоня 👋");
     expect(landingContent.clientCategories).toHaveLength(7);
-    expect(landingContent.clientFlow).toHaveLength(3);
+    expect(landingContent.messagePackages).toHaveLength(5);
     expect(landingContent.tariffs.map(({ code }) => code)).toEqual([
       "base",
       "exclusive",
       "event",
     ]);
-    expect(landingContent.faq.length).toBeGreaterThanOrEqual(10);
+    expect(landingContent.faq).toHaveLength(20);
     expect(landingContent.operator.ogrnip).toBe("326680000031840");
   });
 
-  it("contains no coercive, guaranteed, or placeholder claims", () => {
+  it("contains the approved client and expert offer", () => {
     const copy = JSON.stringify(landingContent);
-    expect(copy).not.toMatch(
-      /успей|гарантируем|гарантия (?:результата|обращений)|гарантированный|без маркировки рекламы|\[\.\.\.\]/iu,
-    );
-    expect(copy).not.toMatch(/ОГРНИП\s*\[|лучший|лечит/iu);
-    expect(copy).not.toMatch(
-      /пакет(?:ы|а)? сообщений|купон|реферальн|резервирует слот|напоминания придут|доступен 24\/7/iu,
-    );
-  });
-
-  it("describes the bot-only payment boundary without collecting card data", () => {
-    expect(landingContent.payment.channel).toBe("Только в Telegram-боте");
-    expect(landingContent.payment.providers).toEqual([
-      { name: "ЮKassa", logo: "/payments/yookassa.svg" },
-      { name: "Т-Банк", logo: "/payments/tbank.svg" },
+    expect(copy).toContain("тест клиент");
+    expect(copy).toContain("тест эксперт");
+    expect(copy).toContain("500 сообщений");
+    expect(copy).toContain("2000 купонов");
+    expect(copy).toContain("24/7");
+    expect(landingContent.about).toEqual([
+      "Привет! Я ии-Тоня — твой персональный помощник в мире саморазвития.",
+      "Я не психолог и не врач. Я — навигатор. Я помогаю тебе найти того специалиста или мероприятие, которые подходят именно тебе: по запросу, по бюджету, по локации, по душе.",
+      "Ты просто пишешь мне в мессенджере — я задаю вопросы, разбираюсь в твоей ситуации и подбираю лучшие варианты из моей базы. А ещё я записываю к экспертам, напоминаю о визитах и собираю обратную связь.",
+      "Моя миссия — чтобы ты не тонул в рекламном шуме, а получал только то, что тебе действительно нужно. Без спама, без перегруза, без лишних вкладок.",
+      "Я работаю 24/7 и всегда на связи. Ты можешь написать мне ночью — я отвечу.",
     ]);
-    expect(landingContent.payment.providerNotice).toContain(
-      "иной подключённый платёжный оператор",
-    );
-    expect(landingContent.payment.flow).toHaveLength(4);
-    expect(landingContent.payment.security).toContain(
-      "не получает и не хранит полный номер банковской карты и CVV/CVC",
-    );
-    expect(landingContent.payment.receipt).toContain(
-      "электронный кассовый чек",
-    );
-    expect(landingContent.payment.refund).toContain("ii-tonya@yandex.ru");
+    expect(landingContent.expertPromise).toHaveLength(4);
+    expect(landingContent.expertSteps[2]?.[1]).toContain("бронирует слот");
+    expect(landingContent.tariffFactors).toEqual([
+      "Вашей ниши и среднего чека на услугу.",
+      "Города, в котором вы работаете.",
+      "Формата работы (очно / онлайн / смешанный).",
+    ]);
   });
 
-  it("publishes unambiguous fixed prices, event formula, and delivery terms", () => {
+  it("keeps the exact supplied FAQ in order", () => {
+    expect(landingContent.faq.map(([question]) => question)).toEqual([
+      "Что такое ии-Тоня?", "Кто может пользоваться сервисом?", "Сколько это стоит для клиента?",
+      "А что, если я не знаю, что мне нужно?", "Как я могу записаться к эксперту?", "Что такое купоны?",
+      "Как работает реферальная программа для клиентов?", "Могу ли я привести друга в сервис?",
+      "Как я могу стать экспертом в базе?", "Сколько стоит размещение для эксперта?",
+      "Есть ли разовый платёж для экспертов?", "Что будет с моей карточкой, если я уйду из проекта?",
+      "Как я получу клиентов как эксперт?", "Мне нужно платить за каждого клиента?",
+      "Почему плата фиксированная, а не за клиента?", "Как быстро я получу клиентов?",
+      "Что делать, если я не умею вести соцсети?", "Могу ли я записаться к конкретному эксперту, если уже знаю его?",
+      "Как я могу отслеживать свой прогресс?", "Что, если мне не понравился эксперт?",
+    ]);
+    const digest = createHash("sha256").update(JSON.stringify(landingContent.faq)).digest("hex");
+    expect(digest).toBe("cf1e079e7159ff519c365e31a19c2021e358ec7246ea869d8fed9686610f4ae0");
+  });
+
+  it("keeps a truthful fail-closed contact boundary", () => {
+    expect(landingContent.contact.formNotice).toContain("не отправляет данные");
+  });
+
+  it("publishes the supplied expert tariff model", () => {
     expect(landingContent.tariffs.map(({ price }) => price)).toEqual([
-      "12 000 ₽ / 30 календарных дней",
-      "20 000 ₽ / 30 календарных дней",
-      "10% / 15% от фактической выручки",
+      "от 12 000 рублей в месяц",
+      "от 20 000 рублей в месяц",
+      "10% / 15% от выручки мероприятия",
     ]);
-    expect(landingContent.tariffs[0].delivery).toContain("1–3 рабочих дня");
-    expect(landingContent.tariffs[1].delivery).toContain("30 календарных дней");
-    expect(landingContent.tariffs[0].description).toContain(
-      "одной карточки эксперта",
-    );
-    expect(landingContent.tariffs[0].setup).toContain(
-      "Первый заказ — 15 000 ₽",
-    );
-    expect(landingContent.tariffs[1].setup).toContain(
-      "Первый заказ — 23 000 ₽",
-    );
-    expect(landingContent.tariffs[2].description).toContain(
-      "за вычетом возвратов участникам",
-    );
-    expect(landingContent.tariffs[2].delivery).toContain(
-      "в течение 5 рабочих дней после мероприятия",
-    );
+    expect(landingContent.tariffs[0].description).toContain("неограниченное количество позиций");
+    expect(landingContent.tariffs[1].description).toContain("Клиентам с высоким бюджетом");
+    expect(landingContent.tariffs[0].setup).toBe("Разовый платёж: 3 000 рублей за включение в базу.");
+    expect(landingContent.eventPayment).toHaveLength(3);
     expect(landingContent.operator.schedule).toContain("круглосуточно");
     expect(landingContent.operator.schedule).toContain("без выходных");
   });
