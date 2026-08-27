@@ -13,6 +13,33 @@ const claims = {
 };
 
 describe("xr1 residency checkout callback", () => {
+  it("reissues the exact token for one server idempotency key", async () => {
+    const stored = new Map<string, typeof claims>();
+    const store = {
+      put: async (hash: string, value: typeof claims) => {
+        stored.set(hash, stored.get(hash) ?? value);
+      },
+      consume: async () => null,
+    };
+    const secret = new Uint8Array(32).fill(7);
+
+    const first = await issueResidencyCheckoutCallback(
+      claims,
+      "quote-retry-1",
+      secret,
+      store,
+    );
+    const retry = await issueResidencyCheckoutCallback(
+      { ...claims, expiresAt: new Date("2026-08-14T05:01:00.000Z") },
+      "quote-retry-1",
+      secret,
+      store,
+    );
+
+    expect(retry).toBe(first);
+    expect(stored).toHaveLength(1);
+  });
+
   it("issues an isolated token and consumes it once with fresh identity binding", async () => {
     let storedHash = "";
     let consumed = false;

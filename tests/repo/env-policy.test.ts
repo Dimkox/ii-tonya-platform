@@ -34,7 +34,10 @@ describe("environment credential policy", () => {
         "EXPERT_TELEGRAM_QUERIES_ENABLED",
         "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
         "EXPERT_TELEGRAM_REFERRAL_ENABLED",
+        "EXPERT_TELEGRAM_CHECKOUT_ENABLED",
         "PAYMENTS_ENABLED",
+        "WORKER_OUTBOX_DELIVERY_ENABLED",
+        "CLIENT_CATALOG_ENABLED",
       ]),
     );
     expect(liveFlags.map((key) => example[key])).toEqual(
@@ -46,6 +49,9 @@ describe("environment credential policy", () => {
     expect(example.EXPERT_TELEGRAM_QUERIES_ENABLED).toBe("false");
     expect(example.EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED).toBe("false");
     expect(example.EXPERT_TELEGRAM_REFERRAL_ENABLED).toBe("false");
+    expect(example.EXPERT_TELEGRAM_CHECKOUT_ENABLED).toBe("false");
+    expect(example.WORKER_OUTBOX_DELIVERY_ENABLED).toBe("false");
+    expect(example.CLIENT_CATALOG_ENABLED).toBe("false");
     expect(example.PAYMENT_PROVIDER).toBe("disabled");
     expect(example.LLM_PROVIDER).toBe("disabled");
 

@@ -13,7 +13,9 @@ import {
   adminRoleAssignments,
   adminSessions,
   channelIdentities,
+  clientIdentityProofReceipts,
   clientProfiles,
+  clientSessions,
   experts,
   integrationInbox,
   integrationErrors,
@@ -22,6 +24,7 @@ import {
   messageLedgerEntries,
   messagePackages,
   notifications,
+  outboxOperatorAlerts,
   privacyDeletionJobs,
   privacyDeletionManifests,
   privacyProcessorAttempts,
@@ -48,6 +51,20 @@ const names = (table: AnyPgTable) => {
 };
 
 describe("authoritative Drizzle schema parity", () => {
+  it("describes the operator case inbox invariants", () => {
+    expect(names(outboxOperatorAlerts)).toMatchObject({
+      checks: [
+        "outbox_operator_alerts_case_reason_check",
+        "outbox_operator_alerts_case_type_check",
+        "outbox_operator_alerts_lifecycle_check",
+        "outbox_operator_alerts_payload_check",
+        "outbox_operator_alerts_status_check",
+      ],
+      indexes: ["outbox_operator_alerts_unresolved_cursor_idx"],
+      uniques: ["outbox_operator_alerts_outbox_reason_unique"],
+    });
+  });
+
   it("exports every reviewed expert referral relation", () => {
     const expectedExports = [
       "expertReferralCodeBatches",
@@ -126,6 +143,10 @@ describe("authoritative Drizzle schema parity", () => {
       checks: [
         "expert_telegram_residency_callbacks_action_check",
         "expert_telegram_residency_callbacks_expiry_check",
+        "expert_telegram_residency_callbacks_checkout_outcome_check",
+        "expert_telegram_residency_callbacks_checkout_state_check",
+        "expert_telegram_residency_callbacks_expiry_check",
+        "expert_telegram_residency_callbacks_processing_lease_check",
         "expert_telegram_residency_callbacks_telegram_id_check",
         "expert_telegram_residency_callbacks_token_hash_check",
       ],
@@ -134,6 +155,11 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
       ],
       indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
+      indexes: [
+        "expert_telegram_residency_callbacks_expiry_idx",
+        "expert_telegram_residency_callbacks_processing_lease_idx",
+        "expert_telegram_residency_callbacks_url_cleanup_idx",
+      ],
       uniques: ["expert_telegram_residency_callbacks_idempotency_unique"],
     });
     expect(requiredTable("expertResidencyPaymentAttempts")?.uniques).toEqual([
@@ -225,6 +251,23 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(clientProfiles).checks).toEqual([
       "client_profiles_expert_note_bounded",
     ]);
+    expect(names(clientSessions)).toMatchObject({
+      checks: [
+        "client_sessions_lifecycle_check",
+        "client_sessions_scope_check",
+        "client_sessions_token_digest_check",
+      ],
+      indexes: ["client_sessions_expiry_idx"],
+    });
+    expect(names(clientIdentityProofReceipts)).toMatchObject({
+      checks: [
+        "client_identity_proof_receipts_expiry_check",
+        "client_identity_proof_receipts_replay_digest_check",
+        "client_identity_proof_receipts_session_digest_check",
+      ],
+      indexes: ["client_identity_proof_receipts_expiry_idx"],
+      uniques: ["client_identity_proof_receipts_session_digest_unique"],
+    });
     expect(names(slots)).toMatchObject({
       checks: ["slots_capacity_positive"],
       uniques: ["slots_provider_external_unique"],
@@ -396,6 +439,27 @@ describe("authoritative Drizzle schema parity", () => {
         "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
         "utf8",
       ),
+      readFileSync(
+        "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0028_operator_case_inbox.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0029_client_catalog_requests.sql",
+        "utf8",
+      ),
+      readFileSync("packages/db/migrations/0030_client_sessions.sql", "utf8"),
+      readFileSync(
+        "packages/db/migrations/0031_client_booking_references.sql",
+        "utf8",
+      ),
     ].join("\n");
     const requiredNames = [
       "channel_identities_provider_external_unique",
@@ -468,11 +532,89 @@ describe("authoritative Drizzle schema parity", () => {
       "expert_provider_operations_order_kind_idx",
       "expert_provider_operations_unbound_recovery_idx",
       "expert_receipt_contacts_append_only",
+      "expert_telegram_residency_callbacks_checkout_outcome_check",
+      "expert_telegram_residency_callbacks_checkout_state_check",
+      "expert_telegram_residency_callbacks_processing_lease_check",
+      "expert_telegram_residency_callbacks_processing_lease_idx",
+      "expert_telegram_residency_callbacks_url_cleanup_idx",
+      "expert_ai_request_receipts_hashes_check",
+      "expert_ai_request_receipts_status_check",
+      "expert_ai_request_receipts_version_check",
+      "expert_ai_request_receipts_state_check",
+      "expert_ai_request_receipts_lease_idx",
+      "expert_ai_request_receipts_cleanup_idx",
+      "outbox_operator_alerts_case_type_check",
+      "outbox_operator_alerts_status_check",
+      "outbox_operator_alerts_case_reason_check",
+      "outbox_operator_alerts_payload_check",
+      "outbox_operator_alerts_lifecycle_check",
+      "outbox_operator_alerts_unresolved_cursor_idx",
+      "client_sessions_token_digest_check",
+      "client_sessions_scope_check",
+      "client_sessions_lifecycle_check",
+      "client_sessions_expiry_idx",
+      "client_identity_proof_receipts_replay_digest_check",
+      "client_identity_proof_receipts_session_digest_check",
+      "client_identity_proof_receipts_expiry_check",
+      "client_identity_proof_receipts_session_digest_unique",
+      "client_identity_proof_receipts_expiry_idx",
+      "client_catalog_choices_choice_digest_check",
+      "client_catalog_choices_choice_digest_unique",
+      "client_catalog_choices_expiry_check",
+      "client_catalog_choices_request_expiry_idx",
+      "client_booking_receipts_user_choice_unique",
+      "client_booking_receipts_booking_handle_unique",
+      "client_booking_receipts_reservation_unique",
+      "client_booking_receipts_choice_digest_check",
+      "client_booking_receipts_booking_handle_check",
+      "client_booking_receipts_owner_handle_idx",
+      "client_booking_erasure_work_phase_check",
+      "client_booking_erasure_work_attempt_count_check",
+      "client_booking_erasure_work_lease_check",
+      "client_booking_erasure_work_claim_idx",
     ];
     for (const name of requiredNames) expect(migration).toContain(name);
+    expect(migration).toContain(
+      'char_length("checkout_url") BETWEEN 1 AND 2048',
+    );
+    expect(migration).toContain('"checkout_url" IS NOT NULL');
+    expect(migration).toContain('"checkout_url" ~* \'^https://');
+    expect(migration).not.toContain("{1,2040}");
     expect(migration).toMatch(
       /select eligibility[\s\S]{1,600}from expert_first_residency_settlements[\s\S]{1,600}for update/iu,
     );
+  });
+
+  it("keeps the principal migration directly before client booking", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; when: number; tag: string }> };
+    const principal = journal.entries.at(-2);
+    expect(principal).toMatchObject({
+      idx: 30,
+      tag: "0030_client_sessions",
+    });
+    expect(principal?.when).toBeGreaterThan(journal.entries.at(-3)?.when ?? 0);
+  });
+
+  it("registers the protected client booking relations as migration 0031", () => {
+    const journal = JSON.parse(
+      readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+    ) as { entries: Array<{ idx: number; when: number; tag: string }> };
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 31,
+      tag: "0031_client_booking_references",
+    });
+    expect(
+      existsSync("packages/db/migrations/0031_client_booking_references.sql"),
+    ).toBe(true);
+    for (const exportName of [
+      "clientCatalogChoices",
+      "clientBookingReceipts",
+      "clientBookingErasureWork",
+    ]) {
+      expect(dbSchema, exportName).toHaveProperty(exportName);
+    }
   });
 
   it("has a coherent latest Drizzle snapshot", () => {

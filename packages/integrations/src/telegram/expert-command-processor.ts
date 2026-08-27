@@ -38,6 +38,18 @@ interface ReferralQueryService {
 }
 
 interface ResidencyQueryService {
+  listActiveTariffs(
+    principal: FinancialPrincipal,
+  ): Promise<
+    | readonly {
+        readonly tariffVersionId: string;
+        readonly displayName: string;
+        readonly priceMinor: string;
+        readonly currency: "RUB";
+        readonly durationSeconds: number;
+      }[]
+    | { readonly kind: "forbidden" | "disabled" }
+  >;
   quote(
     principal: FinancialPrincipal,
     tariffVersionId: string,
@@ -53,6 +65,14 @@ interface ResidencyQueryService {
       }
     | { readonly kind: "forbidden" | "disabled" }
   >;
+}
+
+interface ResidencyCheckoutIssuer {
+  issue(input: {
+    readonly principal: ExpertTelegramCommandPrincipal;
+    readonly tariffVersionId: string;
+    readonly idempotencyKey: string;
+  }): Promise<string>;
 }
 
 interface QueryService {
@@ -149,6 +169,8 @@ export const createExpertCommandProcessor = (deps: {
   readonly views: ExpertTelegramQueryViewPort & ExpertTelegramViewPort;
   readonly referral?: ReferralQueryService;
   readonly residency?: ResidencyQueryService;
+  readonly checkoutReadiness?: boolean;
+  readonly checkout?: ResidencyCheckoutIssuer;
 }): ExpertCommandProcessor => {
   if (
     (deps.financialViewsEnabled === true ||
@@ -157,6 +179,9 @@ export const createExpertCommandProcessor = (deps: {
       (deps.financialViewsEnabled === true && deps.residency === undefined))
   ) {
     throw new Error("Expert Telegram financial query capability is required");
+  }
+  if (deps.checkoutReadiness === true && deps.checkout === undefined) {
+    throw new Error("Expert Telegram checkout capability is required");
   }
   const financialPrincipal = (
     principal: ExpertTelegramCommandPrincipal,
@@ -192,6 +217,33 @@ export const createExpertCommandProcessor = (deps: {
               idempotencyKey: command.idempotencyKey,
               telegramUserId: command.principal.telegramUserId,
               ...summary,
+            }),
+          );
+          return { kind: "processed", deliveryOutcome };
+        }
+        case "/residency": {
+          if (deps.financialViewsEnabled !== true) {
+            const deliveryOutcome = ordinaryDeliveryOutcome(
+              await deps.views.sendUnsupported({
+                idempotencyKey: command.idempotencyKey,
+                telegramUserId: command.principal.telegramUserId,
+              }),
+            );
+            return { kind: "unsupported", deliveryOutcome };
+          }
+          const tariffs = await unavailable(() =>
+            deps.residency!.listActiveTariffs(
+              financialPrincipal(command.principal),
+            ),
+          );
+          if (!Array.isArray(tariffs)) {
+            throw new Error("expert_query_unavailable");
+          }
+          const deliveryOutcome = ordinaryDeliveryOutcome(
+            await deps.views.sendResidencyTariffs({
+              idempotencyKey: command.idempotencyKey,
+              telegramUserId: command.principal.telegramUserId,
+              tariffs,
             }),
           );
           return { kind: "processed", deliveryOutcome };
@@ -301,6 +353,16 @@ export const createExpertCommandProcessor = (deps: {
             ) {
               throw new Error("expert_query_unavailable");
             }
+            const checkoutCallbackData =
+              deps.checkoutReadiness === true
+                ? await unavailable(() =>
+                    deps.checkout!.issue({
+                      principal: command.principal,
+                      tariffVersionId: quote.tariffVersionId!,
+                      idempotencyKey: `${command.idempotencyKey}:checkout:issue`,
+                    }),
+                  )
+                : undefined;
             const deliveryOutcome = ordinaryDeliveryOutcome(
               await deps.views.sendResidencyQuote({
                 idempotencyKey: command.idempotencyKey,
@@ -312,6 +374,9 @@ export const createExpertCommandProcessor = (deps: {
                 cashMinor: quote.cashMinor,
                 currency: quote.currency,
                 durationSeconds: quote.durationSeconds,
+                ...(checkoutCallbackData === undefined
+                  ? {}
+                  : { checkoutCallbackData }),
               }),
             );
             return { kind: "processed", deliveryOutcome };

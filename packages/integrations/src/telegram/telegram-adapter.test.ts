@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   renderExpertReferralSummary,
   renderExpertResidencyQuote,
+  renderExpertResidencyTariffs,
   renderTelegramExpertClient,
   renderTelegramExpertSchedule,
   renderTelegramExpertStats,
@@ -28,6 +29,87 @@ const buildAdapter = () => {
 };
 
 describe("expert Telegram views", () => {
+  it("renders a bounded deterministic active tariff list with server UUIDs", () => {
+    const tariffVersionId = "00000000-0000-4000-8000-000000000101";
+    const rendered = renderExpertResidencyTariffs({
+      idempotencyKey: "tariffs-0001",
+      telegramUserId: "123456789",
+      tariffs: [
+        {
+          tariffVersionId,
+          displayName: "Резидентство на месяц",
+          priceMinor: "200000",
+          currency: "RUB",
+          durationSeconds: 2_592_000,
+        },
+      ],
+    });
+
+    expect(rendered).toContain("Резидентство на месяц");
+    expect(rendered).toContain("200000 RUB minor units");
+    expect(rendered).toContain(tariffVersionId);
+    expect(rendered).toContain(`/residency ${tariffVersionId}`);
+    expect(rendered).not.toMatch(/credit|cash|checkout|payment/iu);
+  });
+
+  it("accepts the authoritative positive safe duration boundary", () => {
+    for (const durationSeconds of [1, Number.MAX_SAFE_INTEGER]) {
+      expect(
+        renderExpertResidencyTariffs({
+          idempotencyKey: `tariffs-duration-${durationSeconds}`,
+          telegramUserId: "123456789",
+          tariffs: [
+            {
+              tariffVersionId: "00000000-0000-4000-8000-000000000101",
+              displayName: "Авторитетный тариф",
+              priceMinor: "200000",
+              currency: "RUB",
+              durationSeconds,
+            },
+          ],
+        }),
+      ).toContain(`Срок: ${durationSeconds} секунд`);
+    }
+  });
+
+  it("renders an explicit empty list and visibly bounds a long valid list", () => {
+    expect(
+      renderExpertResidencyTariffs({
+        idempotencyKey: "tariffs-empty",
+        telegramUserId: "123456789",
+        tariffs: [],
+      }),
+    ).toBe("Активных тарифов резидентства сейчас нет.");
+
+    const rendered = renderExpertResidencyTariffs({
+      idempotencyKey: "tariffs-long",
+      telegramUserId: "123456789",
+      tariffs: Array.from({ length: 20 }, (_, index) => ({
+        tariffVersionId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        displayName: `${index + 1} ${"Тариф ".repeat(30)}`,
+        priceMinor: String(200000 + index),
+        currency: "RUB" as const,
+        durationSeconds: 2_592_000,
+      })),
+    });
+
+    expect(rendered.length).toBeLessThanOrEqual(4096);
+    expect(rendered).toMatch(/Показано \d+ из 20/u);
+  });
+
+  it("sends tariff discovery with request logging disabled", async () => {
+    const { adapter, requests } = buildAdapter();
+    await adapter.sendResidencyTariffs({
+      idempotencyKey: "tariffs-0002",
+      telegramUserId: "123456789",
+      tariffs: [],
+    });
+    expect(requests[0]?.context).toEqual({
+      idempotencyKey: "tariffs-0002",
+      disableRequestLogging: true,
+    });
+  });
+
   it("renders referral summary from server facts without calculating amounts", () => {
     expect(
       renderExpertReferralSummary({
@@ -84,6 +166,56 @@ describe("expert Telegram views", () => {
       idempotencyKey: "summary-0002",
       disableRequestLogging: true,
     });
+  });
+
+  it("renders one opaque xr1 checkout button only when supplied", async () => {
+    const { adapter, requests } = buildAdapter();
+    const callbackData =
+      "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    await adapter.sendResidencyQuote({
+      idempotencyKey: "quote-0002",
+      telegramUserId: "123456789",
+      tariffVersionId: "00000000-0000-4000-8000-000000000101",
+      displayName: "30 days",
+      priceMinor: "199999",
+      creditMinor: "12345",
+      cashMinor: "187654",
+      currency: "RUB",
+      durationSeconds: 2_592_000,
+      checkoutCallbackData: callbackData,
+    });
+
+    expect(requests[0]?.body).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [[{ text: "Оплатить", callback_data: callbackData }]],
+      },
+    });
+    expect(Buffer.byteLength(callbackData, "utf8")).toBeLessThanOrEqual(64);
+  });
+
+  it("sends a bounded HTTPS checkout link with request logging disabled", async () => {
+    const { adapter, requests } = buildAdapter();
+
+    await expect(
+      adapter.sendResidencyCheckoutLink({
+        idempotencyKey: `telegram:${"b".repeat(64)}:checkout:delivery`,
+        telegramUserId: "123456789",
+        checkoutUrl: "https://pay.example/checkout",
+      }),
+    ).resolves.toEqual({ kind: "applied", providerOperationId: "42" });
+
+    expect(requests[0]?.body).toMatchObject({
+      chat_id: "123456789",
+      text: "Оплата резидентства: https://pay.example/checkout",
+    });
+    expect(requests[0]?.context).toMatchObject({ disableRequestLogging: true });
+    await expect(
+      adapter.sendResidencyCheckoutLink({
+        idempotencyKey: "bad-link",
+        telegramUserId: "123456789",
+        checkoutUrl: "http://pay.example/checkout",
+      }),
+    ).rejects.toThrow("invalid_expert_view");
   });
 
   it("rejects malformed server money instead of normalizing it", () => {

@@ -12,8 +12,74 @@ describe("worker main", () => {
     const { disabledExpertResidencyProviderReader } = await import("./main.js");
 
     await expect(
-      disabledExpertResidencyProviderReader.readPayments(),
+      disabledExpertResidencyProviderReader.readPayments({
+        now: new Date("2026-08-14T10:00:00.000Z"),
+        payments: [],
+      }),
     ).resolves.toEqual({ kind: "disabled" });
+  });
+
+  it("constructs the worker outbox registry lazily only for enabled config", async () => {
+    const { selectWorkerOutboxRegistry } = await import("./main.js");
+    const registry = {
+      topics: [
+        "safety.operator_escalation",
+        "admin.negative_feedback",
+      ] as const,
+      dispatch: vi.fn(),
+      reconcile: vi.fn(),
+    };
+    const factory = vi.fn(() => registry);
+
+    expect(
+      selectWorkerOutboxRegistry(
+        { features: { workerOutboxDelivery: false } } as never,
+        factory,
+      ),
+    ).toBeUndefined();
+    expect(factory).not.toHaveBeenCalled();
+
+    expect(
+      selectWorkerOutboxRegistry(
+        { features: { workerOutboxDelivery: true } } as never,
+        factory,
+      ),
+    ).toBe(registry);
+    expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed before registry use when enabled composition is incomplete", async () => {
+    const { selectWorkerOutboxRegistry } = await import("./main.js");
+
+    expect(() =>
+      selectWorkerOutboxRegistry({
+        features: { workerOutboxDelivery: true },
+      } as never),
+    ).toThrow("worker_outbox_delivery_capability_unavailable");
+    expect(() =>
+      selectWorkerOutboxRegistry(
+        { features: { workerOutboxDelivery: true } } as never,
+        () => undefined,
+      ),
+    ).toThrow("worker_outbox_delivery_capability_unavailable");
+  });
+
+  it("does not accept a prebuilt registry as a disabled-mode bypass", async () => {
+    const { createProductionWorkerRuntimeFactory } = await import("./main.js");
+    const registryFactory = vi.fn(() => ({ topics: [] }));
+    const factory = createProductionWorkerRuntimeFactory({
+      workerOutboxRegistryFactory: registryFactory,
+      workerOutboxRegistry: { topics: ["provider.forbidden"] },
+    } as never);
+
+    await expect(
+      factory.create({
+        databaseUrl:
+          "postgresql://worker:worker@localhost/worker?sslmode=require",
+        features: { workerOutboxDelivery: false },
+      } as never),
+    ).resolves.toBeDefined();
+    expect(registryFactory).not.toHaveBeenCalled();
   });
 
   it("accepts an injected YooKassa reader only with complete enabled metadata", async () => {

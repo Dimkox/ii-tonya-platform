@@ -20,6 +20,7 @@ const build = async (options: {
   resolve?: (authorization: string | undefined) => Promise<ExpertPrincipal | null>;
   redeem?: ExpertReferralService["redeemCode"];
   summary?: ExpertReferralService["summary"];
+  listActiveTariffs?: ExpertResidencyService["listActiveTariffs"];
   quote?: ExpertResidencyService["quote"];
   checkout?: ExpertResidencyService["checkout"];
 } = {}) => {
@@ -45,11 +46,23 @@ const build = async (options: {
         cashMinor: "100000",
       })),
   );
+  const listActiveTariffs = vi.fn(
+    options.listActiveTariffs ??
+      (async () => [
+        {
+          tariffVersionId,
+          displayName: "Резидентство на месяц",
+          priceMinor: "200000",
+          currency: "RUB" as const,
+          durationSeconds: 2_592_000,
+        },
+      ]),
+  );
   const checkout = vi.fn(
     options.checkout ??
       (async () => ({
         id: "00000000-0000-4000-8000-000000000201",
-        status: "payment_pending",
+        status: "payment_pending" as const,
       })),
   );
   const app = await buildExpertReferralApi({
@@ -60,6 +73,7 @@ const build = async (options: {
     },
     referrals: { redeemCode, summary },
     residency: {
+      listActiveTariffs,
       quote,
       checkout,
       reconciliation: {
@@ -70,10 +84,76 @@ const build = async (options: {
       },
     },
   });
-  return { app, redeemCode, summary, quote, checkout };
+  return {
+    app,
+    redeemCode,
+    summary,
+    listActiveTariffs,
+    quote,
+    checkout,
+  };
 };
 
 describe("expert referral API", () => {
+  it("returns only the freshly authenticated expert's active tariff projection", async () => {
+    const { app, listActiveTariffs } = await build();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/expert/residency/tariffs",
+        headers: { authorization },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual([
+        {
+          tariffVersionId,
+          displayName: "Резидентство на месяц",
+          priceMinor: "200000",
+          currency: "RUB",
+          durationSeconds: 2_592_000,
+        },
+      ]);
+      expect(listActiveTariffs).toHaveBeenCalledWith(principal);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not query tariffs without a fresh authenticated principal", async () => {
+    const { app, listActiveTariffs } = await build();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/expert/residency/tariffs",
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(listActiveTariffs).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each([
+    [{ kind: "forbidden" as const }, 403],
+    [{ kind: "disabled" as const }, 503],
+  ])("maps a bounded tariff discovery result %#", async (result, status) => {
+    const { app } = await build({
+      listActiveTariffs: async () => result,
+    });
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/expert/residency/tariffs",
+        headers: { authorization },
+      });
+      expect(response.statusCode).toBe(status);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("reauthorizes the principal and fails closed on cross-expert ownership", async () => {
     const { app, redeemCode } = await build({
       redeem: async () => ({ kind: "forbidden" }),

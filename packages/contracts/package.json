@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
-    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^4.3.6"

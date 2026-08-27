@@ -98,21 +98,22 @@ export interface ExpertScheduleView {
 }
 
 export interface BookingWorkflowRepository {
-  searchSlots(command: SearchSlotsCommand & {
-    readonly minimumLeadMs: number;
-  }): Promise<readonly SlotView[]>;
-  reserveAndPublish(command: ReserveCommand & {
-    readonly minimumLeadMs: number;
-    readonly confirmationBufferMs: number;
-  }): Promise<ReserveResult>;
+  searchSlots(
+    command: SearchSlotsCommand & {
+      readonly minimumLeadMs: number;
+    },
+  ): Promise<readonly SlotView[]>;
+  reserveAndPublish(
+    command: ReserveCommand & {
+      readonly minimumLeadMs: number;
+      readonly confirmationBufferMs: number;
+    },
+  ): Promise<ReserveResult>;
   transitionAndPublish(command: {
     readonly reservationId: string;
     readonly expectedVersion: number;
     readonly action:
-      | "expert_confirm"
-      | "expert_cancel"
-      | "client_cancel"
-      | "expire";
+      "expert_confirm" | "expert_cancel" | "client_cancel" | "expire";
     readonly actor: {
       readonly type: "expert" | "client" | "system";
       readonly id: string;
@@ -140,6 +141,7 @@ export interface BookingWorkflowRepository {
 export interface BookingDependencies {
   readonly repository: BookingWorkflowRepository;
   readonly clock: { now(): Date };
+  readonly confirmationBufferMs?: number;
 }
 
 export interface BookingService {
@@ -155,7 +157,8 @@ export interface BookingService {
 }
 
 const MINIMUM_LEAD_MS = 24 * 60 * 60 * 1_000;
-const CONFIRMATION_BUFFER_MS = 30 * 60 * 1_000;
+const DEFAULT_CONFIRMATION_BUFFER_MS = 60 * 60 * 1_000;
+const MAXIMUM_CONFIRMATION_BUFFER_MS = 72 * 60 * 60 * 1_000;
 
 const parseInstant = (value: string, field: string): Date => {
   const parsed = new Date(value);
@@ -177,6 +180,15 @@ const validTimezone = (timezone: string): boolean => {
 export const createBookingService = (
   deps: BookingDependencies,
 ): BookingService => {
+  const confirmationBufferMs =
+    deps.confirmationBufferMs ?? DEFAULT_CONFIRMATION_BUFFER_MS;
+  if (
+    !Number.isSafeInteger(confirmationBufferMs) ||
+    confirmationBufferMs < 1 ||
+    confirmationBufferMs > MAXIMUM_CONFIRMATION_BUFFER_MS
+  ) {
+    throw new Error("Invalid booking confirmation buffer");
+  }
   const clientTransition = (
     command: ClientCancelCommand,
   ): Promise<BookingResult> =>
@@ -223,7 +235,7 @@ export const createBookingService = (
         ...command,
         now: deps.clock.now(),
         minimumLeadMs: MINIMUM_LEAD_MS,
-        confirmationBufferMs: CONFIRMATION_BUFFER_MS,
+        confirmationBufferMs,
       }),
     confirmByExpert: (command) => expertTransition(command, "confirm"),
     cancelByExpert: (command) => expertTransition(command, "cancel"),
@@ -275,8 +287,7 @@ export const createBookingService = (
         return {
           ...view,
           status: record.status,
-          ...(record.status === "booked" &&
-          record.meetingUrl !== undefined
+          ...(record.status === "booked" && record.meetingUrl !== undefined
             ? { meetingUrl: record.meetingUrl }
             : {}),
         };

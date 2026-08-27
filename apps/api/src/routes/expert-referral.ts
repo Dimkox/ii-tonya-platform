@@ -137,6 +137,15 @@ export async function expertReferralRoutes(
   }
 
   if (enabled.expertResidencyBilling) {
+    app.get("/v1/expert/residency/tariffs", async (request, reply) => {
+      const principal = await principalFor(request.headers.authorization);
+      if (principal === null) {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+      const result = await deps.residency.listActiveTariffs(principal);
+      return sendServiceResult(reply, result);
+    });
+
     app.post(
       "/v1/expert/residency/quotes",
       { bodyLimit: 8 * 1024, schema: { body: quoteBodySchema } },

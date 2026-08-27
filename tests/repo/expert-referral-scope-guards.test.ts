@@ -27,11 +27,15 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0023_yookassa_provider_operations.sql",
       "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
       "packages/db/migrations/0025_expert_telegram_residency_callbacks.sql",
+      "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
+      "packages/db/migrations/0027_expert_ai_request_receipts.sql",
+      "packages/db/migrations/0028_operator_case_inbox.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
+      "expert_ai_request_receipts",
       "expert_first_residency_settlements",
       "expert_referral_abuse_holds",
       "expert_referral_admin_execution_results",
@@ -54,10 +58,12 @@ describe("expert residency referral scope boundary", () => {
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
       "/v1/admin/expert-referrals/inventory",
+      "/v1/expert/assistant/messages",
       "/v1/expert/referrals/redeem",
       "/v1/expert/referrals/summary",
       "/v1/expert/residency/checkouts",
       "/v1/expert/residency/quotes",
+      "/v1/expert/residency/tariffs",
       "/v1/webhooks/yookassa",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([
@@ -67,6 +73,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_REFERRAL_HMAC_KEY_REF",
       "EXPERT_REFERRAL_HMAC_KEY_VERSION",
       "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "EXPERT_TELEGRAM_CHECKOUT_ENABLED",
       "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
       "EXPERT_TELEGRAM_REFERRAL_ENABLED",

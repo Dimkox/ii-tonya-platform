@@ -49,10 +49,22 @@ describe("sandbox runtime guard", () => {
       { ...validEnv(), TELEGRAM_ENABLED: "true" },
       "sandbox_live_integration_forbidden",
     ],
-    [{ ...validEnv(), MINOR_ONBOARDING_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
-    [{ ...validEnv(), EXPERT_REFERRAL_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
-    [{ ...validEnv(), EXPERT_RESIDENCY_BILLING_ENABLED: "true" }, "sandbox_live_integration_forbidden"],
-    [{ ...validEnv(), UNREVIEWED_FEATURE_ENABLED: "false" }, "sandbox_unsupported_enable_flag"],
+    [
+      { ...validEnv(), MINOR_ONBOARDING_ENABLED: "true" },
+      "sandbox_live_integration_forbidden",
+    ],
+    [
+      { ...validEnv(), EXPERT_REFERRAL_ENABLED: "true" },
+      "sandbox_live_integration_forbidden",
+    ],
+    [
+      { ...validEnv(), EXPERT_RESIDENCY_BILLING_ENABLED: "true" },
+      "sandbox_live_integration_forbidden",
+    ],
+    [
+      { ...validEnv(), UNREVIEWED_FEATURE_ENABLED: "false" },
+      "sandbox_unsupported_enable_flag",
+    ],
     [
       { ...validEnv(), PAYMENT_API_KEY: "present" },
       "sandbox_payment_credentials_forbidden",
@@ -61,22 +73,35 @@ describe("sandbox runtime guard", () => {
       { ...validEnv(), PAYMENTS_PROVIDER: " " },
       "sandbox_payment_credentials_forbidden",
     ],
-    [{ ...validEnv(), PAYMENT_MERCHANT_PASSWORD: "present" }, "sandbox_payment_credentials_forbidden"],
+    [
+      { ...validEnv(), PAYMENT_MERCHANT_PASSWORD: "present" },
+      "sandbox_payment_credentials_forbidden",
+    ],
   ])("rejects unsafe environment %#", (env, message) => {
     expect(() => assertSandboxRuntimeEnvironment(env)).toThrow(message);
   });
 
   it("accepts only the explicit sandbox fail-closed environment", () => {
-    expect(() => assertSandboxRuntimeEnvironment({ ...validEnv(), PAYMENT_API_KEY: "" })).not.toThrow();
+    expect(() =>
+      assertSandboxRuntimeEnvironment({ ...validEnv(), PAYMENT_API_KEY: "" }),
+    ).not.toThrow();
   });
 
-  it.each(["", "localhost", "example.com", "127.0.0.2", "0.0.0.0 "])("rejects a non-allowlisted sandbox host %j", (host) => {
-    expect(() => sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host })).toThrow("sandbox_host_invalid");
-  });
+  it.each(["", "localhost", "example.com", "127.0.0.2", "0.0.0.0 "])(
+    "rejects a non-allowlisted sandbox host %j",
+    (host) => {
+      expect(() =>
+        sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host }),
+      ).toThrow("sandbox_host_invalid");
+    },
+  );
 
   it("allows only explicit loopback or container bind hosts", () => {
     expect(sandboxListenOptions(validEnv()).host).toBe("127.0.0.1");
-    for (const host of ["127.0.0.1", "0.0.0.0", "::1", "::"]) expect(sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host }).host).toBe(host);
+    for (const host of ["127.0.0.1", "0.0.0.0", "::1", "::"])
+      expect(
+        sandboxListenOptions({ ...validEnv(), SANDBOX_HOST: host }).host,
+      ).toBe(host);
   });
 });
 
@@ -99,8 +124,12 @@ describe("sandbox server composition", () => {
   });
 
   it("contains no runtime migration or schema mutation capability", async () => {
-    const source = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("./server.ts", import.meta.url), "utf8"));
-    expect(source).not.toMatch(/migrateDb|migrateSandboxDatabase|defaultMigrationsFolder/u);
+    const source = await import("node:fs/promises").then(({ readFile }) =>
+      readFile(new URL("./server.ts", import.meta.url), "utf8"),
+    );
+    expect(source).not.toMatch(
+      /migrateDb|migrateSandboxDatabase|defaultMigrationsFolder/u,
+    );
   });
 
   it("builds only after the marker succeeds", async () => {
@@ -120,8 +149,16 @@ describe("sandbox server composition", () => {
   it("composes, listens, and closes the real database lifecycle", async () => {
     const close = vi.fn(async () => undefined);
     const listen = vi.fn(async () => undefined);
-    const runtimeFactory = vi.fn(async () => ({ dependencies: dependencies() as never, close }));
-    await main({ env: validEnv(), runtimeFactory, listen, installSignals: false });
+    const runtimeFactory = vi.fn(async () => ({
+      dependencies: dependencies() as never,
+      close,
+    }));
+    await main({
+      env: validEnv(),
+      runtimeFactory,
+      listen,
+      installSignals: false,
+    });
     expect(runtimeFactory).toHaveBeenCalledOnce();
     expect(listen).toHaveBeenCalledOnce();
     expect(close).toHaveBeenCalledOnce();
@@ -129,14 +166,38 @@ describe("sandbox server composition", () => {
 
   it("closes the database when listen fails", async () => {
     const close = vi.fn(async () => undefined);
-    await expect(main({ env: validEnv(), runtimeFactory: async () => ({ dependencies: dependencies() as never, close }), listen: async () => { throw new Error("listen failed"); }, installSignals: false })).rejects.toThrow("listen failed");
+    await expect(
+      main({
+        env: validEnv(),
+        runtimeFactory: async () => ({
+          dependencies: dependencies() as never,
+          close,
+        }),
+        listen: async () => {
+          throw new Error("listen failed");
+        },
+        installSignals: false,
+      }),
+    ).rejects.toThrow("listen failed");
     expect(close).toHaveBeenCalledOnce();
   });
 
   it("sanitizes signal cleanup rejection and sets a nonzero exit", async () => {
     const previousExitCode = process.exitCode;
-    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    await main({ env: validEnv(), runtimeFactory: async () => ({ dependencies: dependencies() as never, close: async () => { throw new Error("secret detail"); } }), listen: async () => undefined, installSignals: true });
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await main({
+      env: validEnv(),
+      runtimeFactory: async () => ({
+        dependencies: dependencies() as never,
+        close: async () => {
+          throw new Error("secret detail");
+        },
+      }),
+      listen: async () => undefined,
+      installSignals: true,
+    });
     process.emit("SIGTERM");
     await vi.waitFor(() => expect(process.exitCode).toBe(1));
     expect(stderr).toHaveBeenCalledWith("sandbox_shutdown_failed\n");
@@ -148,17 +209,27 @@ describe("sandbox server composition", () => {
   it("attempts database cleanup when app cleanup rejects", async () => {
     const runtimeClose = vi.fn(async () => undefined);
     const appCloseError = new Error("app close secret");
-    await expect(main({
-      env: validEnv(),
-      runtimeFactory: async () => ({ dependencies: dependencies() as never, close: runtimeClose }),
-      listen: async (app) => { vi.spyOn(app, "close").mockRejectedValueOnce(appCloseError); },
-      installSignals: false,
-    })).rejects.toThrow(appCloseError);
+    await expect(
+      main({
+        env: validEnv(),
+        runtimeFactory: async () => ({
+          dependencies: dependencies() as never,
+          close: runtimeClose,
+        }),
+        listen: async (app) => {
+          vi.spyOn(app, "close").mockRejectedValueOnce(appCloseError);
+        },
+        installSignals: false,
+      }),
+    ).rejects.toThrow(appCloseError);
     expect(runtimeClose).toHaveBeenCalledOnce();
   });
 
   it("detects only direct execution", () => {
     expect(isDirectExecution(import.meta.url, process.argv[1])).toBe(false);
-    expect(isDirectExecution(import.meta.url, new URL(import.meta.url).pathname)).toBe(true);
+    expect(
+      isDirectExecution(import.meta.url, fileURLToPath(import.meta.url)),
+    ).toBe(true);
   });
 });
+import { fileURLToPath } from "node:url";

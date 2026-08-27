@@ -13,12 +13,20 @@ import {
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalExpertKeys = process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
+const originalClientSessionEnabled = process.env.CLIENT_SESSION_ENABLED;
+const originalClientCatalogEnabled = process.env.CLIENT_CATALOG_ENABLED;
 afterEach(() => {
   if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
   else process.env.DATABASE_URL = originalDatabaseUrl;
   if (originalExpertKeys === undefined)
     delete process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON;
   else process.env.EXPERT_REFERRAL_HMAC_KEYS_JSON = originalExpertKeys;
+  if (originalClientSessionEnabled === undefined)
+    delete process.env.CLIENT_SESSION_ENABLED;
+  else process.env.CLIENT_SESSION_ENABLED = originalClientSessionEnabled;
+  if (originalClientCatalogEnabled === undefined)
+    delete process.env.CLIENT_CATALOG_ENABLED;
+  else process.env.CLIENT_CATALOG_ENABLED = originalClientCatalogEnabled;
 });
 const disabled = new Proxy(
   {},
@@ -30,11 +38,141 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      $client: { end: async () => undefined },
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientSession: false,
+        clientCatalog: false,
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
+    };
+
+    const disabledDeps = await createDefaultLifecycle().dependencies(
+      config,
+      fakeDb,
+    );
+    expect(disabledDeps.clientCatalogService).toBeUndefined();
+    expect(disabledDeps.clientSessionService).toBeUndefined();
+    expect(disabledDeps.clientSessionRepository).toBeUndefined();
+    expect(disabledDeps.clientPrincipal).toBeUndefined();
+
+    const enabled = {
+      ...config,
+      features: {
+        ...config.features,
+        clientSession: true,
+        clientCatalog: true,
+      },
+    };
+    await expect(
+      createDefaultLifecycle().dependencies(enabled, fakeDb),
+    ).rejects.toThrow("Client session verifier capability is required");
+
+    const injected = await createDefaultLifecycle({
+      clientSessionComposition: {
+        verifier: { verify: async () => null },
+      },
+    }).dependencies(enabled, fakeDb);
+    expect(injected.clientCatalogService).toBeDefined();
+    expect(injected.clientSessionService).toBeDefined();
+    expect(injected.clientSessionRepository).toBeDefined();
+    expect(injected.clientPrincipal).toBeDefined();
+  });
+  it("rejects an invalid client feature combination before migration", async () => {
+    process.env.DATABASE_URL =
+      "postgresql://placeholder.invalid/test?sslmode=require";
+    process.env.CLIENT_SESSION_ENABLED = "false";
+    process.env.CLIENT_CATALOG_ENABLED = "true";
+    const migrate = vi.fn(async () => undefined);
+    const lifecycle: ServerLifecycle = {
+      preflight: createDefaultLifecycle().preflight,
+      migrate,
+      dependencies: async () => disabled as never,
+      close: async () => undefined,
+    };
+    await expect(composeServer(lifecycle, {} as DrizzleDb)).rejects.toThrow(
+      "Client catalog requires client session authority",
+    );
+    expect(migrate).not.toHaveBeenCalled();
+  });
+  it("composes the durable expert AI receipt store only with an injected source capability", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      $client: {
+        query: async () => ({ rows: [], rowCount: 0 }),
+        end: async () => undefined,
+      },
+    } as unknown as DrizzleDb;
+    const config: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: false,
+        expertResidencyBilling: false,
+        expertAiIngress: false,
+      },
+    };
+    const absent = await createDefaultLifecycle().dependencies(config, fakeDb);
+    expect(absent.expertAiIngress).toBeUndefined();
+    expect(absent.expertAiPrincipal).toBeUndefined();
+    expect(absent.expertAiRequests).toBeUndefined();
+
+    const lifecycle = createDefaultLifecycle({
+      expertAiComposition: {
+        ingress: { handle: async () => ({ kind: "disabled" }) },
+        principals: { resolve: async () => null },
+      },
+    });
+    const deps = await lifecycle.dependencies(config, fakeDb);
+    expect(deps.expertAiIngress).toBeDefined();
+    expect(deps.expertAiPrincipal).toBeDefined();
+    expect(deps.expertAiRequests).toBeInstanceOf(
+      (await import("@ii-tonya/db")).PostgresExpertAiRequestReceiptStore,
+    );
+    await lifecycle.close(fakeDb);
+  });
   it("migrates before dependency readiness and closes app before database/telemetry lifecycle", async () => {
     process.env.DATABASE_URL =
       "postgresql://placeholder.invalid/test?sslmode=require";
     const order: string[] = [];
     const lifecycle: ServerLifecycle = {
+      preflight() {},
       async migrate() {
         order.push("migrate");
       },
@@ -104,11 +242,17 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: false, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: false,
+        expertResidencyBilling: false,
+      },
     };
-    const app = await (
-      await import("./app.js")
-    ).buildApp(await lifecycle.dependencies(config, fakeDb));
+    const dependencies = await lifecycle.dependencies(config, fakeDb);
+    expect(dependencies.operatorCases).toBeDefined();
+    const app = await (await import("./app.js")).buildApp(dependencies);
     expect(
       (await app.inject({ method: "GET", url: "/health/live" })).statusCode,
     ).toBe(200);
@@ -121,16 +265,41 @@ describe("server composition", () => {
         })
       ).statusCode,
     ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/v1/expert/assistant/messages",
+          payload: { text: "Баланс", locale: "ru-RU" },
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/v1/admin/operator-cases?limit=10",
+        })
+      ).statusCode,
+    ).toBe(401);
     await app.close();
     await lifecycle.close(fakeDb);
   });
 
   it.each([
-    { financialViewsEnabled: false, expectedKind: "disabled" },
-    { financialViewsEnabled: true, expectedKind: "processed" },
+    {
+      financialViewsEnabled: false,
+      checkoutEnabled: false,
+      expectedKind: "disabled",
+    },
+    {
+      financialViewsEnabled: true,
+      checkoutEnabled: true,
+      expectedKind: "processed",
+    },
   ] as const)(
-    "derives financial view exposure from RuntimeConfig: $financialViewsEnabled",
-    async ({ financialViewsEnabled, expectedKind }) => {
+    "derives financial and checkout exposure from RuntimeConfig: $financialViewsEnabled/$checkoutEnabled",
+    async ({ financialViewsEnabled, checkoutEnabled, expectedKind }) => {
       const referralSummary = vi.fn(async () => ({
         availableMinor: "100000",
         reservedMinor: "0",
@@ -145,6 +314,12 @@ describe("server composition", () => {
         kind: "applied" as const,
         providerOperationId: "2",
       });
+      const checkoutProcess = vi.fn(async () => ({
+        kind: "ready" as const,
+        tokenHash: "b".repeat(64),
+        checkoutUrl: "https://pay.example/checkout",
+        replay: false,
+      }));
       const lifecycle = createDefaultLifecycle({
         expertTelegramComposition: {
           resolvePrincipal: async (telegramUserId) => ({
@@ -175,10 +350,20 @@ describe("server composition", () => {
             redeemCode: async () => ({ kind: "disabled" as const }),
           },
           residency: { quote: async () => ({ kind: "disabled" as const }) },
+          residency: {
+            listActiveTariffs: async () => ({ kind: "disabled" as const }),
+            quote: async () => ({ kind: "disabled" as const }),
+          },
+          checkout: {
+            issue: async () => "xr1.safe",
+            process: checkoutProcess,
+          },
           views: {
             sendReferralSummary,
             sendReferralRedeemed: applied,
             sendResidencyQuote: applied,
+            sendResidencyTariffs: applied,
+            sendResidencyCheckoutLink: applied,
             sendQuerySchedule: applied,
             sendClientChoices: applied,
             sendClientView: applied,
@@ -206,10 +391,14 @@ describe("server composition", () => {
         rawConversationLogging: false,
         selartiOutboundBillingMode: "disabled",
         displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
         features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
           expertReferral: false,
           expertResidencyBilling: false,
           expertTelegramFinancialViews: financialViewsEnabled,
+          expertTelegramCheckout: checkoutEnabled,
         },
       };
 
@@ -231,6 +420,24 @@ describe("server composition", () => {
       expect(sendReferralSummary).toHaveBeenCalledTimes(
         financialViewsEnabled ? 1 : 0,
       );
+      const checkoutInput = {
+        data: "xr1.safe",
+        principal: principal!,
+      };
+      if (checkoutEnabled) {
+        await expect(
+          dependencies.expertTelegramQueries!.processResidencyCheckout(
+            checkoutInput,
+          ),
+        ).resolves.toMatchObject({ kind: "ready" });
+      } else {
+        await expect(
+          dependencies.expertTelegramQueries!.processResidencyCheckout(
+            checkoutInput,
+          ),
+        ).rejects.toThrow("Expert Telegram checkout is disabled");
+      }
+      expect(checkoutProcess).toHaveBeenCalledTimes(checkoutEnabled ? 1 : 0);
       await lifecycle.close(fakeDb);
     },
   );
@@ -254,7 +461,10 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
       features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
         expertTelegramFinancialViews: true,
@@ -288,7 +498,13 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: true, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
       expertReferralKey: {
         currentVersion: "v1",
         reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -327,7 +543,13 @@ describe("server composition", () => {
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: { expertReferral: true, expertResidencyBilling: false },
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        expertReferral: true,
+        expertResidencyBilling: false,
+      },
       expertReferralKey: {
         currentVersion: "v1",
         reference: "env://EXPERT_REFERRAL_HMAC_KEYS_JSON",
@@ -343,7 +565,12 @@ describe("server composition", () => {
       ...dependencies,
       config: {
         ...dependencies.config,
-        features: { expertReferral: false, expertResidencyBilling: false },
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          expertReferral: false,
+          expertResidencyBilling: false,
+        },
       },
     });
     expect(
@@ -357,6 +584,7 @@ describe("server composition", () => {
       "postgresql://placeholder.invalid/test?sslmode=require";
     const order: string[] = [];
     const lifecycle: ServerLifecycle = {
+      preflight() {},
       async migrate() {},
       async dependencies(config) {
         return {

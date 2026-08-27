@@ -6,7 +6,7 @@ describe("projection architecture boundary", () => {
   it("allows projection imports only in worker delivery composition", () => {
     const violations: string[] = [];
     for (const file of globSync(["apps/**/*.ts", "packages/**/*.ts"], {
-      exclude: ["**/*.test.ts", "**/*.testkit.ts"],
+      exclude: ["**/dist/**", "**/*.test.ts", "**/*.testkit.ts"],
     })) {
       violations.push(
         ...findProjectionImportViolations({
@@ -97,9 +97,10 @@ describe("expert residency referral architecture boundary", () => {
   it("keeps production worker provider reads disabled", () => {
     const main = readFileSync("apps/worker/src/main.ts", "utf8");
     expect(main).toContain("disabledExpertResidencyProviderReader");
-    expect(main).toContain('kind: "disabled" as const');
+    expect(main).toContain("return disabledExpertResidencyProviderReader");
+    expect(main).toContain("config.features.yookassa !== true");
     expect(main).not.toMatch(
-      /\b(?:fetch|axios|stripe|yookassa|cloudpayments|paypal|adyen)\b/iu,
+      /from\s+["'](?:axios|stripe|yookassa|cloudpayments|paypal|adyen)(?:[\/"'])/iu,
     );
   });
 
@@ -129,5 +130,4 @@ describe("expert residency referral architecture boundary", () => {
     expect(clientBlock).not.toContain("redeem_expert_referral");
     expect(clientBlock).not.toContain("start_residency_checkout");
   });
-
 });

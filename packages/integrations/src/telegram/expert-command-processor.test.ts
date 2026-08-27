@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createExpertCommandProcessor } from "./expert-command-processor.js";
 import type {
   ExpertTelegramQueryViewPort,
+  ExpertTelegramViewPort,
   TelegramSendOutcome,
 } from "./telegram-adapter.js";
 
@@ -17,6 +18,7 @@ const build = (
   enabled = true,
   financialViewsEnabled = false,
   referralMutationsEnabled = false,
+  checkoutReadiness = false,
 ) => {
   const schedule = vi.fn(async () => ({
     expertId: principal.expertId,
@@ -63,6 +65,18 @@ const build = (
     currency: "RUB" as const,
     durationSeconds: 2_592_000,
   }));
+  const residencyTariffs = vi.fn(async () => [
+    {
+      tariffVersionId: "00000000-0000-4000-8000-000000000301",
+      displayName: "Резидентство на месяц",
+      priceMinor: "200000",
+      currency: "RUB" as const,
+      durationSeconds: 2_592_000,
+    },
+  ]);
+  const issueCheckout = vi.fn(async () =>
+    "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  );
   const sendQuerySchedule = vi.fn<
     ExpertTelegramQueryViewPort["sendQuerySchedule"]
   >(async () => ({
@@ -101,6 +115,18 @@ const build = (
     kind: "applied" as const,
     providerOperationId: "8",
   }));
+  const sendResidencyTariffs = vi.fn<
+    ExpertTelegramViewPort["sendResidencyTariffs"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "10",
+  }));
+  const sendResidencyCheckoutLink = vi.fn<
+    ExpertTelegramViewPort["sendResidencyCheckoutLink"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "11",
+  }));
   const sendReferralRedeemed = vi.fn(async () => ({
     kind: "applied" as const,
     providerOperationId: "9",
@@ -120,6 +146,8 @@ const build = (
     answerCallbackQuery,
     sendReferralSummary,
     sendResidencyQuote,
+    sendResidencyTariffs,
+    sendResidencyCheckoutLink,
     sendReferralRedeemed,
   };
   return {
@@ -131,6 +159,13 @@ const build = (
       referralMutationsEnabled,
       referral: { summary: referralSummary, redeemCode },
       residency: { quote: residencyQuote },
+      checkoutReadiness,
+      checkout: { issue: issueCheckout },
+      referral: { summary: referralSummary, redeemCode },
+      residency: {
+        listActiveTariffs: residencyTariffs,
+        quote: residencyQuote,
+      },
     }),
     schedule,
     clientChoices,
@@ -139,6 +174,8 @@ const build = (
     referralSummary,
     redeemCode,
     residencyQuote,
+    residencyTariffs,
+    issueCheckout,
     views,
   };
 };
@@ -253,6 +290,69 @@ describe("expert Telegram command processor", () => {
     }
     expect(state.residencyQuote).toHaveBeenCalledTimes(1);
     expect(state.referralSummary).not.toHaveBeenCalled();
+  });
+
+  it("lists authoritative active tariffs for the exact private /residency command", async () => {
+    const state = build(true, true);
+
+    await expect(
+      state.processor.processCommand(command("/residency")),
+    ).resolves.toEqual({ kind: "processed", deliveryOutcome: "applied" });
+    expect(state.residencyTariffs).toHaveBeenCalledWith({
+      authenticated: true,
+      userId: principal.userId,
+      expertId: principal.expertId,
+    });
+    expect(state.views.sendResidencyTariffs).toHaveBeenCalledWith({
+      idempotencyKey: "telegram-update-1",
+      telegramUserId: principal.telegramUserId,
+      tariffs: [
+        {
+          tariffVersionId: "00000000-0000-4000-8000-000000000301",
+          displayName: "Резидентство на месяц",
+          priceMinor: "200000",
+          currency: "RUB",
+          durationSeconds: 2_592_000,
+        },
+      ],
+    });
+    expect(state.residencyQuote).not.toHaveBeenCalled();
+    expect(state.issueCheckout).not.toHaveBeenCalled();
+  });
+
+  it("keeps tariff discovery behind the financial-view flag", async () => {
+    const state = build(true, false);
+    await expect(
+      state.processor.processCommand(command("/residency")),
+    ).resolves.toMatchObject({ kind: "unsupported" });
+    expect(state.residencyTariffs).not.toHaveBeenCalled();
+    expect(state.views.sendResidencyTariffs).not.toHaveBeenCalled();
+  });
+
+  it("issues an opaque checkout button only when readiness is composed", async () => {
+    const tariffVersionId = "00000000-0000-4000-8000-000000000301";
+    const disabled = build(true, true, false, false);
+    const enabled = build(true, true, false, true);
+
+    await disabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+    await enabled.processor.processCommand(
+      command(`/residency ${tariffVersionId}`),
+    );
+
+    expect(disabled.issueCheckout).not.toHaveBeenCalled();
+    expect(enabled.issueCheckout).toHaveBeenCalledWith({
+      principal,
+      tariffVersionId,
+      idempotencyKey: "telegram-update-1:checkout:issue",
+    });
+    expect(enabled.views.sendResidencyQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checkoutCallbackData:
+          "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      }),
+    );
   });
 
   it("keeps financial views independently disabled with no service or view call", async () => {

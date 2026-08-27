@@ -617,6 +617,8 @@ export async function startTestPostgres(
       await resetWithImmutableExpertReferralAdminResults(db, async (tx) => {
         await tx.execute(sql`
           truncate table admin_case_actions, integration_errors,
+            client_identity_proof_receipts, client_sessions,
+            client_catalog_tombstones, client_catalog_erasure_index,
             reconciliation_mismatches, delivery_attempts, outbox_operator_alerts,
             dead_letters, integration_outbox,
             integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,

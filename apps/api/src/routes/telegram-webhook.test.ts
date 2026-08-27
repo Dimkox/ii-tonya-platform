@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WebhookInbox } from "./selarti-webhook.js";
 import {
   telegramWebhookRoutes,
+  type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
 } from "./telegram-webhook.js";
 
@@ -12,6 +13,8 @@ const secret = "telegram-webhook-secret";
 const build = async (
   options: {
     queriesEnabled?: boolean;
+    aiEnabled?: boolean;
+    checkoutEnabled?: boolean;
     consume?: (key: string, limit: number, windowMs: number) => boolean;
   } = {},
 ) => {
@@ -59,6 +62,32 @@ const build = async (
     kind: "applied" as const,
     providerOperationId: "answer-1",
   }));
+  const resolveAiPrincipal = vi.fn<TelegramExpertAiIngress["resolvePrincipal"]>(
+    async () => ({
+      authenticated: true,
+      userId: "00000000-0000-4000-8000-000000000100",
+      expertId: "00000000-0000-4000-8000-000000000101",
+    }),
+  );
+  const handleAi = vi.fn<TelegramExpertAiIngress["handle"]>(async () => ({
+    kind: "completed",
+    proposalKind: "view_referral_summary",
+    result: { private: "not-delivered" },
+  }));
+  const processResidencyCheckout = vi.fn<
+    TelegramExpertQueryIngress["processResidencyCheckout"]
+  >(async () => ({
+    kind: "ready" as const,
+    tokenHash: "b".repeat(64),
+    checkoutUrl: "https://pay.example/checkout",
+    replay: false,
+  }));
+  const sendResidencyCheckoutLink = vi.fn<
+    TelegramExpertQueryIngress["sendResidencyCheckoutLink"]
+  >(async () => ({
+    kind: "applied" as const,
+    providerOperationId: "checkout-message-1",
+  }));
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
     secret,
@@ -66,13 +95,18 @@ const build = async (
     inbox: { claim, complete, fail },
     rateLimiter: { consume: options.consume ?? (() => true) },
     expertQueriesEnabled: options.queriesEnabled ?? false,
+    expertCheckoutEnabled: options.checkoutEnabled ?? false,
     expertQueries: {
       resolvePrincipal,
       authenticateClientView,
       processCommand,
       processClientView,
       answerCallbackQuery,
+      processResidencyCheckout,
+      sendResidencyCheckoutLink,
     },
+    expertAiEnabled: options.aiEnabled ?? false,
+    expertAi: { resolvePrincipal: resolveAiPrincipal, handle: handleAi },
   });
   return {
     app,
@@ -87,12 +121,187 @@ const build = async (
     processCommand,
     processClientView,
     answerCallbackQuery,
+    resolveAiPrincipal,
+    handleAi,
+    processResidencyCheckout,
+    sendResidencyCheckoutLink,
   };
 };
 
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
+  it("keeps ordinary private text on the default Telegram lifecycle", async () => {
+    const state = await build();
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 910,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Покажи баланс",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.handleAi).not.toHaveBeenCalled();
+      expect(state.process).toHaveBeenCalledTimes(1);
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("dispatches enabled private non-slash text with a fresh principal and server keys", async () => {
+    const state = await build({ aiEnabled: true });
+    try {
+      const request = (updateId: number) =>
+        state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: { ...headers, "x-correlation-id": "telegram-corr" },
+          payload: {
+            update_id: updateId,
+            message: {
+              from: { id: 123456789 },
+              chat: { id: 123456789, type: "private" },
+              text: "Покажи баланс",
+            },
+          },
+        });
+      expect((await request(911)).json()).toEqual({ accepted: true });
+      expect((await request(912)).statusCode).toBe(200);
+      expect(state.resolveAiPrincipal).toHaveBeenCalledTimes(2);
+      expect(state.handleAi).toHaveBeenNthCalledWith(1, {
+        principal: {
+          authenticated: true,
+          userId: "00000000-0000-4000-8000-000000000100",
+          expertId: "00000000-0000-4000-8000-000000000101",
+        },
+        text: "Покажи баланс",
+        locale: "ru-RU",
+        correlationId: "telegram-corr",
+        idempotencyKey: "telegram:911:expert-ai",
+      });
+      expect(state.process).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("never dispatches slash text or non-private text to expert AI", async () => {
+    const state = await build({ aiEnabled: true, queriesEnabled: true });
+    try {
+      await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 913,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "/stats",
+          },
+        },
+      });
+      const group = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 914,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: -1, type: "group" },
+            text: "Покажи баланс",
+          },
+        },
+      });
+      expect(group.statusCode).toBe(403);
+      expect(state.processCommand).toHaveBeenCalledTimes(1);
+      expect(state.handleAi).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("fails retryably on unavailable AI and completes bounded denials", async () => {
+    const unavailable = await build({ aiEnabled: true });
+    unavailable.handleAi.mockResolvedValueOnce({ kind: "unavailable" });
+    try {
+      const response = await unavailable.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 915,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_ai_unavailable" });
+      expect(unavailable.fail).toHaveBeenCalledWith("claim-1");
+    } finally {
+      await unavailable.app.close();
+    }
+
+    const denied = await build({ aiEnabled: true });
+    denied.handleAi.mockResolvedValueOnce({ kind: "forbidden" });
+    try {
+      const response = await denied.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 916,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, unavailable: true });
+      expect(denied.complete).toHaveBeenCalledWith("claim-1");
+      expect(denied.fail).not.toHaveBeenCalled();
+    } finally {
+      await denied.app.close();
+    }
+  });
+
+  it("deduplicates private expert AI text before a second source dispatch", async () => {
+    const state = await build({ aiEnabled: true });
+    state.claim.mockResolvedValueOnce({ kind: "duplicate" });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 917,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "Баланс",
+          },
+        },
+      });
+      expect(response.json()).toEqual({ accepted: true, duplicate: true });
+      expect(state.resolveAiPrincipal).toHaveBeenCalledTimes(1);
+      expect(state.handleAi).not.toHaveBeenCalled();
+      expect(state.complete).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
   it("keeps xr1 isolated from ct2/cv1 until checkout readiness is composed", async () => {
     const state = await build({ queriesEnabled: true });
     try {
@@ -113,6 +322,229 @@ describe("Telegram webhook callback boundary", () => {
       expect(state.authenticateClientView).not.toHaveBeenCalled();
       expect(state.verifyCallback).not.toHaveBeenCalled();
       expect(state.claim).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("fresh-resolves an xr1 principal, processes checkout, and delivers only the stored URL", async () => {
+    const state = await build({ checkoutEnabled: true });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 902,
+          callback_query: {
+            id: "xr1-ready",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ accepted: true });
+      expect(state.resolvePrincipal).toHaveBeenCalledWith("123456789");
+      expect(state.processResidencyCheckout).toHaveBeenCalledWith({
+        data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        principal: expect.objectContaining({
+          userId: "00000000-0000-4000-8000-000000000100",
+          expertId: "00000000-0000-4000-8000-000000000101",
+          telegramUserId: "123456789",
+        }),
+      });
+      expect(state.sendResidencyCheckoutLink).toHaveBeenCalledWith({
+        idempotencyKey: `telegram:${"b".repeat(64)}:checkout:delivery`,
+        telegramUserId: "123456789",
+        checkoutUrl: "https://pay.example/checkout",
+      });
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+      expect(state.fail).not.toHaveBeenCalled();
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith({
+        callbackQueryId: "xr1-ready",
+        status: "processed",
+        idempotencyKey: "telegram:902:checkout:answer",
+      });
+      expect(state.verifyCallback).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("releases the inbox claim on ambiguous checkout-link delivery for idempotent retry", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.sendResidencyCheckoutLink.mockResolvedValueOnce({
+      kind: "unknown_outcome",
+      reconciliationKey: "checkout-link",
+      reasonCode: "timeout_after_write",
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 903,
+          callback_query: {
+            id: "xr1-ambiguous",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({
+        error: "expert_checkout_delivery_unavailable",
+      });
+      expect(response.body).not.toContain("timeout_after_write");
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "unavailable" }),
+      );
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("returns retryable 503 without owning a busy xr1 inbox claim", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.claim.mockResolvedValueOnce({ kind: "busy" });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 906,
+          callback_query: {
+            id: "xr1-busy",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_checkout_unavailable" });
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.fail).not.toHaveBeenCalled();
+      expect(state.processResidencyCheckout).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("releases an xr1 inbox claim while checkout processing is nonterminal", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.processResidencyCheckout.mockResolvedValueOnce({
+      kind: "processing",
+      tokenHash: "c".repeat(64),
+      replay: true,
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 907,
+          callback_query: {
+            id: "xr1-processing",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: "expert_checkout_unavailable" });
+      expect(state.fail).toHaveBeenCalledWith("claim-1");
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.sendResidencyCheckoutLink).not.toHaveBeenCalled();
+
+      const retry = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 907,
+          callback_query: {
+            id: "xr1-processing-retry",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json()).toEqual({ accepted: true });
+      expect(state.sendResidencyCheckoutLink).toHaveBeenCalledTimes(1);
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("completes a denied xr1 claim without attempting link delivery", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.processResidencyCheckout.mockResolvedValueOnce({
+      kind: "unavailable",
+      replay: true,
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 904,
+          callback_query: {
+            id: "xr1-denied",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ accepted: true, unavailable: true });
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+      expect(state.fail).not.toHaveBeenCalled();
+      expect(state.sendResidencyCheckoutLink).not.toHaveBeenCalled();
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "unavailable" }),
+      );
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("completes a revoked-principal xr1 claim as a generic denial", async () => {
+    const state = await build({ checkoutEnabled: true });
+    state.resolvePrincipal.mockResolvedValueOnce(null);
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 905,
+          callback_query: {
+            id: "xr1-revoked",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ accepted: true, unavailable: true });
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+      expect(state.fail).not.toHaveBeenCalled();
+      expect(state.processResidencyCheckout).not.toHaveBeenCalled();
+      expect(state.sendResidencyCheckoutLink).not.toHaveBeenCalled();
     } finally {
       await state.app.close();
     }

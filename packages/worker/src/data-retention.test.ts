@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { runRetentionBatch } from "./data-retention.js";
+import {
+  runClientSessionRetention,
+  runRetentionBatch,
+} from "./data-retention.js";
 
 describe("data retention", () => {
   it("deletes expired content references but not ledger, consent, safety, or audit facts", async () => {
@@ -63,5 +66,36 @@ describe("data retention", () => {
     expect(repository.alert).toHaveBeenCalledWith(
       expect.objectContaining({ class: "message_ledger" }),
     );
+  });
+});
+
+describe("client session retention", () => {
+  it("reports only normalized removals and is idempotent", async () => {
+    const cleanupExpired = vi
+      .fn()
+      .mockResolvedValueOnce({ receiptsRemoved: 2, sessionsRemoved: 1 })
+      .mockResolvedValueOnce({ receiptsRemoved: 0, sessionsRemoved: 0 });
+    const record = vi.fn();
+
+    await expect(
+      runClientSessionRetention(
+        { repository: { cleanupExpired }, metrics: { record } },
+        100,
+      ),
+    ).resolves.toEqual({ receiptsRemoved: 2, sessionsRemoved: 1 });
+    await expect(
+      runClientSessionRetention(
+        { repository: { cleanupExpired }, metrics: { record } },
+        100,
+      ),
+    ).resolves.toEqual({ receiptsRemoved: 0, sessionsRemoved: 0 });
+    expect(record).toHaveBeenNthCalledWith(1, {
+      operation: "cleanup",
+      outcome: "removed",
+    }, 3);
+    expect(record).toHaveBeenNthCalledWith(2, {
+      operation: "cleanup",
+      outcome: "allowed",
+    });
   });
 });

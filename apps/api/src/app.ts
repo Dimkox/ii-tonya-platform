@@ -2,20 +2,35 @@ import type {
   AdminService,
   BookingService,
   CatalogService,
+  ClientCatalogService,
+  ClientBookingService,
+  ClientPrincipalResolver,
+  ClientSessionService,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
   ExpertReferralAdminService,
+  OperatorCaseService,
   PrivacyService,
 } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
-import { createLogger, type Logger } from "@ii-tonya/observability";
+import {
+  createLogger,
+  recordClientSessionMetric,
+  recordClientBookingMetric,
+  type Logger,
+} from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
+import { operatorCaseRoutes } from "./routes/operator-cases.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
+import {
+  expertAiIngressRoutes,
+  type ExpertAiRequestLedger,
+} from "./routes/expert-ai-ingress.js";
 import {
   expertReferralRoutes,
   type ExpertReferralApiDependencies,
@@ -28,17 +43,28 @@ import {
 import {
   telegramWebhookRoutes,
   type TelegramCallbackService,
+  type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
 } from "./routes/telegram-webhook.js";
 import {
   yookassaWebhookRoutes,
   type YooKassaWebhookDependencies,
 } from "./routes/yookassa-webhook.js";
+import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
+import { clientCatalogRoutes } from "./routes/client-catalog.js";
+import { clientSessionRoutes } from "./routes/client-sessions.js";
+import { clientBookingRoutes } from "./routes/client-booking.js";
+import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
   "resolvePrincipal" | "requestApproval" | "approveApproval"
 >;
+type ClientSessionRevocation = {
+  revoke(
+    tokenDigest: `sha256:${string}`,
+  ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
+};
 export interface AppDependencies {
   config: RuntimeConfig;
   conversationService: ConversationService;
@@ -54,12 +80,22 @@ export interface AppDependencies {
   rateLimiter: RateLimitGate;
   telegramWebhookSecret: string;
   adminApprovals?: ApprovalPort;
+  operatorCases?: OperatorCaseService;
   expertReferralAdminService?: ExpertReferralAdminService;
   expertApi?: ExpertReferralApiDependencies;
   expertCodeKeyring?: ExpertCodeKeyring;
   expertTelegramQueries?: TelegramExpertQueryIngress;
   expertAiIngress?: ExpertAiIngressService;
+  expertAiPrincipal?: ExpertPrincipalResolver;
+  expertAiRequests?: ExpertAiRequestLedger;
+  expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
+  clientCatalogService?: ClientCatalogService;
+  clientSessionService?: ClientSessionService;
+  clientSessionRepository?: ClientSessionRevocation;
+  clientPrincipal?: ClientPrincipalResolver;
+  clientBookingService?: ClientBookingService;
+  clientBookingPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -76,12 +112,30 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  const sessionCapability =
+    deps.clientSessionService !== undefined &&
+    deps.clientSessionRepository !== undefined &&
+    deps.clientPrincipal !== undefined;
+  assertClientCapabilityPreflight(deps.config.features, {
+    identityProofVerifier: sessionCapability,
+    bookingRuntime:
+      deps.clientBookingService !== undefined &&
+      deps.clientBookingPrincipal !== undefined,
+  });
   if (
     (deps.config.features.expertReferral ||
       deps.config.features.expertResidencyBilling) &&
     deps.expertApi === undefined
   ) {
     throw new Error("Expert API runtime capability is required");
+  }
+  if (
+    deps.config.features.clientBooking === true &&
+    (deps.clientBookingService === undefined ||
+      deps.clientBookingPrincipal === undefined ||
+      deps.clientCatalogService === undefined)
+  ) {
+    throw new Error("Client booking runtime capability is required");
   }
   if (
     (deps.config.features.expertTelegramQueries === true ||
@@ -92,10 +146,25 @@ export async function buildApp(
     throw new Error("Expert Telegram query capability is required");
   }
   if (
+    deps.config.features.expertTelegramCheckout === true &&
+    deps.expertTelegramQueries === undefined
+  ) {
+    throw new Error("Expert Telegram checkout capability is required");
+  }
+  if (
     deps.config.features.expertAiIngress === true &&
-    deps.expertAiIngress === undefined
+    (deps.expertAiIngress === undefined ||
+      deps.expertAiPrincipal === undefined ||
+      deps.expertAiRequests === undefined)
   ) {
     throw new Error("Expert AI ingress runtime capability is required");
+  }
+  if (
+    deps.config.features.clientCatalog === true &&
+    (deps.clientCatalogService === undefined ||
+      deps.clientPrincipal === undefined)
+  ) {
+    throw new Error("Client catalog runtime capability is required");
   }
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
@@ -114,6 +183,45 @@ export async function buildApp(
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  if (
+    deps.config.features.clientSession === true &&
+    deps.clientSessionService !== undefined &&
+    deps.clientSessionRepository !== undefined &&
+    deps.clientPrincipal !== undefined
+  ) {
+    await app.register(clientSessionRoutes, {
+      sessions: {
+        issue: (identityProof, signal) =>
+          deps.clientSessionService!.issue(identityProof, signal),
+        revoke: (tokenDigest) =>
+          deps.clientSessionRepository!.revoke(tokenDigest),
+      },
+      principals: deps.clientPrincipal,
+      metrics: { record: recordClientSessionMetric },
+    });
+  }
+  if (
+    deps.config.features.clientCatalog === true &&
+    deps.clientCatalogService !== undefined &&
+    deps.clientPrincipal !== undefined
+  ) {
+    await app.register(clientCatalogRoutes, {
+      catalog: deps.clientCatalogService,
+      principals: deps.clientPrincipal,
+    });
+  }
+  if (
+    deps.config.features.clientBooking === true &&
+    deps.clientBookingService !== undefined &&
+    deps.clientBookingPrincipal !== undefined
+  ) {
+    await app.register(clientBookingRoutes, {
+      bookings: deps.clientBookingService,
+      principals: deps.clientBookingPrincipal,
+      reserveEnabled: deps.config.features.clientBookingReserve === true,
+      metrics: { record: recordClientBookingMetric },
+    });
+  }
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }
@@ -133,14 +241,40 @@ export async function buildApp(
       deps.config.features.expertTelegramQueries === true ||
       deps.config.features.expertTelegramFinancialViews === true ||
       deps.config.features.expertTelegramReferral === true,
+    expertCheckoutEnabled: deps.config.features.expertTelegramCheckout === true,
     ...(deps.expertTelegramQueries === undefined
       ? {}
       : { expertQueries: deps.expertTelegramQueries }),
+    expertAiEnabled:
+      deps.config.features.expertAiIngress === true &&
+      deps.expertAiIngress !== undefined &&
+      deps.expertAiTelegramPrincipal !== undefined,
+    ...(deps.expertAiIngress === undefined ||
+    deps.expertAiTelegramPrincipal === undefined
+      ? {}
+      : {
+          expertAi: {
+            resolvePrincipal: deps.expertAiTelegramPrincipal.resolvePrincipal,
+            handle: deps.expertAiIngress.handle,
+          },
+        }),
   });
   if (deps.expertApi !== undefined) {
     await app.register(expertReferralRoutes, {
       ...deps.expertApi,
       enabled: deps.config.features,
+    });
+  }
+  if (
+    deps.config.features.expertAiIngress === true &&
+    deps.expertAiIngress !== undefined &&
+    deps.expertAiPrincipal !== undefined &&
+    deps.expertAiRequests !== undefined
+  ) {
+    await app.register(expertAiIngressRoutes, {
+      ingress: deps.expertAiIngress,
+      principals: deps.expertAiPrincipal,
+      requests: deps.expertAiRequests,
     });
   }
   if (deps.adminApprovals !== undefined) {
@@ -176,6 +310,11 @@ export async function buildApp(
           return reply.send(response.rawPayload);
         },
       );
+    if (deps.operatorCases !== undefined)
+      await app.register(operatorCaseRoutes, {
+        approvals: deps.adminApprovals,
+        cases: deps.operatorCases,
+      });
     app.post("/v1/admin/*", async (request, reply) => {
       const expertAction =
         /^\/v1\/admin\/actions\/(?:expert_referral|expert_residency)\./u.test(
@@ -245,9 +384,20 @@ export async function buildTestApp(
     selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>;
     selartiFailOnce?: boolean;
     expertApi?: ExpertReferralApiDependencies;
+    expertTelegramQueries?: TelegramExpertQueryIngress;
     expertAiIngress?: ExpertAiIngressService;
+    expertAiPrincipal?: ExpertPrincipalResolver;
+    expertAiRequests?: ExpertAiRequestLedger;
+    expertAiTelegramPrincipal?: Pick<
+      TelegramExpertAiIngress,
+      "resolvePrincipal"
+    >;
     yookassaWebhook?: YooKassaWebhookDependencies;
-    features?: RuntimeConfig["features"];
+    clientCatalogService?: ClientCatalogService;
+    clientSessionService?: ClientSessionService;
+    clientSessionRepository?: ClientSessionRevocation;
+    clientPrincipal?: ClientPrincipalResolver;
+    features?: Partial<RuntimeConfig["features"]>;
   } = {},
 ): Promise<TestApp> {
   const receipts = new Map<string, "processing" | "complete">();
@@ -291,9 +441,14 @@ export async function buildTestApp(
       rawConversationLogging: false,
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
-      features: options.features ?? {
+      yookassaRecovery: { enabled: false },
+      features: {
+        workerOutboxDelivery: false,
+        clientSession: false,
+        clientCatalog: false,
         expertReferral: false,
         expertResidencyBilling: false,
+        ...options.features,
       },
       ...(options.features?.yookassa === true
         ? {
@@ -362,12 +517,36 @@ export async function buildTestApp(
     ...(options.expertApi === undefined
       ? {}
       : { expertApi: options.expertApi }),
+    ...(options.expertTelegramQueries === undefined
+      ? {}
+      : { expertTelegramQueries: options.expertTelegramQueries }),
     ...(options.expertAiIngress === undefined
       ? {}
       : { expertAiIngress: options.expertAiIngress }),
+    ...(options.expertAiPrincipal === undefined
+      ? {}
+      : { expertAiPrincipal: options.expertAiPrincipal }),
+    ...(options.expertAiRequests === undefined
+      ? {}
+      : { expertAiRequests: options.expertAiRequests }),
+    ...(options.expertAiTelegramPrincipal === undefined
+      ? {}
+      : { expertAiTelegramPrincipal: options.expertAiTelegramPrincipal }),
     ...(options.yookassaWebhook === undefined
       ? {}
       : { yookassaWebhook: options.yookassaWebhook }),
+    ...(options.clientCatalogService === undefined
+      ? {}
+      : { clientCatalogService: options.clientCatalogService }),
+    ...(options.clientSessionService === undefined
+      ? {}
+      : { clientSessionService: options.clientSessionService }),
+    ...(options.clientSessionRepository === undefined
+      ? {}
+      : { clientSessionRepository: options.clientSessionRepository }),
+    ...(options.clientPrincipal === undefined
+      ? {}
+      : { clientPrincipal: options.clientPrincipal }),
     ...(options.now === undefined
       ? {}
       : { now: () => new Date(options.now!()) }),

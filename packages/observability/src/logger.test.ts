@@ -35,4 +35,32 @@ describe("logger redaction", () => {
     expect(line).toContain("corr-nested");
     expect(line).toContain("/bot[REDACTED]/sendMessage");
   });
+
+  it("removes every client-session credential field and nested cause before the sink", async () => {
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on("data", (chunk: Buffer) => chunks.push(chunk));
+    createLogger(output).error({
+      request: {
+        identityProof: "proof-sentinel-never-log",
+        rawHeaders: ["Authorization", "Bearer cs1.session-sentinel-never-log"],
+      },
+      verifierOutput: {
+        replayDigest: "hmac-sha256:v1:replay-sentinel-never-log",
+        tokenHash: "sha256:hash-sentinel-never-log",
+      },
+      error: { cause: "nested-cause-sentinel-never-log" },
+    });
+    await new Promise((resolve) => output.once("data", resolve));
+    const line = Buffer.concat(chunks).toString("utf8");
+    for (const sentinel of [
+      "proof-sentinel-never-log",
+      "session-sentinel-never-log",
+      "replay-sentinel-never-log",
+      "hash-sentinel-never-log",
+      "nested-cause-sentinel-never-log",
+    ]) {
+      expect(line).not.toContain(sentinel);
+    }
+  });
 });

@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsup src/main.ts src/index.ts --format esm --dts --clean --tsconfig ../../tsconfig.base.json",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit -p ../../tsconfig.base.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ii-tonya/config": "workspace:*",

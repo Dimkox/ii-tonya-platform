@@ -51,10 +51,10 @@ const payment = {
 const operationPort = (): YooKassaOperationPort => ({
   findByProviderObject: vi.fn(async () => null),
   claim: vi.fn(async () => operation),
-  bindProviderObject: vi.fn(async (_id, providerObjectId) => ({
+  bindProviderObject: vi.fn<YooKassaOperationPort["bindProviderObject"]>(async (_id, providerObjectId) => ({
     ...operation,
     providerObjectId,
-    status: "pending",
+    status: "pending" as const,
   })),
   markUnknown: vi.fn(async () => undefined),
   resolve: vi.fn(async () => undefined),
@@ -318,8 +318,8 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     provider.createRefund = vi.fn(async () => ({
       id: "2f4b6d0d-000f-5000-9000-000000000499",
       paymentId: payment.id,
-      status: "pending",
-      amount: { value: "100.00", currency: "RUB" },
+      status: "pending" as const,
+      amount: { value: "100.00", currency: "RUB" as const },
       createdAt: "2026-08-14T10:00:00.000Z",
     }));
     const adapter = new YooKassaExpertResidencyPaymentAdapter({

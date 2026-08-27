@@ -2,13 +2,19 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
   createAdminService,
+  createClientCatalogService,
+  createClientBookingService,
+  createClientSessionService,
   createExpertReferralAdminService,
+  createOperatorCaseService,
   ExpertCodeCrypto,
   type BookingService,
   type CatalogService,
   type ConversationService,
   type ExpertCodeKeyring,
+  type ExpertAiIngressService,
   type PrivacyService,
+  type IdentityProofVerifier,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -21,6 +27,11 @@ import {
   PostgresAdminRepository,
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
+  PostgresExpertAiRequestReceiptStore,
+  PostgresOperatorCaseRepository,
+  PostgresClientCatalogRepository,
+  PostgresBookingRepository,
+  PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -30,12 +41,26 @@ import {
   EnvironmentExpertCodeSecretResolver,
   type ExpertTelegramIngressFactoryDependencies,
 } from "@ii-tonya/integrations";
-import { createLogger, shutdownTelemetry } from "@ii-tonya/observability";
+import {
+  createLogger,
+  recordClientSessionMetric,
+  shutdownTelemetry,
+} from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
+import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
+import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import { createClientPrincipalResolver } from "./client-principal-resolver.js";
+import { createClientBookingPrincipalResolver } from "./client-booking-principal-resolver.js";
+import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
+import {
+  clientSessionTokenHash,
+  createClientSessionToken,
+} from "./client-session-token.js";
 
 export interface ServerLifecycle {
+  preflight(config: ReturnType<typeof loadEnv>): void;
   dependencies(
     config: ReturnType<typeof loadEnv>,
     db: DrizzleDb,
@@ -62,23 +87,48 @@ export const createDefaultLifecycle = (
         requiredVersions: readonly string[];
       }): ExpertCodeKeyring;
     };
+    expertAiComposition?: {
+      readonly ingress: ExpertAiIngressService;
+      readonly principals: ExpertPrincipalResolver;
+      readonly telegramPrincipals?: {
+        resolvePrincipal(
+          telegramUserId: string,
+        ): ReturnType<ExpertPrincipalResolver["resolve"]>;
+      };
+    };
     expertTelegramComposition?: Omit<
       ExpertTelegramIngressFactoryDependencies,
       | "enabled"
       | "financialViewsEnabled"
       | "referralMutationsEnabled"
+      | "checkoutReadiness"
       | "referral"
       | "residency"
     > &
       Required<
         Pick<ExpertTelegramIngressFactoryDependencies, "referral" | "residency">
       >;
+    clientSessionComposition?: {
+      readonly verifier: IdentityProofVerifier;
+    };
   } = {},
 ): ServerLifecycle => ({
+  preflight(config) {
+    assertClientCapabilityPreflight(config.features, {
+      identityProofVerifier:
+        options.clientSessionComposition?.verifier !== undefined,
+      bookingRuntime: true,
+    });
+  },
   async migrate(db) {
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    assertClientCapabilityPreflight(config.features, {
+      identityProofVerifier:
+        options.clientSessionComposition?.verifier !== undefined,
+      bookingRuntime: true,
+    });
     let expertCodeKeyring: ExpertCodeKeyring | undefined;
     if (config.features?.expertReferral) {
       const keyConfig = config.expertReferralKey;
@@ -113,6 +163,8 @@ export const createDefaultLifecycle = (
       config.features.expertTelegramQueries === true ||
       config.features.expertTelegramFinancialViews === true ||
       config.features.expertTelegramReferral === true;
+      config.features.expertTelegramReferral === true ||
+      config.features.expertTelegramCheckout === true;
     const expertTelegramQueries =
       options.expertTelegramComposition === undefined
         ? undefined
@@ -123,7 +175,51 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramFinancialViews === true,
             referralMutationsEnabled:
               config.features.expertTelegramReferral === true,
+            checkoutReadiness: config.features.expertTelegramCheckout === true,
           });
+    const clientSessionRepository =
+      config.features.clientSession === true
+        ? new PostgresClientSessionRepository(db)
+        : undefined;
+    const clientSessionService =
+      clientSessionRepository === undefined ||
+      options.clientSessionComposition === undefined
+        ? undefined
+        : createClientSessionService({
+            verifier: createClientProofVerifierGate(
+              options.clientSessionComposition.verifier,
+            ),
+            sessions: clientSessionRepository,
+            generateToken: createClientSessionToken,
+            digestToken: clientSessionTokenHash,
+          });
+    const clientPrincipal =
+      clientSessionRepository === undefined
+        ? undefined
+        : createClientPrincipalResolver(clientSessionRepository, {
+            record: recordClientSessionMetric,
+          });
+    const clientBookingPrincipal =
+      clientSessionRepository === undefined
+        ? undefined
+        : createClientBookingPrincipalResolver(clientSessionRepository);
+    const clientCatalogService =
+      config.features.clientCatalog === true &&
+      clientSessionService !== undefined &&
+      clientPrincipal !== undefined
+        ? createClientCatalogService({
+            repository: new PostgresClientCatalogRepository(db),
+            bookingAware: config.features.clientBooking === true,
+          })
+        : undefined;
+    const clientBookingService =
+      config.features.clientBooking === true
+        ? createClientBookingService({
+            repository: new PostgresBookingRepository(db),
+            confirmationBufferMs:
+              config.clientBookingConfirmationBufferMs ?? 3_600_000,
+          })
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -135,6 +231,9 @@ export const createDefaultLifecycle = (
       privacyService: disabledService<PrivacyService>("privacy ingress"),
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
+      }),
+      operatorCases: createOperatorCaseService({
+        cases: new PostgresOperatorCaseRepository(db),
       }),
       adminApprovals,
       expertReferralAdminService: createExpertReferralAdminService({
@@ -167,7 +266,38 @@ export const createDefaultLifecycle = (
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
       telegramWebhookSecret: randomBytes(32).toString("base64url"),
+      ...(clientCatalogService === undefined
+        ? {}
+        : {
+            clientCatalogService,
+          }),
+      ...(clientSessionService === undefined ||
+      clientSessionRepository === undefined ||
+      clientPrincipal === undefined
+        ? {}
+        : {
+            clientSessionService,
+            clientSessionRepository,
+            clientPrincipal,
+          }),
+      ...(clientBookingService === undefined ||
+      clientBookingPrincipal === undefined
+        ? {}
+        : { clientBookingService, clientBookingPrincipal }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
+      ...(options.expertAiComposition === undefined
+        ? {}
+        : {
+            expertAiIngress: options.expertAiComposition.ingress,
+            expertAiPrincipal: options.expertAiComposition.principals,
+            expertAiRequests: new PostgresExpertAiRequestReceiptStore(db),
+            ...(options.expertAiComposition.telegramPrincipals === undefined
+              ? {}
+              : {
+                  expertAiTelegramPrincipal:
+                    options.expertAiComposition.telegramPrincipals,
+                }),
+          }),
     };
   },
   async close(db) {
@@ -180,8 +310,13 @@ export async function composeServer(
   lifecycle: ServerLifecycle,
   db: DrizzleDb,
 ): Promise<FastifyInstance> {
+  const config = loadEnv(process.env);
+  if (typeof lifecycle.preflight !== "function") {
+    throw new Error("server_preflight_capability_unavailable");
+  }
+  lifecycle.preflight(config);
   await lifecycle.migrate(db);
-  return buildApp(await lifecycle.dependencies(loadEnv(process.env), db));
+  return buildApp(await lifecycle.dependencies(config, db));
 }
 
 export async function closeServer(

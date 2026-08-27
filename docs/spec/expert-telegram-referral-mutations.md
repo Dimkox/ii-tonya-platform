@@ -1,6 +1,8 @@
 # ER-TG-002 Expert Telegram Referral Mutations
 
 Status: atomic safe slice implemented; checkout dispatch remains incomplete and disabled.
+Status: referral mutation slice implemented. Checkout dispatch is completed separately by
+ER-TG-003 as a provider-neutral, capability-injected, default-off path.
 
 - **ER-TG-002-R1:** `EXPERT_TELEGRAM_REFERRAL_ENABLED` defaults to `false` and is
   independent from read-only Telegram queries.
@@ -14,6 +16,8 @@ Status: atomic safe slice implemented; checkout dispatch remains incomplete and 
 - **ER-TG-002-R5:** `xr1` does not enter `ct2` or `cv1` processing. Checkout dispatch
   and its button remain absent until a provider-neutral checkout-readiness capability
   is composed and independently reviewed.
+- **ER-TG-002-R5:** `xr1` does not enter `ct2` or `cv1` processing. ER-TG-003 owns the
+  separately gated checkout dispatch; this ER-TG-002 slice does not activate it.
 - **ER-TG-002-R6:** this slice imports or activates no YooKassa/provider capability.
 
 | Requirement | Implementation                                                          | Verification                         | Remaining gate                        |
@@ -21,3 +25,5 @@ Status: atomic safe slice implemented; checkout dispatch remains incomplete and 
 | R1-R3       | config, command processor, fixed Telegram success view                  | config/processor tests               | independent review                    |
 | R4          | `0025_expert_telegram_residency_callbacks.sql`, repository, `xr1` token | token and PostgreSQL repository gate | webhook checkout dispatch             |
 | R5-R6       | webhook isolation branch; no checkout button/provider import            | webhook regression and scope review  | provider-neutral readiness capability |
+| R4          | `0025_expert_telegram_residency_callbacks.sql`, repository, `xr1` token | token and PostgreSQL repository gate | ER-TG-003 migration compatibility review |
+| R5-R6       | webhook namespace isolation; no provider import                         | webhook regression and scope review  | keep independent checkout flag disabled |

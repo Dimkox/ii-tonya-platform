@@ -14,6 +14,7 @@ export interface WorkerCycleReport {
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
   readonly expertResidencyExpiry: unknown;
+  readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
   readonly expertReferralHoldReplay: unknown;
   readonly confirmedOutboxDelivery: unknown;
@@ -42,6 +43,7 @@ export interface WorkerRuntimeDependencies {
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly reservationExpiry: BoundedJob;
   readonly expertResidencyExpiry: BoundedJob;
+  readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
   readonly expertReferralHoldReplay: BoundedJob;
   readonly deliverConfirmedOutbox: BoundedJob;
@@ -53,6 +55,13 @@ export interface WorkerRuntimeDependencies {
 }
 
 export interface ProductionWorkerRuntimeDependencies {
+  readonly workerOutboxRegistry?: Readonly<{
+    readonly topics: readonly string[];
+  }>;
+  readonly workerOutboxRunner?: BoundedJob;
+  readonly clientCatalogRetention?: BoundedJob;
+  readonly clientSessionRetention?: BoundedJob;
+  readonly clientBookingErasure?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -70,11 +79,14 @@ export interface ProductionWorkerRuntimeDependencies {
       readonly from: string;
       readonly to: string;
     }): Promise<void>;
-    deliverSafetyEscalationsBatch(batchSize: number): Promise<unknown>;
+    materializeOperatorCasesBatch(batchSize: number): Promise<unknown>;
   };
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
     HeldRewardRepository;
+  readonly expertTelegramCheckoutRepository: {
+    clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number>;
+  };
   readonly expertResidencyProviderReader?: ExpertResidencyProviderReader;
   readonly outboxRepository: {
     recoverExpiredDispatchLeases(limit: number): Promise<number>;
@@ -136,6 +148,8 @@ export function createWorkerRuntime(
         await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
       const expertResidencyExpiry = await deps.expertResidencyExpiry();
+      const expertTelegramCheckoutCleanup =
+        await deps.expertTelegramCheckoutCleanup();
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
@@ -148,6 +162,7 @@ export function createWorkerRuntime(
         unknownOutcomeReconciliation,
         reservationExpiry,
         expertResidencyExpiry,
+        expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
         expertReferralHoldReplay,
         confirmedOutboxDelivery,
@@ -203,20 +218,30 @@ export function createProductionWorkerRuntime(
   }
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
+  const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
+  if (workerOutboxEnabled !== (deps.workerOutboxRunner !== undefined)) {
+    throw new Error("worker_outbox_delivery_capability_unavailable");
+  }
   return createWorkerRuntime({
     safetyHandoffs: async () =>
       deps.jobsRepository.processDueBatch({
         now: deps.now(),
         batchSize,
       }),
-    recoverExpiredLeases: async () => ({
-      dispatch:
-        await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
-      reconciliation:
-        await deps.outboxRepository.recoverExpiredReconciliationLeases(
-          batchSize,
-        ),
-    }),
+    recoverExpiredLeases: workerOutboxEnabled
+      ? async () => ({
+          dispatch: 0,
+          reconciliation: 0,
+          reason: "owned_by_filtered_runner",
+        })
+      : async () => ({
+          dispatch:
+            await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
+          reconciliation:
+            await deps.outboxRepository.recoverExpiredReconciliationLeases(
+              batchSize,
+            ),
+        }),
     reconcileUnknownOutcomes: async () => ({
       reconciled: 0,
       reason: "providers_disabled",
@@ -232,6 +257,13 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
+    expertTelegramCheckoutCleanup: async () => ({
+      cleared:
+        await deps.expertTelegramCheckoutRepository.clearExpiredCheckoutUrls(
+          deps.now(),
+          batchSize,
+        ),
+    }),
     expertResidencyReconciliation: async () =>
       reconcileExpertResidencyPayments(
         deps.expertReferralJobsRepository,
@@ -245,12 +277,29 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
-    deliverConfirmedOutbox: async () =>
-      deps.jobsRepository.deliverSafetyEscalationsBatch(batchSize),
-    processorPrivacy: async () => ({
-      processed: 0,
-      reason: "privacy_capability_disabled",
-    }),
+    deliverConfirmedOutbox: workerOutboxEnabled
+      ? deps.workerOutboxRunner!
+      : async () =>
+          deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
+    processorPrivacy:
+      deps.clientCatalogRetention === undefined &&
+      deps.clientSessionRetention === undefined &&
+      deps.clientBookingErasure === undefined
+        ? async () => ({
+            processed: 0,
+            reason: "privacy_capability_disabled",
+          })
+        : async () => ({
+            ...(deps.clientCatalogRetention === undefined
+              ? {}
+              : { clientCatalog: await deps.clientCatalogRetention() }),
+            ...(deps.clientSessionRetention === undefined
+              ? {}
+              : { clientSession: await deps.clientSessionRetention() }),
+            ...(deps.clientBookingErasure === undefined
+              ? {}
+              : { clientBooking: await deps.clientBookingErasure() }),
+          }),
     providerReconciliation: async () => ({
       examined: 0,
       matched: 0,

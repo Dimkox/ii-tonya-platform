@@ -24,12 +24,18 @@ describe("loadEnv", () => {
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
     expect(config.features).toEqual({
+      workerOutboxDelivery: false,
+      clientCatalog: false,
+      clientSession: false,
+      clientBooking: false,
+      clientBookingReserve: false,
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
       expertTelegramFinancialViews: false,
       expertAiIngress: false,
       expertTelegramReferral: false,
+      expertTelegramCheckout: false,
       yookassa: false,
     });
     expect(config.selartiOutboundBillingMode).toBe("disabled");
@@ -37,6 +43,52 @@ describe("loadEnv", () => {
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
     ).toThrow("Raw conversation logging is prohibited");
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
+  });
+
+  it("defaults worker outbox delivery off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.workerOutboxDelivery).toBe(false);
+    expect(
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "false" })).features
+        .workerOutboxDelivery,
+    ).toBe(false);
+    expect(
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "true" })).features
+        .workerOutboxDelivery,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "TRUE" })),
+    ).toThrow();
+    expect(() =>
+      loadEnv(localEnv({ WORKER_OUTBOX_DELIVERY_ENABLED: "1" })),
+    ).toThrow();
+  });
+
+  it("defaults client catalog off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.clientCatalog).toBe(false);
+    expect(
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "false" })).features
+        .clientCatalog,
+    ).toBe(false);
+    expect(
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "true" })).features
+        .clientCatalog,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "TRUE" })),
+    ).toThrow();
+    expect(() => loadEnv(localEnv({ CLIENT_CATALOG_ENABLED: "1" }))).toThrow();
+  });
+
+  it("defaults client sessions off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.clientSession).toBe(false);
+    expect(
+      loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "true" })).features
+        .clientSession,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "TRUE" })),
+    ).toThrow();
+    expect(() => loadEnv(localEnv({ CLIENT_SESSION_ENABLED: "1" }))).toThrow();
   });
 
   it("requires safe key metadata only when expert referrals are enabled", () => {
@@ -100,6 +152,14 @@ describe("loadEnv", () => {
     expect(
       loadEnv(localEnv({ EXPERT_TELEGRAM_REFERRAL_ENABLED: "true" })).features
         .expertTelegramReferral,
+    ).toBe(true);
+  });
+
+  it("defaults expert Telegram checkout readiness off", () => {
+    expect(loadEnv(localEnv()).features.expertTelegramCheckout).toBe(false);
+    expect(
+      loadEnv(localEnv({ EXPERT_TELEGRAM_CHECKOUT_ENABLED: "true" })).features
+        .expertTelegramCheckout,
     ).toBe(true);
   });
 
