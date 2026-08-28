@@ -60,13 +60,24 @@ function addMilliseconds(at: Date, milliseconds: number): Date {
   return result;
 }
 
-export function quoteResidency(priceMinor: bigint, availableMinor: bigint) {
+export function quoteResidency(
+  priceMinor: bigint,
+  availableMinor: bigint,
+  creditCapBps = 5_000,
+) {
   assertMinor(priceMinor);
   assertMinor(availableMinor);
   if (priceMinor === 0n) throw new Error("invalid_money");
+  if (
+    !Number.isSafeInteger(creditCapBps) ||
+    creditCapBps < 0 ||
+    creditCapBps > 10_000
+  ) {
+    throw new Error("invalid_credit_cap");
+  }
 
-  const creditMinor =
-    availableMinor < priceMinor / 2n ? availableMinor : priceMinor / 2n;
+  const ceiling = (priceMinor * BigInt(creditCapBps)) / 10_000n;
+  const creditMinor = availableMinor < ceiling ? availableMinor : ceiling;
   return { creditMinor, cashMinor: priceMinor - creditMinor } as const;
 }
 

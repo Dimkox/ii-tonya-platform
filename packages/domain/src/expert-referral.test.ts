@@ -17,6 +17,19 @@ describe("expert referral residency rules", () => {
     });
   });
 
+  it("quotes residency credit using the requested cap", () => {
+    expect(quoteResidency(999n, 999n, 3000)).toEqual({
+      creditMinor: 299n,
+      cashMinor: 700n,
+    });
+  });
+
+  it.each([-1, 10_001])("rejects an invalid credit cap: %s", (creditCapBps) => {
+    expect(() => quoteResidency(100n, 100n, creditCapBps)).toThrow(
+      "invalid_credit_cap",
+    );
+  });
+
   it("allocates the exact requested credit in expiry, grant, and id order", () => {
     expect(
       allocateCreditFifo(
