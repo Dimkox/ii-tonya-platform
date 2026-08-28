@@ -274,13 +274,12 @@ describe("PostgresExpertResidencyRepository checkout snapshots", () => {
     });
     await seedAbundantCredit(expert.expertId);
     const idempotencyKey = randomUUID();
-    await testDb!.db.transaction(async (tx) => {
-      await tx.execute(sql`set local session_replication_role=replica`);
-      await tx.execute(sql`
-        insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,source_type,source_id,idempotency_key)
-        values (${expert.expertId}::uuid,'reward_grant',1,'test_failure',${randomUUID()}::uuid,${`checkout:${expert.expertId}:${idempotencyKey}`})
-      `);
-    });
+    await testDb!.db.execute(
+      sql`create function fail_a1_checkout_reservation() returns trigger language plpgsql as $$ begin raise exception 'a1 checkout reservation failure'; end $$`,
+    );
+    await testDb!.db.execute(
+      sql`create trigger fail_a1_checkout_reservation before insert on expert_referral_ledger_entries for each row execute function fail_a1_checkout_reservation()`,
+    );
     let failure: unknown;
     try {
       await new PostgresExpertResidencyRepository(
@@ -296,8 +295,8 @@ describe("PostgresExpertResidencyRepository checkout snapshots", () => {
     }
     expectPostgresErrorCause(
       failure,
-      "23505",
-      'duplicate key value violates unique constraint "expert_ledger_idempotency_unique"',
+      "P0001",
+      "a1 checkout reservation failure",
     );
     const leftovers = await testDb!.db.execute(sql`
       select
@@ -307,7 +306,7 @@ describe("PostgresExpertResidencyRepository checkout snapshots", () => {
     `);
     expect(leftovers.rows[0]).toEqual({
       orders: 0,
-      entries: 1,
+      entries: 0,
       allocations: 0,
     });
   });
