@@ -197,6 +197,17 @@ describe("expert referral admin routes", () => {
     await app.close();
   });
 
+  it("maps a stale client commercial control to the same conflict", async () => {
+    const approvals = { resolvePrincipal: vi.fn(async () => principal), requestApproval: vi.fn(), approveApproval: vi.fn() };
+    const conflict = Object.assign(new Error("stale"), { code: "CLIENT_COMMERCIAL_POLICY_CONFLICT" });
+    const admin = { execute: vi.fn(async () => { throw conflict; }), inventory: vi.fn() };
+    const app = await buildExpertReferralAdminApi({ approvals, admin, sessionTokenHash: () => principal.sessionIdHash, environmentCeilings: { expertReferral: false, expertResidencyBilling: false } });
+    const response = await app.inject({ method: "POST", url: "/v1/admin/actions/client_commercial_policy.control_v2/00000000-0000-0000-0000-000000000041/execute", headers: { authorization: `Bearer ${token}` }, payload: { approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task3-control-conflict", correlationId: "correlation-task3-control-conflict", command: { expectedVersion: 1, admissionPolicy: "free_client_v2" } } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "conflict" });
+    await app.close();
+  });
+
   it("normalizes override timestamps and maps dual-control denial to 403", async () => {
     const approvals = {
       resolvePrincipal: vi.fn(async () => principal),

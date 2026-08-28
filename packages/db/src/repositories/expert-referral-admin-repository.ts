@@ -549,7 +549,7 @@ export class PostgresExpertReferralAdminRepository {
       )
         throw new Error("invalid_admin_command");
       const row = await tx.execute<{ id: string }>(
-        sql`insert into expert_residency_tariff_versions (id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values (${command.objectId}::uuid,${text(p, "tariffKey")},${text(p, "displayName")},${number(p, "priceMinor")},'RUB',${number(p, "durationSeconds")},${new Date(text(p, "activeFrom"))},${new Date(text(p, "activeTo"))},${approval.approvalId}::uuid,${command.sessionIdHash}) returning id`,
+        sql`insert into expert_residency_tariff_versions (id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,commercial_policy_version,credit_cap_bps,individual_services_enabled,group_event_limit,statistics_level,support_priority,approval_id,admin_session_id_hash) values (${command.objectId}::uuid,${text(p, "tariffKey")},${text(p, "displayName")},${number(p, "priceMinor")},'RUB',${number(p, "durationSeconds")},${new Date(text(p, "activeFrom"))},${new Date(text(p, "activeTo"))},${command.action === "expert_residency.tariff_create_v2" ? text(p, "commercialPolicyVersion") : "legacy_residency_v1"},${command.action === "expert_residency.tariff_create_v2" ? number(p, "creditCapBps") : 5000},${command.action === "expert_residency.tariff_create_v2" ? p.individualServicesEnabled === true : false},${command.action === "expert_residency.tariff_create_v2" ? number(p, "groupEventLimit") : 0},${command.action === "expert_residency.tariff_create_v2" ? text(p, "statisticsLevel") : "basic"},${command.action === "expert_residency.tariff_create_v2" ? text(p, "supportPriority") : "standard"},${approval.approvalId}::uuid,${command.sessionIdHash}) returning id`,
       );
       return { tariffVersionId: row.rows[0]!.id };
     }
@@ -581,6 +581,10 @@ export class PostgresExpertReferralAdminRepository {
     // Approval was consumed by the outer transaction; perform the optimistic write here to keep audit/session/mutation atomic.
     const expected = number(p, "expectedVersion");
     if (command.action === "client_commercial_policy.control_v2") {
+      if (expected === 0) {
+        const inserted = await tx.execute<{ version: number }>(sql`insert into client_commercial_policy_controls (control_key,admission_policy,version,approval_id,admin_session_id_hash) values ('client_access',${text(p, "admissionPolicy")},1,${approval.approvalId}::uuid,${command.sessionIdHash}) on conflict do nothing returning version`);
+        if (inserted.rows[0] !== undefined) return { version: inserted.rows[0].version, admissionPolicy: text(p, "admissionPolicy") };
+      }
       const updated = await tx.execute<{ version: number }>(
         sql`update client_commercial_policy_controls set admission_policy=${text(p, "admissionPolicy")},version=version+1,approval_id=${approval.approvalId}::uuid,admin_session_id_hash=${command.sessionIdHash},updated_at=transaction_timestamp() where control_key='client_access' and version=${expected} returning version`,
       );

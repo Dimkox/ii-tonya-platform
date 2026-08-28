@@ -9,6 +9,23 @@ const principal = {
 };
 
 describe("expert referral admin application boundary", () => {
+  it.each([
+    ["START", 390000, 0, "basic", "standard"],
+    ["BASE", 590000, 1, "expanded", "standard"],
+    ["PRO", 999000, 3, "expanded", "priority"],
+  ])("accepts exact v2 tariff %s", async (tariffKey, priceMinor, groupEventLimit, statisticsLevel, supportPriority) => {
+    const workflows = { execute: vi.fn(async () => ({ allowed: true as const, replayed: false, tariffVersionId: "00000000-0000-4000-8000-000000000030" })), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await service.execute(principal, { action: "expert_residency.tariff_create_v2", objectId: "00000000-0000-4000-8000-000000000030", approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task3-v2", correlationId: "correlation-task3-v2", payload: { tariffKey, displayName: tariffKey, priceMinor, durationSeconds: 2592000, commercialPolicyVersion: "expert_residency_v2", creditCapBps: 3000, individualServicesEnabled: true, groupEventLimit, statisticsLevel, supportPriority, activeFrom: "2026-09-01T00:00:00.000Z", activeTo: "2027-09-01T00:00:00.000Z" }, environmentCeilings: { expertReferral: false, expertResidencyBilling: true } });
+    expect(workflows.execute).toHaveBeenCalled();
+  });
+
+  it("validates the exact client v2 control payload", async () => {
+    const workflows = { execute: vi.fn(async () => ({ allowed: true as const, replayed: false, version: 1, admissionPolicy: "free_client_v2" })), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await service.execute(principal, { action: "client_commercial_policy.control_v2", objectId: "00000000-0000-0000-0000-000000000041", approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task3-control", correlationId: "correlation-task3-control", payload: { expectedVersion: 0, admissionPolicy: "free_client_v2" }, environmentCeilings: { expertReferral: false, expertResidencyBilling: false } });
+    await expect(service.execute(principal, { action: "client_commercial_policy.control_v2", objectId: "00000000-0000-0000-0000-000000000041", approvalId: "00000000-0000-4000-8000-000000000020", nonce: "nonce-task3-control", correlationId: "correlation-task3-control", payload: { expectedVersion: 0, admissionPolicy: "free_client_v2", unknown: true }, environmentCeilings: { expertReferral: false, expertResidencyBilling: false } })).rejects.toThrow("invalid_admin_command");
+  });
   it("rejects a referral batch above the 1000-code limit before persistence", async () => {
     const workflows = { execute: vi.fn(), inventory: vi.fn() };
     const service = createExpertReferralAdminService({ workflows });

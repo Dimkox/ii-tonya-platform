@@ -37,8 +37,7 @@ const v2Actions = [
   "client_commercial_policy.control_v2",
   "expert_residency.tariff_create_v2",
 ] as const;
-type RouteAction = ExpertReferralAdminAction | (typeof v2Actions)[number];
-const objectTypes: Record<RouteAction, string> = {
+const objectTypes: Record<ExpertReferralAdminAction, string> = {
   "expert_referral.batch_generate": "expert",
   "expert_referral.code_revoke": "expert_referral_code",
   "expert_referral.issuance_override": "expert_referral_issuance_override",
@@ -120,13 +119,13 @@ const instant = (value: unknown, field: string): string => {
   return canonicalAdminInstant(value, field);
 };
 const canonicalPayload = (
-  action: RouteAction,
+  action: ExpertReferralAdminAction,
   objectId: string,
   raw: unknown,
   actor?: { id: string; sessionIdHash: string },
 ): ExpertReferralAdminPayload => {
   if (
-    (action === "expert_referral.feature_switch") !==
+    ["expert_referral.feature_switch", "client_commercial_policy.control_v2"].includes(action) !==
     (objectId === controlId)
   )
     throw new Error("invalid_command");
@@ -329,7 +328,7 @@ export async function buildExpertReferralAdminApi(
     return resolved?.sessionIdHash === hash ? resolved : null;
   };
   app.post<{
-    Params: { action: RouteAction; objectId: string };
+    Params: { action: ExpertReferralAdminAction; objectId: string };
     Body: { nonce: string; command: unknown };
   }>(
     "/v1/admin/actions/:action/:objectId/approvals",
@@ -351,7 +350,7 @@ export async function buildExpertReferralAdminApi(
       }
       const result = await deps.approvals.requestApproval({
         sessionIdHash: actor.sessionIdHash,
-        action: request.params.action as ExpertReferralAdminAction,
+        action: request.params.action,
         objectType: objectTypes[request.params.action],
         objectId: request.params.objectId,
         payload: payload as AdminPayload,
@@ -363,7 +362,7 @@ export async function buildExpertReferralAdminApi(
     },
   );
   app.post<{
-    Params: { action: RouteAction; objectId: string };
+    Params: { action: ExpertReferralAdminAction; objectId: string };
     Body: {
       approvalId: string;
       secondApprovalId?: string;
@@ -403,7 +402,7 @@ export async function buildExpertReferralAdminApi(
       }
       try {
         const result = await deps.admin.execute(actor, {
-          action: request.params.action as ExpertReferralAdminAction,
+          action: request.params.action,
           objectId: request.params.objectId,
           approvalId: request.body.approvalId,
           ...(request.body.secondApprovalId === undefined
@@ -424,6 +423,11 @@ export async function buildExpertReferralAdminApi(
         if ((error as Error).message === "invalid_admin_command")
           return reply.code(400).send({ error: "invalid_command" });
         if ((error as { code?: string }).code === "FEATURE_CONTROL_CONFLICT")
+          return reply.code(409).send({ error: "conflict" });
+        if (
+          (error as { code?: string }).code ===
+          "CLIENT_COMMERCIAL_POLICY_CONFLICT"
+        )
           return reply.code(409).send({ error: "conflict" });
         throw error;
       }
