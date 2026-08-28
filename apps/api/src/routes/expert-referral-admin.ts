@@ -33,10 +33,6 @@ const controlId = "00000000-0000-0000-0000-000000000041";
 const rfc3339 =
   /^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/u;
 const opaque = "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$";
-const v2Actions = [
-  "client_commercial_policy.control_v2",
-  "expert_residency.tariff_create_v2",
-] as const;
 const objectTypes: Record<ExpertReferralAdminAction, string> = {
   "expert_referral.batch_generate": "expert",
   "expert_referral.code_revoke": "expert_referral_code",
@@ -57,7 +53,7 @@ const params = {
   properties: {
     action: {
       type: "string",
-      enum: [...expertReferralAdminActions, ...v2Actions],
+      enum: expertReferralAdminActions,
     },
     objectId: {
       anyOf: [{ type: "string", pattern: uuid }, { const: controlId }],
