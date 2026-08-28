@@ -29,6 +29,7 @@ describe("loadEnv", () => {
       clientSession: false,
       clientBooking: false,
       clientBookingReserve: false,
+      clientFreeAccessV2: false,
       expertReferral: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,

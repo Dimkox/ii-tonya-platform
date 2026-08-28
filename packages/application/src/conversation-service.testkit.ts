@@ -69,9 +69,8 @@ export interface ConversationFixture extends ConversationDependencies {
 export const conversationFixture = (input: {
   readonly balance: number;
   readonly safety: "ordinary" | "crisis";
-  readonly outboundBillingMode?:
-    | "disabled"
-    | "provider_delivery_event";
+  readonly outboundBillingMode?: "disabled" | "provider_delivery_event";
+  readonly clientFreeAccessV2Enabled?: boolean;
 }): ConversationFixture => {
   const calls: string[] = [];
   let balance = input.balance;
@@ -183,10 +182,7 @@ export const conversationFixture = (input: {
         };
       }
 
-      if (
-        command.outcome.kind === "no_package" &&
-        balance > 0
-      ) {
+      if (command.outcome.kind === "no_package" && balance > 0) {
         return {
           kind: "retry" as const,
           messageEventId: command.messageEventId,
@@ -194,23 +190,27 @@ export const conversationFixture = (input: {
         };
       }
       const committedOutcome: InboundCompletionOutcome =
-        command.outcome.kind === "no_package" || balance <= 0
-          ? {
-              kind: "no_package",
-              topic: "client.no_package",
-              payload: {},
-            }
-          : command.outcome;
+        command.billingPolicy === "free"
+          ? command.outcome
+          : command.outcome.kind === "no_package" || balance <= 0
+            ? {
+                kind: "no_package",
+                topic: "client.no_package",
+                payload: {},
+              }
+            : command.outcome;
       const packageId =
-        committedOutcome.kind === "no_package" ? null : "package-1";
+        command.billingPolicy === "free" ||
+        committedOutcome.kind === "no_package"
+          ? null
+          : "package-1";
       if (packageId) {
         balance -= 1;
         ledgerDeltas.push(-1);
       }
       pending.state = "completed";
       messageAuditActions.push("conversation.inbound_completed");
-      const outboxKey =
-        `${command.messageEventId}:${committedOutcome.topic}`;
+      const outboxKey = `${command.messageEventId}:${committedOutcome.topic}`;
       outboxByKey.set(outboxKey, {
         topic: committedOutcome.topic,
         charge: 0,
@@ -231,15 +231,21 @@ export const conversationFixture = (input: {
         committedOutcome.kind === "no_package"
           ? { kind: "no_package", chargedMessages: 0 }
           : committedOutcome.kind === "answer"
-            ? { kind: "answer_queued", chargedMessages: 1 }
+            ? { kind: "answer_queued", chargedMessages: packageId ? 1 : 0 }
             : committedOutcome.kind === "show_catalog"
-              ? { kind: "catalog_requested", chargedMessages: 1 }
+              ? {
+                  kind: "catalog_requested",
+                  chargedMessages: packageId ? 1 : 0,
+                }
               : committedOutcome.kind === "start_booking"
-                ? { kind: "booking_started", chargedMessages: 1 }
+                ? {
+                    kind: "booking_started",
+                    chargedMessages: packageId ? 1 : 0,
+                  }
                 : {
                     kind: "human_handoff",
                     reasonCode: committedOutcome.payload.reasonCode,
-                    chargedMessages: 1,
+                    chargedMessages: packageId ? 1 : 0,
                   };
       if (completionFailure) {
         const error = completionFailure;
@@ -288,7 +294,9 @@ export const conversationFixture = (input: {
       ).length,
     grantMessages(count) {
       if (!Number.isSafeInteger(count) || count <= 0) {
-        throw new Error("Granted message count must be a positive safe integer");
+        throw new Error(
+          "Granted message count must be a positive safe integer",
+        );
       }
       balance += count;
     },
@@ -465,6 +473,11 @@ export const conversationFixture = (input: {
     handoffAcknowledgeWithinMs: 300_000,
     outboundBillingMode: input.outboundBillingMode ?? "disabled",
     approvedSafetyContactIds: ["contact-verified"],
+    clientFreeAccessV2Enabled: input.clientFreeAccessV2Enabled ?? false,
+    clientCommercialPolicy:
+      input.clientFreeAccessV2Enabled === undefined
+        ? undefined
+        : { resolveOrAssign: async () => "free_client_v2" },
     outbox: {
       topics: () => [...outboxByKey.values()].map((entry) => entry.topic),
       charges: () => [...outboxByKey.values()].map((entry) => entry.charge),

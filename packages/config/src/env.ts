@@ -76,6 +76,7 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: z
       .string()
       .regex(/^\d+$/u)
@@ -277,6 +278,7 @@ export type RuntimeConfig = {
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientFreeAccessV2?: boolean;
     expertReferral: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
@@ -341,6 +343,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",

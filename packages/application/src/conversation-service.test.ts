@@ -7,6 +7,18 @@ import {
 import { conversationFixture } from "./conversation-service.testkit.js";
 
 describe("conversation workflow", () => {
+  it("allows a free v2 client through with zero charge", async () => {
+    const deps = conversationFixture({
+      balance: 0,
+      safety: "ordinary",
+      clientFreeAccessV2Enabled: true,
+    });
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+    expect(result).toEqual({ kind: "answer_queued", chargedMessages: 0 });
+    expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
+  });
   it("validates bounded canonical input before every effect", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
     const service = createConversationService(deps);
@@ -377,13 +389,11 @@ describe("conversation workflow", () => {
       const deps = conversationFixture({ balance: 0, safety: "ordinary" });
       if (source === "deterministic") {
         deps.deterministicSafety.detect = (() =>
-          "arbitrary_reason") as unknown as
-          typeof deps.deterministicSafety.detect;
+          "arbitrary_reason") as unknown as typeof deps.deterministicSafety.detect;
       } else {
-        deps.typedSafety.classify = vi
-          .fn()
-          .mockResolvedValue({ risk: "arbitrary_reason" }) as unknown as
-          typeof deps.typedSafety.classify;
+        deps.typedSafety.classify = vi.fn().mockResolvedValue({
+          risk: "arbitrary_reason",
+        }) as unknown as typeof deps.typedSafety.classify;
       }
 
       const result = await createConversationService(deps).handleInbound(
@@ -645,9 +655,9 @@ describe("conversation workflow", () => {
   it("keeps current runtime outbound billing disabled even for delivered telemetry", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
 
-    const result = await createConversationService(
-      deps,
-    ).handleOutboundDelivery(deps.delivery);
+    const result = await createConversationService(deps).handleOutboundDelivery(
+      deps.delivery,
+    );
 
     expect(result).toEqual({ kind: "billing_disabled", chargedMessages: 0 });
     expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
@@ -660,7 +670,11 @@ describe("conversation workflow", () => {
       ...deps,
       handoffOwnerId: "bad owner",
       handoffAcknowledgeWithinMs: 0,
-      clock: { now: () => { throw new Error("clock unavailable"); } },
+      clock: {
+        now: () => {
+          throw new Error("clock unavailable");
+        },
+      },
     });
 
     const result = await service.handleOutboundDelivery(deps.delivery);

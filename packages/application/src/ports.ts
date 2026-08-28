@@ -4,6 +4,7 @@ import type {
   SafetyContactChannel,
   SafetyRisk,
 } from "@ii-tonya/domain";
+import type { ClientCommercialPolicyPort } from "./client-commercial-policy.js";
 
 export interface IntentInput {
   readonly text: string;
@@ -148,6 +149,7 @@ export interface CompleteInboundInput {
   readonly userId: string;
   readonly correlationId: string;
   readonly outcome: InboundCompletionOutcome;
+  readonly billingPolicy: "package" | "free";
 }
 
 export type CommittedInboundResult =
@@ -157,9 +159,9 @@ export type CommittedInboundResult =
       readonly chargedMessages: 1;
     }
   | { readonly kind: "no_package"; readonly chargedMessages: 0 }
-  | { readonly kind: "answer_queued"; readonly chargedMessages: 1 }
-  | { readonly kind: "catalog_requested"; readonly chargedMessages: 1 }
-  | { readonly kind: "booking_started"; readonly chargedMessages: 1 };
+  | { readonly kind: "answer_queued"; readonly chargedMessages: 0 | 1 }
+  | { readonly kind: "catalog_requested"; readonly chargedMessages: 0 | 1 }
+  | { readonly kind: "booking_started"; readonly chargedMessages: 0 | 1 };
 
 export type CompleteInboundResult =
   | { readonly kind: "duplicate"; readonly messageEventId: string }
@@ -250,6 +252,8 @@ export interface ConversationDependencies {
   readonly handoffAcknowledgeWithinMs: number;
   readonly outboundBillingMode: "disabled" | "provider_delivery_event";
   readonly approvedSafetyContactIds: readonly string[];
+  readonly clientCommercialPolicy?: ClientCommercialPolicyPort;
+  readonly clientFreeAccessV2Enabled?: boolean;
 }
 
 export type ConversationResult =
@@ -260,16 +264,17 @@ export type ConversationResult =
       readonly chargedMessages: 0 | 1;
     }
   | { readonly kind: "no_package"; readonly chargedMessages: 0 }
-  | { readonly kind: "answer_queued"; readonly chargedMessages: 1 }
-  | { readonly kind: "catalog_requested"; readonly chargedMessages: 1 }
-  | { readonly kind: "booking_started"; readonly chargedMessages: 1 };
+  | { readonly kind: "answer_queued"; readonly chargedMessages: 0 | 1 }
+  | { readonly kind: "catalog_requested"; readonly chargedMessages: 0 | 1 }
+  | { readonly kind: "booking_started"; readonly chargedMessages: 0 | 1 };
 
 export type OutboundDeliveryResult =
   | { readonly kind: "duplicate"; readonly chargedMessages: 0 }
   | { readonly kind: "billing_disabled"; readonly chargedMessages: 0 }
   | { readonly kind: "not_delivered"; readonly chargedMessages: 0 }
   | { readonly kind: "no_package"; readonly chargedMessages: 0 }
-  | { readonly kind: "charged"; readonly chargedMessages: 1 };
+  | { readonly kind: "charged"; readonly chargedMessages: 1 }
+  | { readonly kind: "free"; readonly chargedMessages: 0 };
 
 export interface ConversationService {
   handleInbound(command: HandleInboundCommand): Promise<ConversationResult>;

@@ -15,6 +15,7 @@ import {
   type ExpertAiIngressService,
   type PrivacyService,
   type IdentityProofVerifier,
+  type ClientCommercialPolicyPort,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -111,14 +112,27 @@ export const createDefaultLifecycle = (
     clientSessionComposition?: {
       readonly verifier: IdentityProofVerifier;
     };
+    clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (
+      config.features.clientFreeAccessV2 === true &&
+      options.clientCommercialPolicyRepository === undefined
+    ) {
+      throw new Error("client_commercial_policy_repository_unavailable");
+    }
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
       bookingRuntime: true,
     });
+    if (
+      config.features.clientFreeAccessV2 === true &&
+      options.clientCommercialPolicyRepository === undefined
+    ) {
+      throw new Error("client_commercial_policy_repository_unavailable");
+    }
   },
   async migrate(db) {
     await migrateDb(db, defaultMigrationsFolder);
