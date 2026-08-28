@@ -237,3 +237,4 @@ export {
   clientCommercialPolicyAssignments,
   clientCommercialPolicyControls,
 } from "./schema/commercial-policy.js";
+export { PostgresClientCommercialPolicyRepository } from "./repositories/client-commercial-policy-repository.js";
