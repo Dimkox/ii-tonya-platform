@@ -47,6 +47,9 @@ describe("client commercial policy assignment", () => {
     expect(rows.rows[0]?.count).toBe(1);
   });
   it("rejects a non-positive audit version", async () => {
+    await database.db.execute(
+      sql`insert into admin_approvals (id, action, object_type, object_id, requester_id, expires_at, nonce) values ('00000000-0000-4000-8000-000000000074'::uuid, 'client_commercial_policy.control_v2', 'client_commercial_policy_control', ${objectId}::uuid, ${admin}::uuid, now() + interval '1 hour', 'policy-test-invalid-version-nonce')`,
+    );
     await expect(
       database.db.execute(
         sql`insert into expert_referral_admin_execution_results (approval_id, action, object_id, payload_hash, nonce_hash, requester_session_id_hash, expected_version, safe_result) values ('00000000-0000-4000-8000-000000000074'::uuid, 'client_commercial_policy.control_v2', ${objectId}::uuid, 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd', 'policy-test-session', 0, '{"version":0,"admissionPolicy":"free_client_v2"}'::jsonb)`,
