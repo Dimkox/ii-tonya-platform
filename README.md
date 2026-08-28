@@ -369,6 +369,19 @@ Probe an already deployed API with `pnpm smoke -- --base-url=http://localhost:30
 The local Compose stack binds only the API to loopback, uses placeholder-only database
 credentials, and keeps every live integration flag set to `false`.
 
+## Commercial Core V2 A1 current state
+
+Version: `0.0.0` (package manifest). A1 adds the PostgreSQL schema and audited command
+paths for immutable `free_client_v2` admission assignments and the V2 `START` tariff
+fixture, makes zero-package ordinary-client inbound completion free, and snapshots the
+exact `30%` (`3000` bps) credit ceiling. The end-to-end evidence is
+[`tests/integration/commercial-core-v2-a1.test.ts`](tests/integration/commercial-core-v2-a1.test.ts);
+traceability and rollback are in [`docs/spec/commercial-core-v2-a1-traceability.md`](docs/spec/commercial-core-v2-a1-traceability.md)
+and [`docs/runbooks/commercial-core-v2-a1-rollback.md`](docs/runbooks/commercial-core-v2-a1-rollback.md).
+All live flags default false. No production tariff is seeded, no provider is activated,
+and no live gate is claimed. Expert-referral 30-day maturity is A2 and is not activated.
+External Trust CI, Database Gate, and branch push remain blocked and controller-owned.
+
 ## Release boundary
 
 Local application tests, sanitized provider fixtures, and built test-container health
