@@ -134,6 +134,153 @@ and projections. YooKassa by YooMoney is the selected payment provider; its adap
 recovery boundaries are implemented but remain disabled and uncomposed until the provider
 contract, key-management boundary, and release gates are approved.
 
+## Unit-economics planning calculation
+
+This calculation records the 2026-08-28 planning scenario only. It does not activate or
+replace the tariffs, packages, coupons, referral terms, or legal text currently stored in
+the repository.
+
+### Inputs
+
+| Input                              |                                   Planning value |
+| ---------------------------------- | -----------------------------------------------: |
+| Ordinary-client revenue            |                                          `0 RUB` |
+| Expert price mix                   |    `60% × 3,900 + 30% × 5,900 + 10% × 9,990 RUB` |
+| Listed expert ARPE                 |                                `5,109 RUB/month` |
+| Selarti exchange rate              |                  Bank of Russia USD/RUB `× 1.10` |
+| 2026-08-28 effective Selarti rate  |              `85.9541 × 1.10 = 94.54951 RUB/USD` |
+| Annual inflation stress            | `60%` with expert prices held nominally constant |
+| Stress Selarti rate                |           `94.54951 × 1.60 = 151.279216 RUB/USD` |
+| Average expert lifetime            |                                     `2.5 months` |
+| Equivalent geometric monthly churn |                                  `1 / 2.5 = 40%` |
+| Deterministic offload assumption   |                                            `75%` |
+| Selarti activity assumption        |         `25 AI turns/expert/month` after offload |
+| Selarti billing assumption         |                       `2 billable units/AI turn` |
+| Modeled token allowance            |                   `0.511 RUB/AI turn` at base FX |
+| Acquiring sensitivity              |                       `4.636%` conservative case |
+| USN income-tax sensitivity         |                                             `6%` |
+| VAT sensitivity after threshold    |                         `5%` inside frozen price |
+| VAT threshold used in scale table  |               `20m RUB` normal; `15m RUB` stress |
+| Refund reserve                     |                                  `1% of revenue` |
+| Expert discount/referral leakage   |              `8%-16% of listed ARPE` sensitivity |
+| Support/operations                 |         `600 RUB/expert/month`; stress `960 RUB` |
+| Hosting, backup, monitoring        |          `30,000 RUB/month`; stress `48,000 RUB` |
+| Founder plus part-time support     |        `180,000 RUB/month`; stress `288,000 RUB` |
+| Small-team payroll                 |        `600,000 RUB/month`; stress `960,000 RUB` |
+
+The price mix, offload rate, AI activity and billing ratios, token allowance, refund
+reserve, support, hosting, and payroll rows are internal scenario assumptions rather than
+vendor quotes or observed production metrics.
+
+The Selarti monthly-plan prices used here are `$360` for Pro 20k and `$0.03` for each
+unit above 20,000. The conservative acquiring case models `(2.8% + 1%) × 1.22`; the
+actual merchant rate depends on the YooKassa contract and payment method. Provider and
+tax inputs were retrieved on 2026-08-28 from the official
+[Selarti tariff manual](https://manual.selarti.com/finansovye-voprosy/tarify-i-limity),
+[Bank of Russia daily rate](https://www.cbr.ru/currency_base/daily/?UniDbQuery.Posted=True&UniDbQuery.To=28.08.2026),
+[YooKassa fees](https://yookassa.ru/fees/), and
+[Federal Tax Service 2026 changes](https://www.nalog.gov.ru/new2026/). Selarti prices
+are modeled as quoted in USD; invoice tax treatment must be confirmed separately.
+
+### Core calculation
+
+```text
+ARPE = 0.60 × 3,900 + 0.30 × 5,900 + 0.10 × 9,990 = 5,109 RUB
+monthly churn = 1 / 2.5 = 40%
+AI turns = paying experts × 25
+Selarti units = AI turns × 2
+base Selarti = base FX × [360 + 0.03 × max(0, units − 20,000)] + AI turns × 0.511
+stress Selarti = stress FX × [360 + 0.03 × max(0, units − 20,000)]
+                 + AI turns × (0.511 × 1.60)
+VAT = 5% × revenue when annualized revenue exceeds 20m RUB normal / 15m RUB stress
+contribution = revenue − acquiring − USN − VAT − refunds − Selarti − support − hosting
+replacement CAC = paying experts × 40% × CAC per acquired expert
+LTV = monthly contribution × 2.5
+CAC ceiling at LTV/CAC >= 3 = LTV / 3
+```
+
+For 100 experts, VAT is below the modeled threshold and the line items reproduce the
+published totals (rounded to whole RUB):
+
+```text
+normal = 510,900 − 23,685 − 30,654 − 5,109 − 34,038 − 1,278 − 60,000 − 30,000
+       = 326,136 RUB
+
+stress = 510,900 − 23,685 − 30,654 − 5,109 − 54,460 − 2,044 − 96,000 − 48,000
+       = 250,948 RUB
+
+stress after replacement CAC = 250,948 − (100 × 40% × 2,500) = 150,948 RUB
+```
+
+At 100 paying experts, the modeled normal monthly contribution is approximately
+`3,261 RUB/expert`. Under the 60% inflation and 2.5-month-lifetime stress, before
+replacement acquisition and promotion leakage, it is approximately `2,509 RUB/expert`:
+LTV is approximately `6,274 RUB`, and the all-in CAC ceiling is approximately `2,091 RUB`.
+An `8%-16%` expert-price discount/referral leakage sensitivity subtracts approximately
+`409-817 RUB/expert/month`; stress LTV then falls to approximately `4,230-5,252 RUB` and
+the CAC ceiling to approximately `1,410-1,751 RUB`.
+
+### Scale sensitivity
+
+Contribution below includes the modeled Selarti/tokens, acquiring, tax sensitivity,
+refund reserve, support/operations, and shared hosting. It is before team payroll; the
+last column also subtracts replacement acquisition at `2,500 RUB` for the 40% monthly
+churn.
+
+| Paying experts | MRR at ARPE 5,109 | Normal contribution | Stress contribution | Stress after replacement CAC 2,500 |
+| -------------: | ----------------: | ------------------: | ------------------: | ---------------------------------: |
+|             10 |   51 thousand RUB |    -25 thousand RUB |    -67 thousand RUB |                   -77 thousand RUB |
+|             25 |  128 thousand RUB |    +34 thousand RUB |    -14 thousand RUB |                   -39 thousand RUB |
+|             50 |  255 thousand RUB |   +131 thousand RUB |    +74 thousand RUB |                   +24 thousand RUB |
+|            100 |  511 thousand RUB |   +326 thousand RUB |   +251 thousand RUB |                  +151 thousand RUB |
+|            250 | 1.277 million RUB |   +911 thousand RUB |   +717 thousand RUB |                  +467 thousand RUB |
+|            500 | 2.555 million RUB |  +1.745 million RUB |  +1.514 million RUB |                 +1.014 million RUB |
+
+Modeled break-even counts are:
+
+| Operating shape                        |      Normal | Stress, no paid CAC | Stress with CAC 2,500 |
+| -------------------------------------- | ----------: | ------------------: | --------------------: |
+| Founder-only, excluding founder salary |  17 experts |          29 experts |            41 experts |
+| Founder plus part-time support         |  63 experts |         111 experts |           155 experts |
+| Small team                             | 171 experts |         325 experts |           474 experts |
+
+Break-even is calculated by increasing the paying-expert count until contribution covers
+the listed team payroll. Founder-only excludes founder salary; the other two rows use the
+normal/stress payroll assumptions in the input table. VAT is added once the applicable
+annual threshold is crossed: the 2026 `20m RUB` threshold in the normal case and the 2027
+`15m RUB` threshold in the one-year stress case.
+
+### Selarti and promotion sensitivity
+
+- Pro 20k costs approximately `34,038 RUB/month` at the effective current rate and
+  `54,460 RUB/month` after the 60% FX stress, before tokens and overage.
+- At 28,000 billable units, the modeled monthly Selarti charge is `$600`, or
+  approximately `56,730 RUB` current / `90,768 RUB` stress, before tokens.
+- At 100 active experts and 40% churn, the service must replace 40 experts every month.
+- A `1,000 RUB` expert referral reward is acquisition cost/contra-revenue rather than
+  income.
+
+Client coupons must be reserved at expected redemption value. For the current illustrative
+`2x` package plus `500/500` referral terms, one `1,000 RUB` package produces the following
+pre-fee sensitivity:
+
+| Expected redemption | Expected `2x` coupon cost | Expected `500/500` cost | Total expected cost | Remainder from 1,000 RUB |
+| ------------------: | ------------------------: | ----------------------: | ------------------: | -----------------------: |
+|                 20% |                   400 RUB |                 200 RUB |             600 RUB |                 +400 RUB |
+|                 50% |                 1,000 RUB |                 500 RUB |           1,500 RUB |                 -500 RUB |
+|                 80% |                 1,600 RUB |                 800 RUB |           2,400 RUB |               -1,400 RUB |
+
+If ordinary clients pay nothing, the `2x` package trigger and inviter reward after a
+first package payment have no funding event. At 100 qualifying `500/500` referrals per
+month, the expected reserve alone is `20,000 / 50,000 / 80,000 RUB` at 20% / 50% / 80%
+redemption. This reserve and every discount or expert referral credit must be included in
+realized ARPE and CAC before a scale decision.
+
+The tax sensitivity must be recalculated before activation: the published USN
+VAT-exemption threshold is 20 million RUB in 2026, 15 million RUB in 2027, and 10 million
+RUB from 2028. At listed ARPE `5,109 RUB`, those annual thresholds correspond to roughly
+327 / 245 / 164 continuously paying experts.
+
 ## Production topology
 
 Production is a dedicated Linux server for this project. The application is deployed as
