@@ -41,6 +41,12 @@ describe("expert Telegram views", () => {
           priceMinor: "200000",
           currency: "RUB",
           durationSeconds: 2_592_000,
+          commercialPolicyVersion: "expert_residency_v2",
+          creditCapBps: 3000,
+          individualServicesEnabled: true,
+          groupEventLimit: 0,
+          statisticsLevel: "basic",
+          supportPriority: "standard",
         },
       ],
     });
@@ -65,6 +71,12 @@ describe("expert Telegram views", () => {
               priceMinor: "200000",
               currency: "RUB",
               durationSeconds,
+              commercialPolicyVersion: "expert_residency_v2",
+              creditCapBps: 3000,
+              individualServicesEnabled: true,
+              groupEventLimit: 0,
+              statisticsLevel: "basic",
+              supportPriority: "standard",
             },
           ],
         }),
@@ -90,6 +102,12 @@ describe("expert Telegram views", () => {
         priceMinor: String(200000 + index),
         currency: "RUB" as const,
         durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2",
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic",
+        supportPriority: "standard",
       })),
     });
 
@@ -135,6 +153,12 @@ describe("expert Telegram views", () => {
       cashMinor: "187654",
       currency: "RUB",
       durationSeconds: 2_592_000,
+      commercialPolicyVersion: "expert_residency_v2",
+      creditCapBps: 3000,
+      individualServicesEnabled: true,
+      groupEventLimit: 0,
+      statisticsLevel: "basic",
+      supportPriority: "standard",
     });
     expect(rendered).toContain("Price: 199999 RUB minor units");
     expect(rendered).toContain("Referral credit: 12345 RUB minor units");
@@ -183,6 +207,12 @@ describe("expert Telegram views", () => {
       currency: "RUB",
       durationSeconds: 2_592_000,
       checkoutCallbackData: callbackData,
+      commercialPolicyVersion: "expert_residency_v2",
+      creditCapBps: 3000,
+      individualServicesEnabled: true,
+      groupEventLimit: 0,
+      statisticsLevel: "basic",
+      supportPriority: "standard",
     });
 
     expect(requests[0]?.body).toMatchObject({

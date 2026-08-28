@@ -10,6 +10,7 @@ import type {
   RecordOutboundDeliveryInput,
   VerifiedSafetyContact,
 } from "./ports.js";
+import type { ClientCommercialPolicyPort } from "./client-commercial-policy.js";
 
 interface HandoffView {
   readonly status: "opened";
@@ -71,6 +72,7 @@ export const conversationFixture = (input: {
   readonly safety: "ordinary" | "crisis";
   readonly outboundBillingMode?: "disabled" | "provider_delivery_event";
   readonly clientFreeAccessV2Enabled?: boolean;
+  readonly clientCommercialPolicy?: ClientCommercialPolicyPort;
 }): ConversationFixture => {
   const calls: string[] = [];
   let balance = input.balance;
@@ -245,7 +247,7 @@ export const conversationFixture = (input: {
                 : {
                     kind: "human_handoff",
                     reasonCode: committedOutcome.payload.reasonCode,
-                    chargedMessages: packageId ? 1 : 0,
+                    chargedMessages: 1,
                   };
       if (completionFailure) {
         const error = completionFailure;
@@ -474,10 +476,12 @@ export const conversationFixture = (input: {
     outboundBillingMode: input.outboundBillingMode ?? "disabled",
     approvedSafetyContactIds: ["contact-verified"],
     clientFreeAccessV2Enabled: input.clientFreeAccessV2Enabled ?? false,
-    clientCommercialPolicy:
-      input.clientFreeAccessV2Enabled === undefined
-        ? undefined
-        : { resolveOrAssign: async () => "free_client_v2" },
+    ...(input.clientCommercialPolicy === undefined &&
+    input.clientFreeAccessV2Enabled !== undefined
+      ? { clientCommercialPolicy: { resolveOrAssign: async () => "free_client_v2" as const } }
+      : input.clientCommercialPolicy === undefined
+        ? {}
+        : { clientCommercialPolicy: input.clientCommercialPolicy }),
     outbox: {
       topics: () => [...outboxByKey.values()].map((entry) => entry.topic),
       charges: () => [...outboxByKey.values()].map((entry) => entry.charge),

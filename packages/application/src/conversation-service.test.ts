@@ -21,18 +21,18 @@ describe("conversation workflow", () => {
   });
 
   it("preserves an existing free v2 assignment when admission is disabled", async () => {
-    const deps = conversationFixture({
-      balance: 0,
-      safety: "ordinary",
-      clientFreeAccessV2Enabled: false,
-    });
     const resolveOrAssign = vi.fn(
       async (input: { userId: string; allowV2Admission: boolean }) => {
         expect(input.allowV2Admission).toBe(false);
         return "free_client_v2" as const;
       },
     );
-    deps.clientCommercialPolicy = { resolveOrAssign };
+    const deps = conversationFixture({
+      balance: 0,
+      safety: "ordinary",
+      clientFreeAccessV2Enabled: false,
+      clientCommercialPolicy: { resolveOrAssign },
+    });
 
     const result = await createConversationService(deps).handleInbound(
       deps.inbound,
@@ -75,12 +75,12 @@ describe("conversation workflow", () => {
       balance: 1,
       safety: "ordinary",
       clientFreeAccessV2Enabled: true,
-    });
-    deps.clientCommercialPolicy = {
-      resolveOrAssign: async () => {
-        throw new Error("policy down");
+      clientCommercialPolicy: {
+        resolveOrAssign: async () => {
+          throw new Error("policy down");
+        },
       },
-    };
+    });
     await expect(
       createConversationService(deps).handleOutboundDelivery(deps.delivery),
     ).rejects.toMatchObject({ code: "dependency_unavailable" });

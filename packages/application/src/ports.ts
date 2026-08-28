@@ -119,7 +119,7 @@ export type InboundCompletionOutcome =
     }
   | {
       readonly kind: "no_package";
-      readonly topic: "client.no_package";
+      readonly topic: "client.no_package" | "client.free";
       readonly payload: Readonly<Record<string, never>>;
     }
   | {

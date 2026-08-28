@@ -64,6 +64,12 @@ const build = (
     cashMinor: "100000",
     currency: "RUB" as const,
     durationSeconds: 2_592_000,
+    commercialPolicyVersion: "expert_residency_v2" as const,
+    creditCapBps: 3000,
+    individualServicesEnabled: true,
+    groupEventLimit: 0,
+    statisticsLevel: "basic" as const,
+    supportPriority: "standard" as const,
   }));
   const residencyTariffs = vi.fn(async () => [
     {
@@ -72,6 +78,12 @@ const build = (
       priceMinor: "200000",
       currency: "RUB" as const,
       durationSeconds: 2_592_000,
+      commercialPolicyVersion: "expert_residency_v2" as const,
+      creditCapBps: 3000,
+      individualServicesEnabled: true,
+      groupEventLimit: 0,
+      statisticsLevel: "basic" as const,
+      supportPriority: "standard" as const,
     },
   ]);
   const issueCheckout = vi.fn(async () =>
@@ -311,6 +323,12 @@ describe("expert Telegram command processor", () => {
           priceMinor: "200000",
           currency: "RUB",
           durationSeconds: 2_592_000,
+          commercialPolicyVersion: "expert_residency_v2",
+          creditCapBps: 3000,
+          individualServicesEnabled: true,
+          groupEventLimit: 0,
+          statisticsLevel: "basic",
+          supportPriority: "standard",
         },
       ],
     });

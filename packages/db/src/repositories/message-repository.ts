@@ -41,7 +41,7 @@ export type InboundCompletionOutcome =
     }
   | {
       kind: "no_package";
-      topic: "client.no_package";
+      topic: "client.no_package" | "client.free";
       payload: Record<string, never>;
     }
   | {
@@ -78,7 +78,7 @@ export type CommittedInboundResult =
   | {
       kind: "human_handoff";
       reasonCode: string;
-      chargedMessages: 0 | 1;
+      chargedMessages: 1;
     }
   | { kind: "no_package"; chargedMessages: 0 }
   | { kind: "answer_queued"; chargedMessages: 0 | 1 }
@@ -354,7 +354,7 @@ function committedResultFor(
       return {
         kind: "human_handoff",
         reasonCode: outcome.payload.reasonCode,
-        chargedMessages: charged ? 1 : 0,
+        chargedMessages: 1,
       };
   }
 }

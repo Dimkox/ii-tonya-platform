@@ -27,8 +27,8 @@ describe("expert residency service", () => {
         creditCapBps: 3000,
         individualServicesEnabled: true,
         groupEventLimit,
-        statisticsLevel,
-        supportPriority,
+        statisticsLevel: statisticsLevel as "basic" | "expanded",
+        supportPriority: supportPriority as "standard" | "priority",
       };
       const expectedCredit = {
         START: "117000",
@@ -77,6 +77,12 @@ describe("expert residency service", () => {
         priceMinor: "200000",
         currency: "RUB" as const,
         durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic" as const,
+        supportPriority: "standard" as const,
       },
     ]);
     const dependencies = {
@@ -104,6 +110,12 @@ describe("expert residency service", () => {
         priceMinor: "200000",
         currency: "RUB",
         durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2",
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic",
+        supportPriority: "standard",
       },
     ]);
     expect(dependencies.queries.ownerUserId).toHaveBeenCalledWith(
