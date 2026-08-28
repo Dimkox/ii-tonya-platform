@@ -400,6 +400,31 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
+    [
+      "expert_residency.tariff_create_v3",
+      "packages/db/src/repositories/expert-referral-admin-repository.ts",
+      'action: "expert_residency.tariff_create_v3"',
+    ],
+    [
+      "client_commercial_policy_assignments_shadow",
+      "packages/db/src/schema/commercial-policy.ts",
+      'pgTable("client_commercial_policy_assignments_shadow", {})',
+    ],
+    [
+      "packages/db/migrations/0032_commercial_core_v2_a1.sql.bak",
+      "packages/db/migrations/0032_commercial_core_v2_a1.sql.bak",
+      'import Stripe from "stripe";',
+    ],
+  ])("rejects near-miss A1 scope entry %s", (_nearMiss, path, content) => {
+    expect(
+      [
+        ...classifyPaymentScopeProbe({ path, content }),
+        ...classifyApprovedTrackedScopeContent({ path, content }),
+      ],
+    ).not.toEqual([]);
+  });
+
+  it.each([
     "packages/db/src/schema/audit.ts",
     "packages/db/src/schema/identity.ts",
     "packages/db/src/schema/integration.ts",

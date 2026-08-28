@@ -86,6 +86,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
   "packages/db/migrations/0027_expert_ai_request_receipts.sql",
   "packages/db/migrations/0028_operator_case_inbox.sql",
+  "packages/db/migrations/0032_commercial_core_v2_a1.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -112,6 +113,8 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_referral_abuse_holds",
   "expert_referral_feature_controls",
   "expert_referral_balances",
+  "client_commercial_policy_assignments",
+  "client_commercial_policy_controls",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
@@ -147,6 +150,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.hold_replay",
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
+  "expert_residency.tariff_create_v2",
   "expert_residency.tariff_retire",
   "expert_residency.sandbox_settle",
   "expert_residency.sandbox_refund",
@@ -631,6 +635,10 @@ const approvedMigrationHashes = new Map([
     "b625de5a14c3aa542116b4ad7c88df6ddeab99b893fdbda83bca0f6d8c1f4529",
   ],
   [
+    "packages/db/migrations/0032_commercial_core_v2_a1.sql",
+    "77ecb15523efb8d9d060567eced6cf170d25193b8e3a0ee6cb2dc84253b85b6a",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -708,7 +716,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "946ea5ba29dab55ed8865dc42a9fc2c64651b63d4b2440f29315867d6bbdd8ce",
+    "50b702c170950c16318b00490de10432e4ba1eaea4637582ca352468c51a1d8c",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
