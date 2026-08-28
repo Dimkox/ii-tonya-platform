@@ -30,14 +30,24 @@ describe("expert residency service", () => {
         statisticsLevel,
         supportPriority,
       };
+      const expectedCredit = {
+        START: "117000",
+        BASE: "177000",
+        PRO: "299700",
+      }[_key as "START" | "BASE" | "PRO"];
+      const expectedCash = {
+        START: "273000",
+        BASE: "413000",
+        PRO: "699300",
+      }[_key as "START" | "BASE" | "PRO"];
       const service = createExpertResidencyService({
         environmentEnabled: true,
         commands: {
           listActiveTariffs: async () => [tariff],
           quote: async () => ({
             ...tariff,
-            creditMinor: "117000",
-            cashMinor: "273000",
+            creditMinor: expectedCredit,
+            cashMinor: expectedCash,
           }),
           checkout: vi.fn(),
         },
@@ -52,7 +62,11 @@ describe("expert residency service", () => {
       await expect(service.listActiveTariffs(owner)).resolves.toEqual([tariff]);
       await expect(
         service.quote(owner, tariff.tariffVersionId),
-      ).resolves.toMatchObject(tariff);
+      ).resolves.toEqual({
+        ...tariff,
+        creditMinor: expectedCredit,
+        cashMinor: expectedCash,
+      });
     },
   );
   it("reauthorizes ownership before returning the bounded authoritative tariff list", async () => {
