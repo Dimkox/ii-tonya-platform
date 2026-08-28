@@ -25,6 +25,8 @@ export type ApprovalAdminAction =
   | "expert_referral.abuse_hold_open"
   | "expert_referral.abuse_hold_close"
   | "expert_residency.tariff_create"
+  | "client_commercial_policy.control_v2"
+  | "expert_residency.tariff_create_v2"
   | "expert_residency.tariff_retire"
   | "expert_referral.hold_replay"
   | "expert_referral.feature_switch"
@@ -95,6 +97,8 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "expert_referral.abuse_hold_open": "security_admin",
   "expert_referral.abuse_hold_close": "security_admin",
   "expert_residency.tariff_create": "entitlement_admin",
+  "client_commercial_policy.control_v2": "entitlement_admin",
+  "expert_residency.tariff_create_v2": "entitlement_admin",
   "expert_residency.tariff_retire": "entitlement_admin",
   "expert_referral.hold_replay": "security_admin",
   "expert_referral.feature_switch": "security_admin",

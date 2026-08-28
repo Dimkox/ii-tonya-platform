@@ -57,7 +57,7 @@ export const expertReferralAdminExecutionResults = pgTable(
   (table) => [
     check(
       "expert_referral_admin_result_action_allowed",
-      sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`,
+      sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch','client_commercial_policy.control_v2','expert_residency.tariff_create_v2')`,
     ),
     check(
       "expert_referral_admin_result_payload_hash_format",
@@ -73,7 +73,7 @@ export const expertReferralAdminExecutionResults = pgTable(
     ),
     check(
       "expert_referral_admin_result_expected_version",
-      sql`coalesce((${table.action} = 'expert_referral.feature_switch' and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} <> 'expert_referral.feature_switch' and ${table.expectedVersion} is null), false)`,
+      sql`coalesce((${table.action} in ('expert_referral.feature_switch','client_commercial_policy.control_v2') and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} not in ('expert_referral.feature_switch','client_commercial_policy.control_v2') and ${table.expectedVersion} is null), false)`,
     ),
     check(
       "expert_referral_admin_result_object_only",
@@ -91,9 +91,11 @@ export const expertReferralAdminExecutionResults = pgTable(
       (${table.action} = 'expert_referral.issuance_override' and ${table.safeResult} ? 'overrideId' and ${table.safeResult} - 'overrideId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'overrideId')='string') or
       (${table.action} in ('expert_referral.abuse_hold_open','expert_referral.abuse_hold_close') and ${table.safeResult} ?& array['id','expertId','status'] and ${table.safeResult} - array['id','expertId','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and (${table.safeResult}->>'id') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' and jsonb_typeof(${table.safeResult}->'expertId')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
       (${table.action} = 'expert_residency.tariff_create' and ${table.safeResult} ? 'tariffVersionId' and ${table.safeResult} - 'tariffVersionId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string') or
+      (${table.action} = 'expert_residency.tariff_create_v2' and ${table.safeResult} ? 'tariffVersionId' and ${table.safeResult} - 'tariffVersionId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string') or
       (${table.action} = 'expert_residency.tariff_retire' and ${table.safeResult} ?& array['tariffVersionId','activeTo'] and ${table.safeResult} - array['tariffVersionId','activeTo'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string' and jsonb_typeof(${table.safeResult}->'activeTo')='string') or
       (${table.action} = 'expert_referral.hold_replay' and ${table.safeResult} ?& array['kind','reason'] and ${table.safeResult} - array['kind','reason'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'kind')='string' and jsonb_typeof(${table.safeResult}->'reason')='string') or
       (${table.action} = 'expert_referral.feature_switch' and ${table.safeResult} ? 'version' and ${table.safeResult} - 'version' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number')
+      or (${table.action} = 'client_commercial_policy.control_v2' and ${table.safeResult} ?& array['version','admissionPolicy'] and ${table.safeResult} - array['version','admissionPolicy'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number' and jsonb_typeof(${table.safeResult}->'admissionPolicy')='string')
     `,
     ),
     uniqueIndex("expert_referral_admin_results_second_approval_unique")
@@ -333,6 +335,9 @@ export const expertResidencyTariffVersions = pgTable(
       .notNull()
       .default("legacy_residency_v1"),
     creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    individualServicesEnabled: boolean("individual_services_enabled")
+      .notNull()
+      .default(false),
     groupEventLimit: integer("group_event_limit").notNull().default(0),
     statisticsLevel: text("statistics_level").notNull().default("basic"),
     supportPriority: text("support_priority").notNull().default("standard"),
@@ -363,8 +368,14 @@ export const expertResidencyTariffVersions = pgTable(
       "expert_tariff_v2_cap",
       sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
     ),
-    check("expert_tariff_v2_price", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`),
-    check("expert_tariff_v2_duration", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`),
+    check(
+      "expert_tariff_v2_price",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`,
+    ),
+    check(
+      "expert_tariff_v2_duration",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`,
+    ),
     check(
       "expert_tariff_group_event_limit",
       sql`${table.groupEventLimit} between 0 and 3`,
@@ -523,8 +534,14 @@ export const expertResidencyOrders = pgTable(
       "expert_order_v2_cap",
       sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
     ),
-    check("expert_order_v2_price", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`),
-    check("expert_order_v2_duration", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`),
+    check(
+      "expert_order_v2_price",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`,
+    ),
+    check(
+      "expert_order_v2_duration",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`,
+    ),
     check(
       "expert_order_group_event_limit",
       sql`${table.groupEventLimit} between 0 and 3`,
