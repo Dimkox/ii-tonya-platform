@@ -503,7 +503,7 @@ describe("expert referral residency schema", () => {
     await expectDatabaseError(
       () =>
         insertOrder({ priceMinor: 1000n, creditMinor: 400n, cashMinor: 599n }),
-      { code: "23514", constraint: "expert_order_cash_remainder" },
+      { code: "23514", constraint: "expert_order_cash_credit_conservation" },
     );
   });
 

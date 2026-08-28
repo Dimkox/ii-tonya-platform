@@ -30,11 +30,14 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
       "packages/db/migrations/0027_expert_ai_request_receipts.sql",
       "packages/db/migrations/0028_operator_case_inbox.sql",
+      "packages/db/migrations/0032_commercial_core_v2_a1.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
+      "client_commercial_policy_assignments",
+      "client_commercial_policy_controls",
       "expert_ai_request_receipts",
       "expert_first_residency_settlements",
       "expert_referral_abuse_holds",
@@ -89,6 +92,7 @@ describe("expert residency referral scope boundary", () => {
       "expert_residency.sandbox_refund",
       "expert_residency.sandbox_settle",
       "expert_residency.tariff_create",
+      "expert_residency.tariff_create_v2",
       "expert_residency.tariff_retire",
     ]);
   });

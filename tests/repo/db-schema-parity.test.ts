@@ -125,14 +125,22 @@ describe("authoritative Drizzle schema parity", () => {
     });
     expect(requiredTable("expertResidencyOrders")).toMatchObject({
       checks: [
+        "expert_order_cash_credit_conservation",
         "expert_order_cash_remainder",
         "expert_order_credit_cap",
         "expert_order_currency_rub",
         "expert_order_deadline_after_creation",
         "expert_order_deadline_not_after_provider",
         "expert_order_duration_positive",
+        "expert_order_group_event_limit",
         "expert_order_money_bounds",
+        "expert_order_policy_version",
         "expert_order_settlement_interval",
+        "expert_order_statistics_level",
+        "expert_order_support_priority",
+        "expert_order_v2_cap",
+        "expert_order_v2_duration",
+        "expert_order_v2_price",
       ],
       uniques: [
         "expert_orders_expert_idempotency_unique",
@@ -587,21 +595,26 @@ describe("authoritative Drizzle schema parity", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    const principal = journal.entries.at(-2);
+    const principal = journal.entries.find((entry) => entry.tag === "0030_client_sessions");
     expect(principal).toMatchObject({
       idx: 30,
       tag: "0030_client_sessions",
     });
-    expect(principal?.when).toBeGreaterThan(journal.entries.at(-3)?.when ?? 0);
+    const booking = journal.entries.find((entry) => entry.tag === "0031_client_booking_references");
+    expect(principal?.when).toBeLessThan(booking?.when ?? Number.POSITIVE_INFINITY);
   });
 
   it("registers the protected client booking relations as migration 0031", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries.find((entry) => entry.tag === "0031_client_booking_references")).toMatchObject({
       idx: 31,
       tag: "0031_client_booking_references",
+    });
+    expect(journal.entries.find((entry) => entry.tag === "0032_commercial_core_v2_a1")).toMatchObject({
+      idx: 32,
+      tag: "0032_commercial_core_v2_a1",
     });
     expect(
       existsSync("packages/db/migrations/0031_client_booking_references.sql"),

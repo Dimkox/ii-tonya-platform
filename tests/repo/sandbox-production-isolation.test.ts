@@ -107,7 +107,7 @@ describe("sandbox production isolation", () => {
       "utf8",
     );
     expect(expertRepository).toMatch(
-      /type Action = Exclude<[\s\S]*Extract<ApprovalAdminAction, `expert_\$\{string\}`>,[\s\S]*SandboxAction[\s\S]*>;/u,
+      /type Action = Exclude<ApprovalAdminAction, SandboxAction>;/u,
     );
   });
 });

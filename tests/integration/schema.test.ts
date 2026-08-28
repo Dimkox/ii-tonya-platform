@@ -203,6 +203,8 @@ describe("MVP schema", () => {
       "client_catalog_requests",
       "client_catalog_snapshots",
       "client_catalog_tombstones",
+      "client_commercial_policy_assignments",
+      "client_commercial_policy_controls",
       "client_identity_proof_receipts",
       "client_profiles",
       "client_sessions",
