@@ -329,6 +329,13 @@ export const expertResidencyTariffVersions = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     activeFrom: timestamp("active_from", { withTimezone: true }).notNull(),
     activeTo: timestamp("active_to", { withTimezone: true }).notNull(),
+    commercialPolicyVersion: text("commercial_policy_version")
+      .notNull()
+      .default("legacy_residency_v1"),
+    creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    groupEventLimit: integer("group_event_limit").notNull().default(0),
+    statisticsLevel: text("statistics_level").notNull().default("basic"),
+    supportPriority: text("support_priority").notNull().default("standard"),
     approvalId: uuid("approval_id")
       .notNull()
       .references(() => adminApprovals.id),
@@ -344,6 +351,30 @@ export const expertResidencyTariffVersions = pgTable(
       sql`${table.priceMinor} > 0 and ${table.priceMinor} <= 999999999999`,
     ),
     check("expert_tariff_currency_rub", sql`${table.currency} = 'RUB'`),
+    check(
+      "expert_tariff_policy_version",
+      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2')`,
+    ),
+    check(
+      "expert_tariff_credit_cap",
+      sql`${table.creditCapBps} between 0 and 10000`,
+    ),
+    check(
+      "expert_tariff_v2_cap",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
+    ),
+    check(
+      "expert_tariff_group_event_limit",
+      sql`${table.groupEventLimit} between 0 and 3`,
+    ),
+    check(
+      "expert_tariff_statistics_level",
+      sql`${table.statisticsLevel} in ('basic','expanded')`,
+    ),
+    check(
+      "expert_tariff_support_priority",
+      sql`${table.supportPriority} in ('standard','priority')`,
+    ),
     check("expert_tariff_duration_positive", sql`${table.durationSeconds} > 0`),
     check(
       "expert_tariff_active_interval_valid",
@@ -439,6 +470,13 @@ export const expertResidencyOrders = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     creditMinor: pgBigint("credit_minor", { mode: "bigint" }).notNull(),
     cashMinor: pgBigint("cash_minor", { mode: "bigint" }).notNull(),
+    commercialPolicyVersion: text("commercial_policy_version")
+      .notNull()
+      .default("legacy_residency_v1"),
+    creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    groupEventLimit: integer("group_event_limit").notNull().default(0),
+    statisticsLevel: text("statistics_level").notNull().default("basic"),
+    supportPriority: text("support_priority").notNull().default("standard"),
     paymentDeadline: timestamp("payment_deadline", {
       withTimezone: true,
     }).notNull(),
@@ -473,7 +511,31 @@ export const expertResidencyOrders = pgTable(
     ),
     check(
       "expert_order_credit_cap",
-      sql`${table.creditMinor} <= ${table.priceMinor} / 2`,
+      sql`${table.creditCapBps} between 0 and 10000 and ${table.creditMinor} * 10000 <= ${table.priceMinor} * ${table.creditCapBps}`,
+    ),
+    check(
+      "expert_order_policy_version",
+      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2')`,
+    ),
+    check(
+      "expert_order_v2_cap",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
+    ),
+    check(
+      "expert_order_group_event_limit",
+      sql`${table.groupEventLimit} between 0 and 3`,
+    ),
+    check(
+      "expert_order_statistics_level",
+      sql`${table.statisticsLevel} in ('basic','expanded')`,
+    ),
+    check(
+      "expert_order_support_priority",
+      sql`${table.supportPriority} in ('standard','priority')`,
+    ),
+    check(
+      "expert_order_cash_credit_conservation",
+      sql`${table.cashMinor} + ${table.creditMinor} = ${table.priceMinor}`,
     ),
     check(
       "expert_order_cash_remainder",

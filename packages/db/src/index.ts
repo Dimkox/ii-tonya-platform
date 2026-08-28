@@ -233,3 +233,7 @@ export {
 } from "./repositories/yookassa-operation-repository.js";
 export { PostgresYooKassaReceiptContactAuthority } from "./repositories/yookassa-receipt-contact-repository.js";
 export * from "./schema/index.js";
+export {
+  clientCommercialPolicyAssignments,
+  clientCommercialPolicyControls,
+} from "./schema/commercial-policy.js";

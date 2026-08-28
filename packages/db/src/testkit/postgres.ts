@@ -623,6 +623,7 @@ export async function startTestPostgres(
             dead_letters, integration_outbox,
             integration_inbox, projection_checkpoints, provider_cursors, reconciliation_runs,
             privacy_processor_attempts, privacy_deletion_jobs, admin_object_assignments,
+            client_commercial_policy_assignments, client_commercial_policy_controls,
             admin_role_assignments, admin_sessions, admin_approvals, audit_events,
             human_escalations, safety_incidents, prompt_versions, conversation_messages, conversations,
             feedback, notifications, reservations, message_ledger_entries, message_events,

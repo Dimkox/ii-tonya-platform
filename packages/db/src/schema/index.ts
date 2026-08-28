@@ -6,3 +6,4 @@ export * from "./conversation.js";
 export * from "./audit.js";
 export * from "./integration.js";
 export * from "./expert-residency.js";
+export * from "./commercial-policy.js";
