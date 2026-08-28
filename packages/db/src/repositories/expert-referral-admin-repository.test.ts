@@ -48,6 +48,100 @@ describe("PostgresExpertReferralAdminRepository", () => {
   beforeEach(async () => testDb!.reset());
   afterAll(async () => testDb?.stop());
 
+  it.each([
+    ["START", 390000, 0, "basic", "standard"],
+    ["BASE", 590000, 1, "expanded", "standard"],
+    ["PRO", 999000, 3, "expanded", "priority"],
+  ])(
+    "persists every commercial snapshot column for V2 %s",
+    async (
+      tariffKey,
+      priceMinor,
+      groupEventLimit,
+      statisticsLevel,
+      supportPriority,
+    ) => {
+      const tariffVersionId = randomUUID();
+      const payload = {
+        tariffKey,
+        displayName: tariffKey,
+        priceMinor,
+        durationSeconds: 2592000,
+        commercialPolicyVersion: "expert_residency_v2",
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit,
+        statisticsLevel,
+        supportPriority,
+        activeFrom: "2026-09-01T00:00:00.000Z",
+        activeTo: "2027-09-01T00:00:00.000Z",
+      };
+      const approval = await testDb!.createAdminAudit({
+        action: "expert_residency.tariff_create_v2",
+        objectType: "expert_residency_tariff_version",
+        objectId: tariffVersionId,
+        payload,
+      });
+      await testDb!.db.execute(
+        sql`insert into admin_role_assignments (admin_id,role) values (${approval.adminId}::uuid,'entitlement_admin'),(${approval.approverId}::uuid,'entitlement_admin'),(${approval.adminId}::uuid,'security_admin'),(${approval.approverId}::uuid,'security_admin') on conflict do nothing`,
+      );
+      await testDb!.db.execute(
+        sql`update admin_approvals set required_role='entitlement_admin' where id=${approval.approvalId}::uuid`,
+      );
+      const admin = new PostgresExpertReferralAdminRepository(
+        testDb!.db,
+        crypto,
+      );
+      await expect(
+        admin.execute({
+          action: "expert_residency.tariff_create_v2",
+          objectId: tariffVersionId,
+          approvalId: approval.approvalId,
+          nonce: approval.nonce,
+          correlationId: `test-${randomUUID()}`,
+          payload,
+          sessionIdHash: approval.sessionIdHash,
+          environmentCeilings: {
+            expertReferral: false,
+            expertResidencyBilling: true,
+          },
+        }),
+      ).resolves.toMatchObject({ allowed: true, tariffVersionId });
+      const row = await testDb!.db.execute(
+        sql`select commercial_policy_version,credit_cap_bps,individual_services_enabled,group_event_limit,statistics_level,support_priority,price_minor,duration_seconds from expert_residency_tariff_versions where id=${tariffVersionId}::uuid`,
+      );
+      expect(row.rows[0]).toMatchObject({
+        commercial_policy_version: "expert_residency_v2",
+        credit_cap_bps: 3000,
+        individual_services_enabled: true,
+        group_event_limit: groupEventLimit,
+        statistics_level: statisticsLevel,
+        support_priority: supportPriority,
+        price_minor: String(priceMinor),
+        duration_seconds: 2592000,
+      });
+      await expect(
+        admin.execute({
+          action: "expert_residency.tariff_create_v2",
+          objectId: tariffVersionId,
+          approvalId: approval.approvalId,
+          nonce: approval.nonce,
+          correlationId: `test-${randomUUID()}`,
+          payload,
+          sessionIdHash: approval.sessionIdHash,
+          environmentCeilings: {
+            expertReferral: false,
+            expertResidencyBilling: true,
+          },
+        }),
+      ).resolves.toMatchObject({
+        allowed: true,
+        replayed: true,
+        tariffVersionId,
+      });
+    },
+  );
+
   async function overrideApprovals(input: {
     inviterExpertId: string;
     additionalQuota: number;

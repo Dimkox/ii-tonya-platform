@@ -582,8 +582,14 @@ export class PostgresExpertReferralAdminRepository {
     const expected = number(p, "expectedVersion");
     if (command.action === "client_commercial_policy.control_v2") {
       if (expected === 0) {
-        const inserted = await tx.execute<{ version: number }>(sql`insert into client_commercial_policy_controls (control_key,admission_policy,version,approval_id,admin_session_id_hash) values ('client_access',${text(p, "admissionPolicy")},1,${approval.approvalId}::uuid,${command.sessionIdHash}) on conflict do nothing returning version`);
-        if (inserted.rows[0] !== undefined) return { version: inserted.rows[0].version, admissionPolicy: text(p, "admissionPolicy") };
+        const inserted = await tx.execute<{ version: number }>(
+          sql`insert into client_commercial_policy_controls (control_key,admission_policy,version,approval_id,admin_session_id_hash) values ('client_access',${text(p, "admissionPolicy")},1,${approval.approvalId}::uuid,${command.sessionIdHash}) on conflict do nothing returning version`,
+        );
+        if (inserted.rows[0] !== undefined)
+          return {
+            version: inserted.rows[0].version,
+            admissionPolicy: text(p, "admissionPolicy"),
+          };
       }
       const updated = await tx.execute<{ version: number }>(
         sql`update client_commercial_policy_controls set admission_policy=${text(p, "admissionPolicy")},version=version+1,approval_id=${approval.approvalId}::uuid,admin_session_id_hash=${command.sessionIdHash},updated_at=transaction_timestamp() where control_key='client_access' and version=${expected} returning version`,
