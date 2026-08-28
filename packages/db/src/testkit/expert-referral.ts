@@ -447,8 +447,18 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
       `);
     },
     async createResidencyTariff(input) {
+      const commercialPolicyVersion =
+        input.commercialPolicyVersion ?? "expert_residency_v2";
+      const defaultCreditCapBps =
+        commercialPolicyVersion === "legacy_residency_v1" ? 5000 : 3000;
+      const creditCapBps = input.creditCapBps ?? defaultCreditCapBps;
+      if (creditCapBps !== defaultCreditCapBps)
+        throw new Error("Tariff policy and credit cap conflict");
       const audit = await createAdminAudit({
-        action: "expert_residency.tariff_create_v2",
+        action:
+          commercialPolicyVersion === "legacy_residency_v1"
+            ? "expert_residency.tariff_create"
+            : "expert_residency.tariff_create_v2",
         objectId: randomUUID(),
       });
       const inserted = await base.db.execute<{ id: string }>(sql`
@@ -461,8 +471,8 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
           ${input.tariffKey}, ${input.displayName}, ${input.priceMinor},
           ${input.durationSeconds}, transaction_timestamp() - interval '1 day',
           transaction_timestamp() + interval '1 day',
-          ${input.commercialPolicyVersion ?? "expert_residency_v2"},
-          ${input.creditCapBps ?? 3000}, ${input.individualServicesEnabled ?? true},
+          ${commercialPolicyVersion},
+          ${creditCapBps}, ${input.individualServicesEnabled ?? true},
           ${input.groupEventLimit ?? 0}, ${input.statisticsLevel ?? "basic"},
           ${input.supportPriority ?? "standard"},
           ${audit.approvalId}::uuid, ${audit.sessionIdHash}
