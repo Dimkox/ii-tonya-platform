@@ -269,9 +269,21 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
         residency.listActiveTariffs(input),
       quote: (input: { expertId: string; tariffVersionId: string }) =>
         residency.quote(input),
-      checkout: async () => {
-        throw new Error("checkout orchestration is outside A1");
-      },
+      checkout: ({
+        expertId,
+        tariffVersionId,
+        idempotencyKey,
+      }: {
+        expertId: string;
+        tariffVersionId: string;
+        idempotencyKey: string;
+      }) =>
+        residency.createCheckoutOrder({
+          expertId,
+          tariffVersionId,
+          idempotencyKey,
+          providerDeadline: expiredReplayDeadline,
+        }),
     };
     const service = createExpertResidencyService({
       environmentEnabled: true,
@@ -288,34 +300,32 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
       },
       checkoutProvider: neverProvider,
     });
-    await expect(
-      service.quote(
-        {
-          authenticated: true,
-          expertId: inviter.expertId,
-          userId: inviter.userId,
-        },
-        tariff,
-      ),
-    ).resolves.toMatchObject({ creditMinor: "117000", cashMinor: "273000" });
-    const checkoutDisabled = createExpertResidencyService({
-      environmentEnabled: false,
-      commands,
-      queries: { ownerUserId: async () => inviter.userId },
-      reconciliation: service.reconciliation,
-      checkoutProvider: neverProvider,
+    const expiredReplayKey = randomUUID();
+    const expiredReplayDeadline = new Date(Date.now() + 1_100);
+    await residency.createCheckoutOrder({
+      expertId: inviter.expertId,
+      tariffVersionId: tariff,
+      providerDeadline: expiredReplayDeadline,
+      idempotencyKey: expiredReplayKey,
     });
     await expect(
-      checkoutDisabled.checkout(
+      new Promise((resolve) => setTimeout(resolve, 1_200)),
+    ).resolves.toBeUndefined();
+    await expect(residency.releaseExpiredOrders()).resolves.toEqual({
+      examined: 1,
+      released: 1,
+    });
+    await expect(
+      service.checkout(
         {
           authenticated: true,
           expertId: inviter.expertId,
           userId: inviter.userId,
         },
         tariff,
-        randomUUID(),
+        expiredReplayKey,
       ),
-    ).resolves.toEqual({ kind: "disabled" });
+    ).resolves.toEqual({ id: expect.any(String), status: "expired" });
     expect(neverProvider.createCheckout).not.toHaveBeenCalled();
     const order = await residency.createCheckoutOrder({
       expertId: inviter.expertId,
