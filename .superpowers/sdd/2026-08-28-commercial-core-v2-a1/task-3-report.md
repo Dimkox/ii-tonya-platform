@@ -14,4 +14,4 @@
 - Added both actions to the authoritative application action tuple and exact application validation, removed route action casts, and mapped `CLIENT_COMMERCIAL_POLICY_CONFLICT` to HTTP 409.
 - Added application exact START/BASE/PRO and control payload tests, route conflict coverage, and retained focused repository/replay coverage.
 - Commands/results: focused root Vitest for application, DB admin repository, and API route tests — 3 files, 33 tests passed. Application/DB/API typechecks passed after rebuilding application and DB workspace declarations. Prettier on touched files and `git diff --check` passed.
-- Fix commit: pending.
+- Fix commit: `e5ec225def43979dae81a8a9dfb102a2aa689486`.
