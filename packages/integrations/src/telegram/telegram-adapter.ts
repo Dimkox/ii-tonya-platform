@@ -129,6 +129,12 @@ export interface ExpertResidencyQuoteView {
   cashMinor: string;
   currency: "RUB";
   durationSeconds: number;
+  commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+  creditCapBps: number;
+  individualServicesEnabled: boolean;
+  groupEventLimit: number;
+  statisticsLevel: "basic" | "expanded";
+  supportPriority: "standard" | "priority";
   checkoutCallbackData?: string;
 }
 export interface ExpertResidencyTariffsView {
@@ -297,6 +303,12 @@ export function renderExpertResidencyQuote(
     `Referral credit: ${view.creditMinor} RUB minor units`,
     `Cash due: ${view.cashMinor} RUB minor units`,
     `Duration: ${view.durationSeconds} seconds`,
+    `Policy: ${view.commercialPolicyVersion}`,
+    `Credit cap: ${view.creditCapBps} bps`,
+    `Individual services: ${view.individualServicesEnabled ? "enabled" : "disabled"}`,
+    `Group events: ${view.groupEventLimit}`,
+    `Statistics: ${view.statisticsLevel}`,
+    `Support: ${view.supportPriority}`,
   ].join("\n");
 }
 

@@ -11,12 +11,12 @@ export interface ResidencyQuote {
   durationSeconds?: number;
   creditMinor: string;
   cashMinor: string;
-  commercialPolicyVersion?: "legacy_residency_v1" | "expert_residency_v2";
-  creditCapBps?: number;
-  individualServicesEnabled?: boolean;
-  groupEventLimit?: number;
-  statisticsLevel?: "basic" | "expanded";
-  supportPriority?: "standard" | "priority";
+  commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+  creditCapBps: number;
+  individualServicesEnabled: boolean;
+  groupEventLimit: number;
+  statisticsLevel: "basic" | "expanded";
+  supportPriority: "standard" | "priority";
 }
 export interface ResidencyCheckoutOrder extends ResidencyQuote {
   id: string;
@@ -28,13 +28,13 @@ export interface ResidencyTariff {
   readonly priceMinor: string;
   readonly currency: "RUB";
   readonly durationSeconds: number;
-  readonly commercialPolicyVersion?:
+  readonly commercialPolicyVersion:
     "legacy_residency_v1" | "expert_residency_v2";
-  readonly creditCapBps?: number;
-  readonly individualServicesEnabled?: boolean;
-  readonly groupEventLimit?: number;
-  readonly statisticsLevel?: "basic" | "expanded";
-  readonly supportPriority?: "standard" | "priority";
+  readonly creditCapBps: number;
+  readonly individualServicesEnabled: boolean;
+  readonly groupEventLimit: number;
+  readonly statisticsLevel: "basic" | "expanded";
+  readonly supportPriority: "standard" | "priority";
 }
 export interface ResidencyCheckoutProvider {
   createCheckout(input: {

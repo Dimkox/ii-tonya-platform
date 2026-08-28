@@ -487,6 +487,9 @@ export const expertResidencyOrders = pgTable(
       .notNull()
       .default("legacy_residency_v1"),
     creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    individualServicesEnabled: boolean("individual_services_enabled")
+      .notNull()
+      .default(false),
     groupEventLimit: integer("group_event_limit").notNull().default(0),
     statisticsLevel: text("statistics_level").notNull().default("basic"),
     supportPriority: text("support_priority").notNull().default("standard"),
