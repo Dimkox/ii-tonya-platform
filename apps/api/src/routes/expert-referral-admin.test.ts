@@ -51,10 +51,9 @@ describe("expert referral admin routes", () => {
     expect(accepted.statusCode).toBe(201);
     for (const invalid of [
       { ...command, unknown: true },
-      (() => {
-        const { supportPriority: _, ...rest } = command;
-        return rest;
-      })(),
+      Object.fromEntries(
+        Object.entries(command).filter(([key]) => key !== "supportPriority"),
+      ),
     ]) {
       const response = await app.inject({
         method: "POST",
