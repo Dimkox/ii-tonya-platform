@@ -4,6 +4,57 @@ import { owner } from "./expert-referral-service.testkit.js";
 import { quote } from "./expert-residency-service.testkit.js";
 
 describe("expert residency service", () => {
+  it.each([
+    ["START", "390000", 0, "basic", "standard"],
+    ["BASE", "590000", 1, "expanded", "standard"],
+    ["PRO", "999000", 3, "expanded", "priority"],
+  ])(
+    "exposes authoritative V2 facts for %s",
+    async (
+      _key,
+      priceMinor,
+      groupEventLimit,
+      statisticsLevel,
+      supportPriority,
+    ) => {
+      const tariff = {
+        tariffVersionId: `00000000-0000-4000-8000-00000000010${groupEventLimit}`,
+        displayName: String(_key),
+        priceMinor,
+        currency: "RUB" as const,
+        durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit,
+        statisticsLevel,
+        supportPriority,
+      };
+      const service = createExpertResidencyService({
+        environmentEnabled: true,
+        commands: {
+          listActiveTariffs: async () => [tariff],
+          quote: async () => ({
+            ...tariff,
+            creditMinor: "117000",
+            cashMinor: "273000",
+          }),
+          checkout: vi.fn(),
+        },
+        queries: { ownerUserId: async () => owner.userId },
+        reconciliation: {
+          settle: vi.fn(),
+          reverse: vi.fn(),
+          replayHeldReward: vi.fn(),
+          releaseExpiredOrders: vi.fn(),
+        },
+      });
+      await expect(service.listActiveTariffs(owner)).resolves.toEqual([tariff]);
+      await expect(
+        service.quote(owner, tariff.tariffVersionId),
+      ).resolves.toMatchObject(tariff);
+    },
+  );
   it("reauthorizes ownership before returning the bounded authoritative tariff list", async () => {
     const listActiveTariffs = vi.fn(async () => [
       {

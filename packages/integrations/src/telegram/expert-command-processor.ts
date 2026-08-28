@@ -38,16 +38,15 @@ interface ReferralQueryService {
 }
 
 interface ResidencyQueryService {
-  listActiveTariffs(
-    principal: FinancialPrincipal,
-  ): Promise<
+  listActiveTariffs(principal: FinancialPrincipal): Promise<
     | readonly {
         readonly tariffVersionId: string;
         readonly displayName: string;
         readonly priceMinor: string;
         readonly currency: "RUB";
         readonly durationSeconds: number;
-        readonly commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+        readonly commercialPolicyVersion:
+          "legacy_residency_v1" | "expert_residency_v2";
         readonly creditCapBps: number;
         readonly individualServicesEnabled: boolean;
         readonly groupEventLimit: number;
@@ -68,7 +67,8 @@ interface ResidencyQueryService {
         readonly cashMinor: string;
         readonly currency?: "RUB";
         readonly durationSeconds?: number;
-        readonly commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+        readonly commercialPolicyVersion:
+          "legacy_residency_v1" | "expert_residency_v2";
         readonly creditCapBps: number;
         readonly individualServicesEnabled: boolean;
         readonly groupEventLimit: number;
