@@ -31,3 +31,15 @@ SQL and Drizzle expose matching text policy/entitlement values and defaults. The
 ## Concerns
 
 The repository worktree does not contain `scripts/grok_status.py` or `scripts/grok_verify.py`, so those adaptive-delivery checks could not be run from this worktree. The focused migration test verifies the schema contract and rejection path; it does not insert a fully foreign-key-backed legacy tariff/order fixture.
+
+## Fix round 1/5 evidence
+
+Addressed Important findings 1 and 2 only. Added conditional V2 price allowlists (`390000`, `590000`, `999000`) and 2592000-second duration checks to tariff and order SQL and Drizzle schemas. Added FK-backed user, admin session, approval, expert, legacy tariff, and legacy order fixtures with exact default assertions for both rows.
+
+Commands and observed outputs:
+
+- `/tmp/ii-tonya-corepack.FN4Qho/pnpm exec vitest run tests/integration/commercial-core-v2-migration.test.ts` — 2 tests passed.
+- `/tmp/ii-tonya-corepack.FN4Qho/pnpm --filter @ii-tonya/db exec tsc --noEmit` — passed.
+- `git diff --check` — passed.
+
+The covering test was run against the already-implemented migration constraints and passed; the fixture correction itself had RED evidence in the preceding run (`tariff_name` absent in the migration schema and the under-cap value did not violate the 3000 bps cap). No deferred Minor finding was changed.

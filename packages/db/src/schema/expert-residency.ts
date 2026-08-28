@@ -363,6 +363,8 @@ export const expertResidencyTariffVersions = pgTable(
       "expert_tariff_v2_cap",
       sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
     ),
+    check("expert_tariff_v2_price", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`),
+    check("expert_tariff_v2_duration", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`),
     check(
       "expert_tariff_group_event_limit",
       sql`${table.groupEventLimit} between 0 and 3`,
@@ -521,6 +523,8 @@ export const expertResidencyOrders = pgTable(
       "expert_order_v2_cap",
       sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
     ),
+    check("expert_order_v2_price", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`),
+    check("expert_order_v2_duration", sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`),
     check(
       "expert_order_group_event_limit",
       sql`${table.groupEventLimit} between 0 and 3`,
