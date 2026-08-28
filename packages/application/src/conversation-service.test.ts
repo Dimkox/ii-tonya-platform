@@ -20,6 +20,31 @@ describe("conversation workflow", () => {
     expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
   });
 
+  it("preserves an existing free v2 assignment when admission is disabled", async () => {
+    const deps = conversationFixture({
+      balance: 0,
+      safety: "ordinary",
+      clientFreeAccessV2Enabled: false,
+    });
+    const resolveOrAssign = vi.fn(
+      async (input: { userId: string; allowV2Admission: boolean }) => {
+        expect(input.allowV2Admission).toBe(false);
+        return "free_client_v2" as const;
+      },
+    );
+    deps.clientCommercialPolicy = { resolveOrAssign };
+
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+
+    expect(result).toEqual({ kind: "answer_queued", chargedMessages: 0 });
+    expect(resolveOrAssign).toHaveBeenCalledWith({
+      userId: deps.inbound.userId,
+      allowV2Admission: false,
+    });
+  });
+
   it.each([
     ["catalogue", { kind: "show_catalog", serviceCode: "consultation" }],
     [
