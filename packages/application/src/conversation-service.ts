@@ -768,15 +768,21 @@ export const createConversationService = (
     ) {
       throw dependencyFailure();
     }
+    let isFreeV2 = false;
+    try {
+      isFreeV2 =
+        deps.clientCommercialPolicy !== undefined &&
+        (await deps.clientCommercialPolicy.resolveOrAssign({
+          userId: event.userId,
+          allowV2Admission: deps.clientFreeAccessV2Enabled === true,
+        })) === "free_client_v2";
+    } catch {
+      throw dependencyFailure();
+    }
     const charge =
-      deps.clientCommercialPolicy !== undefined &&
-      (await deps.clientCommercialPolicy.resolveOrAssign({
-        userId: event.userId,
-        allowV2Admission: deps.clientFreeAccessV2Enabled === true,
-      })) === "free_client_v2"
-        ? false
-        : deps.outboundBillingMode === "provider_delivery_event" &&
-          event.status === "delivered";
+      !isFreeV2 &&
+      deps.outboundBillingMode === "provider_delivery_event" &&
+      event.status === "delivered";
     let accepted;
     try {
       accepted = await deps.messageRepository.recordOutboundDelivery({
@@ -795,7 +801,7 @@ export const createConversationService = (
     if (accepted.kind === "duplicate") {
       return { kind: "duplicate", chargedMessages: 0 };
     }
-    if (charge === false && deps.clientCommercialPolicy !== undefined) {
+    if (isFreeV2) {
       return { kind: "free", chargedMessages: 0 };
     }
     if (deps.outboundBillingMode === "disabled") {

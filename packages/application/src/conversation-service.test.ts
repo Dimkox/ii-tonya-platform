@@ -19,6 +19,60 @@ describe("conversation workflow", () => {
     expect(result).toEqual({ kind: "answer_queued", chargedMessages: 0 });
     expect(deps.messageRepository.ledgerDeltas()).toEqual([]);
   });
+
+  it.each([
+    ["catalogue", { kind: "show_catalog", serviceCode: "consultation" }],
+    [
+      "booking",
+      {
+        kind: "start_booking",
+        expertId: "b7ab91db-4988-4ec6-bf23-42d2ea3333a1",
+      },
+    ],
+  ])(
+    "allows a free v2 client through for %s with zero charge",
+    async (_name, proposal) => {
+      const deps = conversationFixture({
+        balance: 0,
+        safety: "ordinary",
+        clientFreeAccessV2Enabled: true,
+      });
+      vi.mocked(deps.intentEngine.propose).mockResolvedValue(proposal as never);
+      const result = await createConversationService(deps).handleInbound(
+        deps.inbound,
+      );
+      expect(result.chargedMessages).toBe(0);
+    },
+  );
+
+  it("normalizes outbound policy failures", async () => {
+    const deps = conversationFixture({
+      balance: 1,
+      safety: "ordinary",
+      clientFreeAccessV2Enabled: true,
+    });
+    deps.clientCommercialPolicy = {
+      resolveOrAssign: async () => {
+        throw new Error("policy down");
+      },
+    };
+    await expect(
+      createConversationService(deps).handleOutboundDelivery(deps.delivery),
+    ).rejects.toMatchObject({ code: "dependency_unavailable" });
+  });
+
+  it("returns a free outbound result and disables charging for V2", async () => {
+    const deps = conversationFixture({
+      balance: 1,
+      safety: "ordinary",
+      outboundBillingMode: "provider_delivery_event",
+      clientFreeAccessV2Enabled: true,
+    });
+    const result = await createConversationService(deps).handleOutboundDelivery(
+      deps.delivery,
+    );
+    expect(result).toEqual({ kind: "free", chargedMessages: 0 });
+  });
   it("validates bounded canonical input before every effect", async () => {
     const deps = conversationFixture({ balance: 3, safety: "ordinary" });
     const service = createConversationService(deps);

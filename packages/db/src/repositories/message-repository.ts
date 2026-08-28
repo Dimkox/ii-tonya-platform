@@ -71,7 +71,7 @@ export interface CompleteInboundCommand {
   userId: string;
   correlationId: string;
   outcome: InboundCompletionOutcome;
-  billingPolicy: "package" | "free";
+  billingPolicy?: "package" | "free";
 }
 
 export type CommittedInboundResult =
