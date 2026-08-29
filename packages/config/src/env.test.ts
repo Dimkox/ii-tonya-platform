@@ -31,6 +31,7 @@ describe("loadEnv", () => {
       clientBookingReserve: false,
       clientFreeAccessV2: false,
       expertReferral: false,
+      expertReferralMaturityWorker: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
       expertTelegramFinancialViews: false,

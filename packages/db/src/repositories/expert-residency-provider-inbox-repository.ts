@@ -6,6 +6,7 @@ import {
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { grantExpertReferralReward } from "./expert-referral-reward-allocation.js";
 
 export class ExpertResidencySettlementError extends Error {
   constructor(public readonly code: string) {
@@ -103,6 +104,7 @@ type OrderRow = {
   residencyStartsAt: Date | string | null;
   residencyEndsAt: Date | string | null;
   providerPaymentId: string | null;
+  commercialPolicyVersion: string;
 };
 const iso = (v: Date | string) =>
   v instanceof Date ? v.toISOString() : new Date(v).toISOString();
@@ -161,7 +163,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
             "EXPERT_RESIDENCY_PROVIDER_EVENT_CONFLICT",
           );
         const orderResult = await tx.execute<OrderRow>(
-          sql`select id,expert_id as "expertId",cash_minor as "cashMinor",currency,duration_seconds as "durationSeconds",payment_deadline as "paymentDeadline",status,settled_at as "settledAt",residency_starts_at as "residencyStartsAt",residency_ends_at as "residencyEndsAt",provider_payment_id as "providerPaymentId" from expert_residency_orders where id=${input.orderId}::uuid for update`,
+          sql`select id,expert_id as "expertId",cash_minor as "cashMinor",currency,duration_seconds as "durationSeconds",payment_deadline as "paymentDeadline",status,settled_at as "settledAt",residency_starts_at as "residencyStartsAt",residency_ends_at as "residencyEndsAt",provider_payment_id as "providerPaymentId",commercial_policy_version as "commercialPolicyVersion" from expert_residency_orders where id=${input.orderId}::uuid for update`,
         );
         const order = orderResult.rows[0];
         if (!order)
@@ -286,9 +288,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const expertEligible = expert.rows[0].active && expert.rows[0].verified;
         const eligibility =
           referral.rows[0] && expertEligible && abuseCleared
-            ? control.rows[0]?.enabled
-              ? "eligible"
-              : "pending_feature_hold"
+            ? "eligible"
             : "permanently_ineligible";
         const marker = await tx.execute<{ id: string }>(
           sql`insert into expert_first_residency_settlements (expert_id,qualifying_order_id,qualifying_payment_attempt_id,referral_id,eligibility,reason_code,settlement_expert_active,settlement_expert_verified,settlement_abuse_cleared,settlement_control_version,settlement_invitee_user_id,settlement_invitee_channel_identity_id,settlement_inviter_expert_id,settlement_inviter_user_id,settlement_inviter_channel_identity_id,settled_at) values (${order.expertId}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,${referral.rows[0]?.id ?? null}::uuid,${eligibility},${!expertEligible ? "expert_ineligible" : !abuseCleared ? "ineligible_abuse_hold" : eligibility === "eligible" ? "eligible_referral" : "pending_feature_hold"},${expert.rows[0].active},${expert.rows[0].verified},${abuseCleared},${control.rows[0]?.version ?? 0},${expert.rows[0].userId}::uuid,${inviteeChannel.rows[0]?.id ?? null}::uuid,${prospectiveReferral.rows[0]?.inviterExpertId ?? null}::uuid,${inviterIdentity.rows[0]?.userId ?? null}::uuid,${inviterIdentity.rows[0]?.channelIdentityId ?? null}::uuid,${now}) on conflict (expert_id) do nothing returning id`,
@@ -304,9 +304,13 @@ export class PostgresExpertResidencyProviderInboxRepository {
               ${marker.rows[0].id}::uuid, ${referral.rows[0].id}::uuid,
               ${order.id}::uuid, ${attempt.rows[0]!.id}::uuid,
               ${referral.rows[0].inviterExpertId}::uuid, ${order.expertId}::uuid, ${now},
-              ${now} + interval '30 days', ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
+              (${now})::timestamptz + interval '30 days', ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
             ) on conflict (first_settlement_id) do nothing
           `);
+          if (order.commercialPolicyVersion === "legacy_residency_v1" && eligibility === "eligible") {
+            const allocation = await grantExpertReferralReward(tx, { maturityId: null, inviterExpertId: referral.rows[0].inviterExpertId, referralId: referral.rows[0].id, firstSettlementId: marker.rows[0].id, orderId: order.id, paymentAttemptId: attempt.rows[0]!.id });
+            rewardGranted = allocation !== "already_granted";
+          }
         }
         const outboxPayload = JSON.stringify({
           orderId: order.id,
@@ -385,17 +389,15 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_PROVIDER_EVENT_CONFLICT",
           );
-        const maturity = await tx.execute<{ id: string; status: string }>(
-          sql`select id,status from expert_referral_reward_maturities where qualifying_order_id=${input.orderId}::uuid for update`,
-        );
         const orderResult = await tx.execute<OrderRow>(
-          sql`select id,expert_id as "expertId",cash_minor as "cashMinor",currency,duration_seconds as "durationSeconds",payment_deadline as "paymentDeadline",status,settled_at as "settledAt",residency_starts_at as "residencyStartsAt",residency_ends_at as "residencyEndsAt",provider_payment_id as "providerPaymentId" from expert_residency_orders where id=${input.orderId}::uuid for update`,
+          sql`select id,expert_id as "expertId",cash_minor as "cashMinor",currency,duration_seconds as "durationSeconds",payment_deadline as "paymentDeadline",status,settled_at as "settledAt",residency_starts_at as "residencyStartsAt",residency_ends_at as "residencyEndsAt",provider_payment_id as "providerPaymentId",commercial_policy_version as "commercialPolicyVersion" from expert_residency_orders where id=${input.orderId}::uuid for update`,
         );
         const order = orderResult.rows[0];
         if (!order || order.providerPaymentId !== input.paymentId)
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_REVERSAL_PAYMENT_MISMATCH",
           );
+        await tx.execute(sql`select id from expert_residency_payment_attempts where order_id=${order.id}::uuid and provider_request_id=${input.paymentId} for update`);
         if (claimed.status === "processed") {
           const priorResult = reversalResultFromPayload(
             claimed.resultPayload,
@@ -426,9 +428,6 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const terminating =
           reversalKind === "charged_back" ||
           cumulative === BigInt(order.cashMinor);
-        if (terminating && maturity.rows[0]?.status === "pending") {
-          await tx.execute(sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`);
-        }
         let rewardReversed = false;
         let debtMinor = 0n;
         const nowResult = await tx.execute<{ now: Date | string }>(
@@ -443,6 +442,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
           }>(
             sql`select id,eligibility,settlement_inviter_expert_id as "inviterExpertId" from expert_first_residency_settlements where qualifying_order_id=${order.id}::uuid for update`,
           );
+          const maturity = await tx.execute<{ id: string; status: string }>(
+            sql`select id,status from expert_referral_reward_maturities where qualifying_order_id=${order.id}::uuid for update`,
+          );
+          if (maturity.rows[0]?.status === "pending") {
+            await tx.execute(sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`);
+          }
           if (
             marker.rows[0] &&
             ["pending_feature_hold", "eligible"].includes(

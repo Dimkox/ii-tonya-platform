@@ -100,6 +100,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly closeTelemetry: () => Promise<void>;
   readonly now: () => Date;
   readonly batchSize?: number;
+  readonly expertReferralMaturityWorkerEnabled?: boolean;
   readonly shutdownTimeoutMs?: number;
 }
 
@@ -231,6 +232,9 @@ export function createProductionWorkerRuntime(
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
   const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
+  if (deps.expertReferralMaturityWorkerEnabled === true && deps.expertReferralJobsRepository.grantDueMaturityBatch === undefined) {
+    throw new Error("expert_referral_maturity_worker_capability_unavailable");
+  }
   if (workerOutboxEnabled !== (deps.workerOutboxRunner !== undefined)) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }

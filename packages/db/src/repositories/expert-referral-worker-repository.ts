@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
 import { PostgresExpertResidencyRepository } from "./expert-residency-repository.js";
+import { grantExpertReferralReward } from "./expert-referral-reward-allocation.js";
 
 export interface ExpertReferralWorkerBatchCommand {
   readonly now: Date;
@@ -178,6 +179,7 @@ export class PostgresExpertReferralWorkerRepository {
     for (const candidate of candidates) {
       const outcome = await this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`select o.id, p.id, s.id from expert_referral_reward_maturities m join expert_residency_orders o on o.id=m.qualifying_order_id join expert_residency_payment_attempts p on p.id=m.qualifying_payment_attempt_id join expert_first_residency_settlements s on s.id=m.first_settlement_id where m.id=${candidate.id}::uuid for update of o,p,s`);
         const maturity = await tx.execute<{ inviterExpertId: string; firstSettlementId: string; referralId: string; orderId: string; paymentAttemptId: string }>(sql`
           select inviter_expert_id as "inviterExpertId", first_settlement_id as "firstSettlementId", referral_id as "referralId", qualifying_order_id as "orderId", qualifying_payment_attempt_id as "paymentAttemptId"
           from expert_referral_reward_maturities where id=${candidate.id}::uuid and status='pending' and matures_at <= transaction_timestamp() for update
@@ -191,7 +193,7 @@ export class PostgresExpertReferralWorkerRepository {
           join expert_residency_payment_attempts p on p.id=m.qualifying_payment_attempt_id
           join expert_first_residency_settlements s on s.id=m.first_settlement_id
           where m.id=${candidate.id}::uuid
-          for update of o,p,s
+
         `);
         const facts = evidence.rows[0];
         if (!facts || facts.orderStatus !== "settled" || facts.paymentStatus !== "settled") {
@@ -203,17 +205,16 @@ export class PostgresExpertReferralWorkerRepository {
           await tx.execute(sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='eligibility_lost',resolved_at=transaction_timestamp(),reason_code='eligibility_lost' where id=${candidate.id}::uuid and status='pending'`);
           return "cancelled" as const;
         }
-        const grant = await tx.execute<{ id: string }>(sql`
-          insert into expert_referral_reward_grants (expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,maturity_id,amount_minor,granted_at,expires_at,idempotency_key)
-          values (${row.inviterExpertId}::uuid,${row.referralId}::uuid,${row.firstSettlementId}::uuid,${row.orderId}::uuid,${row.paymentAttemptId}::uuid,${candidate.id}::uuid,100000,transaction_timestamp(),transaction_timestamp()+interval '365 days',${`reward:${candidate.id}`})
-          on conflict (first_settlement_id) do nothing returning id
-        `);
-        if (!grant.rows[0]) return "granted" as const;
-        const ledger = await tx.execute<{ id: string }>(sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,source_type,source_id,idempotency_key) values (${row.inviterExpertId}::uuid,'reward_grant',100000,'reward_grant',${grant.rows[0].id}::uuid,${`reward-ledger:${candidate.id}`}) returning id`);
-        if (!ledger.rows[0]) throw new Error("expert_referral_maturity_ledger_insert_failed");
-        await tx.execute(sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${ledger.rows[0].id}::uuid,${grant.rows[0].id}::uuid,${row.inviterExpertId}::uuid,100000)`);
+        const allocation = await grantExpertReferralReward(tx, {
+          maturityId: candidate.id,
+          inviterExpertId: row.inviterExpertId,
+          referralId: row.referralId,
+          firstSettlementId: row.firstSettlementId,
+          orderId: row.orderId,
+          paymentAttemptId: row.paymentAttemptId,
+        });
         await tx.execute(sql`update expert_referral_reward_maturities set status='granted',granted_at=transaction_timestamp(),resolved_at=transaction_timestamp(),reason_code='matured' where id=${candidate.id}::uuid and status='pending'`);
-        return "granted" as const;
+        return allocation === "already_granted" ? "pending" as const : "granted" as const;
       });
       if (outcome === "granted") granted++;
       else if (outcome === "cancelled") cancelled++;

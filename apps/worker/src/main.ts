@@ -288,6 +288,8 @@ export function createProductionWorkerRuntimeFactory(
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
           new PostgresExpertReferralWorkerRepository(db),
+        expertReferralMaturityWorkerEnabled:
+          config.features.expertReferralMaturityWorker,
         expertTelegramCheckoutRepository:
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,

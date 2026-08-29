@@ -280,6 +280,7 @@ export type RuntimeConfig = {
     clientBookingReserve?: boolean;
     clientFreeAccessV2?: boolean;
     expertReferral: boolean;
+    expertReferralMaturityWorker: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
     expertTelegramFinancialViews?: boolean;
@@ -345,6 +346,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
+      expertReferralMaturityWorker:
+        value.EXPERT_REFERRAL_MATURITY_WORKER_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
       expertTelegramFinancialViews:
