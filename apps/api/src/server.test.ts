@@ -65,6 +65,7 @@ describe("server composition", () => {
         clientSession: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
     };
@@ -144,6 +145,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         expertAiIngress: false,
       },
@@ -247,6 +249,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
     };
@@ -395,6 +398,7 @@ describe("server composition", () => {
           workerOutboxDelivery: false,
           clientCatalog: false,
           expertReferral: false,
+          expertReferralMaturityWorker: false,
           expertResidencyBilling: false,
           expertTelegramFinancialViews: financialViewsEnabled,
           expertTelegramCheckout: checkoutEnabled,
@@ -465,6 +469,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         expertTelegramFinancialViews: true,
       },
@@ -502,6 +507,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
       expertReferralKey: {
@@ -547,6 +553,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
       expertReferralKey: {
@@ -568,6 +575,7 @@ describe("server composition", () => {
           workerOutboxDelivery: false,
           clientCatalog: false,
           expertReferral: false,
+          expertReferralMaturityWorker: false,
           expertResidencyBilling: false,
         },
       },
