@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { EXPERT_RESIDENCY_V2_TARIFFS } from "../../../contracts/src/expert-residency-tariffs.js";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "@ii-tonya/contracts";
 import {
   canonicalAdminPayloadHash,
   type AdminPayload,

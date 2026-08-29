@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { EXPERT_RESIDENCY_V2_TARIFFS } from "../../../contracts/src/expert-residency-tariffs.js";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "@ii-tonya/contracts";
 import { sql } from "drizzle-orm";
 import {
   afterAll,

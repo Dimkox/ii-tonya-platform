@@ -1,5 +1,5 @@
 import type { AdminPrincipal } from "./admin-service.js";
-import { EXPERT_RESIDENCY_V2_TARIFFS } from "../../contracts/src/expert-residency-tariffs.js";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "@ii-tonya/contracts";
 
 export const expertReferralAdminActions = [
   "expert_referral.batch_generate",
