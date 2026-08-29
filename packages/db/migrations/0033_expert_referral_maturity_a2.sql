@@ -30,8 +30,8 @@ CREATE TABLE expert_referral_reward_maturities (
   CONSTRAINT expert_referral_maturity_settled_clock CHECK (matures_at = settled_at + interval '30 days'),
   CONSTRAINT expert_referral_maturity_terminal_state CHECK (
     (status = 'pending' AND granted_at IS NULL AND cancelled_at IS NULL AND terminal_reason IS NULL)
-    OR (status = 'granted' AND granted_at IS NOT NULL AND cancelled_at IS NULL AND terminal_reason IS NULL)
-    OR (status = 'cancelled' AND granted_at IS NULL AND cancelled_at IS NOT NULL AND terminal_reason IS NOT NULL AND terminal_reason IN ('terminating_provider_reversal', 'eligibility_lost', 'feature_disabled'))
+    OR (status = 'granted' AND granted_at IS NOT NULL AND cancelled_at IS NULL AND terminal_reason IS NULL AND lease_token IS NULL AND lease_until IS NULL)
+    OR (status = 'cancelled' AND granted_at IS NULL AND cancelled_at IS NOT NULL AND terminal_reason IS NOT NULL AND terminal_reason IN ('terminating_provider_reversal', 'eligibility_lost', 'feature_disabled') AND lease_token IS NULL AND lease_until IS NULL)
   ),
   CONSTRAINT expert_referral_maturity_idempotency_nonempty CHECK (idempotency_key = 'expert-referral-maturity:v1:' || first_settlement_id::text),
   CONSTRAINT expert_referral_maturity_attempt_bounded CHECK (attempt_count between 0 and 2147483647)

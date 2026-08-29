@@ -236,9 +236,11 @@ describe("authoritative Drizzle schema parity", () => {
     });
     expect(requiredTable("expertReferralMaturities")).toMatchObject({
       checks: [
+        "expert_referral_maturity_attempt_bounded",
         "expert_referral_maturity_idempotency_nonempty",
         "expert_referral_maturity_policy",
         "expert_referral_maturity_settled_clock",
+        "expert_referral_maturity_terminal_state",
       ],
       foreignKeys: [
         "expert_referral_maturity_settlement_fk",

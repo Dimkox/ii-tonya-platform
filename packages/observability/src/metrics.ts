@@ -44,6 +44,9 @@ export const operationalMetrics = {
   expertReferralHeldReplay: meter.createCounter(
     "ii_tonya_expert_referral_held_replay",
   ),
+  expertReferralMaturity: meter.createCounter(
+    "ii_tonya_expert_referral_maturity",
+  ),
   expertResidencyRefundReversal: meter.createCounter(
     "ii_tonya_expert_residency_refund_reversal",
   ),
@@ -54,6 +57,28 @@ export const operationalMetrics = {
     "ii_tonya_expert_residency_job_duration_ms",
   ),
 } as const;
+
+const expertReferralMaturityOutcomes = new Set([
+  "examined",
+  "granted",
+  "cancelled",
+  "retry",
+  "failed",
+]);
+export type ExpertReferralMaturityMetricOutcome =
+  "examined" | "granted" | "cancelled" | "retry" | "failed";
+export function recordExpertReferralMaturityMetric(
+  outcome: ExpertReferralMaturityMetricOutcome,
+  count = 1,
+): void {
+  if (
+    !expertReferralMaturityOutcomes.has(outcome) ||
+    !Number.isSafeInteger(count) ||
+    count < 1
+  )
+    throw new Error("invalid_expert_referral_maturity_metric");
+  operationalMetrics.expertReferralMaturity.add(count, { outcome });
+}
 
 const clientSessionOperations = new Set([
   "issue",

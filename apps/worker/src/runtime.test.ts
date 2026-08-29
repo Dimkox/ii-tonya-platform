@@ -5,6 +5,76 @@ import {
 } from "./runtime.js";
 
 describe("worker runtime", () => {
+  const maturityDeps = (
+    grantDueMaturityBatch: ReturnType<typeof vi.fn>,
+    record: ReturnType<typeof vi.fn>,
+  ) => ({
+    jobsRepository: {
+      processDueBatch: vi.fn(async () => ({})),
+      expireDueBatch: vi.fn(async () => ({})),
+      listLocalReservations: vi.fn(async () => []),
+      recordProviderUnavailable: vi.fn(async () => undefined),
+      materializeOperatorCasesBatch: vi.fn(async () => ({})),
+    },
+    expertReferralJobsRepository: {
+      expireDueBatch: vi.fn(async () => ({ examined: 0, released: 0 })),
+      replayDueBatch: vi.fn(async () => ({
+        examined: 0,
+        granted: 0,
+        cancelled: 0,
+      })),
+      listReconciliationBatch: vi.fn(async () => []),
+      recordReconciliationMismatches: vi.fn(async () => undefined),
+      grantDueMaturityBatch,
+    },
+    expertTelegramCheckoutRepository: {
+      clearExpiredCheckoutUrls: vi.fn(async () => 0),
+    },
+    outboxRepository: {
+      recoverExpiredDispatchLeases: vi.fn(async () => 0),
+      recoverExpiredReconciliationLeases: vi.fn(async () => 0),
+    },
+    closeDatabase: vi.fn(async () => undefined),
+    closeTelemetry: vi.fn(async () => undefined),
+    now: () => new Date("2026-08-29T00:00:00.000Z"),
+    expertReferralMaturityWorkerEnabled: true,
+    expertReferralMaturityMetrics: { record },
+  });
+
+  it("records fixed maturity outcomes and records failure before rethrow", async () => {
+    const record = vi.fn();
+    const success = createProductionWorkerRuntime(
+      maturityDeps(
+        vi.fn(async () => ({
+          examined: 4,
+          granted: 1,
+          cancelled: 1,
+          pending: 2,
+        })),
+        record,
+      ) as never,
+    );
+    await success.runOnce();
+    expect(record.mock.calls).toEqual([
+      ["examined", 4],
+      ["granted", 1],
+      ["cancelled", 1],
+      ["retry", 2],
+    ]);
+    const failure = new Error("maturity_failed");
+    const failedRecord = vi.fn();
+    const failed = createProductionWorkerRuntime(
+      maturityDeps(
+        vi.fn(async () => {
+          throw failure;
+        }),
+        failedRecord,
+      ) as never,
+    );
+    await expect(failed.runOnce()).rejects.toBe(failure);
+    expect(failedRecord).toHaveBeenCalledWith("failed");
+  });
+
   it("fails closed when maturity is enabled without its repository capability", () => {
     const deps = {
       jobsRepository: {
@@ -20,7 +90,9 @@ describe("worker runtime", () => {
         listReconciliationBatch: vi.fn(async () => []),
         recordReconciliationMismatches: vi.fn(async () => undefined),
       },
-      expertTelegramCheckoutRepository: { clearExpiredCheckoutUrls: vi.fn(async () => 0) },
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: vi.fn(async () => 0),
+      },
       outboxRepository: {
         recoverExpiredDispatchLeases: vi.fn(async () => 0),
         recoverExpiredReconciliationLeases: vi.fn(async () => 0),

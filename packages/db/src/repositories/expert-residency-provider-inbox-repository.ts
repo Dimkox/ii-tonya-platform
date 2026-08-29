@@ -289,7 +289,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
           marker.rows[0] &&
           referral.rows[0] &&
           expertEligible &&
-          abuseCleared
+          abuseCleared &&
+          order.commercialPolicyVersion === "expert_residency_v2" &&
+          eligibility === "eligible"
         ) {
           await tx.execute(sql`
             insert into expert_referral_reward_maturities (
@@ -299,34 +301,39 @@ export class PostgresExpertResidencyProviderInboxRepository {
             ) values (
               ${marker.rows[0].id}::uuid, ${referral.rows[0].id}::uuid,
               ${order.id}::uuid, ${attempt.rows[0]!.id}::uuid,
-              ${referral.rows[0].inviterExpertId}::uuid, ${order.expertId}::uuid, ${now},
-              (${now})::timestamptz + interval '30 days', ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
+              ${referral.rows[0].inviterExpertId}::uuid, ${order.expertId}::uuid,
+              transaction_timestamp(), transaction_timestamp() + interval '30 days',
+              ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
             ) on conflict (first_settlement_id) do nothing
           `);
-          if (
-            order.commercialPolicyVersion === "legacy_residency_v1" &&
-            eligibility === "eligible"
-          ) {
-            const expertIds = [
-              order.expertId,
-              referral.rows[0].inviterExpertId,
-            ].sort();
-            await tx.execute(
-              sql`select id from experts where id in (${sql.join(
-                expertIds.map((id) => sql`${id}::uuid`),
-                sql`,`,
-              )}) order by id for update`,
-            );
-            const allocation = await grantExpertReferralReward(tx, {
-              maturityId: null,
-              inviterExpertId: referral.rows[0].inviterExpertId,
-              referralId: referral.rows[0].id,
-              firstSettlementId: marker.rows[0].id,
-              orderId: order.id,
-              paymentAttemptId: attempt.rows[0]!.id,
-            });
-            rewardGranted = allocation !== "already_granted";
-          }
+        }
+        if (
+          marker.rows[0] &&
+          referral.rows[0] &&
+          expertEligible &&
+          abuseCleared &&
+          order.commercialPolicyVersion === "legacy_residency_v1" &&
+          eligibility === "eligible"
+        ) {
+          const expertIds = [
+            order.expertId,
+            referral.rows[0].inviterExpertId,
+          ].sort();
+          await tx.execute(
+            sql`select id from experts where id in (${sql.join(
+              expertIds.map((id) => sql`${id}::uuid`),
+              sql`,`,
+            )}) order by id for update`,
+          );
+          const allocation = await grantExpertReferralReward(tx, {
+            maturityId: null,
+            inviterExpertId: referral.rows[0].inviterExpertId,
+            referralId: referral.rows[0].id,
+            firstSettlementId: marker.rows[0].id,
+            orderId: order.id,
+            paymentAttemptId: attempt.rows[0]!.id,
+          });
+          rewardGranted = allocation !== "already_granted";
         }
         const outboxPayload = JSON.stringify({
           orderId: order.id,
@@ -465,7 +472,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           );
           if (maturity.rows[0]?.status === "pending") {
             await tx.execute(
-              sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`,
+              sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal',lease_token=null,lease_until=null,updated_at=transaction_timestamp() where id=${maturity.rows[0].id}::uuid and status='pending'`,
             );
           }
           if (

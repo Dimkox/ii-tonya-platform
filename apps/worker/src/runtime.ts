@@ -86,7 +86,10 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
     HeldRewardRepository & {
-      grantDueMaturityBatch?(command: { now: Date; batchSize: number }): Promise<unknown>;
+      grantDueMaturityBatch?(command: {
+        now: Date;
+        batchSize: number;
+      }): Promise<unknown>;
     };
   readonly expertTelegramCheckoutRepository: {
     clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number>;
@@ -101,6 +104,12 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly now: () => Date;
   readonly batchSize?: number;
   readonly expertReferralMaturityWorkerEnabled?: boolean;
+  readonly expertReferralMaturityMetrics?: {
+    record(
+      outcome: "examined" | "granted" | "cancelled" | "retry" | "failed",
+      count?: number,
+    ): void;
+  };
   readonly shutdownTimeoutMs?: number;
 }
 
@@ -158,13 +167,14 @@ export function createWorkerRuntime(
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
-      const expertReferralMaturity = await deps.expertReferralMaturity?.() ?? {
-        examined: 0,
-        granted: 0,
-        cancelled: 0,
-        pending: 0,
-        reason: "maturity_capability_unavailable",
-      };
+      const expertReferralMaturity =
+        (await deps.expertReferralMaturity?.()) ?? {
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+          pending: 0,
+          reason: "maturity_capability_unavailable",
+        };
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
@@ -232,7 +242,10 @@ export function createProductionWorkerRuntime(
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
   const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
-  if (deps.expertReferralMaturityWorkerEnabled === true && deps.expertReferralJobsRepository.grantDueMaturityBatch === undefined) {
+  if (
+    deps.expertReferralMaturityWorkerEnabled === true &&
+    deps.expertReferralJobsRepository.grantDueMaturityBatch === undefined
+  ) {
     throw new Error("expert_referral_maturity_worker_capability_unavailable");
   }
   if (workerOutboxEnabled !== (deps.workerOutboxRunner !== undefined)) {
@@ -293,11 +306,32 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
-    expertReferralMaturity: async () =>
-      deps.expertReferralJobsRepository.grantDueMaturityBatch?.({
-        now: deps.now(),
-        batchSize,
-      }) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 },
+    expertReferralMaturity: async () => {
+      try {
+        const result =
+          ((await deps.expertReferralJobsRepository.grantDueMaturityBatch?.({
+            now: deps.now(),
+            batchSize,
+          })) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 }) as {
+            examined: number;
+            granted: number;
+            cancelled: number;
+            pending: number;
+          };
+        for (const [outcome, count] of [
+          ["examined", result.examined],
+          ["granted", result.granted],
+          ["cancelled", result.cancelled],
+          ["retry", result.pending],
+        ] as const)
+          if (count > 0)
+            deps.expertReferralMaturityMetrics?.record(outcome, count);
+        return result;
+      } catch (error) {
+        deps.expertReferralMaturityMetrics?.record("failed");
+        throw error;
+      }
+    },
     deliverConfirmedOutbox: workerOutboxEnabled
       ? deps.workerOutboxRunner!
       : async () =>

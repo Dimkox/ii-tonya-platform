@@ -140,6 +140,7 @@ describe("A2.1 real-PostgreSQL referral maturity matrix", () => {
         event("settled", legacy.order.id, "legacy_settlement", "50000"),
       ),
     ).resolves.toMatchObject({ rewardGranted: true });
+    expect((await maturity(legacy.order.id)).rows).toHaveLength(0);
   });
 
   it("uses database time at the due boundary instead of caller time", async () => {
@@ -200,6 +201,88 @@ describe("A2.1 real-PostgreSQL referral maturity matrix", () => {
     expect((await maturity(order.id)).rows).toMatchObject([
       { status: "pending" },
     ]);
+  });
+
+  it.each(["invitee_inactive", "inviter_abuse", "referral_mismatch"] as const)(
+    "cancels at due-time when %s invalidates eligibility",
+    async (cause) => {
+      const { inviter, invitee, order } = await fixture();
+      await provider().settle(event("settled", order.id, `recheck_${cause}`));
+      await makeDue(order.id);
+      if (cause === "invitee_inactive")
+        await testDb!.db.execute(
+          sql`update experts set active=false where id=${invitee.expertId}::uuid`,
+        );
+      if (cause === "inviter_abuse") {
+        const audit = await testDb!.createAdminAudit({
+          action: "expert_referral.hold_open",
+          objectId: inviter.expertId,
+        });
+        await testDb!.db.execute(
+          sql`insert into expert_referral_abuse_holds (expert_id,status,reason_code,opened_approval_id,opened_admin_session_id_hash) values (${inviter.expertId}::uuid,'open','due_recheck',${audit.approvalId}::uuid,${audit.sessionIdHash})`,
+        );
+      }
+      if (cause === "referral_mismatch")
+        await testDb!.db.transaction(async (tx) => {
+          await tx.execute(sql`set local session_replication_role=replica`);
+          await tx.execute(
+            sql`update expert_referral_reward_maturities set inviter_expert_id=${invitee.expertId}::uuid where qualifying_order_id=${order.id}::uuid`,
+          );
+        });
+      await expect(
+        worker().grantDueMaturityBatch({ now: new Date(), batchSize: 1 }),
+      ).resolves.toMatchObject({ cancelled: 1, granted: 0 });
+      expect((await maturity(order.id)).rows).toMatchObject([
+        { status: "cancelled" },
+      ]);
+    },
+  );
+
+  it("converges a pre-existing maturity-linked grant and clears its lease", async () => {
+    const { inviter, order } = await fixture();
+    await provider().settle(event("settled", order.id, "linked_convergence"));
+    await makeDue(order.id);
+    const row = (
+      await testDb!.db.execute<{
+        id: string;
+        referralId: string;
+        settlementId: string;
+        paymentId: string;
+      }>(
+        sql`select id,referral_id as "referralId",first_settlement_id as "settlementId",qualifying_payment_attempt_id as "paymentId" from expert_referral_reward_maturities where qualifying_order_id=${order.id}::uuid`,
+      )
+    ).rows[0]!;
+    await testDb!.db.execute(
+      sql`insert into expert_referral_reward_grants (expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,maturity_id,amount_minor,granted_at,expires_at,idempotency_key) values (${inviter.expertId}::uuid,${row.referralId}::uuid,${row.settlementId}::uuid,${order.id}::uuid,${row.paymentId}::uuid,${row.id}::uuid,100000,transaction_timestamp(),transaction_timestamp()+interval '365 days',${`prelinked:${row.id}`})`,
+    );
+    await expect(
+      worker().grantDueMaturityBatch({ now: new Date(), batchSize: 1 }),
+    ).resolves.toMatchObject({ granted: 1 });
+    const state = await testDb!.db.execute<{
+      status: string;
+      leaseToken: string | null;
+      leaseUntil: Date | null;
+    }>(
+      sql`select status,lease_token as "leaseToken",lease_until as "leaseUntil" from expert_referral_reward_maturities where id=${row.id}::uuid`,
+    );
+    expect(state.rows[0]).toEqual({
+      status: "granted",
+      leaseToken: null,
+      leaseUntil: null,
+    });
+  });
+
+  it("does not let a non-expired stale lease owner reclaim due work", async () => {
+    const { order } = await fixture();
+    await provider().settle(event("settled", order.id, "stale_lease"));
+    await makeDue(order.id);
+    const stale = randomUUID();
+    await testDb!.db.execute(
+      sql`update expert_referral_reward_maturities set lease_token=${stale}::uuid,lease_until=transaction_timestamp()+interval '5 minutes' where qualifying_order_id=${order.id}::uuid`,
+    );
+    await expect(
+      worker().grantDueMaturityBatch({ now: new Date(), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 0, granted: 0 });
   });
 
   it("lets a full terminating refund cancel a due pending maturity before the worker", async () => {

@@ -18,6 +18,7 @@ import {
 import {
   recordClientCatalogMetric,
   recordClientSessionMetric,
+  recordExpertReferralMaturityMetric,
   recordWorkerOutboxMetric,
 } from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
@@ -290,6 +291,9 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertReferralWorkerRepository(db),
         expertReferralMaturityWorkerEnabled:
           config.features.expertReferralMaturityWorker,
+        expertReferralMaturityMetrics: {
+          record: recordExpertReferralMaturityMetric,
+        },
         expertTelegramCheckoutRepository:
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,

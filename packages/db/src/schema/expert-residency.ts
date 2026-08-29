@@ -1040,10 +1040,18 @@ export const expertReferralMaturities = pgTable(
     referralId: uuid("referral_id").notNull(),
     qualifyingOrderId: uuid("qualifying_order_id").notNull(),
     qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
-    inviterExpertId: uuid("inviter_expert_id").notNull().references(() => experts.id),
-    inviteeExpertId: uuid("invitee_expert_id").notNull().references(() => experts.id),
-    policyVersion: text("policy_version").notNull().default("expert_referral_v2_30d"),
-    amountMinor: pgBigint("amount_minor", { mode: "bigint" }).notNull().default(sql`100000`),
+    inviterExpertId: uuid("inviter_expert_id")
+      .notNull()
+      .references(() => experts.id),
+    inviteeExpertId: uuid("invitee_expert_id")
+      .notNull()
+      .references(() => experts.id),
+    policyVersion: text("policy_version")
+      .notNull()
+      .default("expert_referral_v2_30d"),
+    amountMinor: pgBigint("amount_minor", { mode: "bigint" })
+      .notNull()
+      .default(sql`100000`),
     settledAt: timestamp("settled_at", { withTimezone: true }).notNull(),
     maturesAt: timestamp("matures_at", { withTimezone: true }).notNull(),
     status: expertReferralMaturityStatus("status").notNull().default("pending"),
@@ -1060,20 +1068,55 @@ export const expertReferralMaturities = pgTable(
     updatedAt,
   },
   (table) => [
-    unique("expert_referral_maturities_settlement_unique").on(table.firstSettlementId),
-    unique("expert_referral_maturities_order_unique").on(table.qualifyingOrderId),
-    unique("expert_referral_maturities_payment_unique").on(table.qualifyingPaymentAttemptId),
+    unique("expert_referral_maturities_settlement_unique").on(
+      table.firstSettlementId,
+    ),
+    unique("expert_referral_maturities_order_unique").on(
+      table.qualifyingOrderId,
+    ),
+    unique("expert_referral_maturities_payment_unique").on(
+      table.qualifyingPaymentAttemptId,
+    ),
     unique("expert_referral_maturities_referral_unique").on(table.referralId),
-    unique("expert_referral_maturities_idempotency_unique").on(table.idempotencyKey),
+    unique("expert_referral_maturities_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
     index("expert_referral_maturities_due_idx").on(table.maturesAt, table.id),
     foreignKey({
-      columns: [table.firstSettlementId, table.referralId, table.qualifyingOrderId, table.qualifyingPaymentAttemptId],
-      foreignColumns: [expertFirstResidencySettlements.id, expertFirstResidencySettlements.referralId, expertFirstResidencySettlements.qualifyingOrderId, expertFirstResidencySettlements.qualifyingPaymentAttemptId],
+      columns: [
+        table.firstSettlementId,
+        table.referralId,
+        table.qualifyingOrderId,
+        table.qualifyingPaymentAttemptId,
+      ],
+      foreignColumns: [
+        expertFirstResidencySettlements.id,
+        expertFirstResidencySettlements.referralId,
+        expertFirstResidencySettlements.qualifyingOrderId,
+        expertFirstResidencySettlements.qualifyingPaymentAttemptId,
+      ],
       name: "expert_referral_maturity_settlement_fk",
     }),
-    check("expert_referral_maturity_settled_clock", sql`${table.maturesAt} = ${table.settledAt} + interval '30 days'`),
-    check("expert_referral_maturity_policy", sql`${table.policyVersion} = 'expert_referral_v2_30d' and ${table.amountMinor} = 100000`),
-    check("expert_referral_maturity_idempotency_nonempty", sql`${table.idempotencyKey} = 'expert-referral-maturity:v1:' || ${table.firstSettlementId}::text`),
+    check(
+      "expert_referral_maturity_settled_clock",
+      sql`${table.maturesAt} = ${table.settledAt} + interval '30 days'`,
+    ),
+    check(
+      "expert_referral_maturity_policy",
+      sql`${table.policyVersion} = 'expert_referral_v2_30d' and ${table.amountMinor} = 100000`,
+    ),
+    check(
+      "expert_referral_maturity_idempotency_nonempty",
+      sql`${table.idempotencyKey} = 'expert-referral-maturity:v1:' || ${table.firstSettlementId}::text`,
+    ),
+    check(
+      "expert_referral_maturity_attempt_bounded",
+      sql`${table.attemptCount} between 0 and 2147483647`,
+    ),
+    check(
+      "expert_referral_maturity_terminal_state",
+      sql`(${table.status} = 'pending' and ${table.grantedAt} is null and ${table.cancelledAt} is null and ${table.terminalReason} is null) or (${table.status} = 'granted' and ${table.grantedAt} is not null and ${table.cancelledAt} is null and ${table.terminalReason} is null and ${table.leaseToken} is null and ${table.leaseUntil} is null) or (${table.status} = 'cancelled' and ${table.grantedAt} is null and ${table.cancelledAt} is not null and ${table.terminalReason} is not null and ${table.leaseToken} is null and ${table.leaseUntil} is null)`,
+    ),
   ],
 );
 
@@ -1088,7 +1131,9 @@ export const expertReferralRewardGrants = pgTable(
     firstSettlementId: uuid("first_settlement_id").notNull(),
     qualifyingOrderId: uuid("qualifying_order_id").notNull(),
     qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
-    maturityId: uuid("maturity_id").references(() => expertReferralMaturities.id),
+    maturityId: uuid("maturity_id").references(
+      () => expertReferralMaturities.id,
+    ),
     amountMinor: pgBigint("amount_minor", { mode: "bigint" })
       .notNull()
       .default(sql`100000`),

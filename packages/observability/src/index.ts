@@ -12,6 +12,7 @@ export {
   recordClientCatalogMetric,
   recordClientBookingMetric,
   recordClientSessionMetric,
+  recordExpertReferralMaturityMetric,
   recordWorkerOutboxMetric,
   referralMetricLabels,
   workerOutboxMetricLabels,
@@ -20,6 +21,7 @@ export {
   type ClientBookingMetricLabels,
   type ClientSessionMetricLabels,
   type MetricLabels,
+  type ExpertReferralMaturityMetricOutcome,
   type WorkerOutboxMetricLabels,
 } from "./metrics.js";
 export {

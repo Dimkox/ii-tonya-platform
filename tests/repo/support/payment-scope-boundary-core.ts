@@ -642,7 +642,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
-    "93499f504796d9d1e5bf41c0c75bf5af0bb94d62f8ada861e8292110856d6017",
+    "dd263b77ae2e8dde0ebe8bde6a3ce1886858c2e465afe0df8857323845e48746",
   ],
   [
     "packages/db/migrations/meta/_journal.json",

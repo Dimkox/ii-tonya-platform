@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   operationalMetrics,
+  recordExpertReferralMaturityMetric,
   clientSessionMetricLabels,
   referralMetricLabels,
   workerOutboxMetricLabels,
@@ -41,10 +42,24 @@ describe("expert referral metric labels", () => {
         "expertReferralDebt",
         "expertReferralDuplicateEvents",
         "expertReferralHeldReplay",
+        "expertReferralMaturity",
         "expertResidencyRefundReversal",
         "expertResidencyReconciliationMismatch",
         "expertResidencyJobDurationMs",
       ]),
+    );
+  });
+
+  it("accepts only fixed maturity outcomes and positive counts", () => {
+    expect(() =>
+      recordExpertReferralMaturityMetric("granted", 2),
+    ).not.toThrow();
+    expect(() => recordExpertReferralMaturityMetric("failed")).not.toThrow();
+    expect(() =>
+      recordExpertReferralMaturityMetric("customer-42" as never),
+    ).toThrow("invalid_expert_referral_maturity_metric");
+    expect(() => recordExpertReferralMaturityMetric("retry", 0)).toThrow(
+      "invalid_expert_referral_maturity_metric",
     );
   });
 
