@@ -30,6 +30,12 @@ describe("loadEnv", () => {
       clientBooking: false,
       clientBookingReserve: false,
       clientFreeAccessV2: false,
+      clientTelegramIngress: false,
+      clientHybridRouting: false,
+      selartiCostAdmission: false,
+      selartiResponseIngress: false,
+      b2TelegramDispatch: false,
+      b2SensitiveRetention: false,
       expertReferral: false,
       expertReferralMaturityWorker: false,
       expertResidencyBilling: false,
@@ -40,6 +46,7 @@ describe("loadEnv", () => {
       expertTelegramCheckout: false,
       yookassa: false,
     });
+    expect(config.features.selartiCostAdmission).toBe(false);
     expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(() =>
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),

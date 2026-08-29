@@ -1,5 +1,13 @@
 import Fastify from "fastify";
-import { describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { selartiResponseRoutes } from "./selarti-response.js";
 
 const secret = "B2_Response_Shared_Secret_0123456789abcdef";
@@ -11,38 +19,50 @@ const body = {
   text: "Ответ",
 };
 
-const build = async (input?: {
-  enabled?: boolean;
-  handle?: (raw: unknown) => Promise<{ status: string }>;
-}) => {
-  const handle = vi.fn(input?.handle ?? (async () => ({ status: "accepted" })));
+const build = async (
+  enabled: boolean,
+  handle: (raw: unknown) => Promise<{ status: string }>,
+) => {
   const app = Fastify({ logger: false });
   await app.register(selartiResponseRoutes, {
-    enabled: input?.enabled ?? true,
+    enabled,
     secret,
     responses: { handle },
     rateLimiter: { consume: () => true },
   });
-  return { app, handle };
+  return app;
 };
 
 describe("dedicated Selarti response endpoint", () => {
+  const handle = vi.fn(async () => ({ status: "accepted" }));
+  let app: Awaited<ReturnType<typeof build>>;
+  let disabledApp: Awaited<ReturnType<typeof build>>;
+
+  beforeAll(async () => {
+    app = await build(true, handle);
+    disabledApp = await build(false, handle);
+  });
+
+  beforeEach(() => {
+    handle.mockReset();
+    handle.mockResolvedValue({ status: "accepted" });
+  });
+
+  afterAll(async () => {
+    await Promise.all([app.close(), disabledApp.close()]);
+  });
+
   it.each([undefined, "Bearer wrong-secret"])(
     "rejects missing or wrong authentication before service",
     async (authorization) => {
-      const state = await build();
-      try {
-        const response = await state.app.inject({
-          method: "POST",
-          url: "/v1/webhooks/selarti/responses",
-          headers: authorization ? { authorization } : {},
-          payload: body,
-        });
-        expect(response.statusCode).toBe(401);
-        expect(state.handle).not.toHaveBeenCalled();
-      } finally {
-        await state.app.close();
-      }
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/webhooks/selarti/responses",
+        headers: authorization ? { authorization } : {},
+        payload: body,
+      });
+      expect(response.statusCode).toBe(401);
+      expect(handle).not.toHaveBeenCalled();
     },
   );
 
@@ -54,53 +74,36 @@ describe("dedicated Selarti response endpoint", () => {
     ["late", 200, { accepted: true, rejected: true }],
     ["unavailable", 503, { error: "selarti_response_unavailable" }],
   ])("maps %s to HTTP %s", async (status, expectedCode, expectedBody) => {
-    const state = await build({ handle: async () => ({ status }) });
-    try {
-      const response = await state.app.inject({
-        method: "POST",
-        url: "/v1/webhooks/selarti/responses",
-        headers: { authorization: `Bearer ${secret}` },
-        payload: body,
-      });
-      expect(response.statusCode).toBe(expectedCode);
-      expect(response.json()).toEqual(expectedBody);
-    } finally {
-      await state.app.close();
-    }
+    handle.mockResolvedValue({ status });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/selarti/responses",
+      headers: { authorization: `Bearer ${secret}` },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(expectedCode);
+    expect(response.json()).toEqual(expectedBody);
   });
 
   it("keeps the endpoint unavailable while its independent flag is off", async () => {
-    const state = await build({ enabled: false });
-    try {
-      const response = await state.app.inject({
-        method: "POST",
-        url: "/v1/webhooks/selarti/responses",
-        headers: { authorization: `Bearer ${secret}` },
-        payload: body,
-      });
-      expect(response.statusCode).toBe(503);
-      expect(state.handle).not.toHaveBeenCalled();
-    } finally {
-      await state.app.close();
-    }
+    const response = await disabledApp.inject({
+      method: "POST",
+      url: "/v1/webhooks/selarti/responses",
+      headers: { authorization: `Bearer ${secret}` },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(503);
+    expect(handle).not.toHaveBeenCalled();
   });
 
   it("returns retryable 503 when the transactional service throws", async () => {
-    const state = await build({
-      handle: async () => {
-        throw new Error("database unavailable");
-      },
+    handle.mockRejectedValue(new Error("database unavailable"));
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/selarti/responses",
+      headers: { authorization: `Bearer ${secret}` },
+      payload: body,
     });
-    try {
-      const response = await state.app.inject({
-        method: "POST",
-        url: "/v1/webhooks/selarti/responses",
-        headers: { authorization: `Bearer ${secret}` },
-        payload: body,
-      });
-      expect(response.statusCode).toBe(503);
-    } finally {
-      await state.app.close();
-    }
+    expect(response.statusCode).toBe(503);
   });
 });
