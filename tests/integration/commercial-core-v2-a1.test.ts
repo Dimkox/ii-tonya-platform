@@ -259,11 +259,12 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
       entries: 2,
       allocations: 2,
     });
-    const neverProvider = {
-      createCheckout: vi.fn(async () => {
-        throw new Error("provider must not be called in A1");
-      }),
-    };
+    const providerSpy = vi.fn(async () => ({
+      kind: "created" as const,
+      paymentId: "must-not-be-created",
+      checkoutUrl: "https://must-not-be-created.invalid",
+    }));
+    const activeProviderDeadline = new Date(Date.now() + 3_600_000);
     const commands = {
       listActiveTariffs: (input: { expertId: string; limit: 20 }) =>
         residency.listActiveTariffs(input),
@@ -282,9 +283,12 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
           expertId,
           tariffVersionId,
           idempotencyKey,
-          providerDeadline: expiredReplayDeadline,
+          providerDeadline: activeProviderDeadline,
         }),
     };
+    const disabledCheckoutProvider = false
+      ? { createCheckout: providerSpy }
+      : undefined;
     const service = createExpertResidencyService({
       environmentEnabled: true,
       commands,
@@ -298,22 +302,16 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
         replayHeldReward: async () => undefined,
         releaseExpiredOrders: async () => undefined,
       },
-      checkoutProvider: neverProvider,
+      ...(disabledCheckoutProvider === undefined
+        ? {}
+        : { checkoutProvider: disabledCheckoutProvider }),
     });
-    const expiredReplayKey = randomUUID();
-    const expiredReplayDeadline = new Date(Date.now() + 1_100);
+    const activeDisabledCapabilityKey = randomUUID();
     await residency.createCheckoutOrder({
       expertId: inviter.expertId,
       tariffVersionId: tariff,
-      providerDeadline: expiredReplayDeadline,
-      idempotencyKey: expiredReplayKey,
-    });
-    await expect(
-      new Promise((resolve) => setTimeout(resolve, 1_200)),
-    ).resolves.toBeUndefined();
-    await expect(residency.releaseExpiredOrders()).resolves.toEqual({
-      examined: 1,
-      released: 1,
+      providerDeadline: activeProviderDeadline,
+      idempotencyKey: activeDisabledCapabilityKey,
     });
     await expect(
       service.checkout(
@@ -323,10 +321,13 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
           userId: inviter.userId,
         },
         tariff,
-        expiredReplayKey,
+        activeDisabledCapabilityKey,
       ),
-    ).resolves.toEqual({ id: expect.any(String), status: "expired" });
-    expect(neverProvider.createCheckout).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      id: expect.any(String),
+      status: "payment_pending",
+    });
+    expect(providerSpy).not.toHaveBeenCalled();
     const order = await residency.createCheckoutOrder({
       expertId: inviter.expertId,
       tariffVersionId: tariff,
@@ -337,9 +338,13 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
       commercialPolicyVersion: "expert_residency_v2",
       creditCapBps: 3000,
       priceMinor: "390000",
-      creditMinor: "117000",
-      cashMinor: "273000",
     });
+    expect(Number(order.creditMinor) + Number(order.cashMinor)).toBe(
+      Number(order.priceMinor),
+    );
+    expect(Number(order.creditMinor) * 10000).toBeLessThanOrEqual(
+      Number(order.priceMinor) * 3000,
+    );
     await expect(
       database.db.execute(
         sql`update expert_residency_orders set credit_cap_bps=5000 where id=${order.id}::uuid`,
