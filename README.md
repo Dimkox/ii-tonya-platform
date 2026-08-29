@@ -49,9 +49,10 @@ The native checksummed-bundle release path is implemented and its exact-SHA Claw
 offline production closure, SPDX SBOM, checksums, inventory, and packaged-entrypoint
 fail-closed smoke are recorded under `docs/test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/`.
 The same packaged API, migration entrypoint, and worker passed a native service rehearsal
-against the single dedicated Claw smoke database. The production bundle is signed, the
-exact-SHA migration is approved and applied, and public HTTPS readiness is live. External
-provider credentials and activation remain separate fail-closed gates.
+against the single dedicated Claw smoke database. The committed `.native-release`
+provenance is from an older SHA and is historical/stale, not valid evidence for this HEAD.
+No signatures or migration approvals are generated here; exact-SHA rebuild, signing, Trust
+CI, Database Gate, and human approvals remain external release gates.
 Repository merge settings allow squash only and delete merged branches; staging and
 production deployment environments accept only `main`.
 
@@ -371,16 +372,22 @@ credentials, and keeps every live integration flag set to `false`.
 
 ## Commercial Core V2 A1 current state
 
-Version: `0.0.0` (package manifest). A1 adds the PostgreSQL schema and audited command
-paths for immutable `free_client_v2` admission assignments and the V2 `START` tariff
-fixture, makes zero-package ordinary-client inbound completion free, and snapshots the
-exact `30%` (`3000` bps) credit ceiling. The end-to-end evidence is
+Version: `0.0.0` (package manifest). A1 adds PostgreSQL commercial controls, immutable
+legacy/V2 client assignments, exact V2 START/BASE/PRO tariff and order snapshots, makes
+zero-package ordinary-client inbound completion free, and snapshots the exact `30%`
+(`3000` bps) credit ceiling. The end-to-end evidence is
 [`tests/integration/commercial-core-v2-a1.test.ts`](tests/integration/commercial-core-v2-a1.test.ts);
 traceability and rollback are in [`docs/spec/commercial-core-v2-a1-traceability.md`](docs/spec/commercial-core-v2-a1-traceability.md)
 and [`docs/runbooks/commercial-core-v2-a1-rollback.md`](docs/runbooks/commercial-core-v2-a1-rollback.md).
 All live flags default false. No production tariff is seeded, no provider is activated,
 and no live gate is claimed. Expert-referral 30-day maturity is A2 and is not activated.
 External Trust CI, Database Gate, and branch push remain blocked and controller-owned.
+
+Commercial-policy observability is an activation gate: Platform owns assignment/control
+write failures and replay conflicts; Payments owns tariff/order conservation; Operations
+owns alerts for control-version conflicts, unexpected provider calls while disabled,
+assignment failures, and ledger conservation drift. Thresholds and routing require
+approval before activation; the go-live reviewer remains unassigned/blocked.
 
 ## Release boundary
 

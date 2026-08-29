@@ -567,17 +567,6 @@ export class PostgresExpertReferralAdminRepository {
       return new PostgresExpertResidencyProviderInboxRepository(
         db,
       ).replayHeldReward(command.objectId);
-    if (
-      bool(p, "newCommandsEnabled") &&
-      !command.environmentCeilings.expertReferral
-    )
-      throw new Error("environment_ceiling");
-    if (
-      bool(p, "rewardGrantsEnabled") &&
-      (!command.environmentCeilings.expertReferral ||
-        !command.environmentCeilings.expertResidencyBilling)
-    )
-      throw new Error("environment_ceiling");
     // Approval was consumed by the outer transaction; perform the optimistic write here to keep audit/session/mutation atomic.
     const expected = number(p, "expectedVersion");
     if (command.action === "client_commercial_policy.control_v2") {
@@ -606,6 +595,17 @@ export class PostgresExpertReferralAdminRepository {
         admissionPolicy: text(p, "admissionPolicy"),
       };
     }
+    if (
+      bool(p, "newCommandsEnabled") &&
+      !command.environmentCeilings.expertReferral
+    )
+      throw new Error("environment_ceiling");
+    if (
+      bool(p, "rewardGrantsEnabled") &&
+      (!command.environmentCeilings.expertReferral ||
+        !command.environmentCeilings.expertResidencyBilling)
+    )
+      throw new Error("environment_ceiling");
     const updated = await tx.execute<{ version: number }>(
       sql`update expert_referral_feature_controls set version=version+1,new_commands_enabled=${bool(p, "newCommandsEnabled")},reward_grants_enabled=${bool(p, "rewardGrantsEnabled")},updated_approval_id=${approval.approvalId}::uuid,updated_admin_session_id_hash=${command.sessionIdHash},updated_at=transaction_timestamp() where control_key='expert_referrals' and version=${expected} returning version`,
     );

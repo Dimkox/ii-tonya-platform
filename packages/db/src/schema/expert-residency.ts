@@ -377,6 +377,10 @@ export const expertResidencyTariffVersions = pgTable(
       sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`,
     ),
     check(
+      "expert_tariff_v2_combination",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or (${table.tariffKey}='START' and ${table.displayName}='Старт' and ${table.priceMinor}=390000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=0 and ${table.statisticsLevel}='basic' and ${table.supportPriority}='standard') or (${table.tariffKey}='BASE' and ${table.displayName}='База' and ${table.priceMinor}=590000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=1 and ${table.statisticsLevel}='expanded' and ${table.supportPriority}='standard') or (${table.tariffKey}='PRO' and ${table.displayName}='Про' and ${table.priceMinor}=999000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=3 and ${table.statisticsLevel}='expanded' and ${table.supportPriority}='priority')`,
+    ),
+    check(
       "expert_tariff_group_event_limit",
       sql`${table.groupEventLimit} between 0 and 3`,
     ),

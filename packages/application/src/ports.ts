@@ -156,7 +156,7 @@ export type CommittedInboundResult =
   | {
       readonly kind: "human_handoff";
       readonly reasonCode: string;
-      readonly chargedMessages: 1;
+      readonly chargedMessages: 0 | 1;
     }
   | { readonly kind: "no_package"; readonly chargedMessages: 0 }
   | { readonly kind: "answer_queued"; readonly chargedMessages: 0 | 1 }

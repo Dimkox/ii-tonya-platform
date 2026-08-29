@@ -7,7 +7,7 @@ grant, ledger, allocation, or execution-result tables directly.
    `00000000-0000-0000-0000-000000000041` with:
 
    ```json
-   {"expectedVersion":<current control version>,"admissionPolicy":"legacy_package_v1","newCommandsEnabled":false,"rewardGrantsEnabled":false}
+   {"expectedVersion":<current control version>,"admissionPolicy":"legacy_package_v1"}
    ```
 
    The execution must record the matching `expectedVersion`, produce version

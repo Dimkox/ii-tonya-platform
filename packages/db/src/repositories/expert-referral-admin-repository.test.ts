@@ -64,7 +64,7 @@ describe("PostgresExpertReferralAdminRepository", () => {
       const tariffVersionId = randomUUID();
       const payload = {
         tariffKey,
-        displayName: tariffKey,
+        displayName: { START: "Старт", BASE: "База", PRO: "Про" }[tariffKey],
         priceMinor,
         durationSeconds: 2592000,
         commercialPolicyVersion: "expert_residency_v2",

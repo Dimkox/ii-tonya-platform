@@ -208,9 +208,16 @@ flowchart TB
     SAFETY["human_escalations / safety_incidents"]
     PRIV["privacy_* / provider_subject_mappings"]
     ADMINSTATE["admin_* / audit_events / integration_errors"]
+    COMMERCIAL["client commercial controls / immutable assignments / tariff and order snapshots\nACTIVE A1 PostgreSQL authority"]
     PROJ["projection_checkpoints / provider_cursors / reconciliation_*"]
   end
   DBREPOS --> COREDB
+  REFADMINREPO --> COMMERCIAL
+  CTRLREPO --> COMMERCIAL
+  RESREPO --> COMMERCIAL
+  MSGREPO --> COMMERCIAL
+  COMMERCIAL --> ADMINSTATE
+  COMMERCIAL --> PKGLEDGER
 
   subgraph REFDB["Expert referral / residency relations"]
     BATCH["expert_referral_code_batches"]
