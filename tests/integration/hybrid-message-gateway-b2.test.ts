@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +16,8 @@ import {
   PostgresOrderedTelegramOutboxRepository,
   PostgresB2SensitiveRetentionRepository,
   PostgresSelartiProposalRepository,
+  PostgresAdminApprovalRepository,
+  selartiBudgetPolicyApprovalPayload,
 } from "../../packages/db/src/index.js";
 import {
   startTestPostgres,
@@ -42,6 +44,49 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         (${userId}::uuid,'client_messaging','granted','client-msg-v1','2026-08-29T00:00:00Z'),
         (${userId}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-29T00:00:01Z')
     `);
+    const expertUser = await database.createUser();
+    const requester = await database.createUser();
+    const approver = await database.createUser();
+    const expertId = randomUUID();
+    const tariffId = randomUUID();
+    const policyId = randomUUID();
+    const requesterSession = `b2-requester:${randomUUID()}`;
+    const approverSession = `b2-approver:${randomUUID()}`;
+    const fixtureNow = new Date();
+    const fixtureExpiry = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+    const settledAt = new Date("2026-08-28T00:00:00Z");
+    const residencyEnd = new Date("2026-09-27T00:00:00Z");
+    await database.db.execute(sql`insert into experts(id,user_id,active,verified) values(${expertId}::uuid,${expertUser}::uuid,true,true)`);
+    await database.db.execute(sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${requesterSession},${requester}::uuid,${fixtureNow},${fixtureExpiry}),(${approverSession},${approver}::uuid,${fixtureNow},${fixtureExpiry})`);
+    await database.db.execute(sql`insert into admin_role_assignments(admin_id,role) values(${requester}::uuid,'security_admin'),(${approver}::uuid,'security_admin'),(${requester}::uuid,'entitlement_admin'),(${approver}::uuid,'entitlement_admin')`);
+    const approvals = new PostgresAdminApprovalRepository(database.db);
+    const tariffRequest = await approvals.requestApproval({
+      sessionIdHash: requesterSession, action: "expert_residency.tariff_create",
+      objectType: "expert_residency_tariff_version", objectId: tariffId,
+      payload: "b2-budget:5900000:RUB:2592000", nonce: "b2-budget-tariff-v1",
+    });
+    if (!tariffRequest) throw new Error("b2_tariff_approval_failed");
+    if (!await approvals.approveApproval({ approvalId: tariffRequest.approvalId, sessionIdHash: approverSession }))
+      throw new Error("b2_tariff_approval_rejected");
+    await database.db.execute(sql`insert into expert_residency_tariff_versions(id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values(${tariffId}::uuid,'b2-budget','B2 budget',5900000,'RUB',2592000,${fixtureNow},${fixtureExpiry},${tariffRequest.approvalId}::uuid,${requesterSession})`);
+    await database.db.execute(sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B2 budget',5900000,'RUB',2592000,0,5900000,${fixtureExpiry},${fixtureExpiry},'b2-settled-cash','settled',${settledAt},${settledAt},${residencyEnd})`);
+    await database.db.execute(sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B2 budget',5900000,'RUB',2592000,0,5900000,'2026-09-21T00:00:00Z','2026-09-21T00:00:00Z','b2-settled-cash-2','settled','2026-09-20T00:00:00Z','2026-09-20T00:00:00Z','2026-10-20T00:00:00Z')`);
+    await database.db.execute(sql`insert into admin_object_assignments(admin_id,object_type,object_id) values(${requester}::uuid,'selarti_budget_policy',${policyId}::uuid)`);
+    const policyPayload = selartiBudgetPolicyApprovalPayload({
+      version: 1, status: "approved", effectiveFrom: "2026-01-01T00:00:00.000Z", effectiveTo: null,
+      globalCapRubMinor: 590000n, globalWarningRubMinor: 580000n, globalSoftRubMinor: 585000n,
+      perUserWarningRubMinor: 580000n, perUserSoftRubMinor: 585000n, perUserHardRubMinor: 590000n,
+      officialUsdRubQuoteMicros: 85_954_100n, selartiUpliftBps: 1000, usdMicrosPerRequest: 0n,
+      usdMicrosPerUnit: 30_000n, worstCaseBillableUnits: 2n, rateVersion: "cbr-b2", modelVersion: "selarti-b2", stressInflationBps: 6000,
+    });
+    const policyRequest = await approvals.requestApproval({
+      sessionIdHash: requesterSession, action: "selarti_budget.policy_approve",
+      objectType: "selarti_budget_policy", objectId: policyId, payload: policyPayload, nonce: "b2-budget-policy-v1",
+    });
+    if (!policyRequest) throw new Error("b2_policy_approval_failed");
+    if (!await approvals.approveApproval({ approvalId: policyRequest.approvalId, sessionIdHash: approverSession }))
+      throw new Error("b2_policy_approval_rejected");
+    await database.db.execute(sql`insert into selarti_budget_policies(id,version,status,effective_from,global_cap_rub_minor,global_warning_rub_minor,global_soft_rub_minor,per_user_warning_rub_minor,per_user_soft_rub_minor,per_user_hard_rub_minor,official_usd_rub_quote_micros,usd_micros_per_request,usd_micros_per_unit,worst_case_billable_units,rate_version,model_version,approval_id) values(${policyId}::uuid,1,'approved','2026-01-01',590000,580000,585000,580000,585000,590000,85954100,0,30000,2,'cbr-b2','selarti-b2',${policyRequest.approvalId}::uuid)`);
   }, 120_000);
 
   afterAll(async () => database.stop());
@@ -124,6 +169,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         text,
         route: "complex_dialogue",
         routingEnabled: true,
+        costAdmissionEnabled: true,
         correlationId: "b2-selarti-2002",
         locale: "ru-RU",
         deadline: "2026-08-29T00:00:30.000Z",
@@ -213,6 +259,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         text: "Ещё один сложный запрос",
         route: "complex_dialogue",
         routingEnabled: true,
+        costAdmissionEnabled: true,
         correlationId: "b2-selarti-2003",
         locale: "ru-RU",
         deadline: "2026-08-29T00:00:30.000Z",
@@ -389,10 +436,11 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         text: "Сложный HTTP запрос",
         route: "complex_dialogue",
         routingEnabled: true,
+        costAdmissionEnabled: true,
         correlationId,
         locale: "ru-RU",
         deadline: "2026-10-01T00:01:00.000Z",
-        occurredAt: "2026-10-01T00:00:00.000Z",
+        occurredAt: "2026-09-20T00:00:00.000Z",
         messagingConsentPolicyVersion: "client-msg-v1",
         selartiConsentPolicyVersion: "selarti-v1",
       });
@@ -431,7 +479,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
     const retained = await database.db.execute<{
       requestId: string | null;
     }>(sql`
-      select payload->>'requestId' "requestId" from integration_outbox
+      select idempotency_key "requestId" from integration_outbox
       where idempotency_key=${acceptedRequest.requestId}
     `);
     expect(retained.rows[0]?.requestId).toBe(acceptedRequest.requestId);

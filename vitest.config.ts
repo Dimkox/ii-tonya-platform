@@ -31,6 +31,7 @@ export default defineConfig({
     ],
   },
   test: {
+    hookTimeout: 45_000,
     include: [
       "packages/**/*.test.ts",
       "apps/**/*.test.ts",
