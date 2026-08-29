@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "../../../contracts/src/expert-residency-tariffs.js";
 import { sql } from "drizzle-orm";
 import {
   afterAll,
@@ -94,7 +95,7 @@ describe("PostgresExpertResidencyRepository checkout snapshots", () => {
       const expert = await testDb!.createExpertIdentity();
       const tariffVersionId = await testDb!.createResidencyTariff({
         tariffKey,
-        displayName: `${tariffKey} residency`,
+        displayName: EXPERT_RESIDENCY_V2_TARIFFS[tariffKey].displayName,
         priceMinor,
         durationSeconds: 2_592_000,
         commercialPolicyVersion: "expert_residency_v2",
@@ -118,7 +119,7 @@ describe("PostgresExpertResidencyRepository checkout snapshots", () => {
       const expected = {
         expertId: expert.expertId,
         tariffVersionId,
-        displayName: `${tariffKey} residency`,
+        displayName: EXPERT_RESIDENCY_V2_TARIFFS[tariffKey].displayName,
         priceMinor: String(priceMinor),
         currency: "RUB",
         durationSeconds: 2_592_000,

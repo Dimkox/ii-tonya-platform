@@ -102,6 +102,39 @@ describe("expert referral admin application boundary", () => {
       }),
     ).rejects.toThrow("invalid_admin_command");
   });
+
+  it("rejects a V2 tariff when displayName does not match its canonical tuple", async () => {
+    const workflows = { execute: vi.fn(), inventory: vi.fn() };
+    const service = createExpertReferralAdminService({ workflows });
+    await expect(
+      service.execute(principal, {
+        action: "expert_residency.tariff_create_v2",
+        objectId: "00000000-0000-4000-8000-000000000030",
+        approvalId: "00000000-0000-4000-8000-000000000020",
+        nonce: "nonce-display-mismatch",
+        correlationId: "correlation-display-mismatch",
+        payload: {
+          tariffKey: "START",
+          displayName: "BASE",
+          priceMinor: 390000,
+          durationSeconds: 2592000,
+          commercialPolicyVersion: "expert_residency_v2",
+          creditCapBps: 3000,
+          individualServicesEnabled: true,
+          groupEventLimit: 0,
+          statisticsLevel: "basic",
+          supportPriority: "standard",
+          activeFrom: "2026-09-01T00:00:00.000Z",
+          activeTo: "2027-09-01T00:00:00.000Z",
+        },
+        environmentCeilings: {
+          expertReferral: false,
+          expertResidencyBilling: true,
+        },
+      }),
+    ).rejects.toThrow("invalid_admin_command");
+    expect(workflows.execute).not.toHaveBeenCalled();
+  });
   it("rejects a referral batch above the 1000-code limit before persistence", async () => {
     const workflows = { execute: vi.fn(), inventory: vi.fn() };
     const service = createExpertReferralAdminService({ workflows });

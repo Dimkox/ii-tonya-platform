@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "../../../contracts/src/expert-residency-tariffs.js";
 import {
   canonicalAdminPayloadHash,
   type AdminPayload,
@@ -449,6 +450,14 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
     async createResidencyTariff(input) {
       const commercialPolicyVersion =
         input.commercialPolicyVersion ?? "expert_residency_v2";
+      if (commercialPolicyVersion === "expert_residency_v2") {
+        const tuple =
+          EXPERT_RESIDENCY_V2_TARIFFS[
+            input.tariffKey as keyof typeof EXPERT_RESIDENCY_V2_TARIFFS
+          ];
+        if (tuple === undefined) throw new Error("Unknown V2 tariff key");
+        input = { ...input, ...tuple };
+      }
       const defaultCreditCapBps =
         commercialPolicyVersion === "legacy_residency_v1" ? 5000 : 3000;
       const creditCapBps = input.creditCapBps ?? defaultCreditCapBps;

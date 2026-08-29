@@ -24,3 +24,7 @@ export type {
   ExpertResidencyCheckoutOutcome,
   ExpertResidencyPaymentEvent,
 } from "./expert-residency.js";
+export {
+  EXPERT_RESIDENCY_V2_TARIFFS,
+  type ExpertResidencyV2TariffKey,
+} from "./expert-residency-tariffs.js";
