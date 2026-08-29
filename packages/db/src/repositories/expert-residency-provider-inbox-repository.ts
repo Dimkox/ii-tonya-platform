@@ -294,89 +294,19 @@ export class PostgresExpertResidencyProviderInboxRepository {
           sql`insert into expert_first_residency_settlements (expert_id,qualifying_order_id,qualifying_payment_attempt_id,referral_id,eligibility,reason_code,settlement_expert_active,settlement_expert_verified,settlement_abuse_cleared,settlement_control_version,settlement_invitee_user_id,settlement_invitee_channel_identity_id,settlement_inviter_expert_id,settlement_inviter_user_id,settlement_inviter_channel_identity_id,settled_at) values (${order.expertId}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,${referral.rows[0]?.id ?? null}::uuid,${eligibility},${!expertEligible ? "expert_ineligible" : !abuseCleared ? "ineligible_abuse_hold" : eligibility === "eligible" ? "eligible_referral" : "pending_feature_hold"},${expert.rows[0].active},${expert.rows[0].verified},${abuseCleared},${control.rows[0]?.version ?? 0},${expert.rows[0].userId}::uuid,${inviteeChannel.rows[0]?.id ?? null}::uuid,${prospectiveReferral.rows[0]?.inviterExpertId ?? null}::uuid,${inviterIdentity.rows[0]?.userId ?? null}::uuid,${inviterIdentity.rows[0]?.channelIdentityId ?? null}::uuid,${now}) on conflict (expert_id) do nothing returning id`,
         );
         let rewardGranted = false;
-        if (marker.rows[0] && eligibility === "eligible" && referral.rows[0]) {
+        if (marker.rows[0] && referral.rows[0] && expertEligible && abuseCleared) {
           await tx.execute(sql`
-            insert into expert_referral_maturities (
+            insert into expert_referral_reward_maturities (
               first_settlement_id, referral_id, qualifying_order_id,
-              qualifying_payment_attempt_id, inviter_expert_id, settled_at,
-              matures_at, idempotency_key
+              qualifying_payment_attempt_id, inviter_expert_id, invitee_expert_id,
+              settled_at, matures_at, idempotency_key
             ) values (
               ${marker.rows[0].id}::uuid, ${referral.rows[0].id}::uuid,
               ${order.id}::uuid, ${attempt.rows[0]!.id}::uuid,
-              ${referral.rows[0].inviterExpertId}::uuid, ${now},
-              ${now} + interval '30 days', ${`maturity:${marker.rows[0].id}`}
+              ${referral.rows[0].inviterExpertId}::uuid, ${order.expertId}::uuid, ${now},
+              ${now} + interval '30 days', ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
             ) on conflict (first_settlement_id) do nothing
           `);
-        }
-        /* New settlements schedule maturity; grants are created only by the due worker. */
-        if (Boolean(false) && marker.rows[0] && eligibility === "eligible" && referral.rows[0]) {
-          const inviter = referral.rows[0].inviterExpertId;
-          await tx.execute(
-            sql`select id from experts where id=${inviter}::uuid for update`,
-          );
-          const debtFacts = await tx.execute<{
-            entryId: string;
-            grantId: string;
-            amount: bigint | string;
-            createdAt: Date | string;
-            expiresAt: Date | string;
-          }>(
-            sql`select e.id as "entryId",a.reward_grant_id as "grantId",a.amount_minor as amount,e.created_at as "createdAt",g.expires_at as "expiresAt" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id join expert_referral_reward_grants g on g.id=a.reward_grant_id where e.expert_id=${inviter}::uuid and e.entry_kind in ('reversal','debt_repayment') order by g.expires_at,e.created_at,a.reward_grant_id,e.id for update of e,a,g`,
-          );
-          const debts = new Map<
-            string,
-            {
-              originalId: string;
-              amount: bigint;
-              createdAt: number;
-              expiresAt: number;
-            }
-          >();
-          for (const fact of debtFacts.rows) {
-            const current = debts.get(fact.grantId);
-            const amount = (current?.amount ?? 0n) + BigInt(fact.amount);
-            debts.set(fact.grantId, {
-              originalId: current?.originalId ?? fact.entryId,
-              amount,
-              createdAt:
-                current?.createdAt ?? new Date(fact.createdAt).getTime(),
-              expiresAt:
-                current?.expiresAt ?? new Date(fact.expiresAt).getTime(),
-            });
-          }
-          let rewardRemaining = 100000n;
-          for (const [grantId, debt] of [...debts].sort(
-            (a, b) =>
-              a[1].expiresAt - b[1].expiresAt ||
-              a[1].createdAt - b[1].createdAt ||
-              a[0].localeCompare(b[0]),
-          )) {
-            const outstanding = debt.amount < 0n ? -debt.amount : 0n;
-            if (outstanding === 0n || rewardRemaining === 0n) continue;
-            const amount =
-              outstanding < rewardRemaining ? outstanding : rewardRemaining;
-            const repayment = await tx.execute<{ id: string }>(
-              sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${inviter}::uuid,'debt_repayment',${amount},${debt.originalId}::uuid,'first_settlement',${marker.rows[0].id}::uuid,${`reward-debt:${marker.rows[0].id}:${grantId}`}) on conflict (idempotency_key) do nothing returning id`,
-            );
-            if (repayment.rows[0])
-              await tx.execute(
-                sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${repayment.rows[0].id}::uuid,${grantId}::uuid,${inviter}::uuid,${amount})`,
-              );
-            rewardRemaining -= amount;
-          }
-          const remainder = rewardRemaining;
-          if (remainder > 0n) {
-            const grant = await tx.execute<{ id: string }>(
-              sql`insert into expert_referral_reward_grants (expert_id,referral_id,first_settlement_id,qualifying_order_id,qualifying_payment_attempt_id,amount_minor,granted_at,expires_at,idempotency_key) values (${inviter}::uuid,${referral.rows[0].id}::uuid,${marker.rows[0].id}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,100000,${now},${new Date(now.getTime() + 365 * 86400000)},${`reward:${marker.rows[0].id}`}) returning id`,
-            );
-            const ledger = await tx.execute<{ id: string }>(
-              sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,source_type,source_id,idempotency_key) values (${inviter}::uuid,'reward_grant',${remainder},'reward_grant',${grant.rows[0]!.id}::uuid,${`reward-ledger:${marker.rows[0].id}`}) returning id`,
-            );
-            await tx.execute(
-              sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${ledger.rows[0]!.id}::uuid,${grant.rows[0]!.id}::uuid,${inviter}::uuid,${remainder})`,
-            );
-            rewardGranted = true;
-          }
         }
         const outboxPayload = JSON.stringify({
           orderId: order.id,
@@ -455,6 +385,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_PROVIDER_EVENT_CONFLICT",
           );
+        const maturity = await tx.execute<{ id: string; status: string }>(
+          sql`select id,status from expert_referral_reward_maturities where qualifying_order_id=${input.orderId}::uuid for update`,
+        );
         const orderResult = await tx.execute<OrderRow>(
           sql`select id,expert_id as "expertId",cash_minor as "cashMinor",currency,duration_seconds as "durationSeconds",payment_deadline as "paymentDeadline",status,settled_at as "settledAt",residency_starts_at as "residencyStartsAt",residency_ends_at as "residencyEndsAt",provider_payment_id as "providerPaymentId" from expert_residency_orders where id=${input.orderId}::uuid for update`,
         );
@@ -493,6 +426,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const terminating =
           reversalKind === "charged_back" ||
           cumulative === BigInt(order.cashMinor);
+        if (terminating && maturity.rows[0]?.status === "pending") {
+          await tx.execute(sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`);
+        }
         let rewardReversed = false;
         let debtMinor = 0n;
         const nowResult = await tx.execute<{ now: Date | string }>(

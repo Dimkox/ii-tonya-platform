@@ -32,17 +32,23 @@ legacy facts and are not rewritten.
   immutable.
 - All batches are bounded to `1..1000`; parallel workers use `FOR UPDATE SKIP LOCKED`.
 
-## Lock order
+## Lock order (architectural ruling)
 
-For rows present in a path, acquire locks in this order:
+For processing rows present in a path, acquire locks in this canonical order:
 
-1. provider inbox identity (provider paths only);
-2. maturity row;
-3. residency order;
-4. first-settlement marker;
-5. payment attempt;
-6. experts in UUID sort order;
-7. referral control and ledger/grants in expiry order.
+1. residency order;
+2. payment attempt;
+3. first-settlement marker;
+4. maturity row;
+5. experts in UUID sort order;
+6. grants by expiry, grant time, and id;
+7. ledger rows by id.
+
+Provider inbox identity is acquired before this common financial prefix when present.
+Due work is claimed in a short `FOR UPDATE SKIP LOCKED` transaction with a lease;
+processing then commits separately in a serializable transaction. Refunds use the same
+common prefix, so a terminating refund cancels a pending maturity even after its due time
+but before grant processing.
 
 The maturity worker and terminating refund must both lock the same maturity row before
 the order/marker/payment facts. A transaction that finds no maturity follows the legacy

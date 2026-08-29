@@ -17,6 +17,7 @@ export interface WorkerCycleReport {
   readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
   readonly expertReferralHoldReplay: unknown;
+  readonly expertReferralMaturity: unknown;
   readonly confirmedOutboxDelivery: unknown;
   readonly processorPrivacy: unknown;
   readonly providerReconciliation: unknown;
@@ -46,6 +47,7 @@ export interface WorkerRuntimeDependencies {
   readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
   readonly expertReferralHoldReplay: BoundedJob;
+  readonly expertReferralMaturity?: BoundedJob;
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
@@ -83,7 +85,9 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
-    HeldRewardRepository;
+    HeldRewardRepository & {
+      grantDueMaturityBatch?(command: { now: Date; batchSize: number }): Promise<unknown>;
+    };
   readonly expertTelegramCheckoutRepository: {
     clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number>;
   };
@@ -153,6 +157,13 @@ export function createWorkerRuntime(
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
+      const expertReferralMaturity = await deps.expertReferralMaturity?.() ?? {
+        examined: 0,
+        granted: 0,
+        cancelled: 0,
+        pending: 0,
+        reason: "maturity_capability_unavailable",
+      };
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
@@ -165,6 +176,7 @@ export function createWorkerRuntime(
         expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
         expertReferralHoldReplay,
+        expertReferralMaturity,
         confirmedOutboxDelivery,
         processorPrivacy,
         providerReconciliation,
@@ -277,6 +289,11 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
+    expertReferralMaturity: async () =>
+      deps.expertReferralJobsRepository.grantDueMaturityBatch?.({
+        now: deps.now(),
+        batchSize,
+      }) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 },
     deliverConfirmedOutbox: workerOutboxEnabled
       ? deps.workerOutboxRunner!
       : async () =>

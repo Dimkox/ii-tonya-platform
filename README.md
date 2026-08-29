@@ -16,6 +16,7 @@ task.
 The client platform foundation is implemented, while live-provider gates remain closed.
 Release A2.1 adds additive expert-referral maturity scheduling: new eligible first
 settlements remain unspendable for 30 days and are processed by a bounded worker;
+the worker is independently default-off via `EXPERT_REFERRAL_MATURITY_WORKER_ENABLED`;
 see the [A2.1 rollback runbook](docs/runbooks/expert-referral-maturity-a2-rollback.md)
 and [A2.1 traceability](docs/spec/expert-referral-maturity-a2-traceability.md).
 The expert residency referral extension
