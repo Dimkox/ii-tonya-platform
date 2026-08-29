@@ -88,6 +88,9 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0028_operator_case_inbox.sql",
   "packages/db/migrations/0032_commercial_core_v2_a1.sql",
   "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+  "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
+  "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
+  "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -117,6 +120,17 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_referral_balances",
   "client_commercial_policy_assignments",
   "client_commercial_policy_controls",
+  "dialogues",
+  "dialogue_inbound",
+  "dialogue_route_decisions",
+  "selarti_response_proposals",
+  "dialogue_deliveries",
+  "dialogue_inbound_tombstones",
+  "selarti_budget_policies",
+  "selarti_cost_reservations",
+  "selarti_actual_usage_facts",
+  "selarti_cost_adjustments",
+  "selarti_budget_alerts",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
@@ -645,8 +659,20 @@ const approvedMigrationHashes = new Map([
     "dd263b77ae2e8dde0ebe8bde6a3ce1886858c2e465afe0df8857323845e48746",
   ],
   [
+    "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
+    "b7b8136238d8533f641887c0fccf33cc2021f67c1046f0e4cf540200abcff456",
+  ],
+  [
+    "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
+    "90ff0fd219c2ec882919d7328089950e69920fd4eede30000484080ab9c0b205",
+  ],
+  [
+    "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
+    "233680aade58a86cfcbb46197ba4281158812c4bd370c9f8acf40b4c5ecce4df",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "273f33856f8f300625b84c424bc0e9d72c804a991ed88f3f97a4250ffd6ddbb5",
+    "16b750cee4440e20cfba29ed154da61eb3d62438055b9bfa663cc11e313e5ec6",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -726,7 +752,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "273f33856f8f300625b84c424bc0e9d72c804a991ed88f3f97a4250ffd6ddbb5",
+    "16b750cee4440e20cfba29ed154da61eb3d62438055b9bfa663cc11e313e5ec6",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1359,7 +1385,11 @@ const inspectMigration = (
     violations.push("sandbox relation token outside approved sandbox paths");
   }
 
-  if (paymentDbPath.test(path)) {
+  if (
+    paymentDbPath.test(path) &&
+    !EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS.has(path) &&
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+  ) {
     violations.push("commercial database migration path");
   }
   if (

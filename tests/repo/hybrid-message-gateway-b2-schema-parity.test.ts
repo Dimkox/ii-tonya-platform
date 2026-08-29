@@ -31,6 +31,6 @@ describe("B2 schema/migration parity", () => {
         (entry) => entry.tag === "0035_hybrid_message_gateway_b2",
       ),
     ).toHaveLength(1);
-    expect(journal.entries.at(-1)?.idx).toBe(35);
+    expect(journal.entries.filter((entry) => entry.idx === 35)).toHaveLength(1);
   });
 });
