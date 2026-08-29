@@ -53,7 +53,6 @@ describe("hybrid gateway B2 ordered local delivery", () => {
     const requesterSession = `b2-requester:${randomUUID()}`;
     const approverSession = `b2-approver:${randomUUID()}`;
     // Business occurrences are fixed; only approval/session validity uses the live DB clock.
-    const fixtureNow = new Date("2026-08-29T00:00:00Z");
     const tariffActiveFrom = new Date("2026-08-01T00:00:00Z");
     const fixtureExpiry = new Date("2027-08-29T00:00:00Z");
     const approvalNow = new Date();
