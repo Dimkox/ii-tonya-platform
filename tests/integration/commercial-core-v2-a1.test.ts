@@ -211,7 +211,7 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
       ),
     ).resolves.toMatchObject({
       firstSettlement: true,
-      rewardGranted: true,
+      rewardGranted: false,
       eligibility: "eligible",
     });
     const secondInvitee = await database.createExpertIdentity();
@@ -255,9 +255,9 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
       referrals: 1,
       settled: 1,
       markers: 1,
-      grants: 2,
-      entries: 2,
-      allocations: 2,
+      grants: 0,
+      entries: 0,
+      allocations: 0,
     });
     const providerSpy = vi.fn(async () => ({
       kind: "created" as const,

@@ -386,6 +386,7 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0019_expert_order_provider_deadline.sql",
     "packages/db/migrations/0021_expert_settlement_snapshot.sql",
     "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+    "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
@@ -416,17 +417,16 @@ describe("MVP scope boundary", () => {
       'import Stripe from "stripe";',
     ],
   ])("rejects near-miss A1 scope entry %s", (_nearMiss, path, content) => {
-    expect(
-      [
-        ...classifyPaymentScopeProbe({ path, content }),
-        ...classifyApprovedTrackedScopeContent({ path, content }),
-      ],
-    ).not.toEqual([]);
+    expect([
+      ...classifyPaymentScopeProbe({ path, content }),
+      ...classifyApprovedTrackedScopeContent({ path, content }),
+    ]).not.toEqual([]);
   });
 
   it.each([
     "packages/db/src/schema/audit.ts",
     "packages/db/src/schema/identity.ts",
+    "packages/db/src/schema/expert-residency.ts",
     "packages/db/src/schema/integration.ts",
   ])("allows reviewed non-payment relations in %s", (path) => {
     expect(

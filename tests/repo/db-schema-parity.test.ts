@@ -78,6 +78,7 @@ describe("authoritative Drizzle schema parity", () => {
       "expertTelegramResidencyCallbacks",
       "expertResidencyProviderEventInbox",
       "expertFirstResidencySettlements",
+      "expertReferralMaturities",
       "expertReferralRewardGrants",
       "expertReferralLedgerEntries",
       "expertReferralLedgerAllocations",
@@ -227,9 +228,30 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_reward_grants_first_settlement_unique",
         "expert_reward_grants_id_expert_unique",
         "expert_reward_grants_idempotency_unique",
+        "expert_reward_grants_maturity_unique",
         "expert_reward_grants_qualifying_order_unique",
         "expert_reward_grants_qualifying_payment_unique",
         "expert_reward_grants_referral_unique",
+      ],
+    });
+    expect(requiredTable("expertReferralMaturities")).toMatchObject({
+      checks: [
+        "expert_referral_maturity_idempotency_nonempty",
+        "expert_referral_maturity_policy",
+        "expert_referral_maturity_settled_clock",
+      ],
+      foreignKeys: [
+        "expert_referral_maturity_settlement_fk",
+        "expert_referral_reward_maturities_invitee_expert_id_experts_id_fk",
+        "expert_referral_reward_maturities_inviter_expert_id_experts_id_fk",
+      ],
+      indexes: ["expert_referral_maturities_due_idx"],
+      uniques: [
+        "expert_referral_maturities_idempotency_unique",
+        "expert_referral_maturities_order_unique",
+        "expert_referral_maturities_payment_unique",
+        "expert_referral_maturities_referral_unique",
+        "expert_referral_maturities_settlement_unique",
       ],
     });
     expect(requiredTable("expertReferralLedgerEntries")?.uniques).toContain(
@@ -595,24 +617,38 @@ describe("authoritative Drizzle schema parity", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    const principal = journal.entries.find((entry) => entry.tag === "0030_client_sessions");
+    const principal = journal.entries.find(
+      (entry) => entry.tag === "0030_client_sessions",
+    );
     expect(principal).toMatchObject({
       idx: 30,
       tag: "0030_client_sessions",
     });
-    const booking = journal.entries.find((entry) => entry.tag === "0031_client_booking_references");
-    expect(principal?.when).toBeLessThan(booking?.when ?? Number.POSITIVE_INFINITY);
+    const booking = journal.entries.find(
+      (entry) => entry.tag === "0031_client_booking_references",
+    );
+    expect(principal?.when).toBeLessThan(
+      booking?.when ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it("registers the protected client booking relations as migration 0031", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    expect(journal.entries.find((entry) => entry.tag === "0031_client_booking_references")).toMatchObject({
+    expect(
+      journal.entries.find(
+        (entry) => entry.tag === "0031_client_booking_references",
+      ),
+    ).toMatchObject({
       idx: 31,
       tag: "0031_client_booking_references",
     });
-    expect(journal.entries.find((entry) => entry.tag === "0032_commercial_core_v2_a1")).toMatchObject({
+    expect(
+      journal.entries.find(
+        (entry) => entry.tag === "0032_commercial_core_v2_a1",
+      ),
+    ).toMatchObject({
       idx: 32,
       tag: "0032_commercial_core_v2_a1",
     });

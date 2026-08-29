@@ -225,6 +225,7 @@ describe("MVP schema", () => {
       "expert_referral_ledger_allocations",
       "expert_referral_ledger_entries",
       "expert_referral_reward_grants",
+      "expert_referral_reward_maturities",
       "expert_referrals",
       "expert_residency_orders",
       "expert_residency_payment_attempts",

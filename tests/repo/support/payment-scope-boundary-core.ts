@@ -87,6 +87,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0027_expert_ai_request_receipts.sql",
   "packages/db/migrations/0028_operator_case_inbox.sql",
   "packages/db/migrations/0032_commercial_core_v2_a1.sql",
+  "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -107,6 +108,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_residency_provider_event_inbox",
   "expert_first_residency_settlements",
   "expert_referral_reward_grants",
+  "expert_referral_reward_maturities",
   "expert_referral_ledger_entries",
   "expert_referral_ledger_allocations",
   "expert_referral_issuance_overrides",
@@ -639,6 +641,14 @@ const approvedMigrationHashes = new Map([
     "e70a77073e08bb15b4ad37dc49b75842bf8ff4284f9e062c5302a54bc7ba8a6d",
   ],
   [
+    "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+    "93499f504796d9d1e5bf41c0c75bf5af0bb94d62f8ada861e8292110856d6017",
+  ],
+  [
+    "packages/db/migrations/meta/_journal.json",
+    "273f33856f8f300625b84c424bc0e9d72c804a991ed88f3f97a4250ffd6ddbb5",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -716,7 +726,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "50b702c170950c16318b00490de10432e4ba1eaea4637582ca352468c51a1d8c",
+    "273f33856f8f300625b84c424bc0e9d72c804a991ed88f3f97a4250ffd6ddbb5",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

@@ -276,7 +276,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const expertEligible = expert.rows[0].active && expert.rows[0].verified;
         const eligibility =
           referral.rows[0] && expertEligible && abuseCleared
-            ? "eligible"
+            ? order.commercialPolicyVersion === "legacy_residency_v1" &&
+              !control.rows[0]?.enabled
+              ? "pending_feature_hold"
+              : "eligible"
             : "permanently_ineligible";
         const marker = await tx.execute<{ id: string }>(
           sql`insert into expert_first_residency_settlements (expert_id,qualifying_order_id,qualifying_payment_attempt_id,referral_id,eligibility,reason_code,settlement_expert_active,settlement_expert_verified,settlement_abuse_cleared,settlement_control_version,settlement_invitee_user_id,settlement_invitee_channel_identity_id,settlement_inviter_expert_id,settlement_inviter_user_id,settlement_inviter_channel_identity_id,settled_at) values (${order.expertId}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,${referral.rows[0]?.id ?? null}::uuid,${eligibility},${!expertEligible ? "expert_ineligible" : !abuseCleared ? "ineligible_abuse_hold" : eligibility === "eligible" ? "eligible_referral" : "pending_feature_hold"},${expert.rows[0].active},${expert.rows[0].verified},${abuseCleared},${control.rows[0]?.version ?? 0},${expert.rows[0].userId}::uuid,${inviteeChannel.rows[0]?.id ?? null}::uuid,${prospectiveReferral.rows[0]?.inviterExpertId ?? null}::uuid,${inviterIdentity.rows[0]?.userId ?? null}::uuid,${inviterIdentity.rows[0]?.channelIdentityId ?? null}::uuid,${now}) on conflict (expert_id) do nothing returning id`,
@@ -745,7 +748,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
     );
     const reward = marker.rows[0]
       ? await tx.execute<{ id: string }>(
-          sql`select id from expert_referral_reward_grants where first_settlement_id=${marker.rows[0].id}::uuid`,
+          sql`select id from expert_referral_reward_grants where first_settlement_id=${marker.rows[0].id}::uuid union all select id from expert_referral_ledger_entries where entry_kind='debt_repayment' and source_id=${marker.rows[0].id}::uuid limit 1`,
         )
       : { rows: [] };
     return {
