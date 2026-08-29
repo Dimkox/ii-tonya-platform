@@ -405,3 +405,11 @@ reviewed `Provider staging status: PASS`, and the exact native release bundle ha
 checksum, SBOM, signature, migration, systemd, smoke, reconciliation, and rollback gates.
 The committed records intentionally remain `NO-GO` and `BLOCKED`; live provider
 composition is not authorized by this branch.
+
+# Hybrid Telegram gateway B1 (default off)
+
+B1 owns authenticated private client Telegram text ingress at `POST /v1/webhooks/telegram/client/:botKey`, bot-scoped identity, consent-gated canonical inbound storage, deterministic routing, and creation of `selarti.request.v1`. The generic `POST /v1/webhooks/telegram` remains reserved for existing expert/fallback processing and never invokes the client gateway. `dialogue_inbound.expires_at` records a deadline exactly 30 days after creation; no physical purge worker is implemented in B1.
+
+Traceability: gateway routing and disabled behavior → `packages/application/src/hybrid-message-gateway.test.ts`; webhook authentication, terminal/retry HTTP semantics, and preserved expert ordering → `apps/api/src/routes/telegram-webhook.test.ts`; atomic identity, consent, replay, ownership, accounting isolation, retention, and outbox behavior → `tests/integration/hybrid-message-gateway-b1.test.ts`; 0033→0034 preservation → `tests/integration/hybrid-message-gateway-b1-migration-upgrade.test.ts`; migration/schema parity → `tests/repo/hybrid-message-gateway-schema-parity.test.ts`.
+
+Rollback/forward recovery: set `CLIENT_TELEGRAM_INGRESS_ENABLED=false` and restart the API; do not reverse migration 0034 or delete journaled dialogue/inbound/outbox facts. Diagnose and repair forward, reconcile any pending `selarti.request.v1` rows by idempotency key, then re-enable only after focused replay/consent tests pass. B2 Selarti-response delivery, physical inbound retention purge, and sensitive outbox-payload purge, B3 budgets/coupons, and all live-provider activation remain pending. Because `selarti.request.v1` contains bounded client text, its production creation remains default-off and explicitly activation-blocked until B2 purge and delivery gates pass.

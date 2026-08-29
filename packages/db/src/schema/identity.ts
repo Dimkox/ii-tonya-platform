@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -96,12 +97,23 @@ export const channelIdentities = pgTable(
       .references(() => users.id),
     provider: text("provider").notNull(),
     externalId: text("external_id").notNull(),
+    botKey: text("bot_key"),
+    externalChatId: text("external_chat_id"),
+    status: text("status").notNull().default("active"),
     ...mutableTimestamps,
   },
   (table) => [
-    unique("channel_identities_provider_external_unique").on(
-      table.provider,
-      table.externalId,
+    uniqueIndex("channel_identities_provider_external_legacy_unique")
+      .on(table.provider, table.externalId)
+      .where(sql`${table.botKey} is null`),
+    uniqueIndex("channel_identities_telegram_bot_user_chat_unique")
+      .on(table.provider, table.botKey, table.externalId, table.externalChatId)
+      .where(
+        sql`${table.provider} = 'telegram' and ${table.botKey} is not null and ${table.externalChatId} is not null and ${table.status} = 'active'`,
+      ),
+    check(
+      "channel_identities_status_check",
+      sql`${table.status} in ('active','unresolved','blocked')`,
     ),
   ],
 );

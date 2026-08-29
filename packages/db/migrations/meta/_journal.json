@@ -239,6 +239,13 @@
       "when": 1788000000000,
       "tag": "0033_expert_referral_maturity_a2",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788048000000,
+      "tag": "0034_hybrid_message_gateway_b1",
+      "breakpoints": true
     }
   ]
 }

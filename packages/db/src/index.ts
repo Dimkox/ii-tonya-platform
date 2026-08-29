@@ -140,6 +140,7 @@ export {
   type ExpertAiStoredOutcome,
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
+export { PostgresHybridMessageRepository } from "./repositories/hybrid-message-repository.js";
 export {
   PostgresOperatorCaseOutboxRepository,
   type OperatorCaseOutboxMessage,

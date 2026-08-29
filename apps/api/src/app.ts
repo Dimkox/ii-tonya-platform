@@ -78,6 +78,16 @@ export interface AppDependencies {
   logger: Logger;
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
+  clientIngressEnabled?: boolean | undefined;
+  clientHybridRoutingEnabled?: boolean | undefined;
+  clientBotKey?: string | undefined;
+  clientGateway?:
+    | {
+        handle(
+          raw: unknown,
+        ): Promise<{ readonly status: string; readonly route?: string }>;
+      }
+    | undefined;
   telegramWebhookSecret: string;
   adminApprovals?: ApprovalPort;
   operatorCases?: OperatorCaseService;
@@ -234,6 +244,10 @@ export async function buildApp(
   });
   await app.register(telegramWebhookRoutes, {
     secret: deps.telegramWebhookSecret,
+    clientIngressEnabled: deps.clientIngressEnabled,
+    clientHybridRoutingEnabled: deps.clientHybridRoutingEnabled,
+    clientBotKey: deps.clientBotKey,
+    clientGateway: deps.clientGateway,
     callbacks: deps.telegramCallbacks,
     inbox: deps.inbox,
     rateLimiter: deps.rateLimiter,

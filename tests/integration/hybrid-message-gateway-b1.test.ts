@@ -1,0 +1,376 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { sql } from "drizzle-orm";
+import {
+  PostgresHybridMessageRepository,
+  PostgresPrivacyRepository,
+} from "../../packages/db/src/index.js";
+import {
+  startTestPostgres,
+  type TestDatabase,
+} from "../../packages/db/src/testkit/postgres.js";
+
+describe("hybrid gateway B1 PostgreSQL transaction", () => {
+  let database: TestDatabase;
+  let client: string;
+  let repository: PostgresHybridMessageRepository;
+  beforeAll(async () => {
+    database = await startTestPostgres();
+    await database.migrate();
+    client = await database.createUser();
+    repository = new PostgresHybridMessageRepository(database.db);
+    await database.db.execute(
+      sql`insert into channel_identities(user_id, provider, external_id, bot_key, external_chat_id, status) values (${client}::uuid, 'telegram', '22', 'bot-a', '22', 'active')`,
+    );
+    await database.db.execute(
+      sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${client}::uuid,'client_messaging','granted','client-msg-v1','2026-08-28T00:00:00Z'),(${client}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-28T00:00:00Z')`,
+    );
+  }, 120_000);
+  afterAll(async () => database.stop());
+  const input = (id: bigint, bot = "bot-a", text = "сложный запрос") => ({
+    updateId: id,
+    payloadHash: createHash("sha256").update(`${id}:${text}`).digest("hex"),
+    provider: "telegram" as const,
+    botKey: bot,
+    externalUserId: "22",
+    externalChatId: "22",
+    text,
+    route: "complex_dialogue" as const,
+    routingEnabled: true,
+    correlationId: `c-${id}`,
+    locale: "ru-RU",
+    deadline: "2026-08-29T00:00:30.000Z",
+    occurredAt: "2026-08-29T00:00:00.000Z",
+    messagingConsentPolicyVersion: "client-msg-v1",
+    selartiConsentPolicyVersion: "selarti-v1",
+  });
+  const bindClient = async (options: {
+    externalUserId: string;
+    externalChatId?: string;
+    status?: "active" | "blocked" | "unresolved";
+    active?: boolean;
+    dualRole?: boolean;
+    messaging?: readonly [decision: "granted" | "revoked", version: string][];
+    ai?: readonly [decision: "granted" | "revoked", version: string][];
+  }) => {
+    const userId = await database.createUser();
+    if (options.active === false) {
+      await database.db.execute(
+        sql`update users set active=false where id=${userId}::uuid`,
+      );
+    }
+    if (options.dualRole === true) {
+      await database.db.execute(
+        sql`insert into experts(user_id,active,verified) values(${userId}::uuid,true,true)`,
+      );
+    }
+    await database.db.execute(
+      sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram',${options.externalUserId},'bot-a',${options.externalChatId ?? options.externalUserId},${options.status ?? "active"})`,
+    );
+    let createdAt = 0;
+    for (const [decision, version] of options.messaging ?? [
+      ["granted", "client-msg-v1"] as const,
+    ]) {
+      await database.db.execute(
+        sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,'client_messaging',${decision},${version},${`2026-08-28T00:00:0${createdAt}Z`})`,
+      );
+      createdAt += 1;
+    }
+    for (const [decision, version] of options.ai ?? [
+      ["granted", "selarti-v1"] as const,
+    ]) {
+      await database.db.execute(
+        sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,'selarti_ai_processing',${decision},${version},${`2026-08-28T00:01:0${createdAt}Z`})`,
+      );
+      createdAt += 1;
+    }
+    return userId;
+  };
+  it("creates one dialogue, inbound, route, and Selarti outbox; exact replay is idempotent", async () => {
+    const outcomes = await Promise.all(
+      Array.from({ length: 5 }, () => repository.persist(input(100n))),
+    );
+    expect(outcomes.filter((x) => x === "claimed")).toHaveLength(1);
+    expect(outcomes.filter((x) => x === "duplicate")).toHaveLength(4);
+    const rows = await database.db.execute<{ inbound: number; outbox: number }>(
+      sql`select (select count(*)::int from dialogue_inbound where provider='telegram' and bot_key='bot-a' and provider_update_id=100) inbound, (select count(*)::int from integration_outbox where topic='selarti.request.v1') outbox`,
+    );
+    expect(rows.rows[0]).toEqual({ inbound: 1, outbox: 1 });
+  });
+  it("rejects poison replay and isolates same update id across bots", async () => {
+    expect(await repository.persist(input(100n, "bot-a", "different"))).toBe(
+      "conflict",
+    );
+    await database.db.execute(
+      sql`insert into channel_identities(user_id, provider, external_id, bot_key, external_chat_id, status) values (${client}::uuid, 'telegram', '22', 'bot-b', '22', 'active')`,
+    );
+    expect(await repository.persist(input(100n, "bot-b"))).toBe("claimed");
+  });
+  it("rejects unknown and legacy NULL identity without durable effects; deterministic/routing-off never enqueue Selarti", async () => {
+    expect(
+      await repository.persist({ ...input(101n), externalUserId: "999" }),
+    ).toBe("rejected");
+    await database.db.execute(
+      sql`insert into channel_identities(user_id, provider, external_id, status) values (${client}::uuid, 'telegram', 'legacy', 'active')`,
+    );
+    expect(
+      await repository.persist({ ...input(102n), externalUserId: "legacy" }),
+    ).toBe("rejected");
+    expect(
+      await repository.persist({
+        ...input(103n),
+        route: "deterministic",
+        routingEnabled: false,
+      }),
+    ).toBe("claimed");
+    const rows = await database.db.execute<{ count: number }>(
+      sql`select count(*)::int count from integration_outbox where topic='selarti.request.v1' and correlation_id in ('c-101','c-102','c-103')`,
+    );
+    expect(rows.rows[0]?.count).toBe(0);
+  });
+  it("rolls back identity-resolved inbound and route when Selarti outbox insertion fails", async () => {
+    await database.db.execute(sql`
+      create function b1_reject_selected_outbox() returns trigger language plpgsql as $$
+      begin
+        if new.topic = 'selarti.request.v1' and new.correlation_id = 'c-104' then
+          raise exception 'forced B1 outbox failure';
+        end if;
+        return new;
+      end $$
+    `);
+    await database.db.execute(sql`
+      create trigger b1_reject_selected_outbox_trigger before insert on integration_outbox
+      for each row execute function b1_reject_selected_outbox()
+    `);
+    try {
+      await expect(repository.persist(input(104n))).rejects.toBeDefined();
+    } finally {
+      await database.db.execute(
+        sql`drop trigger b1_reject_selected_outbox_trigger on integration_outbox`,
+      );
+      await database.db.execute(sql`drop function b1_reject_selected_outbox()`);
+    }
+    const rows = await database.db.execute<{
+      inbound: number;
+      routes: number;
+      outbox: number;
+    }>(sql`
+      select
+        (select count(*)::int from dialogue_inbound where provider='telegram' and bot_key='bot-a' and provider_update_id=104) inbound,
+        (select count(*)::int from dialogue_route_decisions r join dialogue_inbound i on i.id=r.inbound_id where i.provider='telegram' and i.bot_key='bot-a' and i.provider_update_id=104) routes,
+        (select count(*)::int from integration_outbox where correlation_id='c-104') outbox
+    `);
+    expect(rows.rows[0]).toEqual({ inbound: 0, routes: 0, outbox: 0 });
+  });
+  it("rejects dialogue ownership rebind before inbound effects", async () => {
+    await bindClient({ externalUserId: "33", externalChatId: "22" });
+    expect(
+      await repository.persist({ ...input(105n), externalUserId: "33" }),
+    ).toBe("rejected");
+    const rows = await database.db.execute<{ count: number }>(
+      sql`select count(*)::int count from dialogue_inbound where provider_update_id=105`,
+    );
+    expect(rows.rows[0]?.count).toBe(0);
+  });
+  it("accepts an active dual-role client and rejects inactive, blocked, and unresolved bindings", async () => {
+    await bindClient({ externalUserId: "dual", dualRole: true });
+    await bindClient({ externalUserId: "inactive", active: false });
+    await bindClient({ externalUserId: "blocked", status: "blocked" });
+    await bindClient({ externalUserId: "unresolved", status: "unresolved" });
+    expect(
+      await repository.persist({
+        ...input(106n),
+        externalUserId: "dual",
+        externalChatId: "dual",
+        route: "deterministic",
+        routingEnabled: false,
+      }),
+    ).toBe("claimed");
+    for (const [updateId, externalId] of [
+      [107n, "inactive"],
+      [108n, "blocked"],
+      [109n, "unresolved"],
+    ] as const) {
+      expect(
+        await repository.persist({
+          ...input(updateId),
+          externalUserId: externalId,
+          externalChatId: externalId,
+        }),
+      ).toBe("rejected");
+    }
+    const rows = await database.db.execute<{
+      accepted: number;
+      rejected: number;
+    }>(sql`
+      select
+        (select count(*)::int from dialogue_inbound where provider_update_id=106) accepted,
+        (select count(*)::int from dialogue_inbound where provider_update_id in (107,108,109)) rejected
+    `);
+    expect(rows.rows[0]).toEqual({ accepted: 1, rejected: 0 });
+  });
+  it("requires the latest exact messaging and Selarti policy grants before storing text", async () => {
+    await bindClient({
+      externalUserId: "wrong-policy",
+      messaging: [["granted", "client-msg-v0"]],
+    });
+    await bindClient({
+      externalUserId: "revoked-message",
+      messaging: [
+        ["granted", "client-msg-v1"],
+        ["revoked", "client-msg-v1"],
+      ],
+    });
+    await bindClient({
+      externalUserId: "revoked-ai",
+      ai: [
+        ["granted", "selarti-v1"],
+        ["revoked", "selarti-v1"],
+      ],
+    });
+    for (const [updateId, externalId] of [
+      [110n, "wrong-policy"],
+      [111n, "revoked-message"],
+      [112n, "revoked-ai"],
+    ] as const) {
+      expect(
+        await repository.persist({
+          ...input(updateId),
+          externalUserId: externalId,
+          externalChatId: externalId,
+        }),
+      ).toBe("rejected");
+    }
+    const rows = await database.db.execute<{ count: number }>(
+      sql`select count(*)::int count from dialogue_inbound where provider_update_id in (110,111,112)`,
+    );
+    expect(rows.rows[0]?.count).toBe(0);
+  });
+  it("does not mutate package, event, ledger, or deferred coupon accounting", async () => {
+    const snapshot = async () =>
+      database.db.execute<{
+        packages: number;
+        events: number;
+        ledger: number;
+        couponTable: boolean;
+      }>(sql`
+      select
+        (select count(*)::int from message_packages) packages,
+        (select count(*)::int from message_events) events,
+        (select count(*)::int from message_ledger_entries) ledger,
+        to_regclass('public.coupons') is not null as "couponTable"
+    `);
+    const before = (await snapshot()).rows[0];
+    expect(
+      await repository.persist({
+        ...input(113n),
+        route: "deterministic",
+        routingEnabled: false,
+      }),
+    ).toBe("claimed");
+    const after = (await snapshot()).rows[0];
+    expect(after).toEqual(before);
+    expect(after).toEqual({
+      packages: 0,
+      events: 0,
+      ledger: 0,
+      couponTable: false,
+    });
+  });
+
+  it("serializes ingress consent checks with runtime withdrawal on the shared user lock", async () => {
+    const ingressUser = await bindClient({ externalUserId: "race-ingress" });
+    let signalConsentRead!: () => void;
+    const consentRead = new Promise<void>((resolve) => {
+      signalConsentRead = resolve;
+    });
+    let releaseIngress!: () => void;
+    const ingressRelease = new Promise<void>((resolve) => {
+      releaseIngress = resolve;
+    });
+    let withdrawalReachedAudit = false;
+    const ingressFirst = new PostgresHybridMessageRepository(database.db, {
+      afterConsentRead: async (userId) => {
+        expect(userId).toBe(ingressUser);
+        signalConsentRead();
+        await ingressRelease;
+      },
+    });
+    const privacyAfterIngress = new PostgresPrivacyRepository(database.db, {
+      privacyMutationCapability: { enabled: true },
+      beforeWithdrawalAudit: () => {
+        withdrawalReachedAudit = true;
+      },
+    });
+    const ingress = ingressFirst.persist({
+      ...input(114n),
+      externalUserId: "race-ingress",
+      externalChatId: "race-ingress",
+    });
+    await expect(
+      Promise.race([
+        consentRead.then(() => "read"),
+        new Promise((resolve) => setTimeout(() => resolve("timeout"), 250)),
+      ]),
+    ).resolves.toBe("read");
+    const withdrawal = privacyAfterIngress.withdrawConsentAtomically({
+      targetUserId: ingressUser,
+      purpose: "client_messaging",
+      policyVersion: "client-msg-v1",
+      correlationId: "withdraw-after-ingress",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(withdrawalReachedAudit).toBe(false);
+    releaseIngress();
+    await expect(ingress).resolves.toBe("claimed");
+    await expect(withdrawal).resolves.toBeDefined();
+
+    const revokeUser = await bindClient({ externalUserId: "race-revoke" });
+    let signalWithdrawalLock!: () => void;
+    const withdrawalLocked = new Promise<void>((resolve) => {
+      signalWithdrawalLock = resolve;
+    });
+    let releaseWithdrawal!: () => void;
+    const withdrawalRelease = new Promise<void>((resolve) => {
+      releaseWithdrawal = resolve;
+    });
+    const privacyFirst = new PostgresPrivacyRepository(database.db, {
+      privacyMutationCapability: { enabled: true },
+      beforeWithdrawalAudit: async () => {
+        signalWithdrawalLock();
+        await withdrawalRelease;
+      },
+    });
+    const revoke = privacyFirst.withdrawConsentAtomically({
+      targetUserId: revokeUser,
+      purpose: "client_messaging",
+      policyVersion: "client-msg-v1",
+      correlationId: "withdraw-before-ingress",
+    });
+    await withdrawalLocked;
+    let ingressSettled = false;
+    const afterRevoke = repository
+      .persist({
+        ...input(115n),
+        externalUserId: "race-revoke",
+        externalChatId: "race-revoke",
+      })
+      .finally(() => {
+        ingressSettled = true;
+      });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ingressSettled).toBe(false);
+    releaseWithdrawal();
+    await expect(revoke).resolves.toBeDefined();
+    await expect(afterRevoke).resolves.toBe("rejected");
+    const effects = await database.db.execute<{
+      inbound: number;
+      outbox: number;
+    }>(sql`
+      select
+        (select count(*)::int from dialogue_inbound where provider_update_id=115) inbound,
+        (select count(*)::int from integration_outbox where topic='selarti.request.v1' and correlation_id='c-115') outbox
+    `);
+    expect(effects.rows[0]).toEqual({ inbound: 0, outbox: 0 });
+  });
+});

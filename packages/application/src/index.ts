@@ -19,3 +19,4 @@ export * from "./expert-ai-proposal-eval.js";
 export * from "./expert-telegram-query-service.js";
 export * from "./client-commercial-policy.js";
 export * from "./operator-case-service.js";
+export * from "./hybrid-message-gateway.js";

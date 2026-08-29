@@ -64,6 +64,8 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientSession: false,
         clientCatalog: false,
+        clientTelegramIngress: false,
+        clientHybridRouting: false,
         expertReferral: false,
         expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
@@ -78,6 +80,9 @@ describe("server composition", () => {
     expect(disabledDeps.clientSessionService).toBeUndefined();
     expect(disabledDeps.clientSessionRepository).toBeUndefined();
     expect(disabledDeps.clientPrincipal).toBeUndefined();
+    expect(disabledDeps.clientGateway).toBeUndefined();
+    expect(disabledDeps.clientIngressEnabled).toBe(false);
+    expect(disabledDeps.clientHybridRoutingEnabled).toBe(false);
 
     const enabled = {
       ...config,

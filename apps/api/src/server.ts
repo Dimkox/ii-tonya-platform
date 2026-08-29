@@ -16,6 +16,7 @@ import {
   type PrivacyService,
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
+  HybridMessageGateway,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -34,6 +35,7 @@ import {
   PostgresBookingRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
+  PostgresHybridMessageRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import {
@@ -138,6 +140,8 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (config.features.clientTelegramIngress && !config.clientTelegramBotKey)
+      throw new Error("client_telegram_bot_key_required");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -233,6 +237,24 @@ export const createDefaultLifecycle = (
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
         : undefined;
+    const clientGateway =
+      config.features.clientTelegramIngress && config.clientTelegramBotKey
+        ? new HybridMessageGateway({
+            enabled: true,
+            botKey: config.clientTelegramBotKey,
+            routingEnabled: config.features.clientHybridRouting === true,
+            messagingConsentPolicyVersion:
+              config.clientMessagingConsentPolicyVersion!,
+            ...(config.selartiAiConsentPolicyVersion === undefined
+              ? {}
+              : {
+                  selartiConsentPolicyVersion:
+                    config.selartiAiConsentPolicyVersion,
+                }),
+            persist: async (input) =>
+              new PostgresHybridMessageRepository(db).persist(input),
+          })
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -278,7 +300,14 @@ export const createDefaultLifecycle = (
       logger: createLogger(),
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
-      telegramWebhookSecret: randomBytes(32).toString("base64url"),
+      clientIngressEnabled: config.features.clientTelegramIngress,
+      clientHybridRoutingEnabled: config.features.clientHybridRouting,
+      ...(config.clientTelegramBotKey === undefined
+        ? {}
+        : { clientBotKey: config.clientTelegramBotKey }),
+      ...(clientGateway === undefined ? {} : { clientGateway }),
+      telegramWebhookSecret:
+        config.telegramWebhookSecret ?? randomBytes(32).toString("base64url"),
       ...(clientCatalogService === undefined
         ? {}
         : {

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   char,
+  bigint,
   index,
   integer,
   jsonb,
@@ -433,5 +434,86 @@ export const projectionCheckpoints = pgTable(
   },
   (table) => [
     unique("projection_checkpoints_projection_unique").on(table.projection),
+  ],
+);
+
+export const dialogues = pgTable(
+  "dialogues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantKey: text("tenant_key").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    provider: text("provider").notNull(),
+    botKey: text("bot_key").notNull(),
+    externalChatId: text("external_chat_id").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("dialogues_scope_unique").on(
+      table.tenantKey,
+      table.provider,
+      table.botKey,
+      table.externalChatId,
+    ),
+  ],
+);
+export const dialogueInbound = pgTable(
+  "dialogue_inbound",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dialogueId: uuid("dialogue_id")
+      .notNull()
+      .references(() => dialogues.id),
+    provider: text("provider").notNull(),
+    botKey: text("bot_key").notNull(),
+    providerUpdateId: bigint("provider_update_id", {
+      mode: "bigint",
+    }).notNull(),
+    payloadHash: char("payload_hash", { length: 64 }).notNull(),
+    text: text("text").notNull(),
+    createdAt,
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    unique("dialogue_inbound_provider_bot_update_unique").on(
+      table.provider,
+      table.botKey,
+      table.providerUpdateId,
+    ),
+    check(
+      "dialogue_inbound_text_check",
+      sql`char_length(${table.text}) between 1 and 4096 and ${table.text} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      "dialogue_inbound_expiry_check",
+      sql`${table.expiresAt} = ${table.createdAt} + interval '30 days'`,
+    ),
+    index("dialogue_inbound_dialogue_idx").on(
+      table.dialogueId,
+      table.createdAt,
+    ),
+    index("dialogue_inbound_expiry_idx").on(table.expiresAt, table.id),
+  ],
+);
+export const dialogueRouteDecisions = pgTable(
+  "dialogue_route_decisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    inboundId: uuid("inbound_id")
+      .notNull()
+      .references(() => dialogueInbound.id),
+    routeVersion: integer("route_version").notNull().default(1),
+    route: text("route").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("dialogue_route_inbound_unique").on(table.inboundId),
+    check(
+      "dialogue_route_check",
+      sql`${table.route} in ('deterministic','complex_dialogue')`,
+    ),
+    check("dialogue_route_version_check", sql`${table.routeVersion} > 0`),
   ],
 );

@@ -16,6 +16,9 @@ const build = async (
     aiEnabled?: boolean;
     checkoutEnabled?: boolean;
     consume?: (key: string, limit: number, windowMs: number) => boolean;
+    clientHandle?: (
+      raw: unknown,
+    ) => Promise<{ status: string; route?: string }>;
   } = {},
 ) => {
   const claim = vi.fn<WebhookInbox["claim"]>(async () => ({
@@ -88,6 +91,9 @@ const build = async (
     kind: "applied" as const,
     providerOperationId: "checkout-message-1",
   }));
+  const clientGatewayHandle = vi.fn(
+    options.clientHandle ?? (async () => ({ status: "disabled" })),
+  );
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
     secret,
@@ -107,6 +113,13 @@ const build = async (
     },
     expertAiEnabled: options.aiEnabled ?? false,
     expertAi: { resolvePrincipal: resolveAiPrincipal, handle: handleAi },
+    clientIngressEnabled: options.clientHandle !== undefined,
+    clientHybridRoutingEnabled: true,
+    clientBotKey: "bot-client",
+    clientGateway:
+      options.clientHandle === undefined
+        ? undefined
+        : { handle: clientGatewayHandle },
   });
   return {
     app,
@@ -125,12 +138,65 @@ const build = async (
     handleAi,
     processResidencyCheckout,
     sendResidencyCheckoutLink,
+    clientGatewayHandle,
   };
 };
 
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
+  it.each([
+    ["accepted", 200, { status: "accepted", route: "deterministic" }],
+    ["duplicate", 200, { status: "duplicate" }],
+    ["rejected", 200, { status: "rejected" }],
+    ["conflict", 200, { status: "conflict" }],
+    ["unavailable", 503, { status: "unavailable" }],
+  ])("maps client gateway %s to HTTP %s", async (_name, expected, result) => {
+    const state = await build({ clientHandle: async () => result });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/client/bot-client",
+        headers,
+        payload: {
+          update_id: 901,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "/help",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(expected);
+    } finally {
+      await state.app.close();
+    }
+  });
+  it("returns 503 when client gateway throws", async () => {
+    const state = await build({
+      clientHandle: async () => {
+        throw new Error("db");
+      },
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/client/bot-client",
+        headers,
+        payload: {
+          update_id: 902,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "/help",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(503);
+    } finally {
+      await state.app.close();
+    }
+  });
   it("keeps ordinary private text on the default Telegram lifecycle", async () => {
     const state = await build();
     try {
@@ -187,6 +253,106 @@ describe("Telegram webhook callback boundary", () => {
         idempotencyKey: "telegram:911:expert-ai",
       });
       expect(state.process).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+  it("never invokes the client gateway from the generic expert webhook", async () => {
+    const state = await build({
+      clientHandle: async () => ({ status: "accepted" }),
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 920,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "client text",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.clientGatewayHandle).not.toHaveBeenCalled();
+      expect(state.process).toHaveBeenCalledOnce();
+    } finally {
+      await state.app.close();
+    }
+  });
+  it("terminally rejects a wrong dedicated bot path before gateway", async () => {
+    const state = await build({
+      clientHandle: async () => ({ status: "accepted" }),
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/client/wrong-bot",
+        headers,
+        payload: {
+          update_id: 921,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "client text",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ accepted: true, rejected: true });
+      expect(state.clientGatewayHandle).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+  it("caps the dedicated body before gateway and uses a bot-scoped rate key", async () => {
+    const consume = vi.fn(() => true);
+    const state = await build({
+      consume,
+      clientHandle: async () => ({ status: "accepted" }),
+    });
+    try {
+      const oversized = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/client/bot-client",
+        headers,
+        payload: {
+          update_id: 922,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "x".repeat(65_536),
+          },
+        },
+      });
+      expect(oversized.statusCode).toBe(413);
+      expect(state.clientGatewayHandle).not.toHaveBeenCalled();
+
+      await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/client/bot-client",
+        headers,
+        payload: {
+          update_id: 923,
+          message: {
+            from: { id: 123 },
+            chat: { id: 123, type: "private" },
+            text: "ok",
+          },
+        },
+      });
+      expect(consume).toHaveBeenCalledWith(
+        "telegram:client:auth:bot-client",
+        100,
+        60_000,
+      );
+      expect(consume).not.toHaveBeenCalledWith(
+        "telegram:auth:provider",
+        expect.anything(),
+        expect.anything(),
+      );
     } finally {
       await state.app.close();
     }

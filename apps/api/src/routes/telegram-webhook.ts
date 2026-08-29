@@ -7,6 +7,11 @@ import type {
   ExpertTelegramCheckoutResult,
   TelegramSendOutcome,
 } from "@ii-tonya/integrations";
+type HybridGateway = {
+  handle(
+    raw: unknown,
+  ): Promise<{ readonly status: string; readonly route?: string }>;
+};
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -141,6 +146,10 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   expertAi?: TelegramExpertAiIngress;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
+  clientIngressEnabled: boolean | undefined;
+  clientHybridRoutingEnabled: boolean | undefined;
+  clientBotKey: string | undefined;
+  clientGateway: HybridGateway | undefined;
 }> = async (app, deps) => {
   if (
     (deps.expertQueriesEnabled === true ||
@@ -152,6 +161,75 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   if (deps.expertAiEnabled === true && deps.expertAi === undefined) {
     throw new Error("Expert Telegram AI capability is required");
   }
+  app.post<{ Params: { botKey: string } }>(
+    "/v1/webhooks/telegram/client/:botKey",
+    {
+      bodyLimit: 65_536,
+      schema: {
+        params: {
+          type: "object",
+          required: ["botKey"],
+          properties: { botKey: { type: "string", minLength: 1 } },
+        },
+        body: {
+          type: "object",
+          additionalProperties: true,
+          required: ["update_id"],
+          properties: { update_id: { type: "integer", minimum: 0 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const header = request.headers["x-telegram-bot-api-secret-token"];
+      if (
+        !secureEqual(
+          typeof header === "string" ? header : undefined,
+          deps.secret,
+        )
+      ) {
+        const allowed = deps.rateLimiter.consume(
+          `telegram:client:unauth:${request.ip}`,
+          deps.unauthenticatedLimit ?? 100,
+          60_000,
+        );
+        return reply.code(allowed ? 401 : 429).send({ error: "unauthorized" });
+      }
+      if (
+        deps.clientBotKey === undefined ||
+        !secureEqual(request.params.botKey, deps.clientBotKey)
+      ) {
+        return { accepted: true, rejected: true };
+      }
+      if (
+        !deps.rateLimiter.consume(
+          `telegram:client:auth:${deps.clientBotKey}`,
+          deps.authenticatedLimit ?? 100,
+          60_000,
+        )
+      ) {
+        return reply.code(429).send({ error: "rate_limited" });
+      }
+      if (
+        deps.clientIngressEnabled !== true ||
+        deps.clientGateway === undefined
+      ) {
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      let result;
+      try {
+        result = await deps.clientGateway.handle(request.body);
+      } catch {
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      if (result.status === "unavailable" || result.status === "disabled")
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      if (result.status === "rejected" || result.status === "conflict")
+        return { accepted: true, rejected: true };
+      if (result.status === "duplicate")
+        return { accepted: true, duplicate: true };
+      return { accepted: true, route: result.route };
+    },
+  );
   app.post(
     "/v1/webhooks/telegram",
     {

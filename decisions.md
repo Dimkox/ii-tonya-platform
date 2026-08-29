@@ -7,3 +7,5 @@ Treat approved analytics bootstrap code as a release-preserved asset and exercis
 - A2.1 settlement and maturity processing locks the shared financial prefix before sorted expert rows; this matches the architectural order and keeps reciprocal settlement/refund races deadlock-safe while retaining the legacy immediate-grant branch.
 
 Use one canonical financial lock prefix everywhere: provider inbox when present, then separate order, payment, marker, maturity locks, UUID-sorted experts, expiry/grant/id grants, and id-sorted ledgers. Sequential statements make the order explicit instead of delegating it to the PostgreSQL join planner.
+
+Release B1 keeps ingress and hybrid routing independently default-off and validates bot-scoped private identity before any durable effect; this preserves existing expert paths and makes provider activation reversible.
