@@ -295,6 +295,21 @@ export class PostgresExpertResidencyProviderInboxRepository {
         );
         let rewardGranted = false;
         if (marker.rows[0] && eligibility === "eligible" && referral.rows[0]) {
+          await tx.execute(sql`
+            insert into expert_referral_maturities (
+              first_settlement_id, referral_id, qualifying_order_id,
+              qualifying_payment_attempt_id, inviter_expert_id, settled_at,
+              matures_at, idempotency_key
+            ) values (
+              ${marker.rows[0].id}::uuid, ${referral.rows[0].id}::uuid,
+              ${order.id}::uuid, ${attempt.rows[0]!.id}::uuid,
+              ${referral.rows[0].inviterExpertId}::uuid, ${now},
+              ${now} + interval '30 days', ${`maturity:${marker.rows[0].id}`}
+            ) on conflict (first_settlement_id) do nothing
+          `);
+        }
+        /* New settlements schedule maturity; grants are created only by the due worker. */
+        if (Boolean(false) && marker.rows[0] && eligibility === "eligible" && referral.rows[0]) {
           const inviter = referral.rows[0].inviterExpertId;
           await tx.execute(
             sql`select id from experts where id=${inviter}::uuid for update`,

@@ -156,6 +156,10 @@ export const expertFirstSettlementEligibility = pgEnum(
     "cancelled_by_refund",
   ],
 );
+export const expertReferralMaturityStatus = pgEnum(
+  "expert_referral_maturity_status",
+  ["pending", "granted", "cancelled"],
+);
 export const expertReferralLedgerEntryKind = pgEnum(
   "expert_referral_ledger_entry_kind",
   [
@@ -1025,6 +1029,41 @@ export const expertFirstResidencySettlements = pgTable(
       "expert_first_settlement_pending_snapshot_complete",
       sql`${table.eligibility} <> 'pending_feature_hold' or (${table.settlementInviteeUserId} is not null and ${table.settlementInviteeChannelIdentityId} is not null and ${table.settlementInviterExpertId} is not null and ${table.settlementInviterUserId} is not null and ${table.settlementInviterChannelIdentityId} is not null)`,
     ),
+  ],
+);
+
+export const expertReferralMaturities = pgTable(
+  "expert_referral_maturities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    firstSettlementId: uuid("first_settlement_id").notNull(),
+    referralId: uuid("referral_id").notNull(),
+    qualifyingOrderId: uuid("qualifying_order_id").notNull(),
+    qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
+    inviterExpertId: uuid("inviter_expert_id").notNull().references(() => experts.id),
+    settledAt: timestamp("settled_at", { withTimezone: true }).notNull(),
+    maturesAt: timestamp("matures_at", { withTimezone: true }).notNull(),
+    status: expertReferralMaturityStatus("status").notNull().default("pending"),
+    grantedAt: timestamp("granted_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    terminalReason: text("terminal_reason"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("expert_referral_maturities_settlement_unique").on(table.firstSettlementId),
+    unique("expert_referral_maturities_order_unique").on(table.qualifyingOrderId),
+    unique("expert_referral_maturities_payment_unique").on(table.qualifyingPaymentAttemptId),
+    unique("expert_referral_maturities_referral_unique").on(table.referralId),
+    unique("expert_referral_maturities_idempotency_unique").on(table.idempotencyKey),
+    index("expert_referral_maturities_due_idx").on(table.maturesAt, table.id),
+    foreignKey({
+      columns: [table.firstSettlementId, table.referralId, table.qualifyingOrderId, table.qualifyingPaymentAttemptId],
+      foreignColumns: [expertFirstResidencySettlements.id, expertFirstResidencySettlements.referralId, expertFirstResidencySettlements.qualifyingOrderId, expertFirstResidencySettlements.qualifyingPaymentAttemptId],
+      name: "expert_referral_maturity_settlement_fk",
+    }),
+    check("expert_referral_maturity_settled_clock", sql`${table.maturesAt} = ${table.settledAt} + interval '30 days'`),
+    check("expert_referral_maturity_idempotency_nonempty", sql`length(${table.idempotencyKey}) between 1 and 256`),
   ],
 );
 
