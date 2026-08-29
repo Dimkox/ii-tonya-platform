@@ -140,6 +140,8 @@ export async function issueResidencyCheckoutCallback(
   secret: Uint8Array,
   store: ResidencyCheckoutCallbackStore,
 ): Promise<string> {
+  if (!valid(claims) || secret.byteLength < 32 || idempotencyKey.length < 1)
+    throw new ResidencyCheckoutCallbackVerificationError();
   if (
     !valid(claims) ||
     secret.byteLength < 32 ||
@@ -161,15 +163,25 @@ export async function authenticateResidencyCheckoutCallback(
   now: Date,
 ) {
   try {
-    if (secret.byteLength < 32 || !Number.isFinite(now.getTime()))
+    if (
+      !token.startsWith(PREFIX) ||
+      secret.byteLength < 32 ||
+      !Number.isFinite(now.getTime())
+    )
       throw new Error();
-    const decoded = decode(token);
-    if (!timingSafeEqual(decoded.mac, mac(decoded.nonce, binding, secret)))
+    const payload = Buffer.from(token.slice(PREFIX.length), "base64url");
+    if (
+      payload.length !== 32 ||
+      token !== `${PREFIX}${payload.toString("base64url")}`
+    )
       throw new Error();
-    const claims = await store.consume(decoded.tokenHash, binding, now);
+    const nonce = payload.subarray(0, 16);
+    if (!timingSafeEqual(payload.subarray(16), mac(nonce, binding, secret)))
+      throw new Error();
+    const claims = await store.consume(digest(nonce), binding, now);
     if (claims === null || claims.expiresAt.getTime() <= now.getTime())
       throw new Error();
-    return { tokenHash: decoded.tokenHash, claims };
+    return { tokenHash: digest(nonce), claims };
   } catch {
     throw new ResidencyCheckoutCallbackVerificationError();
   }

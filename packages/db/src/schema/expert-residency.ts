@@ -451,6 +451,9 @@ export const expertTelegramResidencyCallbacks = pgTable(
       "expert_telegram_residency_callbacks_expiry_check",
       sql`${table.expiresAt} > ${table.createdAt}`,
     ),
+    index("expert_telegram_residency_callbacks_expiry_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.consumedAt} is null`),
     check(
       "expert_telegram_residency_callbacks_checkout_state_check",
       sql`(${table.checkoutStatus} = 'issued' and ${table.consumedAt} is null) or (${table.checkoutStatus} <> 'issued' and ${table.consumedAt} is not null)`,
@@ -463,9 +466,6 @@ export const expertTelegramResidencyCallbacks = pgTable(
       "expert_telegram_residency_callbacks_checkout_outcome_check",
       sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is not null and char_length(${table.checkoutUrl}) between 1 and 2048 and ${table.checkoutUrl} ~* '^https://[^[:space:]]+$')`,
     ),
-    index("expert_telegram_residency_callbacks_expiry_idx")
-      .on(table.expiresAt)
-      .where(sql`${table.consumedAt} is null`),
     index("expert_telegram_residency_callbacks_processing_lease_idx")
       .on(table.processingLeaseUntil)
       .where(sql`${table.checkoutStatus} = 'processing'`),

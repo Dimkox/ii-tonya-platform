@@ -6,8 +6,10 @@ import { closeDb, createDb } from "../../packages/db/src/client.js";
 import { PostgresExpertTelegramResidencyCallbackRepository } from "../../packages/db/src/repositories/expert-telegram-residency-callback-repository.js";
 
 const schema = "expert_telegram_xr1_test";
-const connectionString = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
-const isolatedUrl = new URL(connectionString ?? "postgresql://invalid");
+const connectionString =
+  process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL ?? process.env.DATABASE_URL;
+if (!connectionString) throw new Error("test_database_unavailable");
+const isolatedUrl = new URL(connectionString);
 isolatedUrl.searchParams.set("options", `-c search_path=${schema},public`);
 const db = createDb(isolatedUrl.toString());
 const repository = new PostgresExpertTelegramResidencyCallbackRepository(db);
