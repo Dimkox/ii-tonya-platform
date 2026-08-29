@@ -273,6 +273,28 @@ describe("commercial core 0032 upgrade compatibility", () => {
           `delete from client_commercial_policy_assignments where user_id='${ids.client}'::uuid`,
         ),
       ).rejects.toBeDefined();
+      await applySqlMigration(
+        pool,
+        "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+      );
+      await expectQuery(
+        pool,
+        `select count(*)::int as count from expert_referral_reward_maturities`,
+        [{ count: 0 }],
+      );
+      await expectQuery(
+        pool,
+        `select commercial_policy_version, credit_cap_bps, price_minor, credit_minor, cash_minor from expert_residency_orders where idempotency_key='upgrade-order'`,
+        [
+          {
+            commercial_policy_version: "legacy_residency_v1",
+            credit_cap_bps: 5000,
+            price_minor: "390000",
+            credit_minor: "117000",
+            cash_minor: "273000",
+          },
+        ],
+      );
     } finally {
       await pool.end();
       await container.stop();

@@ -447,6 +447,7 @@ export async function buildTestApp(
         clientSession: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         ...options.features,
       },
