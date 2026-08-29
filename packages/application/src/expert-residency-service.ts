@@ -141,7 +141,7 @@ export const createExpertResidencyService = (deps: {
       if (
         order.status !== "payment_pending" ||
         deps.checkoutProvider === undefined ||
-        deps.checkoutCapabilityEnabled === false
+        deps.checkoutCapabilityEnabled !== true
       ) {
         return { id: order.id, status: order.status };
       }

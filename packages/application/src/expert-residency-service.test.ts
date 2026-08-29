@@ -42,6 +42,7 @@ describe("expert residency service", () => {
       }[_key as "START" | "BASE" | "PRO"];
       const service = createExpertResidencyService({
         environmentEnabled: true,
+        checkoutCapabilityEnabled: false,
         commands: {
           listActiveTariffs: async () => [tariff],
           quote: async () => ({
@@ -87,6 +88,7 @@ describe("expert residency service", () => {
     ]);
     const dependencies = {
       environmentEnabled: true,
+      checkoutCapabilityEnabled: false,
       commands: {
         quote: async () => quote,
         checkout: vi.fn(),
@@ -155,6 +157,7 @@ describe("expert residency service", () => {
     };
     const deps = {
       environmentEnabled: true,
+      checkoutCapabilityEnabled: false,
       commands: {
         listActiveTariffs: vi.fn(async () => []),
         quote: async () => quote,
@@ -194,6 +197,7 @@ describe("expert residency service", () => {
     }));
     const service = createExpertResidencyService({
       environmentEnabled: true,
+      checkoutCapabilityEnabled: true,
       commands: {
         listActiveTariffs: vi.fn(async () => []),
         quote: async () => quote,
@@ -228,4 +232,40 @@ describe("expert residency service", () => {
     });
     expect(checkout).toHaveBeenCalledBefore(createCheckout);
   });
+});
+
+it("fails closed when a provider is supplied but checkout capability is omitted", async () => {
+  const activeOrder = {
+    ...quote,
+    id: "order-omitted",
+    status: "payment_pending" as const,
+  };
+  const createCheckout = vi.fn(async () => ({
+    kind: "created" as const,
+    paymentId: "must-not-run",
+    checkoutUrl: "https://must-not-run.invalid",
+  }));
+  const service = createExpertResidencyService({
+    environmentEnabled: true,
+    commands: {
+      listActiveTariffs: vi.fn(async () => []),
+      quote: async () => quote,
+      checkout: async () => activeOrder,
+    },
+    queries: { ownerUserId: async () => owner.userId },
+    reconciliation: {
+      settle: vi.fn(),
+      reverse: vi.fn(),
+      replayHeldReward: vi.fn(),
+      releaseExpiredOrders: vi.fn(),
+    },
+    checkoutProvider: { createCheckout },
+  });
+  await expect(
+    service.checkout(owner, "tariff-1", "checkout-omitted"),
+  ).resolves.toEqual({
+    id: activeOrder.id,
+    status: "payment_pending",
+  });
+  expect(createCheckout).not.toHaveBeenCalled();
 });
