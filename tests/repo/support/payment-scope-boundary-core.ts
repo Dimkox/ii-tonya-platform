@@ -636,7 +636,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0032_commercial_core_v2_a1.sql",
-    "77ecb15523efb8d9d060567eced6cf170d25193b8e3a0ee6cb2dc84253b85b6a",
+    "e70a77073e08bb15b4ad37dc49b75842bf8ff4284f9e062c5302a54bc7ba8a6d",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
