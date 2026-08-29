@@ -196,18 +196,6 @@ export class PostgresExpertResidencyProviderInboxRepository {
         }>(
           sql`select inviter_expert_id as "inviterExpertId" from expert_referrals where invitee_expert_id=${order.expertId}::uuid`,
         );
-        const expertIds = [
-          order.expertId,
-          prospectiveReferral.rows[0]?.inviterExpertId,
-        ]
-          .filter((id): id is string => Boolean(id))
-          .sort();
-        await tx.execute(
-          sql`select id from experts where id in (${sql.join(
-            expertIds.map((id) => sql`${id}::uuid`),
-            sql`,`,
-          )}) order by id for update`,
-        );
         const expert = await tx.execute<{
           active: boolean;
           verified: boolean;
@@ -294,7 +282,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
           sql`insert into expert_first_residency_settlements (expert_id,qualifying_order_id,qualifying_payment_attempt_id,referral_id,eligibility,reason_code,settlement_expert_active,settlement_expert_verified,settlement_abuse_cleared,settlement_control_version,settlement_invitee_user_id,settlement_invitee_channel_identity_id,settlement_inviter_expert_id,settlement_inviter_user_id,settlement_inviter_channel_identity_id,settled_at) values (${order.expertId}::uuid,${order.id}::uuid,${attempt.rows[0]!.id}::uuid,${referral.rows[0]?.id ?? null}::uuid,${eligibility},${!expertEligible ? "expert_ineligible" : !abuseCleared ? "ineligible_abuse_hold" : eligibility === "eligible" ? "eligible_referral" : "pending_feature_hold"},${expert.rows[0].active},${expert.rows[0].verified},${abuseCleared},${control.rows[0]?.version ?? 0},${expert.rows[0].userId}::uuid,${inviteeChannel.rows[0]?.id ?? null}::uuid,${prospectiveReferral.rows[0]?.inviterExpertId ?? null}::uuid,${inviterIdentity.rows[0]?.userId ?? null}::uuid,${inviterIdentity.rows[0]?.channelIdentityId ?? null}::uuid,${now}) on conflict (expert_id) do nothing returning id`,
         );
         let rewardGranted = false;
-        if (marker.rows[0] && referral.rows[0] && expertEligible && abuseCleared) {
+        if (
+          marker.rows[0] &&
+          referral.rows[0] &&
+          expertEligible &&
+          abuseCleared
+        ) {
           await tx.execute(sql`
             insert into expert_referral_reward_maturities (
               first_settlement_id, referral_id, qualifying_order_id,
@@ -307,8 +300,28 @@ export class PostgresExpertResidencyProviderInboxRepository {
               (${now})::timestamptz + interval '30 days', ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
             ) on conflict (first_settlement_id) do nothing
           `);
-          if (order.commercialPolicyVersion === "legacy_residency_v1" && eligibility === "eligible") {
-            const allocation = await grantExpertReferralReward(tx, { maturityId: null, inviterExpertId: referral.rows[0].inviterExpertId, referralId: referral.rows[0].id, firstSettlementId: marker.rows[0].id, orderId: order.id, paymentAttemptId: attempt.rows[0]!.id });
+          if (
+            order.commercialPolicyVersion === "legacy_residency_v1" &&
+            eligibility === "eligible"
+          ) {
+            const expertIds = [
+              order.expertId,
+              referral.rows[0].inviterExpertId,
+            ].sort();
+            await tx.execute(
+              sql`select id from experts where id in (${sql.join(
+                expertIds.map((id) => sql`${id}::uuid`),
+                sql`,`,
+              )}) order by id for update`,
+            );
+            const allocation = await grantExpertReferralReward(tx, {
+              maturityId: null,
+              inviterExpertId: referral.rows[0].inviterExpertId,
+              referralId: referral.rows[0].id,
+              firstSettlementId: marker.rows[0].id,
+              orderId: order.id,
+              paymentAttemptId: attempt.rows[0]!.id,
+            });
             rewardGranted = allocation !== "already_granted";
           }
         }
@@ -397,7 +410,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_REVERSAL_PAYMENT_MISMATCH",
           );
-        await tx.execute(sql`select id from expert_residency_payment_attempts where order_id=${order.id}::uuid and provider_request_id=${input.paymentId} for update`);
+        await tx.execute(
+          sql`select id from expert_residency_payment_attempts where order_id=${order.id}::uuid and provider_request_id=${input.paymentId} for update`,
+        );
         if (claimed.status === "processed") {
           const priorResult = reversalResultFromPayload(
             claimed.resultPayload,
@@ -446,7 +461,9 @@ export class PostgresExpertResidencyProviderInboxRepository {
             sql`select id,status from expert_referral_reward_maturities where qualifying_order_id=${order.id}::uuid for update`,
           );
           if (maturity.rows[0]?.status === "pending") {
-            await tx.execute(sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`);
+            await tx.execute(
+              sql`update expert_referral_reward_maturities set status='cancelled',cancelled_at=transaction_timestamp(),terminal_reason='terminating_provider_reversal',resolved_at=transaction_timestamp(),reason_code='terminating_provider_reversal' where id=${maturity.rows[0].id}::uuid and status='pending'`,
+            );
           }
           if (
             marker.rows[0] &&

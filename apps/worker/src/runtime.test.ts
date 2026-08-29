@@ -5,6 +5,37 @@ import {
 } from "./runtime.js";
 
 describe("worker runtime", () => {
+  it("fails closed when maturity is enabled without its repository capability", () => {
+    const deps = {
+      jobsRepository: {
+        processDueBatch: vi.fn(async () => ({})),
+        expireDueBatch: vi.fn(async () => ({})),
+        listLocalReservations: vi.fn(async () => []),
+        recordProviderUnavailable: vi.fn(async () => undefined),
+        materializeOperatorCasesBatch: vi.fn(async () => ({})),
+      },
+      expertReferralJobsRepository: {
+        expireDueBatch: vi.fn(async () => ({})),
+        replayDueBatch: vi.fn(async () => ({})),
+        listReconciliationBatch: vi.fn(async () => []),
+        recordReconciliationMismatches: vi.fn(async () => undefined),
+      },
+      expertTelegramCheckoutRepository: { clearExpiredCheckoutUrls: vi.fn(async () => 0) },
+      outboxRepository: {
+        recoverExpiredDispatchLeases: vi.fn(async () => 0),
+        recoverExpiredReconciliationLeases: vi.fn(async () => 0),
+      },
+      closeDatabase: vi.fn(async () => undefined),
+      closeTelemetry: vi.fn(async () => undefined),
+      now: () => new Date("2026-08-14T10:00:00.000Z"),
+      expertReferralMaturityWorkerEnabled: true,
+    };
+
+    expect(() => createProductionWorkerRuntime(deps as never)).toThrow(
+      "expert_referral_maturity_worker_capability_unavailable",
+    );
+  });
+
   it("runs bounded jobs in the required safety-first order", async () => {
     const calls: string[] = [];
     const job = (name: string) =>
