@@ -53,7 +53,7 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
   }, 120_000);
   afterAll(async () => database?.stop(), 60_000);
 
-  it("audits V2 controls and START, settles an eligible referral, completes free, and snapshots the 30% cap", async () => {
+  it("proves active A1 checkout skips the injected provider when checkout capability is disabled", async () => {
     const admin = new PostgresExpertReferralAdminRepository(
       database.db,
       crypto,
@@ -286,11 +286,9 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
           providerDeadline: activeProviderDeadline,
         }),
     };
-    const disabledCheckoutProvider = false
-      ? { createCheckout: providerSpy }
-      : undefined;
     const service = createExpertResidencyService({
       environmentEnabled: true,
+      checkoutCapabilityEnabled: false,
       commands,
       queries: {
         ownerUserId: async (expertId) =>
@@ -302,9 +300,7 @@ describe("Commercial Core V2 A1 PostgreSQL path", () => {
         replayHeldReward: async () => undefined,
         releaseExpiredOrders: async () => undefined,
       },
-      ...(disabledCheckoutProvider === undefined
-        ? {}
-        : { checkoutProvider: disabledCheckoutProvider }),
+      checkoutProvider: { createCheckout: providerSpy },
     });
     const activeDisabledCapabilityKey = randomUUID();
     await residency.createCheckoutOrder({

@@ -104,6 +104,7 @@ export interface ExpertResidencyService {
 
 export const createExpertResidencyService = (deps: {
   environmentEnabled: boolean;
+  checkoutCapabilityEnabled?: boolean;
   commands: ExpertResidencyCommands;
   queries: ExpertResidencyQueries;
   reconciliation: ExpertResidencyReconciliation;
@@ -139,7 +140,8 @@ export const createExpertResidencyService = (deps: {
       });
       if (
         order.status !== "payment_pending" ||
-        deps.checkoutProvider === undefined
+        deps.checkoutProvider === undefined ||
+        deps.checkoutCapabilityEnabled === false
       ) {
         return { id: order.id, status: order.status };
       }
