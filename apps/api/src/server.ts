@@ -49,6 +49,7 @@ import {
 import {
   createLogger,
   recordClientSessionMetric,
+  recordSelartiBudgetMetric,
   shutdownTelemetry,
 } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
@@ -245,6 +246,8 @@ export const createDefaultLifecycle = (
             enabled: true,
             botKey: config.clientTelegramBotKey,
             routingEnabled: config.features.clientHybridRouting === true,
+            costAdmissionEnabled: config.features.selartiCostAdmission === true,
+            budgetMetric: (outcome) => recordSelartiBudgetMetric({ outcome }),
             messagingConsentPolicyVersion:
               config.clientMessagingConsentPolicyVersion!,
             ...(config.selartiAiConsentPolicyVersion === undefined

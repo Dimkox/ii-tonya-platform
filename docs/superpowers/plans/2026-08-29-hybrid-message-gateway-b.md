@@ -42,18 +42,18 @@ reconciliation semantics are approved.
 Telegram webhook route/composition, config, focused unit/PostgreSQL/contract/security
 tests.
 
-- [ ] RED: authenticated private text from an active bot-scoped identity binding is
+- [x] RED: authenticated private text from an active bot-scoped identity binding is
       accepted once; duplicate delivery produces no second route, debit, or outbox row.
-- [ ] RED: unknown, unresolved, blocked, cross-bot, group, malformed, stale, oversized,
+- [x] RED: unknown, unresolved, blocked, cross-bot, group, malformed, stale, oversized,
       and control-character inputs fail closed before message/financial mutation.
-- [ ] Add tenant-safe `channel_identities`, `dialogues`, immutable `dialogue_inbound`, and
+- [x] Add tenant-safe `channel_identities`, `dialogues`, immutable `dialogue_inbound`, and
       versioned `dialogue_route_decisions` with bounded states and uniqueness constraints.
-- [ ] Atomically claim the Telegram update, resolve `(provider, bot_key, external_user,
-      external_chat)`, record canonical inbound, and select a typed route.
-- [ ] Deterministic commands/FAQ/safety/unsupported inputs never create Selarti work.
+- [x] Atomically claim the Telegram update, resolve `(provider, bot_key, external_user,
+external_chat)`, record canonical inbound, and select a typed route.
+- [x] Deterministic commands/FAQ/safety/unsupported inputs never create Selarti work.
       Only `complex_dialogue` creates a minimal `selarti.request.v1` outbox envelope with
       internal IDs, bounded text, locale, prompt version, deadline, and correlation ID.
-- [ ] Preserve the ordinary-client free-access policy; no package debit is introduced by
+- [x] Preserve the ordinary-client free-access policy; no package debit is introduced by
       Release B.
 
 ## B2 — Selarti proposal convergence and ordered same-chat delivery
@@ -61,18 +61,18 @@ tests.
 **Files:** Selarti provider-neutral port/codec, response ingress, Telegram delivery
 outbox/repository, worker dispatch/reconciliation, tests.
 
-- [ ] RED: Selarti response resolves by stable request ID and tenant binding; arbitrary
+- [x] RED: Selarti response resolves by stable request ID and tenant binding; arbitrary
       authority fields, instructions, credentials, control characters, unapproved URLs,
       overlong text, mismatched thread, duplicate response, and late response are rejected.
-- [ ] Store the accepted response as a proposal, never execute it as an application
+- [x] Store the accepted response as a proposal, never execute it as an application
       command, and enqueue `telegram.send_text.v1` for the original dialogue.
-- [ ] Allocate a monotonic `dialogue_sequence` transactionally for local and Selarti
+- [x] Allocate a monotonic `dialogue_sequence` transactionally for local and Selarti
       replies. Workers may parallelize across dialogues but may claim only the lowest
       unfinished sequence in each dialogue.
-- [ ] Telegram delivery records `applied`, retryable `not_applied`, or
+- [x] Telegram delivery records `applied`, retryable `not_applied`, or
       `unknown_outcome`; timeout-after-send retains the sequence barrier until bounded
       reconciliation/operator resolution.
-- [ ] Prove deterministic and Selarti-assisted messages reach one bot/chat in order and
+- [x] Prove deterministic and Selarti-assisted messages reach one bot/chat in order and
       that no direct Selarti-to-Telegram send path exists.
 
 ## B3 — Cost admission, reconciliation, and rollout controls
@@ -80,14 +80,14 @@ outbox/repository, worker dispatch/reconciliation, tests.
 **Files:** migration/schema, Selarti budget repository/service, metrics, runbooks,
 rollback probes, tests.
 
-- [ ] Add request cost reservations and immutable actual-usage reconciliation keyed by
+- [x] Add request cost reservations and immutable actual-usage reconciliation keyed by
       Selarti request ID. Unknown outcome retains its reservation.
-- [ ] Atomically enforce the lower of the approved RUB cap and 10% of trailing-30-day
+- [x] Atomically enforce the lower of the approved RUB cap and 10% of trailing-30-day
       settled expert-residency revenue, including Selarti's configured `+10%` USD/RUB
       uplift and worst-case billable units.
-- [ ] Add per-user and global warning/soft/hard stops with deterministic fallback or
+- [x] Add per-user and global warning/soft/hard stops with deterministic fallback or
       operator handoff; no paid call occurs above the hard stop.
-- [ ] Expose fixed-cardinality route, offload, latency, budget, delivery, replay, and
+- [x] Expose fixed-cardinality route, offload, latency, budget, delivery, replay, and
       reconciliation metrics plus bounded operator audit facts.
 - [ ] Cut over one test bot only after authenticated Telegram evidence, captured official
       Selarti request/response fixtures, webhook authenticity or private receiver control,
@@ -95,14 +95,16 @@ rollback probes, tests.
 
 ## Verification and release evidence
 
-- [ ] For each vertical slice, run focused RED/GREEN unit and PostgreSQL tests, relevant
+- [x] For each vertical slice, run focused RED/GREEN unit and PostgreSQL tests, relevant
       typechecks/lint, and `git diff --check`.
 - [ ] Before branch completion run one full `pnpm verify`, preserve the raw log, and bind
       the result to the exact HEAD SHA.
-- [ ] Update README current state, connectivity graph, activation contract, traceability,
+- [x] Update README current state, connectivity graph, activation contract, traceability,
       rollback, `decisions.md`, and `mistakes.md` where applicable.
-- [ ] Run independent architecture, code, test, security, and release-readiness reviews on
-      the exact HEAD. External Trust CI and signed gates remain authoritative for merge.
+- [x] Record three independent B3 implementation reviews, remediate their findings, and
+      preserve focused verification evidence without claiming exact-SHA release status.
+- [ ] Run final reviews on the exact HEAD and satisfy the external Trust CI and signed
+      gates that remain authoritative for merge.
 
 ## Deferred channels
 

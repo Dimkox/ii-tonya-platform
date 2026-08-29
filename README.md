@@ -27,6 +27,20 @@ Live activation is blocked until an official authenticated Selarti response fixt
 approved and staging proves unknown-outcome reconciliation. See the
 [B2 traceability](docs/spec/hybrid-message-gateway-b2-traceability.md) and
 [B2 rollback runbook](docs/runbooks/hybrid-message-gateway-b2.md).
+
+Release B3 adds default-off, fail-closed Selarti cost admission. Migration 0036 stores
+immutable approved policy/rate snapshots, per-request worst-case reservations and
+immutable outcome/reconciliation facts. Admission uses integer arithmetic and caps
+monthly exposure at the smaller of the operator cap and 10% of trailing-30-day settled
+expert-residency cash revenue; quoted, refunded, referral-credit and client-supplied
+amounts cannot increase it. Warning can admit, soft/hard stops create a bounded local
+operator handoff, unknown outcomes retain reservation, and server-calculated actual USD
+usage reconciles to RUB without mutating ordinary-client package or ledger state.
+
+`SELARTI_COST_ADMISSION_ENABLED=false` remains the default. Live provider activation is
+still blocked by the B2 official fixture/transport gates and requires an active immutable
+operator-approved policy. See [B3 traceability](docs/spec/hybrid-message-gateway-b3-traceability.md)
+and [B3 operations](docs/runbooks/hybrid-message-gateway-b3.md).
 Release A2.1 adds additive expert-referral maturity scheduling: new eligible commercial
 V2 first settlements remain unspendable for 30 days while legacy settlements create no
 maturity; processing is lease-fenced, revalidates eligibility, and emits bounded metrics;
@@ -425,4 +439,4 @@ B1 owns authenticated private client Telegram text ingress at `POST /v1/webhooks
 
 Traceability: gateway routing and disabled behavior → `packages/application/src/hybrid-message-gateway.test.ts`; webhook authentication, terminal/retry HTTP semantics, and preserved expert ordering → `apps/api/src/routes/telegram-webhook.test.ts`; atomic identity, consent, replay, ownership, accounting isolation, retention, and outbox behavior → `tests/integration/hybrid-message-gateway-b1.test.ts`; 0033→0034 preservation → `tests/integration/hybrid-message-gateway-b1-migration-upgrade.test.ts`; migration/schema parity → `tests/repo/hybrid-message-gateway-schema-parity.test.ts`.
 
-Rollback/forward recovery: set `CLIENT_TELEGRAM_INGRESS_ENABLED=false` and restart the API; do not reverse migration 0034 or delete journaled dialogue/inbound/outbox facts. Diagnose and repair forward, reconcile any pending `selarti.request.v1` rows by idempotency key, then re-enable only after focused replay/consent tests pass. B2 Selarti-response delivery, physical inbound retention purge, and sensitive outbox-payload purge, B3 budgets/coupons, and all live-provider activation remain pending. Because `selarti.request.v1` contains bounded client text, its production creation remains default-off and explicitly activation-blocked until B2 purge and delivery gates pass.
+Rollback/forward recovery: set `CLIENT_TELEGRAM_INGRESS_ENABLED=false` and restart the API; do not reverse migrations 0034–0036 or delete journaled dialogue/inbound/outbox, delivery, reservation, or reconciliation facts. Diagnose and repair forward, reconcile pending `selarti.request.v1` and ambiguous delivery/outcome rows by idempotency key, then re-enable only after focused replay, consent, ordering, retention, and budget tests pass. B2 response convergence/retention and B3 cost admission are implemented and default-off; live dispatcher/provider composition, official Selarti fixtures, full `pnpm verify`, exact-SHA review, external Trust CI, and live-provider activation remain pending. Because `selarti.request.v1` contains bounded client text, its production creation remains explicitly activation-blocked until those gates pass.

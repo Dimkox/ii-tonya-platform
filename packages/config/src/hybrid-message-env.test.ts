@@ -34,9 +34,21 @@ describe("hybrid message config", () => {
       CLIENT_TELEGRAM_BOT_KEY: "bot-a",
       CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "v1",
       SELARTI_AI_CONSENT_POLICY_VERSION: "ai-v1",
+      SELARTI_COST_ADMISSION_ENABLED: "true",
       TELEGRAM_WEBHOOK_SECRET: secret,
     });
     expect(loadEnv(env).telegramWebhookSecret).toBe(secret);
+  });
+  it("keeps B3 admission off and rejects paid routing without it", () => {
+    expect(loadEnv(base()).features.selartiCostAdmission).toBe(false);
+    expect(() =>
+      loadEnv(
+        base({
+          CLIENT_HYBRID_ROUTING_ENABLED: "true",
+          SELARTI_AI_CONSENT_POLICY_VERSION: "ai-v1",
+        }),
+      ),
+    ).toThrow("selarti_budget_admission_configuration_required");
   });
   it("keeps every B2 provider and retention capability independently off", () => {
     const config = loadEnv(base());

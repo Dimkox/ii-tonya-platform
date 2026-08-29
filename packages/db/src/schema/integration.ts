@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import {
   check,
   char,
+  date,
+  foreignKey,
   bigint,
   index,
   integer,
@@ -17,6 +19,7 @@ import {
 import { messageEvents } from "./billing.js";
 import { slots } from "./catalog.js";
 import { users } from "./identity.js";
+import { adminApprovals } from "./audit.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -669,5 +672,239 @@ export const dialogueInboundTombstones = pgTable(
       "dialogue_inbound_tombstones_route_check",
       sql`${table.route} in ('deterministic','complex_dialogue')`,
     ),
+  ],
+);
+
+export const selartiBudgetPolicies = pgTable(
+  "selarti_budget_policies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    version: integer("version").notNull(),
+    status: text("status").notNull(),
+    effectiveFrom: timestamp("effective_from", {
+      withTimezone: true,
+    }).notNull(),
+    effectiveTo: timestamp("effective_to", { withTimezone: true }),
+    globalCapRubMinor: bigint("global_cap_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    globalWarningRubMinor: bigint("global_warning_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    globalSoftRubMinor: bigint("global_soft_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    perUserWarningRubMinor: bigint("per_user_warning_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    perUserSoftRubMinor: bigint("per_user_soft_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    perUserHardRubMinor: bigint("per_user_hard_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    officialUsdRubQuoteMicros: bigint("official_usd_rub_quote_micros", {
+      mode: "bigint",
+    }).notNull(),
+    selartiUpliftBps: integer("selarti_uplift_bps").notNull().default(1000),
+    usdMicrosPerRequest: bigint("usd_micros_per_request", {
+      mode: "bigint",
+    }).notNull(),
+    usdMicrosPerUnit: bigint("usd_micros_per_unit", {
+      mode: "bigint",
+    }).notNull(),
+    worstCaseBillableUnits: bigint("worst_case_billable_units", {
+      mode: "bigint",
+    }).notNull(),
+    rateVersion: text("rate_version").notNull(),
+    modelVersion: text("model_version").notNull(),
+    stressInflationBps: integer("stress_inflation_bps").notNull().default(6000),
+    approvalId: uuid("approval_id")
+      .notNull()
+      .references(() => adminApprovals.id),
+    createdAt,
+  },
+  (table) => {
+    const derivedWorstCaseRubMinor = sql`ceil(((${table.usdMicrosPerRequest}::numeric + ${table.usdMicrosPerUnit}::numeric * ${table.worstCaseBillableUnits}::numeric) * ceil(${table.officialUsdRubQuoteMicros}::numeric * (10000 + ${table.selartiUpliftBps})::numeric / 10000) * 100) / 1000000000000)`;
+    return [
+      unique("selarti_budget_policies_version_unique").on(table.version),
+      unique("selarti_budget_policies_approval_id_unique").on(table.approvalId),
+      unique("selarti_budget_policy_id_version_unique").on(
+        table.id,
+        table.version,
+      ),
+      uniqueIndex("selarti_budget_policy_one_active_idx")
+        .on(table.status)
+        .where(
+          sql`${table.status}='approved' and ${table.effectiveTo} is null`,
+        ),
+      check(
+        "selarti_budget_policy_status_check",
+        sql`${table.status} in ('approved','retired')`,
+      ),
+      check(
+        "selarti_budget_policy_window_check",
+        sql`${table.effectiveTo} is null or ${table.effectiveTo}>${table.effectiveFrom}`,
+      ),
+      check(
+        "selarti_budget_policy_threshold_check",
+        sql`${table.globalCapRubMinor}>0 and ${table.globalCapRubMinor}<=999999999999 and ${table.globalWarningRubMinor}>=0 and ${table.globalWarningRubMinor}<=999999999999 and ${table.globalWarningRubMinor}<=${table.globalSoftRubMinor} and ${table.globalSoftRubMinor}<=999999999999 and ${table.globalSoftRubMinor}<=${table.globalCapRubMinor} and ${table.perUserWarningRubMinor}>=0 and ${table.perUserWarningRubMinor}<=999999999999 and ${table.perUserWarningRubMinor}<=${table.perUserSoftRubMinor} and ${table.perUserSoftRubMinor}<=999999999999 and ${table.perUserSoftRubMinor}<=${table.perUserHardRubMinor} and ${table.perUserHardRubMinor}<=999999999999 and ${table.perUserHardRubMinor}<=${table.globalCapRubMinor}`,
+      ),
+      check(
+        "selarti_budget_policy_cost_check",
+        sql`${table.officialUsdRubQuoteMicros}>0 and ${table.officialUsdRubQuoteMicros}<=999999999999 and ${table.selartiUpliftBps}=1000 and ${table.usdMicrosPerRequest}>=0 and ${table.usdMicrosPerRequest}<=999999999999 and ${table.usdMicrosPerUnit}>=0 and ${table.usdMicrosPerUnit}<=999999999999 and ${table.worstCaseBillableUnits}>0 and ${table.worstCaseBillableUnits}<=1000000 and ${table.stressInflationBps}=6000 and ${derivedWorstCaseRubMinor}>0 and ${derivedWorstCaseRubMinor}<=999999999999`,
+      ),
+    ];
+  },
+);
+
+export const selartiCostReservations = pgTable(
+  "selarti_cost_reservations",
+  {
+    requestId: text("request_id").primaryKey(),
+    payloadHash: char("payload_hash", { length: 64 }).notNull(),
+    policyId: uuid("policy_id")
+      .notNull()
+      .references(() => selartiBudgetPolicies.id),
+    policyVersion: integer("policy_version").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    dialogueId: uuid("dialogue_id")
+      .notNull()
+      .references(() => dialogues.id),
+    periodStart: date("period_start").notNull(),
+    officialUsdRubQuoteMicros: bigint("official_usd_rub_quote_micros", {
+      mode: "bigint",
+    }).notNull(),
+    effectiveUsdRubQuoteMicros: bigint("effective_usd_rub_quote_micros", {
+      mode: "bigint",
+    }).notNull(),
+    selartiUpliftBps: integer("selarti_uplift_bps").notNull(),
+    usdMicrosPerRequest: bigint("usd_micros_per_request", {
+      mode: "bigint",
+    }).notNull(),
+    usdMicrosPerUnit: bigint("usd_micros_per_unit", {
+      mode: "bigint",
+    }).notNull(),
+    worstCaseBillableUnits: bigint("worst_case_billable_units", {
+      mode: "bigint",
+    }).notNull(),
+    worstCaseUsdMicros: bigint("worst_case_usd_micros", {
+      mode: "bigint",
+    }).notNull(),
+    reservedRubMinor: bigint("reserved_rub_minor", {
+      mode: "bigint",
+    }).notNull(),
+    rateVersion: text("rate_version").notNull(),
+    modelVersion: text("model_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    index("selarti_cost_reservations_period_idx").on(
+      table.periodStart,
+      table.userId,
+    ),
+    foreignKey({
+      columns: [table.policyId, table.policyVersion],
+      foreignColumns: [selartiBudgetPolicies.id, selartiBudgetPolicies.version],
+      name: "selarti_cost_reservation_policy_fk",
+    }),
+    check(
+      "selarti_cost_reservation_hash_check",
+      sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "selarti_cost_reservation_amount_check",
+      sql`${table.reservedRubMinor}>0 and ${table.worstCaseUsdMicros}>0`,
+    ),
+  ],
+);
+
+export const selartiActualUsageFacts = pgTable(
+  "selarti_actual_usage_facts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    factId: text("fact_id").notNull(),
+    requestId: text("request_id")
+      .notNull()
+      .references(() => selartiCostReservations.requestId),
+    payloadHash: char("payload_hash", { length: 64 }).notNull(),
+    outcome: text("outcome").notNull(),
+    actualUsdMicros: bigint("actual_usd_micros", { mode: "bigint" }),
+    actualRubMinor: bigint("actual_rub_minor", { mode: "bigint" }),
+    createdAt,
+  },
+  (table) => [
+    unique("selarti_actual_usage_facts_fact_id_unique").on(table.factId),
+    index("selarti_actual_usage_request_idx").on(
+      table.requestId,
+      table.createdAt,
+      table.id,
+    ),
+    uniqueIndex("selarti_actual_usage_terminal_unique")
+      .on(table.requestId)
+      .where(sql`${table.outcome} in ('not_applied','applied')`),
+    uniqueIndex("selarti_actual_usage_unknown_unique")
+      .on(table.requestId)
+      .where(sql`${table.outcome}='unknown'`),
+    check(
+      "selarti_actual_usage_hash_check",
+      sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "selarti_actual_usage_outcome_check",
+      sql`${table.outcome} in ('unknown','not_applied','applied')`,
+    ),
+    check(
+      "selarti_actual_usage_amount_check",
+      sql`(${table.outcome}='applied' and ${table.actualUsdMicros} is not null and ${table.actualUsdMicros}>=0 and ${table.actualRubMinor} is not null and ${table.actualRubMinor}>=0) or (${table.outcome}<>'applied' and ${table.actualUsdMicros} is null and ${table.actualRubMinor} is null)`,
+    ),
+  ],
+);
+
+export const selartiCostAdjustments = pgTable(
+  "selarti_cost_adjustments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: text("request_id")
+      .notNull()
+      .references(() => selartiCostReservations.requestId),
+    kind: text("kind").notNull(),
+    amountRubMinor: bigint("amount_rub_minor", { mode: "bigint" }).notNull(),
+    factId: text("fact_id").notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("selarti_cost_adjustment_unique").on(table.requestId, table.kind),
+    check(
+      "selarti_cost_adjustment_kind_check",
+      sql`${table.kind} in ('released','consumed','unused_released','overrun')`,
+    ),
+    check(
+      "selarti_cost_adjustment_amount_check",
+      sql`${table.amountRubMinor}>=0`,
+    ),
+  ],
+);
+
+export const selartiBudgetAlerts = pgTable(
+  "selarti_budget_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: text("request_id").notNull(),
+    policyVersion: integer("policy_version").notNull(),
+    outcome: text("outcome").notNull(),
+    amountRubMinor: bigint("amount_rub_minor", { mode: "bigint" }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("selarti_budget_alert_unique").on(table.requestId, table.outcome),
+    check(
+      "selarti_budget_alert_outcome_check",
+      sql`${table.outcome} in ('warning','soft_stop','hard_stop','overrun','unknown')`,
+    ),
+    check("selarti_budget_alert_amount_check", sql`${table.amountRubMinor}>=0`),
+    index("selarti_budget_alerts_created_idx").on(table.createdAt, table.id),
   ],
 );

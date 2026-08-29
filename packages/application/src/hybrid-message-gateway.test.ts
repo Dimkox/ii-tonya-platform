@@ -6,6 +6,43 @@ const update = (text: string, id: number | string = 7) => ({
   message: { chat: { id: 22, type: "private" }, from: { id: 22 }, text },
 });
 describe("HybridMessageGateway", () => {
+  it.each(["claimed", "warning", "soft_stop", "hard_stop"] as const)(
+    "emits one bounded budget metric for %s",
+    async (result) => {
+      const outcomes: string[] = [];
+      const gateway = new HybridMessageGateway({
+        enabled: true,
+        botKey: "bot-a",
+        routingEnabled: true,
+        costAdmissionEnabled: true,
+        messagingConsentPolicyVersion: "client-msg-v1",
+        selartiConsentPolicyVersion: "selarti-v1",
+        budgetMetric: (outcome) => outcomes.push(outcome),
+        persist: async () => result,
+      });
+      expect((await gateway.handle(update("сложный запрос"))).status).toBe(
+        "accepted",
+      );
+      expect(outcomes).toEqual([result === "claimed" ? "admitted" : result]);
+    },
+  );
+  it("does not emit a Selarti budget metric for deterministic work", async () => {
+    const outcomes: string[] = [];
+    const gateway = new HybridMessageGateway({
+      enabled: true,
+      botKey: "bot-a",
+      routingEnabled: true,
+      costAdmissionEnabled: true,
+      messagingConsentPolicyVersion: "client-msg-v1",
+      budgetMetric: (outcome) => outcomes.push(outcome),
+      persist: async () => "claimed",
+    });
+    expect(await gateway.handle(update("/help"))).toEqual({
+      status: "accepted",
+      route: "deterministic",
+    });
+    expect(outcomes).toEqual([]);
+  });
   it("passes only server bot scope and canonical input to one atomic repository operation", async () => {
     const calls: Array<Record<string, unknown>> = [];
     const gateway = new HybridMessageGateway({

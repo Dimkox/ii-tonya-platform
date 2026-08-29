@@ -146,7 +146,7 @@ export const adminObjectAssignments = pgTable(
     ),
     check(
       "admin_object_assignments_type_allowed",
-      sql`${table.objectType} in ('safety_case', 'feedback_queue')`,
+      sql`${table.objectType} in ('safety_case', 'feedback_queue', 'selarti_budget_policy')`,
     ),
   ],
 );

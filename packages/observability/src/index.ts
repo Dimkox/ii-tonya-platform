@@ -13,6 +13,8 @@ export {
   recordClientBookingMetric,
   recordClientSessionMetric,
   recordExpertReferralMaturityMetric,
+  recordSelartiBudgetMetric,
+  selartiBudgetMetricLabels,
   recordWorkerOutboxMetric,
   referralMetricLabels,
   workerOutboxMetricLabels,
@@ -23,6 +25,7 @@ export {
   type MetricLabels,
   type ExpertReferralMaturityMetricOutcome,
   type WorkerOutboxMetricLabels,
+  type SelartiBudgetMetricLabels,
 } from "./metrics.js";
 export {
   registerTelemetryShutdown,

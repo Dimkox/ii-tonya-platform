@@ -5,6 +5,10 @@ const migration = readFileSync(
   "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
   "utf8",
 );
+const integrationSchema = readFileSync(
+  "packages/db/src/schema/integration.ts",
+  "utf8",
+);
 describe("B1 schema/migration parity", () => {
   it("uses bot-scoped inbound uniqueness and matching identity indexes", () => {
     expect(migration).toContain(
@@ -24,7 +28,7 @@ describe("B1 schema/migration parity", () => {
       'CREATE INDEX "dialogue_inbound_expiry_idx" ON dialogue_inbound(expires_at, id)',
     );
   });
-  it("journals migration 0034 exactly once", () => {
+  it("journals B1 exactly once and advances through B3", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: { idx: number; tag: string }[] };
@@ -34,11 +38,47 @@ describe("B1 schema/migration parity", () => {
       ),
     ).toHaveLength(1);
     expect(journal.entries.at(-1)).toEqual({
-      idx: 34,
+      idx: 36,
       version: "7",
-      when: 1788048000000,
-      tag: "0034_hybrid_message_gateway_b1",
+      when: 1788220800000,
+      tag: "0036_selarti_budget_controls_b3",
       breakpoints: true,
     });
+  });
+  it("mirrors every B3 policy numeric and derived-cost bound in Drizzle", () => {
+    expect(integrationSchema).toContain(
+      "${table.globalCapRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.globalWarningRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.globalSoftRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.perUserWarningRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.perUserSoftRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.perUserHardRubMinor}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.officialUsdRubQuoteMicros}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.usdMicrosPerRequest}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.usdMicrosPerUnit}<=999999999999",
+    );
+    expect(integrationSchema).toContain(
+      "${table.worstCaseBillableUnits}<=1000000",
+    );
+    expect(integrationSchema).toContain("${derivedWorstCaseRubMinor}>0");
+    expect(integrationSchema).toContain(
+      "${derivedWorstCaseRubMinor}<=999999999999",
+    );
   });
 });

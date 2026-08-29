@@ -118,10 +118,12 @@ export {
   PostgresAdminApprovalRepository,
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
+  selartiBudgetPolicyApprovalPayload,
   requiredApprovalObjectType,
   requiredApprovalRole,
   type AdminPayload,
   type AdminRole,
+  type SelartiBudgetPolicyApprovalPayload,
   type ApprovalAdminAction,
   type ApproveAdminApproval,
   type ConsumeAdminApproval,
@@ -146,6 +148,11 @@ export {
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
 export { PostgresHybridMessageRepository } from "./repositories/hybrid-message-repository.js";
+export {
+  PostgresSelartiBudgetRepository,
+  reserveSelartiCost,
+  type SelartiBudgetAdmission,
+} from "./repositories/selarti-budget-repository.js";
 export {
   PostgresSelartiProposalRepository,
   type AcceptSelartiProposalCommand,

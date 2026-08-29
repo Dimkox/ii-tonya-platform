@@ -56,7 +56,55 @@ export const operationalMetrics = {
   expertResidencyJobDurationMs: meter.createHistogram(
     "ii_tonya_expert_residency_job_duration_ms",
   ),
+  selartiBudgetOutcomes: meter.createCounter(
+    "ii_tonya_selarti_budget_outcomes",
+  ),
 } as const;
+
+const selartiBudgetOutcomes = new Set([
+  "admitted",
+  "warning",
+  "soft_stop",
+  "hard_stop",
+  "released",
+  "reconciled",
+  "overrun",
+  "unknown",
+]);
+export type SelartiBudgetMetricLabels = Readonly<{
+  outcome:
+    | "admitted"
+    | "warning"
+    | "soft_stop"
+    | "hard_stop"
+    | "released"
+    | "reconciled"
+    | "overrun"
+    | "unknown";
+}>;
+export function selartiBudgetMetricLabels(
+  value: unknown,
+): SelartiBudgetMetricLabels {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 1 ||
+    typeof value.outcome !== "string" ||
+    !selartiBudgetOutcomes.has(value.outcome)
+  )
+    throw new Error("invalid_selarti_budget_metric_labels");
+  return value as SelartiBudgetMetricLabels;
+}
+export function recordSelartiBudgetMetric(
+  labels: SelartiBudgetMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1)
+    throw new Error("invalid_selarti_budget_metric_count");
+  operationalMetrics.selartiBudgetOutcomes.add(
+    count,
+    selartiBudgetMetricLabels(labels),
+  );
+}
 
 const expertReferralMaturityOutcomes = new Set([
   "examined",

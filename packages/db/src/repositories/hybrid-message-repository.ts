@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import { reserveSelartiCost } from "./selarti-budget-repository.js";
 
 export type HybridPersistInput = {
   updateId: bigint;
@@ -12,6 +13,7 @@ export type HybridPersistInput = {
   text: string;
   route: "deterministic" | "complex_dialogue";
   routingEnabled: boolean;
+  costAdmissionEnabled?: boolean;
   correlationId: string;
   locale: string;
   deadline: string;
@@ -21,7 +23,13 @@ export type HybridPersistInput = {
   localReplyText?: string;
 };
 export type HybridPersistResult =
-  "claimed" | "duplicate" | "conflict" | "rejected";
+  | "claimed"
+  | "warning"
+  | "duplicate"
+  | "conflict"
+  | "rejected"
+  | "soft_stop"
+  | "hard_stop";
 export class PostgresHybridMessageRepository {
   constructor(
     private readonly db: DrizzleDb,
@@ -117,10 +125,7 @@ export class PostgresHybridMessageRepository {
       await tx.execute(
         sql`insert into dialogue_route_decisions(inbound_id,route_version,route) values(${inbound.id}::uuid,1,${input.route})`,
       );
-      if (input.route === "deterministic") {
-        const reply =
-          input.localReplyText ??
-          "Я помогу с навигацией по сервису. Опишите ваш запрос одним сообщением.";
+      const enqueueLocalReply = async (reply: string) => {
         if (
           reply.length < 1 ||
           reply.length > 512 ||
@@ -174,6 +179,12 @@ export class PostgresHybridMessageRepository {
             'deterministic',${inbound.id},${outboxId}::uuid,${payloadHash}
           )
         `);
+      };
+      if (input.route === "deterministic") {
+        await enqueueLocalReply(
+          input.localReplyText ??
+            "Я помогу с навигацией по сервису. Опишите ваш запрос одним сообщением.",
+        );
       }
       if (input.route === "complex_dialogue" && input.routingEnabled) {
         const requestId = `sha256:${createHash("sha256").update(`${input.provider}\0${input.botKey}\0${input.updateId}`).digest("hex")}`;
@@ -204,9 +215,29 @@ export class PostgresHybridMessageRepository {
         )
           throw new Error("hybrid_outbox_idempotency_conflict");
         if (existing) return "duplicate";
+        const admission =
+          input.costAdmissionEnabled === true
+            ? await reserveSelartiCost(tx, {
+                requestId,
+                payloadHash: input.payloadHash,
+                userId: identity.userId,
+                dialogueId: dialogue.id,
+                occurredAt: input.occurredAt,
+              })
+            : { outcome: "hard_stop" as const, reservedRubMinor: 0n };
+        if (
+          admission.outcome === "soft_stop" ||
+          admission.outcome === "hard_stop"
+        ) {
+          await enqueueLocalReply(
+            "Сейчас я не могу безопасно подключить расширенный подбор. Запрос передан оператору.",
+          );
+          return admission.outcome;
+        }
         await tx.execute(
           sql`insert into integration_outbox(idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash) values(${requestId},'selarti.request.v1',${JSON.stringify(request)}::jsonb,${request.correlationId},${requestId},${input.payloadHash})`,
         );
+        if (admission.outcome === "warning") return "warning";
       }
       return "claimed";
     });

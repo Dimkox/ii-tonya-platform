@@ -79,6 +79,7 @@ const schema = z
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_COST_ADMISSION_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_RESPONSE_INGRESS_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
@@ -317,6 +318,7 @@ export type RuntimeConfig = {
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientHybridRouting?: boolean;
+    selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
     b2TelegramDispatch?: boolean;
     b2SensitiveRetention?: boolean;
@@ -370,9 +372,10 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     throw new Error("client_telegram_ingress_configuration_incomplete");
   if (
     value.CLIENT_HYBRID_ROUTING_ENABLED === "true" &&
-    !value.SELARTI_AI_CONSENT_POLICY_VERSION
+    (!value.SELARTI_AI_CONSENT_POLICY_VERSION ||
+      value.SELARTI_COST_ADMISSION_ENABLED !== "true")
   )
-    throw new Error("selarti_consent_policy_version_required");
+    throw new Error("selarti_budget_admission_configuration_required");
   if (value.SELARTI_RESPONSE_INGRESS_ENABLED === "true") {
     if (
       !value.SELARTI_RESPONSE_SHARED_SECRET ||
@@ -432,6 +435,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
+      selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
       selartiResponseIngress: false,
       b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
       b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",

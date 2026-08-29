@@ -108,6 +108,7 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
   "expert_referral.feature_switch": "expert_referral_feature_control",
   "expert_residency.sandbox_settle": "sandbox_expert_residency_payment",
   "expert_residency.sandbox_refund": "sandbox_expert_residency_payment",
+  "selarti_budget.policy_approve": "selarti_budget_policy",
 };
 
 export class PostgresAdminRepository {

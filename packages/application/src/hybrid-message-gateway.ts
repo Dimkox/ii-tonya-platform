@@ -19,9 +19,13 @@ export interface HybridMessageGatewayDeps {
   enabled?: boolean;
   botKey?: string;
   routingEnabled?: boolean | undefined;
+  costAdmissionEnabled?: boolean | undefined;
   clock?: () => Date;
   messagingConsentPolicyVersion?: string;
   selartiConsentPolicyVersion?: string;
+  budgetMetric?: (
+    outcome: "admitted" | "warning" | "soft_stop" | "hard_stop",
+  ) => void;
   persist: (input: {
     updateId: bigint;
     provider: "telegram";
@@ -32,6 +36,7 @@ export interface HybridMessageGatewayDeps {
     text: string;
     route: HybridRoute;
     routingEnabled: boolean;
+    costAdmissionEnabled?: boolean;
     correlationId: string;
     locale: string;
     deadline: string;
@@ -39,7 +44,15 @@ export interface HybridMessageGatewayDeps {
     messagingConsentPolicyVersion: string;
     selartiConsentPolicyVersion?: string;
     localReplyText?: string;
-  }) => Promise<"claimed" | "duplicate" | "conflict" | "rejected">;
+  }) => Promise<
+    | "claimed"
+    | "warning"
+    | "duplicate"
+    | "conflict"
+    | "rejected"
+    | "soft_stop"
+    | "hard_stop"
+  >;
 }
 const control = /[\u0000-\u001F\u007F-\u009F]/u;
 const deterministic = /^(?:\/help|\/start|\/stop|старт|помощь|отмена)$/iu;
@@ -110,6 +123,7 @@ export class HybridMessageGateway {
       text: update.message.text,
       route,
       routingEnabled: this.deps.routingEnabled === true,
+      costAdmissionEnabled: this.deps.costAdmissionEnabled === true,
       correlationId: `telegram:${this.deps.botKey}:${update.update_id}`,
       locale: "ru-RU",
       deadline: new Date(occurredAt.getTime() + 30_000).toISOString(),
@@ -127,7 +141,22 @@ export class HybridMessageGateway {
             selartiConsentPolicyVersion: this.deps.selartiConsentPolicyVersion,
           }),
     });
-    return result === "claimed"
+    if (
+      route === "complex_dialogue" &&
+      this.deps.costAdmissionEnabled === true
+    ) {
+      if (result === "claimed") this.deps.budgetMetric?.("admitted");
+      else if (
+        result === "warning" ||
+        result === "soft_stop" ||
+        result === "hard_stop"
+      )
+        this.deps.budgetMetric?.(result);
+    }
+    return result === "claimed" ||
+      result === "warning" ||
+      result === "soft_stop" ||
+      result === "hard_stop"
       ? { status: "accepted", route }
       : { status: result };
   }
