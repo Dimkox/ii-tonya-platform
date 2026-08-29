@@ -38,7 +38,7 @@ describe("HybridMessageGateway", () => {
     });
   });
   it("returns exact duplicate, poison conflict, and rejects malformed/group", async () => {
-    const results = ["duplicate", "conflict"] as const;
+    const results: Array<"duplicate" | "conflict"> = ["duplicate", "conflict"];
     const persist = async () => results.shift() ?? "rejected";
     const gateway = new HybridMessageGateway({
       enabled: true,
@@ -77,8 +77,8 @@ describe("HybridMessageGateway", () => {
       status: "accepted",
       route: "deterministic",
     });
-    expect(calls[0].route).toBe("deterministic");
-    expect(calls[0].updateId).toBe(9007199254740993n);
+    expect(calls[0]?.route).toBe("deterministic");
+    expect(calls[0]?.updateId).toBe(9007199254740993n);
   });
   it("returns unavailable without persistence for complex text when routing is disabled", async () => {
     let called = false;

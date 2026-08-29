@@ -12,6 +12,7 @@ import type {
   ExpertReferralAdminService,
   OperatorCaseService,
   PrivacyService,
+  SelartiProposalAcceptResult,
 } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
@@ -55,6 +56,7 @@ import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import { selartiResponseRoutes } from "./routes/selarti-response.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -89,6 +91,12 @@ export interface AppDependencies {
       }
     | undefined;
   telegramWebhookSecret: string;
+  selartiResponseSharedSecret?: string;
+  selartiResponses?: {
+    handle(raw: unknown): Promise<{
+      readonly status: SelartiProposalAcceptResult | "unavailable";
+    }>;
+  };
   adminApprovals?: ApprovalPort;
   operatorCases?: OperatorCaseService;
   expertReferralAdminService?: ExpertReferralAdminService;
@@ -176,6 +184,13 @@ export async function buildApp(
   ) {
     throw new Error("Client catalog runtime capability is required");
   }
+  if (
+    deps.config.features.selartiResponseIngress === true &&
+    (deps.selartiResponses === undefined ||
+      deps.selartiResponseSharedSecret === undefined)
+  ) {
+    throw new Error("Selarti response runtime capability is required");
+  }
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -241,6 +256,18 @@ export async function buildApp(
     logger: deps.logger,
     rateLimiter: deps.rateLimiter,
     ...(deps.now === undefined ? {} : { now: deps.now }),
+  });
+  await app.register(selartiResponseRoutes, {
+    enabled: deps.config.features.selartiResponseIngress === true,
+    secret:
+      deps.selartiResponseSharedSecret ??
+      "disabled_B2_response_secret_0000000000000000",
+    responses: deps.selartiResponses ?? {
+      async handle() {
+        return { status: "unavailable" as const };
+      },
+    },
+    rateLimiter: deps.rateLimiter,
   });
   await app.register(telegramWebhookRoutes, {
     secret: deps.telegramWebhookSecret,

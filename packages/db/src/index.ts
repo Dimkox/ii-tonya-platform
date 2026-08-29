@@ -75,8 +75,13 @@ export {
   OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
+  PostgresOrderedTelegramOutboxRepository,
   type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
+export {
+  PostgresB2SensitiveRetentionRepository,
+  type B2SensitiveRetentionResult,
+} from "./repositories/b2-sensitive-retention-repository.js";
 export {
   PostgresTelegramCallbackRepository,
   type ConsumeTelegramCallbackCommand,
@@ -141,6 +146,11 @@ export {
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
 export { PostgresHybridMessageRepository } from "./repositories/hybrid-message-repository.js";
+export {
+  PostgresSelartiProposalRepository,
+  type AcceptSelartiProposalCommand,
+  type AcceptSelartiProposalResult,
+} from "./repositories/selarti-proposal-repository.js";
 export {
   PostgresOperatorCaseOutboxRepository,
   type OperatorCaseOutboxMessage,

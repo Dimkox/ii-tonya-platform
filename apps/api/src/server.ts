@@ -17,6 +17,7 @@ import {
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
   HybridMessageGateway,
+  createSelartiResponseService,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -36,6 +37,7 @@ import {
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
+  PostgresSelartiProposalRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import {
@@ -255,6 +257,17 @@ export const createDefaultLifecycle = (
               new PostgresHybridMessageRepository(db).persist(input),
           })
         : undefined;
+    const selartiResponses =
+      config.features.selartiResponseIngress === true &&
+      config.clientTelegramBotKey !== undefined
+        ? createSelartiResponseService({
+            enabled: true,
+            tenantKey: config.clientTelegramBotKey,
+            allowedUrlHosts: ["ii-tonya.ru"],
+            clock: () => new Date(),
+            proposals: new PostgresSelartiProposalRepository(db),
+          })
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -308,6 +321,10 @@ export const createDefaultLifecycle = (
       ...(clientGateway === undefined ? {} : { clientGateway }),
       telegramWebhookSecret:
         config.telegramWebhookSecret ?? randomBytes(32).toString("base64url"),
+      ...(config.selartiResponseSharedSecret === undefined
+        ? {}
+        : { selartiResponseSharedSecret: config.selartiResponseSharedSecret }),
+      ...(selartiResponses === undefined ? {} : { selartiResponses }),
       ...(clientCatalogService === undefined
         ? {}
         : {

@@ -79,6 +79,17 @@ const schema = z
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_RESPONSE_INGRESS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    B2_TELEGRAM_DISPATCH_ENABLED: z.enum(["true", "false"]).default("false"),
+    B2_SENSITIVE_RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_RESPONSE_SHARED_SECRET: z
+      .string()
+      .min(32)
+      .max(256)
+      .regex(/^[A-Za-z0-9_-]+$/u)
+      .optional(),
     CLIENT_TELEGRAM_BOT_KEY: z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
@@ -296,6 +307,7 @@ export type RuntimeConfig = {
   clientMessagingConsentPolicyVersion?: string;
   selartiAiConsentPolicyVersion?: string;
   telegramWebhookSecret?: string;
+  selartiResponseSharedSecret?: string;
   features: {
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -305,6 +317,9 @@ export type RuntimeConfig = {
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientHybridRouting?: boolean;
+    selartiResponseIngress?: boolean;
+    b2TelegramDispatch?: boolean;
+    b2SensitiveRetention?: boolean;
     expertReferral: boolean;
     expertReferralMaturityWorker: boolean;
     expertResidencyBilling: boolean;
@@ -358,6 +373,16 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     !value.SELARTI_AI_CONSENT_POLICY_VERSION
   )
     throw new Error("selarti_consent_policy_version_required");
+  if (value.SELARTI_RESPONSE_INGRESS_ENABLED === "true") {
+    if (
+      !value.SELARTI_RESPONSE_SHARED_SECRET ||
+      /placeholder/iu.test(value.SELARTI_RESPONSE_SHARED_SECRET) ||
+      !value.CLIENT_TELEGRAM_BOT_KEY
+    ) {
+      throw new Error("selarti_response_configuration_incomplete");
+    }
+    throw new Error("selarti_response_official_fixture_required");
+  }
 
   if (value.RAW_CONVERSATION_LOGGING === "true") {
     throw new Error("Raw conversation logging is prohibited");
@@ -395,6 +420,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.TELEGRAM_WEBHOOK_SECRET === undefined
       ? {}
       : { telegramWebhookSecret: value.TELEGRAM_WEBHOOK_SECRET }),
+    ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
+      ? {}
+      : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
@@ -404,6 +432,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
+      selartiResponseIngress: false,
+      b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
+      b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertReferralMaturityWorker:
         value.EXPERT_REFERRAL_MATURITY_WORKER_ENABLED === "true",

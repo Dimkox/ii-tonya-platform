@@ -38,6 +38,7 @@ export interface HybridMessageGatewayDeps {
     occurredAt: string;
     messagingConsentPolicyVersion: string;
     selartiConsentPolicyVersion?: string;
+    localReplyText?: string;
   }) => Promise<"claimed" | "duplicate" | "conflict" | "rejected">;
 }
 const control = /[\u0000-\u001F\u007F-\u009F]/u;
@@ -114,6 +115,12 @@ export class HybridMessageGateway {
       deadline: new Date(occurredAt.getTime() + 30_000).toISOString(),
       occurredAt: occurredAt.toISOString(),
       messagingConsentPolicyVersion: this.deps.messagingConsentPolicyVersion,
+      ...(route === "deterministic"
+        ? {
+            localReplyText:
+              "Я помогу с навигацией по сервису. Опишите ваш запрос одним сообщением.",
+          }
+        : {}),
       ...(this.deps.selartiConsentPolicyVersion === undefined
         ? {}
         : {

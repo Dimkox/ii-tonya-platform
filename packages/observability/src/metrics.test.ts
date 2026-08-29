@@ -117,6 +117,14 @@ describe("worker outbox metric labels", () => {
       outcome: "terminal",
       reasonClass: "invalid_payload",
     });
+    expect(
+      workerOutboxMetricLabels({
+        topic: "telegram_send_text",
+        phase: "dispatch",
+        outcome: "unknown",
+        reasonClass: "internal",
+      }),
+    ).toMatchObject({ topic: "telegram_send_text" });
     expect(operationalMetrics).toHaveProperty("workerOutboxDelivery");
   });
 

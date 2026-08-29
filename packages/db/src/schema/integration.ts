@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { messageEvents } from "./billing.js";
@@ -167,6 +168,11 @@ export const integrationOutbox = pgTable(
     }),
     lastNormalizedReason: text("last_normalized_reason"),
     payloadHash: text("payload_hash").notNull(),
+    dialogueId: uuid("dialogue_id").references(() => dialogues.id),
+    dialogueSequence: bigint("dialogue_sequence", { mode: "bigint" }),
+    sensitiveRedactedAt: timestamp("sensitive_redacted_at", {
+      withTimezone: true,
+    }),
     ...mutableTimestamps,
   },
   (table) => [
@@ -179,6 +185,22 @@ export const integrationOutbox = pgTable(
       "integration_outbox_attempts_nonnegative",
       sql`${table.attempt} >= 0 and ${table.reconciliationAttempt} >= 0`,
     ),
+    check(
+      "integration_outbox_dialogue_order_pair",
+      sql`(${table.dialogueId} is null) = (${table.dialogueSequence} is null)`,
+    ),
+    check(
+      "integration_outbox_dialogue_sequence_positive",
+      sql`${table.dialogueSequence} is null or ${table.dialogueSequence} > 0`,
+    ),
+    uniqueIndex("integration_outbox_dialogue_sequence_unique")
+      .on(table.dialogueId, table.dialogueSequence)
+      .where(sql`${table.dialogueId} is not null`),
+    index("integration_outbox_dialogue_order_claim_idx")
+      .on(table.dialogueId, table.dialogueSequence, table.status)
+      .where(
+        sql`${table.topic} = 'telegram.send_text.v1' and ${table.dialogueId} is not null`,
+      ),
     index("integration_outbox_dispatch_lease")
       .on(table.status, table.leaseUntil)
       .where(sql`${table.status} = 'processing'`),
@@ -448,6 +470,9 @@ export const dialogues = pgTable(
     provider: text("provider").notNull(),
     botKey: text("bot_key").notNull(),
     externalChatId: text("external_chat_id").notNull(),
+    nextDeliverySequence: bigint("next_delivery_sequence", { mode: "bigint" })
+      .notNull()
+      .default(0n),
     createdAt,
   },
   (table) => [
@@ -456,6 +481,10 @@ export const dialogues = pgTable(
       table.provider,
       table.botKey,
       table.externalChatId,
+    ),
+    check(
+      "dialogues_delivery_sequence_nonnegative",
+      sql`${table.nextDeliverySequence} >= 0`,
     ),
   ],
 );
@@ -515,5 +544,130 @@ export const dialogueRouteDecisions = pgTable(
       sql`${table.route} in ('deterministic','complex_dialogue')`,
     ),
     check("dialogue_route_version_check", sql`${table.routeVersion} > 0`),
+  ],
+);
+
+export const selartiResponseProposals = pgTable(
+  "selarti_response_proposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: text("request_id").notNull(),
+    dialogueId: uuid("dialogue_id")
+      .notNull()
+      .references(() => dialogues.id),
+    tenantKey: text("tenant_key").notNull(),
+    requestPayloadHash: char("request_payload_hash", { length: 64 }).notNull(),
+    responsePayloadHash: char("response_payload_hash", {
+      length: 64,
+    }).notNull(),
+    text: text("text"),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    redactedAt: timestamp("redacted_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("selarti_response_proposals_request_id_unique").on(table.requestId),
+    check(
+      "selarti_response_proposals_hash_check",
+      sql`${table.requestPayloadHash} ~ '^[0-9a-f]{64}$' and ${table.responsePayloadHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "selarti_response_proposals_text_check",
+      sql`${table.text} is null or (char_length(${table.text}) between 1 and 4096 and ${table.text} !~ '[[:cntrl:]]')`,
+    ),
+    check(
+      "selarti_response_proposals_expiry_check",
+      sql`${table.expiresAt} = ${table.acceptedAt} + interval '30 days'`,
+    ),
+    check(
+      "selarti_response_proposals_redaction_check",
+      sql`(${table.text} is null) = (${table.redactedAt} is not null)`,
+    ),
+    index("selarti_response_proposals_expiry_idx")
+      .on(table.expiresAt, table.id)
+      .where(sql`${table.redactedAt} is null`),
+  ],
+);
+
+export const dialogueDeliveries = pgTable(
+  "dialogue_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dialogueId: uuid("dialogue_id")
+      .notNull()
+      .references(() => dialogues.id),
+    dialogueSequence: bigint("dialogue_sequence", {
+      mode: "bigint",
+    }).notNull(),
+    source: text("source").notNull(),
+    sourceId: text("source_id").notNull(),
+    outboxId: uuid("outbox_id")
+      .notNull()
+      .references(() => integrationOutbox.id),
+    payloadHash: char("payload_hash", { length: 64 }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique("dialogue_deliveries_outbox_id_unique").on(table.outboxId),
+    unique("dialogue_deliveries_dialogue_sequence_unique").on(
+      table.dialogueId,
+      table.dialogueSequence,
+    ),
+    unique("dialogue_deliveries_source_unique").on(
+      table.source,
+      table.sourceId,
+    ),
+    check(
+      "dialogue_deliveries_sequence_positive",
+      sql`${table.dialogueSequence} > 0`,
+    ),
+    check(
+      "dialogue_deliveries_source_check",
+      sql`${table.source} in ('deterministic','selarti')`,
+    ),
+    check(
+      "dialogue_deliveries_hash_check",
+      sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("dialogue_deliveries_order_idx").on(
+      table.dialogueId,
+      table.dialogueSequence,
+    ),
+  ],
+);
+
+export const dialogueInboundTombstones = pgTable(
+  "dialogue_inbound_tombstones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dialogueId: uuid("dialogue_id")
+      .notNull()
+      .references(() => dialogues.id),
+    provider: text("provider").notNull(),
+    botKey: text("bot_key").notNull(),
+    providerUpdateId: bigint("provider_update_id", {
+      mode: "bigint",
+    }).notNull(),
+    payloadHash: char("payload_hash", { length: 64 }).notNull(),
+    route: text("route").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    purgedAt: timestamp("purged_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("dialogue_inbound_tombstones_scope_unique").on(
+      table.provider,
+      table.botKey,
+      table.providerUpdateId,
+    ),
+    check(
+      "dialogue_inbound_tombstones_hash_check",
+      sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "dialogue_inbound_tombstones_route_check",
+      sql`${table.route} in ('deterministic','complex_dialogue')`,
+    ),
   ],
 );

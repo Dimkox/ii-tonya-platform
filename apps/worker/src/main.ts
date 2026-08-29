@@ -13,6 +13,7 @@ import {
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
   PostgresOutboxRepository,
+  PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
 } from "@ii-tonya/db";
 import {
@@ -44,6 +45,8 @@ import {
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
   type OutboxRunnerMetricLabels,
+  type OutboxDispatcher,
+  type OutboxReconciler,
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
@@ -204,6 +207,36 @@ export function composeWorkerOutboxDelivery(
         maxReconciliationAttempts: 3,
         batchSize: 100,
         workerId: "local-operator-case-worker",
+        newAttemptId: randomUUID,
+      }),
+  } as const;
+}
+
+export function composeB2TelegramDelivery(
+  db: DrizzleDb,
+  enabled: boolean,
+  capability?: OutboxDispatcher & OutboxReconciler,
+) {
+  if (!enabled) return undefined;
+  if (capability === undefined) {
+    throw new Error("b2_telegram_delivery_capability_unavailable");
+  }
+  const repository = new PostgresOrderedTelegramOutboxRepository(db);
+  return {
+    repository,
+    run: () =>
+      runOutboxBatch({
+        repository,
+        dispatcher: capability,
+        reconciler: capability,
+        metrics: { record: recordWorkerOutboxMetric },
+        now: () => new Date(),
+        retryDelayMs: (attempt) =>
+          boundedFullJitterDelay(attempt, 1_000, 30_000),
+        maxAttempts: 3,
+        maxReconciliationAttempts: 3,
+        batchSize: 100,
+        workerId: "b2-telegram-delivery-worker",
         newAttemptId: randomUUID,
       }),
   } as const;

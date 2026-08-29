@@ -20,6 +20,10 @@ import {
   integrationInbox,
   integrationErrors,
   integrationOutbox,
+  dialogues,
+  dialogueDeliveries,
+  dialogueInboundTombstones,
+  selartiResponseProposals,
   messageEvents,
   messageLedgerEntries,
   messagePackages,
@@ -275,9 +279,13 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("describes every named migration constraint and partial index", () => {
-    expect(names(channelIdentities).uniques).toEqual([
-      "channel_identities_provider_external_unique",
-    ]);
+    expect(names(channelIdentities)).toMatchObject({
+      indexes: [
+        "channel_identities_provider_external_legacy_unique",
+        "channel_identities_telegram_bot_user_chat_unique",
+      ],
+      uniques: [],
+    });
     expect(names(clientProfiles).checks).toEqual([
       "client_profiles_expert_note_bounded",
     ]);
@@ -353,14 +361,42 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(integrationOutbox)).toMatchObject({
       checks: [
         "integration_outbox_attempts_nonnegative",
+        "integration_outbox_dialogue_order_pair",
+        "integration_outbox_dialogue_sequence_positive",
         "integration_outbox_reconciliation_key_present",
       ],
       indexes: [
+        "integration_outbox_dialogue_order_claim_idx",
+        "integration_outbox_dialogue_sequence_unique",
         "integration_outbox_dispatch_lease",
         "integration_outbox_reconciliation_lease",
       ],
       uniques: ["integration_outbox_idempotency_unique"],
     });
+    expect(names(dialogues).checks).toContain(
+      "dialogues_delivery_sequence_nonnegative",
+    );
+    expect(names(selartiResponseProposals)).toMatchObject({
+      checks: [
+        "selarti_response_proposals_expiry_check",
+        "selarti_response_proposals_hash_check",
+        "selarti_response_proposals_redaction_check",
+        "selarti_response_proposals_text_check",
+      ],
+      indexes: ["selarti_response_proposals_expiry_idx"],
+      uniques: ["selarti_response_proposals_request_id_unique"],
+    });
+    expect(names(dialogueDeliveries)).toMatchObject({
+      indexes: ["dialogue_deliveries_order_idx"],
+      uniques: [
+        "dialogue_deliveries_dialogue_sequence_unique",
+        "dialogue_deliveries_outbox_id_unique",
+        "dialogue_deliveries_source_unique",
+      ],
+    });
+    expect(names(dialogueInboundTombstones).uniques).toEqual([
+      "dialogue_inbound_tombstones_scope_unique",
+    ]);
     expect(names(promptVersions).uniques).toEqual([
       "prompt_versions_name_version_unique",
     ]);
@@ -488,6 +524,10 @@ describe("authoritative Drizzle schema parity", () => {
       readFileSync("packages/db/migrations/0030_client_sessions.sql", "utf8"),
       readFileSync(
         "packages/db/migrations/0031_client_booking_references.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
         "utf8",
       ),
     ].join("\n");

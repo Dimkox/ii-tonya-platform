@@ -14,6 +14,19 @@ That first native release required host-only recovery settings and is not accept
 reproducible cold-deploy artifact; a corrected exact-SHA replacement is the active release
 task.
 The client platform foundation is implemented, while live-provider gates remain closed.
+Release B2 now contains the default-off single-dialogue response convergence slice:
+deterministic and accepted Selarti replies receive one monotonic dialogue sequence and
+become ordered `telegram.send_text.v1` outbox work. Selarti proposals are untrusted,
+authenticated at a dedicated endpoint, validated, and bound only to a durable B1 request;
+there is no direct Selarti-to-Telegram path and no client billing mutation.
+Dispatch, response ingress, and sensitive retention remain independently disabled.
+The typed Telegram dispatcher uses the existing no-request-logging transport boundary,
+but the default worker registry does not compose a bot token or provider URL; that live
+binding is an explicit activation gate rather than an environment-only switch.
+Live activation is blocked until an official authenticated Selarti response fixture is
+approved and staging proves unknown-outcome reconciliation. See the
+[B2 traceability](docs/spec/hybrid-message-gateway-b2-traceability.md) and
+[B2 rollback runbook](docs/runbooks/hybrid-message-gateway-b2.md).
 Release A2.1 adds additive expert-referral maturity scheduling: new eligible commercial
 V2 first settlements remain unspendable for 30 days while legacy settlements create no
 maturity; processing is lease-fenced, revalidates eligibility, and emits bounded metrics;

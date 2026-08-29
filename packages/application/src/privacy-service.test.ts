@@ -107,6 +107,7 @@ describe("privacy lifecycle", () => {
       };
       const service = createPrivacyService({
         repository,
+        audit: { append: vi.fn() },
         capability: { enabled: true },
         pseudonymize: () => "pseudonym",
       });

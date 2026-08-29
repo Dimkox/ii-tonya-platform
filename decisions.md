@@ -9,3 +9,5 @@ Treat approved analytics bootstrap code as a release-preserved asset and exercis
 Use one canonical financial lock prefix everywhere: provider inbox when present, then separate order, payment, marker, maturity locks, UUID-sorted experts, expiry/grant/id grants, and id-sorted ledgers. Sequential statements make the order explicit instead of delegating it to the PostgreSQL join planner.
 
 Release B1 keeps ingress and hybrid routing independently default-off and validates bot-scoped private identity before any durable effect; this preserves existing expert paths and makes provider activation reversible.
+
+B2 retains a terminal Selarti request payload until either its proposal exists or its deadline passes; this preserves response convergence while still allowing bounded sensitive-data redaction.

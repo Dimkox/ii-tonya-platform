@@ -3,6 +3,7 @@ import type { DrizzleDb } from "@ii-tonya/db";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { createLogger } from "@ii-tonya/observability";
 import { createWindowedRateLimiter } from "./rate-limit.js";
+import { buildApp } from "./app.js";
 import {
   closeServer,
   composeServer,
@@ -81,6 +82,8 @@ describe("server composition", () => {
     expect(disabledDeps.clientSessionRepository).toBeUndefined();
     expect(disabledDeps.clientPrincipal).toBeUndefined();
     expect(disabledDeps.clientGateway).toBeUndefined();
+    expect(disabledDeps.selartiResponses).toBeUndefined();
+    expect(disabledDeps.selartiResponseSharedSecret).toBeUndefined();
     expect(disabledDeps.clientIngressEnabled).toBe(false);
     expect(disabledDeps.clientHybridRoutingEnabled).toBe(false);
 
@@ -105,6 +108,46 @@ describe("server composition", () => {
     expect(injected.clientSessionService).toBeDefined();
     expect(injected.clientSessionRepository).toBeDefined();
     expect(injected.clientPrincipal).toBeDefined();
+  });
+  it("fails closed when B2 response ingress is requested without its secret", async () => {
+    const appConfig: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      clientTelegramBotKey: "bot-b2",
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        clientTelegramIngress: false,
+        clientHybridRouting: false,
+        selartiResponseIngress: true,
+        expertReferral: false,
+        expertReferralMaturityWorker: false,
+        expertResidencyBilling: false,
+      },
+    };
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const deps = await createDefaultLifecycle().dependencies(appConfig, fakeDb);
+    expect(deps.selartiResponses).toBeDefined();
+    expect(deps.selartiResponseSharedSecret).toBeUndefined();
+    await expect(buildApp(deps)).rejects.toThrow(
+      "Selarti response runtime capability is required",
+    );
   });
   it("rejects an invalid client feature combination before migration", async () => {
     process.env.DATABASE_URL =
