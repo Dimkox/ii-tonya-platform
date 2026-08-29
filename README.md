@@ -386,7 +386,7 @@ zero-package ordinary-client inbound completion free, and snapshots the exact `3
 traceability and rollback are in [`docs/spec/commercial-core-v2-a1-traceability.md`](docs/spec/commercial-core-v2-a1-traceability.md)
 and [`docs/runbooks/commercial-core-v2-a1-rollback.md`](docs/runbooks/commercial-core-v2-a1-rollback.md).
 All live flags default false. No production tariff is seeded, no provider is activated,
-and no live gate is claimed. Expert-referral 30-day maturity is A2 and is not activated.
+and no live gate is claimed. A2.1 expert-referral 30-day maturity is implemented, while its worker and reward control remain disabled by default.
 External Trust CI, Database Gate, and branch push remain blocked and controller-owned.
 
 Commercial-policy observability is an activation gate: Platform owns assignment/control
