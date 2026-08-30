@@ -8,6 +8,7 @@ export {
 } from "./client.js";
 export { sql } from "drizzle-orm";
 export { PostgresPartnerCommerceRepository, type PartnerCommandResult } from "./repositories/partner-commerce-repository.js";
+export { MemoryTestExpertTrialRepository, PostgresTestExpertTrialRepository, TrialCapReachedError, TrialIdempotencyConflictError, TrialOutcomeConflictError, type TestExpertTrialRepository, type TrialOutcomeKind, type TrialRedemption, type TrialReservation, type TrialSummary } from "./repositories/test-expert-trial-repository.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,

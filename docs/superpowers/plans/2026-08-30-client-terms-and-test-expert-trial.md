@@ -57,11 +57,11 @@ recordOutcome(input: { reservationId: string; outcome: "applied" | "not_applied"
 reconcileUnknown(input: { reservationId: string; providerRequestId: string; outcome: "applied" | "not_applied"; now: Date }): Promise<TrialOutcome>;
 ```
 
-- [ ] Write RED tests for idempotent redemption, 49-turn/50-turn boundaries, concurrency single-winner, unknown retention, definite release, and cross-ledger separation.
-- [ ] Run `pnpm vitest run packages/db/src/repositories/test-expert-trial-repository.test.ts`; confirm missing migration/repository failures.
-- [ ] Implement additive `0038_test_expert_trial.sql`, Drizzle mirror, and Memory/Postgres parity with database-owned counters and locked redemption updates.
-- [ ] Add unique request keys, typed outcomes, foreign keys, check constraints, and bounded indexes; reject fan-out.
-- [ ] Run focused repository/schema tests plus `pnpm typecheck`; expect PASS.
+- [x] Write RED tests for idempotent redemption, 49-turn/50-turn boundaries, concurrency single-winner, unknown retention, definite release, and cross-ledger separation. RED: module import failed before repository implementation.
+- [x] Run `corepack pnpm vitest run packages/db/src/repositories/test-expert-trial-repository.test.ts`; RED captured with the missing repository module.
+- [x] Implement additive `0038_test_expert_trial.sql`, Drizzle mirror, and Memory/Postgres parity with database-owned counters and locked redemption updates.
+- [x] Add unique request keys, typed outcomes, foreign keys, check constraints, and bounded indexes; reject fan-out.
+- [x] Run focused repository/schema tests plus `corepack pnpm --filter @ii-tonya/db typecheck`; GREEN: 7 tests passed and DB typecheck passed.
 
 ### Task 3: Deterministic application boundary
 
@@ -116,4 +116,3 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 - Placeholder scan: this plan contains no `TBD`, `TODO`, “implement later”, unspecified error-handling instruction, or undefined interface name.
 - Type consistency: Task 2 defines the repository methods consumed by Task 3; Task 4 consumes `TestExpertTrialService.handle`; Task 5’s manifest is metadata-only and cannot activate runtime behavior.
 - Explicit non-goals: no production code is changed in this Phase 0 commit; no coupon issuance is activated; no Selarti/network/provider call is made; no analytics/static script is removed.
-

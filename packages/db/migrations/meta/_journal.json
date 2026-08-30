@@ -267,6 +267,13 @@
       "when": 1788307200000,
       "tag": "0037_partner_commerce_a",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788393600000,
+      "tag": "0038_test_expert_trial",
+      "breakpoints": true
     }
   ]
 }
