@@ -25,6 +25,10 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain(
       'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
     );
+    expect(runner).toContain(
+      'git_common_dir="$(git -C "$source_root" rev-parse --path-format=absolute --git-common-dir)"',
+    );
+    expect(runner).toContain('git_marker="$source_root/.git"');
     expect(runner).toContain('[[ "$(hostname -s)" == "claw" ]]');
     expect(runner).toContain("--profile test run --rm --no-deps");
     expect(runner).toContain('docker compose "${compose_args[@]}"');
@@ -41,6 +45,18 @@ describe("direct Claw verification semantics", () => {
       'test "$(docker image inspect "$test_image_ref" --format \'{{.Id}}\')" = "$expected_test_image_id"',
     );
     expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
+    expect(runner).toContain('-v "$git_common_dir:$git_common_dir:ro"');
+    expect(runner).toContain('-v "$git_marker:/workspace/source/.git:ro"');
+    expect(
+      runner.split(
+        'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
+      ),
+    ).toHaveLength(3);
+    expect(
+      runner.split(
+        'test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"',
+      ),
+    ).toHaveLength(3);
     expect(runner).not.toMatch(/GITHUB_|actions-runner|workflow_dispatch/u);
   });
 

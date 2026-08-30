@@ -20,6 +20,10 @@ source_sha="${SOURCE_SHA:?SOURCE_SHA is required}"
 }
 test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
+git_common_dir="$(git -C "$source_root" rev-parse --path-format=absolute --git-common-dir)"
+git_marker="$source_root/.git"
+test -d "$git_common_dir"
+test -e "$git_marker"
 if [[ "$mode" == client-booking ]]; then
   test -z "$(git -C "$source_root" status --porcelain --untracked-files=all)"
   test ! -e "$source_root/node_modules"
@@ -193,6 +197,8 @@ compose_args=(
   -e "CLAW_SOURCE_SHA=$source_sha"
   -e "CLAW_HOST_SOURCE_ROOT=$source_root"
   -v "$source_root:/workspace/source"
+  -v "$git_common_dir:$git_common_dir:ro"
+  -v "$git_marker:/workspace/source/.git:ro"
   -v "$claw_store:/workspace/.pnpm-store"
   -v "$release_output:/workspace/release-output"
   -v "$container_script:/tmp/ii-tonya-claw-gate.sh:ro"
@@ -206,6 +212,9 @@ fi
 
 II_TONYA_SOURCE_SHA="$test_image" docker compose "${compose_args[@]}" \
   --entrypoint bash ii-tonya-test /tmp/ii-tonya-claw-gate.sh
+
+test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
+test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
 
 cat > "$evidence_dir/${mode}.md" <<EOF
 # Direct Claw ${mode} gate

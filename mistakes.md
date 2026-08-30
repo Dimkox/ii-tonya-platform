@@ -1,5 +1,7 @@
 # Mistakes
 
+The repaired Claw gate mounted a linked worktree without its absolute Git common directory, so repository-policy tests failed at `git ls-files` after a successful build. The root cause was validating source visibility but not linked-worktree metadata visibility; the harness now mounts the resolved common Git directory read-only and tests that contract.
+
 The Claw gate assumed that a source-SHA tag and local BuildKit cache made its test image recoverable after the pinned image was deleted. The root cause was relying on mutable apt repositories and host-local cache state; recovery now creates a replacement image from a pushed clean SHA and pins its verified immutable image ID in both gate paths.
 
 Residual admission checked API-side B2/B3 flags but not the worker capabilities needed to converge unknown outcomes. The root cause was validating producer readiness without validating the complete asynchronous convergence path; startup gates must cover both enqueue and reconciliation workers.
