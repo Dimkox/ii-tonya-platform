@@ -196,15 +196,17 @@ export async function buildApp(
   if (
     deps.config.features.testExpertPromo === true &&
     (deps.testExpertPromo === undefined ||
-      deps.config.features.testExpertDeterministicFlow !== true)
+      deps.config.features.testExpertDeterministicFlow !== true ||
+      deps.config.features.clientTelegramIngress !== true ||
+      deps.clientBotKey === undefined)
   )
     throw new Error("Test expert promo runtime capability is required");
   if (
     deps.config.features.testExpertSelarti === true &&
     (deps.testExpertPromo?.residualEnabled !== true ||
-      deps.config.features.testExpertPromptVersion === undefined ||
       deps.config.features.clientHybridRouting !== true ||
       deps.config.features.selartiCostAdmission !== true ||
+      deps.config.features.selartiResponseIngress !== true ||
       deps.config.features.b2TelegramDispatch !== true ||
       deps.config.features.b2SensitiveRetention !== true)
   )

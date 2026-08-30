@@ -9,17 +9,31 @@ export type ParticipantKindInput =
   | "organizer"
   | "festival"
   | "retreat"
-  | "travel";
+  | "travel"
+  | "эксперт"
+  | "центр"
+  | "студия"
+  | "салон"
+  | "ретрит-центр"
+  | "организатор"
+  | "фестиваль"
+  | "ретрит"
+  | "путешествия";
 export function segmentParticipant(
   input: ParticipantKindInput,
 ): ParticipantSegment {
-  if (input === "EXPERT" || input === "expert") return "EXPERT";
+  if (input === "EXPERT" || input === "expert" || input === "эксперт")
+    return "EXPERT";
   if (
     input === "ORGANIZER" ||
     input === "organizer" ||
     input === "festival" ||
     input === "retreat" ||
-    input === "travel"
+    input === "travel" ||
+    input === "организатор" ||
+    input === "фестиваль" ||
+    input === "ретрит" ||
+    input === "путешествия"
   )
     return "ORGANIZER";
   if (
@@ -27,7 +41,11 @@ export function segmentParticipant(
     input === "center" ||
     input === "studio" ||
     input === "salon" ||
-    input === "retreat-center"
+    input === "retreat-center" ||
+    input === "центр" ||
+    input === "студия" ||
+    input === "салон" ||
+    input === "ретрит-центр"
   )
     return "CENTER";
   throw new Error("participant_kind_invalid");

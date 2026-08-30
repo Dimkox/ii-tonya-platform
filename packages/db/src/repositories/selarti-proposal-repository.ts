@@ -91,6 +91,19 @@ export class PostgresSelartiProposalRepository {
       ) {
         return "rejected";
       }
+      const trialReservation = (
+        await tx.execute<{
+          id: string;
+          redemptionId: string;
+          status: "reserved" | "unknown" | "applied" | "not_applied";
+        }>(sql`
+          select id,redemption_id::text "redemptionId",status
+          from test_expert_reservations
+          where provider_request_id=${input.requestId}
+          for update
+        `)
+      ).rows[0];
+      if (trialReservation?.status === "not_applied") return "late";
       const deadline = new Date(request.deadline);
       if (!Number.isFinite(deadline.getTime()) || receivedAt > deadline)
         return "late";
@@ -167,6 +180,30 @@ export class PostgresSelartiProposalRepository {
           'selarti',${proposal.id},${outboxId}::uuid,${payloadHash}
         )
       `);
+      if (
+        trialReservation &&
+        (trialReservation.status === "reserved" ||
+          trialReservation.status === "unknown")
+      ) {
+        await tx.execute(sql`
+          update test_expert_reservations set status='applied'
+          where id=${trialReservation.id}::uuid
+        `);
+        await tx.execute(sql`
+          update test_expert_redemptions
+          set reserved_units=reserved_units-2,consumed_units=consumed_units+2
+          where id=${trialReservation.redemptionId}::uuid
+        `);
+        await tx.execute(sql`
+          insert into test_expert_outcomes(reservation_id,outcome,provider_request_id)
+          values(${trialReservation.id}::uuid,'applied',${input.requestId})
+          on conflict do nothing
+        `);
+        await tx.execute(sql`
+          insert into test_expert_audit_events(redemption_id,reservation_id,event_type,event_digest)
+          values(${trialReservation.redemptionId}::uuid,${trialReservation.id}::uuid,'outcome_applied',${input.responsePayloadHash})
+        `);
+      }
       return "accepted";
     });
   }

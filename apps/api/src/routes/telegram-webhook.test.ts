@@ -150,19 +150,14 @@ const build = async (
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
-  it("derives promo identity from an authenticated private Telegram update and rate-limits before dispatch", async () => {
+  it("routes entry and prefixless session messages through the authenticated bot-scoped promo ingress before the client gateway", async () => {
     const calls: unknown[] = [];
     const promo: TelegramTestExpertPromoIngress = {
-      resolvePrincipal: vi.fn(async (telegramUserId) =>
-        telegramUserId === "123456789"
-          ? { userId: "00000000-0000-4000-8000-000000000100" }
-          : null,
-      ),
       handle: vi.fn(async (input) => {
         calls.push(input);
         return {
-          status: "success" as const,
-          result: { kind: "deterministic" },
+          status: "handled" as const,
+          route: "deterministic" as const,
         };
       }),
     };
@@ -170,36 +165,44 @@ describe("Telegram webhook callback boundary", () => {
     const state = await build({
       promoEnabled: true,
       promo,
+      clientHandle: async () => ({
+        status: "accepted",
+        route: "deterministic",
+      }),
       consume: (key) => {
         keys.push(key);
-        return !key.startsWith("telegram:test-expert:blocked");
+        return true;
       },
     });
     try {
-      const response = await state.app.inject({
-        method: "POST",
-        url: "/v1/webhooks/telegram",
-        headers,
-        payload: {
-          update_id: 9301,
-          message: {
-            from: { id: 123456789 },
-            chat: { id: 123456789, type: "private" },
-            text: "тест эксперт",
+      const send = (updateId: number, text: string) =>
+        state.app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram/client/bot-client",
+          headers,
+          payload: {
+            update_id: updateId,
+            message: {
+              from: { id: 123456789 },
+              chat: { id: 123456789, type: "private" },
+              text,
+            },
           },
-        },
-      });
-      expect(response.statusCode).toBe(200);
+        });
+      expect((await send(9301, "тест эксперт")).statusCode).toBe(200);
+      expect((await send(9302, "Татьяна")).statusCode).toBe(200);
       expect(calls).toEqual([
         expect.objectContaining({
-          userId: "00000000-0000-4000-8000-000000000100",
+          botKey: "bot-client",
           telegramUserId: "123456789",
+          chatId: "123456789",
           text: "тест эксперт",
           requestKey: "telegram:9301:test-expert",
         }),
+        expect.objectContaining({ text: "Татьяна" }),
       ]);
-      expect(JSON.stringify(calls)).not.toContain('telegramUserId":"999');
-      expect(keys).toContain("telegram:test-expert:123456789");
+      expect(keys).toContain("telegram:test-expert:bot-client:123456789");
+      expect(state.clientGatewayHandle).not.toHaveBeenCalled();
     } finally {
       await state.app.close();
     }

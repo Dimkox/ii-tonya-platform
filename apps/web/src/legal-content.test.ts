@@ -67,4 +67,14 @@ describe("public legal documents", () => {
     );
     expect(oferta).not.toContain("Новый Клиент получает 500 купонов");
   });
+
+  it("does not contradict offered paid packages in the public FAQ", async () => {
+    const { landingContent } = await import("./content.js");
+    const faq = landingContent.faq.map((entry) => entry.join(" ")).join(" ");
+    expect(faq).not.toContain("новые платные пакеты в V2 не продаются");
+    expect(faq).toContain("30 дней");
+    expect(faq).toContain("100 сообщений без срока");
+    expect(faq).toContain("Купоны");
+    expect(faq).toContain("отключены");
+  });
 });

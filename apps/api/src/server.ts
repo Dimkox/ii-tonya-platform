@@ -18,8 +18,7 @@ import {
   type ClientCommercialPolicyPort,
   HybridMessageGateway,
   createSelartiResponseService,
-  TestExpertTrialService,
-  segmentParticipant,
+  TestExpertTelegramService,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -40,7 +39,7 @@ import {
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
   PostgresSelartiProposalRepository,
-  PostgresTestExpertTrialRepository,
+  PostgresTestExpertTelegramRepository,
   PostgresExpertTrialPricingPolicy,
   PostgresPartnerTrialPricingPolicy,
   type DrizzleDb,
@@ -123,13 +122,6 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
-    testExpertProviderComposition?: {
-      readonly approvedPromptVersions: ReadonlySet<string>;
-      dispatch(text: string): Promise<{
-        outcome: "applied" | "not_applied" | "unknown";
-        providerRequestId?: string;
-      }>;
-    };
     testExpertMetricSink?: {
       record(
         event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
@@ -145,10 +137,11 @@ export const createDefaultLifecycle = (
       throw new Error("client_commercial_policy_repository_unavailable");
     }
     if (
-      config.features.testExpertSelarti === true &&
-      options.testExpertProviderComposition === undefined
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true &&
+      options.testExpertMetricSink === undefined
     )
-      throw new Error("test_expert_provider_composition_unavailable");
+      throw new Error("test_expert_metric_sink_unavailable");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -165,6 +158,12 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true &&
+      options.testExpertMetricSink === undefined
+    )
+      throw new Error("test_expert_metric_sink_unavailable");
     if (config.features.clientTelegramIngress && !config.clientTelegramBotKey)
       throw new Error("client_telegram_bot_key_required");
     assertClientCapabilityPreflight(config.features, {
@@ -293,104 +292,29 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
-    const trialRepository = new PostgresTestExpertTrialRepository(db);
-    const trialService = new TestExpertTrialService({
-      trial: trialRepository,
-      expertPolicy: new PostgresExpertTrialPricingPolicy(db),
-      partnerPolicy: new PostgresPartnerTrialPricingPolicy(db),
-      approvedPromptVersions:
-        config.features.testExpertPromptVersion !== undefined &&
-        options.testExpertProviderComposition?.approvedPromptVersions.has(
-          config.features.testExpertPromptVersion,
-        ) === true
-          ? new Set([config.features.testExpertPromptVersion])
-          : new Set<string>(),
-      provider:
-        config.features.testExpertSelarti === true &&
-        options.testExpertProviderComposition !== undefined
-          ? (text) => options.testExpertProviderComposition!.dispatch(text)
-          : null,
-      metrics: options.testExpertMetricSink ?? { record: () => undefined },
-    });
+    const testExpertRepository = new PostgresTestExpertTelegramRepository(db);
+    const testExpertResidualEnabled =
+      config.features.testExpertSelarti === true &&
+      config.features.clientHybridRouting === true &&
+      config.features.selartiCostAdmission === true &&
+      config.features.selartiResponseIngress === true &&
+      config.features.b2TelegramDispatch === true &&
+      config.features.b2SensitiveRetention === true;
     const testExpertPromo =
       config.features.testExpertPromo === true &&
       config.features.testExpertDeterministicFlow === true
-        ? {
-            residualEnabled:
-              config.features.testExpertSelarti === true &&
-              config.features.testExpertPromptVersion !== undefined &&
-              options.testExpertProviderComposition?.approvedPromptVersions.has(
-                config.features.testExpertPromptVersion,
-              ) === true,
-            resolvePrincipal: (telegramUserId: string) =>
-              trialRepository.resolveTelegramUser(telegramUserId),
-            async handle(input: {
-              userId: string;
-              telegramUserId: string;
-              text: string;
-              requestKey: string;
-              requestDigest: string;
-              correlationId: string;
-            }) {
-              const command = input.text.trim();
-              if (/^(?:тест эксперт|\/test_expert)$/iu.test(command))
-                return {
-                  status: "success" as const,
-                  result: { kind: "deterministic", trialUnits: 0 },
-                };
-              const quoteMatch =
-                /^(?:тест эксперт|\/test_expert)\s+quote\s+(expert|center|studio|salon|retreat-center|organizer|festival|retreat|travel)$/iu.exec(
-                  command,
-                );
-              if (quoteMatch?.[1]) {
-                const segment = segmentParticipant(
-                  quoteMatch[1].toLowerCase() as Parameters<
-                    typeof segmentParticipant
-                  >[0],
-                );
-                const result = await trialService.handle({
-                  kind: "quote",
-                  segment,
-                  redemptionId: "deterministic-zero-unit",
-                  input: { segment },
-                });
-                return {
-                  status:
-                    result.kind === "unavailable"
-                      ? ("unavailable" as const)
-                      : ("success" as const),
-                  result,
-                };
-              }
-              if (config.features.testExpertSelarti !== true)
-                return { status: "unavailable" as const };
-              try {
-                const result = await trialService.handleResidual({
-                  userId: input.userId,
-                  requestKey: input.requestKey,
-                  requestDigest: input.requestDigest,
-                  text: command.replace(
-                    /^(?:тест эксперт|\/test_expert)\s*/iu,
-                    "",
-                  ),
-                });
-                return {
-                  status:
-                    result.kind === "unavailable"
-                      ? ("unavailable" as const)
-                      : ("success" as const),
-                  result,
-                };
-              } catch (error) {
-                if (
-                  error instanceof Error &&
-                  error.message === "trial_cap_reached"
-                )
-                  return { status: "limit_reached" as const };
-                return { status: "unavailable" as const };
-              }
+        ? Object.assign(
+            new TestExpertTelegramService({
+              telegram: testExpertRepository,
+              expertPolicy: new PostgresExpertTrialPricingPolicy(db),
+              partnerPolicy: new PostgresPartnerTrialPricingPolicy(db),
+              residualEnabled: testExpertResidualEnabled,
+              metrics: options.testExpertMetricSink!,
+            }),
+            {
+              residualEnabled: testExpertResidualEnabled,
             },
-          }
+          )
         : undefined;
     return {
       config,

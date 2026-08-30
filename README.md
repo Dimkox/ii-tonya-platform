@@ -168,53 +168,65 @@ and projections. YooKassa by YooMoney is the selected payment provider; its adap
 recovery boundaries are implemented but remain disabled and uncomposed until the provider
 contract, key-management boundary, and release gates are approved.
 
-## Current V2 trial boundary (Task 5)
+## Current V2 trial boundary
 
-The current tree contains the additive Task 1–5 foundation. Newly issued paid/admin message packages
-use 30 calendar days; the historical intro grant is 100 messages with no expiry; existing rows retain
-their stored expiry. Ordinary `free_client_v2` access remains free and is not re-gated. Future client
-coupon grants, if the deferred default-off coupon subsystem is activated, use a 45-day lifetime; no
-active coupon issuance is claimed by this repository.
+Newly issued paid/admin message packages use 30 calendar days; the intro grant is 100 messages with
+no expiry, and existing rows retain their stored expiry. Ordinary `free_client_v2` access remains free
+and is not re-gated. Paid packages are available where the service offers them. Future coupon grants,
+if the deferred default-off coupon subsystem is activated, use 45 days; this tree does not claim
+active coupon issuance.
 
 The `тест эксперт` foundation is capped at 100 visible-message units, at most 50 AI turns, with two
-units reserved per residual AI turn and zero units for deterministic Telegram warmup, qualification,
-segmentation, and authoritative pricing. Explicit segments are `EXPERT`, `CENTER` (studio, salon,
-retreat/wellness center), and `ORGANIZER` (festival, retreat, travel/event organizer). The PostgreSQL
-authority is additive migrations `0038_test_expert_trial` and `0039_test_expert_trial_hardening`; its campaign, redemption, reservation,
-outcome, and audit records remain separate from coupons, expert referrals, partner acquisition, and
-B3 cost reservations.
-Redemption keys use the isolated `test-expert:<campaign-version-id>:<internal-user-id>` namespace.
-Read summaries are informational only; locked PostgreSQL transitions remain the sole cap authority.
+units reserved per residual AI turn and zero units for deterministic warmup, qualification,
+segmentation, and authoritative pricing. Segments are `EXPERT`, `CENTER` (studio, salon,
+retreat/wellness center), and `ORGANIZER` (festival, retreat, travel/event organizer). PostgreSQL
+authority is the never-remotely-shipped additive migration `0038_test_expert_trial`; the former
+`0039` hardening draft was folded into `0038` before release. Prompt assets, durable bot/chat-scoped
+sessions, campaign versions, redemptions, reservations, outcomes, and append-only audit records stay
+separate from coupons, referrals, partner acquisition, and B3 cost reservations. Redemption keys use
+the `test-expert:<campaign-version-id>:<internal-user-id>` namespace; summaries are informational,
+while locked PostgreSQL transitions remain cap authority.
 
-Four trial controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
+Four controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
 `TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED`, `TEST_EXPERT_SELARTI_ENABLED`, and
-`TEST_EXPERT_PROMPT_VERSION`. The separate public promo body route has been removed. The default-off
-composition now lives inside authenticated `POST /v1/webhooks/telegram`: it verifies the webhook
-secret, derives immutable identity from a private Telegram update, rate-limits before reservation,
-and resolves the internal user through PostgreSQL. Deterministic trigger, segmentation, and
-authoritative expert/partner tariff lookup work with Promo+Deterministic alone. Residual AI also
-requires one active database campaign, its prompt version in approved runtime metadata, an injected
-provider capability, and all existing B2/B3 gates. No campaign or prompt is seeded active, so provider
-admission and production/network calls remain blocked. The current source prompt is preserved by the inactive
-[prompt manifest](docs/prompts/test-expert-source-manifest.json); it is metadata only and cannot
-activate runtime behavior.
+`TEST_EXPERT_PROMPT_VERSION`; the last value is compatibility metadata, not activation authority. The
+public promo body route is removed. Composition lives in the webhook-secret-authenticated client
+route `POST /v1/webhooks/telegram/client/:botKey`, derives identity from a private update, rate-limits
+before reservation, and resolves exactly one bot/chat/user identity. Every deterministic entry,
+warmup, qualification, segment, quote, FAQ, limit, and fallback creates the existing
+`telegram.send_text.v1` outbox/delivery for that same dialogue. Durable session state routes later
+private free-form messages without a repeated prefix; ambiguity fails closed. Placeholder copy is
+versioned and explicitly inactive for selling because approved warmup copy has not been supplied.
 
-Rollout is additive and flag-off: internal allowlist, bounded cohort, then separately approved
-provider admission. Rollback disables provider admission first, reconciles unknown outcomes, drains
-outboxes, and preserves immutable history; no historical expiry, ledger, prompt, or campaign rows are
-rewritten. Raw promo text is ephemeral provider input: it is hashed for idempotency and is not written
-to trial, audit, outcome, or log storage. Existing privacy erasure removes Telegram identity linkage;
-durable bounded trial facts retain only internal identifiers and digests. Typed trial metrics are
-emitted by actual application transitions through an injected sink (default no-op) and cover redemption, deterministic offload, reservation,
-consumption, release, unknown outcomes, cap rejection, duplicates, conversion, cost, and
-reconciliation age. Yandex Metrika and all static scripts in `apps/web/index.html` remain preserved.
+Promo+Deterministic alone provides zero-unit behavior. Residual AI additionally requires one active
+database campaign linked to an approved prompt asset with official-contract evidence and every
+existing B1/B2/B3 capability. One residual turn reserves two units, passes B3 cost admission, and
+creates one idempotent `selarti.request.v1`; there is no direct provider dispatch. Only B2 response
+convergence creates the same-dialogue `telegram.send_text.v1` answer and moves reserved units to
+consumed. A bounded scanner preserves unresolved outcomes, reconciles a durable response as applied,
+and releases only an expired request with no response. No prompt or campaign is seeded active. The
+source prompt remains preserved by the inactive
+[prompt manifest](docs/prompts/test-expert-source-manifest.json), which cannot activate runtime.
 
-Current verification status: focused API, application, config, schema, repository, web, and disposable
-PostgreSQL 17.5 checks are green, including same-key concurrency and provider outcome metadata. The
-single allowed full `pnpm verify` run occurred before this follow-up, failed at test typecheck, and was
-not rerun. Those introduced type regressions and the unrelated partner-pricing test types are now
-fixed under focused typecheck. Restart durability and real database-role denial fixtures remain
-explicit activation blockers pending independent read-only review and exact-SHA CI.
+Rollout is flag-off, then internal allowlist and bounded cohort, then separately approved provider
+admission. Rollback disables provider admission first, reconciles unknowns, drains outboxes, and
+preserves immutable history. Raw deterministic input is stored only as digests; residual text exists
+only in the already retention-governed Selarti request outbox and is never copied to trial/session,
+audit, outcome, or logs. This remains a provider privacy activation gate. An operational metric sink
+is mandatory whenever promo/deterministic is enabled. Actual transitions emit redemption,
+deterministic/offload, reservation, consumption, release, unknown, cap rejection, duplicate, provider
+outcome, and reconciliation-age facts. Conversion and cost names are emitted only when a durable fact
+exists. Yandex Metrika and all static scripts in `apps/web/index.html` remain unchanged.
+
+Focused API, application, config, schema, repository, worker, and web checks are green. Earlier
+disposable PostgreSQL 17.5 checks passed the then-current four cases. New exact-SHA cases for folded
+`0038`, prompt authority, unknown-scan `EXPLAIN`, provider uniqueness, B2 convergence, and audit
+immutability are committed but intentionally unexecuted locally because the three-run PostgreSQL
+budget was exhausted. The single allowed full `pnpm verify` run failed before this follow-up and was
+not rerun; its introduced trial type regressions and partner-pricing test types are fixed under
+focused checks. Official Selarti privacy/contract evidence, approved prompt/warmup copy, external
+execution of the new PostgreSQL cases, restart durability, and real database-role denial remain
+activation blockers pending independent review and exact-SHA CI.
 
 ## Unit-economics planning calculation
 

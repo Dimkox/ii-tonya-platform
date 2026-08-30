@@ -31,3 +31,4 @@ export * from "./yookassa-unbound-recovery.js";
 export * from "./local-operator-case-outbox.js";
 export * from "./b2-sensitive-retention.js";
 export * from "./telegram-send-text-dispatcher.js";
+export * from "./test-expert-trial-reconciliation.js";

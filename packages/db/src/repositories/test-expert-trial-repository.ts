@@ -291,12 +291,14 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
   ): Promise<ActiveTrialCampaign | null> {
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(code)) return null;
     const rows = await this.db.execute<ActiveTrialCampaign>(sql`
-      select id,code,prompt_version as "promptVersion"
-      from test_expert_campaign_versions
-      where code=${code} and status='active' and prompt_version is not null
-        and (effective_from is null or effective_from <= transaction_timestamp())
-        and (effective_to is null or effective_to > transaction_timestamp())
-      order by version desc limit 2`);
+      select c.id,c.code,(p.asset_key||'@'||p.version::text) as "promptVersion"
+      from test_expert_campaign_versions c
+      join test_expert_prompt_assets p on p.id=c.prompt_asset_id and p.version=c.prompt_asset_version
+      where c.code=${code} and c.status='active' and p.status='approved'
+        and p.official_contract_evidence is not null
+        and c.effective_from <= transaction_timestamp()
+        and (c.effective_to is null or c.effective_to > transaction_timestamp())
+      order by c.version desc limit 2`);
     return rows.rows.length === 1 ? rows.rows[0]! : null;
   }
   async createOrGetRedemption(input: {

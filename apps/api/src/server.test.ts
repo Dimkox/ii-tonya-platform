@@ -39,13 +39,56 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("requires an operational metric sink whenever deterministic promo is enabled", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    await expect(
+      createDefaultLifecycle().dependencies(
+        {
+          databaseUrl: "postgresql://placeholder.invalid/test",
+          integrations: {
+            selarti: false,
+            planerka: false,
+            telegram: false,
+            makeProjection: false,
+            intentModel: false,
+            payments: false,
+          },
+          minorOnboarding: false,
+          rawConversationLogging: false,
+          selartiOutboundBillingMode: "disabled",
+          displayTimezone: "Europe/Moscow",
+          yookassaRecovery: { enabled: false },
+          clientTelegramBotKey: "bot-client",
+          features: {
+            workerOutboxDelivery: false,
+            clientCatalog: false,
+            clientTelegramIngress: true,
+            testExpertPromo: true,
+            testExpertDeterministicFlow: true,
+            testExpertSelarti: false,
+            expertReferral: false,
+            expertReferralMaturityWorker: false,
+            expertResidencyBilling: false,
+          },
+        },
+        fakeDb,
+      ),
+    ).rejects.toThrow("test_expert_metric_sink_unavailable");
+  });
+
   it("composes the PostgreSQL test-expert boundary for deterministic flow without provider activation", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),
       transaction: async (operation: (value: unknown) => unknown) =>
         operation({ execute: async () => ({ rows: [] }) }),
     } as unknown as DrizzleDb;
-    const base = (await createDefaultLifecycle().dependencies(
+    const base = (await createDefaultLifecycle({
+      testExpertMetricSink: { record: () => undefined },
+    }).dependencies(
       {
         databaseUrl: "postgresql://placeholder.invalid/test",
         integrations: {

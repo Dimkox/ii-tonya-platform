@@ -32,14 +32,15 @@ describe("test expert trial traceability", () => {
     expect(
       readFileSync("packages/db/migrations/0038_test_expert_trial.sql", "utf8"),
     ).toContain("test_expert_campaign_versions");
-    const hardeningMigration = readFileSync(
-      "packages/db/migrations/0039_test_expert_trial_hardening.sql",
+    const trialMigration = readFileSync(
+      "packages/db/migrations/0038_test_expert_trial.sql",
       "utf8",
     );
-    expect(hardeningMigration).toContain("test_expert_campaign_one_active_idx");
-    expect(hardeningMigration).toContain(
+    expect(trialMigration).toContain("test_expert_campaign_one_active_idx");
+    expect(trialMigration).toContain(
       "test_expert_reservations_unknown_global_idx",
     );
+    expect(trialMigration).toContain("official_contract_evidence");
     expect(TEST_EXPERT_TRIAL_METRICS).toEqual([
       "redemption_created",
       "deterministic_message",

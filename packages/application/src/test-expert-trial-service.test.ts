@@ -109,7 +109,6 @@ describe("test expert deterministic application boundary", () => {
       trial: repository,
       expertPolicy: null,
       partnerPolicy: null,
-      approvedPromptVersions: new Set(["approved-v1"]),
       provider: vi.fn(async () => ({
         outcome: "applied" as const,
         providerRequestId: "provider-operation-1",
@@ -236,7 +235,6 @@ describe("test expert deterministic application boundary", () => {
       expertPolicy: null,
       partnerPolicy: null,
       provider,
-      approvedPromptVersions: new Set(["approved-v1"]),
     });
     const input = {
       userId: "user",
@@ -268,7 +266,6 @@ describe("test expert deterministic application boundary", () => {
         trial: repository,
         expertPolicy: null,
         partnerPolicy: null,
-        approvedPromptVersions: new Set(["approved-v1"]),
         provider: vi.fn(async () => ({
           outcome,
           ...(outcome === "unknown"

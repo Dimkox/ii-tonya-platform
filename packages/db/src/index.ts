@@ -27,6 +27,7 @@ export {
   PostgresExpertTrialPricingPolicy,
   PostgresPartnerTrialPricingPolicy,
 } from "./repositories/test-expert-pricing-policy.js";
+export { PostgresTestExpertTelegramRepository } from "./repositories/test-expert-telegram-repository.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,

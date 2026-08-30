@@ -59,7 +59,6 @@ export class TestExpertTrialService {
       trial: TrialPort;
       expertPolicy: QuotePolicy | null;
       partnerPolicy: QuotePolicy | null;
-      approvedPromptVersions?: ReadonlySet<string>;
       provider:
         | null
         | ((text: string) => Promise<{
@@ -82,11 +81,7 @@ export class TestExpertTrialService {
     )
       throw new Error("residual_request_invalid");
     const campaign = await this.deps.trial.resolveActiveCampaign("test-expert");
-    if (
-      campaign === null ||
-      this.deps.provider === null ||
-      this.deps.approvedPromptVersions?.has(campaign.promptVersion) !== true
-    )
+    if (campaign === null || this.deps.provider === null)
       return {
         kind: "unavailable",
         reason: "authoritative_pricing_policy_unavailable",

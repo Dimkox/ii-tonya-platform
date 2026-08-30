@@ -1,6 +1,6 @@
 # Full Project Connectivity Graph
 
-Status: canonical architecture inventory for `codex/task25-expert-referral-implementation` after synchronization with current `main`.
+Status: canonical architecture inventory for `codex/partner-commerce-v2` at the current local tree; release/activation evidence remains separately gated.
 
 Purpose: maintain one connected view of the entire repository. Runtime modules, PostgreSQL authority, direct Claw gates, native server control, tests, migrations, deploy assets, documentation/evidence, disabled capabilities, deferred scope, prohibited paths, and orphan/dead candidates are all represented.
 
@@ -144,6 +144,26 @@ flowchart TB
     EXADMINSVC --> CODECRYPTO
   end
   APPLICATION --> APPSVC
+
+  subgraph TESTEXPERT["тест эксперт one-dialog boundary"]
+    TEPROMO["authenticated client Telegram ingress\nDISABLED / default-off"]
+    TEFLOW["deterministic session + pricing service\nACTIVE code / inactive selling copy"]
+    TEDB["0038 prompt/session/trial ledger\nPostgreSQL authority / no active seed"]
+    TEB3["B3 cost admission + selarti.request.v1\nDISABLED capability"]
+    TEB2["B2 response convergence\ntelegram.send_text.v1"]
+    TERECON["bounded reserved/unknown reconciliation\nACTIVE library / activation blocked"]
+    TEPROMO --> TEFLOW --> TEDB
+    TEFLOW --> TEB3 --> TEB2
+    TEDB --> TERECON
+    TEB2 --> TEDB
+  end
+  TGWEB --> TEPROMO
+  APPLICATION --> TEFLOW
+  DB --> TEDB
+  DB --> TEB3
+  DB --> TEB2
+  WORKER --> TERECON
+  AUDIT -. prompt/privacy/DB activation gates .-> TEPROMO
 
   subgraph TG["Telegram boundary"]
     TGADAPTER["telegram-adapter\nACTIVE renderer"]

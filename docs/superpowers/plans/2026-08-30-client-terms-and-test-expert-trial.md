@@ -114,10 +114,19 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 - [x] Replace the public body-supplied identity route with the existing webhook-secret-authenticated Telegram ingress and immutable identity resolution from the Telegram update; rate-limit before repository reservation.
 - [x] Separate deterministic admission from residual Selarti admission: promo plus deterministic flags enable zero-unit behavior, while campaign, approved prompt metadata, provider capability, and existing B2/B3 gates are all required for residual AI.
-- [x] Compose the PostgreSQL trial repository, campaign/redemption lookup, trial service, and authoritative expert/partner pricing adapters; add migration `0039_test_expert_trial_hardening.sql` for provider-operation, active-version, and unknown-scan invariants.
+- [x] Compose the PostgreSQL trial repository, campaign/redemption lookup, trial service, and authoritative expert/partner pricing adapters; fold provider-operation, active-version, prompt-authority, session, audit, and unknown-scan invariants into never-shipped migration `0038_test_expert_trial.sql` and remove the unused `0039` draft/journal entry.
 - [x] Cover same-key PostgreSQL races, provider request identity, immutable audit outcomes, durable duplicate replay, injected transition metrics, and ephemeral raw-text privacy with focused tests.
 - [x] Repair the three partner-pricing test type errors without changing pricing behavior; package and test-project typechecks pass after remediation.
 - [x] Keep activation closed: disposable PostgreSQL restart durability and restricted-role denial fixtures remain unproved, and the full verification command remains historically failed and was not rerun.
+
+### Third vertical remediation
+
+- [x] Route deterministic entry and prefixless session follow-ups through the authenticated client Telegram webhook; persist bot/chat-scoped typed session state and create `telegram.send_text.v1` delivery/outbox facts for every deterministic response.
+- [x] Replace direct residual dispatch with B3 cost admission plus one durable `selarti.request.v1`; consume trial units only in existing B2 response convergence.
+- [x] Make PostgreSQL prompt assets and campaign foreign keys activation authority; retain the versioned placeholder copy as inactive for selling and preserve the source prompt/manifest.
+- [x] Add bounded reserved/unknown scanning and reconciliation, append-only audit enforcement, provider-operation uniqueness, Drizzle named parity, and external-only PostgreSQL cases without exceeding the local three-run budget.
+- [x] Require an operational metric sink when deterministic promo is enabled and document actual transition metrics, retention-governed residual text, public 30/45-day terms, and remaining activation gates.
+- [x] Run focused tests, all workspace package typechecks, test-project typecheck, formatting/diff/secret checks; do not rerun full verify or the PostgreSQL integration file.
 
 ## Self-review checklist
 

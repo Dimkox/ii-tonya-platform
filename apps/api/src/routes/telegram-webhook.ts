@@ -35,24 +35,18 @@ export interface TelegramExpertAiIngress {
 
 export interface TelegramTestExpertPromoIngress {
   readonly residualEnabled?: boolean;
-  resolvePrincipal(
-    telegramUserId: string,
-  ): Promise<{ readonly userId: string } | null>;
   handle(input: {
-    readonly userId: string;
+    readonly botKey: string;
     readonly telegramUserId: string;
+    readonly chatId: string;
     readonly text: string;
     readonly requestKey: string;
     readonly requestDigest: string;
     readonly correlationId: string;
+    readonly occurredAt: string;
   }): Promise<{
-    readonly status:
-      | "disabled"
-      | "invalid_request"
-      | "limit_reached"
-      | "unavailable"
-      | "success";
-    readonly result?: unknown;
+    readonly status: "handled" | "unhandled" | "unavailable";
+    readonly route?: "deterministic" | "residual";
   }>;
 }
 
@@ -239,6 +233,67 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         deps.clientGateway === undefined
       ) {
         return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      if (deps.testExpertPromoEnabled === true && deps.testExpertPromo) {
+        const root = request.body as Record<string, unknown>;
+        const message = root.message;
+        if (message && typeof message === "object") {
+          const record = message as Record<string, unknown>;
+          const from = record.from;
+          const chat = record.chat;
+          const text = record.text;
+          const telegramUserId =
+            from && typeof from === "object"
+              ? String((from as Record<string, unknown>).id ?? "")
+              : "";
+          const chatRecord =
+            chat && typeof chat === "object"
+              ? (chat as Record<string, unknown>)
+              : undefined;
+          const chatId = String(chatRecord?.id ?? "");
+          if (
+            typeof text === "string" &&
+            numericIdentity.test(telegramUserId) &&
+            chatRecord?.type === "private" &&
+            chatId === telegramUserId &&
+            text.length >= 1 &&
+            text.length <= 4_096 &&
+            !/[\u0000-\u001F\u007F-\u009F]/u.test(text)
+          ) {
+            if (
+              !deps.rateLimiter.consume(
+                `telegram:test-expert:${deps.clientBotKey}:${telegramUserId}`,
+                20,
+                60_000,
+              )
+            )
+              return reply.code(429).send({ error: "rate_limited" });
+            const updateId = String(root.update_id);
+            try {
+              const result = await deps.testExpertPromo.handle({
+                botKey: deps.clientBotKey,
+                telegramUserId,
+                chatId,
+                text,
+                requestKey: `telegram:${updateId}:test-expert`,
+                requestDigest: createHash("sha256").update(text).digest("hex"),
+                correlationId:
+                  typeof request.headers["x-correlation-id"] === "string"
+                    ? request.headers["x-correlation-id"]
+                    : `telegram:${deps.clientBotKey}:${updateId}`,
+                occurredAt: new Date().toISOString(),
+              });
+              if (result.status === "unavailable")
+                return reply
+                  .code(503)
+                  .send({ error: "test_expert_unavailable" });
+              if (result.status === "handled")
+                return { accepted: true, route: "test_expert" };
+            } catch {
+              return reply.code(503).send({ error: "test_expert_unavailable" });
+            }
+          }
+        }
       }
       let result;
       try {
@@ -475,86 +530,6 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       if (message && typeof message === "object") {
         const record = message as Record<string, unknown>;
         const text = record.text;
-        if (
-          deps.testExpertPromoEnabled === true &&
-          deps.testExpertPromo !== undefined &&
-          typeof text === "string" &&
-          /^(?:тест эксперт|\/test_expert)(?:\s|$)/iu.test(text.trim())
-        ) {
-          const from = record.from;
-          const chat = record.chat;
-          const telegramUserId =
-            from && typeof from === "object"
-              ? String((from as Record<string, unknown>).id ?? "")
-              : "";
-          const chatRecord =
-            chat && typeof chat === "object"
-              ? (chat as Record<string, unknown>)
-              : undefined;
-          if (
-            !numericIdentity.test(telegramUserId) ||
-            chatRecord?.type !== "private" ||
-            String(chatRecord.id ?? "") !== telegramUserId ||
-            text.trim().length === 0 ||
-            text.length > 4_096 ||
-            /[\u0000-\u001F\u007F-\u009F]/u.test(text)
-          )
-            return reply
-              .code(403)
-              .send({ error: "invalid_test_expert_request" });
-          if (
-            !deps.rateLimiter.consume(
-              `telegram:test-expert:${telegramUserId}`,
-              20,
-              60_000,
-            )
-          )
-            return reply.code(429).send({ error: "rate_limited" });
-          const principal =
-            await deps.testExpertPromo.resolvePrincipal(telegramUserId);
-          if (principal === null)
-            return reply
-              .code(403)
-              .send({ error: "invalid_test_expert_request" });
-          const updateId = String(body.update_id);
-          const claim = await deps.inbox.claim("telegram", updateId);
-          if (claim.kind !== "claimed")
-            return { accepted: true, duplicate: true };
-          try {
-            const result = await deps.testExpertPromo.handle({
-              userId: principal.userId,
-              telegramUserId,
-              text,
-              requestKey: `telegram:${updateId}:test-expert`,
-              requestDigest: createHash("sha256").update(text).digest("hex"),
-              correlationId,
-            });
-            if (result.status === "limit_reached") {
-              await deps.inbox.complete(claim.claimId);
-              return reply
-                .code(429)
-                .send({ error: "test_expert_limit_reached" });
-            }
-            if (result.status === "invalid_request") {
-              await deps.inbox.complete(claim.claimId);
-              return reply
-                .code(400)
-                .send({ error: "invalid_test_expert_request" });
-            }
-            if (
-              result.status === "disabled" ||
-              result.status === "unavailable"
-            ) {
-              await deps.inbox.fail(claim.claimId);
-              return reply.code(503).send({ error: "test_expert_unavailable" });
-            }
-            await deps.inbox.complete(claim.claimId);
-            return { accepted: true, route: "test_expert" };
-          } catch {
-            await deps.inbox.fail(claim.claimId);
-            return reply.code(503).send({ error: "test_expert_unavailable" });
-          }
-        }
         if (
           typeof text === "string" &&
           (deps.expertQueriesEnabled === true
