@@ -104,11 +104,11 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 **Interfaces:** Use the same repository methods from Task 2 against disposable PostgreSQL 17.5; use bounded test fixtures and no production credentials.
 
-- [ ] Write RED integration tests for 0037→0038 upgrade, restart durability, FK/role denial, concurrent reservations, unknown reconciliation, and `EXPLAIN` on the locked redemption path.
-- [ ] Run only the focused PostgreSQL file up to three times; if Docker/images are unavailable, record exact skips without claiming a database PASS.
-- [ ] Run the full `pnpm verify` exactly once at branch finish after focused tasks are green.
-- [ ] Run `git diff --check`, static secret scan, and required independent code/test/data/security reviews against the final tree.
-- [ ] Update README status and package `VERSION` only to reflect verified repository state; leave activation and release evidence closed.
+- [x] Write focused PostgreSQL integration tests for 0037→0038 upgrade, FK enforcement, concurrent reservations, unknown reconciliation, and `EXPLAIN` on the locked redemption path; restart durability and role denial remain explicitly unclaimed where the bounded testkit has no safe fixture.
+- [x] Run `corepack pnpm vitest run tests/integration/test-expert-trial-postgres.test.ts` once against disposable PostgreSQL 17.5: 3/3 passed; exact deferred evidence is in `docs/test-evidence/task6-test-expert-trial-postgres.md`.
+- [x] Run the full `corepack pnpm verify` exactly once at branch finish after focused tasks are green: attempted once, exit 2 at typecheck; exact unrelated failures recorded in `docs/test-evidence/task6-test-expert-trial-postgres.md`.
+- [x] Run `git diff --check`, bounded static secret scan, and review preparation against the final tree; no production/provider actions performed.
+- [ ] Update README status and package `VERSION` only to reflect verified repository state; not changed because full verification is red and activation/release evidence remains closed.
 
 ## Self-review checklist
 
