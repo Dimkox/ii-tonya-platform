@@ -75,6 +75,22 @@ describe("hybrid gateway B3 budget admission", () => {
     const approverId = randomUUID();
     const session = `b3:${randomUUID()}`;
     const approverSession = `b3-approver:${randomUUID()}`;
+    const fixtureClock = await database.db.execute<{ now: Date | string }>(
+      sql`select clock_timestamp() as now`,
+    );
+    const rawFixtureNow = fixtureClock.rows[0]?.now;
+    if (rawFixtureNow === undefined)
+      throw new Error("b3_fixture_clock_missing");
+    const fixtureNow = new Date(rawFixtureNow);
+    if (Number.isNaN(fixtureNow.getTime()))
+      throw new Error("b3_fixture_clock_invalid");
+    const fixtureExpiry = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+    const paymentDeadline = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+    const providerDeadline = new Date(
+      fixtureNow.getTime() + 2 * 60 * 60 * 1000,
+    );
+    const settledAt = new Date("2026-08-28T00:00:00Z");
+    const residencyEnd = new Date("2026-09-27T00:00:00Z");
     await database.db.execute(
       sql`insert into experts(id,user_id,active,verified) values(${expertId}::uuid,${expertUser}::uuid,true,true)`,
     );
@@ -85,22 +101,22 @@ describe("hybrid gateway B3 budget admission", () => {
       sql`insert into users(id) values(${approverId}::uuid)`,
     );
     await database.db.execute(
-      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${session},${adminId}::uuid,'2026-08-29T00:00:00Z','2026-08-30T00:00:00Z')`,
+      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${session},${adminId}::uuid,${fixtureNow},${fixtureExpiry})`,
     );
     await database.db.execute(
-      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${approverSession},${approverId}::uuid,'2026-08-29T00:00:00Z','2026-08-30T00:00:00Z')`,
+      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${approverSession},${approverId}::uuid,${fixtureNow},${fixtureExpiry})`,
     );
     await database.db.execute(
-      sql`insert into admin_approvals(id,action,object_type,object_id,requester_id,requester_session_id_hash,payload_hash,required_role,requester_mfa_verified_at,expires_at,nonce,created_at) values(${approvalId}::uuid,'expert_residency.tariff_create','expert_residency_tariff_version',${randomUUID()}::uuid,${adminId}::uuid,${session},'sha256:b3','entitlement_admin','2026-08-29T00:00:00Z','2026-08-30T00:00:00Z',${`nonce:${randomUUID()}`},'2026-08-29T00:00:00Z')`,
+      sql`insert into admin_approvals(id,action,object_type,object_id,requester_id,requester_session_id_hash,payload_hash,required_role,requester_mfa_verified_at,expires_at,nonce,created_at) values(${approvalId}::uuid,'expert_residency.tariff_create','expert_residency_tariff_version',${randomUUID()}::uuid,${adminId}::uuid,${session},'sha256:b3','entitlement_admin',${fixtureNow},${fixtureExpiry},${`nonce:${randomUUID()}`},${fixtureNow})`,
     );
     await database.db.execute(
       sql`insert into expert_residency_tariff_versions(id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values(${tariffId}::uuid,'b3','B3',590000,'RUB',2592000,'2026-08-01','2026-09-30',${approvalId}::uuid,${session})`,
     );
     await database.db.execute(
-      sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B3',590000,'RUB',2592000,0,590000,'2026-08-29T13:00:00Z','2026-08-29T14:00:00Z','b3-revenue','settled','2026-08-20T00:00:00Z','2026-08-20T00:00:00Z','2026-09-19T00:00:00Z')`,
+      sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B3',590000,'RUB',2592000,0,590000,${paymentDeadline},${providerDeadline},'b3-revenue','settled',${settledAt},${settledAt},${residencyEnd})`,
     );
     await database.db.execute(
-      sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status) values(${expertId}::uuid,${tariffId}::uuid,'Quoted ignored',590000,'RUB',2592000,290000,300000,'2026-08-29T13:00:00Z','2026-08-29T14:00:00Z','b3-quoted','quoted')`,
+      sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status) values(${expertId}::uuid,${tariffId}::uuid,'Quoted ignored',590000,'RUB',2592000,290000,300000,${paymentDeadline},${providerDeadline},'b3-quoted','quoted')`,
     );
     const insertPolicy = (id: string, approval: string, version: number) =>
       database.db.execute(

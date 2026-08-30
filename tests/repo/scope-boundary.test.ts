@@ -390,6 +390,8 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
     "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
     "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
+    "packages/db/migrations/0037_partner_commerce_a.sql",
+    "packages/db/migrations/0038_test_expert_trial.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {

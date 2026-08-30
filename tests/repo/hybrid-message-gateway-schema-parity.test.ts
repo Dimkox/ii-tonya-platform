@@ -28,7 +28,7 @@ describe("B1 schema/migration parity", () => {
       'CREATE INDEX "dialogue_inbound_expiry_idx" ON dialogue_inbound(expires_at, id)',
     );
   });
-  it("journals B1 exactly once and advances through B3", () => {
+  it("journals B1 exactly once and advances through the current schema", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: { idx: number; tag: string }[] };
@@ -38,10 +38,10 @@ describe("B1 schema/migration parity", () => {
       ),
     ).toHaveLength(1);
     expect(journal.entries.at(-1)).toEqual({
-      idx: 36,
+      idx: 38,
       version: "7",
-      when: 1788220800000,
-      tag: "0036_selarti_budget_controls_b3",
+      when: 1788393600000,
+      tag: "0038_test_expert_trial",
       breakpoints: true,
     });
   });

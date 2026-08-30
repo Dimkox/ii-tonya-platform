@@ -71,6 +71,12 @@ describe("B1 dedicated Telegram HTTP to PostgreSQL path", () => {
       if (Number.isNaN(fixtureNow.getTime()))
         throw new Error("b1_fixture_clock_invalid");
       const fixtureExpiry = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+      const paymentDeadline = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+      const providerDeadline = new Date(
+        fixtureNow.getTime() + 2 * 60 * 60 * 1000,
+      );
+      const settledAt = new Date("2026-08-28T00:00:00Z");
+      const residencyEnd = new Date("2026-09-27T00:00:00Z");
       const fixtureDatabase = database;
       const seed = async (
         externalId: string,
@@ -151,9 +157,9 @@ describe("B1 dedicated Telegram HTTP to PostgreSQL path", () => {
         idempotency_key,status,settled_at,residency_starts_at,residency_ends_at
       ) values(
         ${expertId}::uuid,${tariffId}::uuid,'B1 HTTP budget',590000,'RUB',2592000,
-        0,590000,'2026-08-29T13:00:00Z','2026-08-29T14:00:00Z',
-        'b1-http-settled-cash','settled','2026-08-20T00:00:00Z',
-        '2026-08-20T00:00:00Z','2026-09-19T00:00:00Z'
+        0,590000,${paymentDeadline},${providerDeadline},
+        'b1-http-settled-cash','settled',${settledAt},
+        ${settledAt},${residencyEnd}
       )
     `);
       await database.db.execute(

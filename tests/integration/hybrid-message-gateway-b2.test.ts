@@ -52,43 +52,99 @@ describe("hybrid gateway B2 ordered local delivery", () => {
     const policyId = randomUUID();
     const requesterSession = `b2-requester:${randomUUID()}`;
     const approverSession = `b2-approver:${randomUUID()}`;
-    // Business occurrences are fixed; only approval/session validity uses the live DB clock.
+    const fixtureClock = await database.db.execute<{ now: Date | string }>(
+      sql`select clock_timestamp() as now`,
+    );
+    const rawFixtureNow = fixtureClock.rows[0]?.now;
+    if (rawFixtureNow === undefined)
+      throw new Error("b2_fixture_clock_missing");
+    const fixtureNow = new Date(rawFixtureNow);
+    if (Number.isNaN(fixtureNow.getTime()))
+      throw new Error("b2_fixture_clock_invalid");
     const tariffActiveFrom = new Date("2026-08-01T00:00:00Z");
     const fixtureExpiry = new Date("2027-08-29T00:00:00Z");
-    const approvalNow = new Date();
+    const approvalNow = fixtureNow;
     const approvalExpiry = new Date(approvalNow.getTime() + 60 * 60 * 1000);
+    const paymentDeadline = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+    const providerDeadline = new Date(
+      fixtureNow.getTime() + 2 * 60 * 60 * 1000,
+    );
     const settledAt = new Date("2026-08-28T00:00:00Z");
     const residencyEnd = new Date("2026-09-27T00:00:00Z");
-    await database.db.execute(sql`insert into experts(id,user_id,active,verified) values(${expertId}::uuid,${expertUser}::uuid,true,true)`);
-    await database.db.execute(sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${requesterSession},${requester}::uuid,${approvalNow},${approvalExpiry}),(${approverSession},${approver}::uuid,${approvalNow},${approvalExpiry})`);
-    await database.db.execute(sql`insert into admin_role_assignments(admin_id,role) values(${requester}::uuid,'security_admin'),(${approver}::uuid,'security_admin'),(${requester}::uuid,'entitlement_admin'),(${approver}::uuid,'entitlement_admin')`);
+    await database.db.execute(
+      sql`insert into experts(id,user_id,active,verified) values(${expertId}::uuid,${expertUser}::uuid,true,true)`,
+    );
+    await database.db.execute(
+      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${requesterSession},${requester}::uuid,${approvalNow},${approvalExpiry}),(${approverSession},${approver}::uuid,${approvalNow},${approvalExpiry})`,
+    );
+    await database.db.execute(
+      sql`insert into admin_role_assignments(admin_id,role) values(${requester}::uuid,'security_admin'),(${approver}::uuid,'security_admin'),(${requester}::uuid,'entitlement_admin'),(${approver}::uuid,'entitlement_admin')`,
+    );
     const approvals = new PostgresAdminApprovalRepository(database.db);
     const tariffRequest = await approvals.requestApproval({
-      sessionIdHash: requesterSession, action: "expert_residency.tariff_create",
-      objectType: "expert_residency_tariff_version", objectId: tariffId,
-      payload: "b2-budget:590000:RUB:2592000", nonce: "b2-budget-tariff-v1",
+      sessionIdHash: requesterSession,
+      action: "expert_residency.tariff_create",
+      objectType: "expert_residency_tariff_version",
+      objectId: tariffId,
+      payload: "b2-budget:590000:RUB:2592000",
+      nonce: "b2-budget-tariff-v1",
     });
     if (!tariffRequest) throw new Error("b2_tariff_approval_failed");
-    if (!await approvals.approveApproval({ approvalId: tariffRequest.approvalId, sessionIdHash: approverSession }))
+    if (
+      !(await approvals.approveApproval({
+        approvalId: tariffRequest.approvalId,
+        sessionIdHash: approverSession,
+      }))
+    )
       throw new Error("b2_tariff_approval_rejected");
-    await database.db.execute(sql`insert into expert_residency_tariff_versions(id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values(${tariffId}::uuid,'b2-budget','B2 budget',590000,'RUB',2592000,${tariffActiveFrom},${fixtureExpiry},${tariffRequest.approvalId}::uuid,${requesterSession})`);
-    await database.db.execute(sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B2 budget',590000,'RUB',2592000,0,590000,'2026-08-30T00:00:00Z','2026-08-30T00:00:00Z','b2-settled-cash','settled',${settledAt},${settledAt},${residencyEnd})`);
-    await database.db.execute(sql`insert into admin_object_assignments(admin_id,object_type,object_id) values(${requester}::uuid,'selarti_budget_policy',${policyId}::uuid)`);
+    await database.db.execute(
+      sql`insert into expert_residency_tariff_versions(id,tariff_key,display_name,price_minor,currency,duration_seconds,active_from,active_to,approval_id,admin_session_id_hash) values(${tariffId}::uuid,'b2-budget','B2 budget',590000,'RUB',2592000,${tariffActiveFrom},${fixtureExpiry},${tariffRequest.approvalId}::uuid,${requesterSession})`,
+    );
+    await database.db.execute(
+      sql`insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at) values(${expertId}::uuid,${tariffId}::uuid,'B2 budget',590000,'RUB',2592000,0,590000,${paymentDeadline},${providerDeadline},'b2-settled-cash','settled',${settledAt},${settledAt},${residencyEnd})`,
+    );
+    await database.db.execute(
+      sql`insert into admin_object_assignments(admin_id,object_type,object_id) values(${requester}::uuid,'selarti_budget_policy',${policyId}::uuid)`,
+    );
     const policyPayload = selartiBudgetPolicyApprovalPayload({
-      version: 1, status: "approved", effectiveFrom: "2026-01-01T00:00:00.000Z", effectiveTo: null,
-      globalCapRubMinor: 59000n, globalWarningRubMinor: 58000n, globalSoftRubMinor: 58500n,
-      perUserWarningRubMinor: 58000n, perUserSoftRubMinor: 58500n, perUserHardRubMinor: 59000n,
-      officialUsdRubQuoteMicros: 85_954_100n, selartiUpliftBps: 1000, usdMicrosPerRequest: 0n,
-      usdMicrosPerUnit: 30_000n, worstCaseBillableUnits: 2n, rateVersion: "cbr-b2", modelVersion: "selarti-b2", stressInflationBps: 6000,
+      version: 1,
+      status: "approved",
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      effectiveTo: null,
+      globalCapRubMinor: 59000n,
+      globalWarningRubMinor: 58000n,
+      globalSoftRubMinor: 58500n,
+      perUserWarningRubMinor: 58000n,
+      perUserSoftRubMinor: 58500n,
+      perUserHardRubMinor: 59000n,
+      officialUsdRubQuoteMicros: 85_954_100n,
+      selartiUpliftBps: 1000,
+      usdMicrosPerRequest: 0n,
+      usdMicrosPerUnit: 30_000n,
+      worstCaseBillableUnits: 2n,
+      rateVersion: "cbr-b2",
+      modelVersion: "selarti-b2",
+      stressInflationBps: 6000,
     });
     const policyRequest = await approvals.requestApproval({
-      sessionIdHash: requesterSession, action: "selarti_budget.policy_approve",
-      objectType: "selarti_budget_policy", objectId: policyId, payload: policyPayload, nonce: "b2-budget-policy-v1",
+      sessionIdHash: requesterSession,
+      action: "selarti_budget.policy_approve",
+      objectType: "selarti_budget_policy",
+      objectId: policyId,
+      payload: policyPayload,
+      nonce: "b2-budget-policy-v1",
     });
     if (!policyRequest) throw new Error("b2_policy_approval_failed");
-    if (!await approvals.approveApproval({ approvalId: policyRequest.approvalId, sessionIdHash: approverSession }))
+    if (
+      !(await approvals.approveApproval({
+        approvalId: policyRequest.approvalId,
+        sessionIdHash: approverSession,
+      }))
+    )
       throw new Error("b2_policy_approval_rejected");
-    await database.db.execute(sql`insert into selarti_budget_policies(id,version,status,effective_from,global_cap_rub_minor,global_warning_rub_minor,global_soft_rub_minor,per_user_warning_rub_minor,per_user_soft_rub_minor,per_user_hard_rub_minor,official_usd_rub_quote_micros,usd_micros_per_request,usd_micros_per_unit,worst_case_billable_units,rate_version,model_version,approval_id) values(${policyId}::uuid,1,'approved','2026-01-01',59000,58000,58500,58000,58500,59000,85954100,0,30000,2,'cbr-b2','selarti-b2',${policyRequest.approvalId}::uuid)`);
+    await database.db.execute(
+      sql`insert into selarti_budget_policies(id,version,status,effective_from,global_cap_rub_minor,global_warning_rub_minor,global_soft_rub_minor,per_user_warning_rub_minor,per_user_soft_rub_minor,per_user_hard_rub_minor,official_usd_rub_quote_micros,usd_micros_per_request,usd_micros_per_unit,worst_case_billable_units,rate_version,model_version,approval_id) values(${policyId}::uuid,1,'approved','2026-01-01',59000,58000,58500,58000,58500,59000,85954100,0,30000,2,'cbr-b2','selarti-b2',${policyRequest.approvalId}::uuid)`,
+    );
   }, 120_000);
 
   afterAll(async () => database.stop());

@@ -12,10 +12,10 @@ describe("AC-025 exact MVP chain", () => {
       const grant = await app.adminGrantPackage({
         userId: client.userId,
         size: 500,
-        validForDays: 60,
+        validForDays: 30,
         idempotencyKey: "grant-ac025-1",
       });
-      expect(grant.expiresAt).toBe("2026-09-26T10:00:00.000Z");
+      expect(grant.expiresAt).toBe("2026-08-27T10:00:00.000Z");
       await app.acceptOrdinaryInbound({
         client,
         text: "Подбери проверенного специалиста",

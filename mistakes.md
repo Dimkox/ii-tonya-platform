@@ -37,3 +37,5 @@ The B1 paid-route fixture used independent `clock_timestamp()` calls for MFA and
 Release slices did not update cross-release characterization and boundary pins. The root cause was treating each release migration as locally complete while shared scope detectors, hashes, journals, and environment fixtures remained on the prior release contract.
 
 The B2 fixture used a 10x tariff and mixed wall-clock approval dates with fixed occurrence dates; full integration teardown also exceeded Vitest's default 10s under concurrent schema cleanup. The root cause was not separating DB-now approval controls from deterministic business fixtures and not sizing the shared teardown budget to measured parallel cleanup.
+
+The partner/trial release changed package validity and added migrations without advancing shared schema, scope-hash, and smoke characterizations; hybrid fixtures also let payment deadlines expire while their business occurrence remained fixed. The root cause was updating vertical feature tests without replaying cross-release contracts and without separating live database lifecycle timestamps from deterministic revenue-window timestamps.

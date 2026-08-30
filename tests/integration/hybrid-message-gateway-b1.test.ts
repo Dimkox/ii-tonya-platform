@@ -38,6 +38,12 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
       if (Number.isNaN(fixtureNow.getTime()))
         throw new Error("b1_fixture_clock_invalid");
       const fixtureExpiry = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+      const paymentDeadline = new Date(fixtureNow.getTime() + 60 * 60 * 1000);
+      const providerDeadline = new Date(
+        fixtureNow.getTime() + 2 * 60 * 60 * 1000,
+      );
+      const settledAt = new Date("2026-08-28T00:00:00Z");
+      const residencyEnd = new Date("2026-09-27T00:00:00Z");
       const expertUser = await db.createUser();
       const requester = await db.createUser();
       const approver = await db.createUser();
@@ -79,7 +85,7 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
       `);
       await db.db.execute(sql`
         insert into expert_residency_orders(expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,idempotency_key,status,settled_at,residency_starts_at,residency_ends_at)
-        values(${expertId}::uuid,${tariffId}::uuid,'B1 budget',590000,'RUB',2592000,0,590000,'2026-08-29T13:00:00Z','2026-08-29T14:00:00Z','b1-settled-cash','settled','2026-08-20T00:00:00Z','2026-08-20T00:00:00Z','2026-09-19T00:00:00Z')
+        values(${expertId}::uuid,${tariffId}::uuid,'B1 budget',590000,'RUB',2592000,0,590000,${paymentDeadline},${providerDeadline},'b1-settled-cash','settled',${settledAt},${settledAt},${residencyEnd})
       `);
       await db.db.execute(
         sql`insert into admin_object_assignments(admin_id,object_type,object_id) values(${requester}::uuid,'selarti_budget_policy',${policyId}::uuid)`,
@@ -125,7 +131,6 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
       `);
       repository = new PostgresHybridMessageRepository(db.db);
     } catch (error) {
-      if (database !== undefined) await database.stop();
       throw error;
     }
   }, 120_000);
