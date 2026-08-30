@@ -16,3 +16,7 @@ B3 derives the live hard cap only from settled expert-residency cash and snapsho
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.
+
+## 2026-08-30 — Bound the client trial and shorten future validity windows
+
+New paid/admin message grants use 30 days and future coupon grants use 45 days, while historical rows remain unchanged. The `тест эксперт` campaign reserves two PostgreSQL-owned units per AI turn, caps each redemption at 100 visible units, and keeps deterministic qualification outside the trial ledger; this makes cost and replay behavior auditable without re-gating free V2 clients.

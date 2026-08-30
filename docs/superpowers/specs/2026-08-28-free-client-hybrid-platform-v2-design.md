@@ -361,3 +361,12 @@ The V2 release train is complete when:
 - No simultaneous webhook ownership by Selarti and the platform.
 - No live credential entry, provider activation, production deployment, destructive
   migration, or historical ledger rewrite as part of implementation PRs.
+
+## 11. 2026-08-30 client-terms amendment
+
+The exact client-package, deferred-coupon, and `тест эксперт` trial rules in
+[`2026-08-30-client-terms-and-test-expert-trial-design.md`](2026-08-30-client-terms-and-test-expert-trial-design.md)
+supersede only the conflicting validity and trial rules in this document. In
+particular, newly issued paid/admin packages use 30 days, future coupon grants use
+45 days after separate activation, intro remains 100/no-expiry, and the dedicated
+trial is capped at 100 visible-message units with two units reserved per AI turn.
