@@ -204,7 +204,7 @@ ambiguous, or wrong-policy-version consent fails closed.
 
 Promo+Deterministic alone provides zero-unit behavior. Residual AI additionally requires one active
 database campaign linked to an approved prompt asset with official-contract evidence and every
-existing B1/B2/B3 capability. One residual turn reserves two units, passes B3 cost admission, and
+existing B1/B2/B3 capability; startup and API composition also require both `TEST_EXPERT_RECONCILIATION_ENABLED` and `WORKER_OUTBOX_DELIVERY_ENABLED`. One residual turn reserves two units, passes B3 cost admission, and
 creates one idempotent `selarti.request.v1`; there is no direct provider dispatch. Only B2 response
 convergence creates the same-dialogue `telegram.send_text.v1` answer and moves reserved units to
 consumed. A bounded scanner preserves delayed, lost, and ambiguous outcomes, reconciles a durable B2

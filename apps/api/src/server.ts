@@ -307,7 +307,9 @@ export const createDefaultLifecycle = (
       config.features.selartiCostAdmission === true &&
       config.features.selartiResponseIngress === true &&
       config.features.b2TelegramDispatch === true &&
-      config.features.b2SensitiveRetention === true;
+      config.features.b2SensitiveRetention === true &&
+      config.features.testExpertReconciliation === true &&
+      config.features.workerOutboxDelivery === true;
     const testExpertPromo =
       config.features.testExpertPromo === true &&
       config.features.testExpertDeterministicFlow === true

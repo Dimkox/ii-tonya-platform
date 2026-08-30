@@ -119,6 +119,66 @@ describe("server composition", () => {
     )) as { testExpertPromo?: unknown };
     expect(base.testExpertPromo).toBeDefined();
   });
+
+  it("keeps residual disabled unless reconciliation and worker outbox capabilities are enabled", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const baseFeatures = {
+      workerOutboxDelivery: true,
+      clientCatalog: false,
+      clientHybridRouting: true,
+      selartiCostAdmission: true,
+      selartiResponseIngress: true,
+      b2TelegramDispatch: true,
+      b2SensitiveRetention: true,
+      testExpertPromo: true,
+      testExpertDeterministicFlow: true,
+      testExpertSelarti: true,
+      testExpertReconciliation: true,
+      expertReferral: false,
+      expertReferralMaturityWorker: false,
+      expertResidencyBilling: false,
+    };
+    const compose = async (features: typeof baseFeatures) =>
+      (await createDefaultLifecycle({
+        testExpertMetricSink: { record: () => undefined },
+      }).dependencies(
+        {
+          databaseUrl: "postgresql://placeholder.invalid/test",
+          integrations: {
+            selarti: false,
+            planerka: false,
+            telegram: false,
+            makeProjection: false,
+            intentModel: false,
+            payments: false,
+          },
+          minorOnboarding: false,
+          rawConversationLogging: false,
+          selartiOutboundBillingMode: "disabled",
+          displayTimezone: "Europe/Moscow",
+          yookassaRecovery: { enabled: false },
+          clientTelegramBotKey: "bot-client",
+          features,
+        },
+        fakeDb,
+      )) as { testExpertPromo: { residualEnabled: boolean } };
+
+    expect(
+      (await compose({ ...baseFeatures, testExpertReconciliation: false }))
+        .testExpertPromo.residualEnabled,
+    ).toBe(false);
+    expect(
+      (await compose({ ...baseFeatures, workerOutboxDelivery: false }))
+        .testExpertPromo.residualEnabled,
+    ).toBe(false);
+    expect((await compose(baseFeatures)).testExpertPromo.residualEnabled).toBe(
+      true,
+    );
+  });
   it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),

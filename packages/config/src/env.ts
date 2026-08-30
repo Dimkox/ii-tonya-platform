@@ -405,7 +405,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       value.SELARTI_COST_ADMISSION_ENABLED !== "true" ||
       value.SELARTI_RESPONSE_INGRESS_ENABLED !== "true" ||
       value.B2_TELEGRAM_DISPATCH_ENABLED !== "true" ||
-      value.B2_SENSITIVE_RETENTION_ENABLED !== "true")
+      value.B2_SENSITIVE_RETENTION_ENABLED !== "true" ||
+      value.TEST_EXPERT_RECONCILIATION_ENABLED !== "true" ||
+      value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true")
   )
     throw new Error("test_expert_residual_configuration_incomplete");
   if (value.SELARTI_RESPONSE_INGRESS_ENABLED === "true") {
