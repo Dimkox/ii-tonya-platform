@@ -69,11 +69,11 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 **Interfaces:** `WarmupStateMachine.next(input): WarmupResult`, `segmentParticipant(input): ParticipantSegment`, and `TestExpertTrialService.handle(input): TrialRouteResult`. The service must call `reserveAiTurn` only for one residual provider request and must pass pricing requests to existing expert/partner policy services.
 
-- [ ] Write RED tests for deterministic zero-unit warmup, incomplete qualification, expert/center/organizer segmentation, authoritative quote sourcing, and fail-closed policy absence.
-- [ ] Run the focused application tests and verify failures before implementation.
-- [ ] Implement finite state transitions and typed results; no LLM prompt decides state, price, or participant kind.
-- [ ] Add applied/not-applied/unknown transitions and duplicate replay behavior through the repository interface.
-- [ ] Run focused tests and package typecheck; expect PASS.
+- [x] Write RED tests for deterministic zero-unit warmup, incomplete qualification, expert/center/organizer segmentation, authoritative quote sourcing, and fail-closed policy absence.
+- [x] Run `corepack pnpm vitest run packages/application/src/test-expert-trial-service.test.ts`; RED captured before implementation with the missing application modules.
+- [x] Implement finite state transitions and typed results; no LLM prompt decides state, price, or participant kind.
+- [x] Add applied/not-applied/unknown transitions and duplicate replay behavior through the repository interface.
+- [x] Run focused tests and `corepack pnpm --filter @ii-tonya/application typecheck`; GREEN: 15 tests passed and application typecheck passed.
 
 ### Task 4: Default-off API and Telegram composition
 

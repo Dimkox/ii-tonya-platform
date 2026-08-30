@@ -23,3 +23,6 @@ export * from "./hybrid-message-gateway.js";
 export * from "./selarti-response-service.js";
 export * from "./selarti-cost-calculator.js";
 export * from "./partner-commerce.js";
+export * from "./test-expert-warmup.js";
+export * from "./test-expert-segmentation.js";
+export * from "./test-expert-trial-service.js";
