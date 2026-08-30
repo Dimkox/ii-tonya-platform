@@ -39,6 +39,43 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("composes the PostgreSQL test-expert boundary for deterministic flow without provider activation", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const base = (await createDefaultLifecycle().dependencies(
+      {
+        databaseUrl: "postgresql://placeholder.invalid/test",
+        integrations: {
+          selarti: false,
+          planerka: false,
+          telegram: false,
+          makeProjection: false,
+          intentModel: false,
+          payments: false,
+        },
+        minorOnboarding: false,
+        rawConversationLogging: false,
+        selartiOutboundBillingMode: "disabled",
+        displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          testExpertPromo: true,
+          testExpertDeterministicFlow: true,
+          testExpertSelarti: false,
+          expertReferral: false,
+          expertReferralMaturityWorker: false,
+          expertResidencyBilling: false,
+        },
+      },
+      fakeDb,
+    )) as { testExpertPromo?: unknown };
+    expect(base.testExpertPromo).toBeDefined();
+  });
   it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),

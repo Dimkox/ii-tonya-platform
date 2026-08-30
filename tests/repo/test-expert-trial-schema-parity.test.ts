@@ -31,6 +31,18 @@ describe("test expert trial schema parity", () => {
     expect(names(schema.testExpertReservations).checks).toContain(
       "test_expert_reservation_units_check",
     );
+    expect(names(schema.testExpertCampaignVersions).indexes).toContain(
+      "test_expert_campaign_one_active_idx",
+    );
+    expect(names(schema.testExpertReservations).indexes).toContain(
+      "test_expert_reservations_unknown_global_idx",
+    );
+    expect(names(schema.testExpertReservations).checks).toEqual(
+      expect.arrayContaining([
+        "test_expert_reservation_status_check",
+        "test_expert_reservation_provider_request_check",
+      ]),
+    );
   });
 
   it("keeps migration additive, inactive by default, and detached from financial ledgers", () => {
@@ -51,6 +63,13 @@ describe("test expert trial schema parity", () => {
     );
     expect(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
-    ).toContain("0038_test_expert_trial");
+    ).toContain("0039_test_expert_trial_hardening");
+    const hardening = readFileSync(
+      "packages/db/migrations/0039_test_expert_trial_hardening.sql",
+      "utf8",
+    );
+    expect(hardening).toContain("test_expert_campaign_one_active_idx");
+    expect(hardening).toContain("test_expert_reservations_unknown_global_idx");
+    expect(hardening).toContain("provider_request_id");
   });
 });

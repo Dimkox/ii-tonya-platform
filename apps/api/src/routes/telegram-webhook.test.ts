@@ -6,6 +6,7 @@ import {
   telegramWebhookRoutes,
   type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
+  type TelegramTestExpertPromoIngress,
 } from "./telegram-webhook.js";
 
 const secret = "telegram-webhook-secret";
@@ -19,6 +20,8 @@ const build = async (
     clientHandle?: (
       raw: unknown,
     ) => Promise<{ status: string; route?: string }>;
+    promoEnabled?: boolean;
+    promo?: TelegramTestExpertPromoIngress;
   } = {},
 ) => {
   const claim = vi.fn<WebhookInbox["claim"]>(async () => ({
@@ -120,6 +123,8 @@ const build = async (
       options.clientHandle === undefined
         ? undefined
         : { handle: clientGatewayHandle },
+    testExpertPromoEnabled: options.promoEnabled ?? false,
+    ...(options.promo === undefined ? {} : { testExpertPromo: options.promo }),
   });
   return {
     app,
@@ -145,6 +150,74 @@ const build = async (
 const headers = { "x-telegram-bot-api-secret-token": secret };
 
 describe("Telegram webhook callback boundary", () => {
+  it("derives promo identity from an authenticated private Telegram update and rate-limits before dispatch", async () => {
+    const calls: unknown[] = [];
+    const promo: TelegramTestExpertPromoIngress = {
+      resolvePrincipal: vi.fn(async (telegramUserId) =>
+        telegramUserId === "123456789"
+          ? { userId: "00000000-0000-4000-8000-000000000100" }
+          : null,
+      ),
+      handle: vi.fn(async (input) => {
+        calls.push(input);
+        return {
+          status: "success" as const,
+          result: { kind: "deterministic" },
+        };
+      }),
+    };
+    const keys: string[] = [];
+    const state = await build({
+      promoEnabled: true,
+      promo,
+      consume: (key) => {
+        keys.push(key);
+        return !key.startsWith("telegram:test-expert:blocked");
+      },
+    });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 9301,
+          message: {
+            from: { id: 123456789 },
+            chat: { id: 123456789, type: "private" },
+            text: "тест эксперт",
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(calls).toEqual([
+        expect.objectContaining({
+          userId: "00000000-0000-4000-8000-000000000100",
+          telegramUserId: "123456789",
+          text: "тест эксперт",
+          requestKey: "telegram:9301:test-expert",
+        }),
+      ]);
+      expect(JSON.stringify(calls)).not.toContain('telegramUserId":"999');
+      expect(keys).toContain("telegram:test-expert:123456789");
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("does not expose the former unauthenticated promo body route", async () => {
+    const state = await build();
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/test-expert-promo/message",
+        payload: { telegramUserId: "123456789", text: "тест эксперт" },
+      });
+      expect(response.statusCode).toBe(404);
+    } finally {
+      await state.app.close();
+    }
+  });
   it.each([
     ["accepted", 200, { status: "accepted", route: "deterministic" }],
     ["duplicate", 200, { status: "duplicate" }],

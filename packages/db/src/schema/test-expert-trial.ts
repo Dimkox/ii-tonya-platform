@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
@@ -32,6 +33,18 @@ export const testExpertCampaignVersions = pgTable(
   },
   (t) => [
     unique("test_expert_campaign_code_version_unique").on(t.code, t.version),
+    uniqueIndex("test_expert_campaign_one_active_idx")
+      .on(t.code)
+      .where(sql`${t.status}='active'`),
+    check(
+      "test_expert_campaign_code_bounded",
+      sql`char_length(${t.code}) between 1 and 128`,
+    ),
+    check("test_expert_campaign_version_positive", sql`${t.version} > 0`),
+    check(
+      "test_expert_campaign_status_check",
+      sql`${t.status} in ('inactive','active','retired')`,
+    ),
     check("test_expert_campaign_cap_check", sql`${t.capUnits} = 100`),
     check(
       "test_expert_campaign_provider_calls_check",
@@ -62,6 +75,15 @@ export const testExpertRedemptions = pgTable(
       "test_expert_redemption_capacity_check",
       sql`${t.consumedUnits} >= 0 and ${t.reservedUnits} >= 0 and ${t.consumedUnits} + ${t.reservedUnits} <= ${t.grantedUnits}`,
     ),
+    check(
+      "test_expert_redemption_key_bounded",
+      sql`char_length(${t.redemptionIdempotencyKey}) between 1 and 128`,
+    ),
+    check("test_expert_redemption_granted_check", sql`${t.grantedUnits}=100`),
+    check(
+      "test_expert_redemption_units_even_check",
+      sql`${t.consumedUnits}%2=0 and ${t.reservedUnits}%2=0`,
+    ),
   ],
 );
 export const testExpertReservations = pgTable(
@@ -88,7 +110,29 @@ export const testExpertReservations = pgTable(
       t.status,
       t.createdAt,
     ),
+    index("test_expert_reservations_unknown_global_idx")
+      .on(t.createdAt, t.id)
+      .where(sql`${t.status}='unknown'`),
+    uniqueIndex("test_expert_reservations_provider_request_idx")
+      .on(t.providerRequestId)
+      .where(sql`${t.providerRequestId} is not null`),
+    check(
+      "test_expert_reservation_key_bounded",
+      sql`char_length(${t.requestKey}) between 1 and 128`,
+    ),
+    check(
+      "test_expert_reservation_digest_check",
+      sql`${t.requestDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
     check("test_expert_reservation_units_check", sql`${t.units} = 2`),
+    check(
+      "test_expert_reservation_status_check",
+      sql`${t.status} in ('reserved','unknown','applied','not_applied')`,
+    ),
+    check(
+      "test_expert_reservation_provider_request_check",
+      sql`(${t.status} in ('unknown','applied') and ${t.providerRequestId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') or (${t.status} in ('reserved','not_applied') and (${t.providerRequestId} is null or ${t.providerRequestId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'))`,
+    ),
   ],
 );
 export const testExpertOutcomes = pgTable(
@@ -109,6 +153,18 @@ export const testExpertOutcomes = pgTable(
       t.reservationId,
       t.outcome,
     ),
+    index("test_expert_outcomes_reservation_idx").on(
+      t.reservationId,
+      t.recordedAt,
+    ),
+    check(
+      "test_expert_outcome_value_check",
+      sql`${t.outcome} in ('unknown','applied','not_applied')`,
+    ),
+    check(
+      "test_expert_outcome_provider_request_check",
+      sql`(${t.outcome} in ('unknown','applied') and ${t.providerRequestId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') or (${t.outcome}='not_applied' and (${t.providerRequestId} is null or ${t.providerRequestId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'))`,
+    ),
   ],
 );
 export const testExpertAuditEvents = pgTable(
@@ -127,5 +183,13 @@ export const testExpertAuditEvents = pgTable(
   },
   (t) => [
     index("test_expert_audit_redemption_idx").on(t.redemptionId, t.createdAt),
+    check(
+      "test_expert_audit_type_bounded",
+      sql`char_length(${t.eventType}) between 1 and 64`,
+    ),
+    check(
+      "test_expert_audit_digest_check",
+      sql`${t.eventDigest} is null or ${t.eventDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
   ],
 );

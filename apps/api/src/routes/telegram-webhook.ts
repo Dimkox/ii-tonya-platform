@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   ExpertAiIngressService,
   ExpertPrincipal,
@@ -31,6 +31,29 @@ export interface TelegramCallbackService {
 export interface TelegramExpertAiIngress {
   resolvePrincipal(telegramUserId: string): Promise<ExpertPrincipal | null>;
   handle: ExpertAiIngressService["handle"];
+}
+
+export interface TelegramTestExpertPromoIngress {
+  readonly residualEnabled?: boolean;
+  resolvePrincipal(
+    telegramUserId: string,
+  ): Promise<{ readonly userId: string } | null>;
+  handle(input: {
+    readonly userId: string;
+    readonly telegramUserId: string;
+    readonly text: string;
+    readonly requestKey: string;
+    readonly requestDigest: string;
+    readonly correlationId: string;
+  }): Promise<{
+    readonly status:
+      | "disabled"
+      | "invalid_request"
+      | "limit_reached"
+      | "unavailable"
+      | "success";
+    readonly result?: unknown;
+  }>;
 }
 
 export interface TelegramExpertQueryIngress {
@@ -150,6 +173,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientHybridRoutingEnabled: boolean | undefined;
   clientBotKey: string | undefined;
   clientGateway: HybridGateway | undefined;
+  testExpertPromoEnabled?: boolean;
+  testExpertPromo?: TelegramTestExpertPromoIngress;
 }> = async (app, deps) => {
   if (
     (deps.expertQueriesEnabled === true ||
@@ -450,6 +475,86 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       if (message && typeof message === "object") {
         const record = message as Record<string, unknown>;
         const text = record.text;
+        if (
+          deps.testExpertPromoEnabled === true &&
+          deps.testExpertPromo !== undefined &&
+          typeof text === "string" &&
+          /^(?:тест эксперт|\/test_expert)(?:\s|$)/iu.test(text.trim())
+        ) {
+          const from = record.from;
+          const chat = record.chat;
+          const telegramUserId =
+            from && typeof from === "object"
+              ? String((from as Record<string, unknown>).id ?? "")
+              : "";
+          const chatRecord =
+            chat && typeof chat === "object"
+              ? (chat as Record<string, unknown>)
+              : undefined;
+          if (
+            !numericIdentity.test(telegramUserId) ||
+            chatRecord?.type !== "private" ||
+            String(chatRecord.id ?? "") !== telegramUserId ||
+            text.trim().length === 0 ||
+            text.length > 4_096 ||
+            /[\u0000-\u001F\u007F-\u009F]/u.test(text)
+          )
+            return reply
+              .code(403)
+              .send({ error: "invalid_test_expert_request" });
+          if (
+            !deps.rateLimiter.consume(
+              `telegram:test-expert:${telegramUserId}`,
+              20,
+              60_000,
+            )
+          )
+            return reply.code(429).send({ error: "rate_limited" });
+          const principal =
+            await deps.testExpertPromo.resolvePrincipal(telegramUserId);
+          if (principal === null)
+            return reply
+              .code(403)
+              .send({ error: "invalid_test_expert_request" });
+          const updateId = String(body.update_id);
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed")
+            return { accepted: true, duplicate: true };
+          try {
+            const result = await deps.testExpertPromo.handle({
+              userId: principal.userId,
+              telegramUserId,
+              text,
+              requestKey: `telegram:${updateId}:test-expert`,
+              requestDigest: createHash("sha256").update(text).digest("hex"),
+              correlationId,
+            });
+            if (result.status === "limit_reached") {
+              await deps.inbox.complete(claim.claimId);
+              return reply
+                .code(429)
+                .send({ error: "test_expert_limit_reached" });
+            }
+            if (result.status === "invalid_request") {
+              await deps.inbox.complete(claim.claimId);
+              return reply
+                .code(400)
+                .send({ error: "invalid_test_expert_request" });
+            }
+            if (
+              result.status === "disabled" ||
+              result.status === "unavailable"
+            ) {
+              await deps.inbox.fail(claim.claimId);
+              return reply.code(503).send({ error: "test_expert_unavailable" });
+            }
+            await deps.inbox.complete(claim.claimId);
+            return { accepted: true, route: "test_expert" };
+          } catch {
+            await deps.inbox.fail(claim.claimId);
+            return reply.code(503).send({ error: "test_expert_unavailable" });
+          }
+        }
         if (
           typeof text === "string" &&
           (deps.expertQueriesEnabled === true

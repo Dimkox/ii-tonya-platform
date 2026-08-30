@@ -180,26 +180,41 @@ The `тест эксперт` foundation is capped at 100 visible-message units,
 units reserved per residual AI turn and zero units for deterministic Telegram warmup, qualification,
 segmentation, and authoritative pricing. Explicit segments are `EXPERT`, `CENTER` (studio, salon,
 retreat/wellness center), and `ORGANIZER` (festival, retreat, travel/event organizer). The PostgreSQL
-authority is additive migration `0038_test_expert_trial`; its campaign, redemption, reservation,
+authority is additive migrations `0038_test_expert_trial` and `0039_test_expert_trial_hardening`; its campaign, redemption, reservation,
 outcome, and audit records remain separate from coupons, expert referrals, partner acquisition, and
 B3 cost reservations.
+Redemption keys use the isolated `test-expert:<campaign-version-id>:<internal-user-id>` namespace.
+Read summaries are informational only; locked PostgreSQL transitions remain the sole cap authority.
 
 Four trial controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
 `TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED`, `TEST_EXPERT_SELARTI_ENABLED`, and
-`TEST_EXPERT_PROMPT_VERSION`. The route boundary is present at
-`/v1/test-expert-promo/message`, but provider admission, campaign activation, prompt selection, and
-production/network calls remain blocked until the official Selarti contract, prompt copy, capability,
-and existing B2/B3 gates are approved. The current source prompt is preserved by the inactive
+`TEST_EXPERT_PROMPT_VERSION`. The separate public promo body route has been removed. The default-off
+composition now lives inside authenticated `POST /v1/webhooks/telegram`: it verifies the webhook
+secret, derives immutable identity from a private Telegram update, rate-limits before reservation,
+and resolves the internal user through PostgreSQL. Deterministic trigger, segmentation, and
+authoritative expert/partner tariff lookup work with Promo+Deterministic alone. Residual AI also
+requires one active database campaign, its prompt version in approved runtime metadata, an injected
+provider capability, and all existing B2/B3 gates. No campaign or prompt is seeded active, so provider
+admission and production/network calls remain blocked. The current source prompt is preserved by the inactive
 [prompt manifest](docs/prompts/test-expert-source-manifest.json); it is metadata only and cannot
 activate runtime behavior.
 
 Rollout is additive and flag-off: internal allowlist, bounded cohort, then separately approved
 provider admission. Rollback disables provider admission first, reconciles unknown outcomes, drains
 outboxes, and preserves immutable history; no historical expiry, ledger, prompt, or campaign rows are
-rewritten. Raw text and encrypted provider context retain the existing maximum 30-day policy with
-erasure propagation. Typed trial metrics cover redemption, deterministic offload, reservation,
+rewritten. Raw promo text is ephemeral provider input: it is hashed for idempotency and is not written
+to trial, audit, outcome, or log storage. Existing privacy erasure removes Telegram identity linkage;
+durable bounded trial facts retain only internal identifiers and digests. Typed trial metrics are
+emitted by actual application transitions through an injected sink (default no-op) and cover redemption, deterministic offload, reservation,
 consumption, release, unknown outcomes, cap rejection, duplicates, conversion, cost, and
 reconciliation age. Yandex Metrika and all static scripts in `apps/web/index.html` remain preserved.
+
+Current verification status: focused API, application, config, schema, repository, web, and disposable
+PostgreSQL 17.5 checks are green, including same-key concurrency and provider outcome metadata. The
+single allowed full `pnpm verify` run occurred before this follow-up, failed at test typecheck, and was
+not rerun. Those introduced type regressions and the unrelated partner-pricing test types are now
+fixed under focused typecheck. Restart durability and real database-role denial fixtures remain
+explicit activation blockers pending independent read-only review and exact-SHA CI.
 
 ## Unit-economics planning calculation
 

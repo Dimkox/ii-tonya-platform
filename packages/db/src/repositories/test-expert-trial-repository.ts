@@ -8,12 +8,19 @@ export type TrialRedemption = {
   campaignVersionId: string;
   userId: string;
 };
+export type ActiveTrialCampaign = {
+  id: string;
+  code: string;
+  promptVersion: string;
+};
 export type TrialReservation = {
   reservationId: string;
   redemptionId: string;
   requestKey: string;
   units: 2;
   status: "reserved" | "unknown" | "applied" | "not_applied";
+  providerRequestId?: string;
+  replay: boolean;
 };
 export type TrialSummary = {
   grantedUnits: 100;
@@ -22,6 +29,10 @@ export type TrialSummary = {
 };
 
 export interface TestExpertTrialRepository {
+  resolveTelegramUser(
+    telegramUserId: string,
+  ): Promise<{ userId: string } | null>;
+  resolveActiveCampaign(code: string): Promise<ActiveTrialCampaign | null>;
   createOrGetRedemption(input: {
     campaignVersionId: string;
     userId: string;
@@ -35,10 +46,12 @@ export interface TestExpertTrialRepository {
   recordOutcome(input: {
     reservationId: string;
     outcome: TrialOutcomeKind;
+    providerRequestId?: string;
   }): Promise<TrialSummary>;
   reconcileUnknown(input: {
     reservationId: string;
     outcome: "applied" | "not_applied";
+    providerRequestId: string;
   }): Promise<TrialSummary>;
   summary(redemptionId: string): Promise<TrialSummary>;
 }
@@ -70,6 +83,19 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
   private readonly redemptions = new Map<string, MemRedemption>();
   private readonly reservations = new Map<string, MemReservation>();
   private readonly locks = new Map<string, Promise<void>>();
+  private activeCampaign: ActiveTrialCampaign | null = null;
+
+  setActiveCampaign(campaign: ActiveTrialCampaign | null): void {
+    this.activeCampaign = campaign;
+  }
+  async resolveTelegramUser(): Promise<{ userId: string } | null> {
+    return null;
+  }
+  async resolveActiveCampaign(
+    code: string,
+  ): Promise<ActiveTrialCampaign | null> {
+    return this.activeCampaign?.code === code ? this.activeCampaign : null;
+  }
 
   async createOrGetRedemption(input: {
     campaignVersionId: string;
@@ -138,7 +164,7 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
           throw new TrialIdempotencyConflictError(
             "request_idempotency_conflict",
           );
-        return existing;
+        return { ...existing, replay: true };
       }
       if (redemption.consumed + redemption.reserved + 2 > 100)
         throw new TrialCapReachedError();
@@ -149,6 +175,7 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
         units: 2,
         status: "reserved",
         digest: input.requestDigest,
+        replay: false,
       };
       this.reservations.set(row.reservationId, row);
       redemption.reserved += 2;
@@ -159,16 +186,21 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
   async recordOutcome(input: {
     reservationId: string;
     outcome: TrialOutcomeKind;
+    providerRequestId?: string;
   }): Promise<TrialSummary> {
     const reservation = this.reservations.get(input.reservationId);
     if (!reservation) throw new Error("reservation_not_found");
     return this.locked(reservation.redemptionId, async () => {
       const redemption = this.redemptions.get(reservation.redemptionId)!;
+      this.validateProviderRequestId(input.outcome, input.providerRequestId);
       if (
         reservation.status === input.outcome ||
         (reservation.status === "unknown" && input.outcome === "unknown")
-      )
+      ) {
+        if (reservation.providerRequestId !== input.providerRequestId)
+          throw new TrialOutcomeConflictError("provider_request_id_conflict");
         return this.toSummary(redemption);
+      }
       if (reservation.status !== "reserved")
         throw new TrialOutcomeConflictError(
           reservation.status === "unknown"
@@ -177,11 +209,14 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
         );
       if (input.outcome === "unknown") {
         reservation.status = "unknown";
+        reservation.providerRequestId = input.providerRequestId!;
         return this.toSummary(redemption);
       }
       redemption.reserved -= 2;
       if (input.outcome === "applied") redemption.consumed += 2;
       reservation.status = input.outcome;
+      if (input.providerRequestId !== undefined)
+        reservation.providerRequestId = input.providerRequestId;
       return this.toSummary(redemption);
     });
   }
@@ -189,11 +224,15 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
   async reconcileUnknown(input: {
     reservationId: string;
     outcome: "applied" | "not_applied";
+    providerRequestId: string;
   }): Promise<TrialSummary> {
     const reservation = this.reservations.get(input.reservationId);
     if (!reservation) throw new Error("reservation_not_found");
     return this.locked(reservation.redemptionId, async () => {
       const redemption = this.redemptions.get(reservation.redemptionId)!;
+      this.validateProviderRequestId(input.outcome, input.providerRequestId);
+      if (reservation.providerRequestId !== input.providerRequestId)
+        throw new TrialOutcomeConflictError("provider_request_id_conflict");
       if (reservation.status === input.outcome)
         return this.toSummary(redemption);
       if (reservation.status !== "unknown")
@@ -210,6 +249,21 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
     if (!row) throw new Error("redemption_not_found");
     return this.toSummary(row);
   }
+  private validateProviderRequestId(
+    outcome: TrialOutcomeKind,
+    providerRequestId: string | undefined,
+  ): void {
+    if (
+      (outcome === "applied" || outcome === "unknown") &&
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(providerRequestId ?? "")
+    )
+      throw new Error("provider_request_id_required");
+    if (
+      providerRequestId !== undefined &&
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(providerRequestId)
+    )
+      throw new Error("provider_request_id_invalid");
+  }
   private toSummary(row: MemRedemption): TrialSummary {
     return {
       grantedUnits: 100,
@@ -221,6 +275,30 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
 
 export class PostgresTestExpertTrialRepository implements TestExpertTrialRepository {
   constructor(private readonly db: DrizzleDb) {}
+  async resolveTelegramUser(
+    telegramUserId: string,
+  ): Promise<{ userId: string } | null> {
+    if (!/^[1-9]\d{0,19}$/u.test(telegramUserId)) return null;
+    const rows = await this.db.execute<{ userId: string }>(sql`
+      select ci.user_id as "userId" from channel_identities ci
+      join users u on u.id=ci.user_id and u.active=true
+      where ci.provider='telegram' and ci.external_id=${telegramUserId} and ci.status='active'
+      order by ci.id limit 1`);
+    return rows.rows[0] ?? null;
+  }
+  async resolveActiveCampaign(
+    code: string,
+  ): Promise<ActiveTrialCampaign | null> {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(code)) return null;
+    const rows = await this.db.execute<ActiveTrialCampaign>(sql`
+      select id,code,prompt_version as "promptVersion"
+      from test_expert_campaign_versions
+      where code=${code} and status='active' and prompt_version is not null
+        and (effective_from is null or effective_from <= transaction_timestamp())
+        and (effective_to is null or effective_to > transaction_timestamp())
+      order by version desc limit 2`);
+    return rows.rows.length === 1 ? rows.rows[0]! : null;
+  }
   async createOrGetRedemption(input: {
     campaignVersionId: string;
     userId: string;
@@ -253,6 +331,11 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
     requestDigest: string;
   }): Promise<TrialReservation> {
     return this.db.transaction(async (tx) => {
+      const balance = await tx.execute<{ consumed: number; reserved: number }>(
+        sql`select consumed_units as consumed, reserved_units as reserved from test_expert_redemptions where id=${input.redemptionId}::uuid for update`,
+      );
+      const row = balance.rows[0];
+      if (!row) throw new Error("redemption_not_found");
       const prior = await tx.execute<{
         reservationId: string;
         redemptionId: string;
@@ -260,21 +343,17 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
         requestDigest: string;
         units: number;
         status: TrialReservation["status"];
+        providerRequestId?: string;
       }>(
-        sql`select id as "reservationId", redemption_id as "redemptionId", request_key as "requestKey", request_digest as "requestDigest", units, status from test_expert_reservations where redemption_id=${input.redemptionId}::uuid and request_key=${input.requestKey} for update`,
+        sql`select id as "reservationId", redemption_id as "redemptionId", request_key as "requestKey", request_digest as "requestDigest", units, status,provider_request_id as "providerRequestId" from test_expert_reservations where redemption_id=${input.redemptionId}::uuid and request_key=${input.requestKey} for update`,
       );
       if (prior.rows[0]) {
         if (prior.rows[0].requestDigest !== input.requestDigest)
           throw new TrialIdempotencyConflictError(
             "request_idempotency_conflict",
           );
-        return { ...prior.rows[0], units: 2 as const };
+        return { ...prior.rows[0], units: 2 as const, replay: true };
       }
-      const balance = await tx.execute<{ consumed: number; reserved: number }>(
-        sql`select consumed_units as consumed, reserved_units as reserved from test_expert_redemptions where id=${input.redemptionId}::uuid for update`,
-      );
-      const row = balance.rows[0];
-      if (!row) throw new Error("redemption_not_found");
       if (Number(row.consumed) + Number(row.reserved) + 2 > 100)
         throw new TrialCapReachedError();
       const inserted = await tx.execute<{ reservationId: string }>(
@@ -283,42 +362,73 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
       await tx.execute(
         sql`update test_expert_redemptions set reserved_units=reserved_units+2 where id=${input.redemptionId}::uuid`,
       );
+      await tx.execute(
+        sql`insert into test_expert_audit_events (redemption_id,reservation_id,event_type,event_digest) values (${input.redemptionId}::uuid,${inserted.rows[0]!.reservationId}::uuid,'units_reserved',${input.requestDigest})`,
+      );
       return {
         reservationId: inserted.rows[0]!.reservationId,
         redemptionId: input.redemptionId,
         requestKey: input.requestKey,
         units: 2,
         status: "reserved",
+        replay: false,
       };
     });
   }
   async recordOutcome(input: {
     reservationId: string;
     outcome: TrialOutcomeKind;
+    providerRequestId?: string;
   }): Promise<TrialSummary> {
-    return this.transition(input.reservationId, input.outcome, false);
+    return this.transition(
+      input.reservationId,
+      input.outcome,
+      input.providerRequestId,
+      false,
+    );
   }
   async reconcileUnknown(input: {
     reservationId: string;
     outcome: "applied" | "not_applied";
+    providerRequestId: string;
   }): Promise<TrialSummary> {
-    return this.transition(input.reservationId, input.outcome, true);
+    return this.transition(
+      input.reservationId,
+      input.outcome,
+      input.providerRequestId,
+      true,
+    );
   }
   private async transition(
     id: string,
     outcome: TrialOutcomeKind,
+    providerRequestId: string | undefined,
     reconcile: boolean,
   ): Promise<TrialSummary> {
     return this.db.transaction(async (tx) => {
       const rows = await tx.execute<{
         redemptionId: string;
         status: TrialReservation["status"];
+        providerRequestId?: string;
       }>(
-        sql`select redemption_id as "redemptionId", status from test_expert_reservations where id=${id}::uuid for update`,
+        sql`select redemption_id as "redemptionId", status,provider_request_id as "providerRequestId" from test_expert_reservations where id=${id}::uuid for update`,
       );
       const row = rows.rows[0];
       if (!row) throw new Error("reservation_not_found");
-      if (row.status === outcome) return this.summaryTx(tx, row.redemptionId);
+      const providerIdValid = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(
+        providerRequestId ?? "",
+      );
+      if ((outcome === "applied" || outcome === "unknown") && !providerIdValid)
+        throw new Error("provider_request_id_required");
+      if (providerRequestId !== undefined && !providerIdValid)
+        throw new Error("provider_request_id_invalid");
+      if (row.status === outcome) {
+        if (row.providerRequestId !== providerRequestId)
+          throw new TrialOutcomeConflictError("provider_request_id_conflict");
+        return this.summaryTx(tx, row.redemptionId);
+      }
+      if (reconcile && row.providerRequestId !== providerRequestId)
+        throw new TrialOutcomeConflictError("provider_request_id_conflict");
       if (
         (row.status === "unknown" && !reconcile) ||
         (reconcile && row.status !== "unknown") ||
@@ -330,20 +440,23 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
             : "outcome_conflict",
         );
       await tx.execute(
-        sql`insert into test_expert_outcomes (reservation_id,outcome) values (${id}::uuid,${outcome}) on conflict (reservation_id,outcome) do nothing`,
+        sql`insert into test_expert_outcomes (reservation_id,outcome,provider_request_id) values (${id}::uuid,${outcome},${providerRequestId ?? null}) on conflict (reservation_id,outcome) do nothing`,
       );
       if (outcome === "unknown")
         await tx.execute(
-          sql`update test_expert_reservations set status='unknown' where id=${id}::uuid`,
+          sql`update test_expert_reservations set status='unknown',provider_request_id=${providerRequestId} where id=${id}::uuid`,
         );
       else {
         await tx.execute(
-          sql`update test_expert_reservations set status=${outcome} where id=${id}::uuid`,
+          sql`update test_expert_reservations set status=${outcome},provider_request_id=coalesce(provider_request_id,${providerRequestId ?? null}) where id=${id}::uuid`,
         );
         await tx.execute(
           sql`update test_expert_redemptions set reserved_units=reserved_units-2, consumed_units=consumed_units+case when ${outcome}='applied' then 2 else 0 end where id=${row.redemptionId}::uuid`,
         );
       }
+      await tx.execute(
+        sql`insert into test_expert_audit_events (redemption_id,reservation_id,event_type) values (${row.redemptionId}::uuid,${id}::uuid,${reconcile ? "outcome_reconciled" : `outcome_${outcome}`})`,
+      );
       return this.summaryTx(tx, row.redemptionId);
     });
   }

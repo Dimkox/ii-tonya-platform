@@ -57,6 +57,30 @@ describe("loadEnv", () => {
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
   });
 
+  it("allows deterministic test-expert flow without Selarti and fails closed for incomplete residual activation", () => {
+    const deterministic = loadEnv(
+      localEnv({
+        TEST_EXPERT_PROMO_ENABLED: "true",
+        TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+      }),
+    );
+    expect(deterministic.features).toMatchObject({
+      testExpertPromo: true,
+      testExpertDeterministicFlow: true,
+      testExpertSelarti: false,
+    });
+    expect(() =>
+      loadEnv(
+        localEnv({
+          TEST_EXPERT_PROMO_ENABLED: "true",
+          TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+          TEST_EXPERT_SELARTI_ENABLED: "true",
+          TEST_EXPERT_PROMPT_VERSION: "approved-v1",
+        }),
+      ),
+    ).toThrow("test_expert_residual_configuration_incomplete");
+  });
+
   it("defaults worker outbox delivery off and accepts only exact booleans", () => {
     expect(loadEnv(localEnv()).features.workerOutboxDelivery).toBe(false);
     expect(

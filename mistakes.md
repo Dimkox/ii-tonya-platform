@@ -1,5 +1,7 @@
 # Mistakes
 
+The first promo boundary was designed as a standalone HTTP route and accepted `telegramUserId` from its body, while startup treated deterministic and provider activation as one gate. The root cause was composing from the new feature inward instead of extending the authenticated Telegram trust boundary and separating zero-cost deterministic capability from residual provider capability.
+
 Full-verify failures from newly added Task 3 tests were incorrectly labeled pre-existing because failure ownership was not checked against the commit introducing the files. Prevention: classify each diagnostic against `git log -- path` and reproduce it with the narrowest relevant typecheck before writing evidence.
 
 Focused verification omitted `legal-view.test.ts`, leaving a stale policy-heading assertion; the full web suite caught it.

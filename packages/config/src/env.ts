@@ -396,6 +396,17 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     }
     throw new Error("selarti_response_official_fixture_required");
   }
+  if (
+    value.TEST_EXPERT_SELARTI_ENABLED === "true" &&
+    (value.TEST_EXPERT_PROMO_ENABLED !== "true" ||
+      value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED !== "true" ||
+      value.TEST_EXPERT_PROMPT_VERSION === undefined ||
+      value.CLIENT_HYBRID_ROUTING_ENABLED !== "true" ||
+      value.SELARTI_COST_ADMISSION_ENABLED !== "true" ||
+      value.B2_TELEGRAM_DISPATCH_ENABLED !== "true" ||
+      value.B2_SENSITIVE_RETENTION_ENABLED !== "true")
+  )
+    throw new Error("test_expert_residual_configuration_incomplete");
 
   if (value.RAW_CONVERSATION_LOGGING === "true") {
     throw new Error("Raw conversation logging is prohibited");

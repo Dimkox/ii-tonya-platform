@@ -27,7 +27,7 @@
 - `packages/application/src/test-expert-warmup.ts`: finite typed warmup state machine.
 - `packages/application/src/test-expert-segmentation.ts`: deterministic participant qualification.
 - `packages/application/src/test-expert-trial-service.ts`: campaign/redemption/reservation boundary and provider outcome transitions.
-- `apps/api/src/routes/test-expert-promo.ts`: default-off Telegram/API composition boundary.
+- `apps/api/src/routes/telegram-webhook.ts`: authenticated default-off Telegram composition boundary; no public body-supplied Telegram identity route exists.
 - `packages/config/src/env.ts` and related config tests: safe-off flags and prompt-version parsing.
 - `apps/web/src/content.ts`, `apps/web/src/legal/oferta.txt`, and matching web tests: truthful 30/45-day public copy without active-coupon claims.
 - `docs/source/ii-tonya-expert-full-source-2026-07-28.txt` (read-only) plus an inactive manifest under `docs/prompts/`: prompt traceability, no source rewrite.
@@ -77,13 +77,13 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 ### Task 4: Default-off API and Telegram composition
 
-**Files:** Create `apps/api/src/routes/test-expert-promo.ts`; modify `apps/api/src/server.ts`, `apps/api/src/app.ts`, Telegram ingress composition, config env parsing, and API/config tests.
+**Files:** Modify `apps/api/src/routes/telegram-webhook.ts`, `apps/api/src/server.ts`, `apps/api/src/app.ts`, config env parsing, and API/config tests.
 
-**Interfaces:** `TestExpertPromoHttpDependencies` accepts the typed trial service and identity resolver; route returns stable `disabled`, `invalid_request`, `limit_reached`, `unavailable`, or bounded success outcomes. Provider dispatch is injected and never constructed when flags are off.
+**Interfaces:** The existing secret-authenticated Telegram webhook derives identity from the Telegram update and delegates to the typed trial ingress; it returns stable `disabled`, `invalid_request`, `limit_reached`, `unavailable`, or bounded success outcomes. Provider dispatch is injected and never constructed when flags are off.
 
 - [x] Write RED tests for all flags default-off, deterministic commands bypassing Selarti, identity mismatch, disabled campaign/prompt, one provider call, and stable duplicate responses. RED captured before implementation: route/module capability absent.
 - [x] Run focused API/config tests and confirm RED.
-- [x] Implement the route and composition with strict input validation, no raw text logging, and fail-closed provider admission.
+- [x] Implement the authenticated Telegram webhook composition with strict input validation, pre-reservation rate limiting, no raw text logging/storage, and fail-closed provider admission; remove the superseded public body-identity route.
 - [x] Test default-off config and injected route capability; provider construction remains absent from default lifecycle.
 - [x] Run focused tests, Prettier, and package typechecks; GREEN: 22 tests passed; `@ii-tonya/application`, `@ii-tonya/config`, and `@ii-tonya/api` typechecks passed; `git diff --check` passed.
 
@@ -106,9 +106,18 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 - [x] Write focused PostgreSQL integration tests for 0037→0038 upgrade, FK enforcement, concurrent reservations, unknown reconciliation, and `EXPLAIN` on the locked redemption path; restart durability and role denial remain explicitly unclaimed where the bounded testkit has no safe fixture.
 - [x] Run `corepack pnpm vitest run tests/integration/test-expert-trial-postgres.test.ts` once against disposable PostgreSQL 17.5: 3/3 passed; exact deferred evidence is in `docs/test-evidence/task6-test-expert-trial-postgres.md`.
-- [x] Run the full `corepack pnpm verify` exactly once at branch finish after focused tasks are green: attempted once, exit 2 at typecheck; exact unrelated failures recorded in `docs/test-evidence/task6-test-expert-trial-postgres.md`.
+- [x] Run the full `corepack pnpm verify` exactly once at branch finish after focused tasks are green: attempted once and exited 2 at typecheck. Follow-up identified both newly introduced trial-test typing regressions and pre-existing partner-pricing test typing errors; all were repaired with focused typechecks, while full verify was deliberately not rerun.
 - [x] Run `git diff --check`, bounded static secret scan, and review preparation against the final tree; no production/provider actions performed.
 - [ ] Update README status and package `VERSION` only to reflect verified repository state; not changed because full verification is red and activation/release evidence remains closed.
+
+### Independent-review remediation
+
+- [x] Replace the public body-supplied identity route with the existing webhook-secret-authenticated Telegram ingress and immutable identity resolution from the Telegram update; rate-limit before repository reservation.
+- [x] Separate deterministic admission from residual Selarti admission: promo plus deterministic flags enable zero-unit behavior, while campaign, approved prompt metadata, provider capability, and existing B2/B3 gates are all required for residual AI.
+- [x] Compose the PostgreSQL trial repository, campaign/redemption lookup, trial service, and authoritative expert/partner pricing adapters; add migration `0039_test_expert_trial_hardening.sql` for provider-operation, active-version, and unknown-scan invariants.
+- [x] Cover same-key PostgreSQL races, provider request identity, immutable audit outcomes, durable duplicate replay, injected transition metrics, and ephemeral raw-text privacy with focused tests.
+- [x] Repair the three partner-pricing test type errors without changing pricing behavior; package and test-project typechecks pass after remediation.
+- [x] Keep activation closed: disposable PostgreSQL restart durability and restricted-role denial fixtures remain unproved, and the full verification command remains historically failed and was not rerun.
 
 ## Self-review checklist
 

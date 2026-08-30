@@ -52,10 +52,12 @@ describe("test expert trial PostgreSQL authority", () => {
     await repository.recordOutcome({
       reservationId: raced[0]!.reservationId,
       outcome: "applied",
+      providerRequestId: "provider-race-a",
     });
     await repository.recordOutcome({
       reservationId: raced[1]!.reservationId,
       outcome: "applied",
+      providerRequestId: "provider-race-b",
     });
     const summary = await repository.summary(redemption.id);
     expect(summary).toMatchObject({ consumedUnits: 4, reservedUnits: 0 });
@@ -88,6 +90,7 @@ describe("test expert trial PostgreSQL authority", () => {
     await repository.recordOutcome({
       reservationId: reservation.reservationId,
       outcome: "unknown",
+      providerRequestId: "provider-unknown-1",
     });
     await expect(repository.summary(redemption.id)).resolves.toMatchObject({
       consumedUnits: 0,
@@ -97,11 +100,46 @@ describe("test expert trial PostgreSQL authority", () => {
       repository.reconcileUnknown({
         reservationId: reservation.reservationId,
         outcome: "not_applied",
+        providerRequestId: "provider-unknown-1",
       }),
     ).resolves.toMatchObject({ consumedUnits: 0, reservedUnits: 0 });
     const plan = await database.db.execute<{ plan: string }>(
       sql`explain (format json) select id from test_expert_redemptions where id=${redemption.id}::uuid for update`,
     );
     expect(JSON.stringify(plan.rows)).toContain("test_expert_redemptions");
+  });
+
+  it("converges an identical same-key race and rejects a conflicting digest", async () => {
+    const userId = await database.createUser();
+    const campaignId = "00000000-0000-4000-8000-000000000383";
+    await database.db.execute(
+      sql`insert into test_expert_campaign_versions (id,code,version) values (${campaignId}::uuid,'test-expert-race',1)`,
+    );
+    const repository = new PostgresTestExpertTrialRepository(database.db);
+    const redemption = await repository.createOrGetRedemption({
+      campaignVersionId: campaignId,
+      userId,
+      idempotencyKey: `test-expert:${campaignId}:${userId}`,
+    });
+    const input = {
+      redemptionId: redemption.id,
+      requestKey: "telegram:race:test-expert",
+      requestDigest: "c".repeat(64),
+    };
+    const [left, right] = await Promise.all([
+      repository.reserveAiTurn(input),
+      repository.reserveAiTurn(input),
+    ]);
+    expect(left.reservationId).toBe(right.reservationId);
+    await expect(
+      repository.reserveAiTurn({
+        ...input,
+        requestDigest: "d".repeat(64),
+      }),
+    ).rejects.toThrow("request_idempotency_conflict");
+    await expect(repository.summary(redemption.id)).resolves.toMatchObject({
+      consumedUnits: 0,
+      reservedUnits: 2,
+    });
   });
 });

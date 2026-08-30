@@ -11,14 +11,23 @@ class TrialDouble {
       requestKey: string;
       digest: string;
       outcome?: string;
+      providerRequestId?: string;
     }
   >();
   readonly redemptions = new Set<string>();
+  async resolveActiveCampaign() {
+    return {
+      id: "campaign-1",
+      code: "test-expert",
+      promptVersion: "approved-v1",
+    };
+  }
   async createOrGetRedemption(_input: {
     campaignVersionId: string;
     userId: string;
     idempotencyKey: string;
   }): Promise<{ id: string }> {
+    void _input;
     const id = "redemption-1";
     this.redemptions.add(id);
     return { id };
@@ -41,6 +50,10 @@ class TrialDouble {
         units: 2 as const,
         status: (existing.outcome ?? "reserved") as
           "reserved" | "unknown" | "applied" | "not_applied",
+        ...(existing.providerRequestId === undefined
+          ? {}
+          : { providerRequestId: existing.providerRequestId }),
+        replay: true,
       };
     }
     const row = {
@@ -55,11 +68,18 @@ class TrialDouble {
       requestKey: input.requestKey,
       units: 2 as const,
       status: "reserved" as const,
+      replay: false,
     };
   }
-  async recordOutcome(input: { reservationId: string; outcome: string }) {
+  async recordOutcome(input: {
+    reservationId: string;
+    outcome: string;
+    providerRequestId?: string;
+  }) {
     const row = this.reservations.get(input.reservationId)!;
     row.outcome = input.outcome;
+    if ("providerRequestId" in input)
+      row.providerRequestId = String(input.providerRequestId);
     return {
       consumedUnits: input.outcome === "applied" ? 2 : 0,
       reservedUnits: input.outcome === "unknown" ? 2 : 0,
@@ -67,6 +87,7 @@ class TrialDouble {
     };
   }
   async summary(_redemptionId?: string) {
+    void _redemptionId;
     const outcomes = [...this.reservations.values()].map((row) => row.outcome);
     return {
       grantedUnits: 100 as const,
@@ -81,6 +102,45 @@ class TrialDouble {
 }
 
 describe("test expert deterministic application boundary", () => {
+  it("uses authoritative campaign redemption and emits bounded transition metrics", async () => {
+    const repository = new TrialDouble();
+    const metrics: unknown[] = [];
+    const service = new TestExpertTrialService({
+      trial: repository,
+      expertPolicy: null,
+      partnerPolicy: null,
+      approvedPromptVersions: new Set(["approved-v1"]),
+      provider: vi.fn(async () => ({
+        outcome: "applied" as const,
+        providerRequestId: "provider-operation-1",
+      })),
+      metrics: { record: (event) => metrics.push(event) },
+    });
+    await expect(
+      service.handleResidual({
+        userId: "user-1",
+        requestKey: "telegram:1:test-expert",
+        requestDigest: "d".repeat(64),
+        text: "остаточный вопрос",
+      }),
+    ).resolves.toEqual({
+      kind: "provider",
+      outcome: "applied",
+      units: 2,
+      providerRequestId: "provider-operation-1",
+    });
+    expect(repository.redemptions).toEqual(new Set(["redemption-1"]));
+    expect(metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "units_reserved" }),
+        expect.objectContaining({ name: "units_consumed" }),
+        expect.objectContaining({ name: "provider_outcome" }),
+      ]),
+    );
+    expect(JSON.stringify(repository.reservations)).not.toContain(
+      "остаточный вопрос",
+    );
+  });
   it("keeps warmup and qualification at zero trial units", () => {
     const machine = new WarmupStateMachine();
     const first = machine.next({ state: "start", answer: "Татьяна" });
@@ -122,11 +182,6 @@ describe("test expert deterministic application boundary", () => {
 
   it("uses only the authoritative policy quote and fails closed without it", async () => {
     const repository = new TrialDouble();
-    const redemption = await repository.createOrGetRedemption({
-      campaignVersionId: "campaign",
-      userId: "user",
-      idempotencyKey: "redemption",
-    });
     const quote = vi.fn(async () => ({
       priceMinor: 5_900_00,
       currency: "RUB" as const,
@@ -142,7 +197,7 @@ describe("test expert deterministic application boundary", () => {
       service.handle({
         kind: "quote",
         segment: "EXPERT",
-        redemptionId: redemption.id,
+        redemptionId: "deterministic-only",
         input: { averageCheckMinor: 10_000 },
       }),
     ).resolves.toMatchObject({
@@ -160,7 +215,7 @@ describe("test expert deterministic application boundary", () => {
       }).handle({
         kind: "quote",
         segment: "EXPERT",
-        redemptionId: redemption.id,
+        redemptionId: "deterministic-only",
         input: {},
       }),
     ).resolves.toEqual({
@@ -172,38 +227,36 @@ describe("test expert deterministic application boundary", () => {
 
   it("reserves one residual provider request, maps outcomes, and replays stably", async () => {
     const repository = new TrialDouble();
-    const redemption = await repository.createOrGetRedemption({
-      campaignVersionId: "campaign",
-      userId: "user",
-      idempotencyKey: "redemption",
-    });
-    const provider = vi.fn(async () => "applied" as const);
+    const provider = vi.fn(async () => ({
+      outcome: "applied" as const,
+      providerRequestId: "provider-request-1",
+    }));
     const service = new TestExpertTrialService({
       trial: repository,
       expertPolicy: null,
       partnerPolicy: null,
       provider,
+      approvedPromptVersions: new Set(["approved-v1"]),
     });
     const input = {
-      kind: "residual" as const,
-      redemptionId: redemption.id,
+      userId: "user",
       requestKey: "request-1",
       requestDigest: "a".repeat(64),
       text: "вопрос",
     };
-    await expect(service.handle(input)).resolves.toMatchObject({
+    await expect(service.handleResidual(input)).resolves.toMatchObject({
       kind: "provider",
       outcome: "applied",
       units: 2,
     });
-    await expect(service.handle(input)).resolves.toMatchObject({
+    await expect(service.handleResidual(input)).resolves.toMatchObject({
       kind: "provider",
       outcome: "applied",
       units: 2,
     });
     expect(provider).toHaveBeenCalledTimes(1);
     await expect(
-      service.handle({ ...input, requestDigest: "b".repeat(64) }),
+      service.handleResidual({ ...input, requestDigest: "b".repeat(64) }),
     ).rejects.toThrow("request_idempotency_conflict");
   });
 
@@ -211,27 +264,27 @@ describe("test expert deterministic application boundary", () => {
     "preserves %s provider outcome semantics",
     async (outcome) => {
       const repository = new TrialDouble();
-      const redemption = await repository.createOrGetRedemption({
-        campaignVersionId: "campaign",
-        userId: "user",
-        idempotencyKey: `redemption-${outcome}`,
-      });
       const service = new TestExpertTrialService({
         trial: repository,
         expertPolicy: null,
         partnerPolicy: null,
-        provider: vi.fn(async () => outcome),
+        approvedPromptVersions: new Set(["approved-v1"]),
+        provider: vi.fn(async () => ({
+          outcome,
+          ...(outcome === "unknown"
+            ? { providerRequestId: "provider-request-unknown" }
+            : {}),
+        })),
       });
       await expect(
-        service.handle({
-          kind: "residual",
-          redemptionId: redemption.id,
+        service.handleResidual({
+          userId: `user-${outcome}`,
           requestKey: `request-${outcome}`,
           requestDigest: "c".repeat(64),
           text: "вопрос",
         }),
       ).resolves.toMatchObject({ kind: "provider", outcome, units: 2 });
-      await expect(repository.summary(redemption.id)).resolves.toMatchObject(
+      await expect(repository.summary("redemption-1")).resolves.toMatchObject(
         outcome === "unknown"
           ? { consumedUnits: 0, reservedUnits: 2 }
           : { consumedUnits: 0, reservedUnits: 0 },

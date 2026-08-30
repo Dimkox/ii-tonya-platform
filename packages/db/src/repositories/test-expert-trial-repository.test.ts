@@ -53,7 +53,11 @@ describe("test expert trial repository", () => {
       ...request(),
       redemptionId,
     });
-    expect(first).toEqual(retry);
+    expect(first.replay).toBe(false);
+    expect(retry).toMatchObject({
+      reservationId: first.reservationId,
+      replay: true,
+    });
     await expect(repository.summary(redemptionId)).resolves.toMatchObject({
       grantedUnits: 100,
       consumedUnits: 0,
@@ -71,6 +75,7 @@ describe("test expert trial repository", () => {
       await repository.recordOutcome({
         reservationId: reservation.reservationId,
         outcome: "applied",
+        providerRequestId: `provider-${i}`,
       });
     }
     await expect(repository.summary(redemptionId)).resolves.toMatchObject({
@@ -91,6 +96,7 @@ describe("test expert trial repository", () => {
     await repository.recordOutcome({
       reservationId: finalReservation.reservationId,
       outcome: "applied",
+      providerRequestId: "provider-final",
     });
   });
 
@@ -104,12 +110,14 @@ describe("test expert trial repository", () => {
       repository.recordOutcome({
         reservationId: applied.reservationId,
         outcome: "applied",
+        providerRequestId: "provider-applied",
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
     await expect(
       repository.recordOutcome({
         reservationId: applied.reservationId,
         outcome: "applied",
+        providerRequestId: "provider-applied",
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
 
@@ -132,18 +140,21 @@ describe("test expert trial repository", () => {
       repository.recordOutcome({
         reservationId: unknown.reservationId,
         outcome: "unknown",
+        providerRequestId: "provider-unknown",
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 2 });
     await expect(
       repository.recordOutcome({
         reservationId: unknown.reservationId,
         outcome: "not_applied",
+        providerRequestId: "provider-unknown",
       }),
     ).rejects.toThrow("unknown_outcome_requires_reconciliation");
     await expect(
       repository.reconcileUnknown({
         reservationId: unknown.reservationId,
         outcome: "not_applied",
+        providerRequestId: "provider-unknown",
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
   });
@@ -163,12 +174,48 @@ describe("test expert trial repository", () => {
     await repository.recordOutcome({
       reservationId: reservation.reservationId,
       outcome: "applied",
+      providerRequestId: "provider-stable",
     });
     await expect(
       repository.recordOutcome({
         reservationId: reservation.reservationId,
         outcome: "not_applied",
+        providerRequestId: "provider-stable",
       }),
     ).rejects.toThrow("outcome_conflict");
+  });
+
+  it("requires stable provider operation metadata for applied and unknown replay", async () => {
+    const { repository, redemptionId } = await make();
+    const reservation = await repository.reserveAiTurn({
+      ...request("provider-metadata"),
+      redemptionId,
+    });
+    await expect(
+      repository.recordOutcome({
+        reservationId: reservation.reservationId,
+        outcome: "unknown",
+      }),
+    ).rejects.toThrow("provider_request_id_required");
+    await repository.recordOutcome({
+      reservationId: reservation.reservationId,
+      outcome: "unknown",
+      providerRequestId: "provider-operation-unknown",
+    });
+    const replay = await repository.reserveAiTurn({
+      ...request("provider-metadata"),
+      redemptionId,
+    });
+    expect(replay).toMatchObject({
+      status: "unknown",
+      providerRequestId: "provider-operation-unknown",
+    });
+    await expect(
+      repository.reconcileUnknown({
+        reservationId: reservation.reservationId,
+        outcome: "applied",
+        providerRequestId: "different-provider-operation",
+      }),
+    ).rejects.toThrow("provider_request_id_conflict");
   });
 });

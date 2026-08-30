@@ -7,8 +7,26 @@ export {
   type DrizzleDb,
 } from "./client.js";
 export { sql } from "drizzle-orm";
-export { PostgresPartnerCommerceRepository, type PartnerCommandResult } from "./repositories/partner-commerce-repository.js";
-export { MemoryTestExpertTrialRepository, PostgresTestExpertTrialRepository, TrialCapReachedError, TrialIdempotencyConflictError, TrialOutcomeConflictError, type TestExpertTrialRepository, type TrialOutcomeKind, type TrialRedemption, type TrialReservation, type TrialSummary } from "./repositories/test-expert-trial-repository.js";
+export {
+  PostgresPartnerCommerceRepository,
+  type PartnerCommandResult,
+} from "./repositories/partner-commerce-repository.js";
+export {
+  MemoryTestExpertTrialRepository,
+  PostgresTestExpertTrialRepository,
+  TrialCapReachedError,
+  TrialIdempotencyConflictError,
+  TrialOutcomeConflictError,
+  type TestExpertTrialRepository,
+  type TrialOutcomeKind,
+  type TrialRedemption,
+  type TrialReservation,
+  type TrialSummary,
+} from "./repositories/test-expert-trial-repository.js";
+export {
+  PostgresExpertTrialPricingPolicy,
+  PostgresPartnerTrialPricingPolicy,
+} from "./repositories/test-expert-pricing-policy.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,

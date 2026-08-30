@@ -32,6 +32,14 @@ describe("test expert trial traceability", () => {
     expect(
       readFileSync("packages/db/migrations/0038_test_expert_trial.sql", "utf8"),
     ).toContain("test_expert_campaign_versions");
+    const hardeningMigration = readFileSync(
+      "packages/db/migrations/0039_test_expert_trial_hardening.sql",
+      "utf8",
+    );
+    expect(hardeningMigration).toContain("test_expert_campaign_one_active_idx");
+    expect(hardeningMigration).toContain(
+      "test_expert_reservations_unknown_global_idx",
+    );
     expect(TEST_EXPERT_TRIAL_METRICS).toEqual([
       "redemption_created",
       "deterministic_message",
@@ -50,5 +58,16 @@ describe("test expert trial traceability", () => {
     expect(readFileSync("apps/web/index.html", "utf8")).toContain(
       "mc.yandex.ru/metrika/tag.js?id=111827123",
     );
+  });
+
+  it("keeps raw trial text ephemeral under the existing retention boundary", () => {
+    const retention = readFileSync("docs/operations/data-retention.md", "utf8");
+    const repository = readFileSync(
+      "packages/db/src/repositories/test-expert-trial-repository.ts",
+      "utf8",
+    );
+    expect(retention).toContain("raw text is never stored");
+    expect(repository).not.toMatch(/raw_(?:message|response|body)/u);
+    expect(repository).not.toMatch(/message_text/u);
   });
 });

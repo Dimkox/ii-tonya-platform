@@ -46,6 +46,7 @@ import {
   type TelegramCallbackService,
   type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
+  type TelegramTestExpertPromoIngress,
 } from "./routes/telegram-webhook.js";
 import {
   yookassaWebhookRoutes,
@@ -57,7 +58,6 @@ import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
-import { testExpertPromoRoutes } from "./routes/test-expert-promo.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -116,7 +116,7 @@ export interface AppDependencies {
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
-  testExpertPromo?: import("./routes/test-expert-promo.js").TestExpertPromoDependencies;
+  testExpertPromo?: TelegramTestExpertPromoIngress;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
   const nonPaymentIntegrations = {
@@ -196,11 +196,19 @@ export async function buildApp(
   if (
     deps.config.features.testExpertPromo === true &&
     (deps.testExpertPromo === undefined ||
-      deps.config.features.testExpertDeterministicFlow !== true ||
-      deps.config.features.testExpertSelarti !== true ||
-      deps.config.features.testExpertPromptVersion === undefined)
+      deps.config.features.testExpertDeterministicFlow !== true)
   )
     throw new Error("Test expert promo runtime capability is required");
+  if (
+    deps.config.features.testExpertSelarti === true &&
+    (deps.testExpertPromo?.residualEnabled !== true ||
+      deps.config.features.testExpertPromptVersion === undefined ||
+      deps.config.features.clientHybridRouting !== true ||
+      deps.config.features.selartiCostAdmission !== true ||
+      deps.config.features.b2TelegramDispatch !== true ||
+      deps.config.features.b2SensitiveRetention !== true)
+  )
+    throw new Error("Test expert residual runtime capability is required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -285,6 +293,12 @@ export async function buildApp(
     clientHybridRoutingEnabled: deps.clientHybridRoutingEnabled,
     clientBotKey: deps.clientBotKey,
     clientGateway: deps.clientGateway,
+    testExpertPromoEnabled:
+      deps.config.features.testExpertPromo === true &&
+      deps.config.features.testExpertDeterministicFlow === true,
+    ...(deps.testExpertPromo === undefined
+      ? {}
+      : { testExpertPromo: deps.testExpertPromo }),
     callbacks: deps.telegramCallbacks,
     inbox: deps.inbox,
     rateLimiter: deps.rateLimiter,
@@ -316,8 +330,6 @@ export async function buildApp(
       enabled: deps.config.features,
     });
   }
-  if (deps.testExpertPromo !== undefined)
-    await app.register(testExpertPromoRoutes, deps.testExpertPromo);
   if (
     deps.config.features.expertAiIngress === true &&
     deps.expertAiIngress !== undefined &&

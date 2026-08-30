@@ -18,6 +18,8 @@ import {
   type ClientCommercialPolicyPort,
   HybridMessageGateway,
   createSelartiResponseService,
+  TestExpertTrialService,
+  segmentParticipant,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -38,6 +40,9 @@ import {
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
   PostgresSelartiProposalRepository,
+  PostgresTestExpertTrialRepository,
+  PostgresExpertTrialPricingPolicy,
+  PostgresPartnerTrialPricingPolicy,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import {
@@ -59,7 +64,6 @@ import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { createClientPrincipalResolver } from "./client-principal-resolver.js";
 import { createClientBookingPrincipalResolver } from "./client-booking-principal-resolver.js";
-import type { TestExpertPromoDependencies } from "./routes/test-expert-promo.js";
 import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
 import {
   clientSessionTokenHash,
@@ -119,10 +123,18 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
-    testExpertPromoComposition?: Omit<
-      TestExpertPromoDependencies,
-      "enabled" | "deterministicEnabled" | "selartiEnabled" | "promptVersion"
-    >;
+    testExpertProviderComposition?: {
+      readonly approvedPromptVersions: ReadonlySet<string>;
+      dispatch(text: string): Promise<{
+        outcome: "applied" | "not_applied" | "unknown";
+        providerRequestId?: string;
+      }>;
+    };
+    testExpertMetricSink?: {
+      record(
+        event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
+      ): void;
+    };
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
@@ -133,10 +145,10 @@ export const createDefaultLifecycle = (
       throw new Error("client_commercial_policy_repository_unavailable");
     }
     if (
-      config.features.testExpertPromo === true &&
-      options.testExpertPromoComposition === undefined
+      config.features.testExpertSelarti === true &&
+      options.testExpertProviderComposition === undefined
     )
-      throw new Error("test_expert_promo_composition_unavailable");
+      throw new Error("test_expert_provider_composition_unavailable");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -281,6 +293,105 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
+    const trialRepository = new PostgresTestExpertTrialRepository(db);
+    const trialService = new TestExpertTrialService({
+      trial: trialRepository,
+      expertPolicy: new PostgresExpertTrialPricingPolicy(db),
+      partnerPolicy: new PostgresPartnerTrialPricingPolicy(db),
+      approvedPromptVersions:
+        config.features.testExpertPromptVersion !== undefined &&
+        options.testExpertProviderComposition?.approvedPromptVersions.has(
+          config.features.testExpertPromptVersion,
+        ) === true
+          ? new Set([config.features.testExpertPromptVersion])
+          : new Set<string>(),
+      provider:
+        config.features.testExpertSelarti === true &&
+        options.testExpertProviderComposition !== undefined
+          ? (text) => options.testExpertProviderComposition!.dispatch(text)
+          : null,
+      metrics: options.testExpertMetricSink ?? { record: () => undefined },
+    });
+    const testExpertPromo =
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true
+        ? {
+            residualEnabled:
+              config.features.testExpertSelarti === true &&
+              config.features.testExpertPromptVersion !== undefined &&
+              options.testExpertProviderComposition?.approvedPromptVersions.has(
+                config.features.testExpertPromptVersion,
+              ) === true,
+            resolvePrincipal: (telegramUserId: string) =>
+              trialRepository.resolveTelegramUser(telegramUserId),
+            async handle(input: {
+              userId: string;
+              telegramUserId: string;
+              text: string;
+              requestKey: string;
+              requestDigest: string;
+              correlationId: string;
+            }) {
+              const command = input.text.trim();
+              if (/^(?:тест эксперт|\/test_expert)$/iu.test(command))
+                return {
+                  status: "success" as const,
+                  result: { kind: "deterministic", trialUnits: 0 },
+                };
+              const quoteMatch =
+                /^(?:тест эксперт|\/test_expert)\s+quote\s+(expert|center|studio|salon|retreat-center|organizer|festival|retreat|travel)$/iu.exec(
+                  command,
+                );
+              if (quoteMatch?.[1]) {
+                const segment = segmentParticipant(
+                  quoteMatch[1].toLowerCase() as Parameters<
+                    typeof segmentParticipant
+                  >[0],
+                );
+                const result = await trialService.handle({
+                  kind: "quote",
+                  segment,
+                  redemptionId: "deterministic-zero-unit",
+                  input: { segment },
+                });
+                return {
+                  status:
+                    result.kind === "unavailable"
+                      ? ("unavailable" as const)
+                      : ("success" as const),
+                  result,
+                };
+              }
+              if (config.features.testExpertSelarti !== true)
+                return { status: "unavailable" as const };
+              try {
+                const result = await trialService.handleResidual({
+                  userId: input.userId,
+                  requestKey: input.requestKey,
+                  requestDigest: input.requestDigest,
+                  text: command.replace(
+                    /^(?:тест эксперт|\/test_expert)\s*/iu,
+                    "",
+                  ),
+                });
+                return {
+                  status:
+                    result.kind === "unavailable"
+                      ? ("unavailable" as const)
+                      : ("success" as const),
+                  result,
+                };
+              } catch (error) {
+                if (
+                  error instanceof Error &&
+                  error.message === "trial_cap_reached"
+                )
+                  return { status: "limit_reached" as const };
+                return { status: "unavailable" as const };
+              }
+            },
+          }
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -332,22 +443,7 @@ export const createDefaultLifecycle = (
         ? {}
         : { clientBotKey: config.clientTelegramBotKey }),
       ...(clientGateway === undefined ? {} : { clientGateway }),
-      ...(options.testExpertPromoComposition === undefined
-        ? {}
-        : {
-            testExpertPromo: {
-              ...options.testExpertPromoComposition,
-              enabled: config.features.testExpertPromo === true,
-              deterministicEnabled:
-                config.features.testExpertDeterministicFlow === true,
-              selartiEnabled: config.features.testExpertSelarti === true,
-              ...(config.features.testExpertPromptVersion === undefined
-                ? {}
-                : {
-                    promptVersion: config.features.testExpertPromptVersion,
-                  }),
-            },
-          }),
+      ...(testExpertPromo === undefined ? {} : { testExpertPromo }),
       telegramWebhookSecret:
         config.telegramWebhookSecret ?? randomBytes(32).toString("base64url"),
       ...(config.selartiResponseSharedSecret === undefined
