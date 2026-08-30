@@ -35,7 +35,9 @@ sanitized summaries/checksums are committed to `docs/test-evidence/`.
 `scripts/run-claw-ci.sh` rejects non-Claw hosts, requires an explicit source root and full
 Git SHA, verifies the checked-out commit, then mounts only that source into the constrained
 test container. Its worktree metadata and common Git directory are mounted separately as
-read-only so repository-policy tests can inspect the exact candidate. It also verifies the
+read-only so repository-policy tests and the nested Gitleaks history scan can inspect the
+exact candidate without mutating Git metadata. Gitleaks uses an explicit non-zero finding
+exit code; only individually reviewed historical fixture fingerprints are ignored. It also verifies the
 exact image ID before execution. Database concurrency
 each test or suite runs once. GitHub stores the resulting commit and PR; sanitized
 exact-SHA evidence is committed in the repository.

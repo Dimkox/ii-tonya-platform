@@ -305,7 +305,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "cf3b936740810eb7af5aa85c3bc727ff49cce10cda631916e8bafc953df89219",
+    "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
   ],
   [
     "scripts/build-native-release.sh",

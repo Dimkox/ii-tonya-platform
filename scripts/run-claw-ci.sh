@@ -79,9 +79,12 @@ case "$CLAW_GATE_MODE" in
     pnpm lint
     NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
     pnpm exec vitest run --coverage --maxWorkers=1
-    docker run --rm -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 \
+    docker run --rm \
+      -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
+      -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
+      ghcr.io/gitleaks/gitleaks:v8.28.0 \
       detect --source=/repo --config=/repo/.gitleaks.toml \
-      --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
+      --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact --exit-code=1
     ;;
   database)
     pnpm build
@@ -196,6 +199,7 @@ compose_args=(
   -e "CLAW_GATE_MODE=$mode"
   -e "CLAW_SOURCE_SHA=$source_sha"
   -e "CLAW_HOST_SOURCE_ROOT=$source_root"
+  -e "CLAW_HOST_GIT_COMMON_DIR=$git_common_dir"
   -v "$source_root:/workspace/source"
   -v "$git_common_dir:$git_common_dir:ro"
   -v "$git_marker:/workspace/source/.git:ro"

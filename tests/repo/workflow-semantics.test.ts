@@ -47,6 +47,10 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
     expect(runner).toContain('-v "$git_common_dir:$git_common_dir:ro"');
     expect(runner).toContain('-v "$git_marker:/workspace/source/.git:ro"');
+    expect(runner).toContain(
+      '-v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro"',
+    );
+    expect(runner).toContain('-e "CLAW_HOST_GIT_COMMON_DIR=$git_common_dir"');
     expect(
       runner.split(
         'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
