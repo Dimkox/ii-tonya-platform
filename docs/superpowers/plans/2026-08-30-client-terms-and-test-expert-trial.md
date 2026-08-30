@@ -93,10 +93,10 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 **Interfaces:** Manifest fields are `key`, `version`, `sha256`, `sourcePath`, `status: "inactive"`, and `activationRequirements`. Runtime code may read metadata only; it cannot activate the asset.
 
-- [ ] Write RED traceability tests for source digest, inactive status, four flags, migration 0038, metric names, and analytics preservation.
-- [ ] Run the focused repository/documentation tests and confirm RED.
-- [ ] Add the immutable manifest, README current-state section, rollout/rollback notes, metrics, privacy retention, and explicit provider contract gate.
-- [ ] Run focused tests, `git diff --check`, and verify no analytics/static script changed.
+- [x] Write RED traceability tests for source digest, inactive status, four flags, migration 0038, metric names, and analytics preservation.
+- [x] Run `corepack pnpm vitest run tests/repo/test-expert-trial-traceability.test.ts`; RED captured before implementation because the metric module was absent.
+- [x] Add the immutable manifest, README current-state section, rollout/rollback notes, metrics, privacy retention, and explicit provider contract gate.
+- [x] Run focused tests, Prettier, package typechecks, `git diff --check`, and verify no analytics/static script changed; GREEN: 2 tests passed.
 
 ### Task 6: PostgreSQL verification and independent review preparation
 

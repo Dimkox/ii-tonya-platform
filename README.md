@@ -168,6 +168,39 @@ and projections. YooKassa by YooMoney is the selected payment provider; its adap
 recovery boundaries are implemented but remain disabled and uncomposed until the provider
 contract, key-management boundary, and release gates are approved.
 
+## Current V2 trial boundary (Task 5)
+
+The current tree contains the additive Task 1–5 foundation. Newly issued paid/admin message packages
+use 30 calendar days; the historical intro grant is 100 messages with no expiry; existing rows retain
+their stored expiry. Ordinary `free_client_v2` access remains free and is not re-gated. Future client
+coupon grants, if the deferred default-off coupon subsystem is activated, use a 45-day lifetime; no
+active coupon issuance is claimed by this repository.
+
+The `тест эксперт` foundation is capped at 100 visible-message units, at most 50 AI turns, with two
+units reserved per residual AI turn and zero units for deterministic Telegram warmup, qualification,
+segmentation, and authoritative pricing. Explicit segments are `EXPERT`, `CENTER` (studio, salon,
+retreat/wellness center), and `ORGANIZER` (festival, retreat, travel/event organizer). The PostgreSQL
+authority is additive migration `0038_test_expert_trial`; its campaign, redemption, reservation,
+outcome, and audit records remain separate from coupons, expert referrals, partner acquisition, and
+B3 cost reservations.
+
+Four trial controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
+`TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED`, `TEST_EXPERT_SELARTI_ENABLED`, and
+`TEST_EXPERT_PROMPT_VERSION`. The route boundary is present at
+`/v1/test-expert-promo/message`, but provider admission, campaign activation, prompt selection, and
+production/network calls remain blocked until the official Selarti contract, prompt copy, capability,
+and existing B2/B3 gates are approved. The current source prompt is preserved by the inactive
+[prompt manifest](docs/prompts/test-expert-source-manifest.json); it is metadata only and cannot
+activate runtime behavior.
+
+Rollout is additive and flag-off: internal allowlist, bounded cohort, then separately approved
+provider admission. Rollback disables provider admission first, reconciles unknown outcomes, drains
+outboxes, and preserves immutable history; no historical expiry, ledger, prompt, or campaign rows are
+rewritten. Raw text and encrypted provider context retain the existing maximum 30-day policy with
+erasure propagation. Typed trial metrics cover redemption, deterministic offload, reservation,
+consumption, release, unknown outcomes, cap rejection, duplicates, conversion, cost, and
+reconciliation age. Yandex Metrika and all static scripts in `apps/web/index.html` remain preserved.
+
 ## Unit-economics planning calculation
 
 This calculation records the 2026-08-28 planning scenario only. It does not activate or
