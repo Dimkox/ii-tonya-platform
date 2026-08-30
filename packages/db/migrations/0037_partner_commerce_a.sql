@@ -53,8 +53,8 @@ CREATE TABLE partner_tariff_policy_versions (
   CONSTRAINT partner_tariff_policy_versions_status_check CHECK (status IN ('draft','approved','retired')),
   CONSTRAINT partner_tariff_policy_versions_window_check CHECK (effective_to IS NULL OR effective_to > effective_from),
   CONSTRAINT partner_tariff_policy_versions_entitlements_check CHECK ((partner_kind='CENTER' AND event_entitlements='{"bands":[{"capacity":30,"count":10}]}'::jsonb) OR (partner_kind='ORGANIZER' AND event_entitlements='{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb)),
-  CONSTRAINT partner_tariff_policy_versions_id_version_unique UNIQUE (policy_version_id, policy_version)
-  ,CONSTRAINT partner_tariff_policy_versions_kind_identity_unique UNIQUE (policy_version_id, partner_kind)
+  CONSTRAINT partner_tariff_policy_versions_id_version_unique UNIQUE (policy_version_id, policy_version),
+  CONSTRAINT partner_tariff_policy_versions_kind_identity_unique UNIQUE (policy_version_id, partner_kind)
 );
 CREATE UNIQUE INDEX partner_tariff_policy_versions_active_idx ON partner_tariff_policy_versions(partner_kind) WHERE status='approved' AND effective_to IS NULL;
 CREATE INDEX partner_tariff_policy_versions_effective_idx ON partner_tariff_policy_versions(partner_kind, effective_from, effective_to);
@@ -72,8 +72,8 @@ CREATE TRIGGER partner_tariff_policy_versions_no_overlap BEFORE INSERT OR UPDATE
 
 CREATE TABLE partner_shadow_quotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  participant_id uuid NOT NULL REFERENCES commercial_participants(id),
-  policy_id uuid NOT NULL REFERENCES partner_tariff_policy_versions(id),
+  participant_id uuid NOT NULL,
+  policy_id uuid NOT NULL,
   policy_version_id text NOT NULL,
   policy_version integer NOT NULL,
   partner_kind text NOT NULL,
@@ -97,6 +97,8 @@ CREATE TABLE partner_shadow_quotes (
   CONSTRAINT partner_shadow_quotes_arithmetic_check CHECK (base_price_minor + online_only_surcharge_minor + city_million_plus_surcharge_minor = final_price_minor),
   CONSTRAINT partner_shadow_quotes_money_check CHECK (base_price_minor > 0 AND online_only_surcharge_minor >= 0 AND city_million_plus_surcharge_minor >= 0 AND final_price_minor > 0 AND resident_commission_bps=1000 AND nonresident_commission_bps=1500 AND nonresident_card_fee_minor=450000),
   CONSTRAINT partner_shadow_quotes_entitlements_check CHECK ((partner_kind='CENTER' AND event_entitlements='{"bands":[{"capacity":30,"count":10}]}'::jsonb) OR (partner_kind='ORGANIZER' AND event_entitlements='{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb)),
+  CONSTRAINT partner_shadow_quotes_participant_id_fkey FOREIGN KEY (participant_id) REFERENCES commercial_participants(id),
+  CONSTRAINT partner_shadow_quotes_policy_id_fkey FOREIGN KEY (policy_id) REFERENCES partner_tariff_policy_versions(id),
   CONSTRAINT partner_shadow_quotes_participant_kind_fk FOREIGN KEY (participant_id, partner_kind) REFERENCES commercial_participants(id, participant_kind),
   CONSTRAINT partner_shadow_quotes_policy_kind_fk FOREIGN KEY (policy_version_id, partner_kind) REFERENCES partner_tariff_policy_versions(policy_version_id, partner_kind)
 );
