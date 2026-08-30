@@ -14,7 +14,11 @@ class TrialDouble {
     }
   >();
   readonly redemptions = new Set<string>();
-  async createOrGetRedemption(): Promise<{ id: string }> {
+  async createOrGetRedemption(_input: {
+    campaignVersionId: string;
+    userId: string;
+    idempotencyKey: string;
+  }): Promise<{ id: string }> {
     const id = "redemption-1";
     this.redemptions.add(id);
     return { id };
@@ -62,7 +66,7 @@ class TrialDouble {
       grantedUnits: 100 as const,
     };
   }
-  async summary() {
+  async summary(_redemptionId?: string) {
     const outcomes = [...this.reservations.values()].map((row) => row.outcome);
     return {
       grantedUnits: 100 as const,

@@ -1,5 +1,7 @@
 # Mistakes
 
+Full-verify failures from newly added Task 3 tests were incorrectly labeled pre-existing because failure ownership was not checked against the commit introducing the files. Prevention: classify each diagnostic against `git log -- path` and reproduce it with the narrowest relevant typecheck before writing evidence.
+
 Focused verification omitted `legal-view.test.ts`, leaving a stale policy-heading assertion; the full web suite caught it.
 
 The deployment review checked only the currently served HTML/JavaScript and inferred that there was no analytics requirement. The root cause was failing to inspect Git history, where the approved Yandex Metrika counter already existed and had later been removed by a wholesale `index.html` rewrite.

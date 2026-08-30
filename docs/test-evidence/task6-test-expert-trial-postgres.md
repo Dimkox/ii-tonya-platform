@@ -19,4 +19,6 @@ Full verification command (run exactly once in this increment):
 
     corepack pnpm verify
 
-Result: exit code 2 during the repository typecheck phase. The exact reported failures were four pre-existing test-call signature errors in `packages/application/src/test-expert-trial-service.test.ts` (lines 121, 171, 210, 230; `handle` expected 0 arguments) and three unrelated type errors in `packages/domain/src/partner-pricing.test.ts` (lines 34, 37, 38). No Task 6 production code was changed to mask these failures.
+Result: exit code 2 during the repository typecheck phase. Four errors in the newly added `packages/application/src/test-expert-trial-service.test.ts` were a Task 3 regression: the test double omitted repository method input parameters (`createOrGetRedemption` and `summary`). Those test-double signatures are now corrected. The remaining three errors are unrelated in `packages/domain/src/partner-pricing.test.ts` (lines 34, 37, 38); full verification remains not passed and was not rerun.
+
+Follow-up focused evidence: `corepack pnpm vitest run packages/application/src/test-expert-trial-service.test.ts` passed 15/15; `corepack pnpm --filter @ii-tonya/application typecheck` passed. `corepack pnpm exec tsc --noEmit -p tsconfig.tests.json` now reports only the three `partner-pricing.test.ts` errors and no application errors.
