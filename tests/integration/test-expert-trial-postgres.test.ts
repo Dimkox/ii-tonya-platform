@@ -144,8 +144,6 @@ describe("test expert trial PostgreSQL authority", () => {
     });
   });
 
-  // External exact-SHA DB gate only in this remediation: the local three-run
-  // PostgreSQL budget was already exhausted before these cases were added.
   it("enforces prompt authority, provider uniqueness, unknown scan and immutable atomic audit", async () => {
     const userId = await database.createUser();
     const promptId = "00000000-0000-4000-8000-000000000384";
@@ -155,13 +153,19 @@ describe("test expert trial PostgreSQL authority", () => {
         id,asset_key,version,sha256,source_path,status,official_contract_evidence
       ) values(
         ${promptId}::uuid,'expert.functional',1,${"e".repeat(64)},
-        'docs/source/ii-tonya-expert-full-source-2026-07-28.txt','approved',
+        'docs/source/ii-tonya-expert-full-source-2026-07-28.txt','inactive',
         'evidence://external-ci/official-selarti-contract'
       )`);
+    await database.db.execute(
+      sql`update test_expert_prompt_assets set status='approved' where id=${promptId}::uuid`,
+    );
     await database.db.execute(sql`
       insert into test_expert_campaign_versions(
         id,code,version,status,prompt_asset_id,prompt_asset_version,effective_from
-      ) values(${campaignId}::uuid,'test-expert-external',1,'active',${promptId}::uuid,1,now())`);
+      ) values(${campaignId}::uuid,'test-expert-external',1,'inactive',${promptId}::uuid,1,now())`);
+    await database.db.execute(
+      sql`update test_expert_campaign_versions set status='active' where id=${campaignId}::uuid`,
+    );
     const repository = new PostgresTestExpertTrialRepository(database.db);
     const redemption = await repository.createOrGetRedemption({
       campaignVersionId: campaignId,
@@ -198,7 +202,7 @@ describe("test expert trial PostgreSQL authority", () => {
         outcome: "not_applied",
         providerRequestId: "sha256:" + "1".repeat(64),
       }),
-    ).rejects.toThrow("unknown_requires_reconciliation");
+    ).rejects.toThrow("unknown_outcome_requires_reconciliation");
     const audit = await database.db.execute<{ id: string }>(sql`
       select id from test_expert_audit_events
       where reservation_id=${first.reservationId}::uuid order by created_at,id limit 1`);
@@ -214,6 +218,23 @@ describe("test expert trial PostgreSQL authority", () => {
     expect(JSON.stringify(plan.rows)).toContain(
       "test_expert_reservations_unknown_global_idx",
     );
+    await expect(
+      database.db.execute(
+        sql`update test_expert_campaign_versions set status='inactive' where id=${campaignId}::uuid`,
+      ),
+    ).rejects.toThrow();
+    await database.db.execute(
+      sql`update test_expert_campaign_versions set status='retired' where id=${campaignId}::uuid`,
+    );
+    const lifecycle = await database.db.execute<{ count: string }>(sql`
+      select count(*)::text count from test_expert_lifecycle_audit_events
+      where entity_id in (${promptId}::uuid,${campaignId}::uuid)`);
+    expect(Number(lifecycle.rows[0]!.count)).toBeGreaterThanOrEqual(3);
+    await expect(
+      database.db.execute(
+        sql`delete from test_expert_lifecycle_audit_events where entity_id=${campaignId}::uuid`,
+      ),
+    ).rejects.toThrow();
   });
 
   it("converges a trial reservation only with the durable B2 response and same-dialogue delivery", async () => {

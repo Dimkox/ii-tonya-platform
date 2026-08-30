@@ -110,6 +110,27 @@ export const testExpertCampaignVersions = pgTable(
     ),
   ],
 );
+export const testExpertLifecycleAuditEvents = pgTable(
+  "test_expert_lifecycle_audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    fromStatus: text("from_status").notNull(),
+    toStatus: text("to_status").notNull(),
+    createdAt,
+  },
+  (t) => [
+    check(
+      "test_expert_lifecycle_entity_type_check",
+      sql`${t.entityType} in ('prompt','campaign')`,
+    ),
+    check(
+      "test_expert_lifecycle_transition_check",
+      sql`${t.fromStatus}<>${t.toStatus}`,
+    ),
+  ],
+);
 export const testExpertSessions = pgTable(
   "test_expert_sessions",
   {
@@ -117,6 +138,7 @@ export const testExpertSessions = pgTable(
     campaignVersionId: uuid("campaign_version_id").references(
       () => testExpertCampaignVersions.id,
     ),
+    redemptionId: uuid("redemption_id"),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
@@ -145,7 +167,7 @@ export const testExpertSessions = pgTable(
     index("test_expert_sessions_user_idx").on(t.userId, t.createdAt),
     check(
       "test_expert_session_state_check",
-      sql`${t.state} in ('awaiting_name','awaiting_specialization','awaiting_segment','qualified','closed')`,
+      sql`${t.state} in ('awaiting_name','awaiting_specialization','awaiting_segment','ready','qualified','closed')`,
     ),
     check("test_expert_session_version_positive", sql`${t.version}>0`),
     check(
@@ -173,9 +195,36 @@ export const testExpertSessions = pgTable(
       sql`${t.status} in ('active','closed')`,
     ),
     check(
-      "test_expert_session_qualified_check",
-      sql`${t.state}<>'qualified' or ${t.segment} is not null`,
+      "test_expert_session_closed_equivalence_check",
+      sql`(${t.state}='closed')=(${t.status}='closed')`,
     ),
+    check(
+      "test_expert_session_progress_check",
+      sql`(${t.state}='awaiting_name' and ${t.nameDigest} is null and ${t.specializationDigest} is null and ${t.segment} is null) or (${t.state}='awaiting_specialization' and ${t.nameDigest} is not null and ${t.specializationDigest} is null and ${t.segment} is null) or (${t.state}='awaiting_segment' and ${t.nameDigest} is not null and ${t.specializationDigest} is not null and ${t.segment} is null) or (${t.state} in ('ready','qualified','closed') and ${t.nameDigest} is not null and ${t.specializationDigest} is not null and ${t.segment} is not null)`,
+    ),
+    check(
+      "test_expert_session_qualified_authority_check",
+      sql`${t.state}<>'qualified' or (${t.campaignVersionId} is not null and ${t.redemptionId} is not null)`,
+    ),
+    foreignKey({
+      name: "test_expert_session_dialogue_scope_fk",
+      columns: [t.dialogueId, t.userId, t.botKey, t.externalChatId],
+      foreignColumns: [
+        dialogues.id,
+        dialogues.userId,
+        dialogues.botKey,
+        dialogues.externalChatId,
+      ],
+    }),
+    foreignKey({
+      name: "test_expert_session_redemption_scope_fk",
+      columns: [t.redemptionId, t.campaignVersionId, t.userId],
+      foreignColumns: [
+        testExpertRedemptions.id,
+        testExpertRedemptions.campaignVersionId,
+        testExpertRedemptions.userId,
+      ],
+    }),
   ],
 );
 export const testExpertDeterministicRequests = pgTable(
@@ -230,6 +279,11 @@ export const testExpertRedemptions = pgTable(
   },
   (t) => [
     unique("test_expert_redemption_key_unique").on(t.redemptionIdempotencyKey),
+    unique("test_expert_redemption_scope_unique").on(
+      t.id,
+      t.campaignVersionId,
+      t.userId,
+    ),
     index("test_expert_redemptions_user_idx").on(t.userId, t.campaignVersionId),
     check(
       "test_expert_redemption_nonnegative_check",

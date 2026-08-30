@@ -12,12 +12,22 @@ export async function reconcileTestExpertTrial(input: {
   readonly minimumAgeMs: number;
   readonly now: Date;
   readonly repository: {
-    scan(input: {
-      limit: number;
-      before: Date;
-    }): Promise<readonly { reservationId: string; createdAt: Date }[]>;
-    reconcile(
+    scan(input: { limit: number; before: Date }): Promise<
+      readonly {
+        reservationId: string;
+        providerRequestId: string;
+        createdAt: Date;
+      }[]
+    >;
+    recordAuthoritativeOutcome(
       reservationId: string,
+      providerRequestId: string,
+      outcome: "applied" | "not_applied",
+    ): Promise<void>;
+  };
+  readonly authority: {
+    resolve(
+      providerRequestId: string,
     ): Promise<"applied" | "not_applied" | "unknown">;
   };
   readonly metrics: { record(event: TestExpertReconciliationMetric): void };
@@ -48,11 +58,21 @@ export async function reconcileTestExpertTrial(input: {
       name: "reconciliation_age",
       value: Math.max(0, input.now.getTime() - row.createdAt.getTime()),
     });
-    const outcome = await input.repository.reconcile(row.reservationId);
+    const outcome = await input.authority.resolve(row.providerRequestId);
     if (outcome === "applied") {
+      await input.repository.recordAuthoritativeOutcome(
+        row.reservationId,
+        row.providerRequestId,
+        outcome,
+      );
       applied += 1;
       input.metrics.record({ name: "units_consumed", value: 1 });
     } else if (outcome === "not_applied") {
+      await input.repository.recordAuthoritativeOutcome(
+        row.reservationId,
+        row.providerRequestId,
+        outcome,
+      );
       released += 1;
       input.metrics.record({ name: "units_released", value: 1 });
     } else {

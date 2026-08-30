@@ -3,6 +3,8 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 
 export type TrialOutcomeKind = "unknown" | "applied" | "not_applied";
+export const isTestExpertProviderRequestId = (value: string): boolean =>
+  /^sha256:[0-9a-f]{64}$/u.test(value);
 export type TrialRedemption = {
   id: string;
   campaignVersionId: string;
@@ -255,12 +257,12 @@ export class MemoryTestExpertTrialRepository implements TestExpertTrialRepositor
   ): void {
     if (
       (outcome === "applied" || outcome === "unknown") &&
-      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(providerRequestId ?? "")
+      !isTestExpertProviderRequestId(providerRequestId ?? "")
     )
       throw new Error("provider_request_id_required");
     if (
       providerRequestId !== undefined &&
-      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(providerRequestId)
+      !isTestExpertProviderRequestId(providerRequestId)
     )
       throw new Error("provider_request_id_invalid");
   }
@@ -417,7 +419,7 @@ export class PostgresTestExpertTrialRepository implements TestExpertTrialReposit
       );
       const row = rows.rows[0];
       if (!row) throw new Error("reservation_not_found");
-      const providerIdValid = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(
+      const providerIdValid = isTestExpertProviderRequestId(
         providerRequestId ?? "",
       );
       if ((outcome === "applied" || outcome === "unknown") && !providerIdValid)

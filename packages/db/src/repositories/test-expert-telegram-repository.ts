@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { reserveSelartiCost } from "./selarti-budget-repository.js";
+import { hasCurrentTestExpertConsent } from "./test-expert-consent-authority.js";
 
 type Executor = Pick<DrizzleDb, "execute">;
 type Scope = { botKey: string; telegramUserId: string; chatId: string };
@@ -12,6 +13,7 @@ type Session = {
     | "awaiting_name"
     | "awaiting_specialization"
     | "awaiting_segment"
+    | "ready"
     | "qualified"
     | "closed";
   name?: string;
@@ -28,7 +30,29 @@ const validScope = (input: Scope) =>
   input.chatId === input.telegramUserId;
 
 export class PostgresTestExpertTelegramRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly consent: {
+      messagingConsentPolicyVersion: string;
+      selartiConsentPolicyVersion?: string;
+    },
+  ) {}
+
+  private async consentGranted(
+    executor: Executor,
+    userId: string,
+    residual = false,
+  ) {
+    if (residual && this.consent.selartiConsentPolicyVersion === undefined)
+      return false;
+    return hasCurrentTestExpertConsent(executor, {
+      userId,
+      messagingPolicyVersion: this.consent.messagingConsentPolicyVersion,
+      ...(residual
+        ? { selartiPolicyVersion: this.consent.selartiConsentPolicyVersion! }
+        : {}),
+    });
+  }
 
   private async identity(executor: Executor, input: Scope) {
     if (!validScope(input)) return { kind: "not_found" as const };
@@ -50,32 +74,39 @@ export class PostgresTestExpertTelegramRepository {
   }
 
   async load(input: Scope) {
-    const identity = await this.identity(this.db, input);
-    if (identity.kind !== "resolved") return identity;
-    const sessions = await this.db.execute<{
-      id: string;
-      version: number;
-      state: Session["state"];
-      segment?: Session["segment"];
-    }>(sql`
+    return this.db.transaction(async (tx) => {
+      const identity = await this.identity(tx, input);
+      if (identity.kind !== "resolved") return identity;
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${identity.userId},0))`,
+      );
+      if (!(await this.consentGranted(tx, identity.userId)))
+        return { kind: "consent_denied" as const };
+      const sessions = await tx.execute<{
+        id: string;
+        version: number;
+        state: Session["state"];
+        segment?: Session["segment"];
+      }>(sql`
       select id,version,state,segment from test_expert_sessions
       where user_id=${identity.userId}::uuid and bot_key=${input.botKey}
         and external_chat_id=${input.chatId} and status='active'
       order by created_at desc,id desc limit 2`);
-    if (sessions.rows.length > 1) return { kind: "ambiguous" as const };
-    const row = sessions.rows[0];
-    return {
-      kind: "resolved" as const,
-      userId: identity.userId,
-      session: row
-        ? {
-            id: row.id,
-            version: Number(row.version),
-            state: row.state,
-            ...(row.segment ? { segment: row.segment } : {}),
-          }
-        : null,
-    };
+      if (sessions.rows.length > 1) return { kind: "ambiguous" as const };
+      const row = sessions.rows[0];
+      return {
+        kind: "resolved" as const,
+        userId: identity.userId,
+        session: row
+          ? {
+              id: row.id,
+              version: Number(row.version),
+              state: row.state,
+              ...(row.segment ? { segment: row.segment } : {}),
+            }
+          : null,
+      };
+    });
   }
 
   async deliverDeterministic(
@@ -106,6 +137,11 @@ export class PostgresTestExpertTelegramRepository {
       const identity = await this.identity(tx, input);
       if (identity.kind !== "resolved" || identity.userId !== input.userId)
         throw new Error("test_expert_identity_ambiguous");
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${input.userId},0))`,
+      );
+      if (!(await this.consentGranted(tx, input.userId)))
+        throw new Error("test_expert_consent_denied");
       const dialogueId = await this.ensureDialogue(tx, input, input.userId);
       const deliveryKey = `sha256:${sha256(`test-expert-delivery\0${input.botKey}\0${input.requestKey}`)}`;
       await tx.execute(sql`
@@ -173,6 +209,11 @@ export class PostgresTestExpertTelegramRepository {
         const identity = await this.identity(tx, input);
         if (identity.kind !== "resolved" || identity.userId !== input.userId)
           throw new Error("test_expert_identity_ambiguous");
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${input.userId},0))`,
+        );
+        if (!(await this.consentGranted(tx, input.userId, true)))
+          throw new Error("test_expert_consent_denied");
         const sessionRows = await tx.execute<{
           id: string;
           version: number;
@@ -182,7 +223,7 @@ export class PostgresTestExpertTelegramRepository {
           select id,version,dialogue_id as "dialogueId",campaign_version_id as "campaignVersionId"
           from test_expert_sessions where id=${input.sessionId}::uuid
             and user_id=${input.userId}::uuid and bot_key=${input.botKey}
-            and external_chat_id=${input.chatId} and state='qualified' and status='active'
+            and external_chat_id=${input.chatId} and state in ('ready','qualified') and status='active'
           for update`);
         const session = sessionRows.rows[0];
         if (
@@ -210,9 +251,6 @@ export class PostgresTestExpertTelegramRepository {
           session.campaignVersionId !== campaign.id
         )
           throw new Error("test_expert_campaign_conflict");
-        await tx.execute(
-          sql`update test_expert_sessions set campaign_version_id=${campaign.id}::uuid,updated_at=transaction_timestamp() where id=${session.id}::uuid`,
-        );
         const redemptionKey = `test-expert:${campaign.id}:${input.userId}`;
         const redemption = await tx.execute<{
           id: string;
@@ -223,6 +261,12 @@ export class PostgresTestExpertTelegramRepository {
           on conflict(redemption_idempotency_key) do update set redemption_idempotency_key=excluded.redemption_idempotency_key
           returning id,(xmax=0) as created`);
         const redemptionId = redemption.rows[0]!.id;
+        await tx.execute(sql`
+          update test_expert_sessions
+          set campaign_version_id=${campaign.id}::uuid,
+              redemption_id=${redemptionId}::uuid,
+              state='qualified',updated_at=transaction_timestamp()
+          where id=${session.id}::uuid`);
         await tx.execute(
           sql`select id from test_expert_redemptions where id=${redemptionId}::uuid for update`,
         );
@@ -332,6 +376,7 @@ export class PostgresTestExpertTelegramRepository {
           "test_expert_identity_ambiguous",
           "test_expert_session_conflict",
           "test_expert_campaign_conflict",
+          "test_expert_consent_denied",
           "request_idempotency_conflict",
         ].includes(error.message)
       )
@@ -345,14 +390,46 @@ export class PostgresTestExpertTelegramRepository {
       throw new Error("test_expert_scan_limit_invalid");
     const rows = await this.db.execute<{
       reservationId: string;
+      providerRequestId: string;
       createdAt: Date;
     }>(sql`
-      select id as "reservationId",created_at as "createdAt" from test_expert_reservations
-      where status in ('reserved','unknown') and created_at<${input.before} order by created_at,id limit ${input.limit}`);
+      select id as "reservationId",provider_request_id as "providerRequestId",created_at as "createdAt" from test_expert_reservations
+      where status in ('reserved','unknown') and provider_request_id is not null and created_at<${input.before} order by created_at,id limit ${input.limit}`);
     return rows.rows;
   }
 
-  async reconcile(reservationId: string) {
+  async resolveAuthoritativeOutcome(providerRequestId: string) {
+    if (!/^sha256:[0-9a-f]{64}$/u.test(providerRequestId))
+      throw new Error("provider_request_id_invalid");
+    const facts = await this.db.execute<{
+      requestCount: number;
+      responseCount: number;
+      authoritativeNotAppliedCount: number;
+    }>(sql`
+      select count(distinct o.id)::integer as "requestCount",
+        count(distinct p.id)::integer as "responseCount",
+        count(distinct case when o.status='dead_letter' and o.last_normalized_reason='provider_not_applied' then o.id end)::integer as "authoritativeNotAppliedCount"
+      from integration_outbox o
+      left join selarti_response_proposals p on p.request_id=o.idempotency_key
+      where o.idempotency_key=${providerRequestId} and o.topic='selarti.request.v1'`);
+    const fact = facts.rows[0];
+    if (
+      !fact ||
+      fact.requestCount !== 1 ||
+      fact.responseCount > 1 ||
+      fact.authoritativeNotAppliedCount > 1
+    )
+      return "unknown" as const;
+    if (fact.responseCount === 1) return "applied" as const;
+    if (fact.authoritativeNotAppliedCount === 1) return "not_applied" as const;
+    return "unknown" as const;
+  }
+
+  async recordAuthoritativeOutcome(
+    reservationId: string,
+    providerRequestId: string,
+    outcome: "applied" | "not_applied",
+  ) {
     return this.db.transaction(async (tx) => {
       const rows = await tx.execute<{
         redemptionId: string;
@@ -364,30 +441,14 @@ export class PostgresTestExpertTelegramRepository {
       if (!row) throw new Error("reservation_not_found");
       if (row.status === "applied" || row.status === "not_applied")
         return row.status;
-      if (!row.providerRequestId) return "unknown" as const;
-      const facts = await tx.execute<{
-        requestCount: number;
-        responseCount: number;
-        expired: boolean;
-      }>(sql`
-        select count(distinct o.id)::integer as "requestCount",
-          count(distinct p.id)::integer as "responseCount",
-          coalesce(bool_or((o.payload->>'deadline')::timestamptz<=transaction_timestamp()),false) as expired
-        from integration_outbox o
-        left join selarti_response_proposals p on p.request_id=o.idempotency_key
-        where o.idempotency_key=${row.providerRequestId} and o.topic='selarti.request.v1'`);
-      const fact = facts.rows[0];
-      if (!fact || fact.requestCount > 1 || fact.responseCount > 1)
-        return "unknown" as const;
-      if (fact.responseCount === 0 && !fact.expired) return "unknown" as const;
-      const outcome = fact.responseCount === 1 ? "applied" : "not_applied";
+      if (row.providerRequestId !== providerRequestId)
+        throw new Error("provider_request_id_conflict");
       await this.transition(tx, {
         redemptionId: row.redemptionId,
         reservationId,
         outcome,
-        providerRequestId: row.providerRequestId,
+        providerRequestId,
       });
-      return outcome;
     });
   }
 

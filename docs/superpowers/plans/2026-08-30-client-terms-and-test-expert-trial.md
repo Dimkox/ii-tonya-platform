@@ -65,9 +65,9 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 ### Task 3: Deterministic application boundary
 
-**Files:** Create `packages/application/src/test-expert-warmup.ts`, `test-expert-segmentation.ts`, and `test-expert-trial-service.ts`; modify application exports and add focused tests.
+**Files:** Create `packages/application/src/test-expert-warmup.ts`, `test-expert-segmentation.ts`, and the one-dialog `test-expert-telegram-service.ts`; modify application exports and add focused tests. The superseded direct-provider `test-expert-trial-service.ts` is removed.
 
-**Interfaces:** `WarmupStateMachine.next(input): WarmupResult`, `segmentParticipant(input): ParticipantSegment`, and `TestExpertTrialService.handle(input): TrialRouteResult`. The service must call `reserveAiTurn` only for one residual provider request and must pass pricing requests to existing expert/partner policy services.
+**Interfaces:** `WarmupStateMachine.next(input): WarmupResult`, `segmentParticipant(input): ParticipantSegment`, and `TestExpertTelegramService.handle(input)`. The repository performs one residual reservation plus durable outbox enqueue and passes pricing requests to existing expert/partner policy services; no direct provider callback is exported.
 
 - [x] Write RED tests for deterministic zero-unit warmup, incomplete qualification, expert/center/organizer segmentation, authoritative quote sourcing, and fail-closed policy absence.
 - [x] Run `corepack pnpm vitest run packages/application/src/test-expert-trial-service.test.ts`; RED captured before implementation with the missing application modules.
@@ -128,9 +128,18 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 - [x] Require an operational metric sink when deterministic promo is enabled and document actual transition metrics, retention-governed residual text, public 30/45-day terms, and remaining activation gates.
 - [x] Run focused tests, all workspace package typechecks, test-project typecheck, formatting/diff/secret checks; do not rerun full verify or the PostgreSQL integration file.
 
+### Final bounded remediation
+
+- [x] Reuse B1 consent authority for current `client_messaging` before deterministic delivery and current `selarti_ai_processing` before residual reservation/outbox; fail closed on missing/revoked/wrong-version facts.
+- [x] Reconcile only authoritative durable applied/not-applied facts; delayed, missing, timed-out, or ambiguous delivery remains reserved/unknown.
+- [x] Add default-off bounded worker composition with mandatory repository, reconciliation authority, and operational metric sink.
+- [x] Add audited controlled prompt/campaign lifecycle transitions, forward rotation, strict session scope/progress constraints, and exact `sha256:<64 lowercase hex>` provider IDs.
+- [x] Remove the obsolete direct-provider application service/export and correct current documentation/evidence.
+- [x] Use the user-authorized single final PostgreSQL exception run: current-head 6/6 passed; full verify was not rerun.
+
 ## Self-review checklist
 
 - Spec coverage: rules 1–2 are Task 1; rules 3–4 are Tasks 2–4; rule 5 is Tasks 3–4; rule 6 is Task 5; rule 7 is Tasks 1, 4, 5, and 6; rollout/privacy/metrics/concurrency are Tasks 2, 4, 5, and 6.
 - Placeholder scan: this plan contains no `TBD`, `TODO`, “implement later”, unspecified error-handling instruction, or undefined interface name.
-- Type consistency: Task 2 defines the repository methods consumed by Task 3; Task 4 consumes `TestExpertTrialService.handle`; Task 5’s manifest is metadata-only and cannot activate runtime behavior.
+- Type consistency: Task 2 defines the repository methods consumed by the one-dialog Task 3/4 service; no direct-provider application service remains; Task 5’s manifest is metadata-only and cannot activate runtime behavior.
 - Explicit non-goals: no production code is changed in this Phase 0 commit; no coupon issuance is activated; no Selarti/network/provider call is made; no analytics/static script is removed.

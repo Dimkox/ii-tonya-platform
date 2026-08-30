@@ -113,7 +113,7 @@ describe("test expert Telegram one-dialog service", () => {
 
     expect(port.session).toEqual(
       expect.objectContaining({
-        state: "qualified",
+        state: "ready",
         segment: "EXPERT",
         name: "Татьяна",
         specialization: "Психолог",
@@ -131,7 +131,7 @@ describe("test expert Telegram one-dialog service", () => {
     port.session = {
       id: "session-1",
       version: 4,
-      state: "qualified",
+      state: "ready",
       name: "Татьяна",
       specialization: "Психолог",
       segment: "EXPERT",
@@ -196,7 +196,7 @@ describe("test expert Telegram one-dialog service", () => {
     port.session = {
       id: "session-1",
       version: 4,
-      state: "qualified",
+      state: "ready",
       segment: "EXPERT",
     };
     const service = new TestExpertTelegramService({

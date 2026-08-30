@@ -21,6 +21,7 @@ export type TestExpertSessionState =
   | "awaiting_name"
   | "awaiting_specialization"
   | "awaiting_segment"
+  | "ready"
   | "qualified"
   | "closed";
 
@@ -43,6 +44,7 @@ export interface TestExpertTelegramPort {
   load(input: TestExpertTelegramScope): Promise<
     | { readonly kind: "ambiguous" }
     | { readonly kind: "not_found" }
+    | { readonly kind: "consent_denied" }
     | {
         readonly kind: "resolved";
         readonly userId: string;
@@ -134,7 +136,8 @@ export class TestExpertTelegramService {
   }> {
     const text = input.text.trim();
     const context = await this.deps.telegram.load(input);
-    if (context.kind === "ambiguous") return { status: "unavailable" };
+    if (context.kind === "ambiguous" || context.kind === "consent_denied")
+      return { status: "unavailable" };
     if (context.kind === "not_found")
       return entry.test(text)
         ? { status: "unavailable" }
@@ -211,7 +214,7 @@ export class TestExpertTelegramService {
       try {
         const quote = await policy.quote({ segment });
         return deterministic(
-          next({ state: "qualified", segment }),
+          next({ state: "ready", segment }),
           `Предварительный тариф: ${formatRub(quote.priceMinor)}. ${TEST_EXPERT_PLACEHOLDER_COPY.faq}`,
         );
       } catch {

@@ -59,7 +59,25 @@ export const operationalMetrics = {
   selartiBudgetOutcomes: meter.createCounter(
     "ii_tonya_selarti_budget_outcomes",
   ),
+  testExpertReconciliation: meter.createCounter(
+    "ii_tonya_test_expert_reconciliation",
+  ),
 } as const;
+
+export function recordTestExpertReconciliationMetric(event: {
+  name:
+    | "reconciliation_age"
+    | "units_consumed"
+    | "units_released"
+    | "unknown_outcome";
+  value: number;
+}): void {
+  if (!Number.isFinite(event.value) || event.value < 0)
+    throw new Error("invalid_test_expert_reconciliation_metric");
+  operationalMetrics.testExpertReconciliation.add(event.value, {
+    outcome: event.name,
+  });
+}
 
 const selartiBudgetOutcomes = new Set([
   "admitted",

@@ -485,6 +485,12 @@ export const dialogues = pgTable(
       table.botKey,
       table.externalChatId,
     ),
+    unique("dialogues_id_user_bot_chat_unique").on(
+      table.id,
+      table.userId,
+      table.botKey,
+      table.externalChatId,
+    ),
     check(
       "dialogues_delivery_sequence_nonnegative",
       sql`${table.nextDeliverySequence} >= 0`,

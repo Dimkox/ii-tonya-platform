@@ -4,6 +4,9 @@ import {
   type TestExpertTrialRepository,
 } from "./test-expert-trial-repository.js";
 
+const providerId = (seed: string) =>
+  `sha256:${seed.padEnd(64, seed[0] ?? "a").slice(0, 64)}`;
+
 const redemption = {
   campaignVersionId: "camp-1",
   userId: "user-1",
@@ -75,7 +78,7 @@ describe("test expert trial repository", () => {
       await repository.recordOutcome({
         reservationId: reservation.reservationId,
         outcome: "applied",
-        providerRequestId: `provider-${i}`,
+        providerRequestId: providerId(i.toString(16)),
       });
     }
     await expect(repository.summary(redemptionId)).resolves.toMatchObject({
@@ -96,7 +99,7 @@ describe("test expert trial repository", () => {
     await repository.recordOutcome({
       reservationId: finalReservation.reservationId,
       outcome: "applied",
-      providerRequestId: "provider-final",
+      providerRequestId: providerId("f"),
     });
   });
 
@@ -110,14 +113,14 @@ describe("test expert trial repository", () => {
       repository.recordOutcome({
         reservationId: applied.reservationId,
         outcome: "applied",
-        providerRequestId: "provider-applied",
+        providerRequestId: providerId("a"),
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
     await expect(
       repository.recordOutcome({
         reservationId: applied.reservationId,
         outcome: "applied",
-        providerRequestId: "provider-applied",
+        providerRequestId: providerId("a"),
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
 
@@ -140,21 +143,21 @@ describe("test expert trial repository", () => {
       repository.recordOutcome({
         reservationId: unknown.reservationId,
         outcome: "unknown",
-        providerRequestId: "provider-unknown",
+        providerRequestId: providerId("b"),
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 2 });
     await expect(
       repository.recordOutcome({
         reservationId: unknown.reservationId,
         outcome: "not_applied",
-        providerRequestId: "provider-unknown",
+        providerRequestId: providerId("b"),
       }),
     ).rejects.toThrow("unknown_outcome_requires_reconciliation");
     await expect(
       repository.reconcileUnknown({
         reservationId: unknown.reservationId,
         outcome: "not_applied",
-        providerRequestId: "provider-unknown",
+        providerRequestId: providerId("b"),
       }),
     ).resolves.toMatchObject({ consumedUnits: 2, reservedUnits: 0 });
   });
@@ -174,13 +177,13 @@ describe("test expert trial repository", () => {
     await repository.recordOutcome({
       reservationId: reservation.reservationId,
       outcome: "applied",
-      providerRequestId: "provider-stable",
+      providerRequestId: providerId("c"),
     });
     await expect(
       repository.recordOutcome({
         reservationId: reservation.reservationId,
         outcome: "not_applied",
-        providerRequestId: "provider-stable",
+        providerRequestId: providerId("c"),
       }),
     ).rejects.toThrow("outcome_conflict");
   });
@@ -200,7 +203,7 @@ describe("test expert trial repository", () => {
     await repository.recordOutcome({
       reservationId: reservation.reservationId,
       outcome: "unknown",
-      providerRequestId: "provider-operation-unknown",
+      providerRequestId: providerId("d"),
     });
     const replay = await repository.reserveAiTurn({
       ...request("provider-metadata"),
@@ -208,13 +211,13 @@ describe("test expert trial repository", () => {
     });
     expect(replay).toMatchObject({
       status: "unknown",
-      providerRequestId: "provider-operation-unknown",
+      providerRequestId: providerId("d"),
     });
     await expect(
       repository.reconcileUnknown({
         reservationId: reservation.reservationId,
         outcome: "applied",
-        providerRequestId: "different-provider-operation",
+        providerRequestId: providerId("e"),
       }),
     ).rejects.toThrow("provider_request_id_conflict");
   });

@@ -25,6 +25,5 @@ export * from "./selarti-cost-calculator.js";
 export * from "./partner-commerce.js";
 export * from "./test-expert-warmup.js";
 export * from "./test-expert-segmentation.js";
-export * from "./test-expert-trial-service.js";
 export * from "./test-expert-trial-metrics.js";
 export * from "./test-expert-telegram-service.js";

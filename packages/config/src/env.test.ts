@@ -39,6 +39,7 @@ describe("loadEnv", () => {
       testExpertPromo: false,
       testExpertDeterministicFlow: false,
       testExpertSelarti: false,
+      testExpertReconciliation: false,
       expertReferral: false,
       expertReferralMaturityWorker: false,
       expertResidencyBilling: false,
@@ -57,11 +58,26 @@ describe("loadEnv", () => {
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
   });
 
+  it("defaults test-expert reconciliation off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.testExpertReconciliation).toBe(false);
+    expect(
+      loadEnv(localEnv({ TEST_EXPERT_RECONCILIATION_ENABLED: "true" })).features
+        .testExpertReconciliation,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ TEST_EXPERT_RECONCILIATION_ENABLED: "TRUE" })),
+    ).toThrow();
+  });
+
   it("allows deterministic test-expert flow without Selarti and fails closed for incomplete residual activation", () => {
     const deterministic = loadEnv(
       localEnv({
         TEST_EXPERT_PROMO_ENABLED: "true",
         TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+        CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
+        CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+        CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
+        TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
       }),
     );
     expect(deterministic.features).toMatchObject({
@@ -76,6 +92,10 @@ describe("loadEnv", () => {
           TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
           TEST_EXPERT_SELARTI_ENABLED: "true",
           TEST_EXPERT_PROMPT_VERSION: "approved-v1",
+          CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
+          CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+          CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
+          TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
         }),
       ),
     ).toThrow("test_expert_residual_configuration_incomplete");

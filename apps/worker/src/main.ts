@@ -15,12 +15,14 @@ import {
   PostgresOutboxRepository,
   PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
+  PostgresTestExpertTelegramRepository,
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
   recordClientSessionMetric,
   recordExpertReferralMaturityMetric,
   recordWorkerOutboxMetric,
+  recordTestExpertReconciliationMetric,
 } from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
 import {
@@ -47,10 +49,42 @@ import {
   type OutboxRunnerMetricLabels,
   type OutboxDispatcher,
   type OutboxReconciler,
+  reconcileTestExpertTrial,
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
 type BoundedJob = () => Promise<unknown>;
+type TestExpertReconciliationCapabilities = {
+  repository: {
+    scan(input: { limit: number; before: Date }): Promise<
+      readonly {
+        reservationId: string;
+        providerRequestId: string;
+        createdAt: Date;
+      }[]
+    >;
+    recordAuthoritativeOutcome(
+      reservationId: string,
+      providerRequestId: string,
+      outcome: "applied" | "not_applied",
+    ): Promise<void>;
+  };
+  authority: {
+    resolve(
+      providerRequestId: string,
+    ): Promise<"applied" | "not_applied" | "unknown">;
+  };
+  metrics: {
+    record(event: {
+      name:
+        | "reconciliation_age"
+        | "units_consumed"
+        | "units_released"
+        | "unknown_outcome";
+      value: number;
+    }): void;
+  };
+};
 
 export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
@@ -132,6 +166,24 @@ export function selectClientSessionRetention(
     throw new Error("client_session_retention_capability_unavailable");
   }
   return job;
+}
+
+export function selectTestExpertReconciliation(
+  config: RuntimeConfig,
+  factory?: () => unknown,
+): TestExpertReconciliationCapabilities | undefined {
+  if (config.features.testExpertReconciliation !== true) return undefined;
+  if (factory === undefined)
+    throw new Error("test_expert_reconciliation_capability_unavailable");
+  const value = factory() as Partial<TestExpertReconciliationCapabilities>;
+  if (
+    typeof value?.repository?.scan !== "function" ||
+    typeof value.repository.recordAuthoritativeOutcome !== "function" ||
+    typeof value?.authority?.resolve !== "function" ||
+    typeof value?.metrics?.record !== "function"
+  )
+    throw new Error("test_expert_reconciliation_capability_unavailable");
+  return value as TestExpertReconciliationCapabilities;
 }
 
 function requireWorkerOutboxRegistry(
@@ -316,6 +368,22 @@ export function createProductionWorkerRuntimeFactory(
                 limit: 100,
               })
           : undefined;
+      const testExpertReconciliation = selectTestExpertReconciliation(
+        config,
+        () => {
+          const repository = new PostgresTestExpertTelegramRepository(db, {
+            messagingConsentPolicyVersion: "worker-reconciliation-only",
+          });
+          return {
+            repository,
+            authority: {
+              resolve: (providerRequestId: string) =>
+                repository.resolveAuthoritativeOutcome(providerRequestId),
+            },
+            metrics: { record: recordTestExpertReconciliationMetric },
+          };
+        },
+      );
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
@@ -344,6 +412,17 @@ export function createProductionWorkerRuntimeFactory(
           ? {}
           : { clientSessionRetention }),
         ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
+        ...(testExpertReconciliation === undefined
+          ? {}
+          : {
+              testExpertReconciliation: () =>
+                reconcileTestExpertTrial({
+                  limit: 100,
+                  minimumAgeMs: 60_000,
+                  now: new Date(),
+                  ...testExpertReconciliation,
+                }),
+            }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),

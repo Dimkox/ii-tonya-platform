@@ -90,6 +90,9 @@ const schema = z
       .enum(["true", "false"])
       .default("false"),
     TEST_EXPERT_SELARTI_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_RECONCILIATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     TEST_EXPERT_PROMPT_VERSION: optionalNonEmptyString,
     SELARTI_RESPONSE_SHARED_SECRET: z
       .string()
@@ -331,6 +334,7 @@ export type RuntimeConfig = {
     testExpertPromo?: boolean;
     testExpertDeterministicFlow?: boolean;
     testExpertSelarti?: boolean;
+    testExpertReconciliation?: boolean;
     testExpertPromptVersion?: string;
     expertReferral: boolean;
     expertReferralMaturityWorker: boolean;
@@ -372,6 +376,12 @@ export type RuntimeConfig = {
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
+  if (
+    value.TEST_EXPERT_PROMO_ENABLED === "true" &&
+    value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true" &&
+    value.CLIENT_TELEGRAM_INGRESS_ENABLED !== "true"
+  )
+    throw new Error("test_expert_consent_ingress_required");
   if (
     value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true" &&
     (!value.CLIENT_TELEGRAM_BOT_KEY ||
@@ -465,6 +475,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       testExpertDeterministicFlow:
         value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true",
       testExpertSelarti: value.TEST_EXPERT_SELARTI_ENABLED === "true",
+      testExpertReconciliation:
+        value.TEST_EXPERT_RECONCILIATION_ENABLED === "true",
       ...(value.TEST_EXPERT_PROMPT_VERSION === undefined
         ? {}
         : { testExpertPromptVersion: value.TEST_EXPERT_PROMPT_VERSION }),

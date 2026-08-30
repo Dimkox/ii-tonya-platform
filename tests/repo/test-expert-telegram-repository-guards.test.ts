@@ -27,6 +27,9 @@ describe("test expert Telegram repository guards", () => {
     expect(source).toContain("'telegram.send_text.v1'");
     expect(source).toContain("test_expert_prompt_assets");
     expect(source).toContain("selarti_response_proposals");
+    expect(source).toContain("hasCurrentTestExpertConsent");
+    expect(source).toContain("last_normalized_reason='provider_not_applied'");
+    expect(source).not.toContain("fact.expired");
     expect(source).not.toMatch(/dispatch\s*\(/u);
     expect(source).not.toMatch(/provider\s*\(/u);
   });

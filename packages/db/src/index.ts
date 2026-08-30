@@ -22,6 +22,7 @@ export {
   type TrialRedemption,
   type TrialReservation,
   type TrialSummary,
+  isTestExpertProviderRequestId,
 } from "./repositories/test-expert-trial-repository.js";
 export {
   PostgresExpertTrialPricingPolicy,

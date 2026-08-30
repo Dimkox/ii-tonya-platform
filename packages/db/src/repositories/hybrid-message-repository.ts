@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { reserveSelartiCost } from "./selarti-budget-repository.js";
+import { hasCurrentTestExpertConsent } from "./test-expert-consent-authority.js";
 
 export type HybridPersistInput = {
   updateId: bigint;
@@ -50,27 +51,19 @@ export class PostgresHybridMessageRepository {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${identity.userId}, 0))`,
       );
-      const latest = async (type: string) =>
-        (
-          await tx.execute<{ decision: string; policyVersion: string }>(
-            sql`select decision,policy_version as "policyVersion" from consents where user_id=${identity.userId}::uuid and consent_type=${type} order by created_at desc,id desc limit 1`,
-          )
-        ).rows[0];
-      const messaging = await latest("client_messaging");
       if (
-        messaging?.decision !== "granted" ||
-        messaging.policyVersion !== input.messagingConsentPolicyVersion
+        !(await hasCurrentTestExpertConsent(tx, {
+          userId: identity.userId,
+          messagingPolicyVersion: input.messagingConsentPolicyVersion,
+          ...(input.route === "complex_dialogue" &&
+          input.selartiConsentPolicyVersion !== undefined
+            ? { selartiPolicyVersion: input.selartiConsentPolicyVersion }
+            : {}),
+        })) ||
+        (input.route === "complex_dialogue" &&
+          input.selartiConsentPolicyVersion === undefined)
       )
         return "rejected";
-      if (input.route === "complex_dialogue") {
-        const ai = await latest("selarti_ai_processing");
-        if (
-          !input.selartiConsentPolicyVersion ||
-          ai?.decision !== "granted" ||
-          ai.policyVersion !== input.selartiConsentPolicyVersion
-        )
-          return "rejected";
-      }
       await this.testHooks.afterConsentRead?.(identity.userId);
       let dialogue = (
         await tx.execute<{ id: string; userId: string }>(

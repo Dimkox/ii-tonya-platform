@@ -292,7 +292,15 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
-    const testExpertRepository = new PostgresTestExpertTelegramRepository(db);
+    const testExpertRepository = new PostgresTestExpertTelegramRepository(db, {
+      messagingConsentPolicyVersion:
+        config.clientMessagingConsentPolicyVersion ?? "unconfigured",
+      ...(config.selartiAiConsentPolicyVersion === undefined
+        ? {}
+        : {
+            selartiConsentPolicyVersion: config.selartiAiConsentPolicyVersion,
+          }),
+    });
     const testExpertResidualEnabled =
       config.features.testExpertSelarti === true &&
       config.features.clientHybridRouting === true &&

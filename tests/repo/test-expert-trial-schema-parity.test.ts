@@ -9,6 +9,7 @@ const names = (table: Parameters<typeof getTableConfig>[0]) => {
     checks: config.checks.map(({ name }) => name),
     indexes: config.indexes.map(({ config: index }) => index.name),
     uniques: config.uniqueConstraints.map(({ name }) => name),
+    foreignKeys: config.foreignKeys.map((key) => key.getName()),
   };
 };
 
@@ -16,6 +17,7 @@ describe("test expert trial schema parity", () => {
   it("exports prompt, session, ledger, outcome, and audit authority with full named parity", () => {
     expect(schema).toHaveProperty("testExpertPromptAssets");
     expect(schema).toHaveProperty("testExpertCampaignVersions");
+    expect(schema).toHaveProperty("testExpertLifecycleAuditEvents");
     expect(schema).toHaveProperty("testExpertSessions");
     expect(schema).toHaveProperty("testExpertDeterministicRequests");
     expect(schema).toHaveProperty("testExpertRedemptions");
@@ -41,6 +43,9 @@ describe("test expert trial schema parity", () => {
       expect.arrayContaining([
         "test_expert_session_state_check",
         "test_expert_session_version_positive",
+        "test_expert_session_closed_equivalence_check",
+        "test_expert_session_progress_check",
+        "test_expert_session_qualified_authority_check",
       ]),
     );
     expect(names(schema.testExpertDeterministicRequests).checks).toEqual(
@@ -73,6 +78,21 @@ describe("test expert trial schema parity", () => {
         "test_expert_reservation_provider_request_check",
       ]),
     );
+    expect(names(schema.testExpertCampaignVersions).foreignKeys).toContain(
+      "test_expert_campaign_prompt_asset_fk",
+    );
+    expect(names(schema.testExpertSessions).foreignKeys).toEqual(
+      expect.arrayContaining([
+        "test_expert_session_dialogue_scope_fk",
+        "test_expert_session_redemption_scope_fk",
+      ]),
+    );
+    expect(names(schema.testExpertRedemptions).uniques).toEqual(
+      expect.arrayContaining([
+        "test_expert_redemption_key_unique",
+        "test_expert_redemption_scope_unique",
+      ]),
+    );
   });
 
   it("folds never-shipped hardening into 0038 with prompt FK, scans, and immutable audit", () => {
@@ -94,6 +114,12 @@ describe("test expert trial schema parity", () => {
     expect(migration).toContain("test_expert_deterministic_immutable");
     expect(migration).toContain("test_expert_campaign_prompt_asset_fk");
     expect(migration).toContain("test_expert_audit_immutable");
+    expect(migration).toContain("test_expert_prompt_transition");
+    expect(migration).toContain("test_expert_campaign_transition");
+    expect(migration).toContain("test_expert_lifecycle_audit_immutable");
+    expect(migration).toContain("test_expert_session_dialogue_scope_fk");
+    expect(migration).toContain("test_expert_session_redemption_scope_fk");
+    expect(migration).toContain("dialogues_id_user_bot_chat_unique");
     expect(migration).toContain("test_expert_reservations_unknown_global_idx");
     expect(migration).toContain(
       "test_expert_reservations_provider_request_idx",

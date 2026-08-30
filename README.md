@@ -187,9 +187,10 @@ separate from coupons, referrals, partner acquisition, and B3 cost reservations.
 the `test-expert:<campaign-version-id>:<internal-user-id>` namespace; summaries are informational,
 while locked PostgreSQL transitions remain cap authority.
 
-Four controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
+The routing controls are default-off: `TEST_EXPERT_PROMO_ENABLED`,
 `TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED`, `TEST_EXPERT_SELARTI_ENABLED`, and
-`TEST_EXPERT_PROMPT_VERSION`; the last value is compatibility metadata, not activation authority. The
+`TEST_EXPERT_PROMPT_VERSION`; the last value is compatibility metadata, not activation authority.
+`TEST_EXPERT_RECONCILIATION_ENABLED` independently gates the bounded worker. The
 public promo body route is removed. Composition lives in the webhook-secret-authenticated client
 route `POST /v1/webhooks/telegram/client/:botKey`, derives identity from a private update, rate-limits
 before reservation, and resolves exactly one bot/chat/user identity. Every deterministic entry,
@@ -197,14 +198,19 @@ warmup, qualification, segment, quote, FAQ, limit, and fallback creates the exis
 `telegram.send_text.v1` outbox/delivery for that same dialogue. Durable session state routes later
 private free-form messages without a repeated prefix; ambiguity fails closed. Placeholder copy is
 versioned and explicitly inactive for selling because approved warmup copy has not been supplied.
+Before routing or delivery, current granted `client_messaging` consent is required; residual
+admission additionally requires current granted `selarti_ai_processing` consent. Missing, revoked,
+ambiguous, or wrong-policy-version consent fails closed.
 
 Promo+Deterministic alone provides zero-unit behavior. Residual AI additionally requires one active
 database campaign linked to an approved prompt asset with official-contract evidence and every
 existing B1/B2/B3 capability. One residual turn reserves two units, passes B3 cost admission, and
 creates one idempotent `selarti.request.v1`; there is no direct provider dispatch. Only B2 response
 convergence creates the same-dialogue `telegram.send_text.v1` answer and moves reserved units to
-consumed. A bounded scanner preserves unresolved outcomes, reconciles a durable response as applied,
-and releases only an expired request with no response. No prompt or campaign is seeded active. The
+consumed. A bounded scanner preserves delayed, lost, and ambiguous outcomes, reconciles a durable B2
+response as applied, and releases only from an authoritative durable `not_applied` fact—never from
+timeout or response absence. Prompt/campaign metadata is immutable, and audited transitions are
+limited to inactive→approved→retired and inactive→active→retired. No prompt or campaign is seeded active. The
 source prompt remains preserved by the inactive
 [prompt manifest](docs/prompts/test-expert-source-manifest.json), which cannot activate runtime.
 
@@ -218,14 +224,13 @@ deterministic/offload, reservation, consumption, release, unknown, cap rejection
 outcome, and reconciliation-age facts. Conversion and cost names are emitted only when a durable fact
 exists. Yandex Metrika and all static scripts in `apps/web/index.html` remain unchanged.
 
-Focused API, application, config, schema, repository, worker, and web checks are green. Earlier
-disposable PostgreSQL 17.5 checks passed the then-current four cases. New exact-SHA cases for folded
-`0038`, prompt authority, unknown-scan `EXPLAIN`, provider uniqueness, B2 convergence, and audit
-immutability are committed but intentionally unexecuted locally because the three-run PostgreSQL
-budget was exhausted. The single allowed full `pnpm verify` run failed before this follow-up and was
+Focused API, application, config, schema, repository, worker, and web checks are green. The explicitly
+authorized final current-head disposable PostgreSQL 17.5 run passed 6/6 cases for folded `0038`,
+lifecycle authority, unknown-scan `EXPLAIN`, provider uniqueness, B2 convergence, concurrency, and
+audit immutability. The single allowed full `pnpm verify` run failed before this follow-up and was
 not rerun; its introduced trial type regressions and partner-pricing test types are fixed under
-focused checks. Official Selarti privacy/contract evidence, approved prompt/warmup copy, external
-execution of the new PostgreSQL cases, restart durability, and real database-role denial remain
+focused checks. Official Selarti privacy/contract evidence, approved prompt/warmup copy, independent
+exact-SHA review, restart durability, and real database-role denial remain
 activation blockers pending independent review and exact-SHA CI.
 
 ## Unit-economics planning calculation

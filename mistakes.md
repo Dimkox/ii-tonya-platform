@@ -1,5 +1,7 @@
 # Mistakes
 
+The trial slice inferred `not_applied` from an expired deadline and omitted B1 consent checks because it modeled reservation state separately from the established messaging trust/delivery authority. Future provider-assisted flows must reuse current consent authority and require an explicit durable delivery/reconciliation fact before releasing reserved value; elapsed time is never proof of non-delivery.
+
 The first remediation treated an HTTP acknowledgement and a direct provider callback as sufficient proof of a one-dialog flow. The root cause was bypassing the existing Telegram delivery and B1/B2/B3 convergence seams; future channel work must trace both ingress identity and the durable user-visible delivery before claiming composition.
 
 The first promo boundary was designed as a standalone HTTP route and accepted `telegramUserId` from its body, while startup treated deterministic and provider activation as one gate. The root cause was composing from the new feature inward instead of extending the authenticated Telegram trust boundary and separating zero-cost deterministic capability from residual provider capability.

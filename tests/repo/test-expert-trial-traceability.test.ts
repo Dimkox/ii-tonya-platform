@@ -23,12 +23,13 @@ describe("test expert trial traceability", () => {
       ]),
     );
   });
-  it("keeps four flags, migration, metric names, and analytics preservation traceable", () => {
+  it("keeps default-off flags, migration, metric names, and analytics preservation traceable", () => {
     const env = readFileSync("packages/config/src/env.ts", "utf8");
     expect(env).toMatch(
       /TEST_EXPERT_(?:PROMO|DETERMINISTIC_FLOW|SELARTI)_ENABLED/gu,
     );
     expect(env).toContain("TEST_EXPERT_PROMPT_VERSION");
+    expect(env).toContain("TEST_EXPERT_RECONCILIATION_ENABLED");
     expect(
       readFileSync("packages/db/migrations/0038_test_expert_trial.sql", "utf8"),
     ).toContain("test_expert_campaign_versions");

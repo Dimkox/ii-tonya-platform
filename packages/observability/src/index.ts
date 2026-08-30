@@ -16,6 +16,7 @@ export {
   recordSelartiBudgetMetric,
   selartiBudgetMetricLabels,
   recordWorkerOutboxMetric,
+  recordTestExpertReconciliationMetric,
   referralMetricLabels,
   workerOutboxMetricLabels,
   type ExpertReferralMetricLabels,

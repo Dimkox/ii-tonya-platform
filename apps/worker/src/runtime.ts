@@ -21,6 +21,7 @@ export interface WorkerCycleReport {
   readonly confirmedOutboxDelivery: unknown;
   readonly processorPrivacy: unknown;
   readonly providerReconciliation: unknown;
+  readonly testExpertReconciliation: unknown;
 }
 
 export interface WorkerRuntime {
@@ -51,6 +52,7 @@ export interface WorkerRuntimeDependencies {
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
+  readonly testExpertReconciliation?: BoundedJob;
   readonly closeDatabase: () => Promise<void>;
   readonly closeTelemetry: () => Promise<void>;
   readonly shutdownTimeoutMs?: number;
@@ -64,6 +66,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -178,6 +181,11 @@ export function createWorkerRuntime(
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
+      const testExpertReconciliation =
+        (await deps.testExpertReconciliation?.()) ?? {
+          scanned: 0,
+          reason: "test_expert_reconciliation_disabled",
+        };
       return {
         safetyHandoffs,
         expiredLeaseRecovery,
@@ -191,6 +199,7 @@ export function createWorkerRuntime(
         confirmedOutboxDelivery,
         processorPrivacy,
         providerReconciliation,
+        testExpertReconciliation,
       };
     })();
     currentCycle = cycle;
@@ -362,6 +371,9 @@ export function createProductionWorkerRuntime(
       projectionRepairs: 0,
       provider: "disabled",
     }),
+    ...(deps.testExpertReconciliation === undefined
+      ? {}
+      : { testExpertReconciliation: deps.testExpertReconciliation }),
     closeDatabase: deps.closeDatabase,
     closeTelemetry: deps.closeTelemetry,
     ...(deps.shutdownTimeoutMs === undefined
