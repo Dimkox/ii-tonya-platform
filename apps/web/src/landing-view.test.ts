@@ -91,7 +91,8 @@ describe("promotional landing view", () => {
     expect(html).toContain("психологи, коучи, терапевты");
     expect(html).toContain("тест клиент");
     expect(html).toContain("тест эксперт");
-    expect(html).toContain("Купоны в 2 раза больше оплаты");
+    expect(html).toContain("срок их действия составит 45 дней");
+    expect(html).toContain("начисление и использование купонов в V2 отключены");
     expect(html).toContain('aria-disabled="true"');
     expect(html).toContain("не отправляет данные");
     expect(html).toContain("А теперь представьте");

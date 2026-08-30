@@ -366,7 +366,7 @@ export class PostgresAdminRepository {
           ${command.userId}::uuid, ${command.units}, ${command.idempotencyKey},
           ${kind}, ${approval.approvalId}::uuid, ${command.sessionIdHash},
           case when ${kind} = 'admin'
-            then c.db_now + interval '60 days' else null end,
+            then c.db_now + interval '30 days' else null end,
           c.db_now
         from (select ${this.grantClock()}::timestamptz as db_now) c
         on conflict (grant_idempotency_key) do nothing

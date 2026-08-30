@@ -120,7 +120,7 @@ describe("atomic approved admin workflows", () => {
       expiresAt: postgresInstant(fixed.rows[0]!.expiresAt),
     }).toEqual({
       grantedAt: fixedNow,
-      expiresAt: new Date("2026-09-26T10:00:00.000Z"),
+      expiresAt: new Date("2026-08-27T10:00:00.000Z"),
     });
 
     const defaultUserId = await testDb!.createUser();
@@ -145,7 +145,7 @@ describe("atomic approved admin workflows", () => {
     );
   });
 
-  it("grants once under replay/concurrency with DB-authoritative 60-day immutable metadata and complete audit", async () => {
+  it("grants once under replay/concurrency with DB-authoritative 30-day package validity and complete audit", async () => {
     const requester = await seedAdmin("entitlement_admin");
     const approver = await seedAdmin("entitlement_admin");
     const userId = await testDb!.createUser();
@@ -198,7 +198,7 @@ describe("atomic approved admin workflows", () => {
         (select count(*)::text from admin_approvals where id = ${auth.approvalId}::uuid and consumed_at is not null) as consumed,
         (select extract(epoch from (expires_at - granted_at))::text from message_packages where grant_idempotency_key = ${idempotencyKey}) as seconds
     `);
-    expect(facts.rows[0]).toEqual({ packages: "1", grants: "1", audits: "1", consumed: "1", seconds: "5184000.000000" });
+    expect(facts.rows[0]).toEqual({ packages: "1", grants: "1", audits: "1", consumed: "1", seconds: "2592000.000000" });
     await expect(testDb!.db.execute(sql`update message_packages set granted_messages = 1 where grant_idempotency_key = ${idempotencyKey}`)).rejects.toThrow();
     await expect(testDb!.db.execute(sql`delete from audit_events where correlation_id = ${auth.correlationId}`)).rejects.toThrow();
   });
