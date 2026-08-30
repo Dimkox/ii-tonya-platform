@@ -22,4 +22,12 @@ describe("partner commerce foundation migration", () => {
     await expect(database.db.execute(sql`update partner_tariff_policy_versions set standard_price_minor=2 where id='00000000-0000-4000-8000-000000000075'::uuid`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
     await expect(database.db.execute(sql`delete from partner_tariff_policy_versions where id='00000000-0000-4000-8000-000000000075'::uuid`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
   });
+
+  it("rejects cross-kind participant and policy references", async () => {
+    const user = await database.createUser();
+    const center = "00000000-0000-4000-8000-000000000076";
+    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${center}::uuid,${user}::uuid,'CENTER','started')`);
+    await database.db.execute(sql`insert into partner_tariff_policy_versions (id,policy_version_id,policy_version,partner_kind,standard_price_minor,referred_six_price_minor,referred_ten_price_minor,online_only_surcharge_minor,city_million_plus_surcharge_minor,currency,duration_seconds,event_entitlements,resident_commission_bps,nonresident_commission_bps,nonresident_card_fee_minor,effective_from) values ('00000000-0000-4000-8000-000000000077'::uuid,'cross-kind',1,'CENTER',1500000,1200000,800000,300000,500000,'RUB',2592000,'{"bands":[{"capacity":30,"count":10}]}'::jsonb,1000,1500,450000,now())`);
+    await expect(database.db.execute(sql`insert into partner_shadow_quotes (participant_id,policy_id,policy_version_id,policy_version,partner_kind,qualified_expert_count,tier,base_price_minor,online_only_surcharge_minor,city_million_plus_surcharge_minor,final_price_minor,currency,duration_seconds,event_entitlements,resident_commission_bps,nonresident_commission_bps,nonresident_card_fee_minor) values (${center}::uuid,'00000000-0000-4000-8000-000000000077'::uuid,'cross-kind',1,'ORGANIZER',0,'STANDARD',2000000,0,0,2000000,'RUB',2592000,'{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb,1000,1500,450000)`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23503");
+  });
 });
