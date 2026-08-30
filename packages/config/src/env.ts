@@ -85,6 +85,12 @@ const schema = z
       .default("false"),
     B2_TELEGRAM_DISPATCH_ENABLED: z.enum(["true", "false"]).default("false"),
     B2_SENSITIVE_RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_PROMO_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    TEST_EXPERT_SELARTI_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_PROMPT_VERSION: optionalNonEmptyString,
     SELARTI_RESPONSE_SHARED_SECRET: z
       .string()
       .min(32)
@@ -322,6 +328,10 @@ export type RuntimeConfig = {
     selartiResponseIngress?: boolean;
     b2TelegramDispatch?: boolean;
     b2SensitiveRetention?: boolean;
+    testExpertPromo?: boolean;
+    testExpertDeterministicFlow?: boolean;
+    testExpertSelarti?: boolean;
+    testExpertPromptVersion?: string;
     expertReferral: boolean;
     expertReferralMaturityWorker: boolean;
     expertResidencyBilling: boolean;
@@ -439,6 +449,13 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       selartiResponseIngress: false,
       b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
       b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",
+      testExpertPromo: value.TEST_EXPERT_PROMO_ENABLED === "true",
+      testExpertDeterministicFlow:
+        value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true",
+      testExpertSelarti: value.TEST_EXPERT_SELARTI_ENABLED === "true",
+      ...(value.TEST_EXPERT_PROMPT_VERSION === undefined
+        ? {}
+        : { testExpertPromptVersion: value.TEST_EXPERT_PROMPT_VERSION }),
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
       expertReferralMaturityWorker:
         value.EXPERT_REFERRAL_MATURITY_WORKER_ENABLED === "true",

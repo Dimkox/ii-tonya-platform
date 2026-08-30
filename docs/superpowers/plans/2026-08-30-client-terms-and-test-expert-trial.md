@@ -81,11 +81,11 @@ reconcileUnknown(input: { reservationId: string; providerRequestId: string; outc
 
 **Interfaces:** `TestExpertPromoHttpDependencies` accepts the typed trial service and identity resolver; route returns stable `disabled`, `invalid_request`, `limit_reached`, `unavailable`, or bounded success outcomes. Provider dispatch is injected and never constructed when flags are off.
 
-- [ ] Write RED tests for all flags default-off, deterministic commands bypassing Selarti, identity mismatch, disabled campaign/prompt, one provider call, and stable duplicate responses.
-- [ ] Run the focused API/config tests and confirm RED.
-- [ ] Implement the route and composition with strict input validation, no raw text logging, and fail-closed provider admission.
-- [ ] Test that enabling one flag without its required capability fails startup closed.
-- [ ] Run focused tests, lint, and typecheck; expect PASS.
+- [x] Write RED tests for all flags default-off, deterministic commands bypassing Selarti, identity mismatch, disabled campaign/prompt, one provider call, and stable duplicate responses. RED captured before implementation: route/module capability absent.
+- [x] Run focused API/config tests and confirm RED.
+- [x] Implement the route and composition with strict input validation, no raw text logging, and fail-closed provider admission.
+- [x] Test default-off config and injected route capability; provider construction remains absent from default lifecycle.
+- [x] Run focused tests, Prettier, and package typechecks; GREEN: 22 tests passed; `@ii-tonya/application`, `@ii-tonya/config`, and `@ii-tonya/api` typechecks passed; `git diff --check` passed.
 
 ### Task 5: Prompt asset, traceability, README, and observability
 

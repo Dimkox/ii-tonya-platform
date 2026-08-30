@@ -59,6 +59,7 @@ import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { createClientPrincipalResolver } from "./client-principal-resolver.js";
 import { createClientBookingPrincipalResolver } from "./client-booking-principal-resolver.js";
+import type { TestExpertPromoDependencies } from "./routes/test-expert-promo.js";
 import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
 import {
   clientSessionTokenHash,
@@ -118,6 +119,10 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
+    testExpertPromoComposition?: Omit<
+      TestExpertPromoDependencies,
+      "enabled" | "deterministicEnabled" | "selartiEnabled" | "promptVersion"
+    >;
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
@@ -127,6 +132,11 @@ export const createDefaultLifecycle = (
     ) {
       throw new Error("client_commercial_policy_repository_unavailable");
     }
+    if (
+      config.features.testExpertPromo === true &&
+      options.testExpertPromoComposition === undefined
+    )
+      throw new Error("test_expert_promo_composition_unavailable");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -322,6 +332,22 @@ export const createDefaultLifecycle = (
         ? {}
         : { clientBotKey: config.clientTelegramBotKey }),
       ...(clientGateway === undefined ? {} : { clientGateway }),
+      ...(options.testExpertPromoComposition === undefined
+        ? {}
+        : {
+            testExpertPromo: {
+              ...options.testExpertPromoComposition,
+              enabled: config.features.testExpertPromo === true,
+              deterministicEnabled:
+                config.features.testExpertDeterministicFlow === true,
+              selartiEnabled: config.features.testExpertSelarti === true,
+              ...(config.features.testExpertPromptVersion === undefined
+                ? {}
+                : {
+                    promptVersion: config.features.testExpertPromptVersion,
+                  }),
+            },
+          }),
       telegramWebhookSecret:
         config.telegramWebhookSecret ?? randomBytes(32).toString("base64url"),
       ...(config.selartiResponseSharedSecret === undefined

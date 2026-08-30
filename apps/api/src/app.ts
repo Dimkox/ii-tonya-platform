@@ -57,6 +57,7 @@ import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
+import { testExpertPromoRoutes } from "./routes/test-expert-promo.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -115,6 +116,7 @@ export interface AppDependencies {
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
+  testExpertPromo?: import("./routes/test-expert-promo.js").TestExpertPromoDependencies;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
   const nonPaymentIntegrations = {
@@ -191,6 +193,14 @@ export async function buildApp(
   ) {
     throw new Error("Selarti response runtime capability is required");
   }
+  if (
+    deps.config.features.testExpertPromo === true &&
+    (deps.testExpertPromo === undefined ||
+      deps.config.features.testExpertDeterministicFlow !== true ||
+      deps.config.features.testExpertSelarti !== true ||
+      deps.config.features.testExpertPromptVersion === undefined)
+  )
+    throw new Error("Test expert promo runtime capability is required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -306,6 +316,8 @@ export async function buildApp(
       enabled: deps.config.features,
     });
   }
+  if (deps.testExpertPromo !== undefined)
+    await app.register(testExpertPromoRoutes, deps.testExpertPromo);
   if (
     deps.config.features.expertAiIngress === true &&
     deps.expertAiIngress !== undefined &&
