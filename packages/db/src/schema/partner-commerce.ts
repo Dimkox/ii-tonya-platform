@@ -29,7 +29,7 @@ export const commercialParticipants = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    participantKind: text("participant_kind").notNull(),
+    participantKind: text("participant_kind"),
     onboardingState: text("onboarding_state").notNull().default("started"),
     createdAt,
   },
@@ -41,6 +41,10 @@ export const commercialParticipants = pgTable(
     check(
       "commercial_participants_onboarding_state_check",
       sql`${table.onboardingState} in ('started','kind_selected','profile_incomplete','profile_ready','offer_available')`,
+    ),
+    check(
+      "commercial_participants_state_kind_coherence_check",
+      sql`(${table.onboardingState}='started' and ${table.participantKind} is null) or (${table.onboardingState}<>'started' and ${table.participantKind} is not null)`,
     ),
     unique("commercial_participants_user_kind_unique").on(
       table.userId,
@@ -55,6 +59,9 @@ export const commercialParticipants = pgTable(
       table.createdAt,
       table.id,
     ),
+    uniqueIndex("commercial_participants_pending_user_unique")
+      .on(table.userId)
+      .where(sql`${table.participantKind} is null`),
   ],
 );
 
@@ -64,6 +71,7 @@ export const organizationProfiles = pgTable(
     participantId: uuid("participant_id").primaryKey(),
     participantKind: text("participant_kind").notNull(),
     legalName: text("legal_name").notNull(),
+    city: text("city").notNull(),
     onlineOnly: boolean("online_only").notNull().default(false),
     cityMillionPlus: boolean("city_million_plus").notNull().default(false),
     verificationState: text("verification_state")
@@ -80,10 +88,8 @@ export const organizationProfiles = pgTable(
       "organization_profiles_verification_check",
       sql`${table.verificationState} in ('unverified','pending','verified','rejected')`,
     ),
-    check(
-      "organization_profiles_legal_name_check",
-      sql`char_length(${table.legalName}) between 1 and 300`,
-    ),
+    check("organization_profiles_legal_name_check", sql`char_length(${table.legalName}) between 1 and 300`),
+    check("organization_profiles_city_check", sql`char_length(${table.city}) between 1 and 200`),
     foreignKey({
       name: "organization_profiles_participant_fk",
       columns: [table.participantId, table.participantKind],
@@ -292,10 +298,6 @@ export const partnerCommandReceipts = pgTable(
       "partner_command_receipts_hash_check",
       sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`,
     ),
-    unique("partner_command_receipts_idempotency_unique").on(
-      table.userId,
-      table.command,
-      table.idempotencyKey,
-    ),
+    unique("partner_command_receipts_idempotency_unique").on(table.userId, table.idempotencyKey),
   ],
 );

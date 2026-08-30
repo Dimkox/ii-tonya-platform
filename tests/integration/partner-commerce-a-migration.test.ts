@@ -10,10 +10,10 @@ describe("partner commerce foundation migration", () => {
   it("enforces participant ownership, onboarding, and organization kind", async () => {
     const user = await database.createUser();
     const id = "00000000-0000-4000-8000-000000000071";
-    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${id}::uuid,${user}::uuid,'CENTER','started')`);
-    await expect(database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values ('00000000-0000-4000-8000-000000000072'::uuid,${user}::uuid,'CENTER','started')`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23505");
+    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${id}::uuid,${user}::uuid,'CENTER','kind_selected')`);
+    await expect(database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values ('00000000-0000-4000-8000-000000000072'::uuid,${user}::uuid,'CENTER','kind_selected')`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23505");
     await expect(database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values ('00000000-0000-4000-8000-000000000073'::uuid,${user}::uuid,'CENTER','PENDING')`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
-    await expect(database.db.execute(sql`insert into organization_profiles (participant_id,participant_kind,legal_name) values (${id}::uuid,'EXPERT','bad')`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
+    await expect(database.db.execute(sql`insert into organization_profiles (participant_id,participant_kind,legal_name,city) values (${id}::uuid,'EXPERT','bad','Moscow')`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
   });
 
   it("rejects invalid policy arithmetic and immutable mutations", async () => {
@@ -26,7 +26,7 @@ describe("partner commerce foundation migration", () => {
   it("rejects cross-kind participant and policy references", async () => {
     const user = await database.createUser();
     const center = "00000000-0000-4000-8000-000000000076";
-    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${center}::uuid,${user}::uuid,'CENTER','started')`);
+    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${center}::uuid,${user}::uuid,'CENTER','kind_selected')`);
     await database.db.execute(sql`insert into partner_tariff_policy_versions (id,policy_version_id,policy_version,partner_kind,standard_price_minor,referred_six_price_minor,referred_ten_price_minor,online_only_surcharge_minor,city_million_plus_surcharge_minor,currency,duration_seconds,event_entitlements,resident_commission_bps,nonresident_commission_bps,nonresident_card_fee_minor,effective_from) values ('00000000-0000-4000-8000-000000000077'::uuid,'cross-kind',1,'CENTER',1500000,1200000,800000,300000,500000,'RUB',2592000,'{"bands":[{"capacity":30,"count":10}]}'::jsonb,1000,1500,450000,now())`);
     await expect(database.db.execute(sql`insert into partner_shadow_quotes (participant_id,policy_id,policy_version_id,policy_version,partner_kind,qualified_expert_count,tier,base_price_minor,online_only_surcharge_minor,city_million_plus_surcharge_minor,final_price_minor,currency,duration_seconds,event_entitlements,resident_commission_bps,nonresident_commission_bps,nonresident_card_fee_minor) values (${center}::uuid,'00000000-0000-4000-8000-000000000077'::uuid,'cross-kind',1,'ORGANIZER',0,'STANDARD',2000000,0,0,2000000,'RUB',2592000,'{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb,1000,1500,450000)`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23503");
   });
@@ -34,7 +34,7 @@ describe("partner commerce foundation migration", () => {
   it("rejects negative shadow quote counts", async () => {
     const user = await database.createUser();
     const participant = "00000000-0000-4000-8000-000000000078";
-    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${participant}::uuid,${user}::uuid,'CENTER','started')`);
+    await database.db.execute(sql`insert into commercial_participants (id,user_id,participant_kind,onboarding_state) values (${participant}::uuid,${user}::uuid,'CENTER','kind_selected')`);
     await expect(database.db.execute(sql`insert into partner_shadow_quotes (participant_id,policy_id,policy_version_id,policy_version,partner_kind,qualified_expert_count,tier,base_price_minor,online_only_surcharge_minor,city_million_plus_surcharge_minor,final_price_minor,currency,duration_seconds,event_entitlements,resident_commission_bps,nonresident_commission_bps,nonresident_card_fee_minor) values (${participant}::uuid,'00000000-0000-4000-8000-000000000075'::uuid,'p',1,'CENTER',-1,'STANDARD',1500000,0,0,1500000,'RUB',2592000,'{"bands":[{"capacity":30,"count":10}]}'::jsonb,1000,1500,450000)`)).rejects.toSatisfy((error: { cause?: { code?: string } }) => error.cause?.code === "23514");
   });
 });

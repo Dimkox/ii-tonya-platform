@@ -15,7 +15,7 @@ describe("partner commerce repository", () => {
     const started = await repository.start({ userId, ...key });
     expect(started.kind).toBe("started");
     const replay = await repository.start({ userId, ...key });
-    expect(replay).toEqual({ kind: "replay", result: started });
+    expect(replay).toEqual(started);
     const participantId = started.kind === "started" ? started.participantId : "";
     expect((await repository.selectKind({ userId, participantId, kind: "CENTER", idempotencyKey: "kind-1", payloadDigest: "b".repeat(64), correlationId: "corr-2" })).kind).toBe("kind_selected");
     expect((await repository.confirmKind({ userId, participantId, idempotencyKey: "confirm-1", payloadDigest: "c".repeat(64), correlationId: "corr-3" })).kind).toBe("confirmed");

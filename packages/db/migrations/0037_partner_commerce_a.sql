@@ -1,20 +1,23 @@
 CREATE TABLE commercial_participants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  participant_kind text NOT NULL,
+  participant_kind text,
   onboarding_state text NOT NULL DEFAULT 'started',
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT commercial_participants_kind_check CHECK (participant_kind IN ('EXPERT','CENTER','ORGANIZER')),
   CONSTRAINT commercial_participants_onboarding_state_check CHECK (onboarding_state IN ('started','kind_selected','profile_incomplete','profile_ready','offer_available')),
+  CONSTRAINT commercial_participants_state_kind_coherence_check CHECK ((onboarding_state='started' AND participant_kind IS NULL) OR (onboarding_state<>'started' AND participant_kind IS NOT NULL)),
   CONSTRAINT commercial_participants_user_kind_unique UNIQUE (user_id, participant_kind),
   CONSTRAINT commercial_participants_id_kind_unique UNIQUE (id, participant_kind)
 );
 CREATE INDEX commercial_participants_user_idx ON commercial_participants(user_id, created_at, id);
+CREATE UNIQUE INDEX commercial_participants_pending_user_unique ON commercial_participants(user_id) WHERE participant_kind IS NULL;
 
 CREATE TABLE organization_profiles (
   participant_id uuid PRIMARY KEY,
   participant_kind text NOT NULL,
   legal_name text NOT NULL,
+  city text NOT NULL,
   online_only boolean NOT NULL DEFAULT false,
   city_million_plus boolean NOT NULL DEFAULT false,
   verification_state text NOT NULL DEFAULT 'unverified',
@@ -22,7 +25,8 @@ CREATE TABLE organization_profiles (
   CONSTRAINT organization_profiles_kind_check CHECK (participant_kind IN ('CENTER','ORGANIZER')),
   CONSTRAINT organization_profiles_participant_fk FOREIGN KEY (participant_id, participant_kind) REFERENCES commercial_participants(id, participant_kind) ON DELETE CASCADE,
   CONSTRAINT organization_profiles_verification_check CHECK (verification_state IN ('unverified','pending','verified','rejected')),
-  CONSTRAINT organization_profiles_legal_name_check CHECK (char_length(legal_name) BETWEEN 1 AND 300)
+  CONSTRAINT organization_profiles_legal_name_check CHECK (char_length(legal_name) BETWEEN 1 AND 300),
+  CONSTRAINT organization_profiles_city_check CHECK (char_length(city) BETWEEN 1 AND 200)
 );
 
 CREATE TABLE partner_tariff_policy_versions (
@@ -113,7 +117,7 @@ CREATE TABLE partner_command_receipts (
   result jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT partner_command_receipts_command_check CHECK (command IN ('partner_onboarding','partner_quote')),
-  CONSTRAINT partner_command_receipts_idempotency_unique UNIQUE (user_id, command, idempotency_key),
+  CONSTRAINT partner_command_receipts_idempotency_unique UNIQUE (user_id, idempotency_key),
   CONSTRAINT partner_command_receipts_hash_check CHECK (payload_hash ~ '^[0-9a-f]{64}$')
 );
 
