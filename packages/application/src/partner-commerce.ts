@@ -1,4 +1,4 @@
-export { calculatePartnerShadowQuote } from "../../domain/src/partner-pricing.js";
+export { calculatePartnerShadowQuote } from "@ii-tonya/domain";
 export type {
   ParticipantOnboardingState,
   PartnerParticipantKind,
@@ -6,4 +6,4 @@ export type {
   PartnerPolicySnapshot,
   PartnerShadowQuote,
   PartnerTier,
-} from "../../domain/src/partner-pricing.js";
+} from "@ii-tonya/domain";
