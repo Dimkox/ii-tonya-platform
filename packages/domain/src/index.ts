@@ -46,6 +46,15 @@ export {
   rewardExpiresAt,
   settlementBeforeDeadline,
 } from "./expert-referral.js";
+export { calculatePartnerShadowQuote } from "./partner-pricing.js";
+export type {
+  ParticipantOnboardingState,
+  PartnerParticipantKind,
+  PartnerParticipantPrincipal,
+  PartnerPolicySnapshot,
+  PartnerShadowQuote,
+  PartnerTier,
+} from "./partner-pricing.js";
 export type {
   CreditAllocation,
   CreditGrant,
