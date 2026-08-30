@@ -7,3 +7,4 @@ export * from "./audit.js";
 export * from "./integration.js";
 export * from "./expert-residency.js";
 export * from "./commercial-policy.js";
+export * from "./partner-commerce.js";
