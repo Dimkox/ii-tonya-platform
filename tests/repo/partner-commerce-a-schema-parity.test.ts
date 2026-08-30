@@ -22,6 +22,12 @@ describe("partner commerce schema parity", () => {
   });
   it("keeps policy and quote predicates semantically exact", () => {
     const migration = readFileSync("packages/db/migrations/0037_partner_commerce_a.sql", "utf8");
+    const drizzle = readFileSync("packages/db/src/schema/partner-commerce.ts", "utf8");
     for (const predicate of ["online_only_surcharge_minor=300000", "city_million_plus_surcharge_minor=500000", "resident_commission_bps=1000", "nonresident_commission_bps=1500", "nonresident_card_fee_minor=450000", `event_entitlements='{"bands":[{"capacity":30,"count":10}]}'::jsonb`, `event_entitlements='{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb`]) expect(migration).toContain(predicate);
+    for (const predicate of ["qualifiedExpertCount} >= 0", "residentCommissionBps}=1000", "nonresidentCommissionBps}=1500", "nonresidentCardFeeMinor}=450000", "partner_shadow_quotes_entitlements_check"]) expect(drizzle).toContain(predicate);
+    expect(drizzle).not.toContain('check("partner_shadow_quotes_entitlements_check", sql`true`)');
+    expect(names(schema.partnerShadowQuotes).foreignKeys).toEqual(expect.arrayContaining([
+      "partner_shadow_quotes_participant_id_commercial_participants_id_fk", "partner_shadow_quotes_policy_id_partner_tariff_policy_versions_id_fk", "partner_shadow_quotes_participant_kind_fk", "partner_shadow_quotes_policy_kind_fk",
+    ]));
   });
 });

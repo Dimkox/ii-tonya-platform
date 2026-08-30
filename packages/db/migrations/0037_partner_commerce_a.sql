@@ -93,6 +93,7 @@ CREATE TABLE partner_shadow_quotes (
   CONSTRAINT partner_shadow_quotes_kind_check CHECK (partner_kind IN ('CENTER','ORGANIZER')),
   CONSTRAINT partner_shadow_quotes_tier_check CHECK (tier IN ('STANDARD','REFERRED_6_9','REFERRED_10_PLUS')),
   CONSTRAINT partner_shadow_quotes_currency_check CHECK (currency='RUB' AND duration_seconds=2592000),
+  CONSTRAINT partner_shadow_quotes_count_check CHECK (qualified_expert_count >= 0),
   CONSTRAINT partner_shadow_quotes_arithmetic_check CHECK (base_price_minor + online_only_surcharge_minor + city_million_plus_surcharge_minor = final_price_minor),
   CONSTRAINT partner_shadow_quotes_money_check CHECK (base_price_minor > 0 AND online_only_surcharge_minor >= 0 AND city_million_plus_surcharge_minor >= 0 AND final_price_minor > 0 AND resident_commission_bps=1000 AND nonresident_commission_bps=1500 AND nonresident_card_fee_minor=450000),
   CONSTRAINT partner_shadow_quotes_entitlements_check CHECK ((partner_kind='CENTER' AND event_entitlements='{"bands":[{"capacity":30,"count":10}]}'::jsonb) OR (partner_kind='ORGANIZER' AND event_entitlements='{"bands":[{"capacity":50,"count":5},{"capacity":100,"count":3},{"capacity":500,"count":1}]}'::jsonb)),
