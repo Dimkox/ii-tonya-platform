@@ -1,7 +1,7 @@
 # Partner Commerce and Acquisition Economics Design
 
 **Date:** 2026-08-30  
-**Status:** Approved in chat; written-spec review pending  
+**Status:** Approved in chat on 2026-08-30
 **Owner:** Dmitry  
 **Base:** `1b730cddf75d1b0cc670d263339afccae1eedd69`  
 **Extends:** `2026-08-28-free-client-hybrid-platform-v2-design.md`
@@ -63,11 +63,11 @@ a global user role.
 
 Supported kinds:
 
-| Kind | Meaning |
-| --- | --- |
-| `EXPERT` | Individual expert using the existing expert-residency product |
-| `CENTER` | Training center, studio, salon, retreat/wellness/massage or similar center with a stable team and location |
-| `ORGANIZER` | Organizer of events, festivals, retreats, travel, or comparable programs |
+| Kind        | Meaning                                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `EXPERT`    | Individual expert using the existing expert-residency product                                              |
+| `CENTER`    | Training center, studio, salon, retreat/wellness/massage or similar center with a stable team and location |
+| `ORGANIZER` | Organizer of events, festivals, retreats, travel, or comparable programs                                   |
 
 The messenger flow asks the applicant to choose the kind before presenting tariffs or
 issuing a referral code. The selection is a typed, deterministic platform command and is
@@ -92,11 +92,11 @@ event entitlements, and commission terms. A settled order is never recalculated.
 
 ### 5.1 Center tariff
 
-| Qualified invited experts | Base residency price |
-| ---: | ---: |
-| `0-5` | `15,000 RUB / 30 days` |
-| `6-9` | `12,000 RUB / 30 days` |
-| `10+` | `8,000 RUB / 30 days` |
+| Qualified invited experts |   Base residency price |
+| ------------------------: | ---------------------: |
+|                     `0-5` | `15,000 RUB / 30 days` |
+|                     `6-9` | `12,000 RUB / 30 days` |
+|                     `10+` |  `8,000 RUB / 30 days` |
 
 Included per paid 30-day period:
 
@@ -108,11 +108,11 @@ Included per paid 30-day period:
 
 ### 5.2 Organizer tariff
 
-| Qualified invited experts | Base residency price |
-| ---: | ---: |
-| `0-5` | `20,000 RUB / 30 days` |
-| `6-9` | `15,000 RUB / 30 days` |
-| `10+` | `10,000 RUB / 30 days` |
+| Qualified invited experts |   Base residency price |
+| ------------------------: | ---------------------: |
+|                     `0-5` | `20,000 RUB / 30 days` |
+|                     `6-9` | `15,000 RUB / 30 days` |
+|                     `10+` | `10,000 RUB / 30 days` |
 
 Included per paid 30-day period:
 
@@ -190,21 +190,21 @@ rewriting settled assessments.
 
 All migrations are additive.
 
-| Table | Purpose |
-| --- | --- |
-| `commercial_participants` | User-owned participant profiles and deterministic onboarding state |
-| `organization_profiles` | Center/organizer facts, verified location, online-only flag, verification state |
-| `partner_tariff_policy_versions` | Immutable prices, tier thresholds, surcharges, entitlements, and commission rules |
-| `partner_residency_orders` | Immutable quote/order snapshots and payment lifecycle |
-| `acquisition_attributions` | Globally unique invited-expert source ownership |
-| `partner_qualification_facts` | Append-only pending, qualified, cancelled, and reversal facts |
-| `partner_tier_locks` | Monotonic effective tier history |
-| `partner_event_entitlement_usage` | Atomic event quota consumption tied to a residency order |
-| `event_revenue_facts` | Authoritative settlement/refund observations |
-| `event_commission_assessments` | Append-only commission and reversal facts |
-| `acquisition_budget_versions` | Approved cohort, period, RUB/message caps, and stop conditions |
-| `prompt_experiment_assignments` | Stable prompt variant assignment and consented experiment state |
-| `conversation_cost_facts` | Provider usage, estimated/actual RUB cost, route reason, and outcome without raw dialogue text |
+| Table                             | Purpose                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `commercial_participants`         | User-owned participant profiles and deterministic onboarding state                             |
+| `organization_profiles`           | Center/organizer facts, verified location, online-only flag, verification state                |
+| `partner_tariff_policy_versions`  | Immutable prices, tier thresholds, surcharges, entitlements, and commission rules              |
+| `partner_residency_orders`        | Immutable quote/order snapshots and payment lifecycle                                          |
+| `acquisition_attributions`        | Globally unique invited-expert source ownership                                                |
+| `partner_qualification_facts`     | Append-only pending, qualified, cancelled, and reversal facts                                  |
+| `partner_tier_locks`              | Monotonic effective tier history                                                               |
+| `partner_event_entitlement_usage` | Atomic event quota consumption tied to a residency order                                       |
+| `event_revenue_facts`             | Authoritative settlement/refund observations                                                   |
+| `event_commission_assessments`    | Append-only commission and reversal facts                                                      |
+| `acquisition_budget_versions`     | Approved cohort, period, RUB/message caps, and stop conditions                                 |
+| `prompt_experiment_assignments`   | Stable prompt variant assignment and consented experiment state                                |
+| `conversation_cost_facts`         | Provider usage, estimated/actual RUB cost, route reason, and outcome without raw dialogue text |
 
 Financial and attribution constraints are enforced in PostgreSQL transactions, not only
 application code. Existing expert, client coupon, package-history, payment, and referral
@@ -266,58 +266,58 @@ or operating budget both permit it.
 
 Planning inputs:
 
-| Input | Value |
-| --- | ---: |
-| Selarti plan | `$360/month`, 20,000 included billable units |
-| Overage | `$0.03/billable message` |
-| Selarti FX | Bank of Russia USD/RUB `x 1.10` |
-| Current effective FX | `94.54951 RUB/USD` |
-| Stress FX | current effective FX `x 1.60 = 151.279216 RUB/USD` |
-| Client free test | 100 messages |
-| Expert sales test | 300 messages |
-| Expected conversion | `5%-10%`; sensitivity also `15%` and `20%` |
-| Average expert lifetime | 2.5 months |
-| Monthly replacement rate | `1 / 2.5 = 40%` |
-| Expert discount/referral leakage | `8%-16%` of listed ARPE |
+| Input                            |                                              Value |
+| -------------------------------- | -------------------------------------------------: |
+| Selarti plan                     |       `$360/month`, 20,000 included billable units |
+| Overage                          |                           `$0.03/billable message` |
+| Selarti FX                       |                    Bank of Russia USD/RUB `x 1.10` |
+| Current effective FX             |                                 `94.54951 RUB/USD` |
+| Stress FX                        | current effective FX `x 1.60 = 151.279216 RUB/USD` |
+| Client free test                 |                                       100 messages |
+| Expert sales test                |                                       300 messages |
+| Expected conversion              |         `5%-10%`; sensitivity also `15%` and `20%` |
+| Average expert lifetime          |                                         2.5 months |
+| Monthly replacement rate         |                                    `1 / 2.5 = 40%` |
+| Expert discount/referral leakage |                            `8%-16%` of listed ARPE |
 
 The all-in marginal message estimate includes overage plus the existing token allowance
 allocated per billable message. Resulting acquisition cost per conversion:
 
 | Conversion | Client 100 messages, current / stress | Expert 300 messages, current / stress |
-| ---: | ---: | ---: |
-| 5% | `6,184 / 9,894 RUB` | `18,552 / 29,683 RUB` |
-| 10% | `3,092 / 4,947 RUB` | `9,276 / 14,842 RUB` |
-| 15% | `2,061 / 3,298 RUB` | `6,184 / 9,894 RUB` |
-| 20% | `1,546 / 2,474 RUB` | `4,638 / 7,421 RUB` |
+| ---------: | ------------------------------------: | ------------------------------------: |
+|         5% |                   `6,184 / 9,894 RUB` |                 `18,552 / 29,683 RUB` |
+|        10% |                   `3,092 / 4,947 RUB` |                  `9,276 / 14,842 RUB` |
+|        15% |                   `2,061 / 3,298 RUB` |                   `6,184 / 9,894 RUB` |
+|        20% |                   `1,546 / 2,474 RUB` |                   `4,638 / 7,421 RUB` |
 
 Expert LTV after the modeled operating costs and leakage is approximately:
 
-| Scenario | 8% leakage | 16% leakage |
-| --- | ---: | ---: |
-| Current | `7,251 RUB` | `6,348 RUB` |
+| Scenario    |  8% leakage | 16% leakage |
+| ----------- | ----------: | ----------: |
+| Current     | `7,251 RUB` | `6,348 RUB` |
 | Stress +60% | `5,371 RUB` | `4,468 RUB` |
 
 Required expert conversion:
 
-| Condition | Current | Stress +60% |
-| --- | ---: | ---: |
-| `CAC <= LTV` | `12.8%-14.6%` | `27.6%-33.2%` |
+| Condition      |       Current |   Stress +60% |
+| -------------- | ------------: | ------------: |
+| `CAC <= LTV`   | `12.8%-14.6%` | `27.6%-33.2%` |
 | `LTV/CAC >= 3` | `38.4%-43.8%` | `82.9%-99.7%` |
 
 Steady-state monthly break-even below includes 40% replacement churn and the expert
 sales-test cost. It excludes client trials, centers, organizers, and event commission
 because their cohort volumes and verified GMV are not yet known:
 
-| Leakage | Conversion | Before founder salary | Founder + support | Small team |
-| ---: | ---: | ---: | ---: | ---: |
-| 8% | 5% | no finite break-even | no finite break-even | no finite break-even |
-| 8% | 10% | no finite break-even | no finite break-even | no finite break-even |
-| 8% | 15% | 20 experts | 203 experts | 880 experts |
-| 8% | 20% | 19 experts | 122 experts | 465 experts |
-| 16% | 5% | no finite break-even | no finite break-even | no finite break-even |
-| 16% | 10% | no finite break-even | no finite break-even | no finite break-even |
-| 16% | 15% | 22 experts | 333 experts | 1,739 experts |
-| 16% | 20% | 22 experts | 159 experts | 628 experts |
+| Leakage | Conversion | Before founder salary |    Founder + support |           Small team |
+| ------: | ---------: | --------------------: | -------------------: | -------------------: |
+|      8% |         5% |  no finite break-even | no finite break-even | no finite break-even |
+|      8% |        10% |  no finite break-even | no finite break-even | no finite break-even |
+|      8% |        15% |            20 experts |          203 experts |          880 experts |
+|      8% |        20% |            19 experts |          122 experts |          465 experts |
+|     16% |         5% |  no finite break-even | no finite break-even | no finite break-even |
+|     16% |        10% |  no finite break-even | no finite break-even | no finite break-even |
+|     16% |        15% |            22 experts |          333 experts |        1,739 experts |
+|     16% |        20% |            22 experts |          159 experts |          628 experts |
 
 Under the 60% stress assumptions, 5%-20% conversion has no finite monthly break-even:
 at 20%, each additional active expert still reduces monthly contribution by approximately
@@ -337,12 +337,12 @@ Partner tier discounts are acquisition consideration rather than free revenue. U
 listed expert ARPE of `5,109 RUB/month`, the gross ecosystem revenue sensitivity before
 leakage, acquisition, tax, support, event costs, and partner churn is:
 
-| Partner state | Partner revenue | Referred-expert listed revenue | Combined gross revenue | Discount from full partner tier |
-| --- | ---: | ---: | ---: | ---: |
-| Center with 6 qualified experts | `12,000` | `30,654` | `42,654 RUB/month` | `3,000 RUB/month` |
-| Center with 10 qualified experts | `8,000` | `51,090` | `59,090 RUB/month` | `7,000 RUB/month` |
-| Organizer with 6 qualified experts | `15,000` | `30,654` | `45,654 RUB/month` | `5,000 RUB/month` |
-| Organizer with 10 qualified experts | `10,000` | `51,090` | `61,090 RUB/month` | `10,000 RUB/month` |
+| Partner state                       | Partner revenue | Referred-expert listed revenue | Combined gross revenue | Discount from full partner tier |
+| ----------------------------------- | --------------: | -----------------------------: | ---------------------: | ------------------------------: |
+| Center with 6 qualified experts     |        `12,000` |                       `30,654` |     `42,654 RUB/month` |               `3,000 RUB/month` |
+| Center with 10 qualified experts    |         `8,000` |                       `51,090` |     `59,090 RUB/month` |               `7,000 RUB/month` |
+| Organizer with 6 qualified experts  |        `15,000` |                       `30,654` |     `45,654 RUB/month` |               `5,000 RUB/month` |
+| Organizer with 10 qualified experts |        `10,000` |                       `51,090` |     `61,090 RUB/month` |              `10,000 RUB/month` |
 
 These figures do not establish partner profitability. The model must be rerun when
 partner lifetime, support cost, event GMV/refunds, attribution volumes, and whether the
