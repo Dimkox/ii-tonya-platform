@@ -7,6 +7,7 @@ export {
   type DrizzleDb,
 } from "./client.js";
 export { sql } from "drizzle-orm";
+export { PostgresPartnerCommerceRepository, type PartnerCommandResult } from "./repositories/partner-commerce-repository.js";
 export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
