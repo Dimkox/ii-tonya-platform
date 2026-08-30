@@ -1,5 +1,7 @@
 # Mistakes
 
+The Claw gate assumed that a source-SHA tag and local BuildKit cache made its test image recoverable after the pinned image was deleted. The root cause was relying on mutable apt repositories and host-local cache state; recovery now creates a replacement image from a pushed clean SHA and pins its verified immutable image ID in both gate paths.
+
 Residual admission checked API-side B2/B3 flags but not the worker capabilities needed to converge unknown outcomes. The root cause was validating producer readiness without validating the complete asynchronous convergence path; startup gates must cover both enqueue and reconciliation workers.
 
 The trial slice inferred `not_applied` from an expired deadline and omitted B1 consent checks because it modeled reservation state separately from the established messaging trust/delivery authority. Future provider-assisted flows must reuse current consent authority and require an explicit durable delivery/reconciliation fact before releasing reserved value; elapsed time is never proof of non-delivery.

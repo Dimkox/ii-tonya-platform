@@ -69,7 +69,10 @@ secret; both remain deferred activation inputs. Enabled composition is proven on
 an injected test capability while the production lifecycle remains closed.
 CI and Database Gate run directly on Claw inside the constrained `ii-tonya-test`
 container, which imitates the dedicated server runtime without becoming a production
-deployment target. GitHub Actions are not used. GitHub stores Git history and pull
+deployment target. The current gate image is pinned to source
+`29993b4fe96facf8c07781833dc7f2d5f560aa7e` and immutable image ID
+`sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63`.
+GitHub Actions are not used. GitHub stores Git history and pull
 requests only; executable evidence is written under `docs/test-evidence/claw/`.
 Final aggregate verification, independent reviews, and human/release approvals remain
 explicit gates.
