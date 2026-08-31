@@ -5,6 +5,14 @@ authoritative ии-Тоня source document.
 
 ## Status
 
+Test delivery deadline: 2026-09-07. The test-only release boundary covers local fixtures,
+contract tests, isolated test containers, and provider-connected staging only where its
+authenticated evidence is recorded. Every external capability remains default-off until
+its own test evidence passes; production activation is outside this delivery scope. The
+non-secret credential inventory is maintained in
+[the test credential runbook](docs/runbooks/test-credential-inventory.md), and provider
+status is tracked in [the staging evidence runbook](docs/runbooks/provider-staging-evidence.md).
+
 Native production runtime deployed; live-provider activation remains closed. The exact
 release `233f3cf72e45e47117948ad5615b603252801e40` runs on the dedicated Ubuntu server as
 systemd-managed API and worker services with system PostgreSQL, nginx, and HTTPS for

@@ -14,6 +14,28 @@ const parseEnv = (text: string): Record<string, string> =>
   );
 
 describe("environment credential policy", () => {
+  it("keeps the test credential inventory non-secret and fail-closed", () => {
+    const inventory = readFileSync(
+      "docs/runbooks/test-credential-inventory.md",
+      "utf8",
+    );
+    expect(inventory).toContain("Test credential inventory");
+    expect(inventory).toContain("Every external capability is default-off");
+    expect(inventory).toContain("2026-09-07");
+    for (const capability of [
+      "Expert promo Telegram bot",
+      "Unified client Telegram bot",
+      "Planerka",
+      "YooKassa",
+      "Selarti",
+      "MAX Business",
+    ]) {
+      expect(inventory).toContain(capability);
+    }
+    expect(inventory).not.toMatch(/(?:^|[ =])(?:sk_|yk_|t_[A-Za-z0-9_-]{20,}|Bearer\s+)[A-Za-z0-9_./+=-]{12,}/im);
+    expect(inventory).not.toContain("merchant secret credential");
+  });
+
   it("tracks only a placeholder example and keeps every live flag false", () => {
     const ignored = readFileSync(".gitignore", "utf8").split(/\r?\n/);
     expect(ignored).toEqual(

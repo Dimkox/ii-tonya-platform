@@ -4,6 +4,19 @@ Project-owned authenticated sessions: unavailable
 
 Local fixtures, injected transports, container health, and local smoke are not provider-connected evidence and cannot change this record.
 
+## Capability matrix
+
+Every external capability is default-off until its test evidence passes. The matrix records
+the boundary for the 2026-09-07 test release; `BLOCKED` means no provider-connected claim.
+
+| Capability | Test-release boundary | Evidence required before activation |
+| --- | --- | --- |
+| Selarti | default-off; local contract fixtures only | authenticated outbound/response contract and unknown-outcome reconciliation |
+| Planerka | default-off; local adapter fixtures only | official API contract, authenticated callbacks, and reconciliation |
+| Telegram | default-off; bot credentials and webhook secrets stay on the test host | bot-scoped ingress, callback, replay, and delivery evidence |
+| YooKassa | default-off; test-shop setup is incomplete | merchant contract, receipt/refund, webhook, and reconciliation evidence |
+| MAX Business | default-off; no approved API contract or credential | approved API contract, callback verification, and delivery fixtures |
+
 The `ii_tonya_sandbox` payment runtime is another local/test fixture. Its settlement or refund evidence cannot satisfy provider authentication, official contract, ingress, rate-limit, or unknown-outcome evidence in this record.
 
 | Provider             | Official contract/version                | Account ID hash | Sanitized fixture checksum | Ingress auth | Idempotency                 | Pre-send failure | Post-send unknown reconciliation | Rate limit   | Reviewer     | Date         | Evidence URI                         |

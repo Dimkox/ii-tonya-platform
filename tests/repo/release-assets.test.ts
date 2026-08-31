@@ -6,6 +6,23 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 describe("release assets", () => {
+  it("documents the exact test-release boundary and provider capability matrix", () => {
+    const readme = readFileSync("README.md", "utf8");
+    const providerEvidence = readFileSync(
+      "docs/runbooks/provider-staging-evidence.md",
+      "utf8",
+    );
+    expect(readme).toContain("Test delivery deadline: 2026-09-07");
+    expect(readme).toContain("test-only release boundary");
+    expect(providerEvidence).toContain("Capability matrix");
+    expect(providerEvidence).toContain("default-off until its test evidence passes");
+    expect(providerEvidence).toContain("Selarti");
+    expect(providerEvidence).toContain("Planerka");
+    expect(providerEvidence).toContain("Telegram");
+    expect(providerEvidence).toContain("YooKassa");
+    expect(providerEvidence).toContain("MAX Business");
+  });
+
   it("contains direct-Claw, native runtime, rollback, and evidence assets", () => {
     const required = [
       "scripts/run-claw-ci.sh",
