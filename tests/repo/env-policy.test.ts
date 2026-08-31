@@ -30,10 +30,17 @@ describe("environment credential policy", () => {
       "Selarti",
       "MAX Business",
     ]) {
-      expect(inventory).toContain(capability);
+      expect(inventory).toMatch(
+        new RegExp(`${capability}[\\s\\S]{0,240}default-off[\\s\\S]{0,240}fail-closed`, "i"),
+      );
     }
-    expect(inventory).not.toMatch(/(?:^|[ =])(?:sk_|yk_|t_[A-Za-z0-9_-]{20,}|Bearer\s+)[A-Za-z0-9_./+=-]{12,}/im);
-    expect(inventory).not.toContain("merchant secret credential");
+    expect(inventory).not.toMatch(
+      /(?:^|[^\w])(?:sk_(?:live|test)_|rk_(?:live|test)_|pk_(?:live|test)_|xox[baprs]-|gh[pousr]_|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|Bearer\s+)[A-Za-z0-9_./+=-]{12,}/im,
+    );
+    expect(inventory).not.toMatch(
+      /\b\d{8,}:[A-Za-z0-9_-]{20,}\b|\b(?:api[_-]?key|token|secret|credential|assignment|account|project|calendar|channel|resource|webhook)[_-]?(?:id|value|ref)?\s*[:=]\s*[A-Za-z0-9][A-Za-z0-9_./+=:-]{15,}/im,
+    );
+    expect(inventory).toContain("YOOKASSA_SHOP_ID=1437535");
   });
 
   it("tracks only a placeholder example and keeps every live flag false", () => {

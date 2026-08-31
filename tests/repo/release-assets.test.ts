@@ -16,11 +16,23 @@ describe("release assets", () => {
     expect(readme).toContain("test-only release boundary");
     expect(providerEvidence).toContain("Capability matrix");
     expect(providerEvidence).toContain("default-off until its test evidence passes");
-    expect(providerEvidence).toContain("Selarti");
-    expect(providerEvidence).toContain("Planerka");
-    expect(providerEvidence).toContain("Telegram");
-    expect(providerEvidence).toContain("YooKassa");
-    expect(providerEvidence).toContain("MAX Business");
+    for (const capability of [
+      "Selarti",
+      "Planerka",
+      "Unified client Telegram bot",
+      "Expert promo Telegram bot",
+      "YooKassa",
+      "MAX Business",
+    ]) {
+      expect(providerEvidence).toMatch(
+        new RegExp(`${capability}[\\s\\S]{0,220}default-off`, "i"),
+      );
+    }
+    expect(providerEvidence).toContain("Provider staging status: BLOCKED");
+    expect(providerEvidence).toContain("not provider-connected evidence");
+    expect(providerEvidence).toContain("Production activation remains excluded");
+    expect(providerEvidence).not.toContain("Provider staging status: PASS");
+    expect(providerEvidence).not.toContain("production release");
   });
 
   it("contains direct-Claw, native runtime, rollback, and evidence assets", () => {

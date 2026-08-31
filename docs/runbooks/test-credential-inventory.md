@@ -8,6 +8,17 @@ Every external capability is default-off until its test evidence passes. The tes
 release boundary permits local fixtures, contract tests, and isolated staging evidence;
 it does not authorize production activation or provider-connected claims.
 
+## Capability status
+
+| Capability | Status | Fail-closed condition |
+| --- | --- | --- |
+| Unified client Telegram bot | default-off | fail-closed until bot-scoped ingress, callback, and delivery evidence passes |
+| Expert promo Telegram bot | default-off | fail-closed until separate bot scope, hand-off, and referral evidence passes |
+| Planerka | default-off | fail-closed until authenticated API and callback reconciliation evidence passes |
+| YooKassa | default-off | fail-closed until test-shop contract, receipt, webhook, and reconciliation evidence passes |
+| Selarti | default-off | fail-closed until authenticated outbound/response and unknown-outcome evidence passes |
+| MAX Business | default-off | fail-closed until approved API, callback, and delivery evidence passes |
+
 ## Supplied, pending contract validation
 
 | Integration | Supplied capability | Current interpretation |

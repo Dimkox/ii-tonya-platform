@@ -13,7 +13,8 @@ the boundary for the 2026-09-07 test release; `BLOCKED` means no provider-connec
 | --- | --- | --- |
 | Selarti | default-off; local contract fixtures only | authenticated outbound/response contract and unknown-outcome reconciliation |
 | Planerka | default-off; local adapter fixtures only | official API contract, authenticated callbacks, and reconciliation |
-| Telegram | default-off; bot credentials and webhook secrets stay on the test host | bot-scoped ingress, callback, replay, and delivery evidence |
+| Unified client Telegram bot | default-off; bot credentials and webhook secrets stay on the test host | bot-scoped ingress, callback, replay, and delivery evidence |
+| Expert promo Telegram bot | default-off; separate bot scope and credentials stay on the test host | promo hand-off, referral attribution, callback, and delivery evidence |
 | YooKassa | default-off; test-shop setup is incomplete | merchant contract, receipt/refund, webhook, and reconciliation evidence |
 | MAX Business | default-off; no approved API contract or credential | approved API contract, callback verification, and delivery fixtures |
 
@@ -26,7 +27,7 @@ The `ii_tonya_sandbox` payment runtime is another local/test fixture. Its settle
 | Telegram             | not executed                             | not executed    | not executed               | not executed | not executed                | not executed     | not executed                     | not executed | not assigned | not executed | unavailable                          |
 | YooKassa by YooMoney | merchant contract/test shop not recorded | not recorded    | local fixtures only        | not executed | local durable boundary only | not executed     | not executed                     | not executed | not assigned | not executed | `docs/runbooks/yookassa-provider.md` |
 
-Provider staging status: BLOCKED
+Provider staging status: BLOCKED. Production activation remains excluded from this record.
 
 YooKassa code and direct Claw gates do not change this status: Claw is a constrained
 development/test container simulating the native server, not a merchant-connected
