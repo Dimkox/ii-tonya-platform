@@ -79,6 +79,20 @@ describe("loadEnv", () => {
       }),
     );
     expect(enabled.features.lifecycleReminders).toBe(true);
+    expect(() =>
+      loadEnv(
+        localEnv({
+          LIFECYCLE_REMINDERS_ENABLED: "true",
+          CLIENT_BOOKING_ENABLED: "true",
+          CLIENT_SESSION_ENABLED: "true",
+          CLIENT_CATALOG_ENABLED: "true",
+          WORKER_OUTBOX_DELIVERY_ENABLED: "true",
+          CLIENT_TELEGRAM_BOT_KEY:
+            "123456789:AAExampleTelegramSecretMustNotBeABotKey",
+          CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
+        }),
+      ),
+    ).toThrow();
   });
 
   it("fails closed for lifecycle capabilities not implemented in release C1", () => {

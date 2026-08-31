@@ -22,7 +22,7 @@ export interface LifecycleBatchResult {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const POLICY_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
-const BOT_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
+const BOT_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const REASON_RE = /^[a-z][a-z0-9_]{0,63}$/u;
 const BOOKING_JOB_TYPES = new Set<LifecycleJobType>([
   "booking_reminder_48h",
@@ -243,6 +243,28 @@ export class PostgresLifecycleSchedulerRepository {
   }): Promise<LifecycleBatchResult> {
     assertBatch(command);
     return this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        with expired as materialized (
+          select id
+          from lifecycle_jobs
+          where status='processing' and lease_until <= ${command.now}
+          order by lease_until,id
+          for update skip locked
+          limit ${command.batchSize}
+        )
+        update lifecycle_jobs job
+        set status=case
+              when job.attempt_count >= 5 then 'dead_letter'
+              else 'retry_wait'
+            end,
+          cancellation_reason=case
+              when job.attempt_count >= 5 then 'attempts_exhausted'
+              else null
+            end,
+          lease_token=null,lease_until=null,updated_at=clock_timestamp()
+        from expired
+        where job.id=expired.id
+      `);
       const claimed = await tx.execute<ClaimedJob>(sql`
         with candidates as materialized (
           select id

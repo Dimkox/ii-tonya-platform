@@ -13,6 +13,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
   it("materializes one eligible reminder through one repository-owned transaction", async () => {
     const execute = vi
       .fn()
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -59,7 +60,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
     ).resolves.toEqual({ examined: 1, materialized: 1, cancelled: 0 });
 
     expect(transaction).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledTimes(7);
+    expect(execute).toHaveBeenCalledTimes(8);
   });
 
   it("contains the locking, authority rechecks, ordered outbox, and terminal fencing", () => {
@@ -70,6 +71,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
 
     for (const required of [
       "for update skip locked",
+      "lease_until <=",
       "client_messaging",
       "next_delivery_sequence",
       "telegram.send_text.v1",
@@ -85,6 +87,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
   it("cancels an ineligible claimed reminder without allocating dialogue output", async () => {
     const execute = vi
       .fn()
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -113,6 +116,6 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
         batchSize: 10,
       }),
     ).resolves.toEqual({ examined: 1, materialized: 0, cancelled: 1 });
-    expect(execute).toHaveBeenCalledTimes(4);
+    expect(execute).toHaveBeenCalledTimes(5);
   });
 });

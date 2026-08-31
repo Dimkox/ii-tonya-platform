@@ -108,7 +108,7 @@ const schema = z
       .optional(),
     CLIENT_TELEGRAM_BOT_KEY: z
       .string()
-      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
       .optional(),
     CLIENT_MESSAGING_CONSENT_POLICY_VERSION: z
       .string()
