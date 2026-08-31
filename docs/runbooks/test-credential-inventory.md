@@ -10,25 +10,25 @@ it does not authorize production activation or provider-connected claims.
 
 ## Capability status
 
-| Capability | Status | Fail-closed condition |
-| --- | --- | --- |
-| Unified client Telegram bot | default-off | fail-closed until bot-scoped ingress, callback, and delivery evidence passes |
-| Expert promo Telegram bot | default-off | fail-closed until separate bot scope, hand-off, and referral evidence passes |
-| Planerka | default-off | fail-closed until authenticated API and callback reconciliation evidence passes |
-| YooKassa | default-off | fail-closed until test-shop contract, receipt, webhook, and reconciliation evidence passes |
-| Selarti | default-off | fail-closed until authenticated outbound/response and unknown-outcome evidence passes |
-| MAX Business | default-off | fail-closed until approved API, callback, and delivery evidence passes |
+| Capability                  | Status      | Fail-closed condition                                                                      |
+| --------------------------- | ----------- | ------------------------------------------------------------------------------------------ |
+| Unified client Telegram bot | default-off | fail-closed until bot-scoped ingress, callback, and delivery evidence passes               |
+| Expert promo Telegram bot   | default-off | fail-closed until separate bot scope, hand-off, and referral evidence passes               |
+| Planerka                    | default-off | fail-closed until authenticated API and callback reconciliation evidence passes            |
+| YooKassa                    | default-off | fail-closed until test-shop contract, receipt, webhook, and reconciliation evidence passes |
+| Selarti                     | default-off | fail-closed until authenticated outbound/response and unknown-outcome evidence passes      |
+| MAX Business                | default-off | fail-closed until approved API, callback, and delivery evidence passes                     |
 
 ## Supplied, pending contract validation
 
-| Integration | Supplied capability | Current interpretation |
-| --- | --- | --- |
-| Expert promo Telegram bot | Bot API credential and public bot address | Suitable only for the external expert-acquisition bot; it is not the client-facing unified bot credential. |
-| Planerka | Account access and a `cal_` credential | Treat as a candidate calendar credential until authenticated API documentation confirms its scope and base URL. |
-| Telegram account | Account contact details | Not sufficient for Bot API integration. The platform requires a bot token and independently generated webhook/callback secrets. |
-| MAX Business | Business phone number | Identifier only; API credential, callback verification material, and approved API contract are not supplied. |
-| YooKassa | Shop ID `1437535` and a merchant credential | Store the credential only in the test host environment. Activation remains disabled until the remaining test-shop configuration below is present and exercised. |
-| Selarti | Existing service association was identified | No API credential set or authenticated webhook contract has been supplied to the platform. |
+| Integration               | Supplied capability                         | Current interpretation                                                                                                                                          |
+| ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expert promo Telegram bot | Bot API credential and public bot address   | Suitable only for the external expert-acquisition bot; it is not the client-facing unified bot credential.                                                      |
+| Planerka                  | Account access and a `cal_` credential      | Treat as a candidate calendar credential until authenticated API documentation confirms its scope and base URL.                                                 |
+| Telegram account          | Account contact details                     | Not sufficient for Bot API integration. The platform requires a bot token and independently generated webhook/callback secrets.                                 |
+| MAX Business              | Business phone number                       | Identifier only; API credential, callback verification material, and approved API contract are not supplied.                                                    |
+| YooKassa                  | Shop ID `1437535` and a merchant credential | Store the credential only in the test host environment. Activation remains disabled until the remaining test-shop configuration below is present and exercised. |
+| Selarti                   | Existing service association was identified | No API credential set or authenticated webhook contract has been supplied to the platform.                                                                      |
 
 ## Still required for the test contour
 

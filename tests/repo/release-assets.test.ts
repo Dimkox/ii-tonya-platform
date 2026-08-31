@@ -15,7 +15,9 @@ describe("release assets", () => {
     expect(readme).toContain("Test delivery deadline: 2026-09-07");
     expect(readme).toContain("test-only release boundary");
     expect(providerEvidence).toContain("Capability matrix");
-    expect(providerEvidence).toContain("default-off until its test evidence passes");
+    expect(providerEvidence).toContain(
+      "default-off until its test evidence passes",
+    );
     for (const capability of [
       "Selarti",
       "Planerka",
@@ -30,7 +32,18 @@ describe("release assets", () => {
     }
     expect(providerEvidence).toContain("Provider staging status: BLOCKED");
     expect(providerEvidence).toContain("not provider-connected evidence");
-    expect(providerEvidence).toContain("Production activation remains excluded");
+    expect(providerEvidence).toContain(
+      "Production activation remains excluded",
+    );
+    expect(providerEvidence).toMatch(
+      /^\|\s*Unified client Telegram bot\s*\|\s*not executed\s*\|/m,
+    );
+    expect(providerEvidence).toMatch(
+      /^\|\s*Expert promo Telegram bot\s*\|\s*not executed\s*\|/m,
+    );
+    expect(providerEvidence).not.toMatch(
+      /^\|\s*Telegram\s*\|\s*not executed\s*\|/m,
+    );
     expect(providerEvidence).not.toContain("Provider staging status: PASS");
     expect(providerEvidence).not.toContain("production release");
   });
