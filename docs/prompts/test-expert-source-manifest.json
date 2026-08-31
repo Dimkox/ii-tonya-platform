@@ -1,0 +1,8 @@
+{
+  "key": "expert.functional",
+  "version": 1,
+  "sha256": "0439ae1c645e6fda46f013a66512401f251aa18d35520f5c9a7a3c7c59314eaf",
+  "sourcePath": "docs/source/ii-tonya-expert-full-source-2026-07-28.txt",
+  "status": "inactive",
+  "activationRequirements": ["approved_prompt_copy", "official_selarti_contract", "provider_activation_gate"]
+}

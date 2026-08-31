@@ -143,7 +143,8 @@ export interface OutboxRunnerDeps {
 export type OutboxMetricTopic =
   | "safety_operator_escalation"
   | "admin_negative_feedback"
-  | "catalog_show";
+  | "catalog_show"
+  | "telegram_send_text";
 export type OutboxMetricPhase =
   "claim" | "dispatch" | "reconciliation" | "lease_recovery";
 export type OutboxMetricOutcome =
@@ -168,7 +169,8 @@ export interface OutboxRecoveryCount {
   readonly topic:
     | "safety.operator_escalation"
     | "admin.negative_feedback"
-    | "catalog.show";
+    | "catalog.show"
+    | "telegram.send_text.v1";
   readonly count: number;
 }
 export interface OutboxClaimBatch {
@@ -230,6 +232,7 @@ function metricTopic(topic: string): OutboxMetricTopic {
   }
   if (topic === "admin.negative_feedback") return "admin_negative_feedback";
   if (topic === "catalog.show") return "catalog_show";
+  if (topic === "telegram.send_text.v1") return "telegram_send_text";
   throw new Error("worker_outbox_metric_topic_unregistered");
 }
 

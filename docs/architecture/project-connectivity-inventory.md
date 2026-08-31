@@ -82,6 +82,16 @@ Connected areas:
 - Verification: unit, integration concurrency/deadline/reversal/hold, e2e lifecycle, repo scope/env/workflow guards.
 - Operations: traceability, runbooks, rollback, security addendum, reconciliation policy.
 
+## `тест эксперт` one-dialog coverage
+
+- API: default-off composition extends the webhook-secret-authenticated client Telegram route; no public body-supplied identity route exists.
+- Application: durable prefixless session routing, zero-unit deterministic warmup/qualification/segmentation/FAQ, and authoritative expert/partner quotes.
+- DB: folded never-shipped migration `0038`, bot/chat-scoped session and deterministic-request facts, database prompt/campaign authority, two-unit trial ledger, B3 admission, B2 response convergence, and append-only audit.
+- Worker: bounded age/limit scan and reconciliation of reserved/unknown trial rows; runtime activation remains blocked.
+- Delivery: deterministic and B2 answers both create the existing `telegram.send_text.v1` outbox/delivery for the original dialogue; residual requests use one `selarti.request.v1` and never dispatch directly.
+- Observability/privacy: enabled composition requires a metric sink; raw residual text stays only in the existing retention-governed Selarti outbox and remains an activation gate.
+- Activation: no prompt/campaign seed, approved selling copy, official Selarti contract/privacy evidence, restart/role proof, or external execution of the newly added PostgreSQL cases is claimed.
+
 ## Non-runtime, historical, and dead/deferred classification
 
 | Entity class                                  | Classification        | Why it stays connected                                                 |

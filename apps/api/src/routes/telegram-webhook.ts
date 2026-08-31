@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   ExpertAiIngressService,
   ExpertPrincipal,
@@ -7,6 +7,11 @@ import type {
   ExpertTelegramCheckoutResult,
   TelegramSendOutcome,
 } from "@ii-tonya/integrations";
+type HybridGateway = {
+  handle(
+    raw: unknown,
+  ): Promise<{ readonly status: string; readonly route?: string }>;
+};
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -26,6 +31,23 @@ export interface TelegramCallbackService {
 export interface TelegramExpertAiIngress {
   resolvePrincipal(telegramUserId: string): Promise<ExpertPrincipal | null>;
   handle: ExpertAiIngressService["handle"];
+}
+
+export interface TelegramTestExpertPromoIngress {
+  readonly residualEnabled?: boolean;
+  handle(input: {
+    readonly botKey: string;
+    readonly telegramUserId: string;
+    readonly chatId: string;
+    readonly text: string;
+    readonly requestKey: string;
+    readonly requestDigest: string;
+    readonly correlationId: string;
+    readonly occurredAt: string;
+  }): Promise<{
+    readonly status: "handled" | "unhandled" | "unavailable";
+    readonly route?: "deterministic" | "residual";
+  }>;
 }
 
 export interface TelegramExpertQueryIngress {
@@ -141,6 +163,12 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   expertAi?: TelegramExpertAiIngress;
   authenticatedLimit?: number;
   unauthenticatedLimit?: number;
+  clientIngressEnabled: boolean | undefined;
+  clientHybridRoutingEnabled: boolean | undefined;
+  clientBotKey: string | undefined;
+  clientGateway: HybridGateway | undefined;
+  testExpertPromoEnabled?: boolean;
+  testExpertPromo?: TelegramTestExpertPromoIngress;
 }> = async (app, deps) => {
   if (
     (deps.expertQueriesEnabled === true ||
@@ -152,6 +180,136 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   if (deps.expertAiEnabled === true && deps.expertAi === undefined) {
     throw new Error("Expert Telegram AI capability is required");
   }
+  app.post<{ Params: { botKey: string } }>(
+    "/v1/webhooks/telegram/client/:botKey",
+    {
+      bodyLimit: 65_536,
+      schema: {
+        params: {
+          type: "object",
+          required: ["botKey"],
+          properties: { botKey: { type: "string", minLength: 1 } },
+        },
+        body: {
+          type: "object",
+          additionalProperties: true,
+          required: ["update_id"],
+          properties: { update_id: { type: "integer", minimum: 0 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const header = request.headers["x-telegram-bot-api-secret-token"];
+      if (
+        !secureEqual(
+          typeof header === "string" ? header : undefined,
+          deps.secret,
+        )
+      ) {
+        const allowed = deps.rateLimiter.consume(
+          `telegram:client:unauth:${request.ip}`,
+          deps.unauthenticatedLimit ?? 100,
+          60_000,
+        );
+        return reply.code(allowed ? 401 : 429).send({ error: "unauthorized" });
+      }
+      if (
+        deps.clientBotKey === undefined ||
+        !secureEqual(request.params.botKey, deps.clientBotKey)
+      ) {
+        return { accepted: true, rejected: true };
+      }
+      if (
+        !deps.rateLimiter.consume(
+          `telegram:client:auth:${deps.clientBotKey}`,
+          deps.authenticatedLimit ?? 100,
+          60_000,
+        )
+      ) {
+        return reply.code(429).send({ error: "rate_limited" });
+      }
+      if (
+        deps.clientIngressEnabled !== true ||
+        deps.clientGateway === undefined
+      ) {
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      if (deps.testExpertPromoEnabled === true && deps.testExpertPromo) {
+        const root = request.body as Record<string, unknown>;
+        const message = root.message;
+        if (message && typeof message === "object") {
+          const record = message as Record<string, unknown>;
+          const from = record.from;
+          const chat = record.chat;
+          const text = record.text;
+          const telegramUserId =
+            from && typeof from === "object"
+              ? String((from as Record<string, unknown>).id ?? "")
+              : "";
+          const chatRecord =
+            chat && typeof chat === "object"
+              ? (chat as Record<string, unknown>)
+              : undefined;
+          const chatId = String(chatRecord?.id ?? "");
+          if (
+            typeof text === "string" &&
+            numericIdentity.test(telegramUserId) &&
+            chatRecord?.type === "private" &&
+            chatId === telegramUserId &&
+            text.length >= 1 &&
+            text.length <= 4_096 &&
+            !/[\u0000-\u001F\u007F-\u009F]/u.test(text)
+          ) {
+            if (
+              !deps.rateLimiter.consume(
+                `telegram:test-expert:${deps.clientBotKey}:${telegramUserId}`,
+                20,
+                60_000,
+              )
+            )
+              return reply.code(429).send({ error: "rate_limited" });
+            const updateId = String(root.update_id);
+            try {
+              const result = await deps.testExpertPromo.handle({
+                botKey: deps.clientBotKey,
+                telegramUserId,
+                chatId,
+                text,
+                requestKey: `telegram:${updateId}:test-expert`,
+                requestDigest: createHash("sha256").update(text).digest("hex"),
+                correlationId:
+                  typeof request.headers["x-correlation-id"] === "string"
+                    ? request.headers["x-correlation-id"]
+                    : `telegram:${deps.clientBotKey}:${updateId}`,
+                occurredAt: new Date().toISOString(),
+              });
+              if (result.status === "unavailable")
+                return reply
+                  .code(503)
+                  .send({ error: "test_expert_unavailable" });
+              if (result.status === "handled")
+                return { accepted: true, route: "test_expert" };
+            } catch {
+              return reply.code(503).send({ error: "test_expert_unavailable" });
+            }
+          }
+        }
+      }
+      let result;
+      try {
+        result = await deps.clientGateway.handle(request.body);
+      } catch {
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      if (result.status === "unavailable" || result.status === "disabled")
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      if (result.status === "rejected" || result.status === "conflict")
+        return { accepted: true, rejected: true };
+      if (result.status === "duplicate")
+        return { accepted: true, duplicate: true };
+      return { accepted: true, route: result.route };
+    },
+  );
   app.post(
     "/v1/webhooks/telegram",
     {
@@ -216,10 +374,6 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           return reply.code(403).send({ error: "invalid_callback" });
         }
         if (data.startsWith("xr1.")) {
-          // ER-TG-002 storage/authentication is isolated from ct2/cv1. Checkout
-          // dispatch remains unavailable until a provider-neutral readiness
-          // capability is explicitly composed.
-          return { accepted: true, unsupported: true };
           if (
             deps.expertCheckoutEnabled !== true ||
             deps.expertQueries === undefined

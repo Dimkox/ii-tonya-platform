@@ -183,8 +183,8 @@ export async function startMvpHarness(input: {
       readonly validForDays: number;
       readonly idempotencyKey: string;
     }) {
-      if (command.validForDays !== 60)
-        throw new Error("AC-025 grant must be valid for 60 days");
+      if (command.validForDays !== 30)
+        throw new Error("AC-025 grant must be valid for 30 days");
       const payload = {
         userId: command.userId,
         units: command.size,
@@ -202,7 +202,9 @@ export async function startMvpHarness(input: {
         select expires_at as "expiresAt" from message_packages
         where id = ${result.packageId}::uuid
       `);
-      return { expiresAt: postgresInstant(stored.rows[0]!.expiresAt).toISOString() };
+      return {
+        expiresAt: postgresInstant(stored.rows[0]!.expiresAt).toISOString(),
+      };
     },
 
     async acceptOrdinaryInbound(command: {

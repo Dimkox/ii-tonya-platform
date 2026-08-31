@@ -59,6 +59,12 @@ describe("admin approval object mappings", () => {
     expect(module.requiredApprovalRole("expert_residency.sandbox_refund")).toBe(
       "entitlement_admin",
     );
+    expect(module.requiredApprovalRole("selarti_budget.policy_approve")).toBe(
+      "security_admin",
+    );
+    expect(
+      module.requiredApprovalObjectType("selarti_budget.policy_approve"),
+    ).toBe("selarti_budget_policy");
   });
 
   it("fixes safety and feedback reads and resolutions to their assignment object types", () => {

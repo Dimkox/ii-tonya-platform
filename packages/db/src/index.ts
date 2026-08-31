@@ -8,6 +8,28 @@ export {
 } from "./client.js";
 export { sql } from "drizzle-orm";
 export {
+  PostgresPartnerCommerceRepository,
+  type PartnerCommandResult,
+} from "./repositories/partner-commerce-repository.js";
+export {
+  MemoryTestExpertTrialRepository,
+  PostgresTestExpertTrialRepository,
+  TrialCapReachedError,
+  TrialIdempotencyConflictError,
+  TrialOutcomeConflictError,
+  type TestExpertTrialRepository,
+  type TrialOutcomeKind,
+  type TrialRedemption,
+  type TrialReservation,
+  type TrialSummary,
+  isTestExpertProviderRequestId,
+} from "./repositories/test-expert-trial-repository.js";
+export {
+  PostgresExpertTrialPricingPolicy,
+  PostgresPartnerTrialPricingPolicy,
+} from "./repositories/test-expert-pricing-policy.js";
+export { PostgresTestExpertTelegramRepository } from "./repositories/test-expert-telegram-repository.js";
+export {
   InboxPayloadMismatchError,
   LegacyInboxAssociationError,
   PostgresInboxRepository,
@@ -75,8 +97,13 @@ export {
   OutboxLeaseLostError,
   OutboxStateConflictError,
   PostgresOutboxRepository,
+  PostgresOrderedTelegramOutboxRepository,
   type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
+export {
+  PostgresB2SensitiveRetentionRepository,
+  type B2SensitiveRetentionResult,
+} from "./repositories/b2-sensitive-retention-repository.js";
 export {
   PostgresTelegramCallbackRepository,
   type ConsumeTelegramCallbackCommand,
@@ -113,10 +140,12 @@ export {
   PostgresAdminApprovalRepository,
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
+  selartiBudgetPolicyApprovalPayload,
   requiredApprovalObjectType,
   requiredApprovalRole,
   type AdminPayload,
   type AdminRole,
+  type SelartiBudgetPolicyApprovalPayload,
   type ApprovalAdminAction,
   type ApproveAdminApproval,
   type ConsumeAdminApproval,
@@ -140,6 +169,17 @@ export {
   type ExpertAiStoredOutcome,
 } from "./repositories/expert-ai-request-receipt-repository.js";
 export { PostgresOperatorCaseRepository } from "./repositories/operator-case-repository.js";
+export { PostgresHybridMessageRepository } from "./repositories/hybrid-message-repository.js";
+export {
+  PostgresSelartiBudgetRepository,
+  reserveSelartiCost,
+  type SelartiBudgetAdmission,
+} from "./repositories/selarti-budget-repository.js";
+export {
+  PostgresSelartiProposalRepository,
+  type AcceptSelartiProposalCommand,
+  type AcceptSelartiProposalResult,
+} from "./repositories/selarti-proposal-repository.js";
 export {
   PostgresOperatorCaseOutboxRepository,
   type OperatorCaseOutboxMessage,
@@ -233,3 +273,8 @@ export {
 } from "./repositories/yookassa-operation-repository.js";
 export { PostgresYooKassaReceiptContactAuthority } from "./repositories/yookassa-receipt-contact-repository.js";
 export * from "./schema/index.js";
+export {
+  clientCommercialPolicyAssignments,
+  clientCommercialPolicyControls,
+} from "./schema/commercial-policy.js";
+export { PostgresClientCommercialPolicyRepository } from "./repositories/client-commercial-policy-repository.js";

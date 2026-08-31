@@ -198,7 +198,6 @@ export {
   ResidencyCheckoutCallbackVerificationError,
   type ResidencyCheckoutCallbackClaims,
   type ResidencyCheckoutCallbackStore,
-} from "./telegram/residency-checkout-callback-token.js";
   type ResidencyCheckoutStateClaim,
   type ResidencyCheckoutStateStore,
   type ResidencyCheckoutStoredOutcome,

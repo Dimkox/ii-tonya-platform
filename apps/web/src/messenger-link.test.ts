@@ -21,4 +21,18 @@ describe("promotional messenger link", () => {
     buildMessengerLink({ expertChatUrl: configured }, "base");
     expect(configured.search).toBe("?lang=ru");
   });
+
+  it.each([
+    ["client", "client"],
+    ["expert", "expert"],
+  ] as const)(
+    "maps the %s route to a non-test public intent",
+    (intent, start) => {
+      const target = buildMessengerLink(
+        { expertChatUrl: new URL("https://t.me/ii_tonya_bot") },
+        intent,
+      );
+      expect([...target.searchParams.entries()]).toEqual([["start", start]]);
+    },
+  );
 });

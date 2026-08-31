@@ -14,7 +14,9 @@ export interface WorkflowAuthorization {
   readonly nonce: string;
   readonly correlationId: string;
 }
-export interface ClientAdminCommand extends WorkflowAuthorization { readonly userId: string; }
+export interface ClientAdminCommand extends WorkflowAuthorization {
+  readonly userId: string;
+}
 export interface GrantAdminPackageCommand extends WorkflowAuthorization {
   readonly userId: string;
   readonly units: 500 | 1000 | 1500 | 2000;
@@ -30,12 +32,22 @@ export interface RevokeAdminPackageCommand extends WorkflowAuthorization {
   readonly packageId: string;
   readonly idempotencyKey: string;
 }
-export interface ExpertAdminCommand extends WorkflowAuthorization { readonly expertId: string; }
-export interface ServiceAdminCommand extends WorkflowAuthorization { readonly serviceId: string; }
-export interface IntegrationErrorAdminCommand extends WorkflowAuthorization { readonly errorId: string; }
-export interface AlertAdminCommand extends WorkflowAuthorization { readonly alertId: string; }
+export interface ExpertAdminCommand extends WorkflowAuthorization {
+  readonly expertId: string;
+}
+export interface ServiceAdminCommand extends WorkflowAuthorization {
+  readonly serviceId: string;
+}
+export interface IntegrationErrorAdminCommand extends WorkflowAuthorization {
+  readonly errorId: string;
+}
+export interface AlertAdminCommand extends WorkflowAuthorization {
+  readonly alertId: string;
+}
 
-export type AdminWorkflowResult<T extends Record<string, unknown> = Record<string, never>> =
+export type AdminWorkflowResult<
+  T extends Record<string, unknown> = Record<string, never>,
+> =
   | ({ readonly allowed: true; readonly replayed: boolean } & T)
   | { readonly allowed: false; readonly reasonCode: "approval_denied" };
 
@@ -89,11 +101,14 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
   "expert_referral.abuse_hold_open": "expert",
   "expert_referral.abuse_hold_close": "expert",
   "expert_residency.tariff_create": "expert_residency_tariff_version",
+  "client_commercial_policy.control_v2": "client_commercial_policy_control",
+  "expert_residency.tariff_create_v2": "expert_residency_tariff_version",
   "expert_residency.tariff_retire": "expert_residency_tariff_version",
   "expert_referral.hold_replay": "expert",
   "expert_referral.feature_switch": "expert_referral_feature_control",
   "expert_residency.sandbox_settle": "sandbox_expert_residency_payment",
   "expert_residency.sandbox_refund": "sandbox_expert_residency_payment",
+  "selarti_budget.policy_approve": "selarti_budget_policy",
 };
 
 export class PostgresAdminRepository {
@@ -145,7 +160,8 @@ export class PostgresAdminRepository {
         where session_id_hash = ${command.sessionIdHash}
       `);
       await this.appendAudit(tx, {
-        actorId: actor.rows[0]?.actorId ?? "00000000-0000-0000-0000-000000000000",
+        actorId:
+          actor.rows[0]?.actorId ?? "00000000-0000-0000-0000-000000000000",
         sessionIdHash: command.sessionIdHash,
         action,
         objectId,
@@ -199,43 +215,66 @@ export class PostgresAdminRepository {
       if (replayed !== undefined && replayed !== null) {
         return { allowed: true, replayed: true, ...replayed };
       }
-      await this.appendDenied(command, binding.action, binding.objectId, "approval_denied");
+      await this.appendDenied(
+        command,
+        binding.action,
+        binding.objectId,
+        "approval_denied",
+      );
       return { allowed: false, reasonCode: "approval_denied" };
     } catch (error) {
-      await this.appendDenied(command, binding.action, binding.objectId, "workflow_failed");
+      await this.appendDenied(
+        command,
+        binding.action,
+        binding.objectId,
+        "workflow_failed",
+      );
       throw error;
     }
   }
 
-  async createClient(command: ClientAdminCommand): Promise<AdminWorkflowResult<{ userId: string }>> {
-    return this.executeApproved(command, {
-      action: "client.create",
-      objectId: command.userId,
-      payload: { userId: command.userId },
-    }, async (tx) => {
-      const inserted = await tx.execute<{ userId: string }>(sql`
+  async createClient(
+    command: ClientAdminCommand,
+  ): Promise<AdminWorkflowResult<{ userId: string }>> {
+    return this.executeApproved(
+      command,
+      {
+        action: "client.create",
+        objectId: command.userId,
+        payload: { userId: command.userId },
+      },
+      async (tx) => {
+        const inserted = await tx.execute<{ userId: string }>(sql`
         insert into users (id, active) values (${command.userId}::uuid, true)
         on conflict (id) do nothing returning id as "userId"
       `);
-      if (inserted.rows[0] === undefined) throw new AdminWorkflowConflictError();
-      return inserted.rows[0];
-    });
+        if (inserted.rows[0] === undefined)
+          throw new AdminWorkflowConflictError();
+        return inserted.rows[0];
+      },
+    );
   }
 
-  async deactivateClient(command: ClientAdminCommand): Promise<AdminWorkflowResult<{ userId: string }>> {
-    return this.executeApproved(command, {
-      action: "client.deactivate",
-      objectId: command.userId,
-      payload: { userId: command.userId },
-    }, async (tx) => {
-      const changed = await tx.execute<{ userId: string }>(sql`
+  async deactivateClient(
+    command: ClientAdminCommand,
+  ): Promise<AdminWorkflowResult<{ userId: string }>> {
+    return this.executeApproved(
+      command,
+      {
+        action: "client.deactivate",
+        objectId: command.userId,
+        payload: { userId: command.userId },
+      },
+      async (tx) => {
+        const changed = await tx.execute<{ userId: string }>(sql`
         update users set active = false, updated_at = clock_timestamp()
         where id = ${command.userId}::uuid and active = true
         returning id as "userId"
       `);
-      if (changed.rows[0] === undefined) throw new AdminTargetNotFoundError();
-      return changed.rows[0];
-    });
+        if (changed.rows[0] === undefined) throw new AdminTargetNotFoundError();
+        return changed.rows[0];
+      },
+    );
   }
 
   private async findGrantReplay(input: {
@@ -273,17 +312,19 @@ export class PostgresAdminRepository {
     `);
     const row = stored.rows[0];
     if (row === undefined) return null;
-    const approval = await new PostgresAdminApprovalRepository(this.db)
-      .validateConsumedApprovalReplay({
-        approvalId: input.approvalId,
-        sessionIdHash: input.sessionIdHash,
-        action: input.action,
-        objectType: "user",
-        objectId: input.userId,
-        payload: input.payload,
-        nonce: input.nonce,
-      });
-    if (approval === null || row.requesterId !== approval.requesterId) return null;
+    const approval = await new PostgresAdminApprovalRepository(
+      this.db,
+    ).validateConsumedApprovalReplay({
+      approvalId: input.approvalId,
+      sessionIdHash: input.sessionIdHash,
+      action: input.action,
+      objectType: "user",
+      objectId: input.userId,
+      payload: input.payload,
+      nonce: input.nonce,
+    });
+    if (approval === null || row.requesterId !== approval.requesterId)
+      return null;
     if (
       row.userId !== input.userId ||
       Number(row.units) !== input.units ||
@@ -292,7 +333,8 @@ export class PostgresAdminRepository {
       row.approvalId !== input.approvalId ||
       row.sessionIdHash !== input.sessionIdHash ||
       (input.kind === "admin" ? row.expiresAt === null : row.expiresAt !== null)
-    ) throw new AdminWorkflowConflictError();
+    )
+      throw new AdminWorkflowConflictError();
     return { packageId: row.packageId };
   }
 
@@ -306,12 +348,15 @@ export class PostgresAdminRepository {
       units: command.units,
       idempotencyKey: command.idempotencyKey,
     };
-    return this.executeApproved(command, {
-      action,
-      objectId: command.userId,
-      payload,
-    }, async (tx, approval) => {
-      const packageRow = await tx.execute<{ packageId: string }>(sql`
+    return this.executeApproved(
+      command,
+      {
+        action,
+        objectId: command.userId,
+        payload,
+      },
+      async (tx, approval) => {
+        const packageRow = await tx.execute<{ packageId: string }>(sql`
         insert into message_packages (
           user_id, granted_messages, grant_idempotency_key, kind,
           admin_approval_id, admin_requester_session_id_hash,
@@ -321,15 +366,15 @@ export class PostgresAdminRepository {
           ${command.userId}::uuid, ${command.units}, ${command.idempotencyKey},
           ${kind}, ${approval.approvalId}::uuid, ${command.sessionIdHash},
           case when ${kind} = 'admin'
-            then c.db_now + interval '60 days' else null end,
+            then c.db_now + interval '30 days' else null end,
           c.db_now
         from (select ${this.grantClock()}::timestamptz as db_now) c
         on conflict (grant_idempotency_key) do nothing
         returning id as "packageId"
       `);
-      const packageId = packageRow.rows[0]?.packageId;
-      if (packageId === undefined) throw new AdminWorkflowConflictError();
-      await tx.execute(sql`
+        const packageId = packageRow.rows[0]?.packageId;
+        if (packageId === undefined) throw new AdminWorkflowConflictError();
+        await tx.execute(sql`
         insert into message_ledger_entries (
           package_id, entry_kind, delta, idempotency_key,
           admin_approval_id, admin_requester_session_id_hash
@@ -339,27 +384,38 @@ export class PostgresAdminRepository {
           ${approval.approvalId}::uuid, ${command.sessionIdHash}
         )
       `);
-      return { packageId };
-    }, () => this.findGrantReplay({
-      ...payload,
-      kind,
-      approvalId: command.approvalId,
-      sessionIdHash: command.sessionIdHash,
-      nonce: command.nonce,
-      action,
-      payload,
-    }));
+        return { packageId };
+      },
+      () =>
+        this.findGrantReplay({
+          ...payload,
+          kind,
+          approvalId: command.approvalId,
+          sessionIdHash: command.sessionIdHash,
+          nonce: command.nonce,
+          action,
+          payload,
+        }),
+    );
   }
 
-  async grantPackage(command: GrantAdminPackageCommand): Promise<AdminWorkflowResult<{ packageId: string }>> {
+  async grantPackage(
+    command: GrantAdminPackageCommand,
+  ): Promise<AdminWorkflowResult<{ packageId: string }>> {
     return this.executeGrant(command, "package.grant", "admin");
   }
 
-  async grantIntroPackage(command: GrantIntroPackageCommand): Promise<AdminWorkflowResult<{ packageId: string }>> {
+  async grantIntroPackage(
+    command: GrantIntroPackageCommand,
+  ): Promise<AdminWorkflowResult<{ packageId: string }>> {
     return this.executeGrant(command, "package.intro_grant", "intro");
   }
 
-  private async findRevokeReplay(command: RevokeAdminPackageCommand): Promise<{ packageId: string; delta: number; originalEntryId: string } | null> {
+  private async findRevokeReplay(command: RevokeAdminPackageCommand): Promise<{
+    packageId: string;
+    delta: number;
+    originalEntryId: string;
+  } | null> {
     const stored = await this.db.execute<{
       packageId: string;
       userId: string;
@@ -390,21 +446,23 @@ export class PostgresAdminRepository {
     `);
     const row = stored.rows[0];
     if (row === undefined) return null;
-    const approval = await new PostgresAdminApprovalRepository(this.db)
-      .validateConsumedApprovalReplay({
-        approvalId: command.approvalId,
-        sessionIdHash: command.sessionIdHash,
-        action: "package.revoke",
-        objectType: "user",
-        objectId: command.userId,
-        payload: {
-          userId: command.userId,
-          packageId: command.packageId,
-          idempotencyKey: command.idempotencyKey,
-        },
-        nonce: command.nonce,
-      });
-    if (approval === null || row.requesterId !== approval.requesterId) return null;
+    const approval = await new PostgresAdminApprovalRepository(
+      this.db,
+    ).validateConsumedApprovalReplay({
+      approvalId: command.approvalId,
+      sessionIdHash: command.sessionIdHash,
+      action: "package.revoke",
+      objectType: "user",
+      objectId: command.userId,
+      payload: {
+        userId: command.userId,
+        packageId: command.packageId,
+        idempotencyKey: command.idempotencyKey,
+      },
+      nonce: command.nonce,
+    });
+    if (approval === null || row.requesterId !== approval.requesterId)
+      return null;
     if (
       row.packageId !== command.packageId ||
       row.userId !== command.userId ||
@@ -413,21 +471,38 @@ export class PostgresAdminRepository {
     ) {
       throw new AdminWorkflowConflictError();
     }
-    return { packageId: row.packageId, delta: Number(row.delta), originalEntryId: row.originalEntryId };
+    return {
+      packageId: row.packageId,
+      delta: Number(row.delta),
+      originalEntryId: row.originalEntryId,
+    };
   }
 
-  async revokePackage(command: RevokeAdminPackageCommand): Promise<AdminWorkflowResult<{ packageId: string; delta: number; originalEntryId: string }>> {
+  async revokePackage(command: RevokeAdminPackageCommand): Promise<
+    AdminWorkflowResult<{
+      packageId: string;
+      delta: number;
+      originalEntryId: string;
+    }>
+  > {
     const payload = {
       userId: command.userId,
       packageId: command.packageId,
       idempotencyKey: command.idempotencyKey,
     };
-    return this.executeApproved(command, {
-      action: "package.revoke",
-      objectId: command.userId,
-      payload,
-    }, async (tx, approval) => {
-      const locked = await tx.execute<{ packageId: string; userId: string; originalEntryId: string }>(sql`
+    return this.executeApproved(
+      command,
+      {
+        action: "package.revoke",
+        objectId: command.userId,
+        payload,
+      },
+      async (tx, approval) => {
+        const locked = await tx.execute<{
+          packageId: string;
+          userId: string;
+          originalEntryId: string;
+        }>(sql`
         select p.id as "packageId", p.user_id as "userId",
           g.id as "originalEntryId"
         from message_packages p
@@ -444,15 +519,15 @@ export class PostgresAdminRepository {
           and g.legacy_admin_fact = false
         for update of p, g
       `);
-      const row = locked.rows[0];
-      if (row === undefined) throw new AdminTargetNotFoundError();
-      const balance = await tx.execute<{ balance: number }>(sql`
+        const row = locked.rows[0];
+        if (row === undefined) throw new AdminTargetNotFoundError();
+        const balance = await tx.execute<{ balance: number }>(sql`
         select coalesce(sum(delta), 0)::integer as balance
         from message_ledger_entries
         where package_id = ${command.packageId}::uuid
       `);
-      const remaining = Math.max(0, Number(balance.rows[0]?.balance ?? 0));
-      const inserted = await tx.execute<{ delta: number }>(sql`
+        const remaining = Math.max(0, Number(balance.rows[0]?.balance ?? 0));
+        const inserted = await tx.execute<{ delta: number }>(sql`
         insert into message_ledger_entries (
           package_id, entry_kind, delta, original_entry_id, idempotency_key,
           admin_approval_id, admin_requester_session_id_hash
@@ -463,23 +538,37 @@ export class PostgresAdminRepository {
         )
         returning delta
       `);
-      return { packageId: row.packageId, delta: Number(inserted.rows[0]!.delta), originalEntryId: row.originalEntryId };
-    }, () => this.findRevokeReplay(command));
+        return {
+          packageId: row.packageId,
+          delta: Number(inserted.rows[0]!.delta),
+          originalEntryId: row.originalEntryId,
+        };
+      },
+      () => this.findRevokeReplay(command),
+    );
   }
 
   private async mutateBooleanTarget(
     command: WorkflowAuthorization,
-    binding: { action: ApprovalAdminAction; objectId: string; payload: AdminPayload; table: "experts" | "expert_services"; column: "verified" | "active"; value: boolean },
+    binding: {
+      action: ApprovalAdminAction;
+      objectId: string;
+      payload: AdminPayload;
+      table: "experts" | "expert_services";
+      column: "verified" | "active";
+      value: boolean;
+    },
   ): Promise<AdminWorkflowResult<{ objectId: string }>> {
     return this.executeApproved(command, binding, async (tx) => {
-      const changed = binding.table === "experts"
-        ? await tx.execute<{ objectId: string }>(sql`
+      const changed =
+        binding.table === "experts"
+          ? await tx.execute<{ objectId: string }>(sql`
             update experts set ${sql.identifier(binding.column)} = ${binding.value},
               updated_at = clock_timestamp()
             where id = ${binding.objectId}::uuid
             returning id as "objectId"
           `)
-        : await tx.execute<{ objectId: string }>(sql`
+          : await tx.execute<{ objectId: string }>(sql`
             update expert_services set active = ${binding.value},
               updated_at = clock_timestamp()
             where id = ${binding.objectId}::uuid
@@ -491,34 +580,67 @@ export class PostgresAdminRepository {
   }
 
   async verifyExpert(command: ExpertAdminCommand) {
-    return this.mutateBooleanTarget(command, { action: "expert.verify", objectId: command.expertId, payload: { expertId: command.expertId, verified: true }, table: "experts", column: "verified", value: true });
+    return this.mutateBooleanTarget(command, {
+      action: "expert.verify",
+      objectId: command.expertId,
+      payload: { expertId: command.expertId, verified: true },
+      table: "experts",
+      column: "verified",
+      value: true,
+    });
   }
   async suspendExpert(command: ExpertAdminCommand) {
-    return this.mutateBooleanTarget(command, { action: "expert.suspend", objectId: command.expertId, payload: { expertId: command.expertId, verified: false }, table: "experts", column: "verified", value: false });
+    return this.mutateBooleanTarget(command, {
+      action: "expert.suspend",
+      objectId: command.expertId,
+      payload: { expertId: command.expertId, verified: false },
+      table: "experts",
+      column: "verified",
+      value: false,
+    });
   }
   async activateService(command: ServiceAdminCommand) {
-    return this.mutateBooleanTarget(command, { action: "service.activate", objectId: command.serviceId, payload: { serviceId: command.serviceId, active: true }, table: "expert_services", column: "active", value: true });
+    return this.mutateBooleanTarget(command, {
+      action: "service.activate",
+      objectId: command.serviceId,
+      payload: { serviceId: command.serviceId, active: true },
+      table: "expert_services",
+      column: "active",
+      value: true,
+    });
   }
   async deactivateService(command: ServiceAdminCommand) {
-    return this.mutateBooleanTarget(command, { action: "service.deactivate", objectId: command.serviceId, payload: { serviceId: command.serviceId, active: false }, table: "expert_services", column: "active", value: false });
+    return this.mutateBooleanTarget(command, {
+      action: "service.deactivate",
+      objectId: command.serviceId,
+      payload: { serviceId: command.serviceId, active: false },
+      table: "expert_services",
+      column: "active",
+      value: false,
+    });
   }
 
-  async resolveIntegrationError(command: IntegrationErrorAdminCommand): Promise<AdminWorkflowResult<{ errorId: string }>> {
-    return this.executeApproved(command, {
-      action: "integration_error.resolve",
-      objectId: command.errorId,
-      payload: { errorId: command.errorId },
-    }, async (tx) => {
-      const changed = await tx.execute<{ errorId: string }>(sql`
+  async resolveIntegrationError(
+    command: IntegrationErrorAdminCommand,
+  ): Promise<AdminWorkflowResult<{ errorId: string }>> {
+    return this.executeApproved(
+      command,
+      {
+        action: "integration_error.resolve",
+        objectId: command.errorId,
+        payload: { errorId: command.errorId },
+      },
+      async (tx) => {
+        const changed = await tx.execute<{ errorId: string }>(sql`
         update integration_errors
         set status = 'resolved', resolved_at = clock_timestamp(),
           updated_at = clock_timestamp()
         where id = ${command.errorId}::uuid and status = 'open'
         returning id as "errorId"
       `);
-      if (changed.rows[0] === undefined) throw new AdminTargetNotFoundError();
-      const serializedPayload = JSON.stringify({ errorId: command.errorId });
-      await tx.execute(sql`
+        if (changed.rows[0] === undefined) throw new AdminTargetNotFoundError();
+        const serializedPayload = JSON.stringify({ errorId: command.errorId });
+        await tx.execute(sql`
         insert into integration_outbox (
           idempotency_key, topic, payload, correlation_id,
           reconciliation_key, payload_hash
@@ -530,8 +652,9 @@ export class PostgresAdminRepository {
           ${digest(serializedPayload)}
         )
       `);
-      return changed.rows[0];
-    });
+        return changed.rows[0];
+      },
+    );
   }
 
   private async recordCaseAction(
@@ -542,26 +665,30 @@ export class PostgresAdminRepository {
       action: "acknowledge" | "resolve";
     },
   ): Promise<AdminWorkflowResult<{ alertId: string }>> {
-    return this.executeApproved(command, {
-      action: input.approvalAction,
-      objectId: command.alertId,
-      payload: { alertId: command.alertId, resolution: input.action },
-    }, async (tx, approval) => {
-      if (input.objectType === "safety_alert") {
-        const target = await tx.execute<{ status: string }>(sql`
+    return this.executeApproved(
+      command,
+      {
+        action: input.approvalAction,
+        objectId: command.alertId,
+        payload: { alertId: command.alertId, resolution: input.action },
+      },
+      async (tx, approval) => {
+        if (input.objectType === "safety_alert") {
+          const target = await tx.execute<{ status: string }>(sql`
           select status
           from human_escalations
           where id = ${command.alertId}::uuid
           for update
         `);
-        const status = target.rows[0]?.status;
-        if (status === undefined) throw new AdminTargetNotFoundError();
-        const valid = input.action === "acknowledge"
-          ? status === "assigned"
-          : status === "acknowledged" || status === "escalated";
-        if (!valid) throw new AdminInvalidStateTransitionError();
-        if (input.action === "acknowledge") {
-          await tx.execute(sql`
+          const status = target.rows[0]?.status;
+          if (status === undefined) throw new AdminTargetNotFoundError();
+          const valid =
+            input.action === "acknowledge"
+              ? status === "assigned"
+              : status === "acknowledged" || status === "escalated";
+          if (!valid) throw new AdminInvalidStateTransitionError();
+          if (input.action === "acknowledge") {
+            await tx.execute(sql`
             update human_escalations
             set status = 'acknowledged',
               acknowledged_at = clock_timestamp(),
@@ -569,8 +696,8 @@ export class PostgresAdminRepository {
               updated_at = clock_timestamp()
             where id = ${command.alertId}::uuid
           `);
-        } else {
-          await tx.execute(sql`
+          } else {
+            await tx.execute(sql`
             update human_escalations
             set status = 'resolved',
               resolved_at = clock_timestamp(),
@@ -578,35 +705,34 @@ export class PostgresAdminRepository {
               updated_at = clock_timestamp()
             where id = ${command.alertId}::uuid
           `);
-        }
-      } else {
-        const target = await tx.execute<{ status: string }>(sql`
+          }
+        } else {
+          const target = await tx.execute<{ status: string }>(sql`
           select escalation_status as status
           from feedback
           where id = ${command.alertId}::uuid
           for update
         `);
-        const status = target.rows[0]?.status;
-        if (status === undefined) throw new AdminTargetNotFoundError();
-        const expected = input.action === "acknowledge"
-          ? "escalated"
-          : "acknowledged";
-        if (status !== expected) throw new AdminInvalidStateTransitionError();
-        if (input.action === "acknowledge") {
-          await tx.execute(sql`
+          const status = target.rows[0]?.status;
+          if (status === undefined) throw new AdminTargetNotFoundError();
+          const expected =
+            input.action === "acknowledge" ? "escalated" : "acknowledged";
+          if (status !== expected) throw new AdminInvalidStateTransitionError();
+          if (input.action === "acknowledge") {
+            await tx.execute(sql`
             update feedback
             set escalation_status = 'acknowledged'
             where id = ${command.alertId}::uuid
           `);
-        } else {
-          await tx.execute(sql`
+          } else {
+            await tx.execute(sql`
             update feedback
             set escalation_status = 'resolved'
             where id = ${command.alertId}::uuid
           `);
+          }
         }
-      }
-      const inserted = await tx.execute<{ alertId: string }>(sql`
+        const inserted = await tx.execute<{ alertId: string }>(sql`
         insert into admin_case_actions (
           object_type, object_id, action, actor_id, approval_id
         ) values (
@@ -615,21 +741,38 @@ export class PostgresAdminRepository {
         )
         returning object_id as "alertId"
       `);
-      return inserted.rows[0]!;
-    });
+        return inserted.rows[0]!;
+      },
+    );
   }
 
   async acknowledgeSafetyAlert(command: AlertAdminCommand) {
-    return this.recordCaseAction(command, { approvalAction: "safety.resolve", objectType: "safety_alert", action: "acknowledge" });
+    return this.recordCaseAction(command, {
+      approvalAction: "safety.resolve",
+      objectType: "safety_alert",
+      action: "acknowledge",
+    });
   }
   async resolveSafetyAlert(command: AlertAdminCommand) {
-    return this.recordCaseAction(command, { approvalAction: "safety.resolve", objectType: "safety_alert", action: "resolve" });
+    return this.recordCaseAction(command, {
+      approvalAction: "safety.resolve",
+      objectType: "safety_alert",
+      action: "resolve",
+    });
   }
   async acknowledgeNegativeFeedback(command: AlertAdminCommand) {
-    return this.recordCaseAction(command, { approvalAction: "feedback.resolve", objectType: "negative_feedback", action: "acknowledge" });
+    return this.recordCaseAction(command, {
+      approvalAction: "feedback.resolve",
+      objectType: "negative_feedback",
+      action: "acknowledge",
+    });
   }
   async resolveNegativeFeedback(command: AlertAdminCommand) {
-    return this.recordCaseAction(command, { approvalAction: "feedback.resolve", objectType: "negative_feedback", action: "resolve" });
+    return this.recordCaseAction(command, {
+      approvalAction: "feedback.resolve",
+      objectType: "negative_feedback",
+      action: "resolve",
+    });
   }
 }
 

@@ -15,6 +15,10 @@ import {
   type ExpertAiIngressService,
   type PrivacyService,
   type IdentityProofVerifier,
+  type ClientCommercialPolicyPort,
+  HybridMessageGateway,
+  createSelartiResponseService,
+  TestExpertTelegramService,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -33,6 +37,11 @@ import {
   PostgresBookingRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
+  PostgresHybridMessageRepository,
+  PostgresSelartiProposalRepository,
+  PostgresTestExpertTelegramRepository,
+  PostgresExpertTrialPricingPolicy,
+  PostgresPartnerTrialPricingPolicy,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import {
@@ -44,6 +53,7 @@ import {
 import {
   createLogger,
   recordClientSessionMetric,
+  recordSelartiBudgetMetric,
   shutdownTelemetry,
 } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
@@ -111,19 +121,51 @@ export const createDefaultLifecycle = (
     clientSessionComposition?: {
       readonly verifier: IdentityProofVerifier;
     };
+    clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
+    testExpertMetricSink?: {
+      record(
+        event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
+      ): void;
+    };
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (
+      config.features.clientFreeAccessV2 === true &&
+      options.clientCommercialPolicyRepository === undefined
+    ) {
+      throw new Error("client_commercial_policy_repository_unavailable");
+    }
+    if (
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true &&
+      options.testExpertMetricSink === undefined
+    )
+      throw new Error("test_expert_metric_sink_unavailable");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
       bookingRuntime: true,
     });
+    if (
+      config.features.clientFreeAccessV2 === true &&
+      options.clientCommercialPolicyRepository === undefined
+    ) {
+      throw new Error("client_commercial_policy_repository_unavailable");
+    }
   },
   async migrate(db) {
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true &&
+      options.testExpertMetricSink === undefined
+    )
+      throw new Error("test_expert_metric_sink_unavailable");
+    if (config.features.clientTelegramIngress && !config.clientTelegramBotKey)
+      throw new Error("client_telegram_bot_key_required");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
         options.clientSessionComposition?.verifier !== undefined,
@@ -162,7 +204,6 @@ export const createDefaultLifecycle = (
     const telegramEnabled =
       config.features.expertTelegramQueries === true ||
       config.features.expertTelegramFinancialViews === true ||
-      config.features.expertTelegramReferral === true;
       config.features.expertTelegramReferral === true ||
       config.features.expertTelegramCheckout === true;
     const expertTelegramQueries =
@@ -220,6 +261,71 @@ export const createDefaultLifecycle = (
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
         : undefined;
+    const clientGateway =
+      config.features.clientTelegramIngress && config.clientTelegramBotKey
+        ? new HybridMessageGateway({
+            enabled: true,
+            botKey: config.clientTelegramBotKey,
+            routingEnabled: config.features.clientHybridRouting === true,
+            costAdmissionEnabled: config.features.selartiCostAdmission === true,
+            budgetMetric: (outcome) => recordSelartiBudgetMetric({ outcome }),
+            messagingConsentPolicyVersion:
+              config.clientMessagingConsentPolicyVersion!,
+            ...(config.selartiAiConsentPolicyVersion === undefined
+              ? {}
+              : {
+                  selartiConsentPolicyVersion:
+                    config.selartiAiConsentPolicyVersion,
+                }),
+            persist: async (input) =>
+              new PostgresHybridMessageRepository(db).persist(input),
+          })
+        : undefined;
+    const selartiResponses =
+      config.features.selartiResponseIngress === true &&
+      config.clientTelegramBotKey !== undefined
+        ? createSelartiResponseService({
+            enabled: true,
+            tenantKey: config.clientTelegramBotKey,
+            allowedUrlHosts: ["ii-tonya.ru"],
+            clock: () => new Date(),
+            proposals: new PostgresSelartiProposalRepository(db),
+          })
+        : undefined;
+    const testExpertRepository = new PostgresTestExpertTelegramRepository(db, {
+      messagingConsentPolicyVersion:
+        config.clientMessagingConsentPolicyVersion ?? "unconfigured",
+      ...(config.selartiAiConsentPolicyVersion === undefined
+        ? {}
+        : {
+            selartiConsentPolicyVersion: config.selartiAiConsentPolicyVersion,
+          }),
+    });
+    const testExpertResidualEnabled =
+      config.features.testExpertSelarti === true &&
+      config.features.clientHybridRouting === true &&
+      config.features.selartiCostAdmission === true &&
+      config.features.selartiResponseIngress === true &&
+      config.features.b2TelegramDispatch === true &&
+      config.features.b2SensitiveRetention === true &&
+      config.features.testExpertReconciliation === true &&
+      config.features.workerOutboxDelivery === true;
+    const testExpertPromo =
+      config.features.testExpertPromo === true &&
+      config.features.testExpertDeterministicFlow === true
+        ? Object.assign(
+            new TestExpertTelegramService({
+              telegram: testExpertRepository,
+              expertPolicy: new PostgresExpertTrialPricingPolicy(db),
+              partnerPolicy: new PostgresPartnerTrialPricingPolicy(db),
+              residualEnabled: testExpertResidualEnabled,
+              metrics: options.testExpertMetricSink!,
+            }),
+            {
+              residualEnabled: testExpertResidualEnabled,
+            },
+          )
+        : undefined;
     return {
       config,
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -265,7 +371,19 @@ export const createDefaultLifecycle = (
       logger: createLogger(),
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
-      telegramWebhookSecret: randomBytes(32).toString("base64url"),
+      clientIngressEnabled: config.features.clientTelegramIngress,
+      clientHybridRoutingEnabled: config.features.clientHybridRouting,
+      ...(config.clientTelegramBotKey === undefined
+        ? {}
+        : { clientBotKey: config.clientTelegramBotKey }),
+      ...(clientGateway === undefined ? {} : { clientGateway }),
+      ...(testExpertPromo === undefined ? {} : { testExpertPromo }),
+      telegramWebhookSecret:
+        config.telegramWebhookSecret ?? randomBytes(32).toString("base64url"),
+      ...(config.selartiResponseSharedSecret === undefined
+        ? {}
+        : { selartiResponseSharedSecret: config.selartiResponseSharedSecret }),
+      ...(selartiResponses === undefined ? {} : { selartiResponses }),
       ...(clientCatalogService === undefined
         ? {}
         : {

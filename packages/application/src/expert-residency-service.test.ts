@@ -4,6 +4,72 @@ import { owner } from "./expert-referral-service.testkit.js";
 import { quote } from "./expert-residency-service.testkit.js";
 
 describe("expert residency service", () => {
+  it.each([
+    ["START", "390000", 0, "basic", "standard"],
+    ["BASE", "590000", 1, "expanded", "standard"],
+    ["PRO", "999000", 3, "expanded", "priority"],
+  ])(
+    "exposes authoritative V2 facts for %s",
+    async (
+      _key,
+      priceMinor,
+      groupEventLimit,
+      statisticsLevel,
+      supportPriority,
+    ) => {
+      const tariff = {
+        tariffVersionId: `00000000-0000-4000-8000-00000000010${groupEventLimit}`,
+        displayName: String(_key),
+        priceMinor,
+        currency: "RUB" as const,
+        durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit,
+        statisticsLevel: statisticsLevel as "basic" | "expanded",
+        supportPriority: supportPriority as "standard" | "priority",
+      };
+      const expectedCredit = {
+        START: "117000",
+        BASE: "177000",
+        PRO: "299700",
+      }[_key as "START" | "BASE" | "PRO"];
+      const expectedCash = {
+        START: "273000",
+        BASE: "413000",
+        PRO: "699300",
+      }[_key as "START" | "BASE" | "PRO"];
+      const service = createExpertResidencyService({
+        environmentEnabled: true,
+        checkoutCapabilityEnabled: false,
+        commands: {
+          listActiveTariffs: async () => [tariff],
+          quote: async () => ({
+            ...tariff,
+            creditMinor: expectedCredit,
+            cashMinor: expectedCash,
+          }),
+          checkout: vi.fn(),
+        },
+        queries: { ownerUserId: async () => owner.userId },
+        reconciliation: {
+          settle: vi.fn(),
+          reverse: vi.fn(),
+          replayHeldReward: vi.fn(),
+          releaseExpiredOrders: vi.fn(),
+        },
+      });
+      await expect(service.listActiveTariffs(owner)).resolves.toEqual([tariff]);
+      await expect(
+        service.quote(owner, tariff.tariffVersionId),
+      ).resolves.toEqual({
+        ...tariff,
+        creditMinor: expectedCredit,
+        cashMinor: expectedCash,
+      });
+    },
+  );
   it("reauthorizes ownership before returning the bounded authoritative tariff list", async () => {
     const listActiveTariffs = vi.fn(async () => [
       {
@@ -12,10 +78,17 @@ describe("expert residency service", () => {
         priceMinor: "200000",
         currency: "RUB" as const,
         durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic" as const,
+        supportPriority: "standard" as const,
       },
     ]);
     const dependencies = {
       environmentEnabled: true,
+      checkoutCapabilityEnabled: false,
       commands: {
         quote: async () => quote,
         checkout: vi.fn(),
@@ -39,6 +112,12 @@ describe("expert residency service", () => {
         priceMinor: "200000",
         currency: "RUB",
         durationSeconds: 2_592_000,
+        commercialPolicyVersion: "expert_residency_v2",
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic",
+        supportPriority: "standard",
       },
     ]);
     expect(dependencies.queries.ownerUserId).toHaveBeenCalledWith(
@@ -78,6 +157,7 @@ describe("expert residency service", () => {
     };
     const deps = {
       environmentEnabled: true,
+      checkoutCapabilityEnabled: false,
       commands: {
         listActiveTariffs: vi.fn(async () => []),
         quote: async () => quote,
@@ -117,6 +197,7 @@ describe("expert residency service", () => {
     }));
     const service = createExpertResidencyService({
       environmentEnabled: true,
+      checkoutCapabilityEnabled: true,
       commands: {
         listActiveTariffs: vi.fn(async () => []),
         quote: async () => quote,
@@ -151,4 +232,40 @@ describe("expert residency service", () => {
     });
     expect(checkout).toHaveBeenCalledBefore(createCheckout);
   });
+});
+
+it("fails closed when a provider is supplied but checkout capability is omitted", async () => {
+  const activeOrder = {
+    ...quote,
+    id: "order-omitted",
+    status: "payment_pending" as const,
+  };
+  const createCheckout = vi.fn(async () => ({
+    kind: "created" as const,
+    paymentId: "must-not-run",
+    checkoutUrl: "https://must-not-run.invalid",
+  }));
+  const service = createExpertResidencyService({
+    environmentEnabled: true,
+    commands: {
+      listActiveTariffs: vi.fn(async () => []),
+      quote: async () => quote,
+      checkout: async () => activeOrder,
+    },
+    queries: { ownerUserId: async () => owner.userId },
+    reconciliation: {
+      settle: vi.fn(),
+      reverse: vi.fn(),
+      replayHeldReward: vi.fn(),
+      releaseExpiredOrders: vi.fn(),
+    },
+    checkoutProvider: { createCheckout },
+  });
+  await expect(
+    service.checkout(owner, "tariff-1", "checkout-omitted"),
+  ).resolves.toEqual({
+    id: activeOrder.id,
+    status: "payment_pending",
+  });
+  expect(createCheckout).not.toHaveBeenCalled();
 });

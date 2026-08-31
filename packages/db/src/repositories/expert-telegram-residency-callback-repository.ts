@@ -89,7 +89,6 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
       throw new Error("invalid_expert_residency_callback");
     }
     const result = await this.db.$client.query(
-      `insert into expert_telegram_residency_callbacks
       `insert into expert_telegram_residency_callbacks as c
        (token_hash,expert_id,telegram_user_id,tariff_version_id,action,idempotency_key,expires_at)
        select $1,$2::uuid,$3,$4::uuid,'start_residency_checkout',$5,$6
@@ -134,7 +133,6 @@ export class PostgresExpertTelegramResidencyCallbackRepository {
       return null;
     }
     const result: QueryResult<CallbackRow> = await this.db.$client.query(
-      `update expert_telegram_residency_callbacks c set consumed_at=$6
       `update expert_telegram_residency_callbacks c
        set consumed_at=$6,checkout_status='unknown',outcome_recorded_at=$6
        from experts e

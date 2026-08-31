@@ -17,9 +17,11 @@ export interface WorkerCycleReport {
   readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
   readonly expertReferralHoldReplay: unknown;
+  readonly expertReferralMaturity: unknown;
   readonly confirmedOutboxDelivery: unknown;
   readonly processorPrivacy: unknown;
   readonly providerReconciliation: unknown;
+  readonly testExpertReconciliation: unknown;
 }
 
 export interface WorkerRuntime {
@@ -46,9 +48,11 @@ export interface WorkerRuntimeDependencies {
   readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
   readonly expertReferralHoldReplay: BoundedJob;
+  readonly expertReferralMaturity?: BoundedJob;
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
+  readonly testExpertReconciliation?: BoundedJob;
   readonly closeDatabase: () => Promise<void>;
   readonly closeTelemetry: () => Promise<void>;
   readonly shutdownTimeoutMs?: number;
@@ -62,6 +66,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
       readonly now: Date;
@@ -83,7 +88,12 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly expertReferralJobsRepository: ExpertResidencyExpiryRepository &
     ExpertResidencyReconciliationRepository &
-    HeldRewardRepository;
+    HeldRewardRepository & {
+      grantDueMaturityBatch?(command: {
+        now: Date;
+        batchSize: number;
+      }): Promise<unknown>;
+    };
   readonly expertTelegramCheckoutRepository: {
     clearExpiredCheckoutUrls(now: Date, limit: number): Promise<number>;
   };
@@ -96,6 +106,13 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly closeTelemetry: () => Promise<void>;
   readonly now: () => Date;
   readonly batchSize?: number;
+  readonly expertReferralMaturityWorkerEnabled?: boolean;
+  readonly expertReferralMaturityMetrics?: {
+    record(
+      outcome: "examined" | "granted" | "cancelled" | "retry" | "failed",
+      count?: number,
+    ): void;
+  };
   readonly shutdownTimeoutMs?: number;
 }
 
@@ -153,9 +170,22 @@ export function createWorkerRuntime(
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
+      const expertReferralMaturity =
+        (await deps.expertReferralMaturity?.()) ?? {
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+          pending: 0,
+          reason: "maturity_capability_unavailable",
+        };
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
+      const testExpertReconciliation =
+        (await deps.testExpertReconciliation?.()) ?? {
+          scanned: 0,
+          reason: "test_expert_reconciliation_disabled",
+        };
       return {
         safetyHandoffs,
         expiredLeaseRecovery,
@@ -165,9 +195,11 @@ export function createWorkerRuntime(
         expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
         expertReferralHoldReplay,
+        expertReferralMaturity,
         confirmedOutboxDelivery,
         processorPrivacy,
         providerReconciliation,
+        testExpertReconciliation,
       };
     })();
     currentCycle = cycle;
@@ -219,6 +251,12 @@ export function createProductionWorkerRuntime(
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
   const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
+  if (
+    deps.expertReferralMaturityWorkerEnabled === true &&
+    deps.expertReferralJobsRepository.grantDueMaturityBatch === undefined
+  ) {
+    throw new Error("expert_referral_maturity_worker_capability_unavailable");
+  }
   if (workerOutboxEnabled !== (deps.workerOutboxRunner !== undefined)) {
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
@@ -277,6 +315,32 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
+    expertReferralMaturity: async () => {
+      try {
+        const result =
+          ((await deps.expertReferralJobsRepository.grantDueMaturityBatch?.({
+            now: deps.now(),
+            batchSize,
+          })) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 }) as {
+            examined: number;
+            granted: number;
+            cancelled: number;
+            pending: number;
+          };
+        for (const [outcome, count] of [
+          ["examined", result.examined],
+          ["granted", result.granted],
+          ["cancelled", result.cancelled],
+          ["retry", result.pending],
+        ] as const)
+          if (count > 0)
+            deps.expertReferralMaturityMetrics?.record(outcome, count);
+        return result;
+      } catch (error) {
+        deps.expertReferralMaturityMetrics?.record("failed");
+        throw error;
+      }
+    },
     deliverConfirmedOutbox: workerOutboxEnabled
       ? deps.workerOutboxRunner!
       : async () =>
@@ -307,6 +371,9 @@ export function createProductionWorkerRuntime(
       projectionRepairs: 0,
       provider: "disabled",
     }),
+    ...(deps.testExpertReconciliation === undefined
+      ? {}
+      : { testExpertReconciliation: deps.testExpertReconciliation }),
     closeDatabase: deps.closeDatabase,
     closeTelemetry: deps.closeTelemetry,
     ...(deps.shutdownTimeoutMs === undefined

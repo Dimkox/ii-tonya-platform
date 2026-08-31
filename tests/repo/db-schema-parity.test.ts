@@ -20,6 +20,10 @@ import {
   integrationInbox,
   integrationErrors,
   integrationOutbox,
+  dialogues,
+  dialogueDeliveries,
+  dialogueInboundTombstones,
+  selartiResponseProposals,
   messageEvents,
   messageLedgerEntries,
   messagePackages,
@@ -78,6 +82,7 @@ describe("authoritative Drizzle schema parity", () => {
       "expertTelegramResidencyCallbacks",
       "expertResidencyProviderEventInbox",
       "expertFirstResidencySettlements",
+      "expertReferralMaturities",
       "expertReferralRewardGrants",
       "expertReferralLedgerEntries",
       "expertReferralLedgerAllocations",
@@ -125,14 +130,22 @@ describe("authoritative Drizzle schema parity", () => {
     });
     expect(requiredTable("expertResidencyOrders")).toMatchObject({
       checks: [
+        "expert_order_cash_credit_conservation",
         "expert_order_cash_remainder",
         "expert_order_credit_cap",
         "expert_order_currency_rub",
         "expert_order_deadline_after_creation",
         "expert_order_deadline_not_after_provider",
         "expert_order_duration_positive",
+        "expert_order_group_event_limit",
         "expert_order_money_bounds",
+        "expert_order_policy_version",
         "expert_order_settlement_interval",
+        "expert_order_statistics_level",
+        "expert_order_support_priority",
+        "expert_order_v2_cap",
+        "expert_order_v2_duration",
+        "expert_order_v2_price",
       ],
       uniques: [
         "expert_orders_expert_idempotency_unique",
@@ -142,7 +155,6 @@ describe("authoritative Drizzle schema parity", () => {
     expect(requiredTable("expertTelegramResidencyCallbacks")).toMatchObject({
       checks: [
         "expert_telegram_residency_callbacks_action_check",
-        "expert_telegram_residency_callbacks_expiry_check",
         "expert_telegram_residency_callbacks_checkout_outcome_check",
         "expert_telegram_residency_callbacks_checkout_state_check",
         "expert_telegram_residency_callbacks_expiry_check",
@@ -154,7 +166,6 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_telegram_residency_callbacks_expert_id_experts_id_fk",
         "expert_telegram_residency_callbacks_tariff_version_id_expert_residency_tariff_versions_id_fk",
       ],
-      indexes: ["expert_telegram_residency_callbacks_expiry_idx"],
       indexes: [
         "expert_telegram_residency_callbacks_expiry_idx",
         "expert_telegram_residency_callbacks_processing_lease_idx",
@@ -221,9 +232,32 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_reward_grants_first_settlement_unique",
         "expert_reward_grants_id_expert_unique",
         "expert_reward_grants_idempotency_unique",
+        "expert_reward_grants_maturity_unique",
         "expert_reward_grants_qualifying_order_unique",
         "expert_reward_grants_qualifying_payment_unique",
         "expert_reward_grants_referral_unique",
+      ],
+    });
+    expect(requiredTable("expertReferralMaturities")).toMatchObject({
+      checks: [
+        "expert_referral_maturity_attempt_bounded",
+        "expert_referral_maturity_idempotency_nonempty",
+        "expert_referral_maturity_policy",
+        "expert_referral_maturity_settled_clock",
+        "expert_referral_maturity_terminal_state",
+      ],
+      foreignKeys: [
+        "expert_referral_maturity_settlement_fk",
+        "expert_referral_reward_maturities_invitee_expert_id_experts_id_fk",
+        "expert_referral_reward_maturities_inviter_expert_id_experts_id_fk",
+      ],
+      indexes: ["expert_referral_maturities_due_idx"],
+      uniques: [
+        "expert_referral_maturities_idempotency_unique",
+        "expert_referral_maturities_order_unique",
+        "expert_referral_maturities_payment_unique",
+        "expert_referral_maturities_referral_unique",
+        "expert_referral_maturities_settlement_unique",
       ],
     });
     expect(requiredTable("expertReferralLedgerEntries")?.uniques).toContain(
@@ -245,9 +279,13 @@ describe("authoritative Drizzle schema parity", () => {
   });
 
   it("describes every named migration constraint and partial index", () => {
-    expect(names(channelIdentities).uniques).toEqual([
-      "channel_identities_provider_external_unique",
-    ]);
+    expect(names(channelIdentities)).toMatchObject({
+      indexes: [
+        "channel_identities_provider_external_legacy_unique",
+        "channel_identities_telegram_bot_user_chat_unique",
+      ],
+      uniques: [],
+    });
     expect(names(clientProfiles).checks).toEqual([
       "client_profiles_expert_note_bounded",
     ]);
@@ -323,14 +361,42 @@ describe("authoritative Drizzle schema parity", () => {
     expect(names(integrationOutbox)).toMatchObject({
       checks: [
         "integration_outbox_attempts_nonnegative",
+        "integration_outbox_dialogue_order_pair",
+        "integration_outbox_dialogue_sequence_positive",
         "integration_outbox_reconciliation_key_present",
       ],
       indexes: [
+        "integration_outbox_dialogue_order_claim_idx",
+        "integration_outbox_dialogue_sequence_unique",
         "integration_outbox_dispatch_lease",
         "integration_outbox_reconciliation_lease",
       ],
       uniques: ["integration_outbox_idempotency_unique"],
     });
+    expect(names(dialogues).checks).toContain(
+      "dialogues_delivery_sequence_nonnegative",
+    );
+    expect(names(selartiResponseProposals)).toMatchObject({
+      checks: [
+        "selarti_response_proposals_expiry_check",
+        "selarti_response_proposals_hash_check",
+        "selarti_response_proposals_redaction_check",
+        "selarti_response_proposals_text_check",
+      ],
+      indexes: ["selarti_response_proposals_expiry_idx"],
+      uniques: ["selarti_response_proposals_request_id_unique"],
+    });
+    expect(names(dialogueDeliveries)).toMatchObject({
+      indexes: ["dialogue_deliveries_order_idx"],
+      uniques: [
+        "dialogue_deliveries_dialogue_sequence_unique",
+        "dialogue_deliveries_outbox_id_unique",
+        "dialogue_deliveries_source_unique",
+      ],
+    });
+    expect(names(dialogueInboundTombstones).uniques).toEqual([
+      "dialogue_inbound_tombstones_scope_unique",
+    ]);
     expect(names(promptVersions).uniques).toEqual([
       "prompt_versions_name_version_unique",
     ]);
@@ -458,6 +524,10 @@ describe("authoritative Drizzle schema parity", () => {
       readFileSync("packages/db/migrations/0030_client_sessions.sql", "utf8"),
       readFileSync(
         "packages/db/migrations/0031_client_booking_references.sql",
+        "utf8",
+      ),
+      readFileSync(
+        "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
         "utf8",
       ),
     ].join("\n");
@@ -589,21 +659,40 @@ describe("authoritative Drizzle schema parity", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    const principal = journal.entries.at(-2);
+    const principal = journal.entries.find(
+      (entry) => entry.tag === "0030_client_sessions",
+    );
     expect(principal).toMatchObject({
       idx: 30,
       tag: "0030_client_sessions",
     });
-    expect(principal?.when).toBeGreaterThan(journal.entries.at(-3)?.when ?? 0);
+    const booking = journal.entries.find(
+      (entry) => entry.tag === "0031_client_booking_references",
+    );
+    expect(principal?.when).toBeLessThan(
+      booking?.when ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it("registers the protected client booking relations as migration 0031", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; when: number; tag: string }> };
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(
+      journal.entries.find(
+        (entry) => entry.tag === "0031_client_booking_references",
+      ),
+    ).toMatchObject({
       idx: 31,
       tag: "0031_client_booking_references",
+    });
+    expect(
+      journal.entries.find(
+        (entry) => entry.tag === "0032_commercial_core_v2_a1",
+      ),
+    ).toMatchObject({
+      idx: 32,
+      tag: "0032_commercial_core_v2_a1",
     });
     expect(
       existsSync("packages/db/migrations/0031_client_booking_references.sql"),

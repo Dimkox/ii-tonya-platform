@@ -29,7 +29,19 @@ describe("loadEnv", () => {
       clientSession: false,
       clientBooking: false,
       clientBookingReserve: false,
+      clientFreeAccessV2: false,
+      clientTelegramIngress: false,
+      clientHybridRouting: false,
+      selartiCostAdmission: false,
+      selartiResponseIngress: false,
+      b2TelegramDispatch: false,
+      b2SensitiveRetention: false,
+      testExpertPromo: false,
+      testExpertDeterministicFlow: false,
+      testExpertSelarti: false,
+      testExpertReconciliation: false,
       expertReferral: false,
+      expertReferralMaturityWorker: false,
       expertResidencyBilling: false,
       expertTelegramQueries: false,
       expertTelegramFinancialViews: false,
@@ -38,11 +50,89 @@ describe("loadEnv", () => {
       expertTelegramCheckout: false,
       yookassa: false,
     });
+    expect(config.features.selartiCostAdmission).toBe(false);
     expect(config.selartiOutboundBillingMode).toBe("disabled");
     expect(() =>
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
     ).toThrow("Raw conversation logging is prohibited");
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
+  });
+
+  it("defaults test-expert reconciliation off and accepts only exact booleans", () => {
+    expect(loadEnv(localEnv()).features.testExpertReconciliation).toBe(false);
+    expect(
+      loadEnv(localEnv({ TEST_EXPERT_RECONCILIATION_ENABLED: "true" })).features
+        .testExpertReconciliation,
+    ).toBe(true);
+    expect(() =>
+      loadEnv(localEnv({ TEST_EXPERT_RECONCILIATION_ENABLED: "TRUE" })),
+    ).toThrow();
+  });
+
+  it("allows deterministic test-expert flow without Selarti and fails closed for incomplete residual activation", () => {
+    const deterministic = loadEnv(
+      localEnv({
+        TEST_EXPERT_PROMO_ENABLED: "true",
+        TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+        CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
+        CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+        CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
+        TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+      }),
+    );
+    expect(deterministic.features).toMatchObject({
+      testExpertPromo: true,
+      testExpertDeterministicFlow: true,
+      testExpertSelarti: false,
+    });
+    expect(() =>
+      loadEnv(
+        localEnv({
+          TEST_EXPERT_PROMO_ENABLED: "true",
+          TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+          TEST_EXPERT_SELARTI_ENABLED: "true",
+          TEST_EXPERT_PROMPT_VERSION: "approved-v1",
+          CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
+          CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+          CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
+          TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+        }),
+      ),
+    ).toThrow("test_expert_residual_configuration_incomplete");
+  });
+
+  it("requires reconciliation and worker outbox capabilities for test-expert residual startup", () => {
+    const residual = {
+      TEST_EXPERT_PROMO_ENABLED: "true",
+      TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: "true",
+      TEST_EXPERT_SELARTI_ENABLED: "true",
+      TEST_EXPERT_PROMPT_VERSION: "approved-v1",
+      CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
+      CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+      CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
+      SELARTI_AI_CONSENT_POLICY_VERSION: "selarti-v1",
+      TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+      CLIENT_HYBRID_ROUTING_ENABLED: "true",
+      SELARTI_COST_ADMISSION_ENABLED: "true",
+      SELARTI_RESPONSE_INGRESS_ENABLED: "true",
+      SELARTI_RESPONSE_SHARED_SECRET: "test-only-response-secret-value-0001",
+      B2_TELEGRAM_DISPATCH_ENABLED: "true",
+      B2_SENSITIVE_RETENTION_ENABLED: "true",
+    } satisfies NodeJS.ProcessEnv;
+
+    expect(() =>
+      loadEnv(
+        localEnv({ ...residual, WORKER_OUTBOX_DELIVERY_ENABLED: "true" }),
+      ),
+    ).toThrow("test_expert_residual_configuration_incomplete");
+    expect(() =>
+      loadEnv(
+        localEnv({
+          ...residual,
+          TEST_EXPERT_RECONCILIATION_ENABLED: "true",
+        }),
+      ),
+    ).toThrow("test_expert_residual_configuration_incomplete");
   });
 
   it("defaults worker outbox delivery off and accepts only exact booleans", () => {

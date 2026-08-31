@@ -3,6 +3,7 @@ import type { DrizzleDb } from "@ii-tonya/db";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { createLogger } from "@ii-tonya/observability";
 import { createWindowedRateLimiter } from "./rate-limit.js";
+import { buildApp } from "./app.js";
 import {
   closeServer,
   composeServer,
@@ -38,6 +39,146 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("requires an operational metric sink whenever deterministic promo is enabled", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    await expect(
+      createDefaultLifecycle().dependencies(
+        {
+          databaseUrl: "postgresql://placeholder.invalid/test",
+          integrations: {
+            selarti: false,
+            planerka: false,
+            telegram: false,
+            makeProjection: false,
+            intentModel: false,
+            payments: false,
+          },
+          minorOnboarding: false,
+          rawConversationLogging: false,
+          selartiOutboundBillingMode: "disabled",
+          displayTimezone: "Europe/Moscow",
+          yookassaRecovery: { enabled: false },
+          clientTelegramBotKey: "bot-client",
+          features: {
+            workerOutboxDelivery: false,
+            clientCatalog: false,
+            clientTelegramIngress: true,
+            testExpertPromo: true,
+            testExpertDeterministicFlow: true,
+            testExpertSelarti: false,
+            expertReferral: false,
+            expertReferralMaturityWorker: false,
+            expertResidencyBilling: false,
+          },
+        },
+        fakeDb,
+      ),
+    ).rejects.toThrow("test_expert_metric_sink_unavailable");
+  });
+
+  it("composes the PostgreSQL test-expert boundary for deterministic flow without provider activation", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const base = (await createDefaultLifecycle({
+      testExpertMetricSink: { record: () => undefined },
+    }).dependencies(
+      {
+        databaseUrl: "postgresql://placeholder.invalid/test",
+        integrations: {
+          selarti: false,
+          planerka: false,
+          telegram: false,
+          makeProjection: false,
+          intentModel: false,
+          payments: false,
+        },
+        minorOnboarding: false,
+        rawConversationLogging: false,
+        selartiOutboundBillingMode: "disabled",
+        displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          testExpertPromo: true,
+          testExpertDeterministicFlow: true,
+          testExpertSelarti: false,
+          expertReferral: false,
+          expertReferralMaturityWorker: false,
+          expertResidencyBilling: false,
+        },
+      },
+      fakeDb,
+    )) as { testExpertPromo?: unknown };
+    expect(base.testExpertPromo).toBeDefined();
+  });
+
+  it("keeps residual disabled unless reconciliation and worker outbox capabilities are enabled", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const baseFeatures = {
+      workerOutboxDelivery: true,
+      clientCatalog: false,
+      clientHybridRouting: true,
+      selartiCostAdmission: true,
+      selartiResponseIngress: true,
+      b2TelegramDispatch: true,
+      b2SensitiveRetention: true,
+      testExpertPromo: true,
+      testExpertDeterministicFlow: true,
+      testExpertSelarti: true,
+      testExpertReconciliation: true,
+      expertReferral: false,
+      expertReferralMaturityWorker: false,
+      expertResidencyBilling: false,
+    };
+    const compose = async (features: typeof baseFeatures) =>
+      (await createDefaultLifecycle({
+        testExpertMetricSink: { record: () => undefined },
+      }).dependencies(
+        {
+          databaseUrl: "postgresql://placeholder.invalid/test",
+          integrations: {
+            selarti: false,
+            planerka: false,
+            telegram: false,
+            makeProjection: false,
+            intentModel: false,
+            payments: false,
+          },
+          minorOnboarding: false,
+          rawConversationLogging: false,
+          selartiOutboundBillingMode: "disabled",
+          displayTimezone: "Europe/Moscow",
+          yookassaRecovery: { enabled: false },
+          clientTelegramBotKey: "bot-client",
+          features,
+        },
+        fakeDb,
+      )) as { testExpertPromo: { residualEnabled: boolean } };
+
+    expect(
+      (await compose({ ...baseFeatures, testExpertReconciliation: false }))
+        .testExpertPromo.residualEnabled,
+    ).toBe(false);
+    expect(
+      (await compose({ ...baseFeatures, workerOutboxDelivery: false }))
+        .testExpertPromo.residualEnabled,
+    ).toBe(false);
+    expect((await compose(baseFeatures)).testExpertPromo.residualEnabled).toBe(
+      true,
+    );
+  });
   it("keeps client authority absent by default and composes it only with an injected verifier", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),
@@ -64,7 +205,10 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientSession: false,
         clientCatalog: false,
+        clientTelegramIngress: false,
+        clientHybridRouting: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
     };
@@ -77,6 +221,11 @@ describe("server composition", () => {
     expect(disabledDeps.clientSessionService).toBeUndefined();
     expect(disabledDeps.clientSessionRepository).toBeUndefined();
     expect(disabledDeps.clientPrincipal).toBeUndefined();
+    expect(disabledDeps.clientGateway).toBeUndefined();
+    expect(disabledDeps.selartiResponses).toBeUndefined();
+    expect(disabledDeps.selartiResponseSharedSecret).toBeUndefined();
+    expect(disabledDeps.clientIngressEnabled).toBe(false);
+    expect(disabledDeps.clientHybridRoutingEnabled).toBe(false);
 
     const enabled = {
       ...config,
@@ -99,6 +248,46 @@ describe("server composition", () => {
     expect(injected.clientSessionService).toBeDefined();
     expect(injected.clientSessionRepository).toBeDefined();
     expect(injected.clientPrincipal).toBeDefined();
+  });
+  it("fails closed when B2 response ingress is requested without its secret", async () => {
+    const appConfig: RuntimeConfig = {
+      databaseUrl: "postgresql://placeholder.invalid/test",
+      integrations: {
+        selarti: false,
+        planerka: false,
+        telegram: false,
+        makeProjection: false,
+        intentModel: false,
+        payments: false,
+      },
+      minorOnboarding: false,
+      rawConversationLogging: false,
+      selartiOutboundBillingMode: "disabled",
+      displayTimezone: "Europe/Moscow",
+      yookassaRecovery: { enabled: false },
+      clientTelegramBotKey: "bot-b2",
+      features: {
+        workerOutboxDelivery: false,
+        clientCatalog: false,
+        clientTelegramIngress: false,
+        clientHybridRouting: false,
+        selartiResponseIngress: true,
+        expertReferral: false,
+        expertReferralMaturityWorker: false,
+        expertResidencyBilling: false,
+      },
+    };
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const deps = await createDefaultLifecycle().dependencies(appConfig, fakeDb);
+    expect(deps.selartiResponses).toBeDefined();
+    expect(deps.selartiResponseSharedSecret).toBeUndefined();
+    await expect(buildApp(deps)).rejects.toThrow(
+      "Selarti response runtime capability is required",
+    );
   });
   it("rejects an invalid client feature combination before migration", async () => {
     process.env.DATABASE_URL =
@@ -144,6 +333,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         expertAiIngress: false,
       },
@@ -247,6 +437,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
     };
@@ -349,7 +540,6 @@ describe("server composition", () => {
             summary: referralSummary,
             redeemCode: async () => ({ kind: "disabled" as const }),
           },
-          residency: { quote: async () => ({ kind: "disabled" as const }) },
           residency: {
             listActiveTariffs: async () => ({ kind: "disabled" as const }),
             quote: async () => ({ kind: "disabled" as const }),
@@ -396,6 +586,7 @@ describe("server composition", () => {
           workerOutboxDelivery: false,
           clientCatalog: false,
           expertReferral: false,
+          expertReferralMaturityWorker: false,
           expertResidencyBilling: false,
           expertTelegramFinancialViews: financialViewsEnabled,
           expertTelegramCheckout: checkoutEnabled,
@@ -466,6 +657,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         expertTelegramFinancialViews: true,
       },
@@ -503,6 +695,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
       expertReferralKey: {
@@ -548,6 +741,7 @@ describe("server composition", () => {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
       expertReferralKey: {
@@ -569,6 +763,7 @@ describe("server composition", () => {
           workerOutboxDelivery: false,
           clientCatalog: false,
           expertReferral: false,
+          expertReferralMaturityWorker: false,
           expertResidencyBilling: false,
         },
       },

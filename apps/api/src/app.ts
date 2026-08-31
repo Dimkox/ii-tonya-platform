@@ -12,6 +12,7 @@ import type {
   ExpertReferralAdminService,
   OperatorCaseService,
   PrivacyService,
+  SelartiProposalAcceptResult,
 } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
@@ -45,6 +46,7 @@ import {
   type TelegramCallbackService,
   type TelegramExpertAiIngress,
   type TelegramExpertQueryIngress,
+  type TelegramTestExpertPromoIngress,
 } from "./routes/telegram-webhook.js";
 import {
   yookassaWebhookRoutes,
@@ -55,6 +57,7 @@ import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import { selartiResponseRoutes } from "./routes/selarti-response.js";
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -78,7 +81,23 @@ export interface AppDependencies {
   logger: Logger;
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
+  clientIngressEnabled?: boolean | undefined;
+  clientHybridRoutingEnabled?: boolean | undefined;
+  clientBotKey?: string | undefined;
+  clientGateway?:
+    | {
+        handle(
+          raw: unknown,
+        ): Promise<{ readonly status: string; readonly route?: string }>;
+      }
+    | undefined;
   telegramWebhookSecret: string;
+  selartiResponseSharedSecret?: string;
+  selartiResponses?: {
+    handle(raw: unknown): Promise<{
+      readonly status: SelartiProposalAcceptResult | "unavailable";
+    }>;
+  };
   adminApprovals?: ApprovalPort;
   operatorCases?: OperatorCaseService;
   expertReferralAdminService?: ExpertReferralAdminService;
@@ -97,6 +116,7 @@ export interface AppDependencies {
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
   now?: () => Date;
+  testExpertPromo?: TelegramTestExpertPromoIngress;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
   const nonPaymentIntegrations = {
@@ -166,6 +186,31 @@ export async function buildApp(
   ) {
     throw new Error("Client catalog runtime capability is required");
   }
+  if (
+    deps.config.features.selartiResponseIngress === true &&
+    (deps.selartiResponses === undefined ||
+      deps.selartiResponseSharedSecret === undefined)
+  ) {
+    throw new Error("Selarti response runtime capability is required");
+  }
+  if (
+    deps.config.features.testExpertPromo === true &&
+    (deps.testExpertPromo === undefined ||
+      deps.config.features.testExpertDeterministicFlow !== true ||
+      deps.config.features.clientTelegramIngress !== true ||
+      deps.clientBotKey === undefined)
+  )
+    throw new Error("Test expert promo runtime capability is required");
+  if (
+    deps.config.features.testExpertSelarti === true &&
+    (deps.testExpertPromo?.residualEnabled !== true ||
+      deps.config.features.clientHybridRouting !== true ||
+      deps.config.features.selartiCostAdmission !== true ||
+      deps.config.features.selartiResponseIngress !== true ||
+      deps.config.features.b2TelegramDispatch !== true ||
+      deps.config.features.b2SensitiveRetention !== true)
+  )
+    throw new Error("Test expert residual runtime capability is required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -232,8 +277,30 @@ export async function buildApp(
     rateLimiter: deps.rateLimiter,
     ...(deps.now === undefined ? {} : { now: deps.now }),
   });
+  await app.register(selartiResponseRoutes, {
+    enabled: deps.config.features.selartiResponseIngress === true,
+    secret:
+      deps.selartiResponseSharedSecret ??
+      "disabled_B2_response_secret_0000000000000000",
+    responses: deps.selartiResponses ?? {
+      async handle() {
+        return { status: "unavailable" as const };
+      },
+    },
+    rateLimiter: deps.rateLimiter,
+  });
   await app.register(telegramWebhookRoutes, {
     secret: deps.telegramWebhookSecret,
+    clientIngressEnabled: deps.clientIngressEnabled,
+    clientHybridRoutingEnabled: deps.clientHybridRoutingEnabled,
+    clientBotKey: deps.clientBotKey,
+    clientGateway: deps.clientGateway,
+    testExpertPromoEnabled:
+      deps.config.features.testExpertPromo === true &&
+      deps.config.features.testExpertDeterministicFlow === true,
+    ...(deps.testExpertPromo === undefined
+      ? {}
+      : { testExpertPromo: deps.testExpertPromo }),
     callbacks: deps.telegramCallbacks,
     inbox: deps.inbox,
     rateLimiter: deps.rateLimiter,
@@ -447,6 +514,7 @@ export async function buildTestApp(
         clientSession: false,
         clientCatalog: false,
         expertReferral: false,
+        expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
         ...options.features,
       },

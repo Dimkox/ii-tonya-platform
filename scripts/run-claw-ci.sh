@@ -20,6 +20,10 @@ source_sha="${SOURCE_SHA:?SOURCE_SHA is required}"
 }
 test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
 test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
+git_common_dir="$(git -C "$source_root" rev-parse --path-format=absolute --git-common-dir)"
+git_marker="$source_root/.git"
+test -d "$git_common_dir"
+test -e "$git_marker"
 if [[ "$mode" == client-booking ]]; then
   test -z "$(git -C "$source_root" status --porcelain --untracked-files=all)"
   test ! -e "$source_root/node_modules"
@@ -34,9 +38,9 @@ missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=p
 
 compose_root=/home/pall/app-stack
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
-test_image=45750b4d1a8748aedae5e765f11300bc3a63d6cd
+test_image=29993b4fe96facf8c07781833dc7f2d5f560aa7e
 test_image_ref="ii-tonya-test:$test_image"
-expected_test_image_id=sha256:587eec47e1e3a9c79a4cbce2981342bded8455e198b5b1aa29316579eb6dab60
+expected_test_image_id=sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63
 test -d "$claw_store"
 test "$(docker image inspect "$test_image_ref" --format '{{.Id}}')" = "$expected_test_image_id"
 claw_syft=""
@@ -75,9 +79,12 @@ case "$CLAW_GATE_MODE" in
     pnpm lint
     NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
     pnpm exec vitest run --coverage --maxWorkers=1
-    docker run --rm -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.28.0 \
+    docker run --rm \
+      -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
+      -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
+      ghcr.io/gitleaks/gitleaks:v8.28.0 \
       detect --source=/repo --config=/repo/.gitleaks.toml \
-      --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact
+      --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact --exit-code=1
     ;;
   database)
     pnpm build
@@ -92,6 +99,7 @@ case "$CLAW_GATE_MODE" in
     pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
+    pnpm exec vitest run tests/integration/test-expert-trial-postgres.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
@@ -191,7 +199,10 @@ compose_args=(
   -e "CLAW_GATE_MODE=$mode"
   -e "CLAW_SOURCE_SHA=$source_sha"
   -e "CLAW_HOST_SOURCE_ROOT=$source_root"
+  -e "CLAW_HOST_GIT_COMMON_DIR=$git_common_dir"
   -v "$source_root:/workspace/source"
+  -v "$git_common_dir:$git_common_dir:ro"
+  -v "$git_marker:/workspace/source/.git:ro"
   -v "$claw_store:/workspace/.pnpm-store"
   -v "$release_output:/workspace/release-output"
   -v "$container_script:/tmp/ii-tonya-claw-gate.sh:ro"
@@ -205,6 +216,9 @@ fi
 
 II_TONYA_SOURCE_SHA="$test_image" docker compose "${compose_args[@]}" \
   --entrypoint bash ii-tonya-test /tmp/ii-tonya-claw-gate.sh
+
+test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"
+test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"
 
 cat > "$evidence_dir/${mode}.md" <<EOF
 # Direct Claw ${mode} gate

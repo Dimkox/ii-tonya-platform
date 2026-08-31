@@ -10,7 +10,7 @@ git_source_sha="$SOURCE_SHA"
 source_archive_sha256="$(sha256sum "$SOURCE_ARCHIVE" | cut -d' ' -f1)"
 [[ "$git_source_sha" =~ ^[0-9a-f]{40}$ ]]
 test "$SOURCE_ARCHIVE_SHA" = "$source_archive_sha256"
-test "$(docker image inspect ii-tonya-test:45750b4d1a8748aedae5e765f11300bc3a63d6cd --format '{{.Id}}')" = "sha256:587eec47e1e3a9c79a4cbce2981342bded8455e198b5b1aa29316579eb6dab60"
+test "$(docker image inspect ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e --format '{{.Id}}')" = "sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63"
 
 build_root="${SANDBOX_BUILD_ROOT:-${TMPDIR:-/tmp}}"
 mkdir -p "$build_root"
@@ -56,7 +56,7 @@ timeout --signal=TERM 420 docker run --rm --network none --read-only --tmpfs /tm
   --volume "$docker_source_mount:/work:rw" \
   "${docker_installed_args[@]}" \
   "${docker_store_args[@]}" \
-  --entrypoint sh ii-tonya-test:45750b4d1a8748aedae5e765f11300bc3a63d6cd -lc '
+  --entrypoint sh ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e -lc '
     set -eu
     installed_root=/seed
     test ! -d /installed || installed_root=/installed

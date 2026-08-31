@@ -44,6 +44,9 @@ export const operationalMetrics = {
   expertReferralHeldReplay: meter.createCounter(
     "ii_tonya_expert_referral_held_replay",
   ),
+  expertReferralMaturity: meter.createCounter(
+    "ii_tonya_expert_referral_maturity",
+  ),
   expertResidencyRefundReversal: meter.createCounter(
     "ii_tonya_expert_residency_refund_reversal",
   ),
@@ -53,7 +56,95 @@ export const operationalMetrics = {
   expertResidencyJobDurationMs: meter.createHistogram(
     "ii_tonya_expert_residency_job_duration_ms",
   ),
+  selartiBudgetOutcomes: meter.createCounter(
+    "ii_tonya_selarti_budget_outcomes",
+  ),
+  testExpertReconciliation: meter.createCounter(
+    "ii_tonya_test_expert_reconciliation",
+  ),
 } as const;
+
+export function recordTestExpertReconciliationMetric(event: {
+  name:
+    | "reconciliation_age"
+    | "units_consumed"
+    | "units_released"
+    | "unknown_outcome";
+  value: number;
+}): void {
+  if (!Number.isFinite(event.value) || event.value < 0)
+    throw new Error("invalid_test_expert_reconciliation_metric");
+  operationalMetrics.testExpertReconciliation.add(event.value, {
+    outcome: event.name,
+  });
+}
+
+const selartiBudgetOutcomes = new Set([
+  "admitted",
+  "warning",
+  "soft_stop",
+  "hard_stop",
+  "released",
+  "reconciled",
+  "overrun",
+  "unknown",
+]);
+export type SelartiBudgetMetricLabels = Readonly<{
+  outcome:
+    | "admitted"
+    | "warning"
+    | "soft_stop"
+    | "hard_stop"
+    | "released"
+    | "reconciled"
+    | "overrun"
+    | "unknown";
+}>;
+export function selartiBudgetMetricLabels(
+  value: unknown,
+): SelartiBudgetMetricLabels {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 1 ||
+    typeof value.outcome !== "string" ||
+    !selartiBudgetOutcomes.has(value.outcome)
+  )
+    throw new Error("invalid_selarti_budget_metric_labels");
+  return value as SelartiBudgetMetricLabels;
+}
+export function recordSelartiBudgetMetric(
+  labels: SelartiBudgetMetricLabels,
+  count = 1,
+): void {
+  if (!Number.isSafeInteger(count) || count < 1)
+    throw new Error("invalid_selarti_budget_metric_count");
+  operationalMetrics.selartiBudgetOutcomes.add(
+    count,
+    selartiBudgetMetricLabels(labels),
+  );
+}
+
+const expertReferralMaturityOutcomes = new Set([
+  "examined",
+  "granted",
+  "cancelled",
+  "retry",
+  "failed",
+]);
+export type ExpertReferralMaturityMetricOutcome =
+  "examined" | "granted" | "cancelled" | "retry" | "failed";
+export function recordExpertReferralMaturityMetric(
+  outcome: ExpertReferralMaturityMetricOutcome,
+  count = 1,
+): void {
+  if (
+    !expertReferralMaturityOutcomes.has(outcome) ||
+    !Number.isSafeInteger(count) ||
+    count < 1
+  )
+    throw new Error("invalid_expert_referral_maturity_metric");
+  operationalMetrics.expertReferralMaturity.add(count, { outcome });
+}
 
 const clientSessionOperations = new Set([
   "issue",
@@ -175,6 +266,7 @@ const workerOutboxTopics = new Set([
   "safety_operator_escalation",
   "admin_negative_feedback",
   "catalog_show",
+  "telegram_send_text",
 ]);
 const workerOutboxPhases = new Set([
   "claim",
@@ -201,7 +293,10 @@ const workerOutboxReasonClasses = new Set([
 
 export type WorkerOutboxMetricLabels = Readonly<{
   topic:
-    "safety_operator_escalation" | "admin_negative_feedback" | "catalog_show";
+    | "safety_operator_escalation"
+    | "admin_negative_feedback"
+    | "catalog_show"
+    | "telegram_send_text";
   phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
   outcome:
     "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";

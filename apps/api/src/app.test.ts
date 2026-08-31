@@ -61,6 +61,12 @@ const testExpertApi = (
       priceMinor: "200000",
       creditMinor: "100000",
       cashMinor: "100000",
+      commercialPolicyVersion: "expert_residency_v2",
+      creditCapBps: 3000,
+      individualServicesEnabled: true,
+      groupEventLimit: 0,
+      statisticsLevel: "basic",
+      supportPriority: "standard",
     }),
     checkout: async () => ({
       id: "00000000-0000-4000-8000-000000000201",

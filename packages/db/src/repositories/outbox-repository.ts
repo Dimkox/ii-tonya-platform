@@ -9,9 +9,10 @@ import type { DrizzleDb } from "../client.js";
 const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
 type WorkerOutboxTopics =
   | typeof LOCAL_OPERATOR_CASE_OUTBOX_TOPICS
-  | typeof CLIENT_CATALOG_OUTBOX_TOPICS;
+  | typeof CLIENT_CATALOG_OUTBOX_TOPICS
+  | readonly ["telegram.send_text.v1"];
 export interface OutboxRecoveryCount {
-  readonly topic: ClientCatalogOutboxTopic;
+  readonly topic: ClientCatalogOutboxTopic | "telegram.send_text.v1";
   readonly count: number;
 }
 
@@ -29,19 +30,37 @@ function validateTopicAllowlist(
     topics.every(
       (topic, index) => topic === CLIENT_CATALOG_OUTBOX_TOPICS[index],
     );
-  if (!local && !clientCatalog) {
+  const telegram = topics.length === 1 && topics[0] === "telegram.send_text.v1";
+  if (!local && !clientCatalog && !telegram) {
     throw new Error("worker_outbox_topic_allowlist_invalid");
   }
-  return clientCatalog
-    ? CLIENT_CATALOG_OUTBOX_TOPICS
-    : LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
+  return telegram
+    ? (["telegram.send_text.v1"] as const)
+    : clientCatalog
+      ? CLIENT_CATALOG_OUTBOX_TOPICS
+      : LOCAL_OPERATOR_CASE_OUTBOX_TOPICS;
 }
 
 function topicPredicate(topics: WorkerOutboxTopics | undefined) {
   if (topics === undefined) return sql``;
+  if (topics.length === 1) return sql` and topic = 'telegram.send_text.v1'`;
   return topics.length === CLIENT_CATALOG_OUTBOX_TOPICS.length
     ? sql` and topic in (${topics[0]}, ${topics[1]}, ${topics[2]})`
     : sql` and topic in (${topics[0]}, ${topics[1]})`;
+}
+
+function orderedDialoguePredicate(
+  topics: WorkerOutboxTopics | undefined,
+  alias = sql`integration_outbox`,
+) {
+  if (topics?.length !== 1 || topics[0] !== "telegram.send_text.v1")
+    return sql``;
+  return sql` and not exists (
+    select 1 from integration_outbox earlier
+    where earlier.dialogue_id = ${alias}.dialogue_id
+      and earlier.dialogue_sequence < ${alias}.dialogue_sequence
+      and earlier.status not in ('succeeded','dead_letter')
+  )`;
 }
 
 function recoveryCounts(
@@ -448,6 +467,7 @@ export class PostgresOutboxRepository {
           )
             and attempt < ${maxAttempts}
             ${topicPredicate(this.topics)}
+            ${orderedDialoguePredicate(this.topics)}
           order by created_at, id
           for update skip locked
           limit ${limit}
@@ -561,6 +581,7 @@ export class PostgresOutboxRepository {
             and reconciliation_attempt < ${maxReconciliationAttempts}
             and (next_reconciliation_at is null or next_reconciliation_at <= now())
             ${topicPredicate(this.topics)}
+            ${orderedDialoguePredicate(this.topics)}
           order by updated_at, id
           for update skip locked
           limit ${limit}
@@ -1085,5 +1106,41 @@ export class PostgresOutboxRepository {
       return result.rows;
     });
     return recoveryCounts(topics, rows);
+  }
+}
+
+/** B2 dispatcher view: one topic and a strict unfinished-sequence barrier. */
+export class PostgresOrderedTelegramOutboxRepository extends PostgresOutboxRepository {
+  constructor(db: DrizzleDb) {
+    super(db, ["telegram.send_text.v1"]);
+  }
+
+  override async claimWithMetrics(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxAttempts: number,
+  ) {
+    return {
+      messages: await this.claim(limit, owner, leaseDurationMs, maxAttempts),
+      exhausted: [],
+    };
+  }
+
+  override async claimUnknownWithMetrics(
+    limit: number,
+    owner: string,
+    leaseDurationMs: number,
+    maxReconciliationAttempts: number,
+  ) {
+    return {
+      messages: await this.claimUnknown(
+        limit,
+        owner,
+        leaseDurationMs,
+        maxReconciliationAttempts,
+      ),
+      exhausted: [],
+    };
   }
 }

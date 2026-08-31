@@ -16,6 +16,7 @@ import type {
   OutboundDeliveryResult,
   VerifiedSafetyContact,
 } from "./ports.js";
+import type { ClientCommercialPolicy } from "./client-commercial-policy.js";
 
 const MAX_INBOUND_TEXT_LENGTH = 4_096;
 const MAX_ANSWER_TEXT_LENGTH = 2_000;
@@ -69,9 +70,7 @@ export type IntentProposalValidation =
 export class ConversationServiceError extends Error {
   readonly retryable: boolean;
 
-  constructor(
-    readonly code: "invalid_input" | "dependency_unavailable",
-  ) {
+  constructor(readonly code: "invalid_input" | "dependency_unavailable") {
     super(
       code === "invalid_input"
         ? "Invalid conversation input"
@@ -115,8 +114,7 @@ const validateAuthorizationScope = (
         typeof code === "string" && boundedCode.test(code),
     ) ||
     new Set(value.allowedExpertIds).size !== value.allowedExpertIds.length ||
-    new Set(value.allowedServiceCodes).size !==
-      value.allowedServiceCodes.length
+    new Set(value.allowedServiceCodes).size !== value.allowedServiceCodes.length
   ) {
     return null;
   }
@@ -166,9 +164,7 @@ const validateIntentProposalUnsafe = (
       typeof value.text !== "string" ||
       value.text.trim().length === 0 ||
       value.text.length > MAX_ANSWER_TEXT_LENGTH ||
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(
-        value.text,
-      )
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value.text)
     ) {
       return { accepted: false, reasonCode: "invalid_shape" };
     }
@@ -323,9 +319,14 @@ const validateOutbound = (event: CanonicalOutboundDelivery): void => {
     typeof event.correlationId !== "string" ||
     !stableKey.test(event.correlationId) ||
     typeof event.status !== "string" ||
-    !["accepted", "queued", "sent", "delivered", "failed", "ambiguous"].includes(
-      event.status,
-    )
+    ![
+      "accepted",
+      "queued",
+      "sent",
+      "delivered",
+      "failed",
+      "ambiguous",
+    ].includes(event.status)
   ) {
     throw new ConversationServiceError("invalid_input");
   }
@@ -341,9 +342,7 @@ interface RuntimeConfig {
   readonly approvedSafetyContactIds: ReadonlySet<string>;
 }
 
-const readRuntimeConfig = (
-  deps: ConversationDependencies,
-): RuntimeConfig => {
+const readRuntimeConfig = (deps: ConversationDependencies): RuntimeConfig => {
   if (
     typeof deps.handoffOwnerId !== "string" ||
     !uuid.test(deps.handoffOwnerId) ||
@@ -356,18 +355,13 @@ const readRuntimeConfig = (
     ) ||
     new Set(deps.approvedSafetyContactIds).size !==
       deps.approvedSafetyContactIds.length ||
-    !["disabled", "provider_delivery_event"].includes(
-      deps.outboundBillingMode,
-    )
+    !["disabled", "provider_delivery_event"].includes(deps.outboundBillingMode)
   ) {
     throw dependencyFailure();
   }
   try {
     const now = deps.clock.now();
-    if (
-      !(now instanceof Date) ||
-      !Number.isFinite(now.getTime())
-    ) {
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
       throw dependencyFailure();
     }
     const stableNow = new Date(now.getTime());
@@ -435,9 +429,8 @@ const selectSafetyContacts = async (
   readonly contacts: readonly VerifiedSafetyContact[];
   readonly directoryState: "fresh" | "no_fresh_contact" | "unavailable";
 }> => {
-  const risk = reasonCode === "classifier_unavailable"
-    ? "uncertain"
-    : reasonCode;
+  const risk =
+    reasonCode === "classifier_unavailable" ? "uncertain" : reasonCode;
   try {
     const candidates = await deps.safetyDirectory.list({
       countryCode: command.countryCode,
@@ -448,7 +441,7 @@ const selectSafetyContacts = async (
     });
     const contacts = candidates
       .filter((candidate) =>
-        isVerifiedSafetyContact(candidate, command, risk, runtime)
+        isVerifiedSafetyContact(candidate, command, risk, runtime),
       )
       .map(({ id, label, channel, value }) => ({
         id,
@@ -506,6 +499,7 @@ const completeInbound = async (
   command: HandleInboundCommand,
   messageEventId: string,
   outcome: InboundCompletionOutcome,
+  billingPolicy: "package" | "free",
 ): Promise<ConversationResult> => {
   try {
     const completed = await deps.messageRepository.completeInbound({
@@ -513,6 +507,7 @@ const completeInbound = async (
       userId: command.userId,
       correlationId: command.correlationId,
       outcome,
+      billingPolicy,
     });
     if (completed.kind === "retry") {
       throw new Error("Unexpected retry for a chargeable outcome");
@@ -540,6 +535,7 @@ const completeNoPackage = async (
         topic: "client.no_package",
         payload: {},
       },
+      billingPolicy: "package",
     });
     if (completed.kind === "retry") {
       return { kind: "retry" };
@@ -561,9 +557,13 @@ export const createConversationService = (
 
     let risk: "ordinary" | SafetyRisk;
     try {
-      const deterministic: unknown =
-        deps.deterministicSafety.detect(command.text);
-      if (deterministic !== null && !safetyRisks.has(deterministic as SafetyRisk)) {
+      const deterministic: unknown = deps.deterministicSafety.detect(
+        command.text,
+      );
+      if (
+        deterministic !== null &&
+        !safetyRisks.has(deterministic as SafetyRisk)
+      ) {
         throw new Error("Invalid deterministic safety result");
       }
       const classified: unknown =
@@ -580,6 +580,20 @@ export const createConversationService = (
     }
     if (risk !== "ordinary") {
       return handleSafety(deps, runtime, command, risk);
+    }
+
+    let billingPolicy: "package" | "free" = "package";
+    try {
+      const policy: ClientCommercialPolicy =
+        deps.clientCommercialPolicy === undefined
+          ? "legacy_package_v1"
+          : await deps.clientCommercialPolicy.resolveOrAssign({
+              userId: command.userId,
+              allowV2Admission: deps.clientFreeAccessV2Enabled === true,
+            });
+      billingPolicy = policy === "free_client_v2" ? "free" : "package";
+    } catch {
+      throw dependencyFailure();
     }
 
     let prepared;
@@ -599,7 +613,7 @@ export const createConversationService = (
     if (prepared.kind === "duplicate") {
       return { kind: "duplicate", chargedMessages: 0 };
     }
-    if (!prepared.packageAvailable) {
+    if (!prepared.packageAvailable && billingPolicy === "package") {
       const completion = await completeNoPackage(
         deps,
         command,
@@ -630,6 +644,7 @@ export const createConversationService = (
             openedAt: runtime.now,
             acknowledgeBy: runtime.acknowledgeBy,
           },
+          billingPolicy,
         );
       }
       authorization = validated;
@@ -646,6 +661,7 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
+        billingPolicy,
       );
     }
 
@@ -659,10 +675,7 @@ export const createConversationService = (
         dataSubjectUserId: command.userId,
         authorization,
       });
-      validation = validateIntentProposal(
-        proposal,
-        authorization,
-      );
+      validation = validateIntentProposal(proposal, authorization);
     } catch {
       return completeInbound(
         deps,
@@ -676,6 +689,7 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
+        billingPolicy,
       );
     }
     if (!validation.accepted) {
@@ -691,6 +705,7 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
+        billingPolicy,
       );
     }
 
@@ -708,6 +723,7 @@ export const createConversationService = (
           openedAt: runtime.now,
           acknowledgeBy: runtime.acknowledgeBy,
         },
+        billingPolicy,
       );
     }
 
@@ -739,12 +755,11 @@ export const createConversationService = (
       command,
       prepared.messageEventId,
       outcome,
+      billingPolicy,
     );
   },
 
-  async handleOutboundDelivery(
-    event,
-  ): Promise<OutboundDeliveryResult> {
+  async handleOutboundDelivery(event): Promise<OutboundDeliveryResult> {
     validateOutbound(event);
     if (
       !["disabled", "provider_delivery_event"].includes(
@@ -753,7 +768,19 @@ export const createConversationService = (
     ) {
       throw dependencyFailure();
     }
+    let isFreeV2 = false;
+    try {
+      isFreeV2 =
+        deps.clientCommercialPolicy !== undefined &&
+        (await deps.clientCommercialPolicy.resolveOrAssign({
+          userId: event.userId,
+          allowV2Admission: deps.clientFreeAccessV2Enabled === true,
+        })) === "free_client_v2";
+    } catch {
+      throw dependencyFailure();
+    }
     const charge =
+      !isFreeV2 &&
       deps.outboundBillingMode === "provider_delivery_event" &&
       event.status === "delivered";
     let accepted;
@@ -773,6 +800,9 @@ export const createConversationService = (
     }
     if (accepted.kind === "duplicate") {
       return { kind: "duplicate", chargedMessages: 0 };
+    }
+    if (isFreeV2) {
+      return { kind: "free", chargedMessages: 0 };
     }
     if (deps.outboundBillingMode === "disabled") {
       return { kind: "billing_disabled", chargedMessages: 0 };

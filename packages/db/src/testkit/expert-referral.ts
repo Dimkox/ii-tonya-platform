@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { EXPERT_RESIDENCY_V2_TARIFFS } from "@ii-tonya/contracts";
 import {
   canonicalAdminPayloadHash,
   type AdminPayload,
@@ -74,6 +75,18 @@ export interface ExpertReferralTestDatabase extends TestDatabase {
   }): Promise<ExpertReferralOverrideFixture>;
   seedExpertReferralQuotaLimit(inviterExpertId: string): Promise<void>;
   seedFirstSettlement(expertId: string): Promise<void>;
+  createResidencyTariff(input: {
+    tariffKey: string;
+    displayName: string;
+    priceMinor: number;
+    durationSeconds: number;
+    commercialPolicyVersion?: "legacy_residency_v1" | "expert_residency_v2";
+    creditCapBps?: number;
+    individualServicesEnabled?: boolean;
+    groupEventLimit?: number;
+    statisticsLevel?: "basic" | "expanded";
+    supportPriority?: "standard" | "priority";
+  }): Promise<string>;
 }
 
 function requiredId(
@@ -94,8 +107,7 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
     requestedSessionIdHash?: string,
     mfaVerifiedAt = new Date(Date.now() - 3 * 60_000),
   ): Promise<{ sessionIdHash: string; mfaVerifiedAt: Date }> => {
-    const sessionIdHash =
-      requestedSessionIdHash ?? `session-${randomUUID()}`;
+    const sessionIdHash = requestedSessionIdHash ?? `session-${randomUUID()}`;
     await base.db.execute(sql`
       insert into admin_role_assignments (admin_id, role)
       values (${adminId}::uuid, 'security_admin')
@@ -392,11 +404,14 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
             insert into expert_residency_orders (
               expert_id, tariff_version_id, snapshot_display_name,
               price_minor, currency, duration_seconds, credit_minor,
-              cash_minor, payment_deadline, status, settled_at,
+              cash_minor, commercial_policy_version, credit_cap_bps,
+              individual_services_enabled, group_event_limit, statistics_level,
+              support_priority, payment_deadline, status, settled_at,
               residency_starts_at, residency_ends_at, idempotency_key
             ) values (
               ${expertId}::uuid, ${tariffId}::uuid, 'Test residency',
               100000, 'RUB', 86400, 0, 100000,
+              'legacy_residency_v1', 5000, false, 0, 'basic', 'standard',
               transaction_timestamp() + interval '1 hour', 'settled',
               transaction_timestamp(), transaction_timestamp(),
               transaction_timestamp() + interval '1 day', ${randomUUID()}
@@ -431,6 +446,48 @@ export async function startExpertReferralTestDatabase(): Promise<ExpertReferralT
           transaction_timestamp()
         )
       `);
+    },
+    async createResidencyTariff(input) {
+      const commercialPolicyVersion =
+        input.commercialPolicyVersion ?? "expert_residency_v2";
+      if (commercialPolicyVersion === "expert_residency_v2") {
+        const tuple =
+          EXPERT_RESIDENCY_V2_TARIFFS[
+            input.tariffKey as keyof typeof EXPERT_RESIDENCY_V2_TARIFFS
+          ];
+        if (tuple === undefined) throw new Error("Unknown V2 tariff key");
+        input = { ...input, ...tuple };
+      }
+      const defaultCreditCapBps =
+        commercialPolicyVersion === "legacy_residency_v1" ? 5000 : 3000;
+      const creditCapBps = input.creditCapBps ?? defaultCreditCapBps;
+      if (creditCapBps !== defaultCreditCapBps)
+        throw new Error("Tariff policy and credit cap conflict");
+      const audit = await createAdminAudit({
+        action:
+          commercialPolicyVersion === "legacy_residency_v1"
+            ? "expert_residency.tariff_create"
+            : "expert_residency.tariff_create_v2",
+        objectId: randomUUID(),
+      });
+      const inserted = await base.db.execute<{ id: string }>(sql`
+        insert into expert_residency_tariff_versions (
+          tariff_key, display_name, price_minor, duration_seconds,
+          active_from, active_to, commercial_policy_version, credit_cap_bps,
+          individual_services_enabled, group_event_limit, statistics_level,
+          support_priority, approval_id, admin_session_id_hash
+        ) values (
+          ${input.tariffKey}, ${input.displayName}, ${input.priceMinor},
+          ${input.durationSeconds}, transaction_timestamp() - interval '1 day',
+          transaction_timestamp() + interval '1 day',
+          ${commercialPolicyVersion},
+          ${creditCapBps}, ${input.individualServicesEnabled ?? true},
+          ${input.groupEventLimit ?? 0}, ${input.statisticsLevel ?? "basic"},
+          ${input.supportPriority ?? "standard"},
+          ${audit.approvalId}::uuid, ${audit.sessionIdHash}
+        ) returning id
+      `);
+      return requiredId(inserted.rows, "residency tariff");
     },
   };
 }

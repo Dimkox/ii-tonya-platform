@@ -44,6 +44,12 @@ const build = async (options: {
         priceMinor: "200000",
         creditMinor: "100000",
         cashMinor: "100000",
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic" as const,
+        supportPriority: "standard" as const,
       })),
   );
   const listActiveTariffs = vi.fn(
@@ -55,6 +61,12 @@ const build = async (options: {
           priceMinor: "200000",
           currency: "RUB" as const,
           durationSeconds: 2_592_000,
+          supportPriority: "standard" as const,
+          commercialPolicyVersion: "expert_residency_v2" as const,
+          creditCapBps: 3000,
+          individualServicesEnabled: true,
+          groupEventLimit: 0,
+          statisticsLevel: "basic" as const,
         },
       ]),
   );
@@ -63,6 +75,12 @@ const build = async (options: {
       (async () => ({
         id: "00000000-0000-4000-8000-000000000201",
         status: "payment_pending" as const,
+        commercialPolicyVersion: "expert_residency_v2" as const,
+        creditCapBps: 3000,
+        individualServicesEnabled: true,
+        groupEventLimit: 0,
+        statisticsLevel: "basic" as const,
+        supportPriority: "standard" as const,
       })),
   );
   const app = await buildExpertReferralApi({
@@ -112,6 +130,12 @@ describe("expert referral API", () => {
           priceMinor: "200000",
           currency: "RUB",
           durationSeconds: 2_592_000,
+          commercialPolicyVersion: "expert_residency_v2",
+          creditCapBps: 3000,
+          individualServicesEnabled: true,
+          groupEventLimit: 0,
+          statisticsLevel: "basic",
+          supportPriority: "standard",
         },
       ]);
       expect(listActiveTariffs).toHaveBeenCalledWith(principal);

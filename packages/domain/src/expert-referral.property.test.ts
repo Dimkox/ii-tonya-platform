@@ -25,6 +25,23 @@ describe("expert referral residency properties", () => {
     );
   });
 
+  it("conserves every valid residency quote within its configured credit cap", () => {
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 1n, max: POSTGRES_BIGINT_MAX }),
+        fc.bigInt({ min: 0n, max: POSTGRES_BIGINT_MAX }),
+        fc.integer({ min: 0, max: 10_000 }),
+        (price, available, capBps) => {
+          const quote = quoteResidency(price, available, capBps);
+          return (
+            quote.creditMinor * 10_000n <= price * BigInt(capBps) &&
+            quote.cashMinor + quote.creditMinor === price
+          );
+        },
+      ),
+    );
+  });
+
   it("allocates FIFO stably regardless of input ordering", () => {
     const grantedAt = new Date("2026-01-01T00:00:00.000Z");
     const grants = [

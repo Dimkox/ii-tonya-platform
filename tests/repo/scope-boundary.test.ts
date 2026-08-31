@@ -386,6 +386,12 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0019_expert_order_provider_deadline.sql",
     "packages/db/migrations/0021_expert_settlement_snapshot.sql",
     "packages/db/migrations/0022_expert_referral_admin_replays.sql",
+    "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+    "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
+    "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
+    "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
+    "packages/db/migrations/0037_partner_commerce_a.sql",
+    "packages/db/migrations/0038_test_expert_trial.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
@@ -400,8 +406,32 @@ describe("MVP scope boundary", () => {
   });
 
   it.each([
+    [
+      "expert_residency.tariff_create_v3",
+      "packages/db/src/repositories/expert-referral-admin-repository.ts",
+      'action: "expert_residency.tariff_create_v3"',
+    ],
+    [
+      "client_commercial_policy_assignments_shadow",
+      "packages/db/src/schema/commercial-policy.ts",
+      'pgTable("client_commercial_policy_assignments_shadow", {})',
+    ],
+    [
+      "packages/db/migrations/0032_commercial_core_v2_a1.sql.bak",
+      "packages/db/migrations/0032_commercial_core_v2_a1.sql.bak",
+      'import Stripe from "stripe";',
+    ],
+  ])("rejects near-miss A1 scope entry %s", (_nearMiss, path, content) => {
+    expect([
+      ...classifyPaymentScopeProbe({ path, content }),
+      ...classifyApprovedTrackedScopeContent({ path, content }),
+    ]).not.toEqual([]);
+  });
+
+  it.each([
     "packages/db/src/schema/audit.ts",
     "packages/db/src/schema/identity.ts",
+    "packages/db/src/schema/expert-residency.ts",
     "packages/db/src/schema/integration.ts",
   ])("allows reviewed non-payment relations in %s", (path) => {
     expect(

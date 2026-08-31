@@ -33,6 +33,12 @@ const dependencies = (proposal: unknown, enabled = true) => {
       currency: "RUB" as const,
       durationSeconds: 31_536_000,
       displayName: "Год",
+      commercialPolicyVersion: "expert_residency_v2" as const,
+      creditCapBps: 3000,
+      individualServicesEnabled: true,
+      groupEventLimit: 0,
+      statisticsLevel: "basic" as const,
+      supportPriority: "standard" as const,
     })),
     checkout: vi.fn(async () => ({
       id: "order-1",

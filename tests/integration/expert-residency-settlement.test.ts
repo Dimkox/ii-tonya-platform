@@ -12,21 +12,16 @@ import { verifiedEventFixture } from "../../packages/integrations/src/expert-res
 let testDb: ExpertReferralTestDatabase | undefined;
 async function orderFixture() {
   const expert = await testDb!.createExpertIdentity();
-  const audit = await testDb!.createAdminAudit({
-    action: "expert_residency.tariff_create",
-    objectId: randomUUID(),
-  });
   const residency = new PostgresExpertResidencyRepository(testDb!.db);
-  const tariff = await residency.createTariffVersion({
-    tariffKey: `settlement-${randomUUID()}`,
-    displayName: "Settlement",
-    priceMinor: 50000n,
-    durationSeconds: 86400,
-    activeFrom: new Date(Date.now() - 1000),
-    activeTo: new Date(Date.now() + 86400000),
-    approvalId: audit.approvalId,
-    adminSessionIdHash: audit.sessionIdHash,
-  });
+  const tariff = {
+    id: await testDb!.createResidencyTariff({
+      tariffKey: `settlement-${randomUUID()}`,
+      displayName: "Settlement",
+      priceMinor: 50000,
+      durationSeconds: 86400,
+      commercialPolicyVersion: "legacy_residency_v1",
+    }),
+  };
   const order = await residency.createCheckoutOrder({
     expertId: expert.expertId,
     tariffVersionId: tariff.id,

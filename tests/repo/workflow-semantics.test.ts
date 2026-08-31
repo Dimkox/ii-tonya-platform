@@ -25,6 +25,10 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain(
       'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
     );
+    expect(runner).toContain(
+      'git_common_dir="$(git -C "$source_root" rev-parse --path-format=absolute --git-common-dir)"',
+    );
+    expect(runner).toContain('git_marker="$source_root/.git"');
     expect(runner).toContain('[[ "$(hostname -s)" == "claw" ]]');
     expect(runner).toContain("--profile test run --rm --no-deps");
     expect(runner).toContain('docker compose "${compose_args[@]}"');
@@ -32,12 +36,31 @@ describe("direct Claw verification semantics", () => {
       "claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store",
     );
     expect(runner).toContain(
-      "expected_test_image_id=sha256:587eec47e1e3a9c79a4cbce2981342bded8455e198b5b1aa29316579eb6dab60",
+      "test_image=29993b4fe96facf8c07781833dc7f2d5f560aa7e",
+    );
+    expect(runner).toContain(
+      "expected_test_image_id=sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63",
     );
     expect(runner).toContain(
       'test "$(docker image inspect "$test_image_ref" --format \'{{.Id}}\')" = "$expected_test_image_id"',
     );
     expect(runner).toContain('-v "$claw_store:/workspace/.pnpm-store"');
+    expect(runner).toContain('-v "$git_common_dir:$git_common_dir:ro"');
+    expect(runner).toContain('-v "$git_marker:/workspace/source/.git:ro"');
+    expect(runner).toContain(
+      '-v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro"',
+    );
+    expect(runner).toContain('-e "CLAW_HOST_GIT_COMMON_DIR=$git_common_dir"');
+    expect(
+      runner.split(
+        'test "$(git -C "$source_root" rev-parse HEAD)" = "$source_sha"',
+      ),
+    ).toHaveLength(3);
+    expect(
+      runner.split(
+        'test -z "$(git -C "$source_root" status --porcelain --untracked-files=no)"',
+      ),
+    ).toHaveLength(3);
     expect(runner).not.toMatch(/GITHUB_|actions-runner|workflow_dispatch/u);
   });
 
@@ -66,12 +89,23 @@ describe("direct Claw verification semantics", () => {
     expect(runner).not.toContain("pnpm test:repeat");
     expect(runner).toContain("repeat_limit: 1");
     for (const suite of [
+      "tests/integration/test-expert-trial-postgres.test.ts",
       "tests/integration/yookassa-migration-upgrade.test.ts",
       "tests/integration/yookassa-operation-concurrency.test.ts",
       "tests/integration/yookassa-reconciliation.test.ts",
     ]) {
       expect(runner.split(suite)).toHaveLength(2);
     }
+  });
+
+  it("pins the sandbox builder to the same immutable Claw image", () => {
+    const builder = read("scripts/build-sandbox-image-offline.sh");
+    expect(builder).toContain(
+      "ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e",
+    );
+    expect(builder).toContain(
+      "sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63",
+    );
   });
 
   it("keeps unbound YooKassa recovery blocked behind explicit policy inputs", () => {
@@ -134,7 +168,7 @@ describe("direct Claw verification semantics", () => {
     const literal = `/seed/node_modules/.bin/vitest run ${manifest.join(" ")} --maxWorkers=1`;
     expect(runner).toContain("ci | database | release | client-booking");
     expect(runner).toContain(literal);
-    expect(runner.split("pnpm exec vitest run", 20)).toHaveLength(17);
+    expect(runner.split("pnpm exec vitest run", 20)).toHaveLength(18);
     expect(runner).toContain("--untracked-files=all");
     expect(runner).toContain("-e II_TONYA_TEST_POSTGRES_ADMIN_URL");
     expect(runner).not.toContain("$II_TONYA_TEST_POSTGRES_ADMIN_URL");

@@ -41,7 +41,7 @@ export type InboundCompletionOutcome =
     }
   | {
       kind: "no_package";
-      topic: "client.no_package";
+      topic: "client.no_package" | "client.free";
       payload: Record<string, never>;
     }
   | {
@@ -71,18 +71,19 @@ export interface CompleteInboundCommand {
   userId: string;
   correlationId: string;
   outcome: InboundCompletionOutcome;
+  billingPolicy?: "package" | "free";
 }
 
 export type CommittedInboundResult =
   | {
       kind: "human_handoff";
       reasonCode: string;
-      chargedMessages: 1;
+      chargedMessages: 0 | 1;
     }
   | { kind: "no_package"; chargedMessages: 0 }
-  | { kind: "answer_queued"; chargedMessages: 1 }
-  | { kind: "catalog_requested"; chargedMessages: 1 }
-  | { kind: "booking_started"; chargedMessages: 1 };
+  | { kind: "answer_queued"; chargedMessages: 0 | 1 }
+  | { kind: "catalog_requested"; chargedMessages: 0 | 1 }
+  | { kind: "booking_started"; chargedMessages: 0 | 1 };
 
 interface StoredCompletion {
   messageEventId: string;
@@ -332,27 +333,28 @@ function parseStoredCompletion(
     packageId,
     ledgerBalance,
     outcome,
-    result: committedResultFor(outcome),
+    result: committedResultFor(outcome, packageId !== null),
   };
 }
 
 function committedResultFor(
   outcome: InboundCompletionOutcome,
+  charged = true,
 ): CommittedInboundResult {
   switch (outcome.kind) {
     case "answer":
-      return { kind: "answer_queued", chargedMessages: 1 };
+      return { kind: "answer_queued", chargedMessages: charged ? 1 : 0 };
     case "no_package":
       return { kind: "no_package", chargedMessages: 0 };
     case "show_catalog":
-      return { kind: "catalog_requested", chargedMessages: 1 };
+      return { kind: "catalog_requested", chargedMessages: charged ? 1 : 0 };
     case "start_booking":
-      return { kind: "booking_started", chargedMessages: 1 };
+      return { kind: "booking_started", chargedMessages: charged ? 1 : 0 };
     case "human_handoff":
       return {
         kind: "human_handoff",
         reasonCode: outcome.payload.reasonCode,
-        chargedMessages: 1,
+        chargedMessages: charged ? 1 : 0,
       };
   }
 }
@@ -505,7 +507,9 @@ export class PostgresMessageRepository implements MessageRepository {
         let charged:
           { packageId: string | null; ledgerBalance: number } | undefined;
         let outcome = command.outcome;
-        if (outcome.kind === "no_package") {
+        if (command.billingPolicy === "free") {
+          charged = await this.free(tx, command.messageEventId, "inbound");
+        } else if (outcome.kind === "no_package") {
           if (
             await this.packageAvailable(tx, command.userId, event.occurredAt)
           ) {
@@ -550,7 +554,7 @@ export class PostgresMessageRepository implements MessageRepository {
           messageEventId: command.messageEventId,
           packageId: charged.packageId,
           ledgerBalance: charged.ledgerBalance,
-          result: committedResultFor(outcome),
+          result: committedResultFor(outcome, charged.packageId !== null),
         };
       }),
     );

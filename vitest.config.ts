@@ -31,6 +31,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // Eight parallel PostgreSQL schema teardowns exceeded 10s in the full suite; 45s is the measured shared ceiling.
+    hookTimeout: 45_000,
     include: [
       "packages/**/*.test.ts",
       "apps/**/*.test.ts",

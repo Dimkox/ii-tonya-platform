@@ -25,11 +25,14 @@ export type ApprovalAdminAction =
   | "expert_referral.abuse_hold_open"
   | "expert_referral.abuse_hold_close"
   | "expert_residency.tariff_create"
+  | "client_commercial_policy.control_v2"
+  | "expert_residency.tariff_create_v2"
   | "expert_residency.tariff_retire"
   | "expert_referral.hold_replay"
   | "expert_referral.feature_switch"
   | "expert_residency.sandbox_settle"
-  | "expert_residency.sandbox_refund";
+  | "expert_residency.sandbox_refund"
+  | "selarti_budget.policy_approve";
 
 type JsonScalar = string | number | boolean | null;
 export type AdminPayload =
@@ -95,11 +98,14 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "expert_referral.abuse_hold_open": "security_admin",
   "expert_referral.abuse_hold_close": "security_admin",
   "expert_residency.tariff_create": "entitlement_admin",
+  "client_commercial_policy.control_v2": "entitlement_admin",
+  "expert_residency.tariff_create_v2": "entitlement_admin",
   "expert_residency.tariff_retire": "entitlement_admin",
   "expert_referral.hold_replay": "security_admin",
   "expert_referral.feature_switch": "security_admin",
   "expert_residency.sandbox_settle": "entitlement_admin",
   "expert_residency.sandbox_refund": "entitlement_admin",
+  "selarti_budget.policy_approve": "security_admin",
 };
 
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
@@ -108,17 +114,69 @@ export const requiredApprovalRole = (action: ApprovalAdminAction): AdminRole =>
   actionRoles[action];
 
 const readObjectTypes: Readonly<
-  Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>
+  Partial<
+    Record<
+      ApprovalAdminAction,
+      "safety_case" | "feedback_queue" | "selarti_budget_policy"
+    >
+  >
 > = {
   "safety.read": "safety_case",
   "safety.resolve": "safety_case",
   "feedback.read": "feedback_queue",
   "feedback.resolve": "feedback_queue",
+  "selarti_budget.policy_approve": "selarti_budget_policy",
 };
 
 export const requiredApprovalObjectType = (
   action: ApprovalAdminAction,
-): "safety_case" | "feedback_queue" | null => readObjectTypes[action] ?? null;
+): "safety_case" | "feedback_queue" | "selarti_budget_policy" | null =>
+  readObjectTypes[action] ?? null;
+
+export type SelartiBudgetPolicyApprovalPayload = {
+  version: number;
+  status: "approved";
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  globalCapRubMinor: bigint;
+  globalWarningRubMinor: bigint;
+  globalSoftRubMinor: bigint;
+  perUserWarningRubMinor: bigint;
+  perUserSoftRubMinor: bigint;
+  perUserHardRubMinor: bigint;
+  officialUsdRubQuoteMicros: bigint;
+  selartiUpliftBps: 1000;
+  usdMicrosPerRequest: bigint;
+  usdMicrosPerUnit: bigint;
+  worstCaseBillableUnits: bigint;
+  rateVersion: string;
+  modelVersion: string;
+  stressInflationBps: 6000;
+};
+export const selartiBudgetPolicyApprovalPayload = (
+  value: SelartiBudgetPolicyApprovalPayload,
+): string =>
+  [
+    "selarti-budget-policy-v1",
+    value.version,
+    value.status,
+    value.effectiveFrom,
+    value.effectiveTo ?? "-",
+    value.globalCapRubMinor,
+    value.globalWarningRubMinor,
+    value.globalSoftRubMinor,
+    value.perUserWarningRubMinor,
+    value.perUserSoftRubMinor,
+    value.perUserHardRubMinor,
+    value.officialUsdRubQuoteMicros,
+    value.selartiUpliftBps,
+    value.usdMicrosPerRequest,
+    value.usdMicrosPerUnit,
+    value.worstCaseBillableUnits,
+    value.rateVersion,
+    value.modelVersion,
+    value.stressInflationBps,
+  ].join("|");
 
 function canonicalize(value: AdminPayload | undefined): string {
   if (value === null) return "null";

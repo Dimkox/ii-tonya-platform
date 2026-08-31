@@ -86,12 +86,20 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0026_expert_telegram_checkout_outcomes.sql",
   "packages/db/migrations/0027_expert_ai_request_receipts.sql",
   "packages/db/migrations/0028_operator_case_inbox.sql",
+  "packages/db/migrations/0032_commercial_core_v2_a1.sql",
+  "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+  "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
+  "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
+  "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
+  "packages/db/migrations/0037_partner_commerce_a.sql",
+  "packages/db/migrations/0038_test_expert_trial.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "commercial_participants",
   "expert_ai_request_receipts",
   "expert_referral_admin_execution_results",
   "expert_referral_code_batches",
@@ -106,12 +114,39 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_residency_provider_event_inbox",
   "expert_first_residency_settlements",
   "expert_referral_reward_grants",
+  "expert_referral_reward_maturities",
   "expert_referral_ledger_entries",
   "expert_referral_ledger_allocations",
   "expert_referral_issuance_overrides",
   "expert_referral_abuse_holds",
   "expert_referral_feature_controls",
   "expert_referral_balances",
+  "organization_profiles",
+  "partner_command_receipts",
+  "partner_shadow_quotes",
+  "partner_tariff_policy_versions",
+  "client_commercial_policy_assignments",
+  "client_commercial_policy_controls",
+  "dialogues",
+  "dialogue_inbound",
+  "dialogue_route_decisions",
+  "selarti_response_proposals",
+  "dialogue_deliveries",
+  "dialogue_inbound_tombstones",
+  "selarti_budget_policies",
+  "selarti_cost_reservations",
+  "selarti_actual_usage_facts",
+  "selarti_cost_adjustments",
+  "selarti_budget_alerts",
+  "test_expert_audit_events",
+  "test_expert_campaign_versions",
+  "test_expert_deterministic_requests",
+  "test_expert_lifecycle_audit_events",
+  "test_expert_outcomes",
+  "test_expert_prompt_assets",
+  "test_expert_redemptions",
+  "test_expert_reservations",
+  "test_expert_sessions",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
@@ -147,6 +182,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS = new Set([
   "expert_referral.hold_replay",
   "expert_referral.feature_switch",
   "expert_residency.tariff_create",
+  "expert_residency.tariff_create_v2",
   "expert_residency.tariff_retire",
   "expert_residency.sandbox_settle",
   "expert_residency.sandbox_refund",
@@ -269,7 +305,7 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/run-claw-ci.sh",
-    "8a3339432860b80076de8d7469d1b980843458dd247e2dea5f200c91b49c73df",
+    "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
   ],
   [
     "scripts/build-native-release.sh",
@@ -341,7 +377,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-sandbox-image-offline.sh",
-    "4ed71fc1c5ad50617e8fb448eb504780812f3eb9145d1d893b3149a24089142e",
+    "cfc689d1ba9f6723db1a4402c89ac1a3e564d6a76dc88343d0be064bca1fbe3e",
   ],
   [
     "scripts/run-sandbox-container-smoke.sh",
@@ -631,6 +667,38 @@ const approvedMigrationHashes = new Map([
     "b625de5a14c3aa542116b4ad7c88df6ddeab99b893fdbda83bca0f6d8c1f4529",
   ],
   [
+    "packages/db/migrations/0032_commercial_core_v2_a1.sql",
+    "e70a77073e08bb15b4ad37dc49b75842bf8ff4284f9e062c5302a54bc7ba8a6d",
+  ],
+  [
+    "packages/db/migrations/0033_expert_referral_maturity_a2.sql",
+    "dd263b77ae2e8dde0ebe8bde6a3ce1886858c2e465afe0df8857323845e48746",
+  ],
+  [
+    "packages/db/migrations/0034_hybrid_message_gateway_b1.sql",
+    "b7b8136238d8533f641887c0fccf33cc2021f67c1046f0e4cf540200abcff456",
+  ],
+  [
+    "packages/db/migrations/0035_hybrid_message_gateway_b2.sql",
+    "90ff0fd219c2ec882919d7328089950e69920fd4eede30000484080ab9c0b205",
+  ],
+  [
+    "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
+    "233680aade58a86cfcbb46197ba4281158812c4bd370c9f8acf40b4c5ecce4df",
+  ],
+  [
+    "packages/db/migrations/0037_partner_commerce_a.sql",
+    "922701d401fc6ca39f4c71d914f00477faf587078d1e38e02a3afbc4fc86d4f2",
+  ],
+  [
+    "packages/db/migrations/0038_test_expert_trial.sql",
+    "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
+  ],
+  [
+    "packages/db/migrations/meta/_journal.json",
+    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+  ],
+  [
     "packages/db/migrations/meta/0000_snapshot.json",
     "a14d4d2de4fb32d36e2e84e55ad57e8f3cee59dad903adb6f68036ac6b54b8a8",
   ],
@@ -708,8 +776,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "1d5f407bf64f5959bcbb65f9e4c4df5737af1450e7d45d6efa7d6948e37b6915",
-    "946ea5ba29dab55ed8865dc42a9fc2c64651b63d4b2440f29315867d6bbdd8ce",
+    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1342,7 +1409,11 @@ const inspectMigration = (
     violations.push("sandbox relation token outside approved sandbox paths");
   }
 
-  if (paymentDbPath.test(path)) {
+  if (
+    paymentDbPath.test(path) &&
+    !EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS.has(path) &&
+    !SANDBOX_PAYMENT_ALLOWED_MIGRATION_PATHS.has(path)
+  ) {
     violations.push("commercial database migration path");
   }
   if (

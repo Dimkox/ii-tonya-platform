@@ -7,10 +7,16 @@ const href = (config: PublicConfig, intent: MessengerIntent): string =>
 
 export function renderLanding(config: PublicConfig): string {
   const content = landingContent;
+  const categories = content.clientCategories
+    .map(
+      ([icon, title, description]) =>
+        `<li data-reveal><span aria-hidden="true">${icon}</span><div><strong>${title}</strong><p>${description}</p></div></li>`,
+    )
+    .join("");
   const faq = content.faq
     .map(
       ([question, answer], index) =>
-        `<details><summary><span>${String(index + 1).padStart(2, "0")}</span>${question}</summary><p>${answer}</p></details>`,
+        `<details data-reveal><summary><span>${String(index + 1).padStart(2, "0")}</span>${question}<i aria-hidden="true">+</i></summary><p>${answer}</p></details>`,
     )
     .join("");
   const tariffs = content.tariffs
@@ -18,31 +24,56 @@ export function renderLanding(config: PublicConfig): string {
       (
         tariff,
         index,
-      ) => `<article class="tariff-card${index === 1 ? " featured" : ""}">
+      ) => `<article class="tariff-card${index === 1 ? " featured" : ""}" data-reveal>
         <p class="tariff-number">0${index + 1}</p><h3>${tariff.name}</h3>
-        <p class="tariff-price">${tariff.price}</p><p>${tariff.description}</p>
+        <p class="tariff-price">${tariff.price}</p><p>${tariff.description}</p><p class="tariff-setup">${tariff.setup}</p>
         <a data-messenger-action href="${href(config, tariff.code)}">Уточнить условия <span aria-hidden="true">↗</span></a>
       </article>`,
     )
     .join("");
-  return `
-    <a class="skip-link" href="#main-content">Перейти к содержанию</a>
-    <header class="site-header"><a class="brand" href="#top"><span>ии</span>Тоня</a>
-      <nav aria-label="Основная навигация"><a href="#about">О сервисе</a><a href="#clients">Клиентам</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a></nav>
+
+  return `<a class="skip-link" href="#main-content">Перейти к содержанию</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="ии-Тоня — наверх"><span>ии</span>Тоня</a>
+      <nav aria-label="Основная навигация"><a href="#about">О проекте</a><a href="#clients">Клиентам</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav>
       <a class="header-action" data-messenger-action href="${href(config, "client")}">Открыть диалог</a>
     </header>
     <main id="main-content">
-      <section class="hero" id="top"><div class="hero-copy"><p class="eyebrow">${content.hero.eyebrow}</p><h1>${content.hero.title}</h1><p class="hero-lead">${content.hero.description}</p>
-        <div class="hero-actions"><a class="button primary" data-messenger-action href="${href(config, "client")}">Подобрать эксперта <span>↗</span></a><a class="button ghost" data-messenger-action href="${href(config, "expert")}">Я эксперт</a></div></div>
-        <div class="hero-orbit" aria-hidden="true"><div class="portrait-mark"><span>ии</span><strong>Т</strong></div><p class="orbit-note top">Тамбов<br>и онлайн</p><p class="orbit-note bottom">Спокойно.<br>По делу.</p></div>
-        <div class="principles">${content.principles.map((item, index) => `<p><span>0${index + 1}</span>${item}</p>`).join("")}</div>
+      <section class="hero" id="top">
+        <div class="hero-copy" data-reveal><p class="section-index">01 / Первый экран</p><h1>${content.hero.title}</h1><p class="hero-lead">${content.hero.description}</p><p class="hero-subtitle">${content.hero.subtitle}</p>
+          <div class="hero-actions"><a class="button primary" data-messenger-action href="${href(config, "client")}">Попробовать бесплатно <span aria-hidden="true">↗</span></a><a class="button ghost" data-messenger-action href="${href(config, "expert")}">Попробовать как эксперт</a></div>
+        </div>
+        <figure class="hero-portrait" data-reveal><div class="portrait-frame"><picture><source type="image/avif" srcset="/tonya-hero-512.avif 512w, /tonya-hero-1024.avif 1024w" sizes="(max-width: 900px) 86vw, 50vw"><source type="image/webp" srcset="/tonya-hero-512.webp 512w, /tonya-hero-1024.webp 1024w" sizes="(max-width: 900px) 86vw, 50vw"><img src="/tonya-hero.png" width="1024" height="1536" alt="Иллюстрация ии-Тони — внимательной женщины-навигатора" fetchpriority="high"></picture></div><figcaption>Тамбов и онлайн</figcaption></figure>
+        <div class="principles">${content.principles.map(([icon, item], index) => `<p><span>${String(index + 1).padStart(2, "0")}</span><i aria-hidden="true">${icon}</i>${item}</p>`).join("")}</div>
       </section>
-      <section class="section about" id="about"><p class="section-index">01 / О сервисе</p><div class="section-heading"><h2>Не каталог из сотен анкет.<br><em>Один понятный диалог.</em></h2><p>ии-Тоня — информационный помощник. Она помогает сравнить направления, формат, стоимость и доступные слоты. Решение всегда остаётся за человеком.</p></div><div class="boundary"><b>Граница сервиса</b><p>Не ставит диагнозы</p><p>Не назначает лечение</p><p>Не обещает результат</p></div></section>
-      <section class="section client-path" id="clients"><p class="section-index">02 / Клиентам</p><div class="section-heading"><h2>От запроса<br>до записи</h2><p>Без анкет на десять экранов. Вопросы появляются по одному и только когда нужны для выбора.</p></div><ol class="steps">${content.clientSteps.map(([number, text]) => `<li><span>${number}</span><p>${text}</p></li>`).join("")}</ol><a class="text-link" data-messenger-action href="${href(config, "client")}">Начать диалог →</a></section>
-      <section class="section expert-path" id="experts"><div class="expert-panel"><p class="section-index light">03 / Экспертам</p><h2>Практика — ваша.<br><em>Организация — наша.</em></h2><ul>${content.expertBenefits.map((item) => `<li>${item}</li>`).join("")}</ul><a class="button light-button" data-messenger-action href="${href(config, "expert")}">Узнать об участии ↗</a></div><div class="expert-aside" aria-hidden="true"><span>для</span><strong>экспертов</strong><i>●</i></div></section>
-      <section class="section tariffs" id="tariffs"><p class="section-index">04 / Информационный каталог</p><div class="section-heading"><h2>Форматы размещения</h2><p>Тарифы показаны для ориентира. Действующие условия и точная стоимость подтверждаются в диалоге до оформления.</p></div><div class="tariff-grid">${tariffs}</div><p class="catalog-note">Разовый организационный платёж и условия мероприятий применяются только после подтверждения в сервисе.</p></section>
-      <section class="section faq" id="faq"><p class="section-index">05 / Вопросы</p><div class="section-heading"><h2>Коротко о главном</h2><p>Если ответа нет, ии-Тоня уточнит информацию в диалоге.</p></div><div class="faq-list">${faq}</div></section>
-      <section class="section contact" id="contacts"><p class="contact-kicker">Готовы начать?</p><h2>Один диалог.<br>Следующий шаг — ваш.</h2><a class="button dark-button" data-messenger-action href="${href(config, "client")}">Написать ии-Тоне ↗</a></section>
+
+      <section class="section about" id="about"><p class="section-index">02 / О проекте</p><div class="section-heading" data-reveal><h2>Это не каталог.<br><em>Это живой диалог.</em></h2><div>${content.about.map((paragraph) => `<p>${paragraph}</p>`).join("")}<p><strong>${content.aboutProposition}</strong></p></div></div>
+        <div class="dialog-card" data-reveal><div class="dialog-avatar" aria-hidden="true">ии</div><div class="dialog-stack"><p class="dialog-bubble">Расскажи, что сейчас важно — можно без готового запроса.</p><p class="dialog-bubble right">Хочу найти подходящего специалиста, но не знаю, с чего начать.</p><p class="dialog-bubble">Задам несколько вопросов и покажу понятные варианты.</p></div></div>
+        <div class="boundary"><b>Граница сервиса</b><p>Не заменяет врача или психолога</p><p>Не назначает лечение</p><p>Не обещает результат</p></div>
+      </section>
+
+      <section class="section client-path" id="clients"><p class="section-index">03 / Клиентам</p><div class="section-heading" data-reveal><h2>Я помогаю тем,<br><em>кто готов развиваться</em></h2><p>Какой бы ни был твой запрос — я помогу найти того, кто сможет помочь.</p></div>
+        <ul class="category-grid">${categories}</ul>
+        <div class="message-packages"><h3>Как это работает</h3><p>Ты покупаешь пакет сообщений и общаешься со мной без ограничений по времени в рамках пакета.</p><ul>${content.messagePackages.map(([name, details]) => `<li><strong>«${name}»</strong> — ${details}</li>`).join("")}</ul><p>Каждое сообщение в диалоге — 1 сообщение из пакета. Никаких скрытых платежей.</p><p>${content.couponOffer}</p><p>${content.clientCta}</p></div>
+        <a class="button primary section-cta" data-messenger-action href="${href(config, "client")}">Попробовать как клиент <span aria-hidden="true">↗</span></a>
+      </section>
+
+      <section class="section expert-path" id="experts"><div class="expert-panel"><p class="section-index light">04 / Экспертам</p><h2 data-reveal>Вы — эксперт.<br><em>Мы поможем вам найти клиентов.</em></h2>
+        <div class="expert-columns"><div data-reveal><p class="mini-label light">Вам знакомо?</p><ul class="problem-list">${content.expertProblems.map((item) => `<li><span aria-hidden="true">×</span>${item}</li>`).join("")}</ul></div><div data-reveal><p class="mini-label light">А теперь представьте</p><ul class="promise-list">${content.expertPromise.map((item) => `<li><span aria-hidden="true">✓</span>${item}</li>`).join("")}</ul></div></div>
+        <p class="mini-label light">Преимущества для экспертов</p><ul class="benefit-list benefit-grid">${content.expertBenefits.map(([icon, item]) => `<li><span aria-hidden="true">${icon}</span>${item}</li>`).join("")}</ul>
+        <ol class="expert-steps">${content.expertSteps.map(([number, item]) => `<li data-reveal><span>${number}</span><p>${item}</p></li>`).join("")}</ol>
+        <aside class="contract-boundary" aria-label="Границы условий"><p>Срок и полнота набора целевой аудитории на мероприятие не гарантируются и зависят от клиентских запросов в конкретный период времени.</p><p>Эксперт обязан соблюдать требования законодательства РФ, в том числе в части маркировки рекламы.</p><p>Если Эксперт подтверждает запись, Клиент получает уведомление с подтверждением.</p></aside>
+        <p>${content.expertCta}</p><a class="button light-button" data-messenger-action href="${href(config, "expert")}">Попробовать как эксперт <span aria-hidden="true">↗</span></a></div>
+      </section>
+
+      <section class="section tariffs" id="tariffs"><p class="section-index">05 / Условия размещения</p><div class="section-heading" data-reveal><h2>Тарифы для экспертов</h2><p>Узнайте свой персональный тариф: стоимость зависит от ниши, города и формата работы.</p></div><div class="tariff-grid">${tariffs}</div>
+        <div class="tariff-details" data-reveal><div><p class="mini-label">Порядок оплаты групповых мероприятий</p><ol>${content.eventPayment.map((item) => `<li>${item}</li>`).join("")}</ol></div><div><p class="mini-label">Гибкий подход к стоимости</p><ul>${content.tariffFactors.map((factor) => `<li>${factor}</li>`).join("")}</ul><p>Напишите ии-Тоне с промокодом «тест эксперт» — рассчитаем персональный тариф.</p></div></div>
+        <a class="text-link" data-messenger-action href="${href(config, "expert")}">Узнать свой тариф →</a>
+      </section>
+
+      <section class="section faq" id="faq"><p class="section-index">06 / Часто задаваемые вопросы</p><div class="section-heading" data-reveal><h2>Коротко о главном</h2><p>Нажмите на вопрос, чтобы раскрыть ответ. Если нужного ответа нет, напишите ии-Тоне.</p></div><div class="faq-list">${faq}</div></section>
+
+      <section class="section contact" id="contacts"><p class="section-index">07 / Контакты</p><p class="contact-kicker">Остались вопросы?</p><h2 data-reveal>Напишите нам —<br>ответим в течение 24 часов.</h2><p class="contact-copy">О сервисе, тарифах и сотрудничестве можно спросить в одном диалоге или напрямую у менеджера.</p><div class="contact-actions"><a class="button dark-button" data-messenger-action href="${href(config, "client")}">Открыть чат с ии-Тоней <span aria-hidden="true">↗</span></a><form class="contact-form-stub" aria-disabled="true"><p>${content.contact.formNotice}</p><label for="contact-stub">Телефон / Telegram / WhatsApp</label><input id="contact-stub" type="text" disabled aria-disabled="true" placeholder="Недоступно в тестовой версии"><button type="button" disabled>Отправить</button></form><a class="button ghost" href="mailto:${content.operator.email}">${content.operator.email}</a><a class="button ghost" href="tel:+79204742866">${content.operator.phone}</a></div></section>
     </main>
-    <footer id="legal"><a class="brand footer-brand" href="#top"><span>ии</span>Тоня</a><p>Информационный сервис по выбору экспертов и записи.</p><p>Юридическая информация предоставляется в диалоге.</p><p>© 2026 ии-Тоня</p></footer>`;
+    <footer id="legal"><div><p class="section-index light">08 / Футер</p><a class="brand footer-brand" href="#top"><span>ии</span>Тоня</a><p>ии-Тоня: сервис персонального сопровождения в саморазвитии</p><ul class="social-labels" aria-label="Социальные сети">${content.socialLabels.map((label) => `<li>${label} — ссылка скоро появится</li>`).join("")}</ul></div><nav aria-label="Навигация в подвале"><a href="#about">О проекте</a><a href="#experts">Экспертам</a><a href="#clients">Клиентам</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav><nav aria-label="Юридическая информация"><a href="/privacy">Политика конфиденциальности</a><a href="/oferta">Публичная оферта</a></nav><div class="operator"><p>${content.operator.name}</p><p>ИНН ${content.operator.inn}</p><p>ОГРНИП ${content.operator.ogrnip}</p><p>${content.operator.address}</p><p>${content.operator.schedule}</p><p>${content.operator.responseTime}</p><p>© 2026 ии-Тоня. Все права защищены.</p></div></footer>`;
 }

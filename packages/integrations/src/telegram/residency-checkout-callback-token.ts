@@ -1,9 +1,3 @@
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const PREFIX = "xr1.";
@@ -148,7 +142,6 @@ export async function issueResidencyCheckoutCallback(
 ): Promise<string> {
   if (!valid(claims) || secret.byteLength < 32 || idempotencyKey.length < 1)
     throw new ResidencyCheckoutCallbackVerificationError();
-  const nonce = randomBytes(16);
   if (
     !valid(claims) ||
     secret.byteLength < 32 ||
@@ -189,15 +182,6 @@ export async function authenticateResidencyCheckoutCallback(
     if (claims === null || claims.expiresAt.getTime() <= now.getTime())
       throw new Error();
     return { tokenHash: digest(nonce), claims };
-    if (secret.byteLength < 32 || !Number.isFinite(now.getTime()))
-      throw new Error();
-    const decoded = decode(token);
-    if (!timingSafeEqual(decoded.mac, mac(decoded.nonce, binding, secret)))
-      throw new Error();
-    const claims = await store.consume(decoded.tokenHash, binding, now);
-    if (claims === null || claims.expiresAt.getTime() <= now.getTime())
-      throw new Error();
-    return { tokenHash: decoded.tokenHash, claims };
   } catch {
     throw new ResidencyCheckoutCallbackVerificationError();
   }

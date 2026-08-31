@@ -108,6 +108,8 @@ const CONSENT_PURPOSES = new Set([
   "client_profile",
   "expert_note",
   "follow_up",
+  "client_messaging",
+  "selarti_ai_processing",
 ]);
 
 /** The caller supplies a per-environment key from its secret manager; it is never persisted. */

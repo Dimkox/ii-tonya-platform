@@ -59,6 +59,12 @@ export interface ResidencyQuote {
   durationSeconds: number;
   creditMinor: string;
   cashMinor: string;
+  commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+  creditCapBps: number;
+  individualServicesEnabled: boolean;
+  groupEventLimit: number;
+  statisticsLevel: "basic" | "expanded";
+  supportPriority: "standard" | "priority";
 }
 export interface ResidencyOrder extends ResidencyQuote {
   id: string;
@@ -100,6 +106,12 @@ type TariffRow = {
   priceMinor: bigint | string;
   currency: "RUB";
   durationSeconds: number;
+  commercialPolicyVersion: "legacy_residency_v1" | "expert_residency_v2";
+  creditCapBps: number;
+  individualServicesEnabled: boolean;
+  groupEventLimit: number;
+  statisticsLevel: "basic" | "expanded";
+  supportPriority: "standard" | "priority";
 };
 export interface ActiveResidencyTariff {
   readonly tariffVersionId: string;
@@ -107,6 +119,13 @@ export interface ActiveResidencyTariff {
   readonly priceMinor: string;
   readonly currency: "RUB";
   readonly durationSeconds: number;
+  readonly commercialPolicyVersion:
+    "legacy_residency_v1" | "expert_residency_v2";
+  readonly creditCapBps: number;
+  readonly individualServicesEnabled: boolean;
+  readonly groupEventLimit: number;
+  readonly statisticsLevel: "basic" | "expanded";
+  readonly supportPriority: "standard" | "priority";
 }
 type OrderRow = TariffRow & {
   expertId: string;
@@ -115,6 +134,7 @@ type OrderRow = TariffRow & {
   creditMinor: bigint;
   cashMinor: bigint;
   providerDeadline: Date | string;
+  individualServicesEnabled: boolean;
 };
 
 export function normalizeDatabaseMoney(
@@ -143,9 +163,14 @@ export class PostgresExpertResidencyRepository {
     this.#controls = new PostgresExpertReferralControlRepository(db);
   }
 
-  private async assertNewCommandsEnabled(tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0]): Promise<void> {
+  private async assertNewCommandsEnabled(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+  ): Promise<void> {
     if (!(await this.#controls.lockFeatureControl(tx)).newCommandsEnabled) {
-      throw new ExpertResidencyCommandError("EXPERT_RESIDENCY_DISABLED", "Expert residency commands are disabled");
+      throw new ExpertResidencyCommandError(
+        "EXPERT_RESIDENCY_DISABLED",
+        "Expert residency commands are disabled",
+      );
     }
   }
 
@@ -177,7 +202,7 @@ export class PostgresExpertResidencyRepository {
           display_name as "displayName",
           price_minor as "priceMinor",
           currency,
-          duration_seconds as "durationSeconds"
+          duration_seconds as "durationSeconds", commercial_policy_version as "commercialPolicyVersion", credit_cap_bps as "creditCapBps", individual_services_enabled as "individualServicesEnabled", group_event_limit as "groupEventLimit", statistics_level as "statisticsLevel", support_priority as "supportPriority"
         from expert_residency_tariff_versions
         where active_from <= transaction_timestamp()
           and transaction_timestamp() < active_to
@@ -247,7 +272,7 @@ export class PostgresExpertResidencyRepository {
           sql`select pg_advisory_xact_lock(hashtextextended(${command.expertId}, 0))`,
         );
         const prior = await tx.execute<OrderRow>(
-          sql`select id,expert_id as "expertId",tariff_version_id as "tariffVersionId",snapshot_display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds",credit_minor as "creditMinor",cash_minor as "cashMinor",payment_deadline as "paymentDeadline",provider_deadline as "providerDeadline",status from expert_residency_orders where expert_id=${command.expertId}::uuid and idempotency_key=${command.idempotencyKey} for update`,
+          sql`select id,expert_id as "expertId",tariff_version_id as "tariffVersionId",snapshot_display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds",credit_minor as "creditMinor",cash_minor as "cashMinor",commercial_policy_version as "commercialPolicyVersion",credit_cap_bps as "creditCapBps",individual_services_enabled as "individualServicesEnabled",group_event_limit as "groupEventLimit",statistics_level as "statisticsLevel",support_priority as "supportPriority",payment_deadline as "paymentDeadline",provider_deadline as "providerDeadline",status from expert_residency_orders where expert_id=${command.expertId}::uuid and idempotency_key=${command.idempotencyKey} for update`,
         );
         if (prior.rows[0]) {
           const stored = prior.rows[0] as OrderRow & {
@@ -301,7 +326,11 @@ export class PostgresExpertResidencyRepository {
           tariff.priceMinor,
           "tariff.priceMinor",
         );
-        const amounts = quoteResidency(tariffPriceMinor, available);
+        const amounts = quoteResidency(
+          tariffPriceMinor,
+          available,
+          tariff.creditCapBps,
+        );
         let remaining = amounts.creditMinor;
         const allocations: {
           grantId: string;
@@ -330,7 +359,7 @@ export class PostgresExpertResidencyRepository {
           command.providerDeadline,
         );
         const inserted = await tx.execute<{ id: string }>(
-          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,payment_deadline,provider_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariffPriceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${deadline},${command.providerDeadline},'payment_pending',${command.idempotencyKey}) returning id`,
+          sql`insert into expert_residency_orders (expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,duration_seconds,credit_minor,cash_minor,commercial_policy_version,credit_cap_bps,individual_services_enabled,group_event_limit,statistics_level,support_priority,payment_deadline,provider_deadline,status,idempotency_key) values (${command.expertId}::uuid,${tariff.id}::uuid,${tariff.displayName},${tariffPriceMinor},'RUB',${tariff.durationSeconds},${amounts.creditMinor},${amounts.cashMinor},${tariff.commercialPolicyVersion},${tariff.creditCapBps},${tariff.individualServicesEnabled},${tariff.groupEventLimit},${tariff.statisticsLevel},${tariff.supportPriority},${deadline},${command.providerDeadline},'payment_pending',${command.idempotencyKey}) returning id`,
         );
         const orderId = this.required(
           inserted.rows[0],
@@ -472,7 +501,7 @@ export class PostgresExpertResidencyRepository {
   }
   private async activeTariff(executor: Pick<DrizzleDb, "execute">, id: string) {
     const result = await executor.execute<TariffRow>(
-      sql`select id,display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds" from expert_residency_tariff_versions where id=${id}::uuid and active_from <= transaction_timestamp() and transaction_timestamp() < active_to`,
+      sql`select id,display_name as "displayName",price_minor as "priceMinor",currency,duration_seconds as "durationSeconds",commercial_policy_version as "commercialPolicyVersion",credit_cap_bps as "creditCapBps",individual_services_enabled as "individualServicesEnabled",group_event_limit as "groupEventLimit",statistics_level as "statisticsLevel",support_priority as "supportPriority" from expert_residency_tariff_versions where id=${id}::uuid and active_from <= transaction_timestamp() and transaction_timestamp() < active_to`,
     );
     if (result.rows.length !== 1)
       throw new ExpertResidencyCommandError(
@@ -507,13 +536,19 @@ export class PostgresExpertResidencyRepository {
       t.priceMinor,
       "tariff.priceMinor",
     );
-    const q = quoteResidency(priceMinor, available);
+    const q = quoteResidency(priceMinor, available, t.creditCapBps);
     return {
       tariffVersionId: t.id,
       displayName: t.displayName,
       ...parseMoneySnapshot({ priceMinor, ...q }),
       currency: "RUB",
       durationSeconds: t.durationSeconds,
+      commercialPolicyVersion: t.commercialPolicyVersion,
+      creditCapBps: t.creditCapBps,
+      individualServicesEnabled: t.individualServicesEnabled,
+      groupEventLimit: t.groupEventLimit,
+      statisticsLevel: t.statisticsLevel,
+      supportPriority: t.supportPriority,
     };
   }
   private toActiveTariff(tariff: TariffRow): ActiveResidencyTariff {
@@ -538,6 +573,12 @@ export class PostgresExpertResidencyRepository {
       ).toString(),
       currency: "RUB",
       durationSeconds: tariff.durationSeconds,
+      commercialPolicyVersion: tariff.commercialPolicyVersion,
+      creditCapBps: tariff.creditCapBps,
+      individualServicesEnabled: tariff.individualServicesEnabled,
+      groupEventLimit: tariff.groupEventLimit,
+      statisticsLevel: tariff.statisticsLevel,
+      supportPriority: tariff.supportPriority,
     };
   }
   private async hydrateOrder(
@@ -562,6 +603,12 @@ export class PostgresExpertResidencyRepository {
       ).toString(),
       currency: "RUB",
       durationSeconds: row.durationSeconds,
+      commercialPolicyVersion: row.commercialPolicyVersion,
+      creditCapBps: row.creditCapBps,
+      individualServicesEnabled: row.individualServicesEnabled,
+      groupEventLimit: row.groupEventLimit,
+      statisticsLevel: row.statisticsLevel,
+      supportPriority: row.supportPriority,
       creditMinor: normalizeDatabaseMoney(
         row.creditMinor,
         "order.creditMinor",

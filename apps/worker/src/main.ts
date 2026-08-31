@@ -13,12 +13,16 @@ import {
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
   PostgresOutboxRepository,
+  PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
+  PostgresTestExpertTelegramRepository,
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
   recordClientSessionMetric,
+  recordExpertReferralMaturityMetric,
   recordWorkerOutboxMetric,
+  recordTestExpertReconciliationMetric,
 } from "@ii-tonya/observability";
 import type { DrizzleDb } from "@ii-tonya/db";
 import {
@@ -43,10 +47,44 @@ import {
   type ExpertResidencyProviderReader,
   type LocalOperatorCaseOutboxRegistry,
   type OutboxRunnerMetricLabels,
+  type OutboxDispatcher,
+  type OutboxReconciler,
+  reconcileTestExpertTrial,
 } from "@ii-tonya/worker";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
 type BoundedJob = () => Promise<unknown>;
+type TestExpertReconciliationCapabilities = {
+  repository: {
+    scan(input: { limit: number; before: Date }): Promise<
+      readonly {
+        reservationId: string;
+        providerRequestId: string;
+        createdAt: Date;
+      }[]
+    >;
+    recordAuthoritativeOutcome(
+      reservationId: string,
+      providerRequestId: string,
+      outcome: "applied" | "not_applied",
+    ): Promise<void>;
+  };
+  authority: {
+    resolve(
+      providerRequestId: string,
+    ): Promise<"applied" | "not_applied" | "unknown">;
+  };
+  metrics: {
+    record(event: {
+      name:
+        | "reconciliation_age"
+        | "units_consumed"
+        | "units_released"
+        | "unknown_outcome";
+      value: number;
+    }): void;
+  };
+};
 
 export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
@@ -130,6 +168,24 @@ export function selectClientSessionRetention(
   return job;
 }
 
+export function selectTestExpertReconciliation(
+  config: RuntimeConfig,
+  factory?: () => unknown,
+): TestExpertReconciliationCapabilities | undefined {
+  if (config.features.testExpertReconciliation !== true) return undefined;
+  if (factory === undefined)
+    throw new Error("test_expert_reconciliation_capability_unavailable");
+  const value = factory() as Partial<TestExpertReconciliationCapabilities>;
+  if (
+    typeof value?.repository?.scan !== "function" ||
+    typeof value.repository.recordAuthoritativeOutcome !== "function" ||
+    typeof value?.authority?.resolve !== "function" ||
+    typeof value?.metrics?.record !== "function"
+  )
+    throw new Error("test_expert_reconciliation_capability_unavailable");
+  return value as TestExpertReconciliationCapabilities;
+}
+
 function requireWorkerOutboxRegistry(
   value: unknown,
   expectedTopics?: readonly string[],
@@ -203,6 +259,36 @@ export function composeWorkerOutboxDelivery(
         maxReconciliationAttempts: 3,
         batchSize: 100,
         workerId: "local-operator-case-worker",
+        newAttemptId: randomUUID,
+      }),
+  } as const;
+}
+
+export function composeB2TelegramDelivery(
+  db: DrizzleDb,
+  enabled: boolean,
+  capability?: OutboxDispatcher & OutboxReconciler,
+) {
+  if (!enabled) return undefined;
+  if (capability === undefined) {
+    throw new Error("b2_telegram_delivery_capability_unavailable");
+  }
+  const repository = new PostgresOrderedTelegramOutboxRepository(db);
+  return {
+    repository,
+    run: () =>
+      runOutboxBatch({
+        repository,
+        dispatcher: capability,
+        reconciler: capability,
+        metrics: { record: recordWorkerOutboxMetric },
+        now: () => new Date(),
+        retryDelayMs: (attempt) =>
+          boundedFullJitterDelay(attempt, 1_000, 30_000),
+        maxAttempts: 3,
+        maxReconciliationAttempts: 3,
+        batchSize: 100,
+        workerId: "b2-telegram-delivery-worker",
         newAttemptId: randomUUID,
       }),
   } as const;
@@ -282,12 +368,33 @@ export function createProductionWorkerRuntimeFactory(
                 limit: 100,
               })
           : undefined;
+      const testExpertReconciliation = selectTestExpertReconciliation(
+        config,
+        () => {
+          const repository = new PostgresTestExpertTelegramRepository(db, {
+            messagingConsentPolicyVersion: "worker-reconciliation-only",
+          });
+          return {
+            repository,
+            authority: {
+              resolve: (providerRequestId: string) =>
+                repository.resolveAuthoritativeOutcome(providerRequestId),
+            },
+            metrics: { record: recordTestExpertReconciliationMetric },
+          };
+        },
+      );
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
           new PostgresExpertReferralWorkerRepository(db),
+        expertReferralMaturityWorkerEnabled:
+          config.features.expertReferralMaturityWorker,
+        expertReferralMaturityMetrics: {
+          record: recordExpertReferralMaturityMetric,
+        },
         expertTelegramCheckoutRepository:
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
@@ -305,6 +412,17 @@ export function createProductionWorkerRuntimeFactory(
           ? {}
           : { clientSessionRetention }),
         ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
+        ...(testExpertReconciliation === undefined
+          ? {}
+          : {
+              testExpertReconciliation: () =>
+                reconcileTestExpertTrial({
+                  limit: 100,
+                  minimumAgeMs: 60_000,
+                  now: new Date(),
+                  ...testExpertReconciliation,
+                }),
+            }),
         closeDatabase: async () => db.$client.end(),
         closeTelemetry: async () => undefined,
         now: () => new Date(),

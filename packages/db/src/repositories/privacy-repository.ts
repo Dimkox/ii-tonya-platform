@@ -146,7 +146,13 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     if (!this.options.privacyMutationCapability?.enabled)
       return Promise.reject(new Error("Privacy mutations are disabled"));
     if (
-      !["client_profile", "expert_note", "follow_up"].includes(command.purpose)
+      ![
+        "client_profile",
+        "expert_note",
+        "follow_up",
+        "client_messaging",
+        "selarti_ai_processing",
+      ].includes(command.purpose)
     ) {
       return Promise.reject(new Error("Unknown privacy consent purpose"));
     }

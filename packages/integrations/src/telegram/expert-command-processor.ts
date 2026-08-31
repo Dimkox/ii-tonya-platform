@@ -38,15 +38,20 @@ interface ReferralQueryService {
 }
 
 interface ResidencyQueryService {
-  listActiveTariffs(
-    principal: FinancialPrincipal,
-  ): Promise<
+  listActiveTariffs(principal: FinancialPrincipal): Promise<
     | readonly {
         readonly tariffVersionId: string;
         readonly displayName: string;
         readonly priceMinor: string;
         readonly currency: "RUB";
         readonly durationSeconds: number;
+        readonly commercialPolicyVersion:
+          "legacy_residency_v1" | "expert_residency_v2";
+        readonly creditCapBps: number;
+        readonly individualServicesEnabled: boolean;
+        readonly groupEventLimit: number;
+        readonly statisticsLevel: "basic" | "expanded";
+        readonly supportPriority: "standard" | "priority";
       }[]
     | { readonly kind: "forbidden" | "disabled" }
   >;
@@ -62,6 +67,13 @@ interface ResidencyQueryService {
         readonly cashMinor: string;
         readonly currency?: "RUB";
         readonly durationSeconds?: number;
+        readonly commercialPolicyVersion:
+          "legacy_residency_v1" | "expert_residency_v2";
+        readonly creditCapBps: number;
+        readonly individualServicesEnabled: boolean;
+        readonly groupEventLimit: number;
+        readonly statisticsLevel: "basic" | "expanded";
+        readonly supportPriority: "standard" | "priority";
       }
     | { readonly kind: "forbidden" | "disabled" }
   >;
@@ -374,6 +386,12 @@ export const createExpertCommandProcessor = (deps: {
                 cashMinor: quote.cashMinor,
                 currency: quote.currency,
                 durationSeconds: quote.durationSeconds,
+                commercialPolicyVersion: quote.commercialPolicyVersion,
+                creditCapBps: quote.creditCapBps,
+                individualServicesEnabled: quote.individualServicesEnabled,
+                groupEventLimit: quote.groupEventLimit,
+                statisticsLevel: quote.statisticsLevel,
+                supportPriority: quote.supportPriority,
                 ...(checkoutCallbackData === undefined
                   ? {}
                   : { checkoutCallbackData }),

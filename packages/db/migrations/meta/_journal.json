@@ -225,6 +225,55 @@
       "when": 1786708800000,
       "tag": "0031_client_booking_references",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786712400000,
+      "tag": "0032_commercial_core_v2_a1",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788000000000,
+      "tag": "0033_expert_referral_maturity_a2",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788048000000,
+      "tag": "0034_hybrid_message_gateway_b1",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788134400000,
+      "tag": "0035_hybrid_message_gateway_b2",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788220800000,
+      "tag": "0036_selarti_budget_controls_b3",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788307200000,
+      "tag": "0037_partner_commerce_a",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788393600000,
+      "tag": "0038_test_expert_trial",
+      "breakpoints": true
     }
   ]
 }

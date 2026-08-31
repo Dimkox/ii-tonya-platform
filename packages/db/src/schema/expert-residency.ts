@@ -57,7 +57,7 @@ export const expertReferralAdminExecutionResults = pgTable(
   (table) => [
     check(
       "expert_referral_admin_result_action_allowed",
-      sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch')`,
+      sql`${table.action} in ('expert_referral.batch_generate','expert_referral.code_revoke','expert_referral.issuance_override','expert_referral.abuse_hold_open','expert_referral.abuse_hold_close','expert_residency.tariff_create','expert_residency.tariff_retire','expert_referral.hold_replay','expert_referral.feature_switch','client_commercial_policy.control_v2','expert_residency.tariff_create_v2')`,
     ),
     check(
       "expert_referral_admin_result_payload_hash_format",
@@ -73,7 +73,7 @@ export const expertReferralAdminExecutionResults = pgTable(
     ),
     check(
       "expert_referral_admin_result_expected_version",
-      sql`coalesce((${table.action} = 'expert_referral.feature_switch' and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} <> 'expert_referral.feature_switch' and ${table.expectedVersion} is null), false)`,
+      sql`coalesce((${table.action} in ('expert_referral.feature_switch','client_commercial_policy.control_v2') and ${table.expectedVersion} is not null and ${table.expectedVersion} between 0 and 2147483646) or (${table.action} not in ('expert_referral.feature_switch','client_commercial_policy.control_v2') and ${table.expectedVersion} is null), false)`,
     ),
     check(
       "expert_referral_admin_result_object_only",
@@ -91,9 +91,11 @@ export const expertReferralAdminExecutionResults = pgTable(
       (${table.action} = 'expert_referral.issuance_override' and ${table.safeResult} ? 'overrideId' and ${table.safeResult} - 'overrideId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'overrideId')='string') or
       (${table.action} in ('expert_referral.abuse_hold_open','expert_referral.abuse_hold_close') and ${table.safeResult} ?& array['id','expertId','status'] and ${table.safeResult} - array['id','expertId','status'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'id')='string' and (${table.safeResult}->>'id') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' and jsonb_typeof(${table.safeResult}->'expertId')='string' and jsonb_typeof(${table.safeResult}->'status')='string') or
       (${table.action} = 'expert_residency.tariff_create' and ${table.safeResult} ? 'tariffVersionId' and ${table.safeResult} - 'tariffVersionId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string') or
+      (${table.action} = 'expert_residency.tariff_create_v2' and ${table.safeResult} ? 'tariffVersionId' and ${table.safeResult} - 'tariffVersionId' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string') or
       (${table.action} = 'expert_residency.tariff_retire' and ${table.safeResult} ?& array['tariffVersionId','activeTo'] and ${table.safeResult} - array['tariffVersionId','activeTo'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'tariffVersionId')='string' and jsonb_typeof(${table.safeResult}->'activeTo')='string') or
       (${table.action} = 'expert_referral.hold_replay' and ${table.safeResult} ?& array['kind','reason'] and ${table.safeResult} - array['kind','reason'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'kind')='string' and jsonb_typeof(${table.safeResult}->'reason')='string') or
       (${table.action} = 'expert_referral.feature_switch' and ${table.safeResult} ? 'version' and ${table.safeResult} - 'version' = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number')
+      or (${table.action} = 'client_commercial_policy.control_v2' and ${table.objectId}='00000000-0000-0000-0000-000000000041'::uuid and ${table.safeResult} ?& array['version','admissionPolicy'] and ${table.safeResult} - array['version','admissionPolicy'] = '{}'::jsonb and jsonb_typeof(${table.safeResult}->'version')='number' and (${table.safeResult}->>'version')::numeric > 0 and (${table.safeResult}->>'version')::numeric % 1 = 0 and jsonb_typeof(${table.safeResult}->'admissionPolicy')='string' and ${table.safeResult}->>'admissionPolicy' in ('legacy_package_v1','free_client_v2'))
     `,
     ),
     uniqueIndex("expert_referral_admin_results_second_approval_unique")
@@ -153,6 +155,10 @@ export const expertFirstSettlementEligibility = pgEnum(
     "pending_feature_hold",
     "cancelled_by_refund",
   ],
+);
+export const expertReferralMaturityStatus = pgEnum(
+  "expert_referral_maturity_status",
+  ["pending", "granted", "cancelled"],
 );
 export const expertReferralLedgerEntryKind = pgEnum(
   "expert_referral_ledger_entry_kind",
@@ -329,6 +335,16 @@ export const expertResidencyTariffVersions = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     activeFrom: timestamp("active_from", { withTimezone: true }).notNull(),
     activeTo: timestamp("active_to", { withTimezone: true }).notNull(),
+    commercialPolicyVersion: text("commercial_policy_version")
+      .notNull()
+      .default("legacy_residency_v1"),
+    creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    individualServicesEnabled: boolean("individual_services_enabled")
+      .notNull()
+      .default(false),
+    groupEventLimit: integer("group_event_limit").notNull().default(0),
+    statisticsLevel: text("statistics_level").notNull().default("basic"),
+    supportPriority: text("support_priority").notNull().default("standard"),
     approvalId: uuid("approval_id")
       .notNull()
       .references(() => adminApprovals.id),
@@ -344,6 +360,42 @@ export const expertResidencyTariffVersions = pgTable(
       sql`${table.priceMinor} > 0 and ${table.priceMinor} <= 999999999999`,
     ),
     check("expert_tariff_currency_rub", sql`${table.currency} = 'RUB'`),
+    check(
+      "expert_tariff_policy_version",
+      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2')`,
+    ),
+    check(
+      "expert_tariff_credit_cap",
+      sql`${table.creditCapBps} between 0 and 10000`,
+    ),
+    check(
+      "expert_tariff_v2_cap",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
+    ),
+    check(
+      "expert_tariff_v2_price",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`,
+    ),
+    check(
+      "expert_tariff_v2_duration",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`,
+    ),
+    check(
+      "expert_tariff_v2_combination",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or (${table.tariffKey}='START' and ${table.displayName}='Старт' and ${table.priceMinor}=390000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=0 and ${table.statisticsLevel}='basic' and ${table.supportPriority}='standard') or (${table.tariffKey}='BASE' and ${table.displayName}='База' and ${table.priceMinor}=590000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=1 and ${table.statisticsLevel}='expanded' and ${table.supportPriority}='standard') or (${table.tariffKey}='PRO' and ${table.displayName}='Про' and ${table.priceMinor}=999000 and ${table.durationSeconds}=2592000 and ${table.creditCapBps}=3000 and ${table.individualServicesEnabled}=true and ${table.groupEventLimit}=3 and ${table.statisticsLevel}='expanded' and ${table.supportPriority}='priority')`,
+    ),
+    check(
+      "expert_tariff_group_event_limit",
+      sql`${table.groupEventLimit} between 0 and 3`,
+    ),
+    check(
+      "expert_tariff_statistics_level",
+      sql`${table.statisticsLevel} in ('basic','expanded')`,
+    ),
+    check(
+      "expert_tariff_support_priority",
+      sql`${table.supportPriority} in ('standard','priority')`,
+    ),
     check("expert_tariff_duration_positive", sql`${table.durationSeconds} > 0`),
     check(
       "expert_tariff_active_interval_valid",
@@ -414,9 +466,6 @@ export const expertTelegramResidencyCallbacks = pgTable(
       "expert_telegram_residency_callbacks_checkout_outcome_check",
       sql`((${table.checkoutStatus} in ('issued','processing')) and ${table.outcomeRecordedAt} is null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} in ('unavailable','unknown') and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is null) or (${table.checkoutStatus} = 'ready' and ${table.outcomeRecordedAt} is not null and ${table.checkoutUrl} is not null and char_length(${table.checkoutUrl}) between 1 and 2048 and ${table.checkoutUrl} ~* '^https://[^[:space:]]+$')`,
     ),
-    index("expert_telegram_residency_callbacks_expiry_idx")
-      .on(table.expiresAt)
-      .where(sql`${table.consumedAt} is null`),
     index("expert_telegram_residency_callbacks_processing_lease_idx")
       .on(table.processingLeaseUntil)
       .where(sql`${table.checkoutStatus} = 'processing'`),
@@ -442,6 +491,16 @@ export const expertResidencyOrders = pgTable(
     durationSeconds: integer("duration_seconds").notNull(),
     creditMinor: pgBigint("credit_minor", { mode: "bigint" }).notNull(),
     cashMinor: pgBigint("cash_minor", { mode: "bigint" }).notNull(),
+    commercialPolicyVersion: text("commercial_policy_version")
+      .notNull()
+      .default("legacy_residency_v1"),
+    creditCapBps: integer("credit_cap_bps").notNull().default(5000),
+    individualServicesEnabled: boolean("individual_services_enabled")
+      .notNull()
+      .default(false),
+    groupEventLimit: integer("group_event_limit").notNull().default(0),
+    statisticsLevel: text("statistics_level").notNull().default("basic"),
+    supportPriority: text("support_priority").notNull().default("standard"),
     paymentDeadline: timestamp("payment_deadline", {
       withTimezone: true,
     }).notNull(),
@@ -476,7 +535,39 @@ export const expertResidencyOrders = pgTable(
     ),
     check(
       "expert_order_credit_cap",
-      sql`${table.creditMinor} <= ${table.priceMinor} / 2`,
+      sql`${table.creditCapBps} between 0 and 10000 and ${table.creditMinor} * 10000 <= ${table.priceMinor} * ${table.creditCapBps}`,
+    ),
+    check(
+      "expert_order_policy_version",
+      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2')`,
+    ),
+    check(
+      "expert_order_v2_cap",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.creditCapBps} = 3000`,
+    ),
+    check(
+      "expert_order_v2_price",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.priceMinor} in (390000,590000,999000)`,
+    ),
+    check(
+      "expert_order_v2_duration",
+      sql`${table.commercialPolicyVersion} <> 'expert_residency_v2' or ${table.durationSeconds} = 2592000`,
+    ),
+    check(
+      "expert_order_group_event_limit",
+      sql`${table.groupEventLimit} between 0 and 3`,
+    ),
+    check(
+      "expert_order_statistics_level",
+      sql`${table.statisticsLevel} in ('basic','expanded')`,
+    ),
+    check(
+      "expert_order_support_priority",
+      sql`${table.supportPriority} in ('standard','priority')`,
+    ),
+    check(
+      "expert_order_cash_credit_conservation",
+      sql`${table.cashMinor} + ${table.creditMinor} = ${table.priceMinor}`,
     ),
     check(
       "expert_order_cash_remainder",
@@ -941,6 +1032,94 @@ export const expertFirstResidencySettlements = pgTable(
   ],
 );
 
+export const expertReferralMaturities = pgTable(
+  "expert_referral_reward_maturities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    firstSettlementId: uuid("first_settlement_id").notNull(),
+    referralId: uuid("referral_id").notNull(),
+    qualifyingOrderId: uuid("qualifying_order_id").notNull(),
+    qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
+    inviterExpertId: uuid("inviter_expert_id")
+      .notNull()
+      .references(() => experts.id),
+    inviteeExpertId: uuid("invitee_expert_id")
+      .notNull()
+      .references(() => experts.id),
+    policyVersion: text("policy_version")
+      .notNull()
+      .default("expert_referral_v2_30d"),
+    amountMinor: pgBigint("amount_minor", { mode: "bigint" })
+      .notNull()
+      .default(sql`100000`),
+    settledAt: timestamp("settled_at", { withTimezone: true }).notNull(),
+    maturesAt: timestamp("matures_at", { withTimezone: true }).notNull(),
+    status: expertReferralMaturityStatus("status").notNull().default("pending"),
+    grantedAt: timestamp("granted_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    terminalReason: text("terminal_reason"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    reasonCode: text("reason_code"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    unique("expert_referral_maturities_settlement_unique").on(
+      table.firstSettlementId,
+    ),
+    unique("expert_referral_maturities_order_unique").on(
+      table.qualifyingOrderId,
+    ),
+    unique("expert_referral_maturities_payment_unique").on(
+      table.qualifyingPaymentAttemptId,
+    ),
+    unique("expert_referral_maturities_referral_unique").on(table.referralId),
+    unique("expert_referral_maturities_idempotency_unique").on(
+      table.idempotencyKey,
+    ),
+    index("expert_referral_maturities_due_idx").on(table.maturesAt, table.id),
+    foreignKey({
+      columns: [
+        table.firstSettlementId,
+        table.referralId,
+        table.qualifyingOrderId,
+        table.qualifyingPaymentAttemptId,
+      ],
+      foreignColumns: [
+        expertFirstResidencySettlements.id,
+        expertFirstResidencySettlements.referralId,
+        expertFirstResidencySettlements.qualifyingOrderId,
+        expertFirstResidencySettlements.qualifyingPaymentAttemptId,
+      ],
+      name: "expert_referral_maturity_settlement_fk",
+    }),
+    check(
+      "expert_referral_maturity_settled_clock",
+      sql`${table.maturesAt} = ${table.settledAt} + interval '30 days'`,
+    ),
+    check(
+      "expert_referral_maturity_policy",
+      sql`${table.policyVersion} = 'expert_referral_v2_30d' and ${table.amountMinor} = 100000`,
+    ),
+    check(
+      "expert_referral_maturity_idempotency_nonempty",
+      sql`${table.idempotencyKey} = 'expert-referral-maturity:v1:' || ${table.firstSettlementId}::text`,
+    ),
+    check(
+      "expert_referral_maturity_attempt_bounded",
+      sql`${table.attemptCount} between 0 and 2147483647`,
+    ),
+    check(
+      "expert_referral_maturity_terminal_state",
+      sql`(${table.status} = 'pending' and ${table.grantedAt} is null and ${table.cancelledAt} is null and ${table.terminalReason} is null) or (${table.status} = 'granted' and ${table.grantedAt} is not null and ${table.cancelledAt} is null and ${table.terminalReason} is null and ${table.leaseToken} is null and ${table.leaseUntil} is null) or (${table.status} = 'cancelled' and ${table.grantedAt} is null and ${table.cancelledAt} is not null and ${table.terminalReason} is not null and ${table.leaseToken} is null and ${table.leaseUntil} is null)`,
+    ),
+  ],
+);
+
 export const expertReferralRewardGrants = pgTable(
   "expert_referral_reward_grants",
   {
@@ -952,6 +1131,9 @@ export const expertReferralRewardGrants = pgTable(
     firstSettlementId: uuid("first_settlement_id").notNull(),
     qualifyingOrderId: uuid("qualifying_order_id").notNull(),
     qualifyingPaymentAttemptId: uuid("qualifying_payment_attempt_id").notNull(),
+    maturityId: uuid("maturity_id").references(
+      () => expertReferralMaturities.id,
+    ),
     amountMinor: pgBigint("amount_minor", { mode: "bigint" })
       .notNull()
       .default(sql`100000`),
@@ -967,6 +1149,7 @@ export const expertReferralRewardGrants = pgTable(
     unique("expert_reward_grants_first_settlement_unique").on(
       table.firstSettlementId,
     ),
+    unique("expert_reward_grants_maturity_unique").on(table.maturityId),
     unique("expert_reward_grants_qualifying_order_unique").on(
       table.qualifyingOrderId,
     ),

@@ -76,6 +76,48 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_COST_ADMISSION_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_RESPONSE_INGRESS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    B2_TELEGRAM_DISPATCH_ENABLED: z.enum(["true", "false"]).default("false"),
+    B2_SENSITIVE_RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_PROMO_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    TEST_EXPERT_SELARTI_ENABLED: z.enum(["true", "false"]).default("false"),
+    TEST_EXPERT_RECONCILIATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    TEST_EXPERT_PROMPT_VERSION: optionalNonEmptyString,
+    SELARTI_RESPONSE_SHARED_SECRET: z
+      .string()
+      .min(32)
+      .max(256)
+      .regex(/^[A-Za-z0-9_-]+$/u)
+      .optional(),
+    CLIENT_TELEGRAM_BOT_KEY: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .optional(),
+    CLIENT_MESSAGING_CONSENT_POLICY_VERSION: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .optional(),
+    SELARTI_AI_CONSENT_POLICY_VERSION: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .optional(),
+    TELEGRAM_WEBHOOK_SECRET: z
+      .string()
+      .min(32)
+      .max(256)
+      .regex(/^[A-Za-z0-9_-]+$/u)
+      .optional(),
     CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES: z
       .string()
       .regex(/^\d+$/u)
@@ -271,13 +313,31 @@ export type RuntimeConfig = {
   rawConversationLogging: false;
   selartiOutboundBillingMode: "disabled";
   displayTimezone: string;
+  clientTelegramBotKey?: string;
+  clientMessagingConsentPolicyVersion?: string;
+  selartiAiConsentPolicyVersion?: string;
+  telegramWebhookSecret?: string;
+  selartiResponseSharedSecret?: string;
   features: {
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientFreeAccessV2?: boolean;
+    clientTelegramIngress?: boolean;
+    clientHybridRouting?: boolean;
+    selartiCostAdmission?: boolean;
+    selartiResponseIngress?: boolean;
+    b2TelegramDispatch?: boolean;
+    b2SensitiveRetention?: boolean;
+    testExpertPromo?: boolean;
+    testExpertDeterministicFlow?: boolean;
+    testExpertSelarti?: boolean;
+    testExpertReconciliation?: boolean;
+    testExpertPromptVersion?: string;
     expertReferral: boolean;
+    expertReferralMaturityWorker: boolean;
     expertResidencyBilling: boolean;
     expertTelegramQueries?: boolean;
     expertTelegramFinancialViews?: boolean;
@@ -316,6 +376,50 @@ export type RuntimeConfig = {
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
+  if (
+    value.TEST_EXPERT_PROMO_ENABLED === "true" &&
+    value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true" &&
+    value.CLIENT_TELEGRAM_INGRESS_ENABLED !== "true"
+  )
+    throw new Error("test_expert_consent_ingress_required");
+  if (
+    value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true" &&
+    (!value.CLIENT_TELEGRAM_BOT_KEY ||
+      !value.CLIENT_MESSAGING_CONSENT_POLICY_VERSION ||
+      !value.TELEGRAM_WEBHOOK_SECRET ||
+      /placeholder/iu.test(value.TELEGRAM_WEBHOOK_SECRET))
+  )
+    throw new Error("client_telegram_ingress_configuration_incomplete");
+  if (
+    value.CLIENT_HYBRID_ROUTING_ENABLED === "true" &&
+    (!value.SELARTI_AI_CONSENT_POLICY_VERSION ||
+      value.SELARTI_COST_ADMISSION_ENABLED !== "true")
+  )
+    throw new Error("selarti_budget_admission_configuration_required");
+  if (
+    value.TEST_EXPERT_SELARTI_ENABLED === "true" &&
+    (value.TEST_EXPERT_PROMO_ENABLED !== "true" ||
+      value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED !== "true" ||
+      value.CLIENT_TELEGRAM_INGRESS_ENABLED !== "true" ||
+      value.CLIENT_HYBRID_ROUTING_ENABLED !== "true" ||
+      value.SELARTI_COST_ADMISSION_ENABLED !== "true" ||
+      value.SELARTI_RESPONSE_INGRESS_ENABLED !== "true" ||
+      value.B2_TELEGRAM_DISPATCH_ENABLED !== "true" ||
+      value.B2_SENSITIVE_RETENTION_ENABLED !== "true" ||
+      value.TEST_EXPERT_RECONCILIATION_ENABLED !== "true" ||
+      value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true")
+  )
+    throw new Error("test_expert_residual_configuration_incomplete");
+  if (value.SELARTI_RESPONSE_INGRESS_ENABLED === "true") {
+    if (
+      !value.SELARTI_RESPONSE_SHARED_SECRET ||
+      /placeholder/iu.test(value.SELARTI_RESPONSE_SHARED_SECRET) ||
+      !value.CLIENT_TELEGRAM_BOT_KEY
+    ) {
+      throw new Error("selarti_response_configuration_incomplete");
+    }
+    throw new Error("selarti_response_official_fixture_required");
+  }
 
   if (value.RAW_CONVERSATION_LOGGING === "true") {
     throw new Error("Raw conversation logging is prohibited");
@@ -335,13 +439,52 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     rawConversationLogging: false,
     selartiOutboundBillingMode: "disabled",
     displayTimezone: value.DISPLAY_TIMEZONE,
+    ...(value.CLIENT_TELEGRAM_BOT_KEY === undefined
+      ? {}
+      : { clientTelegramBotKey: value.CLIENT_TELEGRAM_BOT_KEY }),
+    ...(value.CLIENT_MESSAGING_CONSENT_POLICY_VERSION === undefined
+      ? {}
+      : {
+          clientMessagingConsentPolicyVersion:
+            value.CLIENT_MESSAGING_CONSENT_POLICY_VERSION,
+        }),
+    ...(value.SELARTI_AI_CONSENT_POLICY_VERSION === undefined
+      ? {}
+      : {
+          selartiAiConsentPolicyVersion:
+            value.SELARTI_AI_CONSENT_POLICY_VERSION,
+        }),
+    ...(value.TELEGRAM_WEBHOOK_SECRET === undefined
+      ? {}
+      : { telegramWebhookSecret: value.TELEGRAM_WEBHOOK_SECRET }),
+    ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
+      ? {}
+      : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
+      clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
+      clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
+      selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
+      selartiResponseIngress: false,
+      b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
+      b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",
+      testExpertPromo: value.TEST_EXPERT_PROMO_ENABLED === "true",
+      testExpertDeterministicFlow:
+        value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true",
+      testExpertSelarti: value.TEST_EXPERT_SELARTI_ENABLED === "true",
+      testExpertReconciliation:
+        value.TEST_EXPERT_RECONCILIATION_ENABLED === "true",
+      ...(value.TEST_EXPERT_PROMPT_VERSION === undefined
+        ? {}
+        : { testExpertPromptVersion: value.TEST_EXPERT_PROMPT_VERSION }),
       expertReferral: value.EXPERT_REFERRAL_ENABLED === "true",
+      expertReferralMaturityWorker:
+        value.EXPERT_REFERRAL_MATURITY_WORKER_ENABLED === "true",
       expertResidencyBilling: value.EXPERT_RESIDENCY_BILLING_ENABLED === "true",
       expertTelegramQueries: value.EXPERT_TELEGRAM_QUERIES_ENABLED === "true",
       expertTelegramFinancialViews:

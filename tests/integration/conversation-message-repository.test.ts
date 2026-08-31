@@ -101,6 +101,41 @@ describe("conversation message repository", () => {
     expect(facts.rows[0]).toEqual({ audit: "1", outbox: "1" });
   });
 
+  it("records one durable free fact and replays it idempotently", async () => {
+    const userId = await testDb.createUserWithPackage(1);
+    const repository = new PostgresMessageRepository(testDb.db);
+    const command = inbound(userId, "free-v2");
+    const prepared = await repository.prepareInbound(command);
+    const completed = await repository.completeInbound({
+      messageEventId: prepared.messageEventId,
+      userId,
+      correlationId: command.correlationId,
+      billingPolicy: "free",
+      outcome: answer("free"),
+    });
+    const duplicate = await repository.completeInbound({
+      messageEventId: prepared.messageEventId,
+      userId,
+      correlationId: command.correlationId,
+      billingPolicy: "free",
+      outcome: answer("free"),
+    });
+    expect(completed).toMatchObject({
+      kind: "completed",
+      packageId: null,
+      result: { kind: "answer_queued", chargedMessages: 0 },
+    });
+    expect(duplicate).toEqual({
+      kind: "duplicate",
+      messageEventId: prepared.messageEventId,
+    });
+    const facts = await testDb.db.execute<{ entryKind: string; delta: string }>(
+      sql`select entry_kind as "entryKind", delta::text as delta from message_ledger_entries where message_event_id = ${prepared.messageEventId}::uuid`,
+    );
+    expect(facts.rows).toEqual([{ entryKind: "free", delta: "0" }]);
+    expect(await testDb.packageBalance(userId)).toBe(1);
+  });
+
   it("poisons a provider-event replay whose payload differs", async () => {
     const userId = await testDb.createUserWithPackage(1);
     const repository = new PostgresMessageRepository(testDb.db);
