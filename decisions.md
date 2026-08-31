@@ -15,6 +15,8 @@ Release B1 keeps ingress and hybrid routing independently default-off and valida
 B2 retains a terminal Selarti request payload until either its proposal exists or its deadline passes; this preserves response convergence while still allowing bounded sensitive-data redaction.
 
 B3 derives the live hard cap only from settled expert-residency cash and snapshots integer FX arithmetic with each reservation. This makes refunds and referral credits conservative automatically and prevents later policy/rate changes from rewriting historical cost authority.
+
+Release C resolves reminders against the configured client bot, a numeric Telegram chat identity, current booking state, and the latest exact-policy consent in the same transaction that allocates the dialogue sequence. This prevents cross-bot delivery and makes consent withdrawal win before any outbox fact is created.
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.

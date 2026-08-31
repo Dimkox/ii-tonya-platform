@@ -274,6 +274,13 @@
       "when": 1788393600000,
       "tag": "0038_test_expert_trial",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788480000000,
+      "tag": "0039_lifecycle_scheduler_c1",
+      "breakpoints": true
     }
   ]
 }

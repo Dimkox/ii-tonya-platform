@@ -8,6 +8,10 @@ export {
 } from "./client.js";
 export { sql } from "drizzle-orm";
 export {
+  PostgresLifecycleSchedulerRepository,
+  type LifecycleJobType,
+} from "./repositories/lifecycle-scheduler-repository.js";
+export {
   PostgresPartnerCommerceRepository,
   type PartnerCommandResult,
 } from "./repositories/partner-commerce-repository.js";

@@ -48,6 +48,10 @@ describe("loadEnv", () => {
       expertAiIngress: false,
       expertTelegramReferral: false,
       expertTelegramCheckout: false,
+      lifecycleReminders: false,
+      lifecycleCheckups: false,
+      lifecycleFeedback: false,
+      lifecycleCouponNotices: false,
       yookassa: false,
     });
     expect(config.features.selartiCostAdmission).toBe(false);
@@ -56,6 +60,37 @@ describe("loadEnv", () => {
       loadEnv(localEnv({ RAW_CONVERSATION_LOGGING: "true" })),
     ).toThrow("Raw conversation logging is prohibited");
     expect(() => loadEnv(localEnv({ SELARTI_ENABLED: "true" }))).toThrow();
+  });
+
+  it("enables booking reminders only with their delivery and consent authorities", () => {
+    expect(() =>
+      loadEnv(localEnv({ LIFECYCLE_REMINDERS_ENABLED: "true" })),
+    ).toThrow("lifecycle_scheduler_configuration_incomplete");
+
+    const enabled = loadEnv(
+      localEnv({
+        LIFECYCLE_REMINDERS_ENABLED: "true",
+        CLIENT_BOOKING_ENABLED: "true",
+        CLIENT_SESSION_ENABLED: "true",
+        CLIENT_CATALOG_ENABLED: "true",
+        WORKER_OUTBOX_DELIVERY_ENABLED: "true",
+        CLIENT_TELEGRAM_BOT_KEY: "bot-client",
+        CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
+      }),
+    );
+    expect(enabled.features.lifecycleReminders).toBe(true);
+  });
+
+  it("fails closed for lifecycle capabilities not implemented in release C1", () => {
+    expect(() =>
+      loadEnv(localEnv({ LIFECYCLE_CHECKUPS_ENABLED: "true" })),
+    ).toThrow("lifecycle_checkup_authority_unavailable");
+    expect(() =>
+      loadEnv(localEnv({ LIFECYCLE_FEEDBACK_ENABLED: "true" })),
+    ).toThrow("lifecycle_feedback_authority_unavailable");
+    expect(() =>
+      loadEnv(localEnv({ LIFECYCLE_COUPON_NOTICES_ENABLED: "true" })),
+    ).toThrow("lifecycle_coupon_authority_unavailable");
   });
 
   it("defaults test-expert reconciliation off and accepts only exact booleans", () => {

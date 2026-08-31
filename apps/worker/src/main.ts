@@ -16,6 +16,7 @@ import {
   PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
   PostgresTestExpertTelegramRepository,
+  PostgresLifecycleSchedulerRepository,
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
@@ -386,6 +387,13 @@ export function createProductionWorkerRuntimeFactory(
       );
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
+      const lifecycleSchedulerRepository = config.features.lifecycleReminders
+        ? new PostgresLifecycleSchedulerRepository(
+            db,
+            config.clientMessagingConsentPolicyVersion!,
+            config.clientTelegramBotKey!,
+          )
+        : undefined;
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -399,6 +407,15 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository,
+        ...(lifecycleSchedulerRepository === undefined
+          ? {}
+          : {
+              lifecycleScheduler: () =>
+                lifecycleSchedulerRepository.processDueLifecycleBatch({
+                  now: new Date(),
+                  batchSize: 100,
+                }),
+            }),
         ...(workerOutbox === undefined
           ? {}
           : {

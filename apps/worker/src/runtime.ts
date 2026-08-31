@@ -13,6 +13,7 @@ export interface WorkerCycleReport {
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
+  readonly lifecycleScheduler: unknown;
   readonly expertResidencyExpiry: unknown;
   readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
@@ -44,6 +45,7 @@ export interface WorkerRuntimeDependencies {
   readonly recoverExpiredLeases: BoundedJob;
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly reservationExpiry: BoundedJob;
+  readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly expertResidencyExpiry: BoundedJob;
   readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
@@ -66,6 +68,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
@@ -164,6 +167,11 @@ export function createWorkerRuntime(
       const unknownOutcomeReconciliation =
         await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
+      const lifecycleScheduler = (await deps.lifecycleScheduler?.()) ?? {
+        examined: 0,
+        materialized: 0,
+        reason: "disabled",
+      };
       const expertResidencyExpiry = await deps.expertResidencyExpiry();
       const expertTelegramCheckoutCleanup =
         await deps.expertTelegramCheckoutCleanup();
@@ -191,6 +199,7 @@ export function createWorkerRuntime(
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
         reservationExpiry,
+        lifecycleScheduler,
         expertResidencyExpiry,
         expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
@@ -289,6 +298,7 @@ export function createProductionWorkerRuntime(
         now: deps.now(),
         batchSize,
       }),
+    lifecycleScheduler: deps.lifecycleScheduler,
     expertResidencyExpiry: async () =>
       expireExpertResidencyOrders(
         deps.expertReferralJobsRepository,

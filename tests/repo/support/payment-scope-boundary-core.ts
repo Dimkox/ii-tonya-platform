@@ -93,6 +93,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
+  "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -133,6 +134,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "selarti_response_proposals",
   "dialogue_deliveries",
   "dialogue_inbound_tombstones",
+  "lifecycle_jobs",
   "selarti_budget_policies",
   "selarti_cost_reservations",
   "selarti_actual_usage_facts",
@@ -695,8 +697,12 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
+    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "79b94210b3378e7ca8f1ba9444f6afdb82966d148a9e89052f3512dc8751fc62",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -776,7 +782,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "79b94210b3378e7ca8f1ba9444f6afdb82966d148a9e89052f3512dc8751fc62",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
