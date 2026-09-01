@@ -60,6 +60,7 @@ type IntentRejectionReason =
   | "persistent_tool_instruction"
   | "unauthorized_scope"
   | "unapproved_destination"
+  | "unsupported_intent"
   | "invalid_shape";
 
 export type IntentProposalValidation =
@@ -143,12 +144,70 @@ const capabilityRejection = (
   return null;
 };
 
+const unsupportedExpertKinds = new Set([
+  "set_referral_balance",
+  "set_referral_code",
+  "set_residency_price",
+  "settle_residency",
+  "refund_residency",
+  "chargeback_residency",
+]);
+const existingIntentKinds = new Set([
+  "answer",
+  "show_catalog",
+  "start_booking",
+  "human_handoff",
+]);
+const expertIntentKinds = new Set([
+  "redeem_expert_referral",
+  "view_referral_summary",
+  "quote_residency",
+  "start_residency_checkout",
+]);
+const financialMutationKind =
+  /(?:referral|residency|balance|credit|cash|price|settle|refund|chargeback|payment|ledger|grant|debt)/u;
+const authorityBearingKey =
+  /(?:amount|balance|price|cash|credit|inviter|invitee|referral|settlement|refund|chargeback|payment|provider|ledger|allocation|grant|debt|expertid|callback|url|secret|tool|rawpayload)/iu;
+
+const hasAuthorityBearingField = (value: unknown): boolean => {
+  const pending: unknown[] = [value];
+  const visited = new Set<object>();
+  let inspected = 0;
+  while (pending.length > 0) {
+    if (++inspected > 256) return true;
+    const candidate = pending.pop();
+    if (typeof candidate !== "object" || candidate === null) continue;
+    if (visited.has(candidate)) return true;
+    visited.add(candidate);
+    if (Array.isArray(candidate)) {
+      pending.push(...candidate);
+      continue;
+    }
+    for (const [key, nested] of Object.entries(candidate)) {
+      if (key !== "kind" && authorityBearingKey.test(key)) return true;
+      pending.push(nested);
+    }
+  }
+  return false;
+};
+
 const validateIntentProposalUnsafe = (
   value: unknown,
   authorization?: unknown,
 ): IntentProposalValidation => {
   if (!isRecord(value) || typeof value.kind !== "string") {
     return { accepted: false, reasonCode: "invalid_shape" };
+  }
+  if (
+    unsupportedExpertKinds.has(value.kind) ||
+    (!existingIntentKinds.has(value.kind) &&
+      !expertIntentKinds.has(value.kind) &&
+      financialMutationKind.test(value.kind)) ||
+    (!existingIntentKinds.has(value.kind) &&
+      (expertIntentKinds.has(value.kind) || hasAuthorityBearingField(value)) &&
+      hasAuthorityBearingField(value))
+  ) {
+    return { accepted: false, reasonCode: "unsupported_intent" };
   }
   const earlyRejection = capabilityRejection(
     Object.values(value).filter(
@@ -204,6 +263,41 @@ const validateIntentProposalUnsafe = (
       return { accepted: false, reasonCode: "invalid_shape" };
     }
     proposal = { kind: "human_handoff", reasonCode: value.reasonCode };
+  } else if (value.kind === "redeem_expert_referral") {
+    if (
+      !hasExactKeys(value, ["kind", "code"]) ||
+      typeof value.code !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{2,255}$/u.test(value.code)
+    ) {
+      return { accepted: false, reasonCode: "invalid_shape" };
+    }
+    proposal = { kind: "redeem_expert_referral", code: value.code };
+  } else if (value.kind === "view_referral_summary") {
+    if (!hasExactKeys(value, ["kind"])) {
+      return { accepted: false, reasonCode: "invalid_shape" };
+    }
+    proposal = { kind: "view_referral_summary" };
+  } else if (value.kind === "quote_residency") {
+    if (
+      !hasExactKeys(value, ["kind", "tariffVersionId"]) ||
+      typeof value.tariffVersionId !== "string" ||
+      !uuid.test(value.tariffVersionId)
+    ) {
+      return { accepted: false, reasonCode: "invalid_shape" };
+    }
+    proposal = {
+      kind: "quote_residency",
+      tariffVersionId: value.tariffVersionId,
+    };
+  } else if (value.kind === "start_residency_checkout") {
+    if (
+      !hasExactKeys(value, ["kind", "orderId"]) ||
+      typeof value.orderId !== "string" ||
+      !uuid.test(value.orderId)
+    ) {
+      return { accepted: false, reasonCode: "invalid_shape" };
+    }
+    proposal = { kind: "start_residency_checkout", orderId: value.orderId };
   } else {
     return { accepted: false, reasonCode: "invalid_shape" };
   }
@@ -695,6 +789,21 @@ export const createConversationService = (
     }
 
     const proposal = validation.proposal;
+    if (
+      proposal.kind === "redeem_expert_referral" ||
+      proposal.kind === "view_referral_summary" ||
+      proposal.kind === "quote_residency" ||
+      proposal.kind === "start_residency_checkout"
+    ) {
+      return completeInbound(deps, command, prepared.messageEventId, {
+        kind: "human_handoff",
+        topic: "human_handoff.opened",
+        payload: { reasonCode: "unauthorized_scope" },
+        ownerId: runtime.handoffOwnerId,
+        openedAt: runtime.now,
+        acknowledgeBy: runtime.acknowledgeBy,
+      });
+    }
     if (proposal.kind === "human_handoff") {
       return completeInbound(
         deps,

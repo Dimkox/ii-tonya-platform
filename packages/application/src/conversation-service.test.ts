@@ -338,6 +338,29 @@ describe("conversation workflow", () => {
     );
   });
 
+  it("does not execute or persist an expert financial proposal without an exact expert principal", async () => {
+    const deps = conversationFixture({ balance: 1, safety: "ordinary" });
+    const tariffVersionId = "00000000-0000-4000-8000-000000000015";
+    deps.intentEngine.propose = vi.fn().mockResolvedValue({
+      kind: "quote_residency",
+      tariffVersionId,
+    });
+
+    const result = await createConversationService(deps).handleInbound(
+      deps.inbound,
+    );
+
+    expect(result).toEqual({
+      kind: "human_handoff",
+      reasonCode: "unauthorized_scope",
+      chargedMessages: 1,
+    });
+    expect(deps.outbox.topics()).toEqual(["human_handoff.opened"]);
+    expect(JSON.stringify(deps.outbox.payloads())).not.toContain(
+      tariffVersionId,
+    );
+  });
+
   it.each([
     {},
     { allowedExpertIds: [] },

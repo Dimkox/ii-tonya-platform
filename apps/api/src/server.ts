@@ -9,6 +9,8 @@ import {
   type ConversationService,
   type ExpertCodeSecretResolver,
   type PrivacyService,
+  type ExpertReferralService,
+  type ExpertResidencyService,
 } from "@ii-tonya/application";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -106,6 +108,7 @@ export const createDefaultLifecycle = (
         tariffs: new PostgresExpertResidencyRepository(db),
         heldRewards: new PostgresExpertResidencyProviderInboxRepository(db),
       });
+      const rateLimiter = createWindowedRateLimiter();
       return {
         config,
         conversationService: disabledService<ConversationService>(
@@ -119,6 +122,28 @@ export const createDefaultLifecycle = (
         }),
         adminApprovals,
         expertReferralAdminService,
+        expertReferral: {
+          authentication: {
+            async resolvePrincipal() {
+              return null;
+            },
+          },
+          referrals: disabledService<ExpertReferralService>(
+            "expert referral API",
+          ),
+          residency: disabledService<ExpertResidencyService>(
+            "expert residency API",
+          ),
+          tariffVersions: {
+            async tariffKeyFor() {
+              return null;
+            },
+          },
+          checkoutDeadline: () => {
+            throw new Error("expert residency checkout is disabled");
+          },
+          rateLimiter,
+        },
         selarti: new DisabledSelartiAdapter(),
         telegramCallbacks: {
           async isAuthorizedIdentity() {
@@ -144,7 +169,7 @@ export const createDefaultLifecycle = (
         },
         logger: createLogger(),
         inbox: new PostgresWebhookInboxRepository(db),
-        rateLimiter: createWindowedRateLimiter(),
+        rateLimiter,
         telegramWebhookSecret: randomBytes(32).toString("base64url"),
       };
     },

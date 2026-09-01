@@ -242,3 +242,188 @@ async function authenticateCallbackInternal(
 
   return { tokenHash: hash, claims };
 }
+
+const EXPERT_COMMAND_TOKEN_PREFIX = "ct3.";
+const EXPERT_COMMAND_TOKEN_VERSION = 3;
+const EXPERT_COMMAND_MAC_DOMAIN = Buffer.from(
+  `ii-tonya:telegram-callback\u0000${EXPERT_COMMAND_TOKEN_PREFIX}`,
+  "utf8",
+);
+
+export type ExpertCommandCallbackOperation =
+  | "redeem_expert_referral"
+  | "view_referral_summary"
+  | "quote_residency"
+  | "start_residency_checkout";
+
+export interface ExpertCommandCallbackClaims {
+  readonly kind: "expert_command";
+  readonly expertId: string;
+  readonly operation: ExpertCommandCallbackOperation;
+  readonly objectId: string;
+  readonly version: number;
+  readonly expiresAtEpochSeconds: number;
+}
+
+export type VersionedCallbackClaims =
+  | Readonly<{ kind: "reservation" } & ExpertCallbackClaims>
+  | ExpertCommandCallbackClaims;
+
+export interface ExpertCommandCallbackClaimsStore {
+  put(tokenHash: string, claims: ExpertCommandCallbackClaims): Promise<void>;
+  peek(tokenHash: string): Promise<ExpertCommandCallbackClaims | null>;
+  consumeIfValid(input: {
+    readonly tokenHash: string;
+    readonly expertId: string;
+    readonly operation: ExpertCommandCallbackOperation;
+    readonly objectId: string;
+    readonly version: number;
+    readonly now: Date;
+  }): Promise<ExpertCommandCallbackClaims | null>;
+}
+
+const expertCommandOperations = new Set<ExpertCommandCallbackOperation>([
+  "redeem_expert_referral",
+  "view_referral_summary",
+  "quote_residency",
+  "start_residency_checkout",
+]);
+const callbackObjectId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+
+const validateExpertCommandClaims = (
+  claims: ExpertCommandCallbackClaims,
+): void => {
+  if (
+    claims.kind !== "expert_command" ||
+    claims.expertId.length === 0 ||
+    !expertCommandOperations.has(claims.operation) ||
+    !callbackObjectId.test(claims.objectId) ||
+    !Number.isSafeInteger(claims.version) ||
+    claims.version <= 0 ||
+    !Number.isSafeInteger(claims.expiresAtEpochSeconds) ||
+    claims.expiresAtEpochSeconds <= 0
+  ) {
+    throw new CallbackAuthStateError("Invalid expert command callback claims");
+  }
+};
+
+const expertCommandTag = (nonce: Uint8Array, secret: Uint8Array): Buffer =>
+  createHmac("sha256", secret)
+    .update(EXPERT_COMMAND_MAC_DOMAIN)
+    .update(Buffer.from([EXPERT_COMMAND_TOKEN_VERSION]))
+    .update(nonce)
+    .digest()
+    .subarray(0, TAG_BYTES);
+
+const parseExpertCommandToken = (
+  token: string,
+): { readonly nonce: Buffer; readonly authenticatedTag: Buffer } => {
+  if (!token.startsWith(EXPERT_COMMAND_TOKEN_PREFIX)) {
+    throw new CallbackAuthStateError("Invalid expert command callback token");
+  }
+  const encoded = token.slice(EXPERT_COMMAND_TOKEN_PREFIX.length);
+  if (!/^[A-Za-z0-9_-]+$/u.test(encoded)) {
+    throw new CallbackAuthStateError("Invalid expert command callback token");
+  }
+  const payload = Buffer.from(encoded, "base64url");
+  if (
+    payload.byteLength !== PAYLOAD_BYTES ||
+    payload[0] !== EXPERT_COMMAND_TOKEN_VERSION ||
+    payload.toString("base64url") !== encoded
+  ) {
+    throw new CallbackAuthStateError("Invalid expert command callback token");
+  }
+  return {
+    nonce: payload.subarray(1, 1 + NONCE_BYTES),
+    authenticatedTag: payload.subarray(1 + NONCE_BYTES),
+  };
+};
+
+export async function issueExpertCommandCallback(
+  claims: ExpertCommandCallbackClaims,
+  secret: Uint8Array,
+  store: ExpertCommandCallbackClaimsStore,
+): Promise<string> {
+  validateExpertCommandClaims(claims);
+  requireStrongSecret(secret);
+  const nonce = randomBytes(NONCE_BYTES);
+  const payload = Buffer.concat([
+    Buffer.from([EXPERT_COMMAND_TOKEN_VERSION]),
+    nonce,
+    expertCommandTag(nonce, secret),
+  ]);
+  const token = `${EXPERT_COMMAND_TOKEN_PREFIX}${payload.toString("base64url")}`;
+  if (Buffer.byteLength(token, "utf8") > MAX_CALLBACK_BYTES) {
+    throw new CallbackAuthStateError("Callback token exceeds Telegram limit");
+  }
+  await store.put(tokenHash(nonce), claims);
+  return token;
+}
+
+export async function verifyExpertCommandCallback(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  expected: {
+    readonly operation: ExpertCommandCallbackOperation;
+    readonly objectId: string;
+  },
+  secret: Uint8Array,
+  store: ExpertCommandCallbackClaimsStore,
+  now: Date,
+): Promise<ExpertCommandCallbackClaims> {
+  try {
+    requireStrongSecret(secret);
+    const { nonce, authenticatedTag } = parseExpertCommandToken(token);
+    const expectedTag = expertCommandTag(nonce, secret);
+    if (!timingSafeEqual(authenticatedTag, expectedTag)) {
+      throw new CallbackAuthStateError("Invalid expert command callback token");
+    }
+    const hash = tokenHash(nonce);
+    const stored = await store.peek(hash);
+    if (stored === null) {
+      throw new CallbackAuthStateError("Unknown expert command callback token");
+    }
+    validateExpertCommandClaims(stored);
+    if (
+      !numericTelegramIdentity.test(expectedTelegramUserId) ||
+      binding.telegramUserId !== expectedTelegramUserId ||
+      !binding.active ||
+      !binding.verified ||
+      stored.expertId !== binding.expertId ||
+      stored.operation !== expected.operation ||
+      stored.objectId !== expected.objectId ||
+      stored.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)
+    ) {
+      throw new CallbackAuthStateError(
+        "Expert command callback not authorized",
+      );
+    }
+    const consumed = await store.consumeIfValid({
+      tokenHash: hash,
+      expertId: stored.expertId,
+      operation: stored.operation,
+      objectId: stored.objectId,
+      version: stored.version,
+      now,
+    });
+    if (
+      consumed === null ||
+      consumed.kind !== "expert_command" ||
+      consumed.expertId !== stored.expertId ||
+      consumed.operation !== stored.operation ||
+      consumed.objectId !== stored.objectId ||
+      consumed.version !== stored.version ||
+      consumed.expiresAtEpochSeconds !== stored.expiresAtEpochSeconds
+    ) {
+      throw new CallbackAuthStateError(
+        "Expert command callback not consumable",
+      );
+    }
+    return consumed;
+  } catch (error) {
+    if (error instanceof CallbackInfrastructureError) throw error;
+    if (!(error instanceof CallbackAuthStateError)) throw error;
+    throw new CallbackVerificationError();
+  }
+}

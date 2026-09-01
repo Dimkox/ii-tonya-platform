@@ -1,0 +1,10 @@
+{
+  "modelOutput": {
+    "kind": "view_referral_summary",
+    "expertId": "00000000-0000-4000-8000-000000000905"
+  },
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  }
+}

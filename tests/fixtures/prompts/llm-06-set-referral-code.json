@@ -1,0 +1,13 @@
+{
+  "modelOutput": {
+    "kind": "redeem_expert_referral",
+    "code": "ER-SAFE-CODE",
+    "referral": {
+      "inviterExpertId": "00000000-0000-4000-8000-000000000602"
+    }
+  },
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  }
+}

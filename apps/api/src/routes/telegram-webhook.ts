@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { CallbackInfrastructureError } from "@ii-tonya/integrations";
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -41,7 +42,15 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       const id = from && typeof from === "object" ? (from as Record<string, unknown>).id : undefined;
       if (!numericIdentity.test(String(id ?? ""))) return reply.code(403).send({ error: "unauthorized_expert" });
       if (!await deps.callbacks.isAuthorizedIdentity(String(id))) return reply.code(403).send({ error: "unauthorized_expert" });
-      if (!await deps.callbacks.verifyCallback(body, correlationId)) return reply.code(403).send({ error: "invalid_callback" });
+      try {
+        if (!(await deps.callbacks.verifyCallback(body, correlationId)))
+          return reply.code(403).send({ error: "invalid_callback" });
+      } catch (error) {
+        if (error instanceof CallbackInfrastructureError) {
+          return reply.code(503).send({ error: "callback_unavailable" });
+        }
+        return reply.code(403).send({ error: "invalid_callback" });
+      }
     }
     const updateId = String(body.update_id);
     const claim = await deps.inbox.claim("telegram", updateId);

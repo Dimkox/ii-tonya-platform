@@ -108,6 +108,7 @@ describe("server composition", () => {
     };
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertReferralAdminService).toBeDefined();
+    expect(dependencies.expertReferral).toBeDefined();
     await expect(
       dependencies.expertReferralAdminService!.issueBatch(
         {

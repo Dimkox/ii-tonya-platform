@@ -63,6 +63,97 @@ export interface ExpertScheduleView {
   text: string;
 }
 
+export interface ExpertReferralSummaryTelegramView {
+  readonly code: {
+    readonly status: "none" | "issued" | "redeemed" | "revoked";
+    readonly maskedSuffix: string | null;
+  };
+  readonly spendableBalanceMinor: string;
+  readonly reservedBalanceMinor: string;
+  readonly debtMinor: string;
+  readonly nearestExpiryAt: string | null;
+}
+
+export interface ExpertResidencyQuoteTelegramView {
+  readonly tariffVersionId: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly priceMinor: string;
+  readonly currency: "RUB";
+  readonly durationSeconds: number;
+  readonly creditMinor: string;
+  readonly cashMinor: string;
+}
+
+const decimalMinor = /^[0-9]{1,19}$/u;
+const safeText = /^[^\u0000-\u001F\u007F-\u009F]{1,256}$/u;
+const canonicalUtcInstant =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/u;
+const isCanonicalUtcInstant = (value: string): boolean => {
+  const parsed = new Date(value);
+  return (
+    canonicalUtcInstant.test(value) &&
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString() === value
+  );
+};
+
+export const renderExpertReferralSummary = (
+  view: ExpertReferralSummaryTelegramView,
+): string => {
+  if (
+    !["none", "issued", "redeemed", "revoked"].includes(view.code.status) ||
+    (view.code.status === "none"
+      ? view.code.maskedSuffix !== null
+      : typeof view.code.maskedSuffix !== "string" ||
+        !/^…[A-Za-z0-9]{4,12}$/u.test(view.code.maskedSuffix)) ||
+    !decimalMinor.test(view.spendableBalanceMinor) ||
+    !decimalMinor.test(view.reservedBalanceMinor) ||
+    !decimalMinor.test(view.debtMinor) ||
+    (view.nearestExpiryAt !== null &&
+      !isCanonicalUtcInstant(view.nearestExpiryAt))
+  ) {
+    throw new Error("invalid_expert_referral_view");
+  }
+  const code =
+    view.code.status === "none"
+      ? "none"
+      : `${view.code.status} ${view.code.maskedSuffix}`;
+  return [
+    `Referral code: ${code}`,
+    `Spendable (minor): ${view.spendableBalanceMinor}`,
+    `Reserved (minor): ${view.reservedBalanceMinor}`,
+    `Debt (minor): ${view.debtMinor}`,
+    `Nearest expiry: ${view.nearestExpiryAt ?? "none"}`,
+  ].join("\n");
+};
+
+export const renderExpertResidencyQuote = (
+  view: ExpertResidencyQuoteTelegramView,
+): string => {
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(view.tariffVersionId) ||
+    !safeText.test(view.displayName) ||
+    !safeText.test(view.description) ||
+    !decimalMinor.test(view.priceMinor) ||
+    view.currency !== "RUB" ||
+    !Number.isSafeInteger(view.durationSeconds) ||
+    view.durationSeconds < 86_400 ||
+    view.durationSeconds > 315_360_000 ||
+    !decimalMinor.test(view.creditMinor) ||
+    !decimalMinor.test(view.cashMinor)
+  ) {
+    throw new Error("invalid_expert_residency_quote_view");
+  }
+  return [
+    `${view.displayName}: ${view.description}`,
+    `Price: ${view.priceMinor} ${view.currency}`,
+    `Referral credit: ${view.creditMinor}`,
+    `Cash: ${view.cashMinor}`,
+    `Duration seconds: ${String(view.durationSeconds)}`,
+  ].join("\n");
+};
+
 export type TelegramSendOutcome =
   | { kind: "applied"; providerOperationId: string }
   | {

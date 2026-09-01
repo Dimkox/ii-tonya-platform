@@ -1,0 +1,11 @@
+{
+  "modelOutput": {
+    "kind": "quote_residency",
+    "tariffVersionId": "00000000-0000-4000-8000-000000000703",
+    "priceMinor": "1"
+  },
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  }
+}

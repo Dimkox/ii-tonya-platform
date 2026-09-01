@@ -34,6 +34,21 @@ describe("LLM capability boundary", () => {
   });
 
   it.each([
+    "llm-05-set-referral-balance",
+    "llm-06-set-referral-code",
+    "llm-07-set-residency-price",
+    "llm-08-fake-settlement",
+    "llm-09-cross-expert-referral",
+  ])("rejects malicious expert proposal fixture %s", (fixtureName) => {
+    const fixture = JSON.parse(
+      readFileSync(`tests/fixtures/prompts/${fixtureName}.json`, "utf8"),
+    ) as { modelOutput: unknown; authorization: unknown };
+    expect(
+      validateIntentProposal(fixture.modelOutput, fixture.authorization),
+    ).toEqual({ accepted: false, reasonCode: "unsupported_intent" });
+  });
+
+  it.each([
     { kind: "answer", text: "Короткий безопасный ответ" },
     { kind: "show_catalog", serviceCode: "consultation" },
     { kind: "show_catalog" },
@@ -47,6 +62,55 @@ describe("LLM capability boundary", () => {
       accepted: true,
       proposal,
     });
+  });
+
+  it.each([
+    { kind: "redeem_expert_referral", code: "ER-SAFE-CODE" },
+    { kind: "view_referral_summary" },
+    {
+      kind: "quote_residency",
+      tariffVersionId: "00000000-0000-4000-8000-000000000015",
+    },
+    {
+      kind: "start_residency_checkout",
+      orderId: "00000000-0000-4000-8000-000000000016",
+    },
+  ])("accepts exact expert proposal %# as untrusted data", (proposal) => {
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
+      accepted: true,
+      proposal,
+    });
+  });
+
+  it.each([
+    {
+      kind: "quote_residency",
+      tariffVersionId: "00000000-0000-4000-8000-000000000015",
+      nested: { checkoutUrl: "https://attacker.invalid/pay" },
+    },
+    {
+      kind: "redeem_expert_referral",
+      code: "ER-SAFE-CODE",
+      nested: { apiSecret: "attacker-secret" },
+    },
+    {
+      kind: "view_referral_summary",
+      nested: { toolName: "ledger.write" },
+    },
+  ])("rejects nested authority-bearing expert proposal %#", (proposal) => {
+    expect(validateIntentProposal(proposal, validAuthorization)).toEqual({
+      accepted: false,
+      reasonCode: "unsupported_intent",
+    });
+  });
+
+  it("classifies an unsupported financial mutation kind without fields safely", () => {
+    expect(
+      validateIntentProposal(
+        { kind: "withdraw_referral_credit" },
+        validAuthorization,
+      ),
+    ).toEqual({ accepted: false, reasonCode: "unsupported_intent" });
   });
 
   it.each([

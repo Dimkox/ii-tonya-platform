@@ -18,6 +18,10 @@ import Fastify, {
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
+import {
+  expertReferralRoutes,
+  type ExpertReferralRouteDependencies,
+} from "./routes/expert-referral.js";
 import { healthRoutes, type ReadinessProbe } from "./routes/health.js";
 import {
   selartiWebhookRoutes,
@@ -48,6 +52,7 @@ export interface AppDependencies {
   telegramWebhookSecret: string;
   adminApprovals?: ApprovalPort;
   expertReferralAdminService?: ExpertReferralAdminService;
+  expertReferral?: ExpertReferralRouteDependencies;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -73,6 +78,9 @@ export async function buildApp(
     inbox: deps.inbox,
     rateLimiter: deps.rateLimiter,
   });
+  if (deps.expertReferral !== undefined) {
+    await app.register(expertReferralRoutes, deps.expertReferral);
+  }
   if (deps.adminApprovals !== undefined) {
     const admin = await buildAdminApi({
       approvals: deps.adminApprovals,
@@ -172,6 +180,7 @@ export async function buildTestApp(
       readonly approvals: ApprovalPort;
       readonly service: ExpertReferralAdminService;
     };
+    expertReferral?: ExpertReferralRouteDependencies;
   } = {},
 ): Promise<TestApp> {
   const receipts = new Map<string, "processing" | "complete">();
@@ -272,6 +281,9 @@ export async function buildTestApp(
           adminApprovals: options.expertReferralAdmin.approvals,
           expertReferralAdminService: options.expertReferralAdmin.service,
         }),
+    ...(options.expertReferral === undefined
+      ? {}
+      : { expertReferral: options.expertReferral }),
     ...(options.now === undefined
       ? {}
       : { now: () => new Date(options.now!()) }),

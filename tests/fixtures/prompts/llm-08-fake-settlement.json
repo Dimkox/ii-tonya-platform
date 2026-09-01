@@ -1,0 +1,14 @@
+{
+  "modelOutput": {
+    "kind": "start_residency_checkout",
+    "orderId": "00000000-0000-4000-8000-000000000804",
+    "settlement": {
+      "paymentId": "pay-attacker",
+      "status": "settled"
+    }
+  },
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  }
+}

@@ -1,9 +1,56 @@
 import { describe, expect, it } from "vitest";
 import type { ExpertReferralAdminService } from "@ii-tonya/application";
+import type {
+  ExpertPrincipal,
+  ExpertReferralService,
+  ExpertResidencyService,
+} from "@ii-tonya/application";
 import { buildTestApp } from "./app.js";
+import { createWindowedRateLimiter } from "./rate-limit.js";
 import { hashAdminSessionToken } from "./routes/admin.js";
 
 describe("API boundary", () => {
+  it("mounts the authenticated expert self-summary route through application dependencies", async () => {
+    const principal: ExpertPrincipal = {
+      expertId: "00000000-0000-4000-8000-000000000921",
+      userId: "user-921",
+      provider: "telegram",
+      externalId: "921",
+    };
+    const app = await buildTestApp({
+      expertReferral: {
+        authentication: { resolvePrincipal: async () => principal },
+        referrals: {
+          redeemCode: async () => ({ kind: "forbidden" }),
+          summary: async () => ({
+            expertId: principal.expertId,
+            spendableBalanceMinor: "12",
+            reservedBalanceMinor: "3",
+            debtMinor: "0",
+            nearestExpiryAt: null,
+          }),
+        } satisfies ExpertReferralService,
+        residency: new Proxy({}, { get: () => async () => ({ kind: "forbidden" }) }) as ExpertResidencyService,
+        tariffVersions: { tariffKeyFor: async () => null },
+        checkoutDeadline: () => new Date("2026-08-03T00:15:00.000Z"),
+        rateLimiter: createWindowedRateLimiter(),
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/expert/referrals/summary",
+      headers: { authorization: "Bearer expert-session" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      spendableBalanceMinor: "12",
+      reservedBalanceMinor: "3",
+      debtMinor: "0",
+      nearestExpiryAt: null,
+    });
+    await app.close();
+  });
+
   it("rejects unverified webhooks before application dispatch", async () => {
     const app = await buildTestApp();
     const response = await app.inject({ method: "POST", url: "/v1/webhooks/selarti", payload: { event: "message" } });

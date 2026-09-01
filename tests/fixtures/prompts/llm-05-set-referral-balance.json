@@ -1,0 +1,10 @@
+{
+  "modelOutput": {
+    "kind": "set_referral_balance",
+    "amount": 999999
+  },
+  "authorization": {
+    "allowedExpertIds": [],
+    "allowedServiceCodes": []
+  }
+}
