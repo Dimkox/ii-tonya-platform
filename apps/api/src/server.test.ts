@@ -106,9 +106,27 @@ describe("server composition", () => {
       },
       expertReferralKeys: null,
     };
-    const app = await (
-      await import("./app.js")
-    ).buildApp(await lifecycle.dependencies(config, fakeDb));
+    const dependencies = await lifecycle.dependencies(config, fakeDb);
+    expect(dependencies.expertReferralAdminService).toBeDefined();
+    await expect(
+      dependencies.expertReferralAdminService!.issueBatch(
+        {
+          id: "00000000-0000-4000-8000-000000000941",
+          sessionIdHash: "sha256:disabled-admin-session",
+          roles: ["entitlement_admin"],
+          mfaVerifiedAt: new Date("2026-08-03T00:00:00.000Z"),
+        },
+        {
+          routeObjectId: "00000000-0000-4000-8000-000000000942",
+          inviterExpertId: "00000000-0000-4000-8000-000000000942",
+          count: 1,
+          approvalId: "00000000-0000-4000-8000-000000000943",
+          nonce: "nonce:disabled-admin-test",
+          correlationId: "correlation:disabled-admin-test",
+        },
+      ),
+    ).rejects.toMatchObject({ code: "feature_disabled" });
+    const app = await (await import("./app.js")).buildApp(dependencies);
     expect(
       (await app.inject({ method: "GET", url: "/health/live" })).statusCode,
     ).toBe(200);

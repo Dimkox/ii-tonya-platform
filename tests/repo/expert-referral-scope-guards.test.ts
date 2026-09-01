@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS,
@@ -47,6 +48,11 @@ describe("expert residency referral scope guards", () => {
       "/v1/expert/residency/quotes",
       "/v1/expert/residency/checkouts",
       "/v1/admin/expert-referrals/inventory",
+      "/v1/admin/expert-referrals/*",
+      "/v1/admin/expert-referrals/actions/:action/:objectId/approvals",
+      "/v1/admin/expert-referrals/approvals/:approvalId/approve",
+      "/v1/admin/expert-referrals/actions/:action/:objectId/execute",
+      "/v1/admin/expert-referrals/inviters/:inviterExpertId/inventory",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS]).toEqual([
       "EXPERT_REFERRAL_ENABLED",
@@ -223,6 +229,18 @@ describe("expert residency referral scope guards", () => {
     ],
   ])("rejects %s", (_label, path, content) => {
     expect(classifyPaymentScopeProbe({ path, content })).not.toEqual([]);
+  });
+
+  it("allows only the reviewed expert referral admin route surface", () => {
+    expect(
+      classifyPaymentScopeProbe({
+        path: "apps/api/src/routes/expert-referral-admin.ts",
+        content: readFileSync(
+          "apps/api/src/routes/expert-referral-admin.ts",
+          "utf8",
+        ),
+      }),
+    ).toEqual([]);
   });
 
   it.each([

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ExpertReferralAdminService } from "@ii-tonya/application";
 import { buildTestApp } from "./app.js";
+import { hashAdminSessionToken } from "./routes/admin.js";
 
 describe("API boundary", () => {
   it("rejects unverified webhooks before application dispatch", async () => {
@@ -97,6 +99,69 @@ describe("API boundary", () => {
     for (const method of ["PUT", "PATCH", "DELETE"] as const) {
       expect((await app.inject({ method, url: "/v1/admin/commands/client.create/00000000-0000-4000-8000-000000000000", payload: {} })).statusCode).toBe(404);
     }
+    await app.close();
+  });
+
+  it("mounts the separate authenticated expert referral admin inventory route", async () => {
+    const token = "a".repeat(32);
+    const sessionIdHash = hashAdminSessionToken(token);
+    const principal = {
+      id: "00000000-0000-4000-8000-000000000931",
+      sessionIdHash,
+      roles: ["entitlement_admin" as const],
+      mfaVerifiedAt: new Date("2026-08-03T00:00:00.000Z"),
+    };
+    const inviterId = "00000000-0000-4000-8000-000000000932";
+    const app = await buildTestApp({
+      expertReferralAdmin: {
+        approvals: {
+          async resolvePrincipal(hash: string) {
+            return hash === sessionIdHash ? principal : null;
+          },
+          async requestApproval() {
+            return null;
+          },
+          async approveApproval() {
+            return false;
+          },
+        },
+        service: new Proxy(
+          {
+            async maskedInventory() {
+              return [
+                {
+                  batchId: "00000000-0000-4000-8000-000000000933",
+                  status: "issued" as const,
+                  maskedSuffix: "…SAFE",
+                  createdAt: new Date("2026-08-03T00:00:00.000Z"),
+                },
+              ];
+            },
+          },
+          {
+            get: (target, property) =>
+              property in target
+                ? target[property as keyof typeof target]
+                : async () => ({}),
+          },
+        ) as unknown as ExpertReferralAdminService,
+      },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/admin/expert-referrals/inviters/${inviterId}/inventory`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([
+      {
+        batchId: "00000000-0000-4000-8000-000000000933",
+        status: "issued",
+        maskedSuffix: "…SAFE",
+        createdAt: "2026-08-03T00:00:00.000Z",
+      },
+    ]);
     await app.close();
   });
 });

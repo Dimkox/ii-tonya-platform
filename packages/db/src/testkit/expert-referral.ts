@@ -10,6 +10,7 @@ export interface ExpertReferralAdminEvidence {
   readonly adminId: string;
   readonly approvalId: string;
   readonly sessionIdHash: string;
+  readonly nonce: string;
 }
 
 export const EXPERT_REFERRAL_FEATURE_CONTROL_TEST_OBJECT_ID =
@@ -66,6 +67,7 @@ export class ExpertReferralTestkit {
     const adminId = randomUUID();
     const approverId = randomUUID();
     const approvalId = randomUUID();
+    const nonce = randomUUID();
     const sessionIdHash = `sha256:${randomUUID()}`;
     const approverSessionIdHash = `sha256:${randomUUID()}`;
     const requesterMfaVerifiedAt = new Date(Date.now() - 60_000);
@@ -103,13 +105,13 @@ export class ExpertReferralTestkit {
         ${approvalId}::uuid, ${action},
         ${action === "expert_referral.code_revoke" ? "expert_referral_code" : action === "expert_referral.feature_switch" ? "expert_referral_feature_control" : "expert"},
         ${objectId ?? adminId}::uuid, ${adminId}::uuid,
-        clock_timestamp() + interval '1 day', ${randomUUID()},
+        clock_timestamp() + interval '1 day', ${nonce},
         ${sessionIdHash}, ${approverId}::uuid, ${approverSessionIdHash},
         ${canonicalAdminPayloadHash(payload)}, 'entitlement_admin',
         ${requesterMfaVerifiedAt}, ${approverMfaVerifiedAt}, clock_timestamp()
       )
     `);
-    return { adminId, approvalId, sessionIdHash };
+    return { adminId, approvalId, sessionIdHash, nonce };
   }
 
   async enableFeatureControl(): Promise<ExpertReferralAdminEvidence> {

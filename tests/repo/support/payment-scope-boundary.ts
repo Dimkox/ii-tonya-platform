@@ -36,6 +36,11 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/expert/residency/quotes",
   "/v1/expert/residency/checkouts",
   "/v1/admin/expert-referrals/inventory",
+  "/v1/admin/expert-referrals/*",
+  "/v1/admin/expert-referrals/actions/:action/:objectId/approvals",
+  "/v1/admin/expert-referrals/approvals/:approvalId/approve",
+  "/v1/admin/expert-referrals/actions/:action/:objectId/execute",
+  "/v1/admin/expert-referrals/inviters/:inviterExpertId/inventory",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([

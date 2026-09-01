@@ -6,7 +6,10 @@ import {
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import {
+  appendExpertReferralAuditEvent,
   PostgresExpertReferralControlRepository,
+  validateAndConsumeExpertReferralAdminEvidence,
+  type ExpertReferralAdminEvidence,
   type ExpertReferralEligibility,
   type ExpertReferralTransaction,
 } from "./expert-referral-control-repository.js";
@@ -66,6 +69,10 @@ export type HeldRewardReplayResult =
   | Readonly<{ kind: "reward_granted"; amountMinor: "100000" }>
   | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
 
+export interface AdminHeldRewardReplay extends ExpertReferralAdminEvidence {
+  readonly expertId: string;
+  readonly qualifyingOrderId: string;
+}
 type ExpertResidencyProviderEventResult =
   ExpertResidencySettlementResult | ExpertResidencyRefundResult;
 
@@ -362,14 +369,44 @@ export class PostgresExpertResidencyProviderInboxRepository {
   }
 
   async replayHeldReward(
-    input: Readonly<{
-      expertId: string;
-      qualifyingOrderId: string;
-    }>,
+    input:
+      | Readonly<{
+          expertId: string;
+          qualifyingOrderId: string;
+        }>
+      | AdminHeldRewardReplay,
   ): Promise<HeldRewardReplayResult> {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        if ("approvalId" in input) {
+          const approval = await validateAndConsumeExpertReferralAdminEvidence(
+            tx,
+            input,
+            {
+              action: "expert_referral.hold_replay",
+              objectType: "expert_residency_order",
+              objectId: input.qualifyingOrderId,
+              payload: { expertId: input.expertId },
+            },
+          );
+          if (approval.replay) {
+            throw new ExpertResidencySettlementError(
+              "hold_replay_approval_replayed",
+            );
+          }
+          await appendExpertReferralAuditEvent(tx, {
+            ...input,
+            action: "expert_referral.hold_replay",
+            objectType: "expert_residency_order",
+            objectId: input.qualifyingOrderId,
+            reasonCode: "held_replay_approved",
+            metadata: {
+              expertId: input.expertId,
+              qualifyingOrderId: input.qualifyingOrderId,
+            },
+          });
+        }
         const featureControl = await this.controls.lockFeatureControl(tx);
         const order = await this.lockOrder(tx, input.qualifyingOrderId);
         if (order === undefined || order.expertId !== input.expertId) {
@@ -480,6 +517,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
         return result;
       }),
     );
+  }
+
+  replayHeldRewardAsAdmin(
+    input: AdminHeldRewardReplay,
+  ): Promise<HeldRewardReplayResult> {
+    return this.replayHeldReward(input);
   }
 
   private async processEvent(

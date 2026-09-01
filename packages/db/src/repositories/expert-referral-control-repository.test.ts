@@ -264,4 +264,23 @@ describe("expert referral durable controls", () => {
       }),
     ).rejects.toMatchObject({ code: "admin_evidence_invalid" });
   });
+
+  it("rejects execution evidence with a nonce different from the approval", async () => {
+    const expert = await fixtures.createExpert();
+    const evidence = await fixtures.createAdminEvidence(
+      "expert_referral.abuse_hold_open",
+      expert.expertId,
+      { reasonCode: "identity_review" },
+    );
+    const repo = new PostgresExpertReferralControlRepository(testDb.db);
+
+    await expect(
+      repo.openAbuseHold({
+        expertId: expert.expertId,
+        reasonCode: "identity_review",
+        ...evidence,
+        nonce: "nonce:different-execution-evidence",
+      }),
+    ).rejects.toMatchObject({ code: "admin_evidence_invalid" });
+  });
 });

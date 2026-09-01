@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
+  expertReferralApprovalActions,
+  requiredApprovalRole,
   requiredApprovalObjectType,
 } from "./admin-approval-repository.js";
 
@@ -48,5 +50,22 @@ describe("admin approval object mappings", () => {
     expect(requiredApprovalObjectType("feedback.read")).toBe("feedback_queue");
     expect(requiredApprovalObjectType("feedback.resolve")).toBe("feedback_queue");
     expect(requiredApprovalObjectType("package.grant")).toBeNull();
+  });
+
+  it("freezes the nine expert referral admin actions to entitlement administrators", () => {
+    expect(expertReferralApprovalActions).toEqual([
+      "expert_referral.batch_generate",
+      "expert_referral.code_revoke",
+      "expert_referral.issuance_override",
+      "expert_referral.abuse_hold_open",
+      "expert_referral.abuse_hold_close",
+      "expert_residency.tariff_create",
+      "expert_residency.tariff_retire",
+      "expert_referral.hold_replay",
+      "expert_referral.feature_switch",
+    ]);
+    expect(expertReferralApprovalActions.map(requiredApprovalRole)).toEqual(
+      Array.from({ length: 9 }, () => "entitlement_admin"),
+    );
   });
 });

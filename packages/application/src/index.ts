@@ -9,3 +9,4 @@ export * from "./expert-code-crypto.js";
 export * from "./expert-code-secret-resolver.js";
 export * from "./expert-referral-service.js";
 export * from "./expert-residency-service.js";
+export * from "./expert-referral-admin-service.js";

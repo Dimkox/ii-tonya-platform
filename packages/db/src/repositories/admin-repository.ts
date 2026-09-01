@@ -6,6 +6,7 @@ import {
   type AdminPayload,
   type ApprovalAdminAction,
   type ConsumedAdminApproval,
+  type ExpertReferralApprovalAction,
 } from "./admin-approval-repository.js";
 
 export interface WorkflowAuthorization {
@@ -68,7 +69,12 @@ const digest = (value: string): string =>
 
 const testClockByRepository = new WeakMap<PostgresAdminRepository, Date>();
 
-const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
+type LegacyAdminAction = Exclude<
+  ApprovalAdminAction,
+  ExpertReferralApprovalAction
+>;
+
+const objectTypes: Readonly<Record<LegacyAdminAction, string>> = {
   "client.create": "user",
   "client.deactivate": "user",
   "package.grant": "user",
@@ -98,7 +104,7 @@ export class PostgresAdminRepository {
     input: {
       actorId: string;
       sessionIdHash: string;
-      action: ApprovalAdminAction;
+      action: LegacyAdminAction;
       objectId: string;
       decision: "allowed" | "denied";
       reasonCode: string;
@@ -123,7 +129,7 @@ export class PostgresAdminRepository {
 
   private async appendDenied(
     command: WorkflowAuthorization,
-    action: ApprovalAdminAction,
+    action: LegacyAdminAction,
     objectId: string,
     reasonCode: string,
   ): Promise<void> {
@@ -149,7 +155,7 @@ export class PostgresAdminRepository {
   private async executeApproved<T extends MutationResult>(
     command: WorkflowAuthorization,
     binding: {
-      action: ApprovalAdminAction;
+      action: LegacyAdminAction;
       objectId: string;
       payload: AdminPayload;
     },
@@ -458,7 +464,14 @@ export class PostgresAdminRepository {
 
   private async mutateBooleanTarget(
     command: WorkflowAuthorization,
-    binding: { action: ApprovalAdminAction; objectId: string; payload: AdminPayload; table: "experts" | "expert_services"; column: "verified" | "active"; value: boolean },
+    binding: {
+      action: LegacyAdminAction;
+      objectId: string;
+      payload: AdminPayload;
+      table: "experts" | "expert_services";
+      column: "verified" | "active";
+      value: boolean;
+    },
   ): Promise<AdminWorkflowResult<{ objectId: string }>> {
     return this.executeApproved(command, binding, async (tx) => {
       const changed = binding.table === "experts"

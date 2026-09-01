@@ -7,6 +7,22 @@ export type AdminRole =
   | "catalog_admin"
   | "entitlement_admin"
   | "security_admin";
+
+export const expertReferralApprovalActions = [
+  "expert_referral.batch_generate",
+  "expert_referral.code_revoke",
+  "expert_referral.issuance_override",
+  "expert_referral.abuse_hold_open",
+  "expert_referral.abuse_hold_close",
+  "expert_residency.tariff_create",
+  "expert_residency.tariff_retire",
+  "expert_referral.hold_replay",
+  "expert_referral.feature_switch",
+] as const;
+
+export type ExpertReferralApprovalAction =
+  (typeof expertReferralApprovalActions)[number];
+
 export type ApprovalAdminAction =
   | "client.create"
   | "client.deactivate"
@@ -21,7 +37,8 @@ export type ApprovalAdminAction =
   | "safety.read"
   | "safety.resolve"
   | "feedback.read"
-  | "feedback.resolve";
+  | "feedback.resolve"
+  | ExpertReferralApprovalAction;
 
 type JsonScalar = string | number | boolean | null;
 export type AdminPayload =
@@ -66,6 +83,28 @@ export interface ConsumedAdminApproval {
   readonly consumedAt: Date;
 }
 
+export interface CreateExpertReferralIssuanceOverride {
+  readonly sessionIdHash: string;
+  readonly overrideId: string;
+  readonly inviterExpertId: string;
+  readonly additionalQuota: number;
+  readonly reason: string;
+  readonly validFrom: Date;
+  readonly expiresAt: Date;
+  readonly approvalId: string;
+  readonly nonce: string;
+  readonly secondApprovalId: string;
+  readonly secondNonce: string;
+}
+
+export interface CreatedExpertReferralIssuanceOverride {
+  readonly overrideId: string;
+  readonly inviterExpertId: string;
+  readonly additionalQuota: number;
+  readonly consumedCount: number;
+  readonly expiresAt: Date;
+}
+
 const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "client.create": "support",
   "client.deactivate": "support",
@@ -81,7 +120,20 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "safety.resolve": "security_admin",
   "feedback.read": "support",
   "feedback.resolve": "support",
+  "expert_referral.batch_generate": "entitlement_admin",
+  "expert_referral.code_revoke": "entitlement_admin",
+  "expert_referral.issuance_override": "entitlement_admin",
+  "expert_referral.abuse_hold_open": "entitlement_admin",
+  "expert_referral.abuse_hold_close": "entitlement_admin",
+  "expert_residency.tariff_create": "entitlement_admin",
+  "expert_residency.tariff_retire": "entitlement_admin",
+  "expert_referral.hold_replay": "entitlement_admin",
+  "expert_referral.feature_switch": "entitlement_admin",
 };
+
+export const requiredApprovalRole = (
+  action: ApprovalAdminAction,
+): AdminRole => actionRoles[action];
 
 const readObjectTypes: Readonly<
   Partial<Record<ApprovalAdminAction, "safety_case" | "feedback_queue">>
@@ -142,6 +194,33 @@ interface ApprovalRow extends Record<string, unknown> {
   nonce: string;
   consumedAt: Date;
 }
+
+interface OverrideApprovalRow extends Record<string, unknown> {
+  approvalId: string;
+  action: ApprovalAdminAction;
+  objectType: string;
+  objectId: string;
+  requesterId: string;
+  requesterSessionIdHash: string;
+  approverId: string;
+  payloadHash: string;
+  nonce: string;
+  requiredRole: AdminRole;
+  approved: boolean;
+  consumed: boolean;
+  approvalCurrent: boolean;
+  requesterSessionCurrent: boolean;
+  requesterSessionAdminId: string;
+  requesterMfaMatches: boolean;
+  requesterHasRole: boolean;
+  approverSessionCurrent: boolean;
+  approverSessionAdminId: string;
+  approverMfaMatches: boolean;
+  approverHasRole: boolean;
+}
+
+interface CreatedExpertReferralIssuanceOverrideRow
+  extends CreatedExpertReferralIssuanceOverride, Record<string, unknown> {}
 
 export class PostgresAdminApprovalRepository {
   constructor(private readonly db: DrizzleDb) {}
@@ -292,6 +371,157 @@ export class PostgresAdminApprovalRepository {
       returning a.id as "approvalId"
     `);
     return result.rows.length === 1;
+  }
+
+  async createIssuanceOverride(
+    input: CreateExpertReferralIssuanceOverride,
+  ): Promise<CreatedExpertReferralIssuanceOverride | null> {
+    if (
+      !Number.isInteger(input.additionalQuota) ||
+      input.additionalQuota < 1 ||
+      input.additionalQuota > 1000 ||
+      input.reason.trim().length === 0 ||
+      input.reason.length > 200 ||
+      !Number.isFinite(input.validFrom.getTime()) ||
+      !Number.isFinite(input.expiresAt.getTime()) ||
+      input.expiresAt <= input.validFrom ||
+      input.approvalId === input.secondApprovalId ||
+      input.nonce === input.secondNonce
+    )
+      return null;
+    const payload = {
+      inviterExpertId: input.inviterExpertId,
+      additionalQuota: input.additionalQuota,
+      reason: input.reason,
+      validFrom: input.validFrom.toISOString(),
+      expiresAt: input.expiresAt.toISOString(),
+    };
+    const payloadHash = canonicalAdminPayloadHash(payload);
+    return this.db.transaction(async (tx) => {
+      const approvals = (
+        await tx.execute<OverrideApprovalRow>(sql`
+          select a.id as "approvalId", a.action,
+            a.object_type as "objectType", a.object_id as "objectId",
+            a.requester_id as "requesterId",
+            a.requester_session_id_hash as "requesterSessionIdHash",
+            a.approver_id as "approverId", a.payload_hash as "payloadHash",
+            a.nonce, a.required_role as "requiredRole",
+            a.approved_at is not null as approved,
+            a.consumed_at is not null as consumed,
+            a.expires_at > clock_timestamp() as "approvalCurrent",
+            requester_session.revoked_at is null
+              and requester_session.expires_at > clock_timestamp()
+              and requester_session.mfa_verified_at <= clock_timestamp()
+              and requester_session.mfa_verified_at >= clock_timestamp() - interval '15 minutes'
+              as "requesterSessionCurrent",
+            requester_session.admin_id as "requesterSessionAdminId",
+            requester_session.mfa_verified_at = a.requester_mfa_verified_at
+              as "requesterMfaMatches",
+            exists(select 1 from admin_role_assignments requester_role
+              where requester_role.admin_id = a.requester_id
+                and requester_role.role = a.required_role) as "requesterHasRole",
+            approver_session.revoked_at is null
+              and approver_session.expires_at > clock_timestamp()
+              and approver_session.mfa_verified_at <= clock_timestamp()
+              and approver_session.mfa_verified_at >= clock_timestamp() - interval '15 minutes'
+              as "approverSessionCurrent",
+            approver_session.admin_id as "approverSessionAdminId",
+            approver_session.mfa_verified_at = a.approver_mfa_verified_at
+              as "approverMfaMatches",
+            exists(select 1 from admin_role_assignments approver_role
+              where approver_role.admin_id = a.approver_id
+                and approver_role.role = a.required_role) as "approverHasRole"
+          from admin_approvals a
+          join admin_sessions requester_session
+            on requester_session.session_id_hash = a.requester_session_id_hash
+          join admin_sessions approver_session
+            on approver_session.session_id_hash = a.approver_session_id_hash
+          where a.id in (${input.approvalId}::uuid, ${input.secondApprovalId}::uuid)
+          order by a.id
+          for update of a, requester_session, approver_session
+        `)
+      ).rows;
+      const byId = new Map(approvals.map((row) => [row.approvalId, row]));
+      const first = byId.get(input.approvalId);
+      const second = byId.get(input.secondApprovalId);
+      const valid = (
+        row: OverrideApprovalRow | undefined,
+        nonce: string,
+      ): row is OverrideApprovalRow =>
+        row !== undefined &&
+        row.action === "expert_referral.issuance_override" &&
+        row.objectType === "expert" &&
+        row.objectId === input.overrideId &&
+        row.requesterSessionIdHash === input.sessionIdHash &&
+        row.requesterSessionAdminId === row.requesterId &&
+        row.requesterMfaMatches &&
+        row.payloadHash === payloadHash &&
+        row.nonce === nonce &&
+        row.requiredRole === "entitlement_admin" &&
+        row.approved &&
+        !row.consumed &&
+        row.approvalCurrent &&
+        row.requesterSessionCurrent &&
+        row.requesterHasRole &&
+        row.approverId !== row.requesterId &&
+        row.approverSessionAdminId === row.approverId &&
+        row.approverMfaMatches &&
+        row.approverSessionCurrent &&
+        row.approverHasRole;
+      if (
+        !valid(first, input.nonce) ||
+        !valid(second, input.secondNonce) ||
+        first.requesterId !== second.requesterId ||
+        first.approverId === second.approverId
+      )
+        return null;
+      const consumed = await tx.execute(sql`
+        update admin_approvals set consumed_at = clock_timestamp()
+        where id in (${input.approvalId}::uuid, ${input.secondApprovalId}::uuid)
+          and consumed_at is null
+        returning id
+      `);
+      if (consumed.rows.length !== 2) return null;
+      const inserted = (
+        await tx.execute<CreatedExpertReferralIssuanceOverrideRow>(sql`
+          insert into expert_referral_issuance_overrides (
+            id, inviter_expert_id, additional_quota, reason, valid_from,
+            expires_at, requested_by_admin_id, requester_session_id_hash,
+            first_approver_id, second_approver_id,
+            first_approval_id, second_approval_id
+          ) values (
+            ${input.overrideId}::uuid, ${input.inviterExpertId}::uuid,
+            ${input.additionalQuota}, ${input.reason}, ${input.validFrom},
+            ${input.expiresAt}, ${first.requesterId}::uuid,
+            ${input.sessionIdHash}, ${first.approverId}::uuid,
+            ${second.approverId}::uuid, ${input.approvalId}::uuid,
+            ${input.secondApprovalId}::uuid
+          )
+          returning id as "overrideId", inviter_expert_id as "inviterExpertId",
+            additional_quota as "additionalQuota", consumed_count as "consumedCount",
+            expires_at as "expiresAt"
+        `)
+      ).rows[0];
+      if (inserted === undefined)
+        throw new Error("issuance_override_insert_failed");
+      await tx.execute(sql`
+        insert into audit_events (
+          actor_type, actor_id, authenticated_session_id_hash, action,
+          object_type, object_id, decision, reason_code, correlation_id,
+          occurred_at, metadata_hash
+        ) values (
+          'admin', ${first.requesterId}::uuid, ${input.sessionIdHash},
+          'expert_referral.issuance_override', 'expert_referral_issuance_override',
+          ${input.overrideId}::uuid, 'allow', ${input.reason},
+          ${`approvals:${input.approvalId}:${input.secondApprovalId}`},
+          clock_timestamp(), ${payloadHash}
+        )
+      `);
+      return {
+        ...inserted,
+        expiresAt: new Date(inserted.expiresAt),
+      };
+    });
   }
 
   async consumeApproval(

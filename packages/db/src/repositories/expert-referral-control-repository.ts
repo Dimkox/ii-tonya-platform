@@ -34,6 +34,7 @@ export interface ExpertReferralAdminEvidence {
   readonly adminId: string;
   readonly approvalId: string;
   readonly sessionIdHash: string;
+  readonly nonce: string;
 }
 
 export interface UpdateExpertReferralFeatureControl extends ExpertReferralAdminEvidence {
@@ -110,6 +111,7 @@ interface ApprovalEvidenceRow extends Record<string, unknown> {
   sessionAdminId: string;
   requesterMfaMatches: boolean;
   payloadHash: string;
+  nonce: string;
   requiredRole: string;
   requesterHasRole: boolean;
   approverSessionCurrent: boolean;
@@ -157,6 +159,7 @@ export async function validateAndConsumeExpertReferralAdminEvidence(
       s.admin_id as "sessionAdminId",
       s.mfa_verified_at = a.requester_mfa_verified_at as "requesterMfaMatches",
       a.payload_hash as "payloadHash",
+      a.nonce,
       a.required_role as "requiredRole",
       exists(
         select 1 from admin_role_assignments requester_role
@@ -204,6 +207,7 @@ export async function validateAndConsumeExpertReferralAdminEvidence(
     row.requiredRole !== "entitlement_admin" ||
     !row.requesterHasRole ||
     !row.approverHasRole ||
+    row.nonce !== evidence.nonce ||
     row.payloadHash !== canonicalAdminPayloadHash(expected.payload)
   ) {
     throw new ExpertReferralControlError("admin_evidence_invalid");

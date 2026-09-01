@@ -3,15 +3,21 @@ import type {
   BookingService,
   CatalogService,
   ConversationService,
+  ExpertReferralAdminService,
   PrivacyService,
 } from "@ii-tonya/application";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
 import { createLogger, type Logger } from "@ii-tonya/observability";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
+import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
 import { healthRoutes, type ReadinessProbe } from "./routes/health.js";
 import {
   selartiWebhookRoutes,
@@ -41,6 +47,7 @@ export interface AppDependencies {
   rateLimiter: RateLimitGate;
   telegramWebhookSecret: string;
   adminApprovals?: ApprovalPort;
+  expertReferralAdminService?: ExpertReferralAdminService;
   now?: () => Date;
 }
 const assertDisabled = (config: RuntimeConfig): void => {
@@ -89,6 +96,37 @@ export async function buildApp(
     });
     app.addHook("onClose", () => admin.close());
   }
+  if (
+    deps.adminApprovals !== undefined &&
+    deps.expertReferralAdminService !== undefined
+  ) {
+    const expertReferralAdmin = await buildExpertReferralAdminApi({
+      approvals: deps.adminApprovals,
+      admin: deps.expertReferralAdminService,
+    });
+    const forward = async (request: FastifyRequest, reply: FastifyReply) => {
+      const response = await expertReferralAdmin.inject({
+        method: request.method as "GET" | "POST",
+        url: request.url,
+        headers: request.headers,
+        ...(request.body === undefined
+          ? {}
+          : { payload: request.body as object }),
+      });
+      reply.code(response.statusCode);
+      for (const [name, value] of Object.entries(response.headers)) {
+        if (name !== "content-length" && value !== undefined)
+          reply.header(name, value);
+      }
+      return reply.send(response.rawPayload);
+    };
+    app.route({
+      method: ["GET", "POST"],
+      url: "/v1/admin/expert-referrals/*",
+      handler: forward,
+    });
+    app.addHook("onClose", () => expertReferralAdmin.close());
+  }
   return app as unknown as FastifyInstance;
 }
 
@@ -130,6 +168,10 @@ export async function buildTestApp(
     now?: () => number;
     selartiEvent?: Awaited<ReturnType<SelartiPort["decodeVerifiedWebhook"]>>;
     selartiFailOnce?: boolean;
+    expertReferralAdmin?: {
+      readonly approvals: ApprovalPort;
+      readonly service: ExpertReferralAdminService;
+    };
   } = {},
 ): Promise<TestApp> {
   const receipts = new Map<string, "processing" | "complete">();
@@ -224,6 +266,12 @@ export async function buildTestApp(
       options.now === undefined ? {} : { now: options.now },
     ),
     telegramWebhookSecret: "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+    ...(options.expertReferralAdmin === undefined
+      ? {}
+      : {
+          adminApprovals: options.expertReferralAdmin.approvals,
+          expertReferralAdminService: options.expertReferralAdmin.service,
+        }),
     ...(options.now === undefined
       ? {}
       : { now: () => new Date(options.now!()) }),

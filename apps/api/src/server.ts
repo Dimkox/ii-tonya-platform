@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   ExpertCodeCrypto,
   createAdminService,
+  createExpertReferralAdminService,
   type BookingService,
   type CatalogService,
   type ConversationService,
@@ -19,6 +20,9 @@ import {
   PostgresAdminApprovalRepository,
   PostgresAdminRepository,
   PostgresExpertReferralControlRepository,
+  PostgresExpertReferralRepository,
+  PostgresExpertResidencyProviderInboxRepository,
+  PostgresExpertResidencyRepository,
   PostgresWebhookInboxRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -72,12 +76,15 @@ export const createDefaultLifecycle = (
       await migrateDb(db, defaultMigrationsFolder);
     },
     async dependencies(config, db) {
+      let expertCodeCrypto = disabledService<ExpertCodeCrypto>(
+        "expert referral code issuance",
+      );
       if (config.features.expertReferral) {
         if (config.expertReferralKeys === null) {
           throw new Error("expert_referral_key_config_unavailable");
         }
         const requiredVersions = await activeIssuedCodeKeyVersions(db);
-        new ExpertCodeCrypto(
+        expertCodeCrypto = new ExpertCodeCrypto(
           expertCodeSecretResolver.resolve({
             currentVersion: config.expertReferralKeys.currentVersion,
             reference: config.expertReferralKeys.reference,
@@ -86,6 +93,19 @@ export const createDefaultLifecycle = (
         );
       }
       const adminApprovals = new PostgresAdminApprovalRepository(db);
+      const expertReferralAdminService = createExpertReferralAdminService({
+        environment: {
+          read: () => ({
+            referralEnabled: config.features.expertReferral,
+            residencyBillingEnabled: config.features.expertResidencyBilling,
+          }),
+        },
+        referrals: new PostgresExpertReferralRepository(db, expertCodeCrypto),
+        overrides: adminApprovals,
+        controls: new PostgresExpertReferralControlRepository(db),
+        tariffs: new PostgresExpertResidencyRepository(db),
+        heldRewards: new PostgresExpertResidencyProviderInboxRepository(db),
+      });
       return {
         config,
         conversationService: disabledService<ConversationService>(
@@ -98,6 +118,7 @@ export const createDefaultLifecycle = (
           workflows: new PostgresAdminRepository(db),
         }),
         adminApprovals,
+        expertReferralAdminService,
         selarti: new DisabledSelartiAdapter(),
         telegramCallbacks: {
           async isAuthorizedIdentity() {

@@ -555,6 +555,51 @@ describe("expert residency held reward replay", () => {
     });
   });
 
+  it("atomically consumes exact admin evidence for a held reward replay", async () => {
+    const prepared = await scenario({ rewardEnabled: false });
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+    await repo.settle(prepared.settlement);
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+    const evidence = await fixtures.createAdminEvidence(
+      "expert_referral.hold_replay",
+      prepared.orderId,
+      { expertId: prepared.inviteeId },
+    );
+    await testDb.db.execute(sql`update admin_approvals
+      set object_type = 'expert_residency_order'
+      where id = ${evidence.approvalId}::uuid`);
+    const command = {
+      ...evidence,
+      expertId: prepared.inviteeId,
+      qualifyingOrderId: prepared.orderId,
+    };
+
+    await expect(repo.replayHeldRewardAsAdmin(command)).resolves.toEqual({
+      kind: "reward_granted",
+      amountMinor: "100000",
+    });
+    const persisted = await testDb.db.execute<{
+      consumed: boolean;
+      auditCount: number;
+    }>(sql`select
+      (select consumed_at is not null from admin_approvals
+        where id = ${evidence.approvalId}::uuid) as consumed,
+      (select count(*)::integer from audit_events
+        where action = 'expert_referral.hold_replay'
+          and object_id = ${prepared.orderId}::uuid
+          and actor_id = ${evidence.adminId}::uuid
+          and authenticated_session_id_hash = ${evidence.sessionIdHash}) as "auditCount"`);
+    expect(persisted.rows[0]).toEqual({ consumed: true, auditCount: 1 });
+    await expect(repo.replayHeldRewardAsAdmin(command)).rejects.toMatchObject({
+      code: "hold_replay_approval_replayed",
+    });
+    expect(await heldFacts(prepared)).toMatchObject({
+      grants: 1,
+      spendableMinor: "100000",
+    });
+  });
+
   it("permanently records an open settlement-time abuse hold", async () => {
     const prepared = await scenario({ abuseHold: true });
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);

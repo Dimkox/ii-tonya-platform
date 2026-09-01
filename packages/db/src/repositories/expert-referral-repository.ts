@@ -30,6 +30,7 @@ interface AdminEvidence {
   readonly adminId: string;
   readonly approvalId: string;
   readonly sessionIdHash: string;
+  readonly nonce: string;
 }
 
 export interface IssueExpertReferralBatch extends AdminEvidence {

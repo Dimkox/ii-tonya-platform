@@ -64,6 +64,176 @@ describe("PostgreSQL admin approval lifecycle", () => {
     await expect(repository.resolvePrincipal("not-a-session")).resolves.toBeNull();
   });
 
+  it("atomically creates a bounded issuance override from two distinct approvals", async () => {
+    const requester = await seedAdmin("entitlement_admin");
+    const firstApprover = await seedAdmin("entitlement_admin");
+    const secondApprover = await seedAdmin("entitlement_admin");
+    const inviterUserId = randomUUID();
+    const inviterExpertId = randomUUID();
+    const overrideId = randomUUID();
+    const validFrom = new Date(Date.now() - 60_000);
+    const expiresAt = new Date(Date.now() + 3_600_000);
+    await testDb!.db.execute(sql`
+      insert into users (id) values (${inviterUserId}::uuid)
+    `);
+    await testDb!.db.execute(sql`
+      insert into experts (id, user_id, active, verified)
+      values (${inviterExpertId}::uuid, ${inviterUserId}::uuid, true, true)
+    `);
+    const repository = new PostgresAdminApprovalRepository(testDb!.db);
+    const overridePayload = {
+      inviterExpertId,
+      additionalQuota: 25,
+      reason: "bounded_exception",
+      validFrom: validFrom.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    };
+    const firstNonce = `nonce:${randomUUID()}`;
+    const secondNonce = `nonce:${randomUUID()}`;
+    const first = await repository.requestApproval({
+      sessionIdHash: requester.sessionIdHash,
+      action: "expert_referral.issuance_override",
+      objectType: "expert",
+      objectId: overrideId,
+      payload: overridePayload,
+      nonce: firstNonce,
+    });
+    const second = await repository.requestApproval({
+      sessionIdHash: requester.sessionIdHash,
+      action: "expert_referral.issuance_override",
+      objectType: "expert",
+      objectId: overrideId,
+      payload: overridePayload,
+      nonce: secondNonce,
+    });
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    await expect(
+      repository.approveApproval({
+        approvalId: first!.approvalId,
+        sessionIdHash: firstApprover.sessionIdHash,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.approveApproval({
+        approvalId: second!.approvalId,
+        sessionIdHash: secondApprover.sessionIdHash,
+      }),
+    ).resolves.toBe(true);
+
+    await expect(
+      repository.createIssuanceOverride({
+        sessionIdHash: requester.sessionIdHash,
+        overrideId,
+        inviterExpertId,
+        additionalQuota: 25,
+        reason: "bounded_exception",
+        validFrom,
+        expiresAt,
+        approvalId: first!.approvalId,
+        nonce: firstNonce,
+        secondApprovalId: second!.approvalId,
+        secondNonce,
+      }),
+    ).resolves.toMatchObject({
+      overrideId,
+      inviterExpertId,
+      additionalQuota: 25,
+      consumedCount: 0,
+    });
+    const persisted = await testDb!.db.execute<{
+      approvalCount: number;
+      auditCount: number;
+    }>(sql`
+      select
+        (select count(*)::integer from admin_approvals
+          where id in (${first!.approvalId}::uuid, ${second!.approvalId}::uuid)
+            and consumed_at is not null) as "approvalCount",
+        (select count(*)::integer from audit_events
+          where action = 'expert_referral.issuance_override'
+            and object_id = ${overrideId}::uuid) as "auditCount"
+    `);
+    expect(persisted.rows[0]).toEqual({ approvalCount: 2, auditCount: 1 });
+  });
+
+  it("does not consume override approvals from the same approver or a changed payload", async () => {
+    const requester = await seedAdmin("entitlement_admin");
+    const approver = await seedAdmin("entitlement_admin");
+    const inviterUserId = randomUUID();
+    const inviterExpertId = randomUUID();
+    const overrideId = randomUUID();
+    const validFrom = new Date(Date.now() - 60_000);
+    const expiresAt = new Date(Date.now() + 3_600_000);
+    await testDb!.db.execute(
+      sql`insert into users (id) values (${inviterUserId}::uuid)`,
+    );
+    await testDb!.db
+      .execute(sql`insert into experts (id, user_id, active, verified)
+      values (${inviterExpertId}::uuid, ${inviterUserId}::uuid, true, true)`);
+    const repository = new PostgresAdminApprovalRepository(testDb!.db);
+    const payload = {
+      inviterExpertId,
+      additionalQuota: 10,
+      reason: "bounded_exception",
+      validFrom: validFrom.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    };
+    const firstNonce = `nonce:${randomUUID()}`;
+    const secondNonce = `nonce:${randomUUID()}`;
+    const first = await repository.requestApproval({
+      sessionIdHash: requester.sessionIdHash,
+      action: "expert_referral.issuance_override",
+      objectType: "expert",
+      objectId: overrideId,
+      payload,
+      nonce: firstNonce,
+    });
+    const second = await repository.requestApproval({
+      sessionIdHash: requester.sessionIdHash,
+      action: "expert_referral.issuance_override",
+      objectType: "expert",
+      objectId: overrideId,
+      payload,
+      nonce: secondNonce,
+    });
+    await repository.approveApproval({
+      approvalId: first!.approvalId,
+      sessionIdHash: approver.sessionIdHash,
+    });
+    await repository.approveApproval({
+      approvalId: second!.approvalId,
+      sessionIdHash: approver.sessionIdHash,
+    });
+
+    await expect(
+      repository.createIssuanceOverride({
+        sessionIdHash: requester.sessionIdHash,
+        overrideId,
+        inviterExpertId,
+        additionalQuota: 11,
+        reason: "bounded_exception",
+        validFrom,
+        expiresAt,
+        approvalId: first!.approvalId,
+        nonce: firstNonce,
+        secondApprovalId: second!.approvalId,
+        secondNonce,
+      }),
+    ).resolves.toBeNull();
+    const state = await testDb!.db.execute<{
+      consumed: number;
+      overrides: number;
+    }>(sql`
+      select
+        (select count(*)::integer from admin_approvals where id in
+          (${first!.approvalId}::uuid, ${second!.approvalId}::uuid)
+          and consumed_at is not null) as consumed,
+        (select count(*)::integer from expert_referral_issuance_overrides
+          where id = ${overrideId}::uuid) as overrides
+    `);
+    expect(state.rows[0]).toEqual({ consumed: 0, overrides: 0 });
+  });
+
   it("persists a role-bound request and permits one distinct authenticated approval", async () => {
     const requester = await seedAdmin("entitlement_admin");
     const approver = await seedAdmin("entitlement_admin");
