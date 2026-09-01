@@ -6,9 +6,24 @@ import type { WebhookInbox } from "./selarti-webhook.js";
 
 export interface TelegramCallbackService {
   isAuthorizedIdentity(telegramUserId: string): Promise<boolean>;
-  verifyCallback(update: Readonly<Record<string, unknown>>, correlationId: string): Promise<boolean>;
+  verifyCallback(
+    update: Readonly<Record<string, unknown>>,
+    correlationId: string,
+  ): Promise<boolean | PreparedTelegramCallback>;
   process(update: Readonly<Record<string, unknown>>, correlationId: string): Promise<void>;
 }
+
+export interface PreparedTelegramCallback {
+  execute(): Promise<void>;
+}
+
+const isPreparedCallback = (
+  value: unknown,
+): value is PreparedTelegramCallback =>
+  typeof value === "object" &&
+  value !== null &&
+  "execute" in value &&
+  typeof (value as { execute?: unknown }).execute === "function";
 
 const numericIdentity = /^[1-9]\d{0,19}$/u;
 const secureEqual = (actual: string | undefined, expected: string): boolean => {
@@ -37,13 +52,19 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     const body = request.body as Record<string, unknown>;
     const correlationId = typeof request.headers["x-correlation-id"] === "string" ? request.headers["x-correlation-id"] : crypto.randomUUID();
     const callback = body.callback_query;
+    let preparedCallback: PreparedTelegramCallback | null = null;
     if (callback && typeof callback === "object") {
       const from = (callback as Record<string, unknown>).from;
       const id = from && typeof from === "object" ? (from as Record<string, unknown>).id : undefined;
       if (!numericIdentity.test(String(id ?? ""))) return reply.code(403).send({ error: "unauthorized_expert" });
       if (!await deps.callbacks.isAuthorizedIdentity(String(id))) return reply.code(403).send({ error: "unauthorized_expert" });
       try {
-        if (!(await deps.callbacks.verifyCallback(body, correlationId)))
+        const verified = await deps.callbacks.verifyCallback(
+          body,
+          correlationId,
+        );
+        if (isPreparedCallback(verified)) preparedCallback = verified;
+        else if (verified !== true)
           return reply.code(403).send({ error: "invalid_callback" });
       } catch (error) {
         if (error instanceof CallbackInfrastructureError) {
@@ -56,7 +77,9 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     const claim = await deps.inbox.claim("telegram", updateId);
     if (claim.kind !== "claimed") return { accepted: true, duplicate: true };
     try {
-      await deps.callbacks.process(body, correlationId);
+      if (preparedCallback === null)
+        await deps.callbacks.process(body, correlationId);
+      else await preparedCallback.execute();
       await deps.inbox.complete(claim.claimId);
     } catch (error) {
       await deps.inbox.fail(claim.claimId);

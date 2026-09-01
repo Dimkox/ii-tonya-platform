@@ -174,6 +174,7 @@ export const expertReferralRoutes: FastifyPluginAsync<
     try {
       const result = await deps.referrals.summary(principal);
       if (denied(result)) return forbidden(reply);
+      if (result.expertId !== principal.expertId) return forbidden(reply);
       if (
         !decimalMinor.test(result.spendableBalanceMinor) ||
         !decimalMinor.test(result.reservedBalanceMinor) ||

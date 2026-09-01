@@ -282,6 +282,14 @@ export interface ExpertCommandCallbackClaimsStore {
   }): Promise<ExpertCommandCallbackClaims | null>;
 }
 
+export interface ExpertCommandCallbackVersionAuthority {
+  currentVersion(input: {
+    readonly expertId: string;
+    readonly operation: ExpertCommandCallbackOperation;
+    readonly objectId: string;
+  }): Promise<number | null>;
+}
+
 const expertCommandOperations = new Set<ExpertCommandCallbackOperation>([
   "redeem_expert_referral",
   "view_referral_summary",
@@ -364,10 +372,7 @@ export async function verifyExpertCommandCallback(
   token: string,
   expectedTelegramUserId: string,
   binding: ExpertBinding,
-  expected: {
-    readonly operation: ExpertCommandCallbackOperation;
-    readonly objectId: string;
-  },
+  versionAuthority: ExpertCommandCallbackVersionAuthority,
   secret: Uint8Array,
   store: ExpertCommandCallbackClaimsStore,
   now: Date,
@@ -391,10 +396,18 @@ export async function verifyExpertCommandCallback(
       !binding.active ||
       !binding.verified ||
       stored.expertId !== binding.expertId ||
-      stored.operation !== expected.operation ||
-      stored.objectId !== expected.objectId ||
       stored.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)
     ) {
+      throw new CallbackAuthStateError(
+        "Expert command callback not authorized",
+      );
+    }
+    const currentVersion = await versionAuthority.currentVersion({
+      expertId: stored.expertId,
+      operation: stored.operation,
+      objectId: stored.objectId,
+    });
+    if (currentVersion !== stored.version) {
       throw new CallbackAuthStateError(
         "Expert command callback not authorized",
       );

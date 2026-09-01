@@ -183,3 +183,95 @@ formatter form; the inherited files were not reformatted wholesale.
   The unrelated broad-suite/Reaper failure above also remains visible for
   follow-up. This implementation makes no Task 10 completion or activation
   claim.
+
+## Fix round 1/5 — reachable expert Telegram commands
+
+### Findings addressed
+
+- The package index now exports both `ct3` issue/verify functions, every new
+  claim/store/operation/version-authority type, both expert Telegram renderers,
+  and both renderer view types. A runtime index test proves all four function
+  exports are defined; API compilation consumes the exported types rather than
+  importing private source files. Only the exact approved index hash changed in
+  the scope guard.
+- Added an injectable, provider-neutral expert Telegram command processor. An
+  opaque callback binds a server command ID; a current-command port supplies
+  the authoritative version and then resolves the exact same expert,
+  operation, object, and version. Plaintext referral code, idempotency data,
+  tariff key, and checkout deadline remain in this server-side resolver and are
+  absent from the token.
+- `telegramWebhookRoutes` now accepts a request-local prepared callback. The
+  verified processor closes over the exact principal and resolved command, so
+  the route executes it after the existing inbox claim without a shared cache
+  or generic dead port. The legacy boolean callback/process contract remains
+  compatible.
+- All four operations route to the Task 8 referral/residency services. Output
+  is injected and hard-projected as redeemed, validated self-summary,
+  validated server quote, or safe provider-neutral checkout outcome. The
+  end-to-end route test injects allocation, grant, payment, and provider facts
+  and proves they do not reach output.
+- `ct3` verification now asks an authoritative port for the current version
+  after authenticating the binding and before token consumption. Stale version,
+  expert, operation, and object substitution all fail without consuming a
+  still-valid token. Existing `ct2` code and contracts are unchanged.
+- HTTP summary now also verifies `summary.expertId` equals the authenticated
+  principal at the adapter boundary. A cross-expert result returns the same
+  generic 403 and leaks none of its owner or balance data.
+- Verification-side `peek` and `consumeIfValid` infrastructure failures are
+  exercised with real issued tokens and fail-once stores. Both preserve the
+  typed `CallbackInfrastructureError`; the following retry succeeds, proving
+  the token was not consumed.
+- Default lifecycle composition remains unchanged and disabled. No live
+  binding/store/output implementation, provider, credential, environment flag,
+  network call, migration, or activation was added.
+
+### Strict RED/GREEN evidence
+
+```text
+corepack pnpm vitest run packages/integrations/src/telegram/callback-token.test.ts
+RED — 1 file failed; 10 failed and 2 passed. Production still treated the new
+authoritative-version port as caller-supplied operation/object expectations;
+stale-version and verification-side infrastructure paths could not satisfy the
+intended contract.
+
+corepack pnpm vitest run packages/integrations/src/index.test.ts apps/api/src/expert-telegram-command.test.ts apps/api/src/routes/expert-referral.test.ts
+RED — 3/3 files failed; 2 failed and 11 passed plus one missing-module suite.
+Package runtime exports were undefined, the processor did not exist, and a
+cross-expert summary returned 200 instead of 403.
+
+focused implementation plus exact scope/dependency guards:
+GREEN — 8 files, 181/181 tests passed.
+```
+
+### Final fix-round verification
+
+```text
+focused/prior Telegram, ct2 repository/migration, API/app/server/admin, Task 8
+service, prompt, and conversation regressions:
+19 files, 273/273 tests passed
+
+scope/dependency/env/admin/architecture/release/workflow guards:
+9 files, 198/198 tests passed
+
+bash -n scripts/deploy-compose-remote.sh scripts/validate-runtime-env.sh
+exit 0
+
+corepack pnpm --workspace-concurrency=1 -r --sort run build
+exit 0 — all 10 workspace projects passed, including declarations
+
+corepack pnpm -r --sort run typecheck
+exit 0 — all 10 workspace projects passed
+
+exact changed-TypeScript ESLint, exact changed-file Prettier, and git diff check
+exit 0
+```
+
+The only touched compact legacy formatter exception is
+`apps/api/src/routes/telegram-webhook.ts`; it is already a whole-file Prettier
+failure at reviewed base `f75deac`. Its new prepared-callback hunks were matched
+to formatter output without reformatting inherited code.
+
+The named human AI behavior spot-check remains **PENDING — none supplied**.
+The known provider-deadline fixture is intentionally unchanged and remains
+carried to Task 12 as directed. Independent re-review is required; this fix
+round makes no completion or activation claim.

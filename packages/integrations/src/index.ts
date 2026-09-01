@@ -58,11 +58,18 @@ export {
   CallbackVerificationError,
   authenticateCallback,
   issueCallback,
+  issueExpertCommandCallback,
   verifyCallback,
+  verifyExpertCommandCallback,
   type CallbackClaimsStore,
   type AuthenticatedExpertCallback,
   type ExpertBinding,
   type ExpertCallbackClaims,
+  type ExpertCommandCallbackClaims,
+  type ExpertCommandCallbackClaimsStore,
+  type ExpertCommandCallbackOperation,
+  type ExpertCommandCallbackVersionAuthority,
+  type VersionedCallbackClaims,
 } from "./telegram/callback-token.js";
 export {
   CallbackConflictError,
@@ -88,9 +95,13 @@ export {
 } from "./expert-residency/environment-secret-resolver.js";
 export {
   buildTelegramMethodUrl,
+  renderExpertReferralSummary,
+  renderExpertResidencyQuote,
   redactTelegramUrl,
   TelegramAdapter,
+  type ExpertReferralSummaryTelegramView,
   type ExpertReservationView,
+  type ExpertResidencyQuoteTelegramView,
   type ExpertScheduleView,
   type TelegramAdapterDeps,
   type TelegramPort,

@@ -167,6 +167,38 @@ describe("authenticated expert referral API", () => {
     await app.close();
   });
 
+  it("fails closed without leaking a cross-expert summary", async () => {
+    const { referrals, residency } = services();
+    referrals.summary.mockResolvedValueOnce({
+      expertId: "00000000-0000-4000-8000-000000001199",
+      spendableBalanceMinor: "987654321",
+      reservedBalanceMinor: "123456789",
+      debtMinor: "777",
+      nearestExpiryAt: new Date("2027-08-01T00:00:00.000Z"),
+    });
+    const app = await buildApi({
+      authentication: { resolvePrincipal: async () => principal },
+      referrals,
+      residency,
+      tariffVersions: { tariffKeyFor: async () => "expert-month-v1" },
+      checkoutDeadline: () => new Date("2026-08-03T00:15:00.000Z"),
+      rateLimiter: createWindowedRateLimiter(),
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/expert/referrals/summary",
+      headers: { authorization: "Bearer current-session" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "forbidden" });
+    expect(response.body).not.toContain("987654321");
+    expect(response.body).not.toContain("123456789");
+    expect(response.body).not.toContain("00000000-0000-4000-8000-000000001199");
+    await app.close();
+  });
+
   it("hard-projects checkout without allocation or expert internals", async () => {
     const { referrals, residency } = services();
     residency.checkout = vi.fn(async () => ({

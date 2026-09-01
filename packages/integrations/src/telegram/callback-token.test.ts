@@ -9,6 +9,14 @@ import {
   type ExpertCommandCallbackClaimsStore,
 } from "./callback-token.js";
 
+interface ExpertCommandCallbackVersionAuthority {
+  currentVersion(input: {
+    readonly expertId: string;
+    readonly operation: ExpertCommandCallbackClaims["operation"];
+    readonly objectId: string;
+  }): Promise<number | null>;
+}
+
 const secret = new Uint8Array(32).fill(17);
 const now = new Date("2026-08-03T12:00:00.000Z");
 const claims: ExpertCommandCallbackClaims = {
@@ -25,6 +33,20 @@ const binding = {
   active: true,
   verified: true,
 };
+
+const versionAuthority = (
+  operation = claims.operation,
+  objectId = claims.objectId,
+  version = claims.version,
+): ExpertCommandCallbackVersionAuthority => ({
+  async currentVersion(candidate) {
+    return candidate.expertId === claims.expertId &&
+      candidate.operation === operation &&
+      candidate.objectId === objectId
+      ? version
+      : null;
+  },
+});
 
 const memoryStore = (): ExpertCommandCallbackClaimsStore => {
   const values = new Map<string, ExpertCommandCallbackClaims>();
@@ -63,7 +85,7 @@ describe("versioned expert command callback tokens", () => {
         token,
         "1201",
         binding,
-        { operation: claims.operation, objectId: claims.objectId },
+        versionAuthority(),
         secret,
         store,
         now,
@@ -74,7 +96,7 @@ describe("versioned expert command callback tokens", () => {
         token,
         "1201",
         binding,
-        { operation: claims.operation, objectId: claims.objectId },
+        versionAuthority(),
         secret,
         store,
         now,
@@ -145,8 +167,8 @@ describe("versioned expert command callback tokens", () => {
       _name,
       telegramUserId,
       candidateBinding,
-      operation,
-      objectId,
+      expectedOperation,
+      expectedObjectId,
       candidateNow,
     ) => {
       const store = memoryStore();
@@ -156,7 +178,7 @@ describe("versioned expert command callback tokens", () => {
           token,
           telegramUserId,
           candidateBinding,
-          { operation, objectId },
+          versionAuthority(expectedOperation, expectedObjectId),
           secret,
           store,
           candidateNow,
@@ -168,7 +190,7 @@ describe("versioned expert command callback tokens", () => {
             token,
             "1201",
             binding,
-            { operation: claims.operation, objectId: claims.objectId },
+            versionAuthority(),
             secret,
             store,
             now,
@@ -178,7 +200,114 @@ describe("versioned expert command callback tokens", () => {
     },
   );
 
-  it("preserves infrastructure failures for retry instead of disguising them as auth", async () => {
+  it("rejects a stale authoritative version without consuming the token", async () => {
+    const store = memoryStore();
+    const token = await issueExpertCommandCallback(claims, secret, store);
+
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(claims.operation, claims.objectId, claims.version + 1),
+        secret,
+        store,
+        now,
+      ),
+    ).rejects.toBeInstanceOf(CallbackVerificationError);
+
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(),
+        secret,
+        store,
+        now,
+      ),
+    ).resolves.toEqual(claims);
+  });
+
+  it("preserves a verification-side peek infrastructure failure without consumption", async () => {
+    const store = memoryStore();
+    const token = await issueExpertCommandCallback(claims, secret, store);
+    let failPeek = true;
+    const flakyStore: ExpertCommandCallbackClaimsStore = {
+      ...store,
+      async peek(key) {
+        if (failPeek) {
+          failPeek = false;
+          throw new CallbackInfrastructureError();
+        }
+        return store.peek(key);
+      },
+    };
+
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(),
+        secret,
+        flakyStore,
+        now,
+      ),
+    ).rejects.toBeInstanceOf(CallbackInfrastructureError);
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(),
+        secret,
+        flakyStore,
+        now,
+      ),
+    ).resolves.toEqual(claims);
+  });
+
+  it("preserves a verification-side consume infrastructure failure without consumption", async () => {
+    const store = memoryStore();
+    const token = await issueExpertCommandCallback(claims, secret, store);
+    let failConsume = true;
+    const flakyStore: ExpertCommandCallbackClaimsStore = {
+      ...store,
+      async consumeIfValid(input) {
+        if (failConsume) {
+          failConsume = false;
+          throw new CallbackInfrastructureError();
+        }
+        return store.consumeIfValid(input);
+      },
+    };
+
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(),
+        secret,
+        flakyStore,
+        now,
+      ),
+    ).rejects.toBeInstanceOf(CallbackInfrastructureError);
+    await expect(
+      verifyExpertCommandCallback(
+        token,
+        "1201",
+        binding,
+        versionAuthority(),
+        secret,
+        flakyStore,
+        now,
+      ),
+    ).resolves.toEqual(claims);
+  });
+
+  it("preserves issuance-side infrastructure failures", async () => {
     const failingStore: ExpertCommandCallbackClaimsStore = {
       async put() {
         throw new CallbackInfrastructureError();
