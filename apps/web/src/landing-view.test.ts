@@ -59,6 +59,30 @@ describe("promotional landing view", () => {
     }
   });
 
+  it("names every major region and gives the hero a compact trust strip", () => {
+    for (const [section, heading] of [
+      ["about", "about-title"],
+      ["clients", "clients-title"],
+      ["experts", "experts-title"],
+      ["tariffs", "tariffs-title"],
+      ["faq", "faq-title"],
+      ["contacts", "contacts-title"],
+    ] as const) {
+      expect(html).toContain(`id="${section}" aria-labelledby="${heading}"`);
+      expect(html).toContain(`id="${heading}"`);
+    }
+    expect(html).toContain('class="hero-proof"');
+    expect(html).toContain("Один диалог");
+    expect(html).toContain("Подбор по запросу");
+    expect(html).toContain("На связи 24/7");
+  });
+
+  it("provides visible keyboard focus and reduced-motion fallbacks", () => {
+    expect(styles).toMatch(/:focus-visible[\s\S]*outline:/u);
+    expect(styles).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/u);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*640px\)[\s\S]*\.hero-proof/u);
+  });
+
   it("renders the offer-backed expert contract boundaries", () => {
     expect(html).toContain('class="contract-boundary"');
     expect(html).toContain("не гарантируются и зависят от клиентских запросов");

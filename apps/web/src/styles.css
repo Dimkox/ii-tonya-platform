@@ -280,6 +280,33 @@ footer nav a {
   align-items: center;
 }
 
+.hero-subtitle {
+  max-width: 35rem;
+  margin-bottom: 1.25rem;
+  color: var(--forest-dark);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+}
+
+.hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0;
+  margin: 0 0 1.8rem;
+  list-style: none;
+}
+
+.hero-proof li {
+  padding: 0.5rem 0.75rem;
+  color: var(--forest-dark);
+  background: rgba(255, 253, 249, 0.64);
+  border: 1px solid rgba(49, 85, 74, 0.28);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
 .button {
   display: inline-flex;
   gap: 1.4rem;
@@ -1412,6 +1439,11 @@ summary:focus-visible {
   .hero-actions,
   .contact-actions {
     display: grid;
+  }
+
+  .hero-proof {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .message-packages,
