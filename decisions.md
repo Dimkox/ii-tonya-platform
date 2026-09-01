@@ -27,6 +27,8 @@ Consume `waitlist.promote.v1`, FIFO promotion, protected booking-receipt creatio
 Any correction after a migration has been committed uses a new forward migration plus an explicit old-to-new upgrade test. This preserves already-applied databases while still validating fresh installs through the complete journal.
 
 Historical reschedule facts that predate stored replay results are marked explicitly unrecoverable and return conflict on retry; new facts store the exact result and are replayable. Refusing an unknowable replay is safer than fabricating a deadline from mutable reservation state.
+
+Prerender the landing into the Vite HTML artifact and lazy-load both fallback landing rendering and legal routes. This kept the full page crawlable without JavaScript while reducing first-load JS from 114.5 KB to 3.0 KB without duplicating approved content.
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.

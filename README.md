@@ -13,6 +13,15 @@ non-secret credential inventory is maintained in
 [the test credential runbook](docs/runbooks/test-credential-inventory.md), and provider
 status is tracked in [the staging evidence runbook](docs/runbooks/provider-staging-evidence.md).
 
+The public landing is now emitted as raw, indexable HTML during the Vite build rather
+than being created only in the browser. It includes canonical/Open Graph/Twitter
+metadata, truthful `WebSite`/`Organization`/`FAQPage` JSON-LD, robots/sitemap assets,
+responsive AVIF/WebP imagery, and a project-local Codex adaptation of the upstream
+[`seo-landing` v1.11 skill](.agents/skills/seo-landing/UPSTREAM.md). Yandex Metrika counter
+`111827123` remains an explicitly approved first-load dependency. Current exact-product
+evidence is recorded in
+[`docs/test-evidence/landing/1642fda93de2f201e3a8b59059e15fa45f0a3f93/verification.md`](docs/test-evidence/landing/1642fda93de2f201e3a8b59059e15fa45f0a3f93/verification.md).
+
 Release D1 now implements default-off client rescheduling and FIFO waitlist operations.
 PostgreSQL owns protected handles, owner authorization, immutable reschedule facts,
 72-hour promoted holds, capacity fencing, and retry-safe command receipts. Reservation

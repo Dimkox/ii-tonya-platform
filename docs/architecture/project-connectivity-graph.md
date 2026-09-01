@@ -45,6 +45,7 @@ flowchart TB
     GITIGNORE[".gitignore\nACTIVE secret/env hygiene"]
     AGENTS["AGENTS.md\nACTIVE agent/test policy"]
     README["README.md\nACTIVE orientation"]
+    SEOSKILL[".agents/skills/seo-landing\nACTIVE Codex development skill"]
     ROOTPKG --> WORKSPACE --> LOCK
     ROOTPKG --> TSCFG
     ROOTPKG --> VITEST
@@ -52,6 +53,7 @@ flowchart TB
     GITIGNORE --> ENVEX
     AGENTS --> ROOTPKG
     README --> ROOTPKG
+    SEOSKILL --> README
   end
   PROJECT --> ROOT
 
@@ -75,8 +77,11 @@ flowchart TB
   subgraph APPS["Composition roots"]
     API["apps/api\n@ii-tonya/api\nACTIVE"]
     APPWORKER["apps/worker\n@ii-tonya/app-worker\nACTIVE"]
+    WEB["apps/web\nstatic-prerendered landing + legal routes\nACTIVE"]
   end
   PROJECT --> APPS
+  WEB --> SEOSKILL
+  WEB --> SOURCE
 
   subgraph PKGS["Workspace packages"]
     APPLICATION["packages/application\nACTIVE"]

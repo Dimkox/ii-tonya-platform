@@ -15,6 +15,7 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 | `.gitignore`          | secret/env hygiene -> env-policy tests                   | ACTIVE POLICY                          |
 | `AGENTS.md`           | agent execution/test constraints -> development workflow | ACTIVE POLICY                          |
 | `README.md`           | repository orientation -> source/spec/handoff/graph      | ACTIVE DOC                             |
+| `.agents/skills/seo-landing` | Codex landing workflow -> `apps/web` build and evidence | ACTIVE DEV TOOL                        |
 
 ## CI, automation, deployment, and server control
 
@@ -54,6 +55,7 @@ All workspace roots are represented in the canonical graph and have containment 
 | --------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
 | `apps/api`                  | HTTP/webhook composition                        | application/config/db/integrations/observability           |
 | `apps/worker`               | bounded background lifecycle                    | config/db/integrations/observability/worker                |
+| `apps/web`                  | static-prerendered public landing and legal UI   | local content/assets; messenger deep links; Yandex Metrika |
 | `apps/sandbox-api`          | test-only checkout/admin composition            | sandbox-only; never production                             |
 | `packages/application`      | deterministic use cases + prompt boundary       | API/worker -> contracts/domain                             |
 | `packages/config`           | validated environment                           | both apps                                                  |

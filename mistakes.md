@@ -57,3 +57,5 @@ The first waitlist-worker review-fix test inherited a booked reservation, while 
 The first immutable reschedule-replay repair edited migration `0040` after that migration had already been committed. The root cause was optimizing for fresh-schema tests without testing the applied-`0040` upgrade path; the repair now uses `0041` and a real PostgreSQL upgrade test.
 
 The first `0041` backfill copied the reservation's current deadline into every historical reschedule fact. The root cause was assuming mutable aggregate state could reconstruct per-command results even though confirmation buffers vary; old facts are now explicitly unrecoverable and cannot return invented data.
+
+The first async route-splitting change reused a nullable DOM query inside a nested async function, so TypeScript correctly rejected the lost control-flow narrowing. The root cause was relying on outer-scope narrowing across a closure; the checked element is now captured as a non-null local before the async boundary.
