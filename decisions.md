@@ -23,6 +23,8 @@ Lifecycle workers reclaim expired processing leases in a bounded `SKIP LOCKED` p
 Reservation expiry appends `waitlist.promote.v1` in the same PostgreSQL transaction as the expired state and other integration facts. This preserves newly available capacity across crashes while keeping FIFO promotion independently retryable and capacity-fenced.
 
 Consume `waitlist.promote.v1`, FIFO promotion, protected booking-receipt creation, and terminal outbox transition in one PostgreSQL transaction. This closes the crash gap where a promoted reservation could exist without a client handle or the command could be acknowledged without the reservation.
+
+Any correction after a migration has been committed uses a new forward migration plus an explicit old-to-new upgrade test. This preserves already-applied databases while still validating fresh installs through the complete journal.
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.

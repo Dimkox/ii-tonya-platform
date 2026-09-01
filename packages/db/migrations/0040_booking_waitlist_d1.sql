@@ -56,14 +56,11 @@ CREATE TABLE booking_reschedule_facts (
   new_slot_id uuid NOT NULL REFERENCES slots(id),
   old_version integer NOT NULL,
   new_version integer NOT NULL,
-  result_status text NOT NULL,
-  result_reserved_until timestamptz NOT NULL,
   idempotency_key char(64) NOT NULL UNIQUE,
   correlation_id text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT booking_reschedule_slots_check CHECK (old_slot_id<>new_slot_id),
   CONSTRAINT booking_reschedule_versions_check CHECK (old_version>0 AND new_version=old_version+1),
-  CONSTRAINT booking_reschedule_result_status_check CHECK (result_status='reserved'),
   CONSTRAINT booking_reschedule_key_check CHECK (idempotency_key ~ '^[0-9a-f]{64}$')
 );
 

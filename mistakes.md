@@ -53,3 +53,5 @@ The first Release C integration run could not see `lifecycle_jobs` because the h
 The Task 3 repeat command used the repository runner through Corepack even though that runner spawns a bare `pnpm`, and a later Reaper startup failure triggered teardown against an uninitialized database. The root cause was not tracing executable and resource ownership across child-process/setup boundaries; direct Corepack repeats and guarded teardown now preserve the primary failure.
 
 The first waitlist-worker review-fix test inherited a booked reservation, while the reschedule test asserted an old live status after deliberately mutating it. The root cause was coupling immutable-replay assertions to mutable shared fixture state instead of resetting each transition precondition and checking replay separately from the live projection.
+
+The first immutable reschedule-replay repair edited migration `0040` after that migration had already been committed. The root cause was optimizing for fresh-schema tests without testing the applied-`0040` upgrade path; the repair now uses `0041`, controlled trigger suspension for backfill, and a real PostgreSQL upgrade test.

@@ -95,6 +95,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0038_test_expert_trial.sql",
   "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
   "packages/db/migrations/0040_booking_waitlist_d1.sql",
+  "packages/db/migrations/0041_booking_reschedule_replay.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -706,11 +707,15 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0040_booking_waitlist_d1.sql",
-    "f92a6561a94bbce6cabda29ffd9471f2e549610e750e9232cc9753638d61023b",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/0041_booking_reschedule_replay.sql",
+    "5f6355936b50de629211883df48067490d844ebac7cce9450802216b730bbf88",
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "15f2757d8708c7b42f1cc269eafc8c9a230e02acc993428bf3354e7805cdbb3f",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -790,7 +795,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "15f2757d8708c7b42f1cc269eafc8c9a230e02acc993428bf3354e7805cdbb3f",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
