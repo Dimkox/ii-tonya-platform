@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "description": "Runtime routing floors, reasoning policy, and analysis-wave cap. Router and policy load this file; missing keys fall back to adaptive_grok.router / policy defaults.",
+  "principles": [
+    "parallelize read-heavy analysis and review",
+    "use exactly one write owner",
+    "use low reasoning by default and reserve high reasoning for architecture, task framing, security, and release decisions",
+    "add Bitrix specialist whenever repository or task has Bitrix signals",
+    "add security review for auth, PII, AI, production, and external writes",
+    "bind evidence to the current repository fingerprint",
+    "do not pad the analysis wave with unmatched domain specialists"
+  ],
+  "reasoning": {
+    "default": "low",
+    "high_effort_agents": [
+      "task_analyst",
+      "architect",
+      "bitrix_architect",
+      "integration_architect",
+      "data_architect",
+      "ai_architect",
+      "security_reviewer",
+      "release_reviewer"
+    ],
+    "enforcement": "Agent effort is declared in .grok/agents/*.md. Model-facing subagent spawn does not provide a per-call reasoning override."
+  },
+  "max_parallel_analysis": 10,
+  "write_roles": [
+    "ai_implementer",
+    "bitrix_implementer",
+    "data_implementer",
+    "frontend_implementer",
+    "general_implementer",
+    "integration_implementer",
+    "php_implementer"
+  ],
+  "analysis_floors": {
+    "always": ["repo_explorer"],
+    "feature_like": ["task_analyst"],
+    "standard": ["architect", "docs_researcher"]
+  },
+  "analysis_domain_agents": {
+    "bitrix": ["bitrix_architect"],
+    "api": ["integration_architect"],
+    "event": ["integration_architect"],
+    "integration": ["integration_architect"],
+    "data": ["data_architect"],
+    "ai": ["ai_architect"]
+  },
+  "review_floors": {
+    "delivery": ["code_reviewer", "test_reviewer"],
+    "docs": ["code_reviewer"],
+    "review_intent": ["code_reviewer", "test_reviewer"],
+    "release": ["release_reviewer"]
+  },
+  "review_domain_agents": {
+    "bitrix": ["bitrix_reviewer"],
+    "data": ["data_reviewer"],
+    "security": ["security_reviewer"],
+    "ai": ["security_reviewer"],
+    "integration": ["security_reviewer"]
+  },
+  "review_risk_agents": {
+    "high": ["security_reviewer", "release_reviewer"]
+  }
+}

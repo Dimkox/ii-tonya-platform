@@ -27,28 +27,46 @@ describe("promotional landing view", () => {
     expect(html.match(/<details\b/gu)).toHaveLength(20);
     expect(html).toContain("<picture>");
     expect(html).toContain('type="image/avif"');
-    expect(html).toContain('srcset="/tonya-hero-512.avif 512w, /tonya-hero-1024.avif 1024w"');
+    expect(html).toContain(
+      'srcset="/tonya-hero-512.avif 512w, /tonya-hero-1024.avif 1024w"',
+    );
     expect(html).toContain('type="image/webp"');
-    expect(html).toContain('srcset="/tonya-hero-512.webp 512w, /tonya-hero-1024.webp 1024w"');
-    expect(html.match(/sizes="\(max-width: 900px\) 86vw, 50vw"/gu)).toHaveLength(2);
-    expect(html).toMatch(/<img src="\/tonya-hero\.png" width="1024" height="1536" alt="Иллюстрация ии-Тони — внимательной женщины-навигатора" fetchpriority="high">/u);
+    expect(html).toContain(
+      'srcset="/tonya-hero-512.webp 512w, /tonya-hero-1024.webp 1024w"',
+    );
+    expect(
+      html.match(/sizes="\(max-width: 900px\) 86vw, 50vw"/gu),
+    ).toHaveLength(2);
+    expect(html).toMatch(
+      /<img src="\/tonya-hero\.png" width="1024" height="1536" alt="Иллюстрация ии-Тони — внимательной женщины-навигатора" fetchpriority="high">/u,
+    );
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="/oferta"');
     expect(html).toContain("326680000031840");
   });
 
   it("keeps mobile section navigation visible without JavaScript", () => {
-    expect(html).toMatch(/<nav aria-label="Основная навигация">[\s\S]*href="#contacts"/u);
-    expect(styles).not.toMatch(/@media\s*\(max-width:\s*900px\)[\s\S]*?\.site-header\s*>\s*nav\s*\{\s*display:\s*none/iu);
-    expect(styles).toMatch(/\.site-header\s*>\s*nav\s*\{[\s\S]*overflow-x:\s*auto/iu);
+    expect(html).toMatch(
+      /<nav aria-label="Основная навигация">[\s\S]*href="#contacts"/u,
+    );
+    expect(styles).not.toMatch(
+      /@media\s*\(max-width:\s*900px\)[\s\S]*?\.site-header\s*>\s*nav\s*\{\s*display:\s*none/iu,
+    );
+    expect(styles).toMatch(
+      /\.site-header\s*>\s*nav\s*\{[\s\S]*overflow-x:\s*auto/iu,
+    );
   });
 
   it("renders all eight conceptual blocks in order with aligned labels", () => {
     const markers = [
-      ['id="top"', "01 / Первый экран"], ['id="about"', "02 / О проекте"],
-      ['id="clients"', "03 / Клиентам"], ['id="experts"', "04 / Экспертам"],
-      ['id="tariffs"', "05 / Условия размещения"], ['id="faq"', "06 / Часто задаваемые вопросы"],
-      ['id="contacts"', "07 / Контакты"], ['id="legal"', "08 / Футер"],
+      ['id="top"', "01 / Первый экран"],
+      ['id="about"', "02 / О проекте"],
+      ['id="clients"', "03 / Клиентам"],
+      ['id="experts"', "04 / Экспертам"],
+      ['id="tariffs"', "05 / Условия размещения"],
+      ['id="faq"', "06 / Часто задаваемые вопросы"],
+      ['id="contacts"', "07 / Контакты"],
+      ['id="legal"', "08 / Футер"],
     ] as const;
     let previous = -1;
     for (const [id, label] of markers) {
@@ -59,16 +77,48 @@ describe("promotional landing view", () => {
     }
   });
 
+  it("names every major region and gives the hero a compact trust strip", () => {
+    for (const [section, heading] of [
+      ["about", "about-title"],
+      ["clients", "clients-title"],
+      ["experts", "experts-title"],
+      ["tariffs", "tariffs-title"],
+      ["faq", "faq-title"],
+      ["contacts", "contacts-title"],
+    ] as const) {
+      expect(html).toContain(`id="${section}" aria-labelledby="${heading}"`);
+      expect(html).toContain(`id="${heading}"`);
+    }
+    expect(html).toContain('class="hero-proof"');
+    expect(html).toContain("Один диалог");
+    expect(html).toContain("Подбор по запросу");
+    expect(html).toContain("На связи 24/7");
+  });
+
+  it("provides visible keyboard focus and reduced-motion fallbacks", () => {
+    expect(styles).toMatch(/:focus-visible[\s\S]*outline:/u);
+    expect(styles).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/u);
+    expect(styles).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.hero-proof/u,
+    );
+  });
+
   it("renders the offer-backed expert contract boundaries", () => {
     expect(html).toContain('class="contract-boundary"');
     expect(html).toContain("не гарантируются и зависят от клиентских запросов");
-    expect(html).toContain("требования законодательства РФ, в том числе в части маркировки рекламы");
-    expect(html).toContain("Если Эксперт подтверждает запись, Клиент получает уведомление с подтверждением");
+    expect(html).toContain(
+      "требования законодательства РФ, в том числе в части маркировки рекламы",
+    );
+    expect(html).toContain(
+      "Если Эксперт подтверждает запись, Клиент получает уведомление с подтверждением",
+    );
   });
 
   it("uses only defined radius tokens for message packages", () => {
     expect(styles).not.toContain("var(--radius)");
-    expect(styles).toMatch(/\.message-packages\s*\{[\s\S]*border-radius:\s*var\(--radius-(?:sm|md|lg)\)/u);
+    expect(styles).toMatch(
+      /\.message-packages\s*\{[\s\S]*border-radius:\s*var\(--radius-(?:sm|md|lg)\)/u,
+    );
   });
 
   it("keeps every action inside the messenger boundary", () => {
@@ -83,11 +133,39 @@ describe("promotional landing view", () => {
     }
   });
 
+  it("maps rendered CTAs to the intended bot and start payloads", () => {
+    const targets = [
+      ...html.matchAll(/data-messenger-action href="([^"]+)"/gu),
+    ].map(([, target]) => new URL(target!));
+
+    expect(targets.map(({ pathname }) => pathname)).toEqual(
+      targets.map(() => "/ii_tonya_bot"),
+    );
+    expect(targets.map((target) => target.searchParams.get("start"))).toEqual([
+      "client",
+      "client",
+      "expert",
+      "client",
+      "expert",
+      "expert_base",
+      "expert_exclusive",
+      "expert_event",
+      "expert",
+      "client",
+    ]);
+  });
+
   it("publishes the requested landing offer and safe form stub", () => {
-    expect(html).toContain("Я помогу тебе найти того, кто поможет на твоём пути развития");
+    expect(html).toContain(
+      "Я помогу тебе найти того, кто поможет на твоём пути развития",
+    );
     expect(html).toContain("Попробовать бесплатно");
-    expect(html.match(/Твой персональный навигатор по миру саморазвития/gu)).toHaveLength(1);
-    expect(html).toContain("Какой бы ни был твой запрос — я помогу найти того, кто сможет помочь.");
+    expect(
+      html.match(/Твой персональный навигатор по миру саморазвития/gu),
+    ).toHaveLength(1);
+    expect(html).toContain(
+      "Какой бы ни был твой запрос — я помогу найти того, кто сможет помочь.",
+    );
     expect(html).toContain("психологи, коучи, терапевты");
     expect(html).toContain("тест клиент");
     expect(html).toContain("тест эксперт");
@@ -115,9 +193,7 @@ describe("promotional landing view", () => {
     expect(html).toMatch(/<input[^>]+disabled/iu);
     expect(html).toMatch(/<button[^>]+disabled/iu);
     expect(html).not.toMatch(/mc\.yandex|google-analytics|fonts\.googleapis/iu);
-    expect(html).not.toMatch(
-      /<input[^>]*(?:card|cvv)/iu,
-    );
+    expect(html).not.toMatch(/<input[^>]*(?:card|cvv)/iu);
     expect(html).toContain("тест клиент");
   });
 });

@@ -16,6 +16,8 @@ import {
   PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
   PostgresTestExpertTelegramRepository,
+  PostgresLifecycleSchedulerRepository,
+  PostgresWaitlistRepository,
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
@@ -91,6 +93,12 @@ export interface WorkerRuntimeFactory {
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly yookassaReader?: ExpertResidencyProviderReader;
+  readonly waitlistRepositoryFactory?: (
+    db: DrizzleDb,
+    confirmationBufferMs: number,
+  ) => {
+    processPromotionCommandsBatch(batchSize: number): Promise<unknown>;
+  };
   readonly workerOutboxRegistryFactory?: (
     db: DrizzleDb,
     config: RuntimeConfig,
@@ -386,6 +394,20 @@ export function createProductionWorkerRuntimeFactory(
       );
       const outboxRepository =
         workerOutbox?.repository ?? new PostgresOutboxRepository(db);
+      const lifecycleSchedulerRepository = config.features.lifecycleReminders
+        ? new PostgresLifecycleSchedulerRepository(
+            db,
+            config.clientMessagingConsentPolicyVersion!,
+            config.clientTelegramBotKey!,
+          )
+        : undefined;
+      const waitlistRepository = config.features.clientWaitlist
+        ? (
+            deps.waitlistRepositoryFactory ??
+            ((waitlistDb, confirmationBufferMs) =>
+              new PostgresWaitlistRepository(waitlistDb, confirmationBufferMs))
+          )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
+        : undefined;
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -399,6 +421,21 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository,
+        ...(lifecycleSchedulerRepository === undefined
+          ? {}
+          : {
+              lifecycleScheduler: () =>
+                lifecycleSchedulerRepository.processDueLifecycleBatch({
+                  now: new Date(),
+                  batchSize: 100,
+                }),
+            }),
+        ...(waitlistRepository === undefined
+          ? {}
+          : {
+              waitlistPromotion: () =>
+                waitlistRepository.processPromotionCommandsBatch(100),
+            }),
         ...(workerOutbox === undefined
           ? {}
           : {

@@ -5,6 +5,7 @@ import {
   createClientCatalogService,
   createClientBookingService,
   createClientSessionService,
+  createWaitlistService,
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
@@ -16,6 +17,7 @@ import {
   type PrivacyService,
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
+  type ProtectedWaitlistRepository,
   HybridMessageGateway,
   createSelartiResponseService,
   TestExpertTelegramService,
@@ -35,6 +37,7 @@ import {
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
   PostgresBookingRepository,
+  PostgresWaitlistRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
@@ -122,6 +125,10 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
+    waitlistRepositoryFactory?: (
+      db: DrizzleDb,
+      confirmationBufferMs: number,
+    ) => ProtectedWaitlistRepository;
     testExpertMetricSink?: {
       record(
         event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
@@ -259,6 +266,19 @@ export const createDefaultLifecycle = (
             repository: new PostgresBookingRepository(db),
             confirmationBufferMs:
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
+          })
+        : undefined;
+    const clientWaitlistService =
+      config.features.clientWaitlist === true
+        ? createWaitlistService({
+            repository: (
+              options.waitlistRepositoryFactory ??
+              ((waitlistDb, confirmationBufferMs) =>
+                new PostgresWaitlistRepository(
+                  waitlistDb,
+                  confirmationBufferMs,
+                ))
+            )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000),
           })
         : undefined;
     const clientGateway =
@@ -402,6 +422,7 @@ export const createDefaultLifecycle = (
       clientBookingPrincipal === undefined
         ? {}
         : { clientBookingService, clientBookingPrincipal }),
+      ...(clientWaitlistService === undefined ? {} : { clientWaitlistService }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
         ? {}

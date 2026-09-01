@@ -6,6 +6,48 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 describe("release assets", () => {
+  it("documents the exact test-release boundary and provider capability matrix", () => {
+    const readme = readFileSync("README.md", "utf8");
+    const providerEvidence = readFileSync(
+      "docs/runbooks/provider-staging-evidence.md",
+      "utf8",
+    );
+    expect(readme).toContain("Test delivery deadline: 2026-09-07");
+    expect(readme).toContain("test-only release boundary");
+    expect(providerEvidence).toContain("Capability matrix");
+    expect(providerEvidence).toContain(
+      "default-off until its test evidence passes",
+    );
+    for (const capability of [
+      "Selarti",
+      "Planerka",
+      "Unified client Telegram bot",
+      "Expert promo Telegram bot",
+      "YooKassa",
+      "MAX Business",
+    ]) {
+      expect(providerEvidence).toMatch(
+        new RegExp(`${capability}[\\s\\S]{0,220}default-off`, "i"),
+      );
+    }
+    expect(providerEvidence).toContain("Provider staging status: BLOCKED");
+    expect(providerEvidence).toContain("not provider-connected evidence");
+    expect(providerEvidence).toContain(
+      "Production activation remains excluded",
+    );
+    expect(providerEvidence).toMatch(
+      /^\|\s*Unified client Telegram bot\s*\|\s*not executed\s*\|/m,
+    );
+    expect(providerEvidence).toMatch(
+      /^\|\s*Expert promo Telegram bot\s*\|\s*not executed\s*\|/m,
+    );
+    expect(providerEvidence).not.toMatch(
+      /^\|\s*Telegram\s*\|\s*not executed\s*\|/m,
+    );
+    expect(providerEvidence).not.toContain("Provider staging status: PASS");
+    expect(providerEvidence).not.toContain("production release");
+  });
+
   it("contains direct-Claw, native runtime, rollback, and evidence assets", () => {
     const required = [
       "scripts/run-claw-ci.sh",

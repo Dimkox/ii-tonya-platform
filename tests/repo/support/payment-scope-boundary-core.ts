@@ -93,6 +93,9 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
+  "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0040_booking_waitlist_d1.sql",
+  "packages/db/migrations/0041_booking_reschedule_replay.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -133,6 +136,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "selarti_response_proposals",
   "dialogue_deliveries",
   "dialogue_inbound_tombstones",
+  "lifecycle_jobs",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "selarti_budget_policies",
   "selarti_cost_reservations",
   "selarti_actual_usage_facts",
@@ -303,6 +310,198 @@ const approvedPackageManifestHashes = new Map([
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
+  [
+    ".grok-stack/adaptive_grok/__init__.py",
+    "4c8bb7854a2800b179b36a0b814d1fbab103f65380ff66c5e1e301ddeadaca1e",
+  ],
+  [
+    ".grok-stack/adaptive_grok/_policy_legacy.py",
+    "dfea131b4d33bf135a138e73deb6848aa4eca63f6ddde9529d9ae5f1788b9145",
+  ],
+  [
+    ".grok-stack/adaptive_grok/bitrix_checks.py",
+    "a741852a839e678d836b79299f5f882874d155cd239c74b24601a68d9d806a4a",
+  ],
+  [
+    ".grok-stack/adaptive_grok/change.py",
+    "6d0c7c17214faa4920e6980ed6ef42e708dc3e949a9c1b505d46cb4ae6db297c",
+  ],
+  [
+    ".grok-stack/adaptive_grok/deploy.py",
+    "1dfb923458a05f2f7963f4eaec6dc3ed853effb37ee245dce748a1d7bbf0de2a",
+  ],
+  [
+    ".grok-stack/adaptive_grok/doctor.py",
+    "3a4e22e19c0046855fe194ead66647a16cf40acc2120379e4f0b33d0c0ee1a4d",
+  ],
+  [
+    ".grok-stack/adaptive_grok/manifest.py",
+    "56b5b06615358b984711b0bd37881e420b36103ac8ab03863846e0b0386985a8",
+  ],
+  [
+    ".grok-stack/adaptive_grok/policy.py",
+    "e139523289057979d547d69b1c0ac0f9bfd979658be72f986a36ebea677b0ffa",
+  ],
+  [
+    ".grok-stack/adaptive_grok/protected_write.py",
+    "ef9cafb89ae22d8a88bb8bd953f679e33b4fbcbc4c3391136eac83e5a5dec3ca",
+  ],
+  [
+    ".grok-stack/adaptive_grok/receipts.py",
+    "e6037fc3445abf283e1db2846a84e63f6b2bd3166f9b9485dadddb759169abfa",
+  ],
+  [
+    ".grok-stack/adaptive_grok/repo.py",
+    "c0525e24e2ed24fca5235b5012b8e9cad13296ef39bd151d344db3738085f011",
+  ],
+  [
+    ".grok-stack/adaptive_grok/router.py",
+    "99a50875b6af2e6a419d984071b5d87b50332b5bffd79a2ff223f8db32ae4d8e",
+  ],
+  [
+    ".grok-stack/adaptive_grok/shell_targets.py",
+    "aa2585164c4c3d68584f9f58f79caca5e0efc305da1c15b38709bb8a16bfc30d",
+  ],
+  [
+    ".grok-stack/adaptive_grok/spec.py",
+    "52eea68cd97727befb252a6fee41b2536ccfcd7414e5c8868f1da769d706300d",
+  ],
+  [
+    ".grok-stack/adaptive_grok/state.py",
+    "a7d7fcca4a4c756c5409f1114fcce047dbf380c186ad6230e2ef763668ac217d",
+  ],
+  [
+    ".grok-stack/adaptive_grok/toolchain.py",
+    "4c50ae7dd8f18f3792e065f529c09b93037ba23d8e3faaef0278b9f0f604c930",
+  ],
+  [
+    ".grok-stack/adaptive_grok/util.py",
+    "1eb764b037ef335ed9a42416fcb8e038d7e2fed6ac37d78a947748d2ed72347d",
+  ],
+  [
+    ".grok-stack/adaptive_grok/verification.py",
+    "49fa0bd6f815323725460c6c3623af84b1a86222fd54fe4dae2ab9bcf4b65104",
+  ],
+  [
+    ".grok-stack/templates/hook_root_shim.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    ".grok/hooks/_lib.py",
+    "8b7bb18f58104133058d013668beae86ea67b4082b4e56223c7444bdd07e3ac0",
+  ],
+  [
+    ".grok/hooks/post_tool_use.py",
+    "2d416c9f45448a18a05cfd6779dd4564203379ec7ca66e6569630f0b085fe2af",
+  ],
+  [
+    ".grok/hooks/pre_compact.py",
+    "5beba302fbb82d38271a575053d4b50fca554f8abecb35f2181e04cbc02a5f18",
+  ],
+  [
+    ".grok/hooks/pre_tool_use.py",
+    "87ac222e91eef75316140b7bd13b374aa1d9d316de88564cf0c5e44bf22fa4de",
+  ],
+  [
+    ".grok/hooks/session_end.py",
+    "3f326c8c5ec3f592a959f952d14a90baf10809c19745818342d86d96c27c7279",
+  ],
+  [
+    ".grok/hooks/session_start.py",
+    "a10fccca02f28b02319beaceed4d609e41ab89c275fe05722b75810683aeef29",
+  ],
+  [
+    ".grok/hooks/stop_gate.py",
+    "fb6b79bb978866ae3b31011205feda36c40224c639bde0aedc913ca06330c2d8",
+  ],
+  [
+    ".grok/hooks/subagent_start.py",
+    "64d8792a1f84210f00906540a57cd3b49adf8214a86251bc9fa31de3c126275d",
+  ],
+  [
+    ".grok/hooks/subagent_stop.py",
+    "d1589871b20a21ee68adf3eabaaabb62dd25a027752c367abc40b27512b55865",
+  ],
+  [
+    ".grok/hooks/user_prompt_submit.py",
+    "8262e8f581cfa4d35b7f7c48eeb1da172d100b96c8cb1346e722840d10b41b66",
+  ],
+  [
+    "post_tool_use.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "pre_compact.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "pre_tool_use.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "scripts/grok_approve.py",
+    "9ec482e0fae2bdcc843fd8340ca4f4888772346d155c57db012eaecfb5cf7cf2",
+  ],
+  [
+    "scripts/grok_change.py",
+    "d40381314fd763af34d0fbd4df58eaf54fa5ee7d412222a83d6d615b0132517c",
+  ],
+  [
+    "scripts/grok_deploy.py",
+    "9fe62594655e1f091ebcd84b71c6c9c3bdb29a9247ba6000d096cd804eb3d8c3",
+  ],
+  [
+    "scripts/grok_doctor.py",
+    "03b1d25e597039dcd0b20ec579f4110b68b3d84c93faa388c161e88609197cd1",
+  ],
+  [
+    "scripts/grok_review.py",
+    "a8a5d994240e1caa6e52eb4896ee90855e36381f8ea7e508b386d074ab48a0aa",
+  ],
+  [
+    "scripts/grok_route.py",
+    "8279504f1b929483af450d3499a3d9487ae21c7f09546422f5deb7cce438348f",
+  ],
+  [
+    "scripts/grok_spec.py",
+    "899a02855a71cde23f34dec95f42f96606ffbc1e3f6f9662cd741edd36d057e2",
+  ],
+  [
+    "scripts/grok_status.py",
+    "2a53134da3fc04f5db4faf1601f126005d1f29d35ad070701cdf23233f142faa",
+  ],
+  [
+    "scripts/grok_verify.py",
+    "8e2a8fcb807f4131f1cf9c560d1832dbe38e6b36f7306baa971b78a1caaabc04",
+  ],
+  [
+    "session_end.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "session_start.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "stop_gate.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "subagent_start.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "subagent_stop.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
+  [
+    "tests/test_grok_verification_adaptation.py",
+    "1eaad5ec7978c0d02f1597483a4583594449c3d596e51b78cbe4f72c968d1b8e",
+  ],
+  [
+    "user_prompt_submit.py",
+    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
+  ],
   [
     "scripts/run-claw-ci.sh",
     "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
@@ -695,8 +894,20 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
+    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
+    "packages/db/migrations/0040_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/0041_booking_reschedule_replay.sql",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -776,7 +987,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -789,6 +1000,9 @@ const approvedDatabaseRelations = new Set([
   "channel_identities",
   "client_booking_erasure_work",
   "client_booking_receipts",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "client_catalog_choices",
   "client_catalog_erasure_index",
   "client_catalog_requests",

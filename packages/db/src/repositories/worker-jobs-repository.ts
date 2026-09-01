@@ -49,7 +49,7 @@ export class PostgresWorkerJobsRepository {
         failed: number | string;
       }>(sql`
         with due as materialized (
-          select id, user_id, expert_id, version
+          select id, user_id, expert_id, slot_id, version
           from reservations
           where status = 'reserved'
             and reserved_until <= clock_timestamp()
@@ -61,7 +61,7 @@ export class PostgresWorkerJobsRepository {
           set status = 'expired', version = r.version + 1, updated_at = clock_timestamp()
           from due
           where r.id = due.id and r.status = 'reserved' and r.version = due.version
-          returning r.id, r.user_id, r.expert_id, r.version, r.updated_at
+          returning r.id, r.user_id, r.expert_id, r.slot_id, r.version, r.updated_at
         ), audited as (
           insert into audit_events (
             actor_type, actor_id, authenticated_session_id_hash, action,
@@ -90,6 +90,7 @@ export class PostgresWorkerJobsRepository {
             topics.topic,
             jsonb_build_object(
               'reservationId', expired.id::text,
+              'slotId', expired.slot_id::text,
               'version', expired.version,
               'charge', 0
             ),
@@ -103,7 +104,8 @@ export class PostgresWorkerJobsRepository {
           cross join (values
             ('planerka.cancel'),
             ('client.reservation_expired'),
-            ('expert.reservation_expired')
+            ('expert.reservation_expired'),
+            ('waitlist.promote.v1')
           ) as topics(topic)
           on conflict (idempotency_key) do nothing
           returning id
