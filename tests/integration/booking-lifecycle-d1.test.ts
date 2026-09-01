@@ -321,3 +321,75 @@ describe("booking waitlist leave idempotency", () => {
     }
   }, 120_000);
 });
+
+describe("booking waitlist join idempotency", () => {
+  it("conflicts when one actor reuses a join key for another choice and handle", async () => {
+    const database = await startTestPostgres();
+    try {
+      await database.migrate();
+      const fixture = await seedWaitlistFixture(database);
+      const first = await fixture.candidate("join-key-first");
+      const secondChoiceDigest = `sha256:${createHash("sha256")
+        .update("choice-join-key-second")
+        .digest("hex")}` as const;
+      const secondRequestId = (
+        await database.db.execute<{ id: string }>(sql`
+          insert into client_catalog_requests(user_id,request_digest,state,expires_at)
+          values(
+            ${first.userId}::uuid,
+            ${createHash("sha256").update("request-join-key-second").digest("hex")},
+            'ready',${new Date(fixture.occupied.databaseNow.getTime() + 60 * 60 * 1_000)}
+          ) returning id
+        `)
+      ).rows[0]!.id;
+      await database.db.execute(sql`
+        insert into client_catalog_choices(request_id,choice_digest,slot_id,expires_at)
+        values(
+          ${secondRequestId}::uuid,${secondChoiceDigest},${fixture.occupied.slotId}::uuid,
+          ${new Date(fixture.occupied.databaseNow.getTime() + 60 * 60 * 1_000)}
+        )
+      `);
+      const second = {
+        ...first,
+        choiceDigest: secondChoiceDigest,
+        waitlistHandle: `wl1.${Buffer.from("join-key-second".padEnd(32, "x"))
+          .toString("base64url")
+          .slice(0, 43)
+          .padEnd(43, "A")}` as const,
+        correlationId: "join-key-second",
+      };
+
+      await expect(fixture.repository.join(first)).resolves.toMatchObject({
+        kind: "joined",
+        waitlistHandle: first.waitlistHandle,
+      });
+      await expect(fixture.repository.join(first)).resolves.toMatchObject({
+        kind: "replayed",
+        waitlistHandle: first.waitlistHandle,
+      });
+      await expect(fixture.repository.join(second)).resolves.toEqual({
+        kind: "conflict",
+      });
+      await expect(fixture.repository.join(first)).resolves.toMatchObject({
+        kind: "replayed",
+        waitlistHandle: first.waitlistHandle,
+      });
+      const entries = await database.db.execute<{
+        choiceDigest: string;
+        waitlistHandle: string;
+      }>(sql`
+        select choice_digest as "choiceDigest",waitlist_handle as "waitlistHandle"
+        from booking_waitlist_entries
+        where user_id=${first.userId}::uuid
+      `);
+      expect(entries.rows).toEqual([
+        {
+          choiceDigest: first.choiceDigest,
+          waitlistHandle: first.waitlistHandle,
+        },
+      ]);
+    } finally {
+      await database.stop();
+    }
+  }, 120_000);
+});

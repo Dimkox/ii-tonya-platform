@@ -97,24 +97,35 @@ export class PostgresWaitlistRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`waitlist:${command.idempotencyKey}`},0))`,
         );
+        const requestHash = hash(`${command.userId}\0${command.choiceDigest}`);
         const replay = (
           await tx.execute<{
+            actorUserId: string;
+            requestHash: string;
             waitlistHandle: `wl1.${string}`;
             position: number | string;
           }>(sql`
-            select result->>'waitlistHandle' as "waitlistHandle",
+            select actor_user_id as "actorUserId",request_hash as "requestHash",
+              result->>'waitlistHandle' as "waitlistHandle",
               result->>'position' as position
             from booking_waitlist_command_receipts
             where command_type='join' and idempotency_key=${command.idempotencyKey}
-              and actor_user_id=${command.userId}::uuid
+            for update
           `)
         ).rows[0];
-        if (replay)
+        if (replay) {
+          if (
+            replay.actorUserId !== command.userId ||
+            replay.requestHash !== requestHash
+          ) {
+            return { kind: "conflict" as const };
+          }
           return {
             kind: "replayed" as const,
             waitlistHandle: replay.waitlistHandle,
             position: position(replay.position),
           };
+        }
         const choice = (
           await tx.execute<{ slotId: string }>(sql`
             select c.slot_id as "slotId"
@@ -163,7 +174,7 @@ export class PostgresWaitlistRepository {
             command_type,idempotency_key,actor_user_id,request_hash,waitlist_entry_id,result
           ) values(
             'join',${command.idempotencyKey},${command.userId}::uuid,
-            ${hash(`${command.userId}\0${command.choiceDigest}`)},${inserted.id}::uuid,
+            ${requestHash},${inserted.id}::uuid,
             ${JSON.stringify(result)}::jsonb
           )
         `);
