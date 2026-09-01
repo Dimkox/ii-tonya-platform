@@ -1,4 +1,4 @@
-const landingRoot = '<main id="app"></main>';
+const landingRoot = '<div id="app"></div>';
 
 export function injectLandingMarkup(
   document: string,
@@ -9,6 +9,6 @@ export function injectLandingMarkup(
   }
   return document.replace(
     landingRoot,
-    `<main id="app" data-prerendered="true">${landingMarkup}</main>`,
+    `<div id="app" data-prerendered="true">${landingMarkup}</div>`,
   );
 }

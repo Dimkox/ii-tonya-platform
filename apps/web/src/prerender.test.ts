@@ -25,6 +25,7 @@ describe("production landing prerender", () => {
   it("publishes the complete landing in raw HTML before JavaScript runs", () => {
     expect(document).toContain("<h1>Привет, я ии-Тоня");
     expect(document.match(/<details\b/gu)).toHaveLength(20);
+    expect(document.match(/<main\b/gu)).toHaveLength(1);
     expect(document).toContain('data-prerendered="true"');
     expect(document).not.toContain('<main id="app"></main>');
   });
