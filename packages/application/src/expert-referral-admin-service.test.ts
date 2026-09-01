@@ -25,7 +25,6 @@ const principal = {
 const authorization = {
   approvalId: APPROVAL_ID,
   nonce: "nonce:expert-referral-admin-001",
-  correlationId: "correlation:expert-referral-admin-001",
 };
 
 function fixture(): ExpertReferralAdminDependencies & {

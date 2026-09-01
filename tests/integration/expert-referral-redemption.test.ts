@@ -70,6 +70,55 @@ describe("expert referral code lifecycle", () => {
     );
   });
 
+  it.each([
+    ["inactive", { active: false }],
+    ["unverified", { verified: false }],
+  ] as const)(
+    "rejects an %s inviter without issuance, audit, or approval consumption",
+    async (_label, inviterState) => {
+      await fixtures.enableFeatureControl();
+      const inviter = await fixtures.createExpert(inviterState);
+      const evidence = await fixtures.createAdminEvidence(
+        "expert_referral.batch_generate",
+        inviter.expertId,
+        { count: 1, overrideId: null },
+      );
+
+      await expect(
+        repo.issueBatch({
+          inviterExpertId: inviter.expertId,
+          count: 1,
+          ...evidence,
+        }),
+      ).rejects.toMatchObject({
+        code: "expert_referral_inviter_ineligible",
+      });
+      const state = await testDb.db.execute<{
+        batches: number;
+        codes: number;
+        audits: number;
+        approvalConsumed: boolean;
+      }>(sql`
+        select
+          (select count(*)::integer from expert_referral_code_batches
+            where inviter_expert_id = ${inviter.expertId}::uuid) as batches,
+          (select count(*)::integer from expert_referral_codes
+            where inviter_expert_id = ${inviter.expertId}::uuid) as codes,
+          (select count(*)::integer from audit_events
+            where action = 'expert_referral.batch_generate'
+              and actor_id = ${evidence.adminId}::uuid) as audits,
+          (select consumed_at is not null from admin_approvals
+            where id = ${evidence.approvalId}::uuid) as "approvalConsumed"
+      `);
+      expect(state.rows[0]).toEqual({
+        batches: 0,
+        codes: 0,
+        audits: 0,
+        approvalConsumed: false,
+      });
+    },
+  );
+
   it("fails closed when commands are disabled or issuance exceeds quota", async () => {
     const inviter = await fixtures.createExpert();
     const evidence = await fixtures.createAdminEvidence(
@@ -184,6 +233,112 @@ describe("expert referral code lifecycle", () => {
         ...revokeEvidence,
       }),
     ).rejects.toMatchObject({ code: "admin_evidence_invalid" });
+  });
+
+  it("revokes only issued codes while preserving exact replay and rollback", async () => {
+    await fixtures.enableFeatureControl();
+    const inviter = await fixtures.createExpert();
+    const invitee = await fixtures.createExpert();
+    const issueEvidence = await fixtures.createAdminEvidence(
+      "expert_referral.batch_generate",
+      inviter.expertId,
+      { count: 2, overrideId: null },
+    );
+    const batch = await repo.issueBatch({
+      inviterExpertId: inviter.expertId,
+      count: 2,
+      ...issueEvidence,
+    });
+    await repo.redeemCode({
+      plaintext: batch.codes[0]!.plaintext,
+      inviteeExpertId: invitee.expertId,
+      provider: invitee.provider,
+      externalId: invitee.externalId,
+    });
+    const redeemedEvidence = await fixtures.createAdminEvidence(
+      "expert_referral.code_revoke",
+      batch.codes[0]!.codeId,
+      { reasonCode: "security_review" },
+    );
+
+    await expect(
+      repo.revokeCode({
+        codeId: batch.codes[0]!.codeId,
+        reasonCode: "security_review",
+        ...redeemedEvidence,
+      }),
+    ).rejects.toMatchObject({ code: "expert_referral_code_not_revocable" });
+    const redeemedState = await testDb.db.execute<{
+      status: string;
+      revocationApprovalId: string | null;
+      approvalConsumed: boolean;
+      auditCount: number;
+    }>(sql`
+      select c.status, c.revocation_approval_id as "revocationApprovalId",
+        (select consumed_at is not null from admin_approvals
+          where id = ${redeemedEvidence.approvalId}::uuid) as "approvalConsumed",
+        (select count(*)::integer from audit_events
+          where action = 'expert_referral.code_revoke'
+            and object_id = c.id) as "auditCount"
+      from expert_referral_codes c
+      where c.id = ${batch.codes[0]!.codeId}::uuid
+    `);
+    expect(redeemedState.rows[0]).toEqual({
+      status: "redeemed",
+      revocationApprovalId: null,
+      approvalConsumed: false,
+      auditCount: 0,
+    });
+
+    const issuedEvidence = await fixtures.createAdminEvidence(
+      "expert_referral.code_revoke",
+      batch.codes[1]!.codeId,
+      { reasonCode: "security_review" },
+    );
+    const command = {
+      codeId: batch.codes[1]!.codeId,
+      reasonCode: "security_review",
+      ...issuedEvidence,
+    };
+    const revoked = await repo.revokeCode(command);
+    await expect(repo.revokeCode(command)).resolves.toEqual(revoked);
+    await expect(
+      repo.revokeCode({ ...command, reasonCode: "changed_reason" }),
+    ).rejects.toMatchObject({ code: "admin_evidence_invalid" });
+
+    const secondEvidence = await fixtures.createAdminEvidence(
+      "expert_referral.code_revoke",
+      batch.codes[1]!.codeId,
+      { reasonCode: "second_review" },
+    );
+    await expect(
+      repo.revokeCode({
+        codeId: batch.codes[1]!.codeId,
+        reasonCode: "second_review",
+        ...secondEvidence,
+      }),
+    ).rejects.toMatchObject({ code: "expert_referral_code_not_revocable" });
+    const revokedState = await testDb.db.execute<{
+      status: string;
+      revocationApprovalId: string | null;
+      secondApprovalConsumed: boolean;
+      auditCount: number;
+    }>(sql`
+      select c.status, c.revocation_approval_id as "revocationApprovalId",
+        (select consumed_at is not null from admin_approvals
+          where id = ${secondEvidence.approvalId}::uuid) as "secondApprovalConsumed",
+        (select count(*)::integer from audit_events
+          where action = 'expert_referral.code_revoke'
+            and object_id = c.id) as "auditCount"
+      from expert_referral_codes c
+      where c.id = ${batch.codes[1]!.codeId}::uuid
+    `);
+    expect(revokedState.rows[0]).toEqual({
+      status: "revoked",
+      revocationApprovalId: issuedEvidence.approvalId,
+      secondApprovalConsumed: false,
+      auditCount: 1,
+    });
   });
 
   it("rejects self-referral, ineligible identity, and an open abuse hold", async () => {

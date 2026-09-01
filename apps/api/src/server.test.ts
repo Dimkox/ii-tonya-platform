@@ -122,7 +122,6 @@ describe("server composition", () => {
           count: 1,
           approvalId: "00000000-0000-4000-8000-000000000943",
           nonce: "nonce:disabled-admin-test",
-          correlationId: "correlation:disabled-admin-test",
         },
       ),
     ).rejects.toMatchObject({ code: "feature_disabled" });

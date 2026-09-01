@@ -96,11 +96,10 @@ const requestBodySchema = {
 const executionBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["approvalId", "nonce", "correlationId", "command"],
+  required: ["approvalId", "nonce", "command"],
   properties: {
     approvalId: { type: "string", pattern: uuidPattern },
     nonce: { type: "string", pattern: opaquePattern },
-    correlationId: { type: "string", pattern: opaquePattern },
     command: commandSchema,
   },
 } as const;
@@ -144,10 +143,16 @@ const boundedText = (value: unknown, maximum: number): value is string =>
 const reasonCode = (value: unknown): value is string =>
   typeof value === "string" && /^[a-z][a-z0-9_]{0,63}$/u.test(value);
 
-const isoDate = (value: unknown): value is string =>
-  typeof value === "string" &&
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value) &&
-  Number.isFinite(Date.parse(value));
+const isoDate = (value: unknown): value is string => {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)
+  ) {
+    return false;
+  }
+  const instant = new Date(value);
+  return Number.isFinite(instant.getTime()) && instant.toISOString() === value;
+};
 
 function parseCommand(
   action: ExpertReferralApprovalAction,
@@ -292,13 +297,12 @@ async function resolvePrincipal(
 }
 
 const baseAuthorization = (
-  body: { approvalId: string; nonce: string; correlationId: string },
+  body: { approvalId: string; nonce: string },
   routeObjectId: string,
 ) => ({
   routeObjectId,
   approvalId: body.approvalId,
   nonce: body.nonce,
-  correlationId: body.correlationId,
 });
 
 async function execute(
@@ -306,7 +310,7 @@ async function execute(
   principal: AdminPrincipal,
   action: ExpertReferralApprovalAction,
   objectId: string,
-  body: { approvalId: string; nonce: string; correlationId: string },
+  body: { approvalId: string; nonce: string },
   values: CommandRecord,
 ): Promise<unknown> {
   const auth = baseAuthorization(body, objectId);
@@ -501,7 +505,6 @@ export async function buildExpertReferralAdminApi(
     Body: {
       approvalId: string;
       nonce: string;
-      correlationId: string;
       command: unknown;
     };
   }>(

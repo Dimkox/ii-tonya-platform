@@ -7,7 +7,6 @@ export interface ExpertReferralAdminAuthorization {
   readonly routeObjectId: string;
   readonly approvalId: string;
   readonly nonce: string;
-  readonly correlationId: string;
 }
 
 interface AdminEvidence {
