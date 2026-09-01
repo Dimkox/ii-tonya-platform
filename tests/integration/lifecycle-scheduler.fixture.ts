@@ -8,6 +8,7 @@ import type { TestDatabase } from "../../packages/db/src/testkit/postgres.js";
 export interface LifecycleFixture {
   readonly userId: string;
   readonly reservationId: string;
+  readonly slotId: string;
   readonly dialogueId: string;
   readonly startsAt: Date;
   readonly databaseNow: Date;
@@ -82,6 +83,7 @@ export async function seedLifecycleFixture(
   return {
     userId,
     reservationId,
+    slotId,
     dialogueId,
     startsAt,
     databaseNow,

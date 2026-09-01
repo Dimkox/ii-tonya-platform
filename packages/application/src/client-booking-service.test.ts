@@ -203,4 +203,43 @@ describe("client booking application boundary", () => {
       correlationId: "cancel-correlation",
     });
   });
+
+  it("derives a stable owner-only reschedule command from protected handles", async () => {
+    const rescheduleOwnedByHandle = vi.fn(async () => ({
+      kind: "rescheduled" as const,
+      reservationStatus: "reserved" as const,
+      reservedUntil: new Date("2026-08-16T12:00:00.000Z"),
+    }));
+    const service = createClientBookingService({
+      repository: {
+        reserveProtectedChoice: vi.fn(),
+        cancelOwnedByHandle: vi.fn(),
+        rescheduleOwnedByHandle,
+      },
+      newCorrelationId: () => "reschedule-correlation",
+      confirmationBufferMs: 259_200_000,
+    });
+    const principal = {
+      authenticated: true as const,
+      active: true as const,
+      userId,
+    };
+    await expect(
+      service.reschedule(principal, bookingHandle, { choiceHandle }),
+    ).resolves.toEqual({
+      bookingHandle,
+      state: "reserved",
+      reservedUntil: "2026-08-16T12:00:00.000Z",
+      replayed: false,
+    });
+    expect(rescheduleOwnedByHandle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId,
+        bookingHandle,
+        choiceDigest,
+        correlationId: "reschedule-correlation",
+        confirmationBufferMs: 259_200_000,
+      }),
+    );
+  });
 });

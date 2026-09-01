@@ -29,6 +29,7 @@ describe("loadEnv", () => {
       clientSession: false,
       clientBooking: false,
       clientBookingReserve: false,
+      clientWaitlist: false,
       clientFreeAccessV2: false,
       clientTelegramIngress: false,
       clientHybridRouting: false,

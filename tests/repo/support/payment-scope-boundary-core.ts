@@ -94,6 +94,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
   "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0040_booking_waitlist_d1.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -135,6 +136,9 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "dialogue_deliveries",
   "dialogue_inbound_tombstones",
   "lifecycle_jobs",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "selarti_budget_policies",
   "selarti_cost_reservations",
   "selarti_actual_usage_facts",
@@ -701,8 +705,12 @@ const approvedMigrationHashes = new Map([
     "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
   ],
   [
+    "packages/db/migrations/0040_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "79b94210b3378e7ca8f1ba9444f6afdb82966d148a9e89052f3512dc8751fc62",
+    "15f2757d8708c7b42f1cc269eafc8c9a230e02acc993428bf3354e7805cdbb3f",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -782,7 +790,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "79b94210b3378e7ca8f1ba9444f6afdb82966d148a9e89052f3512dc8751fc62",
+    "15f2757d8708c7b42f1cc269eafc8c9a230e02acc993428bf3354e7805cdbb3f",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -795,6 +803,9 @@ const approvedDatabaseRelations = new Set([
   "channel_identities",
   "client_booking_erasure_work",
   "client_booking_receipts",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "client_catalog_choices",
   "client_catalog_erasure_index",
   "client_catalog_requests",

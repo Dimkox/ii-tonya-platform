@@ -281,6 +281,13 @@
       "when": 1788480000000,
       "tag": "0039_lifecycle_scheduler_c1",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788566400000,
+      "tag": "0040_booking_waitlist_d1",
+      "breakpoints": true
     }
   ]
 }

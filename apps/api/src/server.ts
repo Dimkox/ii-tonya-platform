@@ -5,6 +5,7 @@ import {
   createClientCatalogService,
   createClientBookingService,
   createClientSessionService,
+  createWaitlistService,
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
@@ -35,6 +36,7 @@ import {
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
   PostgresBookingRepository,
+  PostgresWaitlistRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
@@ -261,6 +263,12 @@ export const createDefaultLifecycle = (
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
         : undefined;
+    const clientWaitlistService =
+      config.features.clientWaitlist === true
+        ? createWaitlistService({
+            repository: new PostgresWaitlistRepository(db),
+          })
+        : undefined;
     const clientGateway =
       config.features.clientTelegramIngress && config.clientTelegramBotKey
         ? new HybridMessageGateway({
@@ -402,6 +410,7 @@ export const createDefaultLifecycle = (
       clientBookingPrincipal === undefined
         ? {}
         : { clientBookingService, clientBookingPrincipal }),
+      ...(clientWaitlistService === undefined ? {} : { clientWaitlistService }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
         ? {}

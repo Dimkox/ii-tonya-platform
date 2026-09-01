@@ -38,11 +38,15 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0037_partner_commerce_a.sql",
       "packages/db/migrations/0038_test_expert_trial.sql",
       "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+      "packages/db/migrations/0040_booking_waitlist_d1.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
+      "booking_reschedule_facts",
+      "booking_waitlist_command_receipts",
+      "booking_waitlist_entries",
       "client_commercial_policy_assignments",
       "client_commercial_policy_controls",
       "commercial_participants",

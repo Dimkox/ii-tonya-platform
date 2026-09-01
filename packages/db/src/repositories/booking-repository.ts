@@ -123,6 +123,21 @@ export interface CancelOwnedBookingCommand {
   correlationId: string;
 }
 
+export interface RescheduleOwnedBookingCommand {
+  userId: string;
+  bookingHandle: `bk1.${string}`;
+  choiceDigest: `sha256:${string}`;
+  idempotencyKey: string;
+  correlationId: string;
+  confirmationBufferMs: number;
+}
+
+export type ProtectedClientBookingRescheduleResult = {
+  kind: "rescheduled" | "replayed" | "not_found" | "conflict";
+  reservationStatus?: ReservationStatus;
+  reservedUntil?: Date;
+};
+
 export interface CancelBookingForErasureCommand {
   userId: string;
   reservationId: string;
@@ -189,6 +204,7 @@ type BookingAuditAction =
   | "reservation.reserve"
   | "reservation.expert_confirm"
   | "reservation.client_cancel"
+  | "reservation.reschedule"
   | "reservation.expert_cancel"
   | "reservation.expire"
   | "reservation.complete"
@@ -202,6 +218,8 @@ const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
       return ["planerka.confirm", "client.booking_confirmed"];
     case "reservation.client_cancel":
       return ["planerka.cancel", "telegram.booking_cancelled"];
+    case "reservation.reschedule":
+      return ["planerka.reschedule", "telegram.reservation_rescheduled"];
     case "reservation.expert_cancel":
       return ["planerka.cancel", "client.booking_cancelled"];
     case "reservation.expire":
@@ -918,6 +936,171 @@ export class PostgresBookingRepository {
       return result.status === "cancelled_by_client"
         ? { kind: "cancelled" }
         : { kind: "conflict" };
+    });
+  }
+
+  rescheduleOwnedByHandle(
+    command: RescheduleOwnedBookingCommand,
+  ): Promise<ProtectedClientBookingRescheduleResult> {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.bookingHandle) ||
+      !/^sha256:[0-9a-f]{64}$/u.test(command.choiceDigest) ||
+      !/^[0-9a-f]{64}$/u.test(command.idempotencyKey) ||
+      command.correlationId.length < 1 ||
+      !Number.isSafeInteger(command.confirmationBufferMs) ||
+      command.confirmationBufferMs < 1 ||
+      command.confirmationBufferMs > MAXIMUM_HOLD_MS
+    ) {
+      return Promise.resolve({ kind: "conflict" });
+    }
+    return this.runSerializable(async (tx) => {
+      const replay = (
+        await tx.execute<{
+          status: ReservationStatus;
+          reservedUntil: Date | string;
+        }>(sql`
+          select r.status,r.reserved_until as "reservedUntil"
+          from booking_reschedule_facts f
+          join reservations r on r.id=f.reservation_id
+          where f.idempotency_key=${command.idempotencyKey}
+            and f.user_id=${command.userId}::uuid
+        `)
+      ).rows[0];
+      if (replay) {
+        return {
+          kind: "replayed",
+          reservationStatus: replay.status,
+          reservedUntil: normalizeBookingTimestamp(
+            replay.reservedUntil,
+            "reservations.reserved_until",
+          ),
+        };
+      }
+      const now = normalizeBookingTimestamp(
+        one(
+          (
+            await tx.execute<{ databaseNow: Date | string }>(sql`
+              select clock_timestamp() as "databaseNow"
+            `)
+          ).rows,
+          "the database clock",
+        ).databaseNow,
+        "clock_timestamp",
+      );
+      const owned = (
+        await tx.execute<{
+          reservationId: string;
+          oldSlotId: string;
+          status: ReservationStatus;
+          version: number;
+        }>(sql`
+          select r.id as "reservationId",r.slot_id as "oldSlotId",r.status,r.version
+          from client_booking_receipts b
+          join reservations r on r.id=b.reservation_id
+          join users u on u.id=b.user_id and u.active=true
+          where b.user_id=${command.userId}::uuid
+            and b.booking_handle=${command.bookingHandle}
+          for update of r
+        `)
+      ).rows[0];
+      if (!owned) return { kind: "not_found" };
+      if (owned.status !== "reserved" && owned.status !== "booked") {
+        return { kind: "conflict" };
+      }
+      const target = (
+        await tx.execute<{
+          slotId: string;
+          expertId: string;
+          serviceId: string;
+          capacity: number;
+          startsAt: Date | string;
+        }>(sql`
+          select s.id as "slotId",e.id as "expertId",es.id as "serviceId",
+            s.capacity,s.starts_at as "startsAt"
+          from client_catalog_choices c
+          join client_catalog_requests cr on cr.id=c.request_id
+          join slots s on s.id=c.slot_id
+          join expert_services es on es.id=s.expert_service_id and es.active=true
+          join experts e on e.id=es.expert_id and e.active=true and e.verified=true
+          where c.choice_digest=${command.choiceDigest}
+            and cr.user_id=${command.userId}::uuid and cr.state='ready'
+            and c.expires_at>${now} and cr.expires_at>${now}
+            and s.starts_at>${new Date(now.getTime() + MINIMUM_LEAD_MS)}
+            and s.observed_at>=${new Date(now.getTime() - SLOT_FRESHNESS_MS)}
+            and s.observed_at<=${now}
+          for update of c,cr
+        `)
+      ).rows[0];
+      if (!target || target.slotId === owned.oldSlotId) {
+        return { kind: "conflict" };
+      }
+      await tx.execute(sql`
+        select pg_advisory_xact_lock(hashtextextended('slot:'||slot_id::text,0))
+        from (values(${owned.oldSlotId}::uuid),(${target.slotId}::uuid)) slots(slot_id)
+        order by slot_id
+      `);
+      await tx.execute(sql`
+        select id from slots where id in (${owned.oldSlotId}::uuid,${target.slotId}::uuid)
+        order by id for update
+      `);
+      const occupancy = Number(
+        (
+          await tx.execute<{ count: string }>(sql`
+            select count(*)::text count from reservations
+            where slot_id=${target.slotId}::uuid and id<>${owned.reservationId}::uuid
+              and (status='booked' or (status='reserved' and reserved_until>${now}))
+          `)
+        ).rows[0]!.count,
+      );
+      if (occupancy >= target.capacity) return { kind: "conflict" };
+      const reservedUntil = new Date(
+        now.getTime() + command.confirmationBufferMs,
+      );
+      await tx.execute(sql`
+        update lifecycle_jobs set status='cancelled',cancellation_reason='booking_rescheduled',
+          lease_token=null,lease_until=null,updated_at=${now}
+        where subject_kind='reservation' and subject_id=${owned.reservationId}::uuid
+          and status in ('pending','processing','retry_wait')
+      `);
+      const updated = (
+        await tx.execute<{ status: ReservationStatus; version: number }>(sql`
+          update reservations
+          set slot_id=${target.slotId}::uuid,expert_id=${target.expertId}::uuid,
+            expert_service_id=${target.serviceId}::uuid,status='reserved',
+            reserved_until=${reservedUntil},meeting_url=null,
+            version=version+1,updated_at=${now}
+          where id=${owned.reservationId}::uuid and version=${owned.version}
+          returning status,version
+        `)
+      ).rows[0];
+      if (!updated) return { kind: "conflict" };
+      await tx.execute(sql`
+        insert into booking_reschedule_facts(
+          reservation_id,user_id,old_slot_id,new_slot_id,old_version,new_version,
+          idempotency_key,correlation_id,created_at
+        ) values(
+          ${owned.reservationId}::uuid,${command.userId}::uuid,
+          ${owned.oldSlotId}::uuid,${target.slotId}::uuid,${owned.version},${updated.version},
+          ${command.idempotencyKey},${command.correlationId},${now}
+        )
+      `);
+      await this.auditAndOutbox(tx, {
+        actorType: "client",
+        actorId: command.userId,
+        action: "reservation.reschedule",
+        reservationId: owned.reservationId,
+        decision: updated.status,
+        reasonCode: "client_reschedule",
+        correlationId: command.correlationId,
+        occurredAt: now,
+        version: updated.version,
+      });
+      return {
+        kind: "rescheduled",
+        reservationStatus: updated.status,
+        reservedUntil,
+      };
     });
   }
 

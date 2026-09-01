@@ -7,6 +7,7 @@ export {
   type DrizzleDb,
 } from "./client.js";
 export { sql } from "drizzle-orm";
+export { PostgresWaitlistRepository } from "./repositories/waitlist-repository.js";
 export {
   PostgresLifecycleSchedulerRepository,
   type LifecycleJobType,

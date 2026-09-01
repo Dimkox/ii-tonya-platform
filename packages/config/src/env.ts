@@ -76,6 +76,7 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_WAITLIST_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -330,6 +331,7 @@ export type RuntimeConfig = {
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientWaitlist?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientHybridRouting?: boolean;
@@ -386,6 +388,14 @@ export type RuntimeConfig = {
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
+  if (
+    value.CLIENT_WAITLIST_ENABLED === "true" &&
+    (value.CLIENT_BOOKING_ENABLED !== "true" ||
+      value.CLIENT_CATALOG_ENABLED !== "true" ||
+      value.CLIENT_SESSION_ENABLED !== "true")
+  ) {
+    throw new Error("client_waitlist_configuration_incomplete");
+  }
   if (value.LIFECYCLE_CHECKUPS_ENABLED === "true") {
     throw new Error("lifecycle_checkup_authority_unavailable");
   }
@@ -495,6 +505,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientWaitlist: value.CLIENT_WAITLIST_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",

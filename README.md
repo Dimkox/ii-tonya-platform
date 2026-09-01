@@ -13,6 +13,13 @@ non-secret credential inventory is maintained in
 [the test credential runbook](docs/runbooks/test-credential-inventory.md), and provider
 status is tracked in [the staging evidence runbook](docs/runbooks/provider-staging-evidence.md).
 
+Release D1 now implements default-off client rescheduling and FIFO waitlist operations.
+PostgreSQL owns protected handles, owner authorization, immutable reschedule facts,
+72-hour promoted holds, capacity fencing, and retry-safe command receipts. Reservation
+expiry records `waitlist.promote.v1` in the same transaction, so a crash cannot lose newly
+available capacity; provider delivery and Planerka activation remain later default-off
+test-release gates.
+
 Native production runtime deployed; live-provider activation remains closed. The exact
 release `233f3cf72e45e47117948ad5615b603252801e40` runs on the dedicated Ubuntu server as
 systemd-managed API and worker services with system PostgreSQL, nginx, and HTTPS for

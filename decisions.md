@@ -19,6 +19,8 @@ B3 derives the live hard cap only from settled expert-residency cash and snapsho
 Release C resolves reminders against the configured client bot, a numeric Telegram chat identity, current booking state, and the latest exact-policy consent in the same transaction that allocates the dialogue sequence. This prevents cross-bot delivery and makes consent withdrawal win before any outbox fact is created.
 
 Lifecycle workers reclaim expired processing leases in a bounded `SKIP LOCKED` pass before claiming due work, dead-lettering exhausted attempts and rotating the fencing token. The logical `botKey` deliberately excludes `:` so a Telegram API token cannot be accidentally persisted as routing metadata.
+
+Reservation expiry appends `waitlist.promote.v1` in the same PostgreSQL transaction as the expired state and other integration facts. This preserves newly available capacity across crashes while keeping FIFO promotion independently retryable and capacity-fenced.
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.
