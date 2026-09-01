@@ -275,3 +275,101 @@ The named human AI behavior spot-check remains **PENDING — none supplied**.
 The known provider-deadline fixture is intentionally unchanged and remains
 carried to Task 12 as directed. Independent re-review is required; this fix
 round makes no completion or activation claim.
+
+## Fix round 2/5 — retry-safe expert callback execution
+
+### Review findings and design
+
+- The previous processor consumed `ct3` while preparing the callback before
+  the webhook inbox claim. A busy/failed claim, Task 8 failure, or output
+  failure therefore made the same update permanently non-retryable. A
+  completed duplicate also failed callback verification before the inbox could
+  return its durable duplicate decision.
+- The previous prepared callback closed over the binding/principal and command
+  resolved before the inbox claim. A command version, object, operation, or
+  complete four-field binding change during the claim could execute that stale
+  snapshot.
+- Preparation now performs only authenticated, non-consuming token/binding
+  validation and carries the opaque token hash plus claims. After a successful
+  inbox claim, one injected atomic lease operation re-resolves and validates
+  the complete current binding/principal and exact command, checks the
+  authoritative version, and acquires the token once while returning an
+  immutable typed command lease.
+- Task 8 service and output execution happen only under that lease. Any service
+  or output failure releases it before the webhook inbox claim is failed, so a
+  retry of the same update can acquire again. Successful service and output
+  complete the token lease, then the webhook completes its inbox claim.
+  Completed duplicate update IDs return 200 before acquisition; replay under a
+  different update ID reaches the completed token state, fails generically,
+  and performs no Task 8 or output work.
+- The stateful fake implements token states `available`, `leased`, and
+  `completed` and atomically validates token claims, expiry, all principal
+  fields, Telegram identity, operation, object, and version. Mutation from v1
+  to v2 between prepare and claim, plus object/operation/binding substitutions,
+  invoke zero Task 8 operations.
+- The lease/store/binding implementation remains an injected provider-neutral
+  port only. No database migration, durable/live composition, provider,
+  credential, environment flag, network call, or activation was added. A
+  durable atomic implementation remains an activation prerequisite.
+
+### Strict RED/GREEN evidence
+
+```text
+corepack pnpm vitest run apps/api/src/expert-telegram-command.test.ts
+first behavioral RED — 1 failed file, 1/1 failed: completed duplicate returned
+403 instead of 200 because ct3 had been consumed before inbox.claim.
+
+expanded required RED — 1 failed file, 11/11 failed: service/output retries
+returned 403, inbox busy/throw consumed before claim, replay never reached the
+atomic port, and post-prepare version/object/operation/binding changes executed
+the stale prepared command.
+
+focused GREEN — 1 file, 11/11 passed: four operations and safe projections,
+fail-once Task 8, fail-once output, inbox busy/failure, duplicate, replay, and
+all four authoritative-state mutation cases.
+
+focused public-surface/callback/webhook/app/server/scope checkpoint —
+8 files, 182/182 passed.
+```
+
+The fresh-worktree test command initially could not collect tests because
+package build outputs were absent. Building the API dependency closure fixed
+that setup condition; it is not counted as behavioral RED. Production remained
+unchanged until the two behavioral RED results above were recorded.
+
+### Final fix-round verification and ledger evidence
+
+```text
+affected Telegram/ct2 repository+migration/webhook-inbox/API/app/server/admin/
+Task 8/prompt/conversation regressions:
+20 files, 285/285 tests passed
+
+scope/dependency/env/admin/architecture/release/workflow guards:
+9 files, 198/198 tests passed
+
+bash -n scripts/deploy-compose-remote.sh scripts/validate-runtime-env.sh
+exit 0
+
+corepack pnpm --workspace-concurrency=1 -r --sort run build
+exit 0 — all 10 workspace projects passed, including declarations
+
+corepack pnpm -r --sort run typecheck
+exit 0 — all 10 workspace projects passed
+
+exact changed-TypeScript ESLint, exact non-legacy changed-file Prettier, and
+git diff --check
+exit 0
+```
+
+The package index now additionally exports the non-consuming authenticated
+`ct3` preparation result/function; its runtime package import is defined. Only
+the exact integrations-index scope SHA-256 changed, to
+`73edd1ac1036192736772c25f98fb2bee8c0c3d715a715ded87ce64d7f61c161`, and the
+exact scope guard passed. The only touched compact legacy formatter exception
+remains `apps/api/src/routes/telegram-webhook.ts`; its new import/error-mapping
+hunks are formatter-shaped and the inherited whole-file exception is unchanged.
+
+The named human AI behavior spot-check remains **PENDING — none supplied**.
+The provider-deadline fixture remains untouched and carried to Task 12.
+Independent re-review is required; this fix round makes no Task 10 completion,
+durable-activation, staging, or production claim.

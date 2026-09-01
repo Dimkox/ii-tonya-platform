@@ -282,6 +282,11 @@ export interface ExpertCommandCallbackClaimsStore {
   }): Promise<ExpertCommandCallbackClaims | null>;
 }
 
+export interface AuthenticatedExpertCommandCallback {
+  readonly tokenHash: string;
+  readonly claims: ExpertCommandCallbackClaims;
+}
+
 export interface ExpertCommandCallbackVersionAuthority {
   currentVersion(input: {
     readonly expertId: string;
@@ -378,30 +383,15 @@ export async function verifyExpertCommandCallback(
   now: Date,
 ): Promise<ExpertCommandCallbackClaims> {
   try {
-    requireStrongSecret(secret);
-    const { nonce, authenticatedTag } = parseExpertCommandToken(token);
-    const expectedTag = expertCommandTag(nonce, secret);
-    if (!timingSafeEqual(authenticatedTag, expectedTag)) {
-      throw new CallbackAuthStateError("Invalid expert command callback token");
-    }
-    const hash = tokenHash(nonce);
-    const stored = await store.peek(hash);
-    if (stored === null) {
-      throw new CallbackAuthStateError("Unknown expert command callback token");
-    }
-    validateExpertCommandClaims(stored);
-    if (
-      !numericTelegramIdentity.test(expectedTelegramUserId) ||
-      binding.telegramUserId !== expectedTelegramUserId ||
-      !binding.active ||
-      !binding.verified ||
-      stored.expertId !== binding.expertId ||
-      stored.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)
-    ) {
-      throw new CallbackAuthStateError(
-        "Expert command callback not authorized",
-      );
-    }
+    const authenticated = await authenticateExpertCommandCallbackInternal(
+      token,
+      expectedTelegramUserId,
+      binding,
+      secret,
+      store,
+      now,
+    );
+    const stored = authenticated.claims;
     const currentVersion = await versionAuthority.currentVersion({
       expertId: stored.expertId,
       operation: stored.operation,
@@ -413,7 +403,7 @@ export async function verifyExpertCommandCallback(
       );
     }
     const consumed = await store.consumeIfValid({
-      tokenHash: hash,
+      tokenHash: authenticated.tokenHash,
       expertId: stored.expertId,
       operation: stored.operation,
       objectId: stored.objectId,
@@ -439,4 +429,61 @@ export async function verifyExpertCommandCallback(
     if (!(error instanceof CallbackAuthStateError)) throw error;
     throw new CallbackVerificationError();
   }
+}
+
+export async function authenticateExpertCommandCallback(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  secret: Uint8Array,
+  store: ExpertCommandCallbackClaimsStore,
+  now: Date,
+): Promise<AuthenticatedExpertCommandCallback> {
+  try {
+    return await authenticateExpertCommandCallbackInternal(
+      token,
+      expectedTelegramUserId,
+      binding,
+      secret,
+      store,
+      now,
+    );
+  } catch (error) {
+    if (error instanceof CallbackInfrastructureError) throw error;
+    if (!(error instanceof CallbackAuthStateError)) throw error;
+    throw new CallbackVerificationError();
+  }
+}
+
+async function authenticateExpertCommandCallbackInternal(
+  token: string,
+  expectedTelegramUserId: string,
+  binding: ExpertBinding,
+  secret: Uint8Array,
+  store: ExpertCommandCallbackClaimsStore,
+  now: Date,
+): Promise<AuthenticatedExpertCommandCallback> {
+  requireStrongSecret(secret);
+  const { nonce, authenticatedTag } = parseExpertCommandToken(token);
+  const expectedTag = expertCommandTag(nonce, secret);
+  if (!timingSafeEqual(authenticatedTag, expectedTag)) {
+    throw new CallbackAuthStateError("Invalid expert command callback token");
+  }
+  const hash = tokenHash(nonce);
+  const stored = await store.peek(hash);
+  if (stored === null) {
+    throw new CallbackAuthStateError("Unknown expert command callback token");
+  }
+  validateExpertCommandClaims(stored);
+  if (
+    !numericTelegramIdentity.test(expectedTelegramUserId) ||
+    binding.telegramUserId !== expectedTelegramUserId ||
+    !binding.active ||
+    !binding.verified ||
+    stored.expertId !== binding.expertId ||
+    stored.expiresAtEpochSeconds <= Math.floor(now.getTime() / 1_000)
+  ) {
+    throw new CallbackAuthStateError("Expert command callback not authorized");
+  }
+  return { tokenHash: hash, claims: stored };
 }

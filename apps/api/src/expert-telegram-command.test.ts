@@ -140,6 +140,11 @@ describe("expert Telegram command processor", () => {
       })),
     } as unknown as ExpertResidencyService;
     const published: unknown[] = [];
+    const commandStates = new Map<
+      string,
+      { kind: "available" | "leased" | "completed"; leaseId?: string }
+    >();
+    const leaseTokens = new Map<string, string>();
     const processor = createExpertTelegramCommandProcessor({
       secret,
       store,
@@ -157,22 +162,39 @@ describe("expert Telegram command processor", () => {
         },
       },
       commands: {
-        async currentVersion(input) {
-          const command = commands.get(input.objectId);
-          return command !== undefined &&
-            command.operation === input.operation &&
-            input.expertId === principal.expertId
-            ? command.version
-            : null;
+        async acquire(input) {
+          const { tokenHash, claims } = input.authenticated;
+          const state = commandStates.get(tokenHash) ?? { kind: "available" };
+          if (state.kind === "completed") return { kind: "completed" };
+          if (state.kind === "leased") return { kind: "busy" };
+          const command = commands.get(claims.objectId);
+          if (
+            command === undefined ||
+            command.operation !== claims.operation ||
+            command.version !== claims.version ||
+            claims.expertId !== principal.expertId ||
+            input.telegramUserId !== "1301" ||
+            input.preparedBinding.telegramUserId !== "1301" ||
+            input.preparedBinding.principal.expertId !== principal.expertId ||
+            !input.preparedBinding.active ||
+            !input.preparedBinding.verified
+          ) {
+            return { kind: "rejected" };
+          }
+          const leaseId = `lease-${tokenHash}`;
+          commandStates.set(tokenHash, { kind: "leased", leaseId });
+          leaseTokens.set(leaseId, tokenHash);
+          return { kind: "acquired", leaseId, principal, command };
         },
-        async resolveCurrent(input) {
-          const command = commands.get(input.objectId);
-          return command !== undefined &&
-            command.operation === input.operation &&
-            command.version === input.version &&
-            input.expertId === principal.expertId
-            ? command
-            : null;
+        async complete(leaseId) {
+          const tokenHash = leaseTokens.get(leaseId);
+          if (tokenHash === undefined) throw new Error("unknown_test_lease");
+          commandStates.set(tokenHash, { kind: "completed" });
+        },
+        async release(leaseId) {
+          const tokenHash = leaseTokens.get(leaseId);
+          if (tokenHash === undefined) throw new Error("unknown_test_lease");
+          commandStates.set(tokenHash, { kind: "available" });
         },
       },
       referrals,
@@ -184,16 +206,30 @@ describe("expert Telegram command processor", () => {
       },
     });
     const app = Fastify({ logger: false });
+    const receipts = new Map<string, "processing" | "complete">();
     await app.register(telegramWebhookRoutes, {
       secret: "telegram-webhook-secret",
       callbacks: processor,
       inbox: {
-        claim: async (_source, eventId) => ({
-          kind: "claimed" as const,
-          claimId: `claim-${eventId}`,
-        }),
-        complete: async () => undefined,
-        fail: async () => undefined,
+        claim: async (_source, eventId) => {
+          const state = receipts.get(eventId);
+          if (state !== undefined) {
+            return {
+              kind:
+                state === "complete"
+                  ? ("duplicate" as const)
+                  : ("busy" as const),
+            };
+          }
+          receipts.set(eventId, "processing");
+          return { kind: "claimed" as const, claimId: eventId };
+        },
+        complete: async (claimId) => {
+          receipts.set(claimId, "complete");
+        },
+        fail: async (claimId) => {
+          receipts.delete(claimId);
+        },
       },
       rateLimiter: createWindowedRateLimiter(),
     });
@@ -236,11 +272,30 @@ describe("expert Telegram command processor", () => {
       expect(response.statusCode).toBe(200);
     }
 
+    const completedDuplicate = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: {
+        "x-telegram-bot-api-secret-token": "telegram-webhook-secret",
+        "x-correlation-id": "telegram-command-duplicate",
+      },
+      payload: {
+        update_id: 1_301,
+        callback_query: {
+          id: "query-duplicate",
+          from: { id: 1301 },
+          data: tokens[0],
+        },
+      },
+    });
+    expect(completedDuplicate.statusCode).toBe(200);
+
     expect(referrals.redeemCode).toHaveBeenCalledWith(
       principal,
       "ER-SERVER-ONLY-CODE",
       "telegram-redeem-1301",
     );
+    expect(referrals.redeemCode).toHaveBeenCalledTimes(1);
     expect(referrals.summary).toHaveBeenCalledWith(principal);
     expect(residency.quote).toHaveBeenCalledWith(principal, "expert-month-v1");
     expect(residency.checkout).toHaveBeenCalledWith(principal, {
@@ -300,4 +355,413 @@ describe("expert Telegram command processor", () => {
     expect(JSON.stringify(published)).not.toContain("disabled");
     await app.close();
   });
+});
+
+type AtomicAcquireInput = Readonly<{
+  authenticated: Readonly<{
+    tokenHash: string;
+    claims: ExpertCommandCallbackClaims;
+  }>;
+  telegramUserId: string;
+  preparedBinding: Readonly<{
+    telegramUserId: string;
+    principal: ExpertPrincipal;
+    active: boolean;
+    verified: boolean;
+  }>;
+  now: Date;
+}>;
+
+type RetryHarnessOptions = Readonly<{
+  serviceFailsOnce?: boolean;
+  outputFailsOnce?: boolean;
+  firstClaim?: "busy" | "throw";
+  mutateBeforeAcquire?: "version" | "object" | "operation" | "binding";
+}>;
+
+const retryHarness = async (options: RetryHarnessOptions = {}) => {
+  const callbackValues = new Map<string, ExpertCommandCallbackClaims>();
+  const legacyConsumed = new Set<string>();
+  let callbackConsumes = 0;
+  const store: ExpertCommandCallbackClaimsStore = {
+    async put(key, value) {
+      callbackValues.set(key, value);
+    },
+    async peek(key) {
+      return legacyConsumed.has(key) ? null : (callbackValues.get(key) ?? null);
+    },
+    async consumeIfValid(input) {
+      callbackConsumes += 1;
+      const value = callbackValues.get(input.tokenHash);
+      if (
+        legacyConsumed.has(input.tokenHash) ||
+        value === undefined ||
+        value.expertId !== input.expertId ||
+        value.operation !== input.operation ||
+        value.objectId !== input.objectId ||
+        value.version !== input.version ||
+        value.expiresAtEpochSeconds <= Math.floor(input.now.getTime() / 1_000)
+      ) {
+        return null;
+      }
+      legacyConsumed.add(input.tokenHash);
+      return value;
+    },
+  };
+
+  const originalCommand: ExpertTelegramServerCommand = {
+    operation: "redeem_expert_referral",
+    objectId: "retry-command-1301",
+    version: 1,
+    code: "ER-RETRY-SERVER-ONLY",
+    idempotencyKey: "telegram-retry-1301",
+  };
+  let currentCommand: ExpertTelegramServerCommand = originalCommand;
+  const originalBinding = {
+    telegramUserId: "1301",
+    principal,
+    active: true,
+    verified: true,
+  } as const;
+  let currentBinding: Readonly<{
+    telegramUserId: string;
+    principal: ExpertPrincipal;
+    active: boolean;
+    verified: boolean;
+  }> = originalBinding;
+
+  const executionState = new Map<
+    string,
+    { kind: "available" | "leased" | "completed"; leaseId?: string }
+  >();
+  const leaseTokenHashes = new Map<string, string>();
+  let acquisitionCalls = 0;
+  let releaseCalls = 0;
+  let completeCalls = 0;
+  const samePrincipal = (left: ExpertPrincipal, right: ExpertPrincipal) =>
+    left.expertId === right.expertId &&
+    left.userId === right.userId &&
+    left.provider === right.provider &&
+    left.externalId === right.externalId;
+  const commandPort = {
+    async currentVersion(input: {
+      expertId: string;
+      operation: ExpertCommandCallbackClaims["operation"];
+      objectId: string;
+    }) {
+      return input.expertId === principal.expertId &&
+        input.operation === currentCommand.operation &&
+        input.objectId === currentCommand.objectId
+        ? currentCommand.version
+        : null;
+    },
+    async resolveCurrent(input: {
+      expertId: string;
+      operation: ExpertCommandCallbackClaims["operation"];
+      objectId: string;
+      version: number;
+    }) {
+      return input.expertId === principal.expertId &&
+        input.operation === currentCommand.operation &&
+        input.objectId === currentCommand.objectId &&
+        input.version === currentCommand.version
+        ? currentCommand
+        : null;
+    },
+    async acquire(input: AtomicAcquireInput) {
+      acquisitionCalls += 1;
+      const { tokenHash, claims } = input.authenticated;
+      const state = executionState.get(tokenHash) ?? { kind: "available" };
+      if (state.kind === "completed") return { kind: "completed" } as const;
+      if (state.kind === "leased") return { kind: "busy" } as const;
+      const stored = callbackValues.get(tokenHash);
+      const bindingUnchanged =
+        currentBinding.telegramUserId === input.telegramUserId &&
+        currentBinding.telegramUserId ===
+          input.preparedBinding.telegramUserId &&
+        currentBinding.active &&
+        currentBinding.verified &&
+        input.preparedBinding.active &&
+        input.preparedBinding.verified &&
+        samePrincipal(
+          currentBinding.principal,
+          input.preparedBinding.principal,
+        );
+      if (
+        stored === undefined ||
+        stored.expertId !== claims.expertId ||
+        stored.operation !== claims.operation ||
+        stored.objectId !== claims.objectId ||
+        stored.version !== claims.version ||
+        stored.expiresAtEpochSeconds !== claims.expiresAtEpochSeconds ||
+        claims.expertId !== currentBinding.principal.expertId ||
+        claims.expiresAtEpochSeconds <=
+          Math.floor(input.now.getTime() / 1_000) ||
+        !bindingUnchanged ||
+        currentCommand.operation !== claims.operation ||
+        currentCommand.objectId !== claims.objectId ||
+        currentCommand.version !== claims.version
+      ) {
+        return { kind: "rejected" } as const;
+      }
+      const leaseId = `lease-${String(acquisitionCalls)}`;
+      executionState.set(tokenHash, { kind: "leased", leaseId });
+      leaseTokenHashes.set(leaseId, tokenHash);
+      return {
+        kind: "acquired",
+        leaseId,
+        principal: Object.freeze({ ...currentBinding.principal }),
+        command: Object.freeze({ ...currentCommand }),
+      } as const;
+    },
+    async complete(leaseId: string) {
+      completeCalls += 1;
+      const tokenHash = leaseTokenHashes.get(leaseId);
+      if (tokenHash === undefined) throw new Error("unknown_test_lease");
+      executionState.set(tokenHash, { kind: "completed" });
+    },
+    async release(leaseId: string) {
+      releaseCalls += 1;
+      const tokenHash = leaseTokenHashes.get(leaseId);
+      if (tokenHash === undefined) throw new Error("unknown_test_lease");
+      executionState.set(tokenHash, { kind: "available" });
+    },
+  };
+
+  let serviceFails = options.serviceFailsOnce ?? false;
+  let outputFails = options.outputFailsOnce ?? false;
+  let serviceAttempts = 0;
+  let semanticEffects = 0;
+  const appliedIdempotencyKeys = new Set<string>();
+  const published: unknown[] = [];
+  const referrals = {
+    async redeemCode(
+      candidatePrincipal: ExpertPrincipal,
+      code: string,
+      idempotencyKey: string,
+    ) {
+      serviceAttempts += 1;
+      if (serviceFails) {
+        serviceFails = false;
+        throw new Error("test_service_unavailable");
+      }
+      if (!appliedIdempotencyKeys.has(idempotencyKey)) {
+        appliedIdempotencyKeys.add(idempotencyKey);
+        semanticEffects += 1;
+      }
+      expect(candidatePrincipal).toEqual(principal);
+      expect(code).toBe("ER-RETRY-SERVER-ONLY");
+      return { kind: "redeemed" as const, referralId: "private-referral" };
+    },
+    async summary() {
+      throw new Error("unexpected_summary");
+    },
+  } as unknown as ExpertReferralService;
+  const output = {
+    async publish(message: unknown) {
+      if (outputFails) {
+        outputFails = false;
+        throw new Error("test_output_unavailable");
+      }
+      published.push(message);
+    },
+  };
+  const processor = createExpertTelegramCommandProcessor({
+    secret,
+    store,
+    clock: { now: () => new Date(now) },
+    bindings: {
+      async resolveCurrent(telegramUserId) {
+        return telegramUserId === currentBinding.telegramUserId
+          ? currentBinding
+          : null;
+      },
+    },
+    commands: commandPort as never,
+    referrals,
+    residency: {} as ExpertResidencyService,
+    output,
+  });
+
+  const receipts = new Map<string, "processing" | "complete">();
+  let firstClaim = options.firstClaim;
+  let mutated = false;
+  const app = Fastify({ logger: false });
+  await app.register(telegramWebhookRoutes, {
+    secret: "telegram-webhook-secret",
+    callbacks: processor,
+    inbox: {
+      async claim(_provider, eventId) {
+        if (firstClaim !== undefined) {
+          const behavior = firstClaim;
+          firstClaim = undefined;
+          if (behavior === "throw") throw new Error("test_inbox_unavailable");
+          return { kind: "busy" as const };
+        }
+        if (!mutated && options.mutateBeforeAcquire !== undefined) {
+          mutated = true;
+          if (options.mutateBeforeAcquire === "version") {
+            currentCommand = { ...originalCommand, version: 2 };
+          } else if (options.mutateBeforeAcquire === "object") {
+            currentCommand = {
+              ...originalCommand,
+              objectId: "replacement-command-1301",
+            };
+          } else if (options.mutateBeforeAcquire === "operation") {
+            currentCommand = {
+              operation: "view_referral_summary",
+              objectId: originalCommand.objectId,
+              version: originalCommand.version,
+              code: { status: "none", maskedSuffix: null },
+            };
+          } else {
+            currentBinding = {
+              ...originalBinding,
+              principal: { ...principal, userId: "replacement-user-1301" },
+            };
+          }
+        }
+        const stored = receipts.get(eventId);
+        if (stored !== undefined) {
+          return {
+            kind:
+              stored === "complete"
+                ? ("duplicate" as const)
+                : ("busy" as const),
+          };
+        }
+        receipts.set(eventId, "processing");
+        return { kind: "claimed" as const, claimId: eventId };
+      },
+      async complete(claimId) {
+        receipts.set(claimId, "complete");
+      },
+      async fail(claimId) {
+        receipts.delete(claimId);
+      },
+    },
+    rateLimiter: createWindowedRateLimiter(),
+  });
+
+  const token = await issueExpertCommandCallback(
+    {
+      kind: "expert_command",
+      expertId: principal.expertId,
+      operation: originalCommand.operation,
+      objectId: originalCommand.objectId,
+      version: originalCommand.version,
+      expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 60,
+    },
+    secret,
+    store,
+  );
+  for (const tokenHash of callbackValues.keys()) {
+    executionState.set(tokenHash, { kind: "available" });
+  }
+  const send = (updateId: number) =>
+    app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: {
+        "x-telegram-bot-api-secret-token": "telegram-webhook-secret",
+        "x-correlation-id": `retry-${String(updateId)}`,
+      },
+      payload: {
+        update_id: updateId,
+        callback_query: {
+          id: `query-${String(updateId)}`,
+          from: { id: 1301 },
+          data: token,
+        },
+      },
+    });
+
+  return {
+    app,
+    send,
+    metrics: {
+      callbackConsumes: () => callbackConsumes,
+      acquisitions: () => acquisitionCalls,
+      releases: () => releaseCalls,
+      completes: () => completeCalls,
+      serviceAttempts: () => serviceAttempts,
+      semanticEffects: () => semanticEffects,
+      published: () => published.length,
+    },
+  };
+};
+
+describe("expert Telegram callback retry safety", () => {
+  it("releases the lease after a Task 8 failure so the same update retries once semantically", async () => {
+    const harness = await retryHarness({ serviceFailsOnce: true });
+    expect((await harness.send(2_001)).statusCode).toBe(500);
+    expect((await harness.send(2_001)).statusCode).toBe(200);
+    expect(harness.metrics.serviceAttempts()).toBe(2);
+    expect(harness.metrics.semanticEffects()).toBe(1);
+    expect(harness.metrics.published()).toBe(1);
+    expect(harness.metrics.releases()).toBe(1);
+    expect(harness.metrics.completes()).toBe(1);
+    await harness.app.close();
+  });
+
+  it("releases the lease after output failure so the same update retries once semantically", async () => {
+    const harness = await retryHarness({ outputFailsOnce: true });
+    expect((await harness.send(2_002)).statusCode).toBe(500);
+    expect((await harness.send(2_002)).statusCode).toBe(200);
+    expect(harness.metrics.serviceAttempts()).toBe(2);
+    expect(harness.metrics.semanticEffects()).toBe(1);
+    expect(harness.metrics.published()).toBe(1);
+    expect(harness.metrics.releases()).toBe(1);
+    expect(harness.metrics.completes()).toBe(1);
+    await harness.app.close();
+  });
+
+  it.each([
+    ["busy", 200],
+    ["throw", 500],
+  ] as const)(
+    "does not consume or acquire when the inbox claim is %s",
+    async (firstClaim, expectedStatus) => {
+      const harness = await retryHarness({ firstClaim });
+      expect((await harness.send(2_003)).statusCode).toBe(expectedStatus);
+      expect(harness.metrics.callbackConsumes()).toBe(0);
+      expect(harness.metrics.acquisitions()).toBe(0);
+      expect((await harness.send(2_003)).statusCode).toBe(200);
+      expect(harness.metrics.semanticEffects()).toBe(1);
+      expect(harness.metrics.acquisitions()).toBe(1);
+      await harness.app.close();
+    },
+  );
+
+  it("returns 200 for a completed duplicate without re-executing", async () => {
+    const harness = await retryHarness();
+    expect((await harness.send(2_004)).statusCode).toBe(200);
+    expect((await harness.send(2_004)).statusCode).toBe(200);
+    expect(harness.metrics.serviceAttempts()).toBe(1);
+    expect(harness.metrics.published()).toBe(1);
+    expect(harness.metrics.acquisitions()).toBe(1);
+    await harness.app.close();
+  });
+
+  it("rejects a replay under a different update ID without re-executing", async () => {
+    const harness = await retryHarness();
+    expect((await harness.send(2_005)).statusCode).toBe(200);
+    expect((await harness.send(2_006)).statusCode).toBe(403);
+    expect(harness.metrics.serviceAttempts()).toBe(1);
+    expect(harness.metrics.published()).toBe(1);
+    expect(harness.metrics.acquisitions()).toBe(2);
+    await harness.app.close();
+  });
+
+  it.each(["version", "object", "operation", "binding"] as const)(
+    "rejects a post-prepare %s change before any Task 8 invocation",
+    async (mutateBeforeAcquire) => {
+      const harness = await retryHarness({ mutateBeforeAcquire });
+      expect((await harness.send(2_007)).statusCode).toBe(403);
+      expect(harness.metrics.serviceAttempts()).toBe(0);
+      expect(harness.metrics.semanticEffects()).toBe(0);
+      expect(harness.metrics.published()).toBe(0);
+      await harness.app.close();
+    },
+  );
 });

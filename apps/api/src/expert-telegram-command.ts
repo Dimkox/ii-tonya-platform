@@ -4,13 +4,13 @@ import type {
   ExpertResidencyService,
 } from "@ii-tonya/application";
 import {
+  authenticateExpertCommandCallback,
+  CallbackInfrastructureError,
+  CallbackVerificationError,
   renderExpertReferralSummary,
   renderExpertResidencyQuote,
-  verifyExpertCommandCallback,
-  type ExpertCommandCallbackClaims,
+  type AuthenticatedExpertCommandCallback,
   type ExpertCommandCallbackClaimsStore,
-  type ExpertCommandCallbackOperation,
-  type ExpertCommandCallbackVersionAuthority,
   type ExpertReferralSummaryTelegramView,
   type ExpertResidencyQuoteTelegramView,
 } from "@ii-tonya/integrations";
@@ -18,13 +18,6 @@ import type {
   PreparedTelegramCallback,
   TelegramCallbackService,
 } from "./routes/telegram-webhook.js";
-
-interface ExpertTelegramCommandPointer {
-  readonly expertId: string;
-  readonly operation: ExpertCommandCallbackOperation;
-  readonly objectId: string;
-  readonly version: number;
-}
 
 export type ExpertTelegramServerCommand =
   | Readonly<{
@@ -58,18 +51,36 @@ export type ExpertTelegramServerCommand =
     }>;
 
 export interface ExpertTelegramBindingPort {
-  resolveCurrent(telegramUserId: string): Promise<Readonly<{
-    telegramUserId: string;
-    principal: ExpertPrincipal;
-    active: boolean;
-    verified: boolean;
-  }> | null>;
+  resolveCurrent(telegramUserId: string): Promise<ExpertTelegramBinding | null>;
 }
 
-export interface ExpertTelegramServerCommandPort extends ExpertCommandCallbackVersionAuthority {
-  resolveCurrent(
-    input: ExpertTelegramCommandPointer,
-  ): Promise<ExpertTelegramServerCommand | null>;
+export type ExpertTelegramBinding = Readonly<{
+  telegramUserId: string;
+  principal: ExpertPrincipal;
+  active: boolean;
+  verified: boolean;
+}>;
+
+export type ExpertTelegramCommandLeaseResult =
+  | Readonly<{
+      kind: "acquired";
+      leaseId: string;
+      principal: ExpertPrincipal;
+      command: ExpertTelegramServerCommand;
+    }>
+  | Readonly<{ kind: "busy" }>
+  | Readonly<{ kind: "completed" }>
+  | Readonly<{ kind: "rejected" }>;
+
+export interface ExpertTelegramServerCommandPort {
+  acquire(input: {
+    readonly authenticated: AuthenticatedExpertCommandCallback;
+    readonly telegramUserId: string;
+    readonly preparedBinding: ExpertTelegramBinding;
+    readonly now: Date;
+  }): Promise<ExpertTelegramCommandLeaseResult>;
+  complete(leaseId: string): Promise<void>;
+  release(leaseId: string): Promise<void>;
 }
 
 export type ExpertTelegramCommandOutcome =
@@ -138,15 +149,6 @@ const callbackInput = (
     ? { telegramUserId, token: record.data }
     : null;
 };
-
-const exactCommand = (
-  command: ExpertTelegramServerCommand | null,
-  claims: ExpertCommandCallbackClaims,
-): command is ExpertTelegramServerCommand =>
-  command !== null &&
-  command.operation === claims.operation &&
-  command.objectId === claims.objectId &&
-  command.version === claims.version;
 
 const executeCommand = async (
   deps: ExpertTelegramCommandDependencies,
@@ -238,7 +240,7 @@ export const createExpertTelegramCommandProcessor = (
     if (input === null) return false;
     const binding = await deps.bindings.resolveCurrent(input.telegramUserId);
     if (binding === null) return false;
-    const claims = await verifyExpertCommandCallback(
+    const authenticated = await authenticateExpertCommandCallback(
       input.token,
       input.telegramUserId,
       {
@@ -247,26 +249,38 @@ export const createExpertTelegramCommandProcessor = (
         active: binding.active,
         verified: binding.verified,
       },
-      deps.commands,
       deps.secret,
       deps.store,
       deps.clock.now(),
     );
-    const command = await deps.commands.resolveCurrent({
-      expertId: claims.expertId,
-      operation: claims.operation,
-      objectId: claims.objectId,
-      version: claims.version,
-    });
-    if (!exactCommand(command, claims)) return false;
     const prepared: PreparedTelegramCallback = {
       async execute() {
-        const outcome = await executeCommand(deps, binding.principal, command);
-        await deps.output.publish({
+        const lease = await deps.commands.acquire({
+          authenticated,
           telegramUserId: input.telegramUserId,
-          correlationId,
-          outcome,
+          preparedBinding: binding,
+          now: deps.clock.now(),
         });
+        if (lease.kind === "busy") throw new CallbackInfrastructureError();
+        if (lease.kind === "completed" || lease.kind === "rejected") {
+          throw new CallbackVerificationError();
+        }
+        try {
+          const outcome = await executeCommand(
+            deps,
+            lease.principal,
+            lease.command,
+          );
+          await deps.output.publish({
+            telegramUserId: input.telegramUserId,
+            correlationId,
+            outcome,
+          });
+          await deps.commands.complete(lease.leaseId);
+        } catch (error) {
+          await deps.commands.release(lease.leaseId);
+          throw error;
+        }
       },
     };
     return prepared;

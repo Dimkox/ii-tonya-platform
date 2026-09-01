@@ -80,7 +80,7 @@ const approvedPaymentBoundaryPaths = new Set([
 const approvedPaymentBoundaryHashes = new Map([
   [
     "packages/integrations/src/index.ts",
-    "718f3bbdfdeb5f8495e6bff4f40666da9445a8567fded1396c627819e039bb49",
+    "73edd1ac1036192736772c25f98fb2bee8c0c3d715a715ded87ce64d7f61c161",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",

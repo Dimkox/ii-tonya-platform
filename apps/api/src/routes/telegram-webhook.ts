@@ -1,5 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
-import { CallbackInfrastructureError } from "@ii-tonya/integrations";
+import {
+  CallbackInfrastructureError,
+  CallbackVerificationError,
+} from "@ii-tonya/integrations";
 import type { FastifyPluginAsync } from "fastify";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
@@ -83,6 +86,12 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       await deps.inbox.complete(claim.claimId);
     } catch (error) {
       await deps.inbox.fail(claim.claimId);
+      if (error instanceof CallbackInfrastructureError) {
+        return reply.code(503).send({ error: "callback_unavailable" });
+      }
+      if (error instanceof CallbackVerificationError) {
+        return reply.code(403).send({ error: "invalid_callback" });
+      }
       throw error;
     }
     return { accepted: true };
