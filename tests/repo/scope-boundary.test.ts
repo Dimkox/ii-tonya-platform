@@ -491,6 +491,18 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
+  it("pins reviewed Adaptive Grok workflow automation content", () => {
+    const path = ".grok-stack/adaptive_grok/verification.py";
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${content}#`,
+      }),
+    ).not.toEqual([]);
+  });
+
   it("keeps deterministic database clocks outside the production API", () => {
     const repository = readFileSync(
       "packages/db/src/repositories/admin-repository.ts",
