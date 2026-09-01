@@ -396,7 +396,10 @@ export function createProductionWorkerRuntimeFactory(
           )
         : undefined;
       const waitlistRepository = config.features.clientWaitlist
-        ? new PostgresWaitlistRepository(db)
+        ? new PostgresWaitlistRepository(
+            db,
+            config.clientBookingConfirmationBufferMs ?? 3_600_000,
+          )
         : undefined;
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),

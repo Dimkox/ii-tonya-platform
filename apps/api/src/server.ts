@@ -266,7 +266,10 @@ export const createDefaultLifecycle = (
     const clientWaitlistService =
       config.features.clientWaitlist === true
         ? createWaitlistService({
-            repository: new PostgresWaitlistRepository(db),
+            repository: new PostgresWaitlistRepository(
+              db,
+              config.clientBookingConfirmationBufferMs ?? 3_600_000,
+            ),
           })
         : undefined;
     const clientGateway =

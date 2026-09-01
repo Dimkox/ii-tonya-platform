@@ -1,6 +1,6 @@
 # Full Project Connectivity Graph
 
-Status: canonical architecture inventory for `codex/partner-commerce-v2` at the current local tree; release/activation evidence remains separately gated.
+Status: canonical architecture inventory for the `codex/seo-landing-rebuild` test/PR release candidate; it is not a claim that this tree is currently deployed, and release/activation evidence remains separately gated.
 
 Purpose: maintain one connected view of the entire repository. Runtime modules, PostgreSQL authority, direct Claw gates, native server control, tests, migrations, deploy assets, documentation/evidence, disabled capabilities, deferred scope, prohibited paths, and orphan/dead candidates are all represented.
 
@@ -351,7 +351,7 @@ flowchart TB
     VERIFY["pnpm verify"]
     CONTAINER["Dockerfile / compose\nDEV + TEST ONLY"]
     BUNDLE["native API/worker bundle + SBOM\nSIGNED / exact SHA proven"]
-    DEPLOY["systemd native deploy + rollback\nACTIVE at 233f3cf"]
+    DEPLOY["systemd native deploy + rollback\nACTIVE TOOL / historical evidence at 233f3cf"]
     CIWF --> VERIFY --> TESTS
     VERIFY --> CONTAINER
     VERIFY --> BUNDLE
@@ -369,8 +369,8 @@ flowchart TB
     SERVERCTRL["GitHub Actions workflows\nREMOVED"]
     SERVERCMD["legacy server command\nREMOVED; Git history only"]
     NATIVECI["direct native deployment\nscripts/deploy-native-remote.sh"]
-    HOST["dedicated server /opt/ii-tonya-platform\nsystemd + system PostgreSQL + nginx\nACTIVE PRODUCTION RUNTIME"]
-    DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nACTIVE OPS endpoint"]
+    HOST["dedicated server /opt/ii-tonya-platform\nsystemd + system PostgreSQL + nginx\nAPPROVED PRODUCTION TARGET / current RC not deployed"]
+    DOMAINLIVE["ii-tonya.ru reverse proxy/TLS\nOPS TARGET / current RC unverified"]
     BOOTSTRAP --> RUNNER
     SERVERCTRL -. removed .-> RUNNER
     BOOTSTRAP -. historical .-> RUNNER
@@ -437,7 +437,7 @@ flowchart TB
 
   subgraph DEAD["Deferred / prohibited / non-runtime inventory"]
     CLIENTCOUPON["client 500/500 coupon executable runtime\nDEFERRED"]
-    WAITLIST["waitlist runtime\nDEFERRED"]
+    WAITLIST["Release D1 client waitlist + reschedule\nDISABLED / TESTED / default-off"]
     RESCHEDULE["expert reschedule composite runtime\nDEFERRED"]
     WALLETAPI["personal YooMoney Wallet API / T-Bank integration\nPROHIBITED / out of scope"]
     MAKEWRITE["Make/Sheets authoritative writes\nPROHIBITED"]
@@ -445,7 +445,7 @@ flowchart TB
     HISTEVID["old exact-SHA test evidence\nEVIDENCE"]
     OLDPLANS["completed plans/progress checkpoints\nEVIDENCE"]
     CLIENTCOUPON -. isolated by scope guards .-> REFDB
-    WAITLIST -. intentionally absent .-> BOOK
+    WAITLIST -. implemented, default-off .-> BOOK
     RESCHEDULE -. intentionally absent .-> BOOK
     WALLETAPI -. rejected by provider scope .-> PAYBOUND
     MAKEWRITE -. rejected architecture .-> MAKE
@@ -516,6 +516,7 @@ The native bundle/systemd path is the only production release path.
 | Unknown-outcome worker placeholder          | `DISABLED`          | Lifecycle slot retained while providers are disabled.            |
 | Processor-privacy worker placeholder        | `DISABLED`          | Capability not composed yet.                                     |
 | Generic provider reconciliation placeholder | `DISABLED`          | No approved provider reader.                                     |
+| Release D1 client waitlist/reschedule       | `DISABLED`          | Implemented and tested; feature flags default off.               |
 | Old migrations/snapshots                    | `LEGACY/HISTORICAL` | Required for replay and schema parity.                           |
 | Handoffs/test evidence/SDD progress         | `EVIDENCE`          | Required for exact-SHA recovery/audit; no runtime edge expected. |
 
@@ -524,7 +525,6 @@ The native bundle/systemd path is the only production release path.
 | Entity                                             | Mark         | Enforcement                                            |
 | -------------------------------------------------- | ------------ | ------------------------------------------------------ |
 | Client `500/500` coupon executable model           | `DEFERRED`   | Separate from expert referral context.                 |
-| Waitlist runtime                                   | `DEFERRED`   | Outside current release.                               |
 | Expert reschedule composite runtime                | `DEFERRED`   | Outside current release.                               |
 | Live expert-residency payment SDK/network adapter  | `PROHIBITED` | Scope boundary rejects provider capability.            |
 | Make/Sheets authoritative financial/booking writes | `PROHIBITED` | PostgreSQL authority + architecture guards.            |

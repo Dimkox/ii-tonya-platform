@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PostgresWaitlistRepository } from "../../packages/db/src/repositories/waitlist-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -65,4 +66,48 @@ describe("booking waitlist concurrent FIFO promotion", () => {
       holdSeconds: "259200.000000",
     });
   });
+});
+
+describe("booking waitlist promotion deadline policy", () => {
+  it("promotes a slot beyond 24 hours and caps the hold at start minus the configured buffer", async () => {
+    const database = await startTestPostgres();
+    try {
+      await database.migrate();
+      const fixture = await seedWaitlistFixture(database);
+      const repository = new PostgresWaitlistRepository(
+        database.db,
+        2 * 60 * 60 * 1_000,
+      );
+      const candidate = await fixture.candidate("promotion-deadline-policy");
+      await expect(repository.join(candidate)).resolves.toMatchObject({
+        kind: "joined",
+      });
+      const startsAt = new Date(
+        fixture.occupied.databaseNow.getTime() + 48 * 60 * 60 * 1_000,
+      );
+      await database.db.execute(sql`
+        update reservations set status='cancelled_by_client'
+        where id=${fixture.occupied.reservationId}::uuid
+      `);
+      await database.db.execute(sql`
+        update slots set starts_at=${startsAt},observed_at=${fixture.occupied.databaseNow}
+        where id=${fixture.occupied.slotId}::uuid
+      `);
+
+      await expect(
+        repository.promoteNext({
+          slotId: fixture.occupied.slotId,
+          now: fixture.occupied.databaseNow,
+          holdDurationMs: 259_200_000,
+        }),
+      ).resolves.toMatchObject({
+        kind: "promoted",
+        reservedUntil: new Date(
+          fixture.occupied.databaseNow.getTime() + 46 * 60 * 60 * 1_000,
+        ),
+      });
+    } finally {
+      await database.stop();
+    }
+  }, 120_000);
 });

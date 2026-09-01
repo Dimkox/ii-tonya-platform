@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { sql } from "drizzle-orm";
+import { computeReservedUntil } from "@ii-tonya/domain";
 
 import type { DrizzleDb } from "../client.js";
 
@@ -61,7 +62,18 @@ function position(value: number | string): number {
 }
 
 export class PostgresWaitlistRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly confirmationBufferMs = 60 * 60 * 1_000,
+  ) {
+    if (
+      !Number.isSafeInteger(confirmationBufferMs) ||
+      confirmationBufferMs < 1 ||
+      confirmationBufferMs > HOLD_MS
+    ) {
+      throw new Error("waitlist_invalid_confirmation_buffer");
+    }
+  }
 
   async join(command: {
     userId: string;
@@ -302,13 +314,23 @@ export class PostgresWaitlistRepository {
           from slots s join expert_services es on es.id=s.expert_service_id
           join experts e on e.id=es.expert_id
           where s.id=${command.slotId}::uuid and es.active and e.active and e.verified
-            and s.starts_at>${command.now}::timestamptz+interval '72 hours'
+            and s.starts_at>${command.now}::timestamptz+interval '24 hours'
             and s.observed_at>=${command.now}::timestamptz-interval '15 minutes'
             and s.observed_at<=${command.now}::timestamptz
           for update of s
         `)
     ).rows[0];
     if (!slot) return { kind: "stale_slot" };
+    let reservedUntil: Date;
+    try {
+      reservedUntil = computeReservedUntil(
+        command.now,
+        new Date(slot.startsAt),
+        this.confirmationBufferMs,
+      );
+    } catch {
+      return { kind: "stale_slot" };
+    }
     const occupancy = Number(
       (
         await tx.execute<{ count: string }>(sql`
@@ -334,7 +356,6 @@ export class PostgresWaitlistRepository {
         `)
     ).rows[0];
     if (!entry) return { kind: "none_available" };
-    const reservedUntil = new Date(command.now.getTime() + HOLD_MS);
     const bookingHandle = `bk1.${createHash("sha256")
       .update(`waitlist-booking:${entry.id}`)
       .digest("base64url")}`;
