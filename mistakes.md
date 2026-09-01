@@ -59,3 +59,5 @@ The first immutable reschedule-replay repair edited migration `0040` after that 
 The first `0041` backfill copied the reservation's current deadline into every historical reschedule fact. The root cause was assuming mutable aggregate state could reconstruct per-command results even though confirmation buffers vary; old facts are now explicitly unrecoverable and cannot return invented data.
 
 The first async route-splitting change reused a nullable DOM query inside a nested async function, so TypeScript correctly rejected the lost control-flow narrowing. The root cause was relying on outer-scope narrowing across a closure; the checked element is now captured as a non-null local before the async boundary.
+
+The first final web gate invoked npm's root `--workspace` mode even though the root workspace is pnpm-managed and npm has no workspace declaration there. The root cause was mixing the repository package manager with the package-local verification contract; final web checks now use `npm --prefix apps/web` explicitly.
