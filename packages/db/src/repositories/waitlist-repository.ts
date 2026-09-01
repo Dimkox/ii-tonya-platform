@@ -10,6 +10,7 @@ const KEY = /^[0-9a-f]{64}$/u;
 const CHOICE = /^sha256:[0-9a-f]{64}$/u;
 const HANDLE = /^wl1\.[A-Za-z0-9_-]{43}$/u;
 const HOLD_MS = 72 * 60 * 60 * 1_000;
+type DbTransaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 
 export type WaitlistJoinResult =
   | {
@@ -89,13 +90,11 @@ export class PostgresWaitlistRepository {
             waitlistHandle: `wl1.${string}`;
             position: number | string;
           }>(sql`
-            select e.waitlist_handle as "waitlistHandle",
-              (select count(*) from booking_waitlist_entries q
-                where q.slot_id=e.slot_id and q.status='waiting'
-                  and (q.created_at<e.created_at or (q.created_at=e.created_at and q.id<=e.id))) as position
-            from booking_waitlist_entries e
-            where e.join_idempotency_key=${command.idempotencyKey}
-              and e.user_id=${command.userId}::uuid
+            select result->>'waitlistHandle' as "waitlistHandle",
+              result->>'position' as position
+            from booking_waitlist_command_receipts
+            where command_type='join' and idempotency_key=${command.idempotencyKey}
+              and actor_user_id=${command.userId}::uuid
           `)
         ).rows[0];
         if (replay)
@@ -221,14 +220,84 @@ export class PostgresWaitlistRepository {
     ) {
       return { kind: "stale_slot" };
     }
+    return this.db.transaction((tx) =>
+      this.promoteNextInTransaction(tx, command),
+    );
+  }
+
+  async processPromotionCommandsBatch(batchSize: number): Promise<{
+    examined: number;
+    promoted: number;
+    completed: number;
+  }> {
+    if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 500)
+      throw new Error("waitlist_invalid_promotion_batch_size");
     return this.db.transaction(async (tx) => {
-      const slot = (
-        await tx.execute<{
-          expertId: string;
-          serviceId: string;
-          capacity: number;
-          startsAt: Date | string;
-        }>(sql`
+      const databaseNow = (
+        await tx.execute<{ now: Date | string }>(sql`
+          select clock_timestamp() as now
+        `)
+      ).rows[0]!.now;
+      const now =
+        databaseNow instanceof Date ? databaseNow : new Date(databaseNow);
+      if (!Number.isFinite(now.getTime()))
+        throw new Error("waitlist_invalid_database_clock");
+      const commands = (
+        await tx.execute<{ id: string; slotId: string | null }>(sql`
+          select id,payload->>'slotId' as "slotId"
+          from integration_outbox
+          where topic='waitlist.promote.v1'
+            and (status='pending' or (status='retry_wait'
+              and (next_attempt_at is null or next_attempt_at<=${now})))
+          order by created_at,id
+          for update skip locked
+          limit ${batchSize}
+        `)
+      ).rows;
+      let promoted = 0;
+      let completed = 0;
+      for (const command of commands) {
+        if (command.slotId === null || !UUID.test(command.slotId)) {
+          await tx.execute(sql`
+            update integration_outbox
+            set status='dead_letter',last_normalized_reason='waitlist_promotion_payload_invalid',
+              dispatch_owner_id=null,dispatch_claim_token=null,lease_until=null,
+              next_attempt_at=null,updated_at=${now}
+            where id=${command.id}::uuid
+          `);
+          completed += 1;
+          continue;
+        }
+        const result = await this.promoteNextInTransaction(tx, {
+          slotId: command.slotId,
+          now,
+          holdDurationMs: HOLD_MS,
+        });
+        if (result.kind === "promoted") promoted += 1;
+        await tx.execute(sql`
+          update integration_outbox
+          set status='succeeded',last_normalized_reason=${`waitlist_${result.kind}`},
+            dispatch_owner_id=null,dispatch_claim_token=null,lease_until=null,
+            next_attempt_at=null,updated_at=${now}
+          where id=${command.id}::uuid
+        `);
+        completed += 1;
+      }
+      return { examined: commands.length, promoted, completed };
+    });
+  }
+
+  private async promoteNextInTransaction(
+    tx: DbTransaction,
+    command: { slotId: string; now: Date; holdDurationMs: number },
+  ): Promise<WaitlistPromotionResult> {
+    const slot = (
+      await tx.execute<{
+        expertId: string;
+        serviceId: string;
+        capacity: number;
+        startsAt: Date | string;
+      }>(sql`
           select e.id as "expertId",es.id as "serviceId",s.capacity,s.starts_at as "startsAt"
           from slots s join expert_services es on es.id=s.expert_service_id
           join experts e on e.id=es.expert_id
@@ -238,31 +307,39 @@ export class PostgresWaitlistRepository {
             and s.observed_at<=${command.now}::timestamptz
           for update of s
         `)
-      ).rows[0];
-      if (!slot) return { kind: "stale_slot" };
-      const occupancy = Number(
-        (
-          await tx.execute<{ count: string }>(sql`
+    ).rows[0];
+    if (!slot) return { kind: "stale_slot" };
+    const occupancy = Number(
+      (
+        await tx.execute<{ count: string }>(sql`
         select count(*)::text count from reservations
         where slot_id=${command.slotId}::uuid
           and (status='booked' or (status='reserved' and reserved_until>${command.now}))
       `)
-        ).rows[0]!.count,
-      );
-      if (occupancy >= slot.capacity) return { kind: "slot_full" };
-      const entry = (
-        await tx.execute<{ id: string; userId: string }>(sql`
-          select w.id,w.user_id as "userId" from booking_waitlist_entries w
+      ).rows[0]!.count,
+    );
+    if (occupancy >= slot.capacity) return { kind: "slot_full" };
+    const entry = (
+      await tx.execute<{
+        id: string;
+        userId: string;
+        choiceDigest: `sha256:${string}`;
+      }>(sql`
+          select w.id,w.user_id as "userId",w.choice_digest as "choiceDigest"
+          from booking_waitlist_entries w
           join users u on u.id=w.user_id and u.active=true
           where w.slot_id=${command.slotId}::uuid and w.status='waiting'
           order by w.created_at,w.id
           for update of w skip locked limit 1
         `)
-      ).rows[0];
-      if (!entry) return { kind: "none_available" };
-      const reservedUntil = new Date(command.now.getTime() + HOLD_MS);
-      const reservation = (
-        await tx.execute<{ id: string }>(sql`
+    ).rows[0];
+    if (!entry) return { kind: "none_available" };
+    const reservedUntil = new Date(command.now.getTime() + HOLD_MS);
+    const bookingHandle = `bk1.${createHash("sha256")
+      .update(`waitlist-booking:${entry.id}`)
+      .digest("base64url")}`;
+    const reservation = (
+      await tx.execute<{ id: string }>(sql`
           insert into reservations(
             user_id,slot_id,expert_id,expert_service_id,status,idempotency_key,reserved_until
           ) values(
@@ -270,19 +347,25 @@ export class PostgresWaitlistRepository {
             ${slot.serviceId}::uuid,'reserved',${`waitlist-promotion:${entry.id}`},${reservedUntil}
           ) returning id
         `)
-      ).rows[0]!;
-      await tx.execute(sql`
+    ).rows[0]!;
+    await tx.execute(sql`
+        insert into client_booking_receipts(
+          user_id,choice_digest,booking_handle,reservation_id
+        ) values(
+          ${entry.userId}::uuid,${entry.choiceDigest},${bookingHandle},${reservation.id}::uuid
+        )
+      `);
+    await tx.execute(sql`
         update booking_waitlist_entries
         set status='promoted',promoted_reservation_id=${reservation.id}::uuid,
           promotion_hold_until=${reservedUntil},updated_at=${command.now}
         where id=${entry.id}::uuid and status='waiting'
       `);
-      return {
-        kind: "promoted",
-        entryId: entry.id,
-        reservationId: reservation.id,
-        reservedUntil,
-      };
-    });
+    return {
+      kind: "promoted",
+      entryId: entry.id,
+      reservationId: reservation.id,
+      reservedUntil,
+    };
   }
 }

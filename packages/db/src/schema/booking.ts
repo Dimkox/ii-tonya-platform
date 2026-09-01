@@ -277,6 +277,10 @@ export const bookingRescheduleFacts = pgTable("booking_reschedule_facts", {
     .references(() => slots.id),
   oldVersion: integer("old_version").notNull(),
   newVersion: integer("new_version").notNull(),
+  resultStatus: text("result_status").notNull(),
+  resultReservedUntil: timestamp("result_reserved_until", {
+    withTimezone: true,
+  }).notNull(),
   idempotencyKey: char("idempotency_key", { length: 64 }).notNull().unique(),
   correlationId: text("correlation_id").notNull(),
   createdAt: mutableTimestamps.createdAt,

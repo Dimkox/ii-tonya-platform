@@ -14,6 +14,8 @@ describe("booking waitlist D1 migration", () => {
       "CREATE TABLE booking_reschedule_facts",
       "booking_waitlist_one_active_client_slot",
       "booking_waitlist_fifo_claim_idx",
+      "result_status",
+      "result_reserved_until",
       "waiting",
       "promoted",
       "cancelled",

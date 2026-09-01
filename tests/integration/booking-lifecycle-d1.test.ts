@@ -55,6 +55,11 @@ describe("booking waitlist lifecycle D1", () => {
         correlationId: "leave-second",
       }),
     ).resolves.toEqual({ kind: "replayed" });
+    await expect(fixture.repository.join(second)).resolves.toMatchObject({
+      kind: "replayed",
+      waitlistHandle: second.waitlistHandle,
+      position: 2,
+    });
     const rows = await database.db.execute<{ status: string }>(sql`
       select status from booking_waitlist_entries
       where waitlist_handle=${second.waitlistHandle}
@@ -127,17 +132,19 @@ describe("booking waitlist lifecycle D1", () => {
       correlationId: "reschedule-d1",
       confirmationBufferMs: 259_200_000,
     };
-    await expect(
-      repository.rescheduleOwnedByHandle(command),
-    ).resolves.toMatchObject({
+    const firstResult = await repository.rescheduleOwnedByHandle(command);
+    expect(firstResult).toMatchObject({
       kind: "rescheduled",
       reservationStatus: "reserved",
     });
-    await expect(
-      repository.rescheduleOwnedByHandle(command),
-    ).resolves.toMatchObject({
+    await database.db.execute(sql`
+      update reservations set status='booked'
+      where id=${fixture.occupied.reservationId}::uuid
+    `);
+    await expect(repository.rescheduleOwnedByHandle(command)).resolves.toEqual({
       kind: "replayed",
-      reservationStatus: "reserved",
+      reservationStatus: firstResult.reservationStatus,
+      reservedUntil: firstResult.reservedUntil,
     });
     const facts = await database.db.execute<{
       slotId: string;
@@ -158,7 +165,7 @@ describe("booking waitlist lifecycle D1", () => {
     `);
     expect(facts.rows[0]).toMatchObject({
       slotId: targetSlotId,
-      status: "reserved",
+      status: "booked",
       version: 2,
       cancelledJobs: "3",
       facts: "1",
@@ -169,7 +176,7 @@ describe("booking waitlist lifecycle D1", () => {
   it("persists a stable waitlist promotion command in the expiry transaction", async () => {
     await database.db.execute(sql`
       update reservations
-      set created_at=clock_timestamp() - interval '2 seconds',
+      set status='reserved',created_at=clock_timestamp() - interval '2 seconds',
         reserved_until=clock_timestamp() - interval '1 second'
       where id=${fixture.occupied.reservationId}::uuid
     `);

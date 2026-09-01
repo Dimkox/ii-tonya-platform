@@ -960,9 +960,8 @@ export class PostgresBookingRepository {
           status: ReservationStatus;
           reservedUntil: Date | string;
         }>(sql`
-          select r.status,r.reserved_until as "reservedUntil"
+          select f.result_status as status,f.result_reserved_until as "reservedUntil"
           from booking_reschedule_facts f
-          join reservations r on r.id=f.reservation_id
           where f.idempotency_key=${command.idempotencyKey}
             and f.user_id=${command.userId}::uuid
         `)
@@ -1078,11 +1077,11 @@ export class PostgresBookingRepository {
       await tx.execute(sql`
         insert into booking_reschedule_facts(
           reservation_id,user_id,old_slot_id,new_slot_id,old_version,new_version,
-          idempotency_key,correlation_id,created_at
+          result_status,result_reserved_until,idempotency_key,correlation_id,created_at
         ) values(
           ${owned.reservationId}::uuid,${command.userId}::uuid,
           ${owned.oldSlotId}::uuid,${target.slotId}::uuid,${owned.version},${updated.version},
-          ${command.idempotencyKey},${command.correlationId},${now}
+          ${updated.status},${reservedUntil},${command.idempotencyKey},${command.correlationId},${now}
         )
       `);
       await this.auditAndOutbox(tx, {

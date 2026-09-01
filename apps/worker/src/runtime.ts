@@ -13,6 +13,7 @@ export interface WorkerCycleReport {
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
+  readonly waitlistPromotion: unknown;
   readonly lifecycleScheduler: unknown;
   readonly expertResidencyExpiry: unknown;
   readonly expertTelegramCheckoutCleanup: unknown;
@@ -45,6 +46,7 @@ export interface WorkerRuntimeDependencies {
   readonly recoverExpiredLeases: BoundedJob;
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly reservationExpiry: BoundedJob;
+  readonly waitlistPromotion?: BoundedJob | undefined;
   readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly expertResidencyExpiry: BoundedJob;
   readonly expertTelegramCheckoutCleanup: BoundedJob;
@@ -69,6 +71,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
   readonly lifecycleScheduler?: BoundedJob | undefined;
+  readonly waitlistPromotion?: BoundedJob | undefined;
   readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
@@ -167,6 +170,12 @@ export function createWorkerRuntime(
       const unknownOutcomeReconciliation =
         await deps.reconcileUnknownOutcomes();
       const reservationExpiry = await deps.reservationExpiry();
+      const waitlistPromotion = (await deps.waitlistPromotion?.()) ?? {
+        examined: 0,
+        promoted: 0,
+        completed: 0,
+        reason: "disabled",
+      };
       const lifecycleScheduler = (await deps.lifecycleScheduler?.()) ?? {
         examined: 0,
         materialized: 0,
@@ -199,6 +208,7 @@ export function createWorkerRuntime(
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
         reservationExpiry,
+        waitlistPromotion,
         lifecycleScheduler,
         expertResidencyExpiry,
         expertTelegramCheckoutCleanup,
@@ -298,6 +308,7 @@ export function createProductionWorkerRuntime(
         now: deps.now(),
         batchSize,
       }),
+    waitlistPromotion: deps.waitlistPromotion,
     lifecycleScheduler: deps.lifecycleScheduler,
     expertResidencyExpiry: async () =>
       expireExpertResidencyOrders(

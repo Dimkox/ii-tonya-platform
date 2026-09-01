@@ -706,7 +706,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0040_booking_waitlist_d1.sql",
-    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+    "f92a6561a94bbce6cabda29ffd9471f2e549610e750e9232cc9753638d61023b",
   ],
   [
     "packages/db/migrations/meta/_journal.json",

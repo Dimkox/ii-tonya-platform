@@ -51,3 +51,5 @@ Running `gh pr merge --delete-branch` from a linked feature worktree completed t
 The first Release C integration run could not see `lifecycle_jobs` because the hand-authored SQL migration was not added to Drizzle's migration journal. The root cause was treating the migration filename as sufficient registration; every manual migration must update and test the journal entry before PostgreSQL integration tests run.
 
 The Task 3 repeat command used the repository runner through Corepack even though that runner spawns a bare `pnpm`, and a later Reaper startup failure triggered teardown against an uninitialized database. The root cause was not tracing executable and resource ownership across child-process/setup boundaries; direct Corepack repeats and guarded teardown now preserve the primary failure.
+
+The first waitlist-worker review-fix test inherited a booked reservation, while the reschedule test asserted an old live status after deliberately mutating it. The root cause was coupling immutable-replay assertions to mutable shared fixture state instead of resetting each transition precondition and checking replay separately from the live projection.

@@ -204,7 +204,7 @@ describe("client booking routes", () => {
   });
 
   it("keeps waitlist mutations default-off without calling services", async () => {
-    const { app, join } = await appFor({ waitlistEnabled: false });
+    const { app, join, reschedule } = await appFor({ waitlistEnabled: false });
     const response = await app.inject({
       method: "POST",
       url: "/v1/client/waitlist",
@@ -217,6 +217,18 @@ describe("client booking routes", () => {
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ error: "feature_disabled" });
     expect(join).not.toHaveBeenCalled();
+    const rescheduled = await app.inject({
+      method: "POST",
+      url: `/v1/client/bookings/${bookingHandle}/reschedule`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      payload: JSON.stringify({ choiceHandle }),
+    });
+    expect(rescheduled.statusCode).toBe(503);
+    expect(rescheduled.json()).toEqual({ error: "feature_disabled" });
+    expect(reschedule).not.toHaveBeenCalled();
     await app.close();
   });
 });

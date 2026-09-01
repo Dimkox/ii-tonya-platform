@@ -324,6 +324,10 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
         return reply.code(401).send({ error: "unauthorized" });
       if (resolution.kind === "unavailable")
         return reply.code(503).send({ error: "temporarily_unavailable" });
+      if (!deps.waitlistEnabled) {
+        deps.metrics?.record({ operation: "reschedule", outcome: "disabled" });
+        return reply.code(503).send({ error: "feature_disabled" });
+      }
       try {
         const result = await deps.bookings.reschedule(
           resolution.principal,

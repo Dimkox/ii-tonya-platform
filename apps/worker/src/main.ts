@@ -17,6 +17,7 @@ import {
   PostgresWorkerJobsRepository,
   PostgresTestExpertTelegramRepository,
   PostgresLifecycleSchedulerRepository,
+  PostgresWaitlistRepository,
 } from "@ii-tonya/db";
 import {
   recordClientCatalogMetric,
@@ -394,6 +395,9 @@ export function createProductionWorkerRuntimeFactory(
             config.clientTelegramBotKey!,
           )
         : undefined;
+      const waitlistRepository = config.features.clientWaitlist
+        ? new PostgresWaitlistRepository(db)
+        : undefined;
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -415,6 +419,12 @@ export function createProductionWorkerRuntimeFactory(
                   now: new Date(),
                   batchSize: 100,
                 }),
+            }),
+        ...(waitlistRepository === undefined
+          ? {}
+          : {
+              waitlistPromotion: () =>
+                waitlistRepository.processPromotionCommandsBatch(100),
             }),
         ...(workerOutbox === undefined
           ? {}
