@@ -17,8 +17,13 @@ export interface TelegramCallbackService {
 }
 
 export interface PreparedTelegramCallback {
-  execute(): Promise<void>;
+  execute(receipt: TelegramWebhookReceipt): Promise<void>;
 }
+
+export type TelegramWebhookReceipt = Readonly<{
+  source: "telegram";
+  updateId: string;
+}>;
 
 const isPreparedCallback = (
   value: unknown,
@@ -82,7 +87,11 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     try {
       if (preparedCallback === null)
         await deps.callbacks.process(body, correlationId);
-      else await preparedCallback.execute();
+      else
+        await preparedCallback.execute({
+          source: "telegram",
+          updateId,
+        });
       await deps.inbox.complete(claim.claimId);
     } catch (error) {
       await deps.inbox.fail(claim.claimId);

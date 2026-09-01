@@ -17,6 +17,7 @@ import {
 import type {
   PreparedTelegramCallback,
   TelegramCallbackService,
+  TelegramWebhookReceipt,
 } from "./routes/telegram-webhook.js";
 
 export type ExpertTelegramServerCommand =
@@ -78,6 +79,7 @@ export interface ExpertTelegramServerCommandPort {
     readonly telegramUserId: string;
     readonly preparedBinding: ExpertTelegramBinding;
     readonly now: Date;
+    readonly receipt: TelegramWebhookReceipt;
   }): Promise<ExpertTelegramCommandLeaseResult>;
   complete(leaseId: string): Promise<void>;
   release(leaseId: string): Promise<void>;
@@ -106,7 +108,9 @@ export type ExpertTelegramCommandOutcome =
     }>;
 
 export interface ExpertTelegramOutputPort {
-  publish(message: {
+  publishOnce(message: {
+    readonly receipt: TelegramWebhookReceipt;
+    readonly outcomeId: string;
     readonly telegramUserId: string;
     readonly correlationId: string;
     readonly outcome: ExpertTelegramCommandOutcome;
@@ -254,12 +258,13 @@ export const createExpertTelegramCommandProcessor = (
       deps.clock.now(),
     );
     const prepared: PreparedTelegramCallback = {
-      async execute() {
+      async execute(receipt) {
         const lease = await deps.commands.acquire({
           authenticated,
           telegramUserId: input.telegramUserId,
           preparedBinding: binding,
           now: deps.clock.now(),
+          receipt,
         });
         if (lease.kind === "busy") throw new CallbackInfrastructureError();
         if (lease.kind === "completed" || lease.kind === "rejected") {
@@ -271,7 +276,9 @@ export const createExpertTelegramCommandProcessor = (
             lease.principal,
             lease.command,
           );
-          await deps.output.publish({
+          await deps.output.publishOnce({
+            receipt,
+            outcomeId: `expert-command:${authenticated.tokenHash}`,
             telegramUserId: input.telegramUserId,
             correlationId,
             outcome,

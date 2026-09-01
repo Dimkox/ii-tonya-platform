@@ -373,3 +373,83 @@ The named human AI behavior spot-check remains **PENDING — none supplied**.
 The provider-deadline fixture remains untouched and carried to Task 12.
 Independent re-review is required; this fix round makes no Task 10 completion,
 durable-activation, staging, or production claim.
+
+## Fix round 3/5 — receipt-bound lease and idempotent output
+
+### Findings addressed
+
+- The released lease state now remains permanently bound to the first trusted
+  webhook receipt identity, exactly `telegram:<update_id>`. The route constructs
+  that identity only after `inbox.claim` succeeds and passes it into the atomic
+  acquisition operation; `correlationId` is not used for ownership or replay.
+- The stateful atomic fake preserves the receipt binding across release and
+  permits only that same receipt to reacquire. A different update ID is rejected
+  before Task 8 or output invocation, both after a fail-once Task 8 service and
+  after an ambiguous output failure. The original update ID then reacquires and
+  completes normally.
+- Output is now an explicit `publishOnce` port. It receives the token-bound
+  receipt plus deterministic `expert-command:<authenticated-token-hash>`
+  outcome identity. The ambiguity fake persists the semantic output effect and
+  then throws; retry observes the same key and payload, creates no second
+  semantic output, and completes the token/inbox lifecycle.
+- Generic boolean Telegram callbacks remain on their existing path. Fresh
+  complete binding/principal, authoritative version/object/operation checks,
+  immutable command acquisition, all four Task 8 operations, safe projections,
+  and completed-duplicate behavior remain intact.
+- No migration, durable/live port implementation, provider, credential,
+  environment flag, network call, or activation was added. Durable receipt-
+  bound lease and idempotent output implementations remain activation gates.
+
+### Strict RED/GREEN evidence
+
+```text
+corepack pnpm vitest run apps/api/src/expert-telegram-command.test.ts
+RED — 1 failed file, 2 failed and 9 passed (11 total). After both service and
+output failures released the lease, a different update ID returned 200 instead
+of 403 and reached execution.
+
+GREEN — 1 file, 11/11 passed. The service-failure and output-after-side-effect
+cases reject the intervening different update with zero additional Task 8/
+output effects, then allow the original update to finish. All prior round-2
+scenarios and all four operation/projection cases remain green.
+
+focused callback/webhook/app/server/scope checkpoint —
+8 files, 182/182 tests passed.
+```
+
+The receipt tests deliberately reuse the same correlation ID across different
+update IDs, so they cannot pass by binding the lease to correlation metadata.
+
+### Final fix-round verification
+
+```text
+affected Telegram/ct2 repository+migration/webhook-inbox/API/app/server/admin/
+Task 8/prompt/conversation regressions:
+20 files, 285/285 tests passed
+
+scope/dependency/env/admin/architecture/release/workflow guards:
+9 files, 198/198 tests passed
+
+bash -n scripts/deploy-compose-remote.sh scripts/validate-runtime-env.sh
+exit 0
+
+corepack pnpm --workspace-concurrency=1 -r --sort run build
+exit 0 — all 10 workspace projects passed, including declarations
+
+corepack pnpm -r --sort run typecheck
+exit 0 — all 10 workspace projects passed
+
+exact changed-TypeScript ESLint, exact non-legacy changed-file Prettier, report
+Prettier, and git diff --check
+exit 0
+```
+
+No integrations package surface changed, so the approved exact index SHA-256
+remains unchanged; its scope guards passed. The touched compact legacy file
+`apps/api/src/routes/telegram-webhook.ts` retains its already documented base
+formatter exception, while its new receipt hunks are formatter-shaped.
+
+The named human AI behavior spot-check remains **PENDING — none supplied**.
+The provider-deadline fixture remains untouched and carried to Task 12.
+Independent re-review is required; this fix round makes no Task 10 completion,
+durable-activation, staging, or production claim.

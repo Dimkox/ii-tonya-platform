@@ -200,8 +200,12 @@ describe("expert Telegram command processor", () => {
       referrals,
       residency,
       output: {
-        async publish(message) {
-          published.push(message);
+        async publishOnce(message) {
+          published.push({
+            telegramUserId: message.telegramUserId,
+            correlationId: message.correlationId,
+            outcome: message.outcome,
+          });
         },
       },
     });
@@ -370,6 +374,7 @@ type AtomicAcquireInput = Readonly<{
     verified: boolean;
   }>;
   now: Date;
+  receipt: Readonly<{ source: "telegram"; updateId: string }>;
 }>;
 
 type RetryHarnessOptions = Readonly<{
@@ -432,7 +437,11 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
 
   const executionState = new Map<
     string,
-    { kind: "available" | "leased" | "completed"; leaseId?: string }
+    {
+      kind: "available" | "leased" | "completed";
+      leaseId?: string;
+      receiptKey: string | undefined;
+    }
   >();
   const leaseTokenHashes = new Map<string, string>();
   let acquisitionCalls = 0;
@@ -471,9 +480,19 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
     async acquire(input: AtomicAcquireInput) {
       acquisitionCalls += 1;
       const { tokenHash, claims } = input.authenticated;
-      const state = executionState.get(tokenHash) ?? { kind: "available" };
+      const state = executionState.get(tokenHash) ?? {
+        kind: "available",
+        receiptKey: undefined,
+      };
       if (state.kind === "completed") return { kind: "completed" } as const;
       if (state.kind === "leased") return { kind: "busy" } as const;
+      const receiptKey =
+        input.receipt === undefined
+          ? undefined
+          : `${input.receipt.source}:${input.receipt.updateId}`;
+      if (state.receiptKey !== undefined && state.receiptKey !== receiptKey) {
+        return { kind: "rejected" } as const;
+      }
       const stored = callbackValues.get(tokenHash);
       const bindingUnchanged =
         currentBinding.telegramUserId === input.telegramUserId &&
@@ -505,7 +524,11 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
         return { kind: "rejected" } as const;
       }
       const leaseId = `lease-${String(acquisitionCalls)}`;
-      executionState.set(tokenHash, { kind: "leased", leaseId });
+      executionState.set(tokenHash, {
+        kind: "leased",
+        leaseId,
+        receiptKey: state.receiptKey ?? receiptKey,
+      });
       leaseTokenHashes.set(leaseId, tokenHash);
       return {
         kind: "acquired",
@@ -518,13 +541,19 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
       completeCalls += 1;
       const tokenHash = leaseTokenHashes.get(leaseId);
       if (tokenHash === undefined) throw new Error("unknown_test_lease");
-      executionState.set(tokenHash, { kind: "completed" });
+      executionState.set(tokenHash, {
+        kind: "completed",
+        receiptKey: executionState.get(tokenHash)?.receiptKey,
+      });
     },
     async release(leaseId: string) {
       releaseCalls += 1;
       const tokenHash = leaseTokenHashes.get(leaseId);
       if (tokenHash === undefined) throw new Error("unknown_test_lease");
-      executionState.set(tokenHash, { kind: "available" });
+      executionState.set(tokenHash, {
+        kind: "available",
+        receiptKey: executionState.get(tokenHash)?.receiptKey,
+      });
     },
   };
 
@@ -534,6 +563,7 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
   let semanticEffects = 0;
   const appliedIdempotencyKeys = new Set<string>();
   const published: unknown[] = [];
+  const outputRecords = new Map<string, string>();
   const referrals = {
     async redeemCode(
       candidatePrincipal: ExpertPrincipal,
@@ -558,12 +588,29 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
     },
   } as unknown as ExpertReferralService;
   const output = {
-    async publish(message: unknown) {
+    async publishOnce(message: {
+      receipt: { source: "telegram"; updateId: string };
+      outcomeId: string;
+      telegramUserId: string;
+      outcome: unknown;
+    }) {
+      const key = `${message.receipt.source}:${message.receipt.updateId}:${message.outcomeId}`;
+      const semanticPayload = JSON.stringify({
+        telegramUserId: message.telegramUserId,
+        outcome: message.outcome,
+      });
+      const prior = outputRecords.get(key);
+      if (prior !== undefined && prior !== semanticPayload) {
+        throw new Error("test_output_idempotency_conflict");
+      }
+      if (prior === undefined) {
+        outputRecords.set(key, semanticPayload);
+        published.push(message);
+      }
       if (outputFails) {
         outputFails = false;
-        throw new Error("test_output_unavailable");
+        throw new Error("test_output_ambiguous");
       }
-      published.push(message);
     },
   };
   const processor = createExpertTelegramCommandProcessor({
@@ -656,7 +703,10 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
     store,
   );
   for (const tokenHash of callbackValues.keys()) {
-    executionState.set(tokenHash, { kind: "available" });
+    executionState.set(tokenHash, {
+      kind: "available",
+      receiptKey: undefined,
+    });
   }
   const send = (updateId: number) =>
     app.inject({
@@ -664,7 +714,7 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
       url: "/v1/webhooks/telegram",
       headers: {
         "x-telegram-bot-api-secret-token": "telegram-webhook-secret",
-        "x-correlation-id": `retry-${String(updateId)}`,
+        "x-correlation-id": "shared-retry-correlation",
       },
       payload: {
         update_id: updateId,
@@ -692,9 +742,13 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
 };
 
 describe("expert Telegram callback retry safety", () => {
-  it("releases the lease after a Task 8 failure so the same update retries once semantically", async () => {
+  it("binds a released service-failure lease to the original receipt before retry", async () => {
     const harness = await retryHarness({ serviceFailsOnce: true });
     expect((await harness.send(2_001)).statusCode).toBe(500);
+    expect((await harness.send(2_101)).statusCode).toBe(403);
+    expect(harness.metrics.serviceAttempts()).toBe(1);
+    expect(harness.metrics.semanticEffects()).toBe(0);
+    expect(harness.metrics.published()).toBe(0);
     expect((await harness.send(2_001)).statusCode).toBe(200);
     expect(harness.metrics.serviceAttempts()).toBe(2);
     expect(harness.metrics.semanticEffects()).toBe(1);
@@ -704,9 +758,14 @@ describe("expert Telegram callback retry safety", () => {
     await harness.app.close();
   });
 
-  it("releases the lease after output failure so the same update retries once semantically", async () => {
+  it("deduplicates ambiguous output and rejects a different receipt before retry", async () => {
     const harness = await retryHarness({ outputFailsOnce: true });
     expect((await harness.send(2_002)).statusCode).toBe(500);
+    expect(harness.metrics.published()).toBe(1);
+    expect((await harness.send(2_102)).statusCode).toBe(403);
+    expect(harness.metrics.serviceAttempts()).toBe(1);
+    expect(harness.metrics.semanticEffects()).toBe(1);
+    expect(harness.metrics.published()).toBe(1);
     expect((await harness.send(2_002)).statusCode).toBe(200);
     expect(harness.metrics.serviceAttempts()).toBe(2);
     expect(harness.metrics.semanticEffects()).toBe(1);
