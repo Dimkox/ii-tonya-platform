@@ -9,6 +9,7 @@ import {
   defaultMigrationsFolder,
   migrateDb,
 } from "../../packages/db/src/client.js";
+import { PostgresBookingRepository } from "../../packages/db/src/repositories/booking-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -45,7 +46,7 @@ describe("booking reschedule replay migration upgrade", () => {
       await rm(oldMigrationsFolder, { recursive: true, force: true });
   }, 120_000);
 
-  it("backfills existing facts and preserves their immutable trigger", async () => {
+  it("marks multiple historical facts unrecoverable and preserves their immutable trigger", async () => {
     const fixture = await seedLifecycleFixture(database);
     const targetSlotId = (
       await database.db.execute<{ id: string }>(sql`
@@ -54,6 +55,17 @@ describe("booking reschedule replay migration upgrade", () => {
         )
         select expert_service_id,'local','upgrade-target',
           starts_at+interval '1 day',ends_at+interval '1 day',observed_at,capacity
+        from slots where id=${fixture.slotId}::uuid
+        returning id
+      `)
+    ).rows[0]!.id;
+    const secondTargetSlotId = (
+      await database.db.execute<{ id: string }>(sql`
+        insert into slots(
+          expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity
+        )
+        select expert_service_id,'local','upgrade-second-target',
+          starts_at+interval '2 days',ends_at+interval '2 days',observed_at,capacity
         from slots where id=${fixture.slotId}::uuid
         returning id
       `)
@@ -68,25 +80,53 @@ describe("booking reschedule replay migration upgrade", () => {
         ${"9".repeat(64)},'upgrade-existing-fact'
       )
     `);
+    await database.db.execute(sql`
+      insert into booking_reschedule_facts(
+        reservation_id,user_id,old_slot_id,new_slot_id,old_version,new_version,
+        idempotency_key,correlation_id
+      ) values(
+        ${fixture.reservationId}::uuid,${fixture.userId}::uuid,
+        ${targetSlotId}::uuid,${secondTargetSlotId}::uuid,2,3,
+        ${"8".repeat(64)},'upgrade-second-existing-fact'
+      )
+    `);
 
     await migrateDb(database.db, defaultMigrationsFolder);
 
     const result = await database.db.execute<{
-      resultStatus: string;
-      resultReservedUntil: Date | string;
-      reservedUntil: Date | string;
+      replayRecoverable: boolean;
+      resultStatus: string | null;
+      resultReservedUntil: Date | string | null;
     }>(sql`
       select f.result_status as "resultStatus",
         f.result_reserved_until as "resultReservedUntil",
-        r.reserved_until as "reservedUntil"
+        f.replay_recoverable as "replayRecoverable"
       from booking_reschedule_facts f
-      join reservations r on r.id=f.reservation_id
-      where f.correlation_id='upgrade-existing-fact'
+      where f.reservation_id=${fixture.reservationId}::uuid
+      order by f.old_version
     `);
-    expect(result.rows[0]).toMatchObject({ resultStatus: "reserved" });
-    expect(new Date(result.rows[0]!.resultReservedUntil)).toEqual(
-      new Date(result.rows[0]!.reservedUntil),
-    );
+    expect(result.rows).toEqual([
+      {
+        replayRecoverable: false,
+        resultStatus: null,
+        resultReservedUntil: null,
+      },
+      {
+        replayRecoverable: false,
+        resultStatus: null,
+        resultReservedUntil: null,
+      },
+    ]);
+    await expect(
+      new PostgresBookingRepository(database.db).rescheduleOwnedByHandle({
+        userId: fixture.userId,
+        bookingHandle: `bk1.${"A".repeat(43)}`,
+        choiceDigest: `sha256:${"1".repeat(64)}`,
+        idempotencyKey: "9".repeat(64),
+        correlationId: "safe-unrecoverable-replay",
+        confirmationBufferMs: 3_600_000,
+      }),
+    ).resolves.toEqual({ kind: "conflict" });
     const trigger = await database.db.execute<{ enabled: string }>(sql`
       select tgenabled as enabled from pg_trigger
       where tgname='booking_reschedule_facts_immutable_guard'

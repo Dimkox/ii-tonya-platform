@@ -957,16 +957,25 @@ export class PostgresBookingRepository {
     return this.runSerializable(async (tx) => {
       const replay = (
         await tx.execute<{
-          status: ReservationStatus;
-          reservedUntil: Date | string;
+          status: ReservationStatus | null;
+          reservedUntil: Date | string | null;
+          replayRecoverable: boolean;
         }>(sql`
-          select f.result_status as status,f.result_reserved_until as "reservedUntil"
+          select f.result_status as status,f.result_reserved_until as "reservedUntil",
+            f.replay_recoverable as "replayRecoverable"
           from booking_reschedule_facts f
           where f.idempotency_key=${command.idempotencyKey}
             and f.user_id=${command.userId}::uuid
         `)
       ).rows[0];
       if (replay) {
+        if (
+          !replay.replayRecoverable ||
+          replay.status === null ||
+          replay.reservedUntil === null
+        ) {
+          return { kind: "conflict" };
+        }
         return {
           kind: "replayed",
           reservationStatus: replay.status,
@@ -1077,11 +1086,13 @@ export class PostgresBookingRepository {
       await tx.execute(sql`
         insert into booking_reschedule_facts(
           reservation_id,user_id,old_slot_id,new_slot_id,old_version,new_version,
-          result_status,result_reserved_until,idempotency_key,correlation_id,created_at
+          result_status,result_reserved_until,replay_recoverable,
+          idempotency_key,correlation_id,created_at
         ) values(
           ${owned.reservationId}::uuid,${command.userId}::uuid,
           ${owned.oldSlotId}::uuid,${target.slotId}::uuid,${owned.version},${updated.version},
-          ${updated.status},${reservedUntil},${command.idempotencyKey},${command.correlationId},${now}
+          ${updated.status},${reservedUntil},true,
+          ${command.idempotencyKey},${command.correlationId},${now}
         )
       `);
       await this.auditAndOutbox(tx, {

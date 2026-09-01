@@ -25,6 +25,8 @@ Reservation expiry appends `waitlist.promote.v1` in the same PostgreSQL transact
 Consume `waitlist.promote.v1`, FIFO promotion, protected booking-receipt creation, and terminal outbox transition in one PostgreSQL transaction. This closes the crash gap where a promoted reservation could exist without a client handle or the command could be acknowledged without the reservation.
 
 Any correction after a migration has been committed uses a new forward migration plus an explicit old-to-new upgrade test. This preserves already-applied databases while still validating fresh installs through the complete journal.
+
+Historical reschedule facts that predate stored replay results are marked explicitly unrecoverable and return conflict on retry; new facts store the exact result and are replayable. Refusing an unknowable replay is safer than fabricating a deadline from mutable reservation state.
 ## 2026-08-30 — Keep partner commerce separate from expert residency
 
 Centers and organizers use a separate `Partner Commerce` bounded context while sharing identity, payment observations, outbox, and audit primitives. This preserves the fixed expert tariff/referral invariants and avoids a polymorphic migration for products with different qualification and event-quota semantics.

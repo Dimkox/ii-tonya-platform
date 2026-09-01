@@ -32,15 +32,9 @@ describe("booking waitlist D1 migration", () => {
     );
     expect(migration).toContain("ADD COLUMN result_status");
     expect(migration).toContain("ADD COLUMN result_reserved_until");
-    expect(migration).toContain("SET result_status='reserved'");
-    expect(migration).toContain(
-      "DISABLE TRIGGER booking_reschedule_facts_immutable_guard",
-    );
-    expect(migration).toContain(
-      "ENABLE TRIGGER booking_reschedule_facts_immutable_guard",
-    );
-    expect(migration).toContain("ALTER COLUMN result_status SET NOT NULL");
-    expect(migration).toContain("booking_reschedule_result_status_check");
+    expect(migration).toContain("ADD COLUMN replay_recoverable");
+    expect(migration).toContain("booking_reschedule_replay_result_check");
+    expect(migration).not.toContain("UPDATE booking_reschedule_facts");
   });
 
   it("registers replay repair after waitlist migration", () => {

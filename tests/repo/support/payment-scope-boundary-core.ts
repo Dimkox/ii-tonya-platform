@@ -711,7 +711,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/0041_booking_reschedule_replay.sql",
-    "5f6355936b50de629211883df48067490d844ebac7cce9450802216b730bbf88",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
   ],
   [
     "packages/db/migrations/meta/_journal.json",

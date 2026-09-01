@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   char,
   index,
@@ -261,27 +262,38 @@ export const bookingWaitlistCommandReceipts = pgTable(
   ],
 );
 
-export const bookingRescheduleFacts = pgTable("booking_reschedule_facts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  reservationId: uuid("reservation_id")
-    .notNull()
-    .references(() => reservations.id),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  oldSlotId: uuid("old_slot_id")
-    .notNull()
-    .references(() => slots.id),
-  newSlotId: uuid("new_slot_id")
-    .notNull()
-    .references(() => slots.id),
-  oldVersion: integer("old_version").notNull(),
-  newVersion: integer("new_version").notNull(),
-  resultStatus: text("result_status").notNull(),
-  resultReservedUntil: timestamp("result_reserved_until", {
-    withTimezone: true,
-  }).notNull(),
-  idempotencyKey: char("idempotency_key", { length: 64 }).notNull().unique(),
-  correlationId: text("correlation_id").notNull(),
-  createdAt: mutableTimestamps.createdAt,
-});
+export const bookingRescheduleFacts = pgTable(
+  "booking_reschedule_facts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reservationId: uuid("reservation_id")
+      .notNull()
+      .references(() => reservations.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    oldSlotId: uuid("old_slot_id")
+      .notNull()
+      .references(() => slots.id),
+    newSlotId: uuid("new_slot_id")
+      .notNull()
+      .references(() => slots.id),
+    oldVersion: integer("old_version").notNull(),
+    newVersion: integer("new_version").notNull(),
+    resultStatus: text("result_status"),
+    resultReservedUntil: timestamp("result_reserved_until", {
+      withTimezone: true,
+    }),
+    replayRecoverable: boolean("replay_recoverable").notNull().default(false),
+    idempotencyKey: char("idempotency_key", { length: 64 }).notNull().unique(),
+    correlationId: text("correlation_id").notNull(),
+    createdAt: mutableTimestamps.createdAt,
+  },
+  (table) => [
+    check(
+      "booking_reschedule_replay_result_check",
+      sql`(${table.replayRecoverable} and ${table.resultStatus}='reserved' and ${table.resultReservedUntil} is not null)
+        or (not ${table.replayRecoverable} and ${table.resultStatus} is null and ${table.resultReservedUntil} is null)`,
+    ),
+  ],
+);
