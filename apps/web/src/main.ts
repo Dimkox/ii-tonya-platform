@@ -18,11 +18,13 @@ if (legalRoute !== undefined) {
       ? "Договор-оферта — ии-Тоня"
       : "Политика конфиденциальности — ии-Тоня";
 } else {
-  app.innerHTML = renderLanding(
-    readPublicConfig({
-      VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
-    }),
-  );
+  if (app.dataset.prerendered !== "true") {
+    app.innerHTML = renderLanding(
+      readPublicConfig({
+        VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
+      }),
+    );
+  }
   const reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
