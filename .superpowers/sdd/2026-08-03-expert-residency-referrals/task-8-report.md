@@ -153,3 +153,69 @@ targeted rerun passed 3/3.
 - No known failing Task 8 check or implementation concern remains. Independent
   review is the remaining completion gate; both commercial ceilings remain
   disabled and this commit contains no staging or production activation.
+
+## Fix round 1/5 — authorize before disabled command responses
+
+### Finding addressed
+
+- Redemption, quote, and checkout now invoke fresh expert identity
+  authorization before evaluating their environment ceiling. The ceiling still
+  wins response precedence: a disabled command returns `{ kind: "disabled" }`
+  for both valid and invalid identities, preventing identity enumeration.
+- A disabled command stops after authorization. It does not read the durable
+  control and cannot reach referral commands, quote/order creation, or payment.
+- Added mutation coverage proving `userId`, `provider`, and `externalId` must
+  all match the identity returned by the authorization port. Added checkout
+  coverage proving the durable command switch is read again on every call.
+
+### Strict RED/GREEN evidence
+
+```text
+corepack pnpm vitest run packages/application/src/expert-referral-service.test.ts packages/application/src/expert-residency-service.test.ts
+
+RED — 2 failed, 17 passed. Both disabled-ceiling tests received zero identity
+authorization reads instead of the required owner/invalid-principal reads.
+
+GREEN — 2 files, 19/19 tests passed.
+```
+
+The production fix was only the branch-order change in each service: authorize
+first, then return the non-enumerating disabled result, then return forbidden
+for an invalid identity when the ceiling is enabled.
+
+### Final verification
+
+```text
+focused application tests: 2 files, 19/19 passed
+exact five-file Prettier check: exit 0
+exact five-file ESLint: exit 0
+exact five-file git diff --check: exit 0
+
+isolated HEAD-plus-fix workspace build:
+exit 0 — all 10 workspace projects passed, including declarations
+
+isolated HEAD-plus-fix workspace typecheck after build:
+exit 0 — all 10 workspace projects passed
+```
+
+The shared working tree's first typecheck invocation stopped in an explicitly
+protected, unrelated in-progress `packages/config/src/env.ts` edit: it returns
+`expertReferralMaturityWorker` without adding that field to `RuntimeConfig`.
+That file and the accompanying `apps/worker/src/runtime.ts` edit were not
+modified or staged. An isolated worktree at current HEAD with only this fix
+applied proved the complete build/typecheck gate. Its first clean-worktree
+typecheck was run before declarations existed and reported unresolved internal
+workspace packages; running the repository's required build-before-typecheck
+order passed fully.
+
+### Self-review and concerns
+
+- Confirmed all disabled calls authorize exactly once while controls and every
+  mutation/payment port remain at zero calls.
+- Confirmed enabled invalid identities still return `forbidden`, disabled
+  invalid identities return `disabled`, and the complete identity comparison
+  remains centralized in `authorizeExpert`.
+- Confirmed existing settlement/refund/reconciliation/release/reversal/replay
+  paths are untouched.
+- No Task 8 fix concern remains. The unrelated dirty config/worker edits are a
+  shared-worktree verification constraint only and remain outside this commit.

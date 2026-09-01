@@ -37,10 +37,56 @@ describe("expert residency application boundary", () => {
         providerDeadline: new Date("2026-08-03T00:30:00.000Z"),
       }),
     ).resolves.toEqual({ kind: "disabled" });
+    await expect(
+      service.checkout(fixture.other, {
+        tariffKey: "annual-v1",
+        idempotencyKey: "checkout_812",
+        providerDeadline: new Date("2026-08-03T00:30:00.000Z"),
+      }),
+    ).resolves.toEqual({ kind: "disabled" });
+    expect(fixture.authorizationCount(fixture.owner.expertId)).toBe(2);
+    expect(fixture.authorizationCount(fixture.other.expertId)).toBe(1);
     expect(fixture.controlReadCount()).toBe(0);
     expect(fixture.quoteCount()).toBe(0);
     expect(fixture.checkoutCount()).toBe(0);
   });
+
+  it.each([
+    ["userId", { userId: "00000000-0000-4000-8000-000000000899" }],
+    ["provider", { provider: "another-provider" }],
+    ["externalId", { externalId: "another-external-id" }],
+  ])(
+    "rejects quote and checkout when principal %s differs from the resolved identity",
+    async (_field, mutation) => {
+      const fixture = expertResidencyFixture();
+      let authorizationReads = 0;
+      const service = createExpertResidencyService({
+        ...fixture,
+        identity: {
+          async authorize() {
+            authorizationReads += 1;
+            return fixture.owner;
+          },
+        },
+      });
+      const principal = { ...fixture.owner, ...mutation };
+
+      await expect(service.quote(principal, "annual-v1")).resolves.toEqual({
+        kind: "forbidden",
+      });
+      await expect(
+        service.checkout(principal, {
+          tariffKey: "annual-v1",
+          idempotencyKey: "checkout_identity_mismatch",
+          providerDeadline: new Date("2026-08-03T00:30:00.000Z"),
+        }),
+      ).resolves.toEqual({ kind: "forbidden" });
+      expect(authorizationReads).toBe(2);
+      expect(fixture.controlReadCount()).toBe(0);
+      expect(fixture.quoteCount()).toBe(0);
+      expect(fixture.checkoutCount()).toBe(0);
+    },
+  );
 
   it("observes durable command-switch changes without a process cache", async () => {
     const fixture = expertResidencyFixture();
@@ -60,6 +106,32 @@ describe("expert residency application boundary", () => {
 
     expect(fixture.controlReadCount()).toBe(3);
     expect(fixture.quoteCount()).toBe(2);
+  });
+
+  it("observes durable command-switch changes on every checkout call", async () => {
+    const fixture = expertResidencyFixture();
+    const service = createExpertResidencyService(fixture);
+    const checkout = (idempotencyKey: string) =>
+      service.checkout(fixture.owner, {
+        tariffKey: "annual-v1",
+        idempotencyKey,
+        providerDeadline: new Date("2026-08-03T00:30:00.000Z"),
+      });
+
+    await expect(checkout("checkout_switch_1")).resolves.toMatchObject({
+      kind: "checkout_created",
+    });
+    fixture.setNewCommandsEnabled(false);
+    await expect(checkout("checkout_switch_2")).resolves.toEqual({
+      kind: "disabled",
+    });
+    fixture.setNewCommandsEnabled(true);
+    await expect(checkout("checkout_switch_3")).resolves.toMatchObject({
+      kind: "checkout_created",
+    });
+
+    expect(fixture.controlReadCount()).toBe(3);
+    expect(fixture.checkoutCount()).toBe(2);
   });
 
   it("builds checkout payment input only from the committed order", async () => {

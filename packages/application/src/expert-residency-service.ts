@@ -170,8 +170,8 @@ const commandIdentity = async (
   dependencies: ExpertResidencyDependencies,
   principal: ExpertPrincipal,
 ): Promise<ExpertCommandDenied | ExpertPrincipal> => {
-  if (!dependencies.billingEnabled) return { kind: "disabled" };
   const identity = await authorizeExpert(dependencies.identity, principal);
+  if (!dependencies.billingEnabled) return { kind: "disabled" };
   if (identity === null) return { kind: "forbidden" };
   const control = await dependencies.controls.readForCommand();
   return control.newCommandsEnabled ? identity : { kind: "disabled" };

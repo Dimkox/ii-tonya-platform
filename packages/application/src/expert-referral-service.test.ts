@@ -47,10 +47,46 @@ describe("expert referral application boundary", () => {
     await expect(
       service.redeemCode(fixture.owner, fixture.code, fixture.idempotencyKey),
     ).resolves.toEqual({ kind: "disabled" });
-    expect(fixture.authorizationCount(fixture.owner.expertId)).toBe(0);
+    await expect(
+      service.redeemCode(fixture.other, fixture.code, "referral_redeem_802"),
+    ).resolves.toEqual({ kind: "disabled" });
+    expect(fixture.authorizationCount(fixture.owner.expertId)).toBe(1);
+    expect(fixture.authorizationCount(fixture.other.expertId)).toBe(1);
     expect(fixture.controlReadCount()).toBe(0);
     expect(fixture.redemptionCount()).toBe(0);
   });
+
+  it.each([
+    ["userId", { userId: "00000000-0000-4000-8000-000000000899" }],
+    ["provider", { provider: "another-provider" }],
+    ["externalId", { externalId: "another-external-id" }],
+  ])(
+    "rejects a principal whose %s differs from the resolved identity",
+    async (_field, mutation) => {
+      const fixture = expertReferralFixture();
+      let authorizationReads = 0;
+      const service = createExpertReferralService({
+        ...fixture,
+        identity: {
+          async authorize() {
+            authorizationReads += 1;
+            return fixture.owner;
+          },
+        },
+      });
+
+      await expect(
+        service.redeemCode(
+          { ...fixture.owner, ...mutation },
+          fixture.code,
+          fixture.idempotencyKey,
+        ),
+      ).resolves.toEqual({ kind: "forbidden" });
+      expect(authorizationReads).toBe(1);
+      expect(fixture.controlReadCount()).toBe(0);
+      expect(fixture.redemptionCount()).toBe(0);
+    },
+  );
 
   it("reads the durable new-command switch on every redemption call", async () => {
     const fixture = expertReferralFixture();

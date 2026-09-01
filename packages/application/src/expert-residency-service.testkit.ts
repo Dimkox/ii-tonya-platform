@@ -11,6 +11,7 @@ export interface ExpertResidencyFixture extends ExpertResidencyDependencies {
   readonly refundEvent: VerifiedExpertResidencyEvent;
   setAuthorized(expertId: string, authorized: boolean): void;
   setNewCommandsEnabled(enabled: boolean): void;
+  authorizationCount(expertId: string): number;
   controlReadCount(): number;
   quoteCount(): number;
   checkoutCount(): number;
@@ -36,6 +37,7 @@ export const expertResidencyFixture = (
     [owner.expertId, true],
     [other.expertId, false],
   ]);
+  const authorizationReads = new Map<string, number>();
   const operations: string[] = [];
   let newCommandsEnabled = true;
   let controlReads = 0;
@@ -82,6 +84,10 @@ export const expertResidencyFixture = (
     billingEnabled: options.billingEnabled ?? true,
     identity: {
       async authorize(principal) {
+        authorizationReads.set(
+          principal.expertId,
+          (authorizationReads.get(principal.expertId) ?? 0) + 1,
+        );
         return authorization.get(principal.expertId) === true
           ? { ...principal }
           : null;
@@ -177,6 +183,7 @@ export const expertResidencyFixture = (
     setNewCommandsEnabled(enabled) {
       newCommandsEnabled = enabled;
     },
+    authorizationCount: (expertId) => authorizationReads.get(expertId) ?? 0,
     controlReadCount: () => controlReads,
     quoteCount: () => quotes,
     checkoutCount: () => checkouts,

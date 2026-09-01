@@ -88,8 +88,8 @@ export const createExpertReferralService = (
   dependencies: ExpertReferralDependencies,
 ): ExpertReferralService => ({
   async redeemCode(principal, code, idempotencyKey) {
-    if (!dependencies.referralEnabled) return { kind: "disabled" };
     const identity = await authorizeExpert(dependencies.identity, principal);
+    if (!dependencies.referralEnabled) return { kind: "disabled" };
     if (identity === null) return { kind: "forbidden" };
     const control = await dependencies.controls.readForCommand();
     if (!control.newCommandsEnabled) return { kind: "disabled" };
