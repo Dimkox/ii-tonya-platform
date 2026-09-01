@@ -94,14 +94,18 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         });
       await deps.inbox.complete(claim.claimId);
     } catch (error) {
-      await deps.inbox.fail(claim.claimId);
+      try {
+        await deps.inbox.fail(claim.claimId);
+      } catch {
+        return reply.code(500).send({ error: "callback_execution_failed" });
+      }
       if (error instanceof CallbackInfrastructureError) {
         return reply.code(503).send({ error: "callback_unavailable" });
       }
       if (error instanceof CallbackVerificationError) {
         return reply.code(403).send({ error: "invalid_callback" });
       }
-      throw error;
+      return reply.code(500).send({ error: "callback_execution_failed" });
     }
     return { accepted: true };
   });

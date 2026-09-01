@@ -453,3 +453,72 @@ The named human AI behavior spot-check remains **PENDING — none supplied**.
 The provider-deadline fixture remains untouched and carried to Task 12.
 Independent re-review is required; this fix round makes no Task 10 completion,
 durable-activation, staging, or production claim.
+
+## Fix round 4/5 — redacted callback execution failures
+
+### Finding addressed
+
+- The webhook route previously rethrew untyped Task 8 and output exceptions
+  after failing the inbox claim, which let Fastify's default 500 serializer
+  expose the exception message. An exception from `inbox.fail` also escaped and
+  replaced the original failure with its own potentially sensitive message.
+- The route now returns the fixed body
+  `{ "error": "callback_execution_failed" }` with status 500 for every untyped
+  execution/output failure and for every `inbox.fail` failure. Neither error
+  object is serialized. After a successful `inbox.fail`, typed
+  `CallbackVerificationError` and `CallbackInfrastructureError` retain their
+  generic 403 and 503 mappings respectively.
+- The existing processor releases its receipt-bound command lease before the
+  route calls `inbox.fail`; a successful fail therefore leaves the same update
+  retryable. Route tests prove both fail-once Task 8 and publish-after-side-
+  effect failures return the redacted response and then succeed under the
+  original update without duplicate semantic effects. Receipt substitution,
+  completed duplicate, stale snapshot, all four operations, and `publishOnce`
+  behavior remain unchanged.
+- No package surface, migration, durable/live composition, provider,
+  credential, environment flag, network call, or activation was added.
+
+### Strict RED/GREEN evidence
+
+```text
+corepack pnpm vitest run apps/api/src/expert-telegram-command.test.ts \
+  apps/api/src/routes/telegram-webhook.test.ts
+
+RED — 2 failed files, 3 failed and 10 passed (13 total). Task 8 and output
+failures exposed `ER-PLAINTEXT-SECRET-CODE`; the inbox failure exposed
+`ER-INBOX-FAIL-SECRET` in Fastify's default 500 body.
+
+GREEN — 2 files, 13/13 passed. Both execution paths return only the fixed
+redacted 500 body, an inbox-failure exception is also redacted, and the
+original update remains retryable after successful inbox failure handling.
+```
+
+### Final fix-round verification
+
+```text
+affected Telegram/ct2 repository+migration/webhook-inbox/API/app/server/admin/
+Task 8/prompt/conversation regressions:
+20 files, 286/286 tests passed
+
+scope/dependency/env/admin/architecture/release/workflow guards:
+9 files, 198/198 tests passed
+
+bash -n scripts/deploy-compose-remote.sh scripts/validate-runtime-env.sh
+exit 0
+
+corepack pnpm --workspace-concurrency=1 -r --sort run build
+exit 0 — all 10 workspace projects passed, including declarations
+
+corepack pnpm -r --sort run typecheck
+exit 0 — all 10 workspace projects passed
+```
+
+No public package surface changed, so no exact scope-hash expectation changed;
+the existing scope guards passed. Exact changed-TypeScript ESLint, exact
+non-legacy changed-file/report Prettier, and `git diff --check` are recorded in
+the fix commit verification.
+
+The named human AI behavior spot-check remains **PENDING — none supplied**.
+The provider-deadline fixture remains untouched and carried to Task 12.
+Independent re-review is required; this fix round makes no Task 10 completion,
+durable-activation, staging, or production claim.

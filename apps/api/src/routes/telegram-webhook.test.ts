@@ -48,4 +48,54 @@ describe("Telegram expert callback boundary", () => {
     expect(claims).toBe(0);
     await app.close();
   });
+
+  it("redacts both execution and inbox failure errors", async () => {
+    let failures = 0;
+    const app = Fastify({ logger: false });
+    await app.register(telegramWebhookRoutes, {
+      secret: "telegram-webhook-secret",
+      callbacks: {
+        isAuthorizedIdentity: async () => true,
+        verifyCallback: async () => ({
+          execute: async () => {
+            throw new Error("ER-PLAINTEXT-SECRET-CODE");
+          },
+        }),
+        process: async () => undefined,
+      },
+      inbox: {
+        claim: async () => ({
+          kind: "claimed" as const,
+          claimId: "claim-redaction",
+        }),
+        complete: async () => undefined,
+        fail: async () => {
+          failures += 1;
+          throw new Error("ER-INBOX-FAIL-SECRET");
+        },
+      },
+      rateLimiter: createWindowedRateLimiter(),
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: { "x-telegram-bot-api-secret-token": "telegram-webhook-secret" },
+      payload: {
+        update_id: 11,
+        callback_query: {
+          id: "query-redaction",
+          from: { id: 1001 },
+          data: "ct3.authenticated-token",
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "callback_execution_failed" });
+    expect(response.body).not.toContain("ER-PLAINTEXT-SECRET-CODE");
+    expect(response.body).not.toContain("ER-INBOX-FAIL-SECRET");
+    expect(failures).toBe(1);
+    await app.close();
+  });
 });

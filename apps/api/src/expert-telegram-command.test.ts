@@ -573,7 +573,7 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
       serviceAttempts += 1;
       if (serviceFails) {
         serviceFails = false;
-        throw new Error("test_service_unavailable");
+        throw new Error("ER-PLAINTEXT-SECRET-CODE");
       }
       if (!appliedIdempotencyKeys.has(idempotencyKey)) {
         appliedIdempotencyKeys.add(idempotencyKey);
@@ -609,7 +609,7 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
       }
       if (outputFails) {
         outputFails = false;
-        throw new Error("test_output_ambiguous");
+        throw new Error("ER-PLAINTEXT-SECRET-CODE");
       }
     },
   };
@@ -744,7 +744,10 @@ const retryHarness = async (options: RetryHarnessOptions = {}) => {
 describe("expert Telegram callback retry safety", () => {
   it("binds a released service-failure lease to the original receipt before retry", async () => {
     const harness = await retryHarness({ serviceFailsOnce: true });
-    expect((await harness.send(2_001)).statusCode).toBe(500);
+    const failed = await harness.send(2_001);
+    expect(failed.statusCode).toBe(500);
+    expect(failed.json()).toEqual({ error: "callback_execution_failed" });
+    expect(failed.body).not.toContain("ER-PLAINTEXT-SECRET-CODE");
     expect((await harness.send(2_101)).statusCode).toBe(403);
     expect(harness.metrics.serviceAttempts()).toBe(1);
     expect(harness.metrics.semanticEffects()).toBe(0);
@@ -760,7 +763,10 @@ describe("expert Telegram callback retry safety", () => {
 
   it("deduplicates ambiguous output and rejects a different receipt before retry", async () => {
     const harness = await retryHarness({ outputFailsOnce: true });
-    expect((await harness.send(2_002)).statusCode).toBe(500);
+    const failed = await harness.send(2_002);
+    expect(failed.statusCode).toBe(500);
+    expect(failed.json()).toEqual({ error: "callback_execution_failed" });
+    expect(failed.body).not.toContain("ER-PLAINTEXT-SECRET-CODE");
     expect(harness.metrics.published()).toBe(1);
     expect((await harness.send(2_102)).statusCode).toBe(403);
     expect(harness.metrics.serviceAttempts()).toBe(1);
