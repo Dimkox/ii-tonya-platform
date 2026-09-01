@@ -4,9 +4,9 @@
   --paper-deep: #e9dfd1;
   --paper-light: #fffaf3;
   --ink: #242722;
-  --muted: #696b63;
+  --muted: #595c55;
   --line: rgba(36, 39, 34, 0.18);
-  --terracotta: #b95f45;
+  --terracotta: #a84e36;
   --terracotta-dark: #8f432f;
   --terracotta-light: #db9d82;
   --forest: #31554a;
@@ -817,7 +817,7 @@ footer nav a {
 }
 
 .featured .tariff-number {
-  color: #efc2ac;
+  color: #ffe0d1;
 }
 
 .tariff-card h3 {
@@ -861,7 +861,7 @@ footer nav a {
 }
 
 .featured .tariff-setup {
-  color: #efc2ac;
+  color: #ffe0d1;
 }
 
 .tariff-card a {
@@ -1096,6 +1096,10 @@ footer > div:first-child p {
   margin-bottom: 1rem;
   color: var(--white);
   font-size: 2.2rem;
+}
+
+.footer-brand span {
+  color: #e8a086;
 }
 
 footer nav {
