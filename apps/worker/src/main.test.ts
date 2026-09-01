@@ -2,6 +2,30 @@ import { getEventListeners } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 describe("worker main", () => {
+  it("composes existing-state jobs with the disabled provider reader and no feature flag gate", async () => {
+    const { composeProductionWorkerRuntime } = await import("./main.js");
+    const createRuntime = vi.fn((dependencies) => dependencies as never);
+    const runtime = composeProductionWorkerRuntime({
+      db: { $client: { end: vi.fn(async () => undefined) } } as never,
+      now: () => new Date("2026-09-02T00:00:00.000Z"),
+      closeTelemetry: vi.fn(async () => undefined),
+      createRuntime,
+    }) as unknown as {
+      expertReferralWorkerRepository: { expireDueBatch: unknown };
+      expertResidencyProvider: {
+        reconcile(paymentId: string): Promise<unknown>;
+      };
+    };
+
+    expect(runtime.expertReferralWorkerRepository.expireDueBatch).toBeTypeOf(
+      "function",
+    );
+    await expect(
+      runtime.expertResidencyProvider.reconcile("never-inspected"),
+    ).resolves.toBeNull();
+    expect(createRuntime).toHaveBeenCalledOnce();
+  });
+
   it("can be imported without starting the polling loop", async () => {
     const module = await import("./main.js");
 

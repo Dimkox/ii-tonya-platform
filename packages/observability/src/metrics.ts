@@ -20,3 +20,123 @@ export type MetricLabels = Readonly<{
   outcome: string;
   errorCode?: string;
 }>;
+
+const REFERRAL_MODULE_VALUES = ["expert_referral", "expert_residency"] as const;
+const REFERRAL_OPERATION_VALUES = [
+  "code_lifecycle",
+  "redemption",
+  "reward",
+  "credit_spend",
+  "credit_expiry",
+  "debt",
+  "duplicate_event",
+  "held_replay",
+  "refund",
+  "reversal",
+  "reconciliation_mismatch",
+] as const;
+const REFERRAL_OUTCOME_VALUES = [
+  "issued",
+  "revoked",
+  "redeemed",
+  "rejected",
+  "granted",
+  "debt_repaid",
+  "spent",
+  "expired",
+  "duplicate",
+  "cancelled",
+  "still_held",
+  "matched",
+  "mismatch",
+  "provider_disabled",
+  "failed",
+] as const;
+const REFERRAL_ERROR_CODE_VALUES = [
+  "none",
+  "invalid_state",
+  "provider_disabled",
+  "provider_unavailable",
+  "conflicting_fact",
+  "database_unavailable",
+  "unknown",
+] as const;
+const REFERRAL_MODULES = new Set<string>(REFERRAL_MODULE_VALUES);
+const REFERRAL_OPERATIONS = new Set<string>(REFERRAL_OPERATION_VALUES);
+const REFERRAL_OUTCOMES = new Set<string>(REFERRAL_OUTCOME_VALUES);
+const REFERRAL_ERROR_CODES = new Set<string>(REFERRAL_ERROR_CODE_VALUES);
+
+export type ReferralMetricLabels = Readonly<{
+  module: (typeof REFERRAL_MODULE_VALUES)[number];
+  operation: (typeof REFERRAL_OPERATION_VALUES)[number];
+  outcome: (typeof REFERRAL_OUTCOME_VALUES)[number];
+  errorCode?: (typeof REFERRAL_ERROR_CODE_VALUES)[number];
+}>;
+
+export function referralMetricLabels(input: unknown): ReferralMetricLabels {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error("invalid_referral_metric_labels");
+  }
+  const labels = input as Record<string, unknown>;
+  const keys = Object.keys(labels);
+  if (
+    keys.some(
+      (key) => !["module", "operation", "outcome", "errorCode"].includes(key),
+    ) ||
+    typeof labels.module !== "string" ||
+    !REFERRAL_MODULES.has(labels.module) ||
+    typeof labels.operation !== "string" ||
+    !REFERRAL_OPERATIONS.has(labels.operation) ||
+    typeof labels.outcome !== "string" ||
+    !REFERRAL_OUTCOMES.has(labels.outcome) ||
+    (labels.errorCode !== undefined &&
+      (typeof labels.errorCode !== "string" ||
+        !REFERRAL_ERROR_CODES.has(labels.errorCode)))
+  ) {
+    throw new Error("invalid_referral_metric_labels");
+  }
+  return {
+    module: labels.module as ReferralMetricLabels["module"],
+    operation: labels.operation as ReferralMetricLabels["operation"],
+    outcome: labels.outcome as ReferralMetricLabels["outcome"],
+    ...(labels.errorCode === undefined
+      ? {}
+      : {
+          errorCode: labels.errorCode as Exclude<
+            ReferralMetricLabels["errorCode"],
+            undefined
+          >,
+        }),
+  };
+}
+
+const expertReferralMetrics = {
+  lifecycle: meter.createCounter("ii_tonya_expert_referral_lifecycle"),
+  operationDurationMs: meter.createHistogram(
+    "ii_tonya_expert_referral_operation_duration_ms",
+  ),
+} as const;
+
+export function recordExpertReferralLifecycle(input: unknown, count = 1): void {
+  if (!Number.isSafeInteger(count) || count < 1 || count > 1_000) {
+    throw new Error("invalid_referral_metric_count");
+  }
+  expertReferralMetrics.lifecycle.add(count, referralMetricLabels(input));
+}
+
+export function observeExpertReferralDuration(
+  input: unknown,
+  durationMs: number,
+): void {
+  if (
+    !Number.isFinite(durationMs) ||
+    durationMs < 0 ||
+    durationMs > 3_600_000
+  ) {
+    throw new Error("invalid_referral_metric_duration");
+  }
+  expertReferralMetrics.operationDurationMs.record(
+    durationMs,
+    referralMetricLabels(input),
+  );
+}

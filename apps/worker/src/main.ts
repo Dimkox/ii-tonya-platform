@@ -4,11 +4,15 @@ import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
 import {
   createDb,
+  PostgresExpertReferralWorkerRepository,
   PostgresOutboxRepository,
   PostgresWorkerJobsRepository,
+  type DrizzleDb,
 } from "@ii-tonya/db";
+import { DisabledExpertResidencyPaymentAdapter } from "@ii-tonya/integrations";
 import {
   createProductionWorkerRuntime,
+  type ProductionWorkerRuntimeDependencies,
   type WorkerRuntime,
 } from "./runtime.js";
 
@@ -33,13 +37,33 @@ export interface WorkerMainOptions {
 
 const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 
+export function composeProductionWorkerRuntime(input: {
+  readonly db: DrizzleDb;
+  readonly now: () => Date;
+  readonly closeTelemetry: () => Promise<void>;
+  readonly createRuntime?: (
+    dependencies: ProductionWorkerRuntimeDependencies,
+  ) => WorkerRuntime;
+}): WorkerRuntime {
+  const createRuntime = input.createRuntime ?? createProductionWorkerRuntime;
+  return createRuntime({
+    jobsRepository: new PostgresWorkerJobsRepository(input.db),
+    outboxRepository: new PostgresOutboxRepository(input.db),
+    expertReferralWorkerRepository: new PostgresExpertReferralWorkerRepository(
+      input.db,
+    ),
+    expertResidencyProvider: new DisabledExpertResidencyPaymentAdapter(),
+    closeDatabase: async () => input.db.$client.end(),
+    closeTelemetry: input.closeTelemetry,
+    now: input.now,
+  });
+}
+
 const productionRuntimeFactory: WorkerRuntimeFactory = {
   async create(config) {
     const db = createDb(config.databaseUrl);
-    return createProductionWorkerRuntime({
-      jobsRepository: new PostgresWorkerJobsRepository(db),
-      outboxRepository: new PostgresOutboxRepository(db),
-      closeDatabase: async () => db.$client.end(),
+    return composeProductionWorkerRuntime({
+      db,
       closeTelemetry: async () => undefined,
       now: () => new Date(),
     });

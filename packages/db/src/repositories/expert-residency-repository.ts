@@ -865,34 +865,41 @@ export class PostgresExpertResidencyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
-        const decision = (
-          await tx.execute<{
-            decision: "settlement_allowed" | "expire_and_release";
-            status: OrderRow["status"];
-          }>(sql`
+        return this.releaseExpiredOrderInTransaction(tx, command);
+      }),
+    );
+  }
+
+  async releaseExpiredOrderInTransaction(
+    tx: ExpertReferralTransaction,
+    command: ReleaseExpiredOrders,
+  ): Promise<ExpiryReleaseResult> {
+    requireText(command.orderId, "invalid_order_id");
+    const decision = (
+      await tx.execute<{
+        decision: "settlement_allowed" | "expire_and_release";
+        status: OrderRow["status"];
+      }>(sql`
         select expert_residency_payment_deadline_state(payment_deadline) as decision,
           status
         from expert_residency_orders where id = ${command.orderId}::uuid for update
       `)
-        ).rows[0];
-        if (decision === undefined)
-          throw new ExpertResidencyRepositoryError("order_not_found");
-        if (decision.decision === "settlement_allowed")
-          return { kind: "settlement_allowed", released: false };
-        if (decision.status === "expired")
-          return { kind: "expired", released: false };
-        if (
-          decision.status !== "quoted" &&
-          decision.status !== "payment_pending"
-        ) {
-          return { kind: "expired", released: false };
-        }
-        const reservation = (
-          await tx.execute<{
-            id: string;
-            accountExpertId: string;
-            amountMinor: bigint | string;
-          }>(sql`
+    ).rows[0];
+    if (decision === undefined)
+      throw new ExpertResidencyRepositoryError("order_not_found");
+    if (decision.decision === "settlement_allowed")
+      return { kind: "settlement_allowed", released: false };
+    if (decision.status === "expired")
+      return { kind: "expired", released: false };
+    if (decision.status !== "quoted" && decision.status !== "payment_pending") {
+      return { kind: "expired", released: false };
+    }
+    const reservation = (
+      await tx.execute<{
+        id: string;
+        accountExpertId: string;
+        amountMinor: bigint | string;
+      }>(sql`
         select l.id, l.account_expert_id as "accountExpertId", l.amount_minor as "amountMinor"
         from expert_referral_ledger_entries l
         where l.entry_kind = 'reservation' and l.source_type = 'residency_order'
@@ -901,14 +908,13 @@ export class PostgresExpertResidencyRepository {
             where terminal.original_entry_id = l.id and terminal.entry_kind in ('release', 'spend'))
         for update
       `)
-        ).rows[0];
-        await tx.execute(
-          sql`update expert_residency_orders set status = 'expired', updated_at = clock_timestamp() where id = ${command.orderId}::uuid`,
-        );
-        if (reservation === undefined)
-          return { kind: "expired", released: false };
-        const releaseId = randomUUID();
-        await tx.execute(sql`
+    ).rows[0];
+    await tx.execute(
+      sql`update expert_residency_orders set status = 'expired', updated_at = clock_timestamp() where id = ${command.orderId}::uuid`,
+    );
+    if (reservation === undefined) return { kind: "expired", released: false };
+    const releaseId = randomUUID();
+    await tx.execute(sql`
         insert into expert_referral_ledger_entries (
           id, account_expert_id, entry_kind, amount_minor, source_type, source_id,
           original_entry_id, idempotency_key
@@ -918,17 +924,12 @@ export class PostgresExpertResidencyRepository {
           ${`residency-release:${command.orderId}`}
         )
       `);
-        const allocations = await this.reservationAllocations(
-          tx,
-          reservation.id,
-        );
-        for (const allocation of allocations) {
-          await tx.execute(sql`insert into expert_referral_ledger_allocations (ledger_entry_id, reward_grant_id, amount_minor)
+    const allocations = await this.reservationAllocations(tx, reservation.id);
+    for (const allocation of allocations) {
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (ledger_entry_id, reward_grant_id, amount_minor)
           values (${releaseId}::uuid, ${allocation.grantId}::uuid, ${bigint(allocation.amountMinor)})`);
-        }
-        return { kind: "expired", released: true };
-      }),
-    );
+    }
+    return { kind: "expired", released: true };
   }
 
   private async activeTariff(

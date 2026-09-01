@@ -113,6 +113,13 @@ export {
 } from "./repositories/feedback-repository.js";
 export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
 export {
+  PostgresExpertReferralWorkerRepository,
+  type ExpertReferralHoldReplayBatchResult,
+  type ExpertReferralWorkerBatchCommand,
+  type ExpertReferralWorkerBatchResult,
+  type ExpertResidencyReconciliationCandidate,
+} from "./repositories/expert-referral-worker-repository.js";
+export {
   PostgresWebhookInboxRepository,
   WebhookInboxClaimLostError,
 } from "./repositories/webhook-inbox-repository.js";

@@ -1,3 +1,13 @@
+import {
+  expireExpertResidencyOrders,
+  reconcileExpertResidencyPayments,
+  replayHeldRewards,
+  type ExpertResidencyExpiryRepository,
+  type ExpertResidencyReconciliationProvider,
+  type ExpertResidencyReconciliationRepository,
+  type HeldRewardReplayRepository,
+} from "@ii-tonya/worker";
+
 export interface WorkerCycleReport {
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
@@ -6,6 +16,9 @@ export interface WorkerCycleReport {
   readonly confirmedOutboxDelivery: unknown;
   readonly processorPrivacy: unknown;
   readonly providerReconciliation: unknown;
+  readonly expertResidencyExpiry: unknown;
+  readonly expertResidencyReconciliation: unknown;
+  readonly expertReferralHoldReplay: unknown;
 }
 
 export interface WorkerRuntime {
@@ -24,6 +37,9 @@ export interface WorkerRuntimeDependencies {
   readonly deliverConfirmedOutbox: BoundedJob;
   readonly processorPrivacy: BoundedJob;
   readonly providerReconciliation: BoundedJob;
+  readonly expertResidencyExpiry: BoundedJob;
+  readonly expertResidencyReconciliation: BoundedJob;
+  readonly expertReferralHoldReplay: BoundedJob;
   readonly closeDatabase: () => Promise<void>;
   readonly closeTelemetry: () => Promise<void>;
   readonly shutdownTimeoutMs?: number;
@@ -47,6 +63,10 @@ export interface ProductionWorkerRuntimeDependencies {
     recoverExpiredDispatchLeases(limit: number): Promise<number>;
     recoverExpiredReconciliationLeases(limit: number): Promise<number>;
   };
+  readonly expertReferralWorkerRepository: ExpertResidencyExpiryRepository &
+    ExpertResidencyReconciliationRepository &
+    HeldRewardReplayRepository;
+  readonly expertResidencyProvider: ExpertResidencyReconciliationProvider;
   readonly closeDatabase: () => Promise<void>;
   readonly closeTelemetry: () => Promise<void>;
   readonly now: () => Date;
@@ -101,6 +121,10 @@ export function createWorkerRuntime(
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
+      const expertResidencyExpiry = await deps.expertResidencyExpiry();
+      const expertResidencyReconciliation =
+        await deps.expertResidencyReconciliation();
+      const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
       return {
         safetyHandoffs,
         expiredLeaseRecovery,
@@ -109,6 +133,9 @@ export function createWorkerRuntime(
         confirmedOutboxDelivery,
         processorPrivacy,
         providerReconciliation,
+        expertResidencyExpiry,
+        expertResidencyReconciliation,
+        expertReferralHoldReplay,
       };
     })();
     currentCycle = cycle;
@@ -185,6 +212,25 @@ export function createProductionWorkerRuntime(
       projectionRepairs: 0,
       provider: "disabled",
     }),
+    expertResidencyExpiry: async () =>
+      expireExpertResidencyOrders(
+        deps.expertReferralWorkerRepository,
+        deps.now(),
+        batchSize,
+      ),
+    expertResidencyReconciliation: async () =>
+      reconcileExpertResidencyPayments(
+        deps.expertReferralWorkerRepository,
+        deps.expertResidencyProvider,
+        deps.now(),
+        batchSize,
+      ),
+    expertReferralHoldReplay: async () =>
+      replayHeldRewards(
+        deps.expertReferralWorkerRepository,
+        deps.now(),
+        batchSize,
+      ),
     closeDatabase: deps.closeDatabase,
     closeTelemetry: deps.closeTelemetry,
     ...(deps.shutdownTimeoutMs === undefined
