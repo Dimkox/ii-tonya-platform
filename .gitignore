@@ -20,3 +20,7 @@ _bmad/*.bak
 .worktrees/
 work/
 /.native-release/
+.grok-stack/runtime/*
+!.grok-stack/runtime/.gitkeep
+.coverage
+.coverage.*

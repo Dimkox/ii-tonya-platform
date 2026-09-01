@@ -126,6 +126,10 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
   app,
   deps,
 ) => {
+  const waitlist = deps.waitlist;
+  if (deps.waitlistEnabled && waitlist === undefined) {
+    throw new Error("client_booking_waitlist_dependency_required");
+  }
   app.removeAllContentTypeParsers();
   app.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) =>
     done(null, body),
@@ -324,10 +328,6 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
         return reply.code(401).send({ error: "unauthorized" });
       if (resolution.kind === "unavailable")
         return reply.code(503).send({ error: "temporarily_unavailable" });
-      if (!deps.waitlistEnabled) {
-        deps.metrics?.record({ operation: "reschedule", outcome: "disabled" });
-        return reply.code(503).send({ error: "feature_disabled" });
-      }
       try {
         const result = await deps.bookings.reschedule(
           resolution.principal,
@@ -390,8 +390,11 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
         deps.metrics?.record({ operation: "waitlist", outcome: "disabled" });
         return reply.code(503).send({ error: "feature_disabled" });
       }
+      if (waitlist === undefined) {
+        throw new Error("client_booking_waitlist_dependency_required");
+      }
       try {
-        const result = await deps.waitlist!.join(resolution.principal, body);
+        const result = await waitlist.join(resolution.principal, body);
         deps.metrics?.record({
           operation: "waitlist",
           outcome: result.replayed ? "replayed" : "created",
@@ -446,11 +449,11 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
         deps.metrics?.record({ operation: "waitlist", outcome: "disabled" });
         return reply.code(503).send({ error: "feature_disabled" });
       }
+      if (waitlist === undefined) {
+        throw new Error("client_booking_waitlist_dependency_required");
+      }
       try {
-        const result = await deps.waitlist!.leave(
-          resolution.principal,
-          rawPath[1]!,
-        );
+        const result = await waitlist.leave(resolution.principal, rawPath[1]!);
         deps.metrics?.record({ operation: "waitlist", outcome: "cancelled" });
         return reply.code(200).send({
           waitlistHandle: result.waitlistHandle,

@@ -1,0 +1,16 @@
+# Adaptive Grok Build Pro — project config
+# Docs: https://docs.x.ai/build/overview
+
+sandbox_mode = "workspace-write"
+
+[models]
+default = "grok-4.6"
+default_reasoning_effort = "low"
+
+[features]
+hooks = true
+# Project hooks require /hooks-trust in the Grok TUI.
+# v2.0.4 hooks are fail-open: broken imports never lock the agent.
+
+[ui]
+screen_mode = "minimal"

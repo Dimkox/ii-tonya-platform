@@ -3,6 +3,16 @@
 Production-oriented implementation of the client and expert workflows described in the
 authoritative ии-Тоня source document.
 
+## Local delivery workflow
+
+Adaptive Grok Build Pro v2.0.12 is installed locally as repository workflow tooling. The
+route manifest in `.grok-stack/runtime/active-route.json` selects the applicable skills and
+single write owner; `scripts/grok_status.py`, `scripts/grok_verify.py`, and
+`scripts/grok_review.py` provide local status, verification, and review evidence. The
+workflow connects repository instructions in `AGENTS.md` with the project tree, tests, and
+change evidence; it does not claim that external Trust CI, branch protection, or production
+activation is live. The complete local toolchain is listed in the connectivity inventory.
+
 ## Status
 
 Test delivery deadline: 2026-09-07. The test-only release boundary covers local fixtures,

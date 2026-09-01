@@ -52,7 +52,15 @@ describe("environment credential policy", () => {
   it("tracks only a placeholder example and keeps every live flag false", () => {
     const ignored = readFileSync(".gitignore", "utf8").split(/\r?\n/);
     expect(ignored).toEqual(
-      expect.arrayContaining([".env", ".env.*", "!.env.example"]),
+      expect.arrayContaining([
+        ".env",
+        ".env.*",
+        "!.env.example",
+        ".grok-stack/runtime/*",
+        "!.grok-stack/runtime/.gitkeep",
+        ".coverage",
+        ".coverage.*",
+      ]),
     );
 
     const example = parseEnv(readFileSync(".env.example", "utf8"));

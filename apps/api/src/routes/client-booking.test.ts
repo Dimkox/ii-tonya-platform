@@ -12,6 +12,7 @@ const userId = "00000000-0000-4000-8000-000000000101";
 const appFor = async (input?: {
   reserveEnabled?: boolean;
   waitlistEnabled?: boolean;
+  provideWaitlist?: boolean;
 }) => {
   const reserve = vi.fn(async () => ({
     created: true,
@@ -40,7 +41,7 @@ const appFor = async (input?: {
     replayed: false,
   }));
   const app = Fastify();
-  await app.register(clientBookingRoutes, {
+  app.register(clientBookingRoutes, {
     principals: {
       resolve: async () => ({
         kind: "resolved" as const,
@@ -52,7 +53,7 @@ const appFor = async (input?: {
       }),
     },
     bookings: { reserve, cancel, reschedule },
-    waitlist: { join, leave },
+    ...(input?.provideWaitlist === false ? {} : { waitlist: { join, leave } }),
     reserveEnabled: input?.reserveEnabled ?? true,
     waitlistEnabled: input?.waitlistEnabled ?? true,
   });
@@ -203,7 +204,7 @@ describe("client booking routes", () => {
     await app.close();
   });
 
-  it("keeps waitlist mutations default-off without calling services", async () => {
+  it("keeps waitlist mutations default-off while owner reschedule remains available", async () => {
     const { app, join, reschedule } = await appFor({ waitlistEnabled: false });
     const response = await app.inject({
       method: "POST",
@@ -226,9 +227,24 @@ describe("client booking routes", () => {
       },
       payload: JSON.stringify({ choiceHandle }),
     });
-    expect(rescheduled.statusCode).toBe(503);
-    expect(rescheduled.json()).toEqual({ error: "feature_disabled" });
-    expect(reschedule).not.toHaveBeenCalled();
+    expect(rescheduled.statusCode).toBe(201);
+    expect(rescheduled.json()).toEqual({
+      bookingHandle,
+      state: "reserved",
+      reservedUntil: "2026-08-16T12:00:00.000Z",
+    });
+    expect(reschedule).toHaveBeenCalledOnce();
     await app.close();
+  });
+
+  it("rejects enabled waitlist registration without its dependency", async () => {
+    const { app } = await appFor({
+      waitlistEnabled: true,
+      provideWaitlist: false,
+    });
+
+    await expect(app.ready()).rejects.toThrow(
+      "client_booking_waitlist_dependency_required",
+    );
   });
 });
