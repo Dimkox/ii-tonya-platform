@@ -39,6 +39,57 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("passes the configured booking confirmation buffer to the waitlist repository factory", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const waitlistRepository = {
+      join: vi.fn(),
+      leave: vi.fn(),
+    };
+    const waitlistRepositoryFactory = vi.fn(() => waitlistRepository);
+    const confirmationBufferMs = 1_234_567;
+
+    const dependencies = await createDefaultLifecycle({
+      waitlistRepositoryFactory,
+    }).dependencies(
+      {
+        databaseUrl: "postgresql://placeholder.invalid/test",
+        integrations: {
+          selarti: false,
+          planerka: false,
+          telegram: false,
+          makeProjection: false,
+          intentModel: false,
+          payments: false,
+        },
+        minorOnboarding: false,
+        rawConversationLogging: false,
+        selartiOutboundBillingMode: "disabled",
+        displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
+        clientBookingConfirmationBufferMs: confirmationBufferMs,
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          clientWaitlist: true,
+          expertReferral: false,
+          expertReferralMaturityWorker: false,
+          expertResidencyBilling: false,
+        },
+      },
+      fakeDb,
+    );
+
+    expect(dependencies.clientWaitlistService).toBeDefined();
+    expect(waitlistRepositoryFactory).toHaveBeenCalledWith(
+      fakeDb,
+      confirmationBufferMs,
+    );
+  });
+
   it("requires an operational metric sink whenever deterministic promo is enabled", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),

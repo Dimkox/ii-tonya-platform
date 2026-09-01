@@ -93,6 +93,12 @@ export interface WorkerRuntimeFactory {
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly yookassaReader?: ExpertResidencyProviderReader;
+  readonly waitlistRepositoryFactory?: (
+    db: DrizzleDb,
+    confirmationBufferMs: number,
+  ) => {
+    processPromotionCommandsBatch(batchSize: number): Promise<unknown>;
+  };
   readonly workerOutboxRegistryFactory?: (
     db: DrizzleDb,
     config: RuntimeConfig,
@@ -396,10 +402,11 @@ export function createProductionWorkerRuntimeFactory(
           )
         : undefined;
       const waitlistRepository = config.features.clientWaitlist
-        ? new PostgresWaitlistRepository(
-            db,
-            config.clientBookingConfirmationBufferMs ?? 3_600_000,
-          )
+        ? (
+            deps.waitlistRepositoryFactory ??
+            ((waitlistDb, confirmationBufferMs) =>
+              new PostgresWaitlistRepository(waitlistDb, confirmationBufferMs))
+          )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
         : undefined;
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),

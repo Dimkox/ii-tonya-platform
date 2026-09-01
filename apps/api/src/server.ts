@@ -17,6 +17,7 @@ import {
   type PrivacyService,
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
+  type ProtectedWaitlistRepository,
   HybridMessageGateway,
   createSelartiResponseService,
   TestExpertTelegramService,
@@ -124,6 +125,10 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
+    waitlistRepositoryFactory?: (
+      db: DrizzleDb,
+      confirmationBufferMs: number,
+    ) => ProtectedWaitlistRepository;
     testExpertMetricSink?: {
       record(
         event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
@@ -266,10 +271,14 @@ export const createDefaultLifecycle = (
     const clientWaitlistService =
       config.features.clientWaitlist === true
         ? createWaitlistService({
-            repository: new PostgresWaitlistRepository(
-              db,
-              config.clientBookingConfirmationBufferMs ?? 3_600_000,
-            ),
+            repository: (
+              options.waitlistRepositoryFactory ??
+              ((waitlistDb, confirmationBufferMs) =>
+                new PostgresWaitlistRepository(
+                  waitlistDb,
+                  confirmationBufferMs,
+                ))
+            )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000),
           })
         : undefined;
     const clientGateway =

@@ -192,6 +192,24 @@ export class PostgresWaitlistRepository {
       return { kind: "not_found" };
     }
     return this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`waitlist:leave:${command.idempotencyKey}`},0))`,
+      );
+      const requestHash = hash(`${command.userId}\0${command.waitlistHandle}`);
+      const receipt = (
+        await tx.execute<{ actorUserId: string; requestHash: string }>(sql`
+          select actor_user_id as "actorUserId",request_hash as "requestHash"
+          from booking_waitlist_command_receipts
+          where command_type='leave' and idempotency_key=${command.idempotencyKey}
+          for update
+        `)
+      ).rows[0];
+      if (receipt !== undefined) {
+        return receipt.actorUserId === command.userId &&
+          receipt.requestHash === requestHash
+          ? { kind: "replayed" as const }
+          : { kind: "conflict" as const };
+      }
       const entry = (
         await tx.execute<{ id: string; status: string }>(sql`
           select id,status from booking_waitlist_entries
@@ -203,18 +221,18 @@ export class PostgresWaitlistRepository {
       if (entry.status === "cancelled") return { kind: "replayed" };
       if (entry.status !== "waiting") return { kind: "conflict" };
       await tx.execute(sql`
-        update booking_waitlist_entries
-        set status='cancelled',cancellation_reason='client_left',updated_at=clock_timestamp()
-        where id=${entry.id}::uuid and status='waiting'
-      `);
-      await tx.execute(sql`
         insert into booking_waitlist_command_receipts(
           command_type,idempotency_key,actor_user_id,request_hash,waitlist_entry_id,result
         ) values(
           'leave',${command.idempotencyKey},${command.userId}::uuid,
-          ${hash(`${command.userId}\0${command.waitlistHandle}`)},${entry.id}::uuid,
+          ${requestHash},${entry.id}::uuid,
           '{"kind":"left"}'::jsonb
-        ) on conflict(command_type,idempotency_key) do nothing
+        )
+      `);
+      await tx.execute(sql`
+        update booking_waitlist_entries
+        set status='cancelled',cancellation_reason='client_left',updated_at=clock_timestamp()
+        where id=${entry.id}::uuid and status='waiting'
       `);
       return { kind: "left" };
     });

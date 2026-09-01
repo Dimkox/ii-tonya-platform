@@ -28,7 +28,7 @@ describe("booking waitlist promotion worker", () => {
       kind: "joined",
     });
     await database.db.execute(sql`
-      update slots set starts_at=clock_timestamp()+interval '96 hours',
+      update slots set starts_at=clock_timestamp()+interval '48 hours',
         observed_at=clock_timestamp()
       where id=${fixture.occupied.slotId}::uuid
     `);
@@ -52,22 +52,36 @@ describe("booking waitlist promotion worker", () => {
       bookingHandle: string;
       reservationId: string;
       waitlistStatus: string;
+      reservationReservedUntil: Date | string;
+      promotionHoldUntil: Date | string;
+      startsAt: Date | string;
     }>(sql`
       select o.status as "outboxStatus",b.booking_handle as "bookingHandle",
-        b.reservation_id as "reservationId",w.status as "waitlistStatus"
+        b.reservation_id as "reservationId",w.status as "waitlistStatus",
+        r.reserved_until as "reservationReservedUntil",
+        w.promotion_hold_until as "promotionHoldUntil",s.starts_at as "startsAt"
       from integration_outbox o
       join booking_waitlist_entries w on w.slot_id=(o.payload->>'slotId')::uuid
         and w.status='promoted'
       join client_booking_receipts b on b.reservation_id=w.promoted_reservation_id
+      join reservations r on r.id=w.promoted_reservation_id
+      join slots s on s.id=w.slot_id
       where o.topic='waitlist.promote.v1'
     `);
-    expect(state.rows).toEqual([
-      {
-        outboxStatus: "succeeded",
-        bookingHandle: expect.stringMatching(/^bk1\.[A-Za-z0-9_-]{43}$/u),
-        reservationId: expect.any(String),
-        waitlistStatus: "promoted",
-      },
-    ]);
+    expect(state.rows).toHaveLength(1);
+    const promoted = state.rows[0]!;
+    expect(promoted).toMatchObject({
+      outboxStatus: "succeeded",
+      bookingHandle: expect.stringMatching(/^bk1\.[A-Za-z0-9_-]{43}$/u),
+      reservationId: expect.any(String),
+      waitlistStatus: "promoted",
+    });
+    const reservationReservedUntil = new Date(
+      promoted.reservationReservedUntil,
+    );
+    const promotionHoldUntil = new Date(promoted.promotionHoldUntil);
+    const startsAt = new Date(promoted.startsAt);
+    expect(reservationReservedUntil).toEqual(promotionHoldUntil);
+    expect(startsAt.getTime() - promotionHoldUntil.getTime()).toBe(3_600_000);
   });
 });

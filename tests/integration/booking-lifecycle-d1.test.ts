@@ -204,3 +204,120 @@ describe("booking waitlist lifecycle D1", () => {
     ]);
   });
 });
+
+describe("booking waitlist leave idempotency", () => {
+  it("conflicts when one leave key is reused for another owned handle", async () => {
+    const database = await startTestPostgres();
+    try {
+      await database.migrate();
+      const firstSlot = await seedWaitlistFixture(database);
+      const first = await firstSlot.candidate("leave-key-first");
+      const source = (
+        await database.db.execute<{ expertId: string; serviceId: string }>(sql`
+          select es.expert_id as "expertId",s.expert_service_id as "serviceId"
+          from slots s join expert_services es on es.id=s.expert_service_id
+          where s.id=${firstSlot.occupied.slotId}::uuid
+        `)
+      ).rows[0]!;
+      const secondStartsAt = new Date(
+        firstSlot.occupied.databaseNow.getTime() + 96 * 60 * 60 * 1_000,
+      );
+      const secondSlotId = (
+        await database.db.execute<{ id: string }>(sql`
+          insert into slots(
+            expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity
+          ) values(
+            ${source.serviceId}::uuid,'local','leave-key-second-slot',${secondStartsAt},
+            ${new Date(secondStartsAt.getTime() + 60 * 60 * 1_000)},
+            ${firstSlot.occupied.databaseNow},1
+          ) returning id
+        `)
+      ).rows[0]!.id;
+      const occupyingUserId = await database.createUser();
+      await database.db.execute(sql`
+        insert into reservations(
+          user_id,slot_id,expert_id,expert_service_id,status,idempotency_key,reserved_until
+        ) values(
+          ${occupyingUserId}::uuid,${secondSlotId}::uuid,${source.expertId}::uuid,
+          ${source.serviceId}::uuid,'booked','leave-key-second-occupancy',
+          ${new Date(firstSlot.occupied.databaseNow.getTime() + 60 * 60 * 1_000)}
+        )
+      `);
+      const secondChoiceDigest = `sha256:${createHash("sha256")
+        .update("choice-leave-key-second")
+        .digest("hex")}` as const;
+      const secondRequestId = (
+        await database.db.execute<{ id: string }>(sql`
+          insert into client_catalog_requests(user_id,request_digest,state,expires_at)
+          values(
+            ${first.userId}::uuid,${createHash("sha256").update("request-leave-key-second").digest("hex")},
+            'ready',${new Date(firstSlot.occupied.databaseNow.getTime() + 60 * 60 * 1_000)}
+          ) returning id
+        `)
+      ).rows[0]!.id;
+      await database.db.execute(sql`
+        insert into client_catalog_choices(request_id,choice_digest,slot_id,expires_at)
+        values(
+          ${secondRequestId}::uuid,${secondChoiceDigest},${secondSlotId}::uuid,
+          ${new Date(firstSlot.occupied.databaseNow.getTime() + 60 * 60 * 1_000)}
+        )
+      `);
+      const second = {
+        ...first,
+        choiceDigest: secondChoiceDigest,
+        idempotencyKey: createHash("sha256")
+          .update("join-leave-key-second")
+          .digest("hex"),
+        waitlistHandle: `wl1.${Buffer.from("leave-key-second".padEnd(32, "x"))
+          .toString("base64url")
+          .slice(0, 43)
+          .padEnd(43, "A")}` as const,
+        correlationId: "join-leave-key-second",
+      };
+      await expect(firstSlot.repository.join(first)).resolves.toMatchObject({
+        kind: "joined",
+      });
+      await expect(firstSlot.repository.join(second)).resolves.toMatchObject({
+        kind: "joined",
+      });
+      const leaveKey = "e".repeat(64);
+      const leaveFirst = {
+        userId: first.userId,
+        waitlistHandle: first.waitlistHandle,
+        idempotencyKey: leaveKey,
+        correlationId: "leave-key-first",
+      };
+
+      await expect(firstSlot.repository.leave(leaveFirst)).resolves.toEqual({
+        kind: "left",
+      });
+      await expect(
+        firstSlot.repository.leave({
+          ...leaveFirst,
+          waitlistHandle: second.waitlistHandle,
+          correlationId: "leave-key-second",
+        }),
+      ).resolves.toEqual({ kind: "conflict" });
+      await expect(firstSlot.repository.leave(leaveFirst)).resolves.toEqual({
+        kind: "replayed",
+      });
+      const state = await database.db.execute<{
+        waitlistHandle: string;
+        status: string;
+      }>(sql`
+        select waitlist_handle as "waitlistHandle",status
+        from booking_waitlist_entries
+        where waitlist_handle in (${first.waitlistHandle},${second.waitlistHandle})
+        order by waitlist_handle
+      `);
+      expect(state.rows).toEqual(
+        expect.arrayContaining([
+          { waitlistHandle: first.waitlistHandle, status: "cancelled" },
+          { waitlistHandle: second.waitlistHandle, status: "waiting" },
+        ]),
+      );
+    } finally {
+      await database.stop();
+    }
+  }, 120_000);
+});
