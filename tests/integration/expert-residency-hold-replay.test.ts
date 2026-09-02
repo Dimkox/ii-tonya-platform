@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import type { ExpertResidencyPaymentEvent } from "../../packages/contracts/src/index.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
+import { PostgresExpertReferralWorkerRepository } from "../../packages/db/src/repositories/expert-referral-worker-repository.js";
 import { ExpertReferralTestkit } from "../../packages/db/src/testkit/expert-referral.js";
 import {
   startTestPostgres,
@@ -54,9 +55,12 @@ async function scenario(
     readonly rewardEnabled?: boolean;
     readonly abuseHold?: boolean;
     readonly creditMinor?: bigint;
+    readonly featureAlreadyInitialized?: boolean;
   } = {},
 ): Promise<HeldScenario> {
-  await fixtures.enableFeatureControl();
+  if (input.featureAlreadyInitialized !== true) {
+    await fixtures.enableFeatureControl();
+  }
   if (input.rewardEnabled === false) {
     await testDb.db.execute(sql`update expert_referral_feature_controls
       set reward_grants_enabled = false, version = version + 1`);
@@ -761,5 +765,121 @@ describe("expert residency held reward replay", () => {
           facts.grants === 1 &&
           facts.reversals === 1),
     ).toBe(true);
+  });
+
+  it("keeps disabled worker holds retry-visible and grants after durable re-enable", async () => {
+    const prepared = await scenario({ rewardEnabled: false });
+    const provider = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+    const worker = new PostgresExpertReferralWorkerRepository(testDb.db);
+    await provider.settle(prepared.settlement);
+
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toEqual({
+      examined: 1,
+      granted: 0,
+      debtRepaid: 0,
+      ineligible: 0,
+      cancelled: 0,
+      stillHeld: 1,
+      failed: 0,
+    });
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, granted: 1, failed: 0 });
+    expect(await heldFacts(prepared)).toMatchObject({
+      eligibility: "eligible",
+      grants: 1,
+      spendableMinor: "100000",
+    });
+  });
+
+  it("isolates a poisoned worker item, serves the next row, and releases locks", async () => {
+    const poisoned = await scenario({ rewardEnabled: false });
+    const provider = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+    await provider.settle(poisoned.settlement);
+    const eligible = await scenario({
+      rewardEnabled: false,
+      featureAlreadyInitialized: true,
+    });
+    await provider.settle(eligible.settlement);
+    const markerId = (
+      await testDb.db.execute<{ markerId: string }>(sql`select id as "markerId"
+        from expert_first_residency_settlements
+        where expert_id = ${poisoned.inviteeId}::uuid`)
+    ).rows[0]!.markerId;
+    await testDb.db.execute(sql`insert into integration_outbox (
+      idempotency_key, topic, payload, correlation_id, reconciliation_key,
+      payload_hash
+    ) values (${`expert-residency-held-replay:${markerId}`},
+      'expert_residency.held_reward_replayed', '{"conflict":true}'::jsonb,
+      'wrong', ${`expert-residency:${poisoned.orderId}`},
+      ${`sha256:${"f".repeat(64)}`})`);
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+    const worker = new PostgresExpertReferralWorkerRepository(testDb.db);
+
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 2 }),
+    ).resolves.toMatchObject({ examined: 2, granted: 1, failed: 1 });
+    expect(await heldFacts(eligible)).toMatchObject({
+      eligibility: "eligible",
+      grants: 1,
+    });
+    await testDb.db.execute(sql`delete from integration_outbox
+      where idempotency_key = ${`expert-residency-held-replay:${markerId}`}`);
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, granted: 1, failed: 0 });
+  });
+
+  it.each([1, 2, 3])(
+    "worker replay ownership concurrency run %s grants exactly once",
+    async () => {
+      const prepared = await scenario({ rewardEnabled: false });
+      const provider = new PostgresExpertResidencyProviderInboxRepository(
+        testDb.db,
+      );
+      await provider.settle(prepared.settlement);
+      await testDb.db.execute(sql`update expert_referral_feature_controls
+        set reward_grants_enabled = true, version = version + 1`);
+      const first = new PostgresExpertReferralWorkerRepository(testDb.db);
+      const second = new PostgresExpertReferralWorkerRepository(testDb.db);
+
+      const results = await Promise.all([
+        first.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+        second.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+      ]);
+      expect(results.reduce((sum, result) => sum + result.granted, 0)).toBe(1);
+      expect(results.reduce((sum, result) => sum + result.failed, 0)).toBe(0);
+      expect(await heldFacts(prepared)).toMatchObject({ grants: 1 });
+    },
+    30_000,
+  );
+
+  it("serializes worker replay against a terminating refund", async () => {
+    const prepared = await scenario({ rewardEnabled: false });
+    const provider = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+    const worker = new PostgresExpertReferralWorkerRepository(testDb.db);
+    await provider.settle(prepared.settlement);
+    await testDb.db.execute(sql`update expert_referral_feature_controls
+      set reward_grants_enabled = true, version = version + 1`);
+
+    await Promise.all([
+      provider.refund(refundEvent(prepared)),
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ]);
+    const facts = await heldFacts(prepared);
+    expect(facts.debtMinor).toBe("0");
+    expect(facts.spendableMinor).toBe("0");
+    expect(facts.grants === 0 || facts.reversals === 1).toBe(true);
   });
 });

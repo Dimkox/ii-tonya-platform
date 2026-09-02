@@ -407,6 +407,18 @@ export class PostgresExpertResidencyProviderInboxRepository {
             },
           });
         }
+        return this.replayHeldRewardInTransaction(tx, input);
+      }),
+    );
+  }
+
+  async replayHeldRewardInTransaction(
+    tx: ExpertReferralTransaction,
+    input: Readonly<{
+      expertId: string;
+      qualifyingOrderId: string;
+    }>,
+  ): Promise<HeldRewardReplayResult> {
         const featureControl = await this.controls.lockFeatureControl(tx);
         const order = await this.lockOrder(tx, input.qualifyingOrderId);
         if (order === undefined || order.expertId !== input.expertId) {
@@ -515,8 +527,6 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const result = await this.heldRewardEffect(tx, order);
         await this.auditHeldReplay(tx, order, marker.id, result);
         return result;
-      }),
-    );
   }
 
   replayHeldRewardAsAdmin(

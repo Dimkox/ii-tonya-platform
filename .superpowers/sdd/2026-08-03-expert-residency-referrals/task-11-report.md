@@ -66,3 +66,30 @@ The optional whole suite was intentionally not run in deadline mode. The known p
 ## Protected shared edits
 
 The implementation worktree was created at the exact reviewed base, so it never contained or depended on the shared dirty edits in `apps/worker/src/runtime.ts` and `packages/config/src/env.ts`. Before shared-branch advancement, their unstaged combined diff must still hash to `6a35fa28ff123c84a00dff5b1427c256e4f0c525`, and the protected staged diff must remain empty.
+
+## Independent-review remediation — DB ownership and full projection
+
+Worktree: `.worktrees/task11-fix1` (`codex/task11-fix1`), base `17a0dd22b11d`.
+
+- Reconciliation claims now use a five-minute database lease and an exact `(attemptId, providerPaymentId, claimedAt)` compare-and-set owner check. Stale owners fail with `reconciliation_claim_lost`; an expired lease becomes claimable again.
+- Held replay now owns the control and order locks for the complete bounded batch and delegates each item through a nested savepoint to the existing transaction-scoped Task 7 state machine. A poisoned item cannot abort later items, and locks are released after the batch.
+- Reconciliation now locks and compares the order/payment row plus bounded projections for provider identity/state, active reservation/spend, first-settlement reward grant, allocation-derived ledger balance, over-repaid debt, and residency activation. The only mismatch codes are the seven finite literals in the repository. A digest-bound immutable incident/audit pair is inserted once; retry performs no correction.
+
+### Remediation RED/GREEN
+
+- Lease/CAS and transaction-owned held replay RED/GREEN were captured before this projection slice.
+- Full projection RED: `17 tests`, `5 failed / 12 passed`; independent corruption probes initially exposed the absent projection contract plus two fixture-proof issues (immutable snapshot protection and the lease timestamp being intentionally mutable).
+- Full real-PostgreSQL projection GREEN: provider state, reservation, reward grant, ledger allocation, debt, and residency activation each emitted exactly one bounded mismatch code, one incident/audit pair after retry, and changed no financial fields.
+- Provider identity classification is separately exercised at the locked-row boundary and passed `1/1`, asserting the exact serialized incident fragment `"mismatchCodes":["provider_identity"]`.
+- Worker repository non-concurrency slice passed `7/7`. The earlier required concurrency evidence remains exactly three runs; it was not expanded to twenty.
+- All ten workspace builds passed after rebuilding barrels in dependency order. All ten workspace typechecks then passed; the earlier direct DB typecheck before rebuilding dependent barrels failed only on unavailable workspace package declarations and was superseded by this reproducible build-then-typecheck gate.
+- Changed-file ESLint passed. Prettier passed for the worker repository, its test, and the held-replay integration test; the deliberately minimal transaction extraction in the provider inbox retains its pre-existing formatting. `git diff --check` passed.
+
+### Protected shared bytes at remediation handoff
+
+At shared HEAD `17a0dd22b11d`, the protected worktree blobs are:
+
+- `apps/worker/src/runtime.ts`: `635c08dc84443b1a16cf4ed986d946ca0d8e4b81`
+- `packages/config/src/env.ts`: `89c8cecb24079b66707a0187d9fe85a5784e4896`
+
+Their corresponding HEAD blobs are `f64f9c0d0a4301553a0689c6be67627614358529` and `0a34abc369702778ec90398fdf9b4ac62de04ee0`. The protected staged diff is empty (`sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`). The combined unstaged diff hash at this newer HEAD is `sha256:b4ff0464a597ddc42ac78a6212434e65f53ca8a6d184320438e5b2acc5ae1aa8`; the earlier `6a35…` value was diff-relative to the pre-Task-11 runtime base, so content-blob hashes are the reproducible cross-base proof.
