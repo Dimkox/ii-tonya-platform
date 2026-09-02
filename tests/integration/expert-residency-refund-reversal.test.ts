@@ -370,7 +370,9 @@ describe("expert residency refund and reward reversal", () => {
     });
 
     const first = await repo.refund(event);
-    await expect(repo.refund(event)).resolves.toEqual(first);
+    await expect(repo.refund(event)).resolves.toMatchObject({
+      financialFacts: { disposition: "duplicate" },
+    });
     expect(first).toMatchObject({
       kind: "refunded",
       cashRefundedMinor: "10000",
@@ -378,6 +380,12 @@ describe("expert residency refund and reward reversal", () => {
       restoredCreditMinor: "0",
       residencyTerminated: false,
       rewardReversed: false,
+      financialFacts: {
+        disposition: "applied",
+        cashRefundedMinor: "10000",
+        rewardReversed: false,
+        debtCreatedMinor: "0",
+      },
     });
     await expect(
       repo.refund(
@@ -410,7 +418,9 @@ describe("expert residency refund and reward reversal", () => {
     });
 
     const first = await repo.refund(event);
-    await expect(repo.refund(event)).resolves.toEqual(first);
+    await expect(repo.refund(event)).resolves.toMatchObject({
+      financialFacts: { disposition: "duplicate" },
+    });
     expect(first).toMatchObject({
       kind: "refunded",
       restoredCreditMinor: "0",
@@ -419,6 +429,12 @@ describe("expert residency refund and reward reversal", () => {
       removedCreditMinor: "20000",
       cancelledReservationMinor: "20000",
       debtMinor: "60000",
+      financialFacts: {
+        disposition: "applied",
+        cashRefundedMinor: "100000",
+        rewardReversed: true,
+        debtCreatedMinor: "60000",
+      },
     });
     const facts = (
       await testDb.db.execute<{

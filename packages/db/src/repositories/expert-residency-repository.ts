@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { ExpertResidencyCheckoutFinancialFacts } from "@ii-tonya/contracts";
 import { allocateCreditFifo, quoteResidency } from "@ii-tonya/domain";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
@@ -73,6 +74,7 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
     readonly grantId: string;
     readonly amountMinor: string;
   }[];
+  readonly financialFacts: ExpertResidencyCheckoutFinancialFacts;
 }
 
 export interface ReferralCreditBalance {
@@ -287,6 +289,7 @@ function tariffResult(
 function orderResult(
   row: OrderRow,
   allocations: readonly AllocationRow[],
+  creditReservedMinor: bigint,
 ): ResidencyCheckoutOrder {
   return {
     ...tariffResult(row, bigint(row.creditMinor), bigint(row.cashMinor)),
@@ -298,6 +301,7 @@ function orderResult(
       grantId: allocation.grantId,
       amountMinor: bigint(allocation.amountMinor).toString(),
     })),
+    financialFacts: { creditReservedMinor: creditReservedMinor.toString() },
   };
 }
 
@@ -741,6 +745,7 @@ export class PostgresExpertResidencyRepository {
             return orderResult(
               existing,
               await this.orderAllocations(tx, existing.orderId),
+              0n,
             );
           }
           const eligibility = await this.controls.lockEligibility(
@@ -838,6 +843,10 @@ export class PostgresExpertResidencyRepository {
               grantId: allocation.grantId,
               amountMinor: allocation.amountMinor,
             })),
+            allocations.reduce(
+              (total, allocation) => total + allocation.amountMinor,
+              0n,
+            ),
           );
         }),
       );

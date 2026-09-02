@@ -107,45 +107,17 @@ describe("expert financial production-boundary metrics", () => {
             paymentDeadline: new Date("2026-09-02T01:00:00.000Z"),
             status: "quoted",
             allocations: [],
-            telemetry: {
-              disposition: "applied",
-              effects: [
-                {
-                  operation: "bonus_share",
-                  outcome: "applied",
-                  errorCode: "none",
-                },
-              ],
-            },
+            financialFacts: { creditReservedMinor: "100000" },
           }) as const,
         releaseExpiredOrders: async () => ({
           kind: "expired" as const,
           released: true as const,
-          telemetry: {
-            disposition: "applied" as const,
-            effects: [],
-          },
         }),
         reverseRewardGrant: async () => ({
           rewardReversed: true,
           removedCreditMinor: 25_000n,
           cancelledReservationMinor: 5_000n,
           debtMinor: 10_000n,
-          telemetry: {
-            disposition: "applied" as const,
-            effects: [
-              {
-                operation: "reversal" as const,
-                outcome: "reversed" as const,
-                errorCode: "none" as const,
-              },
-              {
-                operation: "debt" as const,
-                outcome: "debt_created" as const,
-                errorCode: "none" as const,
-              },
-            ],
-          },
         }),
       },
       payment: {
@@ -165,83 +137,37 @@ describe("expert financial production-boundary metrics", () => {
             if (applied) {
               return {
                 kind: "settled" as const,
-                telemetry: {
-                  disposition: "duplicate" as const,
-                  effects: [] as const,
-                },
+                financialFacts: { disposition: "duplicate" as const },
               };
             }
             applied = true;
             return {
               kind: "settled" as const,
-              telemetry: {
+              financialFacts: {
                 disposition: "applied" as const,
-                effects: [
-                  {
-                    operation: "first_payment_qualification" as const,
-                    outcome: "eligible" as const,
-                    errorCode: "none" as const,
-                  },
-                  {
-                    operation: "credit_spend" as const,
-                    outcome: "spent" as const,
-                    errorCode: "none" as const,
-                  },
-                  {
-                    operation: "reward_grant" as const,
-                    outcome: "granted" as const,
-                    errorCode: "none" as const,
-                  },
-                ],
+                creditSpentMinor: "100000",
+                firstPaymentQualification: "eligible" as const,
+                rewardCreated: true,
+                debtRepaidMinor: "0",
               },
             };
           };
         })(),
         refund: async () => ({
           kind: "refunded" as const,
-          telemetry: {
+          financialFacts: {
             disposition: "applied" as const,
-            effects: [
-              {
-                operation: "refund" as const,
-                outcome: "refunded" as const,
-                errorCode: "none" as const,
-              },
-              {
-                operation: "reversal" as const,
-                outcome: "reversed" as const,
-                errorCode: "none" as const,
-              },
-              {
-                operation: "debt" as const,
-                outcome: "debt_created" as const,
-                errorCode: "none" as const,
-              },
-            ],
+            cashRefundedMinor: "100000",
+            rewardReversed: true,
+            debtCreatedMinor: "10000",
           },
         }),
         replayHeldReward: async () => ({
           kind: "debt_repaid" as const,
           amountMinor: "10000",
-          telemetry: {
-            disposition: "applied" as const,
-            effects: [
-              {
-                operation: "held_replay" as const,
-                outcome: "debt_repaid" as const,
-                errorCode: "none" as const,
-              },
-              {
-                operation: "reward_grant" as const,
-                outcome: "debt_repaid" as const,
-                errorCode: "none" as const,
-              },
-              {
-                operation: "debt" as const,
-                outcome: "debt_repaid" as const,
-                errorCode: "none" as const,
-              },
-            ],
+          financialFacts: {
+            rewardCreated: true,
+            debtRepaidMinor: "10000",
           },
         }),
       },
@@ -321,7 +247,12 @@ describe("expert financial production-boundary metrics", () => {
 
     await expiryModule.expireExpertResidencyOrders(
       {
-        expireDueBatch: async () => ({ examined: 2, changed: 1, failed: 1 }),
+        expireDueBatch: async () => ({
+          examined: 2,
+          changed: 1,
+          creditChanged: 1,
+          failed: 1,
+        }),
       },
       new Date("2026-09-02T00:00:00.000Z"),
       2,

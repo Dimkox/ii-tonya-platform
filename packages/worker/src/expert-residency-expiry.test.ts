@@ -7,13 +7,18 @@ describe("expert residency expiry job", () => {
     const expireDueBatch = vi.fn(
       async (command: { readonly now: Date; readonly batchSize: number }) => {
         void command;
-        return { examined: 1, changed: 1, failed: 0 };
+        return { examined: 1, changed: 1, creditChanged: 1, failed: 0 };
       },
     );
 
     await expect(
       expireExpertResidencyOrders({ expireDueBatch }, deadline, 100),
-    ).resolves.toEqual({ examined: 1, changed: 1, failed: 0 });
+    ).resolves.toEqual({
+      examined: 1,
+      changed: 1,
+      creditChanged: 1,
+      failed: 0,
+    });
     expect(expireDueBatch).toHaveBeenCalledWith({
       now: deadline,
       batchSize: 100,

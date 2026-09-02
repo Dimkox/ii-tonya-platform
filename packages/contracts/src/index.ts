@@ -11,8 +11,12 @@ export {
 } from "./expert-residency.js";
 export type {
   ExpertResidencyCheckoutCommand,
+  ExpertResidencyCheckoutFinancialFacts,
   ExpertResidencyCheckoutOutcome,
+  ExpertResidencyHeldReplayFinancialFacts,
   ExpertResidencyPaymentEvent,
+  ExpertResidencyRefundFinancialFacts,
+  ExpertResidencySettlementFinancialFacts,
   ExpertResidencyVerificationEvidence,
 } from "./expert-residency.js";
 export {

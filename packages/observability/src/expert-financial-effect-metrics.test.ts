@@ -17,12 +17,6 @@ const principal = {
   externalId: "private-external-id",
 };
 
-const effect = (operation: string, outcome: string) => ({
-  operation,
-  outcome,
-  errorCode: "none",
-});
-
 describe("authoritative expert financial effect metrics", () => {
   const reader = new sdkMetrics.PeriodicExportingMetricReader({
     exporter: new sdkMetrics.InMemoryMetricExporter(
@@ -33,6 +27,7 @@ describe("authoritative expert financial effect metrics", () => {
   const provider = new sdkMetrics.MeterProvider({ readers: [reader] });
   let createService: CreateService;
   let reconcilePayments: (typeof import("../../worker/src/expert-residency-reconciliation.js"))["reconcileExpertResidencyPayments"];
+  let expireOrders: (typeof import("../../worker/src/expert-residency-expiry.js"))["expireExpertResidencyOrders"];
 
   beforeAll(async () => {
     expect(apiMetrics.setGlobalMeterProvider(provider)).toBe(true);
@@ -40,6 +35,8 @@ describe("authoritative expert financial effect metrics", () => {
       await import("../../application/src/expert-residency-service.js"));
     ({ reconcileExpertResidencyPayments: reconcilePayments } =
       await import("../../worker/src/expert-residency-reconciliation.js"));
+    ({ expireExpertResidencyOrders: expireOrders } =
+      await import("../../worker/src/expert-residency-expiry.js"));
   });
 
   afterAll(async () => {
@@ -107,22 +104,17 @@ describe("authoritative expert financial effect metrics", () => {
           paymentDeadline: new Date("2026-09-02T01:00:00.000Z"),
           status: "quoted",
           allocations: [],
-          telemetry: {
-            disposition: "applied",
-            effects: [effect("bonus_share", "applied")],
-          },
+          financialFacts: { creditReservedMinor: "100000" },
         }) as never,
       releaseExpiredOrders: async () => ({
         kind: "settlement_allowed",
         released: false,
-        telemetry: { disposition: "applied", effects: [] },
       }),
       reverseRewardGrant: async () => ({
         rewardReversed: false,
         removedCreditMinor: 0n,
         cancelledReservationMinor: 0n,
         debtMinor: 0n,
-        telemetry: { disposition: "applied", effects: [] },
       }),
     },
     payment: {
@@ -139,17 +131,28 @@ describe("authoritative expert financial effect metrics", () => {
       settle: async () =>
         ({
           kind: "settled",
-          telemetry: { disposition: "applied", effects: [] },
+          financialFacts: {
+            disposition: "applied",
+            creditSpentMinor: "0",
+            firstPaymentQualification: null,
+            rewardCreated: false,
+            debtRepaidMinor: "0",
+          },
         }) as never,
       refund: async () =>
         ({
           kind: "refunded",
-          telemetry: { disposition: "applied", effects: [] },
+          financialFacts: {
+            disposition: "applied",
+            cashRefundedMinor: "0",
+            rewardReversed: false,
+            debtCreatedMinor: "0",
+          },
         }) as never,
       replayHeldReward: async () =>
         ({
           kind: "still_held",
-          telemetry: { disposition: "applied", effects: [] },
+          financialFacts: { rewardCreated: false, debtRepaidMinor: "0" },
         }) as never,
     },
     ...overrides,
@@ -162,9 +165,12 @@ describe("authoritative expert financial effect metrics", () => {
           settle: async () =>
             ({
               kind: "settled",
-              telemetry: {
+              financialFacts: {
                 disposition: "applied",
-                effects: [effect("first_payment_qualification", "eligible")],
+                creditSpentMinor: "0",
+                firstPaymentQualification: "eligible",
+                rewardCreated: false,
+                debtRepaidMinor: "0",
               },
             }) as never,
           refund: async () => ({ kind: "refunded" }) as never,
@@ -189,9 +195,12 @@ describe("authoritative expert financial effect metrics", () => {
           settle: async () =>
             ({
               kind: "settled",
-              telemetry: {
+              financialFacts: {
                 disposition: "applied",
-                effects: [effect("credit_spend", "spent")],
+                creditSpentMinor: "100000",
+                firstPaymentQualification: null,
+                rewardCreated: false,
+                debtRepaidMinor: "0",
               },
             }) as never,
           refund: async () => ({ kind: "refunded" }) as never,
@@ -224,18 +233,17 @@ describe("authoritative expert financial effect metrics", () => {
   it("emits only duplicate event for an explicit idempotent replay", async () => {
     const applied = {
       kind: "settled" as const,
-      telemetry: {
+      financialFacts: {
         disposition: "applied",
-        effects: [
-          effect("first_payment_qualification", "eligible"),
-          effect("credit_spend", "spent"),
-          effect("reward_grant", "granted"),
-        ],
+        creditSpentMinor: "100000",
+        firstPaymentQualification: "eligible",
+        rewardCreated: true,
+        debtRepaidMinor: "0",
       },
     };
     const duplicate = {
       kind: "settled" as const,
-      telemetry: { disposition: "duplicate", effects: [] },
+      financialFacts: { disposition: "duplicate" },
     };
     let calls = 0;
     const service = createService(
@@ -261,7 +269,7 @@ describe("authoritative expert financial effect metrics", () => {
     expect(change(beforeReplay, afterReplay, "reward_grant")).toBe(0);
   });
 
-  it("does not infer refund, reversal, or debt effects from absent metadata", async () => {
+  it("does not infer refund, reversal, or debt effects from zero authoritative facts", async () => {
     const service = createService(dependencies());
     const before = await totals();
 
@@ -287,5 +295,25 @@ describe("authoritative expert financial effect metrics", () => {
     });
     const afterCheckout = await totals();
     expect(change(afterQuote, afterCheckout, "bonus_share")).toBe(1);
+  });
+
+  it("does not emit credit expiry when changed orders released no credit", async () => {
+    const before = await totals();
+
+    await expireOrders(
+      {
+        expireDueBatch: async () => ({
+          examined: 1,
+          changed: 1,
+          creditChanged: 0,
+          failed: 0,
+        }),
+      },
+      new Date("2026-09-02T00:00:00.000Z"),
+      1,
+    );
+
+    const after = await totals();
+    expect(change(before, after, "credit_expiry")).toBe(0);
   });
 });

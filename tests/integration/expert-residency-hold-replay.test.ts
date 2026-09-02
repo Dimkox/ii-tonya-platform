@@ -350,7 +350,9 @@ describe("expert residency held reward replay", () => {
       const event = refundEvent(prepared, { kind, eventId });
 
       const first = await repo.refund(event);
-      await expect(repo.refund(event)).resolves.toEqual(first);
+      await expect(repo.refund(event)).resolves.toMatchObject({
+        financialFacts: { disposition: "duplicate" },
+      });
       expect(first).toMatchObject({
         kind,
         cumulativeCashRefundedMinor: "50000",
@@ -478,7 +480,9 @@ describe("expert residency held reward replay", () => {
     });
 
     const earlyResult = await repo.refund(early);
-    await expect(repo.refund(early)).resolves.toEqual(earlyResult);
+    await expect(repo.refund(early)).resolves.toMatchObject({
+      financialFacts: { disposition: "duplicate" },
+    });
     expect(earlyResult).toMatchObject({
       cumulativeCashRefundedMinor: "10000",
       residencyTerminated: false,
@@ -553,10 +557,14 @@ describe("expert residency held reward replay", () => {
     };
 
     const first = await repo.replayHeldReward(command);
-    await expect(repo.replayHeldReward(command)).resolves.toEqual(first);
+    await expect(repo.replayHeldReward(command)).resolves.toMatchObject({
+      kind: first.kind,
+      financialFacts: { rewardCreated: false, debtRepaidMinor: "0" },
+    });
     expect(first).toMatchObject({
       kind: "reward_granted",
       amountMinor: "100000",
+      financialFacts: { rewardCreated: true, debtRepaidMinor: "0" },
     });
     expect(await heldFacts(prepared)).toMatchObject({
       eligibility: "eligible",
@@ -587,9 +595,10 @@ describe("expert residency held reward replay", () => {
       qualifyingOrderId: prepared.orderId,
     };
 
-    await expect(repo.replayHeldRewardAsAdmin(command)).resolves.toEqual({
+    await expect(repo.replayHeldRewardAsAdmin(command)).resolves.toMatchObject({
       kind: "reward_granted",
       amountMinor: "100000",
+      financialFacts: { rewardCreated: true, debtRepaidMinor: "0" },
     });
     const persisted = await testDb.db.execute<{
       consumed: boolean;
@@ -819,8 +828,15 @@ describe("expert residency held reward replay", () => {
     await provider.settle(second.settlement);
     const replayHeldRewardInTransaction = vi.fn(async (_tx, command) =>
       command.qualifyingOrderId === first.orderId
-        ? ({ kind: "still_held" } as const)
-        : ({ kind: "reward_granted", amountMinor: "100000" } as const),
+        ? ({
+            kind: "still_held",
+            financialFacts: { rewardCreated: false, debtRepaidMinor: "0" },
+          } as const)
+        : ({
+            kind: "reward_granted",
+            amountMinor: "100000",
+            financialFacts: { rewardCreated: true, debtRepaidMinor: "0" },
+          } as const),
     );
     const worker = new PostgresExpertReferralWorkerRepository(testDb.db, {
       releaseExpiredOrderInTransaction: vi.fn(),

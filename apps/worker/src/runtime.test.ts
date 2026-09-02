@@ -7,10 +7,11 @@ import {
 describe("worker runtime", () => {
   it("runs bounded jobs in the required safety-first order", async () => {
     const calls: string[] = [];
-    const job = (name: string) => vi.fn(async () => {
-      calls.push(name);
-      return { name };
-    });
+    const job = (name: string) =>
+      vi.fn(async () => {
+        calls.push(name);
+        return { name };
+      });
     const runtime = createWorkerRuntime({
       safetyHandoffs: job("safety"),
       recoverExpiredLeases: job("lease-recovery"),
@@ -48,9 +49,12 @@ describe("worker runtime", () => {
 
   it("stops new cycles, finishes the current cycle, and closes resources once", async () => {
     let finishSafety: (() => void) | undefined;
-    const safetyHandoffs = vi.fn(() => new Promise<{ name: string }>((resolve) => {
-      finishSafety = () => resolve({ name: "safety" });
-    }));
+    const safetyHandoffs = vi.fn(
+      () =>
+        new Promise<{ name: string }>((resolve) => {
+          finishSafety = () => resolve({ name: "safety" });
+        }),
+    );
     const closeDatabase = vi.fn(async () => undefined);
     const closeTelemetry = vi.fn(async () => undefined);
     const noop = vi.fn(async () => ({}));
@@ -111,8 +115,16 @@ describe("worker runtime", () => {
 
   it("composes the safe PostgreSQL jobs without a live provider dispatcher", async () => {
     const jobsRepository = {
-      processDueBatch: vi.fn(async () => ({ examined: 0, escalated: 0, unchanged: 0 })),
-      expireDueBatch: vi.fn(async () => ({ examined: 0, changed: 0, failed: 0 })),
+      processDueBatch: vi.fn(async () => ({
+        examined: 0,
+        escalated: 0,
+        unchanged: 0,
+      })),
+      expireDueBatch: vi.fn(async () => ({
+        examined: 0,
+        changed: 0,
+        failed: 0,
+      })),
       listLocalReservations: vi.fn(async () => []),
       recordObservation: vi.fn(async () => undefined),
       recordProviderUnavailable: vi.fn(async () => undefined),
@@ -126,6 +138,7 @@ describe("worker runtime", () => {
       expireDueBatch: vi.fn(async () => ({
         examined: 1,
         changed: 1,
+        creditChanged: 1,
         failed: 0,
       })),
       claimReconciliationBatch: vi.fn(async () => []),
@@ -154,11 +167,15 @@ describe("worker runtime", () => {
 
     expect(jobsRepository.processDueBatch).toHaveBeenCalledOnce();
     expect(jobsRepository.expireDueBatch).toHaveBeenCalledOnce();
-    expect(report.expiredLeaseRecovery).toEqual({ dispatch: 1, reconciliation: 2 });
+    expect(report.expiredLeaseRecovery).toEqual({
+      dispatch: 1,
+      reconciliation: 2,
+    });
     expect(report.confirmedOutboxDelivery).toEqual({ delivered: 1 });
     expect(report.expertResidencyExpiry).toEqual({
       examined: 1,
       changed: 1,
+      creditChanged: 1,
       failed: 0,
     });
     expect(report.expertResidencyReconciliation).toEqual({

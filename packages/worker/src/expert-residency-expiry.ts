@@ -6,6 +6,7 @@ import {
 export interface ExpertResidencyExpiryResult {
   readonly examined: number;
   readonly changed: number;
+  readonly creditChanged: number;
   readonly failed: number;
 }
 
@@ -40,7 +41,7 @@ export async function expireExpertResidencyOrders(
       now: new Date(now.getTime()),
       batchSize,
     });
-    if (result.changed > 0) {
+    if (result.creditChanged > 0) {
       safelyRecordExpertReferralLifecycle(
         {
           module: "expert_residency",
@@ -48,7 +49,7 @@ export async function expireExpertResidencyOrders(
           outcome: "expired",
           errorCode: "none",
         },
-        result.changed,
+        result.creditChanged,
       );
     }
     if (result.failed > 0) {
@@ -67,7 +68,7 @@ export async function expireExpertResidencyOrders(
         module: "expert_residency",
         operation: "credit_expiry",
         outcome:
-          result.changed > 0
+          result.creditChanged > 0
             ? "expired"
             : result.failed > 0
               ? "failed"

@@ -31,15 +31,12 @@ describe("expert financial telemetry failure isolation", () => {
       await import("../../application/src/expert-residency-service.js");
     const committed = {
       kind: "settled" as const,
-      telemetry: {
+      financialFacts: {
         disposition: "applied",
-        effects: [
-          {
-            operation: "first_payment_qualification",
-            outcome: "eligible",
-            errorCode: "none",
-          },
-        ],
+        creditSpentMinor: "0",
+        firstPaymentQualification: "eligible",
+        rewardCreated: false,
+        debtRepaidMinor: "0",
       },
     };
     const service = createExpertResidencyService({

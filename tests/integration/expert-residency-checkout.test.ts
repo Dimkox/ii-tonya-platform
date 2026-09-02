@@ -203,6 +203,7 @@ describe("expert residency checkout", () => {
     ]);
     expect(order.creditMinor).toBe("125000");
     expect(order.cashMinor).toBe("125001");
+    expect(order.financialFacts).toEqual({ creditReservedMinor: "125000" });
     expect(order).not.toHaveProperty("providerDeadline");
     const persistedDeadline = (
       await testDb.db.execute<{ providerDeadline: Date | string | null }>(sql`
@@ -221,6 +222,17 @@ describe("expert residency checkout", () => {
     expect((await repo.balance(expert.expertId)).spendableBalanceMinor).toBe(
       "75000",
     );
+    await expect(
+      repo.createCheckoutOrder({
+        expertId: expert.expertId,
+        tariffKey: "residency-month",
+        providerDeadline,
+        idempotencyKey: "checkout-fifo",
+      }),
+    ).resolves.toMatchObject({
+      orderId: order.orderId,
+      financialFacts: { creditReservedMinor: "0" },
+    });
     await expect(
       repo.createCheckoutOrder({
         expertId: expert.expertId,

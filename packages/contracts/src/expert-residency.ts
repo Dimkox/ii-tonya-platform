@@ -83,6 +83,35 @@ export type ExpertResidencyVerificationEvidence = z.infer<
   typeof expertResidencyVerificationEvidenceSchema
 >;
 
+export type ExpertResidencyCheckoutFinancialFacts = Readonly<{
+  creditReservedMinor: string;
+}>;
+
+export type ExpertResidencySettlementFinancialFacts =
+  | Readonly<{ disposition: "duplicate" }>
+  | Readonly<{
+      disposition: "applied";
+      creditSpentMinor: string;
+      firstPaymentQualification:
+        "eligible" | "ineligible" | "pending_feature_hold" | null;
+      rewardCreated: boolean;
+      debtRepaidMinor: string;
+    }>;
+
+export type ExpertResidencyRefundFinancialFacts =
+  | Readonly<{ disposition: "duplicate" }>
+  | Readonly<{
+      disposition: "applied";
+      cashRefundedMinor: string;
+      rewardReversed: boolean;
+      debtCreatedMinor: string;
+    }>;
+
+export type ExpertResidencyHeldReplayFinancialFacts = Readonly<{
+  rewardCreated: boolean;
+  debtRepaidMinor: string;
+}>;
+
 export type ExpertResidencyCheckoutOutcome =
   | Readonly<{
       kind: "created";

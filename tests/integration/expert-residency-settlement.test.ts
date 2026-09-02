@@ -383,12 +383,23 @@ describe("expert residency settlement", () => {
     const first = await repo.settle(event);
     const replay = await repo.settle(event);
 
-    expect(replay).toEqual(first);
     expect(first).toMatchObject({
       kind: "settled",
       orderId: prepared.orderId,
       eligibilityStatus: "eligible",
       rewardEffect: { kind: "reward_granted", amountMinor: "100000" },
+      financialFacts: {
+        disposition: "applied",
+        creditSpentMinor: "50000",
+        firstPaymentQualification: "eligible",
+        rewardCreated: true,
+        debtRepaidMinor: "0",
+      },
+    });
+    expect(replay).toMatchObject({
+      kind: "settled",
+      orderId: prepared.orderId,
+      financialFacts: { disposition: "duplicate" },
     });
     const order = (
       await testDb.db.execute<{
@@ -477,6 +488,22 @@ describe("expert residency settlement", () => {
         and column_name in ('raw_payload', 'raw_body', 'headers', 'payload')
     `);
     expect(rawColumns.rows).toEqual([]);
+  });
+
+  it("reports zero authoritative credit spend for a cash-only settlement", async () => {
+    const prepared = await scenario();
+    const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
+
+    await expect(repo.settle(verified(prepared.event))).resolves.toMatchObject({
+      kind: "settled",
+      financialFacts: {
+        disposition: "applied",
+        creditSpentMinor: "0",
+        firstPaymentQualification: "eligible",
+        rewardCreated: true,
+        debtRepaidMinor: "0",
+      },
+    });
   });
 
   it("records exact amount and currency failures and rejects conflicting replay content", async () => {
@@ -800,8 +827,10 @@ describe("expert residency settlement", () => {
     );
     const repo = new PostgresExpertResidencyProviderInboxRepository(testDb.db);
 
-    const first = await repo.settle(event);
-    await expect(repo.settle(event)).resolves.toEqual(first);
+    await repo.settle(event);
+    await expect(repo.settle(event)).resolves.toMatchObject({
+      financialFacts: { disposition: "duplicate" },
+    });
   });
 
   it("applies rewards debt-first for partial, full, and remaining debt exactly once", async () => {
@@ -840,8 +869,15 @@ describe("expert residency settlement", () => {
           kind: "debt_repaid",
           amountMinor: expected.repaidMinor,
         },
+        financialFacts: {
+          disposition: "applied",
+          rewardCreated: true,
+          debtRepaidMinor: expected.repaidMinor,
+        },
       });
-      await expect(repo.settle(event)).resolves.toEqual(first);
+      await expect(repo.settle(event)).resolves.toMatchObject({
+        financialFacts: { disposition: "duplicate" },
+      });
 
       const balance = (
         await testDb.db.execute<{
@@ -896,7 +932,9 @@ describe("expert residency settlement", () => {
         kind: "settled",
         rewardEffect: { kind: "debt_repaid", amountMinor: "40000" },
       });
-      await expect(repo.settle(event)).resolves.toEqual(first);
+      await expect(repo.settle(event)).resolves.toMatchObject({
+        financialFacts: { disposition: "duplicate" },
+      });
 
       const facts = (
         await testDb.db.execute<{
@@ -981,7 +1019,11 @@ describe("expert residency settlement", () => {
       testDb.db,
     ).settle(verified(prepared.event));
 
-    expect(result).toEqual({ kind: "expired", orderId: prepared.orderId });
+    expect(result).toMatchObject({
+      kind: "expired",
+      orderId: prepared.orderId,
+      financialFacts: { disposition: "applied", creditSpentMinor: "0" },
+    });
     const state = (
       await testDb.db.execute<{
         status: string;

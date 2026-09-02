@@ -1,4 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
+import type {
+  ExpertResidencyHeldReplayFinancialFacts,
+  ExpertResidencyRefundFinancialFacts,
+  ExpertResidencySettlementFinancialFacts,
+} from "@ii-tonya/contracts";
 import {
   requireVerifiedExpertResidencyPaymentEvent,
   type VerifiedExpertResidencyPaymentEvent,
@@ -24,7 +29,11 @@ const REWARD_MINOR = 100_000n;
 const REWARD_LIFETIME_MILLISECONDS = 365 * 86_400_000;
 
 export type ExpertResidencySettlementResult =
-  | Readonly<{ kind: "expired"; orderId: string }>
+  | Readonly<{
+      kind: "expired";
+      orderId: string;
+      financialFacts: ExpertResidencySettlementFinancialFacts;
+    }>
   | Readonly<{
       kind: "settled";
       orderId: string;
@@ -40,6 +49,7 @@ export type ExpertResidencySettlementResult =
         | Readonly<{ kind: "none" }>
         | Readonly<{ kind: "reward_granted"; amountMinor: "100000" }>
         | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
+      financialFacts: ExpertResidencySettlementFinancialFacts;
     }>;
 
 export type ExpertResidencyRefundResult = Readonly<{
@@ -59,15 +69,37 @@ export type ExpertResidencyRefundResult = Readonly<{
     | "pending_feature_hold"
     | "cancelled_by_refund"
     | "not_first_settlement";
+  financialFacts: ExpertResidencyRefundFinancialFacts;
 }>;
 
 export type HeldRewardReplayResult =
-  | Readonly<{ kind: "still_held" }>
-  | Readonly<{ kind: "cancelled_by_refund" }>
-  | Readonly<{ kind: "ineligible"; reason: string }>
-  | Readonly<{ kind: "terminated_after_grant" }>
-  | Readonly<{ kind: "reward_granted"; amountMinor: "100000" }>
-  | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
+  | Readonly<{
+      kind: "still_held";
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>
+  | Readonly<{
+      kind: "cancelled_by_refund";
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>
+  | Readonly<{
+      kind: "ineligible";
+      reason: string;
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>
+  | Readonly<{
+      kind: "terminated_after_grant";
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>
+  | Readonly<{
+      kind: "reward_granted";
+      amountMinor: "100000";
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>
+  | Readonly<{
+      kind: "debt_repaid";
+      amountMinor: string;
+      financialFacts: ExpertResidencyHeldReplayFinancialFacts;
+    }>;
 
 export interface AdminHeldRewardReplay extends ExpertReferralAdminEvidence {
   readonly expertId: string;
@@ -152,6 +184,23 @@ interface ReferralRow extends Record<string, unknown> {
   inviterExpertId: string;
 }
 
+const noHeldRewardFinancialFacts =
+  (): ExpertResidencyHeldReplayFinancialFacts => ({
+    rewardCreated: false,
+    debtRepaidMinor: "0",
+  });
+
+const noAppliedSettlementFinancialEffects = (): Extract<
+  ExpertResidencySettlementFinancialFacts,
+  { disposition: "applied" }
+> => ({
+  disposition: "applied",
+  creditSpentMinor: "0",
+  firstPaymentQualification: null,
+  rewardCreated: false,
+  debtRepaidMinor: "0",
+});
+
 function bigint(value: bigint | string): bigint {
   return typeof value === "bigint" ? value : BigInt(value);
 }
@@ -222,12 +271,14 @@ function isSettlementResult(
   const result = value as Record<string, unknown>;
   if (result.kind === "expired") {
     return (
-      Object.keys(result).length === 2 && typeof result.orderId === "string"
+      Object.keys(result).length === 3 &&
+      typeof result.orderId === "string" &&
+      isSettlementFinancialFacts(result.financialFacts)
     );
   }
   if (
     result.kind !== "settled" ||
-    Object.keys(result).length !== 7 ||
+    Object.keys(result).length !== 8 ||
     typeof result.orderId !== "string" ||
     typeof result.settledAt !== "string" ||
     typeof result.residencyStartsAt !== "string" ||
@@ -240,7 +291,8 @@ function isSettlementResult(
     ].includes(String(result.eligibilityStatus)) ||
     typeof result.rewardEffect !== "object" ||
     result.rewardEffect === null ||
-    Array.isArray(result.rewardEffect)
+    Array.isArray(result.rewardEffect) ||
+    !isSettlementFinancialFacts(result.financialFacts)
   ) {
     return false;
   }
@@ -254,6 +306,48 @@ function isSettlementResult(
       typeof effect.amountMinor === "string" &&
       /^[1-9][0-9]{0,18}$/u.test(effect.amountMinor) &&
       Object.keys(effect).length === 2)
+  );
+}
+
+function isSettlementFinancialFacts(
+  value: unknown,
+): value is ExpertResidencySettlementFinancialFacts {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const facts = value as Record<string, unknown>;
+  if (facts.disposition === "duplicate") {
+    return Object.keys(facts).length === 1;
+  }
+  return (
+    facts.disposition === "applied" &&
+    Object.keys(facts).length === 5 &&
+    isCanonicalNonnegativeMinor(facts.creditSpentMinor) &&
+    (facts.firstPaymentQualification === null ||
+      ["eligible", "ineligible", "pending_feature_hold"].includes(
+        String(facts.firstPaymentQualification),
+      )) &&
+    typeof facts.rewardCreated === "boolean" &&
+    isCanonicalNonnegativeMinor(facts.debtRepaidMinor)
+  );
+}
+
+function isRefundFinancialFacts(
+  value: unknown,
+): value is ExpertResidencyRefundFinancialFacts {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const facts = value as Record<string, unknown>;
+  if (facts.disposition === "duplicate") {
+    return Object.keys(facts).length === 1;
+  }
+  return (
+    facts.disposition === "applied" &&
+    Object.keys(facts).length === 4 &&
+    isCanonicalNonnegativeMinor(facts.cashRefundedMinor) &&
+    typeof facts.rewardReversed === "boolean" &&
+    isCanonicalNonnegativeMinor(facts.debtCreatedMinor)
   );
 }
 
@@ -271,7 +365,7 @@ function isRefundResult(value: unknown): value is ExpertResidencyRefundResult {
   }
   const result = value as Record<string, unknown>;
   return (
-    Object.keys(result).length === 11 &&
+    Object.keys(result).length === 12 &&
     ["refunded", "charged_back"].includes(String(result.kind)) &&
     typeof result.orderId === "string" &&
     isCanonicalNonnegativeMinor(result.cashRefundedMinor) &&
@@ -282,6 +376,7 @@ function isRefundResult(value: unknown): value is ExpertResidencyRefundResult {
     isCanonicalNonnegativeMinor(result.removedCreditMinor) &&
     isCanonicalNonnegativeMinor(result.cancelledReservationMinor) &&
     isCanonicalNonnegativeMinor(result.debtMinor) &&
+    isRefundFinancialFacts(result.financialFacts) &&
     [
       "eligible",
       "ineligible",
@@ -419,114 +514,148 @@ export class PostgresExpertResidencyProviderInboxRepository {
       qualifyingOrderId: string;
     }>,
   ): Promise<HeldRewardReplayResult> {
-        const featureControl = await this.controls.lockFeatureControl(tx);
-        const order = await this.lockOrder(tx, input.qualifyingOrderId);
-        if (order === undefined || order.expertId !== input.expertId) {
-          throw new ExpertResidencySettlementError("held_order_not_found");
-        }
-        if (order.paymentAttemptId !== null) {
-          await tx.execute(sql`select id from expert_residency_payment_attempts
+    const featureControl = await this.controls.lockFeatureControl(tx);
+    const order = await this.lockOrder(tx, input.qualifyingOrderId);
+    if (order === undefined || order.expertId !== input.expertId) {
+      throw new ExpertResidencySettlementError("held_order_not_found");
+    }
+    if (order.paymentAttemptId !== null) {
+      await tx.execute(sql`select id from expert_residency_payment_attempts
             where id = ${order.paymentAttemptId}::uuid for update`);
-        }
-        await tx.execute(sql`select pg_advisory_xact_lock(
+    }
+    await tx.execute(sql`select pg_advisory_xact_lock(
           hashtextextended(${`expert-residency:settlement:${order.expertId}`}, 0)
         )`);
-        await this.controls.lockEligibility(tx, order.expertId);
-        const referral = await this.lockReferral(tx, order.expertId);
-        await this.lockResidencyRows(tx, order.expertId);
-        const marker = await this.lockFirstMarker(tx, order.expertId);
-        if (
-          marker === undefined ||
-          marker.qualifyingOrderId !== order.orderId
-        ) {
-          throw new ExpertResidencySettlementError("held_marker_not_found");
-        }
-        if (marker.eligibilityStatus === "cancelled_by_refund") {
-          return { kind: "cancelled_by_refund" };
-        }
-        if (marker.eligibilityStatus === "ineligible") {
-          return { kind: "ineligible", reason: "permanently_ineligible" };
-        }
-        if (marker.eligibilityStatus === "eligible") {
-          if (order.status !== "settled") {
-            return { kind: "terminated_after_grant" };
-          }
-          const result = await this.heldRewardEffect(tx, order);
-          await this.auditHeldReplay(tx, order, marker.id, result);
-          return result;
-        }
-        const snapshot = (
-          await tx.execute<{
-            expertActive: boolean;
-            expertVerified: boolean;
-            uniqueIdentity: boolean;
-            abuseCleared: boolean;
-          }>(sql`select expert_active as "expertActive",
+    await this.controls.lockEligibility(tx, order.expertId);
+    const referral = await this.lockReferral(tx, order.expertId);
+    await this.lockResidencyRows(tx, order.expertId);
+    const marker = await this.lockFirstMarker(tx, order.expertId);
+    if (marker === undefined || marker.qualifyingOrderId !== order.orderId) {
+      throw new ExpertResidencySettlementError("held_marker_not_found");
+    }
+    if (marker.eligibilityStatus === "cancelled_by_refund") {
+      return {
+        kind: "cancelled_by_refund",
+        financialFacts: noHeldRewardFinancialFacts(),
+      };
+    }
+    if (marker.eligibilityStatus === "ineligible") {
+      return {
+        kind: "ineligible",
+        reason: "permanently_ineligible",
+        financialFacts: noHeldRewardFinancialFacts(),
+      };
+    }
+    if (marker.eligibilityStatus === "eligible") {
+      if (order.status !== "settled") {
+        return {
+          kind: "terminated_after_grant",
+          financialFacts: noHeldRewardFinancialFacts(),
+        };
+      }
+      const result = await this.heldRewardEffect(tx, order);
+      await this.auditHeldReplay(tx, order, marker.id, result);
+      return result;
+    }
+    const snapshot = (
+      await tx.execute<{
+        expertActive: boolean;
+        expertVerified: boolean;
+        uniqueIdentity: boolean;
+        abuseCleared: boolean;
+      }>(sql`select expert_active as "expertActive",
             expert_verified as "expertVerified",
             unique_identity as "uniqueIdentity", abuse_cleared as "abuseCleared"
             from expert_first_residency_settlements
             where id = ${marker.id}::uuid`)
-        ).rows[0]!;
-        const now = await this.databaseNow(tx);
-        let ineligibleReason: string | null = null;
-        if (
-          !snapshot.expertActive ||
-          !snapshot.expertVerified ||
-          !snapshot.uniqueIdentity ||
-          !snapshot.abuseCleared
-        ) {
-          ineligibleReason = "held_snapshot_ineligible";
-        } else if (order.status !== "settled") {
-          ineligibleReason = "held_order_not_settled";
-        } else if (
-          order.residencyEndsAt === null ||
-          date(order.residencyEndsAt).getTime() <= now.getTime()
-        ) {
-          ineligibleReason = "held_residency_not_active";
-        } else if (referral === undefined) {
-          ineligibleReason = "held_referral_missing";
-        }
-        if (ineligibleReason !== null) {
-          const eligibility =
-            order.status === "refunded" || order.status === "charged_back"
-              ? "cancelled_by_refund"
-              : "ineligible";
-          const reason =
-            eligibility === "cancelled_by_refund"
-              ? order.status === "refunded"
-                ? "terminating_refund"
-                : "terminating_chargeback"
-              : ineligibleReason;
-          await tx.execute(sql`update expert_first_residency_settlements set
+    ).rows[0]!;
+    const now = await this.databaseNow(tx);
+    let ineligibleReason: string | null = null;
+    if (
+      !snapshot.expertActive ||
+      !snapshot.expertVerified ||
+      !snapshot.uniqueIdentity ||
+      !snapshot.abuseCleared
+    ) {
+      ineligibleReason = "held_snapshot_ineligible";
+    } else if (order.status !== "settled") {
+      ineligibleReason = "held_order_not_settled";
+    } else if (
+      order.residencyEndsAt === null ||
+      date(order.residencyEndsAt).getTime() <= now.getTime()
+    ) {
+      ineligibleReason = "held_residency_not_active";
+    } else if (referral === undefined) {
+      ineligibleReason = "held_referral_missing";
+    }
+    if (ineligibleReason !== null) {
+      const eligibility =
+        order.status === "refunded" || order.status === "charged_back"
+          ? "cancelled_by_refund"
+          : "ineligible";
+      const reason =
+        eligibility === "cancelled_by_refund"
+          ? order.status === "refunded"
+            ? "terminating_refund"
+            : "terminating_chargeback"
+          : ineligibleReason;
+      await tx.execute(sql`update expert_first_residency_settlements set
             eligibility_status = ${eligibility}, eligibility_reason_code = ${reason}
             where id = ${marker.id}::uuid
               and eligibility_status = 'pending_feature_hold'`);
-          const result: HeldRewardReplayResult =
-            eligibility === "cancelled_by_refund"
-              ? { kind: "cancelled_by_refund" }
-              : { kind: "ineligible", reason };
-          await this.auditHeldReplay(tx, order, marker.id, result);
-          return result;
-        }
-        if (!featureControl.rewardGrantsEnabled) {
-          return { kind: "still_held" };
-        }
-        await tx.execute(sql`update expert_first_residency_settlements set
+      const result: HeldRewardReplayResult =
+        eligibility === "cancelled_by_refund"
+          ? {
+              kind: "cancelled_by_refund",
+              financialFacts: noHeldRewardFinancialFacts(),
+            }
+          : {
+              kind: "ineligible",
+              reason,
+              financialFacts: noHeldRewardFinancialFacts(),
+            };
+      await this.auditHeldReplay(tx, order, marker.id, result);
+      return result;
+    }
+    if (!featureControl.rewardGrantsEnabled) {
+      return {
+        kind: "still_held",
+        financialFacts: noHeldRewardFinancialFacts(),
+      };
+    }
+    await tx.execute(sql`update expert_first_residency_settlements set
           eligibility_status = 'eligible',
           eligibility_reason_code = 'eligible_after_feature_replay'
           where id = ${marker.id}::uuid
             and eligibility_status = 'pending_feature_hold'`);
-        await this.appendReward(
-          tx,
-          referral!,
-          order.orderId,
-          marker.id,
-          date(order.settledAt!),
-        );
-        await this.flushDeferredSettlementConstraints(tx);
-        const result = await this.heldRewardEffect(tx, order);
-        await this.auditHeldReplay(tx, order, marker.id, result);
-        return result;
+    const financialFacts = await this.appendReward(
+      tx,
+      referral!,
+      order.orderId,
+      marker.id,
+      date(order.settledAt!),
+    );
+    await this.flushDeferredSettlementConstraints(tx);
+    const result: HeldRewardReplayResult =
+      financialFacts.debtRepaidMinor > 0n
+        ? {
+            kind: "debt_repaid",
+            amountMinor: financialFacts.debtRepaidMinor.toString(),
+            financialFacts: {
+              rewardCreated: financialFacts.rewardCreated,
+              debtRepaidMinor: financialFacts.debtRepaidMinor.toString(),
+            },
+          }
+        : {
+            kind: "reward_granted",
+            amountMinor: "100000",
+            financialFacts: {
+              rewardCreated: financialFacts.rewardCreated,
+              debtRepaidMinor: "0",
+            },
+          };
+    await this.auditHeldReplay(tx, order, marker.id, result);
+    return result;
   }
 
   replayHeldRewardAsAdmin(
@@ -633,7 +762,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
           "provider_event_replay_conflict",
         );
       }
-      return { result };
+      return {
+        result: {
+          ...result,
+          financialFacts: { disposition: "duplicate" },
+        },
+      };
     }
     throw new ExpertResidencySettlementError("provider_event_claim_conflict");
   }
@@ -663,7 +797,11 @@ export class PostgresExpertResidencyProviderInboxRepository {
       throw new ExpertResidencySettlementError(validationError);
     }
     if (order.status === "settled" || order.status === "expired") {
-      return this.resultForOrder(tx, order);
+      return this.resultForOrder(
+        tx,
+        order,
+        noAppliedSettlementFinancialEffects(),
+      );
     }
     if (order.status !== "payment_pending" && order.status !== "quoted") {
       throw new ExpertResidencySettlementError("order_state_invalid");
@@ -678,7 +816,11 @@ export class PostgresExpertResidencyProviderInboxRepository {
     ).rows[0]?.decision;
     if (deadline !== "settlement_allowed") {
       await this.expireAndRelease(tx, order);
-      const result = { kind: "expired", orderId: order.orderId } as const;
+      const result = {
+        kind: "expired",
+        orderId: order.orderId,
+        financialFacts: noAppliedSettlementFinancialEffects(),
+      } as const;
       await this.auditAndOutbox(tx, order.expertId, event, result);
       return result;
     }
@@ -700,9 +842,15 @@ export class PostgresExpertResidencyProviderInboxRepository {
     await tx.execute(sql`update expert_residency_payment_attempts set
       status = 'succeeded', updated_at = clock_timestamp()
       where id = ${order.paymentAttemptId}::uuid`);
-    await this.commitReservation(tx, order);
+    const creditSpentMinor = await this.commitReservation(tx, order);
 
     const priorMarker = await this.lockFirstMarker(tx, order.expertId);
+    let firstPaymentQualification: Extract<
+      ExpertResidencySettlementFinancialFacts,
+      { disposition: "applied" }
+    >["firstPaymentQualification"] = null;
+    let rewardCreated = false;
+    let debtRepaidMinor = 0n;
     if (priorMarker === undefined) {
       const decision = eligibilityDecision(eligibility);
       const status = !decision.eligible
@@ -714,6 +862,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
         status === "pending_feature_hold"
           ? "reward_grants_disabled"
           : decision.reason;
+      firstPaymentQualification = status;
       const markerId = randomUUID();
       await tx.execute(sql`insert into expert_first_residency_settlements (
         id, expert_id, qualifying_order_id, eligibility_status,
@@ -726,7 +875,15 @@ export class PostgresExpertResidencyProviderInboxRepository {
         ${eligibility.abuseCleared}, ${now}
       )`);
       if (status === "eligible" && referral !== undefined) {
-        await this.appendReward(tx, referral, order.orderId, markerId, now);
+        const rewardFacts = await this.appendReward(
+          tx,
+          referral,
+          order.orderId,
+          markerId,
+          now,
+        );
+        rewardCreated = rewardFacts.rewardCreated;
+        debtRepaidMinor = rewardFacts.debtRepaidMinor;
       }
     }
 
@@ -737,7 +894,13 @@ export class PostgresExpertResidencyProviderInboxRepository {
       residencyStartsAt: startsAt,
       residencyEndsAt: endsAt,
     };
-    const result = await this.resultForOrder(tx, settledOrder);
+    const result = await this.resultForOrder(tx, settledOrder, {
+      disposition: "applied",
+      creditSpentMinor: creditSpentMinor.toString(),
+      firstPaymentQualification,
+      rewardCreated,
+      debtRepaidMinor: debtRepaidMinor.toString(),
+    });
     await this.auditAndOutbox(tx, order.expertId, event, result);
     return result;
   }
@@ -876,6 +1039,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
       cancelledReservationMinor: reversal.cancelledReservationMinor.toString(),
       debtMinor: reversal.debtMinor.toString(),
       eligibilityStatus,
+      financialFacts: {
+        disposition: "applied",
+        cashRefundedMinor: refundMinor.toString(),
+        rewardReversed: reversal.rewardReversed,
+        debtCreatedMinor: reversal.debtMinor.toString(),
+      },
     };
     await this.auditAndOutbox(tx, order.expertId, event, result);
     return result;
@@ -1025,13 +1194,13 @@ export class PostgresExpertResidencyProviderInboxRepository {
   private async commitReservation(
     tx: ExpertReferralTransaction,
     order: OrderRow,
-  ): Promise<void> {
+  ): Promise<bigint> {
     const credit = bigint(order.creditMinor);
     const reservation = await this.activeReservation(tx, order.orderId);
     if (credit === 0n) {
       if (reservation !== undefined)
         throw new ExpertResidencySettlementError("unexpected_reservation");
-      return;
+      return 0n;
     }
     if (
       reservation === undefined ||
@@ -1047,6 +1216,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
       ${reservation.amountMinor}, 'residency_order', ${order.orderId}::uuid,
       ${reservation.id}::uuid, ${`residency-spend:${order.orderId}`})`);
     await this.copyAllocations(tx, reservation.id, spendId);
+    return credit;
   }
 
   private async activeReservation(
@@ -1115,7 +1285,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
     orderId: string,
     markerId: string,
     grantedAt: Date,
-  ): Promise<void> {
+  ): Promise<{
+    readonly rewardCreated: true;
+    readonly debtRepaidMinor: bigint;
+  }> {
     await tx.execute(sql`select pg_advisory_xact_lock(
       hashtextextended(${`expert-referral:reward:${referral.inviterExpertId}`}, 0)
     )`);
@@ -1212,6 +1385,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
       ) values (${repaymentId}::uuid, ${grantId}::uuid, ${repayment})`);
       remainingReward -= repayment;
     }
+    return {
+      rewardCreated: true,
+      debtRepaidMinor: REWARD_MINOR - remainingReward,
+    };
   }
 
   private async lockResidencyRows(
@@ -1250,9 +1427,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
   private async resultForOrder(
     tx: ExpertReferralTransaction,
     order: OrderRow,
+    financialFacts: ExpertResidencySettlementFinancialFacts,
   ): Promise<ExpertResidencySettlementResult> {
     if (order.status === "expired") {
-      return { kind: "expired", orderId: order.orderId };
+      return { kind: "expired", orderId: order.orderId, financialFacts };
     }
     if (
       order.status !== "settled" ||
@@ -1309,6 +1487,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
       residencyEndsAt: date(order.residencyEndsAt).toISOString(),
       eligibilityStatus: settlementEligibility,
       rewardEffect,
+      financialFacts,
     };
   }
 
@@ -1367,15 +1546,25 @@ export class PostgresExpertResidencyProviderInboxRepository {
     tx: ExpertReferralTransaction,
     order: OrderRow,
   ): Promise<HeldRewardReplayResult> {
-    const settlement = await this.resultForOrder(tx, order);
+    const settlement = await this.resultForOrder(
+      tx,
+      order,
+      noAppliedSettlementFinancialEffects(),
+    );
     if (settlement.kind !== "settled") {
       throw new ExpertResidencySettlementError("held_order_not_settled");
     }
     if (settlement.rewardEffect.kind === "reward_granted") {
-      return settlement.rewardEffect;
+      return {
+        ...settlement.rewardEffect,
+        financialFacts: noHeldRewardFinancialFacts(),
+      };
     }
     if (settlement.rewardEffect.kind === "debt_repaid") {
-      return settlement.rewardEffect;
+      return {
+        ...settlement.rewardEffect,
+        financialFacts: noHeldRewardFinancialFacts(),
+      };
     }
     throw new ExpertResidencySettlementError("held_reward_effect_missing");
   }
@@ -1388,11 +1577,13 @@ export class PostgresExpertResidencyProviderInboxRepository {
   ): Promise<void> {
     const action = "expert_residency.held_reward_replayed";
     const correlationId = `held-replay:${markerId}`;
+    const { financialFacts: _financialFacts, ...auditedResult } = result;
+    void _financialFacts;
     const payload = {
       orderId: order.orderId,
       expertId: order.expertId,
       markerId,
-      result,
+      result: auditedResult,
     };
     const idempotencyKey = `expert-residency-held-replay:${markerId}`;
     const reconciliationKey = `expert-residency:${order.orderId}`;
@@ -1444,6 +1635,8 @@ export class PostgresExpertResidencyProviderInboxRepository {
     event: VerifiedExpertResidencyPaymentEvent,
     result: ExpertResidencyProviderEventResult,
   ): Promise<void> {
+    const { financialFacts: _financialFacts, ...businessResult } = result;
+    void _financialFacts;
     const action =
       result.kind === "settled"
         ? "expert_residency.settled"
@@ -1459,7 +1652,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
       payloadDigest: event.payloadDigest,
       verificationId: event.verification.verificationId,
       ...(result.kind === "refunded" || result.kind === "charged_back"
-        ? { result }
+        ? { result: businessResult }
         : {}),
     });
     await tx.execute(sql`insert into audit_events (
@@ -1471,7 +1664,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
       ${correlationId}, clock_timestamp(), ${metadataHash})`);
     const payload =
       result.kind === "refunded" || result.kind === "charged_back"
-        ? { expertId, ...result, status: result.kind }
+        ? { expertId, ...businessResult, status: result.kind }
         : {
             orderId: event.orderId,
             expertId,

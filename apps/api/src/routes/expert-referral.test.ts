@@ -217,16 +217,7 @@ describe("authenticated expert referral API", () => {
         paymentDeadline: new Date("2026-08-03T00:15:00.000Z"),
         status: "pending",
         allocations: [{ grantId: "private-grant", amountMinor: "100000" }],
-        telemetry: {
-          disposition: "applied" as const,
-          effects: [
-            {
-              operation: "bonus_share" as const,
-              outcome: "applied" as const,
-              errorCode: "none" as const,
-            },
-          ],
-        },
+        financialFacts: { creditReservedMinor: "100000" },
       },
       payment: {
         kind: "pending_reconciliation" as const,
@@ -258,6 +249,7 @@ describe("authenticated expert referral API", () => {
       outcome: { kind: "pending_reconciliation" },
     });
     expect(response.body).not.toContain("private-grant");
+    expect(response.body).not.toContain("creditReservedMinor");
     expect(response.body).not.toContain("safe-provider-neutral-id");
     expect(response.body).not.toContain("disabled");
     expect(residency.checkout).toHaveBeenCalledWith(principal, {

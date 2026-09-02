@@ -1,7 +1,11 @@
 import type {
   ExpertResidencyCheckoutCommand,
+  ExpertResidencyCheckoutFinancialFacts,
   ExpertResidencyCheckoutOutcome,
+  ExpertResidencyHeldReplayFinancialFacts,
   ExpertResidencyPaymentEvent,
+  ExpertResidencyRefundFinancialFacts,
+  ExpertResidencySettlementFinancialFacts,
   ExpertResidencyVerificationEvidence,
 } from "@ii-tonya/contracts";
 import {
@@ -27,25 +31,6 @@ export interface ResidencyQuote {
   readonly cashMinor: string;
 }
 
-export type ExpertFinancialTelemetryEffect = Readonly<{
-  readonly operation: Exclude<
-    ReferralMetricLabels["operation"],
-    "duplicate_event"
-  >;
-  readonly outcome: ReferralMetricLabels["outcome"];
-  readonly errorCode: NonNullable<ReferralMetricLabels["errorCode"]>;
-}>;
-
-export type ExpertFinancialTelemetry =
-  | Readonly<{
-      readonly disposition: "applied";
-      readonly effects: readonly ExpertFinancialTelemetryEffect[];
-    }>
-  | Readonly<{
-      readonly disposition: "duplicate";
-      readonly effects: readonly [];
-    }>;
-
 export interface ResidencyCheckoutOrder extends ResidencyQuote {
   readonly orderId: string;
   readonly expertId: string;
@@ -55,7 +40,7 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
     readonly grantId: string;
     readonly amountMinor: string;
   }[];
-  readonly telemetry: ExpertFinancialTelemetry;
+  readonly financialFacts: ExpertResidencyCheckoutFinancialFacts;
 }
 
 export type VerifiedExpertResidencyEvent = Readonly<
@@ -72,14 +57,14 @@ export type ExpertResidencySettlementResult = Readonly<{
     | Readonly<{ kind: "none" }>
     | Readonly<{ kind: "reward_granted"; amountMinor: string }>
     | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
-  readonly telemetry: ExpertFinancialTelemetry;
+  readonly financialFacts: ExpertResidencySettlementFinancialFacts;
 }>;
 
 export type ExpertResidencyRefundResult = Readonly<{
   readonly kind: "refunded" | "charged_back";
   readonly rewardReversed?: boolean;
   readonly debtMinor?: string;
-  readonly telemetry: ExpertFinancialTelemetry;
+  readonly financialFacts: ExpertResidencyRefundFinancialFacts;
 }>;
 
 export type HeldRewardReplayResult = Readonly<{
@@ -92,7 +77,7 @@ export type HeldRewardReplayResult = Readonly<{
     | "debt_repaid";
   readonly amountMinor?: string;
   readonly reason?: string;
-  readonly telemetry: ExpertFinancialTelemetry;
+  readonly financialFacts: ExpertResidencyHeldReplayFinancialFacts;
 }>;
 
 export interface ExpertResidencyOrderPort {
@@ -110,12 +95,10 @@ export interface ExpertResidencyOrderPort {
     | {
         readonly kind: "settlement_allowed";
         readonly released: false;
-        readonly telemetry: ExpertFinancialTelemetry;
       }
     | {
         readonly kind: "expired";
         readonly released: boolean;
-        readonly telemetry: ExpertFinancialTelemetry;
       }
   >;
   reverseRewardGrant(command: {
@@ -127,7 +110,6 @@ export interface ExpertResidencyOrderPort {
     readonly removedCreditMinor: bigint;
     readonly cancelledReservationMinor: bigint;
     readonly debtMinor: bigint;
-    readonly telemetry: ExpertFinancialTelemetry;
   }>;
 }
 
@@ -236,19 +218,105 @@ const financialMetric = (
   });
 };
 
-const recordFinancialTelemetry = (
-  telemetry: ExpertFinancialTelemetry,
+const positiveMinor = (value: string): boolean => /^[1-9][0-9]*$/u.test(value);
+
+const recordDuplicate = (): void => {
+  financialMetric("duplicate_event", "duplicate");
+};
+
+const recordCheckoutFacts = (
+  facts: ExpertResidencyCheckoutFinancialFacts,
 ): void => {
   try {
-    if (telemetry.disposition === "duplicate") {
-      financialMetric("duplicate_event", "duplicate");
-      return;
-    }
-    for (const effect of telemetry.effects) {
-      financialMetric(effect.operation, effect.outcome, effect.errorCode);
+    if (positiveMinor(facts.creditReservedMinor)) {
+      financialMetric("bonus_share", "applied");
     }
   } catch {
-    // Invalid or unavailable telemetry must not alter financial semantics.
+    // Invalid or unavailable facts must not alter financial semantics.
+  }
+};
+
+const recordSettlementFacts = (
+  facts: ExpertResidencySettlementFinancialFacts,
+): void => {
+  try {
+    if (facts.disposition === "duplicate") {
+      recordDuplicate();
+      return;
+    }
+    if (facts.firstPaymentQualification !== null) {
+      financialMetric(
+        "first_payment_qualification",
+        facts.firstPaymentQualification,
+      );
+    }
+    if (positiveMinor(facts.creditSpentMinor)) {
+      financialMetric("credit_spend", "spent");
+    }
+    if (facts.rewardCreated) {
+      financialMetric(
+        "reward_grant",
+        positiveMinor(facts.debtRepaidMinor) ? "debt_repaid" : "granted",
+      );
+    }
+    if (positiveMinor(facts.debtRepaidMinor)) {
+      financialMetric("debt", "debt_repaid");
+    }
+  } catch {
+    // Invalid or unavailable facts must not alter financial semantics.
+  }
+};
+
+const recordRefundFacts = (
+  kind: ExpertResidencyRefundResult["kind"],
+  facts: ExpertResidencyRefundFinancialFacts,
+): void => {
+  try {
+    if (facts.disposition === "duplicate") {
+      recordDuplicate();
+      return;
+    }
+    if (positiveMinor(facts.cashRefundedMinor)) {
+      financialMetric("refund", kind);
+    }
+    if (facts.rewardReversed) {
+      financialMetric("reversal", "reversed");
+    }
+    if (positiveMinor(facts.debtCreatedMinor)) {
+      financialMetric("debt", "debt_created");
+    }
+  } catch {
+    // Invalid or unavailable facts must not alter financial semantics.
+  }
+};
+
+const recordHeldReplayFacts = (result: HeldRewardReplayResult): void => {
+  try {
+    const outcome: ReferralMetricLabels["outcome"] =
+      result.kind === "cancelled_by_refund"
+        ? "cancelled"
+        : result.kind === "terminated_after_grant" ||
+            result.kind === "ineligible"
+          ? "ineligible"
+          : result.kind === "reward_granted"
+            ? "granted"
+            : result.kind === "debt_repaid"
+              ? "debt_repaid"
+              : "still_held";
+    financialMetric("held_replay", outcome);
+    if (result.financialFacts.rewardCreated) {
+      financialMetric(
+        "reward_grant",
+        positiveMinor(result.financialFacts.debtRepaidMinor)
+          ? "debt_repaid"
+          : "granted",
+      );
+    }
+    if (positiveMinor(result.financialFacts.debtRepaidMinor)) {
+      financialMetric("debt", "debt_repaid");
+    }
+  } catch {
+    // Invalid or unavailable facts must not alter financial semantics.
   }
 };
 
@@ -276,7 +344,7 @@ export const createExpertResidencyService = (
     if (order.expertId !== identity.expertId) {
       throw new Error("expert_residency_order_ownership_mismatch");
     }
-    recordFinancialTelemetry(order.telemetry);
+    recordCheckoutFacts(order.financialFacts);
     const payment = await dependencies.payment.createCheckout({
       orderId: order.orderId,
       idempotencyKey: request.idempotencyKey,
@@ -289,12 +357,12 @@ export const createExpertResidencyService = (
 
   async settle(event) {
     const result = await dependencies.existingState.settle(event);
-    recordFinancialTelemetry(result.telemetry);
+    recordSettlementFacts(result.financialFacts);
     return result;
   },
   async refund(event) {
     const result = await dependencies.existingState.refund(event);
-    recordFinancialTelemetry(result.telemetry);
+    recordRefundFacts(result.kind, result.financialFacts);
     return result;
   },
   async reconcile(paymentId) {
@@ -302,26 +370,33 @@ export const createExpertResidencyService = (
     if (event === null) return null;
     if (event.kind === "settled") {
       const result = await dependencies.existingState.settle(event);
-      recordFinancialTelemetry(result.telemetry);
+      recordSettlementFacts(result.financialFacts);
       return result;
     }
     const result = await dependencies.existingState.refund(event);
-    recordFinancialTelemetry(result.telemetry);
+    recordRefundFacts(result.kind, result.financialFacts);
     return result;
   },
   async releaseExpiredOrder(command) {
     const result = await dependencies.orders.releaseExpiredOrders(command);
-    recordFinancialTelemetry(result.telemetry);
+    if (result.kind === "expired" && result.released) {
+      financialMetric("credit_expiry", "expired");
+    }
     return result;
   },
   async reverseReward(command) {
     const result = await dependencies.orders.reverseRewardGrant(command);
-    recordFinancialTelemetry(result.telemetry);
+    if (result.rewardReversed) {
+      financialMetric("reversal", "reversed");
+    }
+    if (result.debtMinor > 0n) {
+      financialMetric("debt", "debt_created");
+    }
     return result;
   },
   async replayHeldReward(command) {
     const result = await dependencies.existingState.replayHeldReward(command);
-    recordFinancialTelemetry(result.telemetry);
+    recordHeldReplayFacts(result);
     return result;
   },
 });
