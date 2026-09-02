@@ -139,3 +139,29 @@ DB commit: `53ffdb7ea254a327279ddca81d4b73045dcdece3`
 - Integrated real PostgreSQL repository gate: `26/26`, with only the exhausted old concurrency repetitions skipped. Integrated held-replay affected gate: `3/3`.
 - Dependency-ordered builds passed `10/10`. The first integrated typecheck exposed the third new telemetry fixture missing `claimedAt`; after correcting that fixture, dependency-ordered typechecks passed `10/10`.
 - Exact changed-TypeScript ESLint, changed-file Prettier, and `git diff --check` passed. No migration, schema, flag, live provider, credential, or network change was introduced.
+
+## Independent-review remediation round 3 — debt bindings and authoritative effects
+
+Base: `7099734f6a159de7d0c8c0d4f2a789a3a65438f2`
+
+Integrated commits:
+
+- `32aeca6` — DB projection and authoritative expiry count (source `ec3be7c3de19b46314eee8c92858ad32d13a58a4`).
+- `6fe5a8f` — typed authoritative financial facts and effect-derived telemetry (source `01900a8b53f589aca63da0afc2f9f89c2d750ed9`).
+
+### Round-3 RED/GREEN
+
+- RED: `creditChanged` was absent for a released reservation and for both bounded zero/nonzero unit outcomes. A structurally consistent reward with corrupted amount or one-second lifetime drift incorrectly matched. A production-shaped debt repayment bound to an old reversal but funded by a new same-inviter reward grant incorrectly emitted a debt mismatch, while two old-source/source-allocation corruptions incorrectly matched.
+- GREEN: targeted DB remediation passed `8/8`; the complete affected worker repository slice passed `31/31`. The three previously exhausted skip-locked repetitions and the already isolated snapshot-race test were explicitly excluded.
+- Debt projection now keeps `original_entry_id` bound to the old reversal while requiring repayment `source_id` and its sole allocation to bind the new same-account reward grant. Aggregate repayments remain bounded by the reversed amount. Reward projection independently enforces `100000` minor units and exactly `31536000` seconds.
+- Expiry batches now return required `creditChanged`, incremented only for `kind = expired` with `released = true`; cash-only order expiry remains `changed = 1`, `creditChanged = 0`.
+- Application and provider boundaries now return typed immutable financial facts. Telemetry is derived only from those authoritative facts, including exact zero-value negative cases; it is not inferred from order/result labels.
+
+### Round-3 integrated gate
+
+- Application/worker/observability/runtime/API/scope guards: 8 files, `64/64`.
+- Real PostgreSQL projection/debt/expiry repository: `31/31` with exhausted races excluded.
+- Real PostgreSQL authoritative facts: checkout `1/1`, held replay `2/2`, refund/reversal/debt `3/3`, settlement/debt/expiry `5/5`.
+- Dependency-ordered workspace builds passed `10/10`; workspace typechecks passed `10/10`. Fresh worktrees must build dependency barrels before Vitest/typecheck can resolve workspace package exports.
+- The known provider-deadline fixture remains the recorded Task 12 carry. It was deliberately not selected and is not attributed to Task 11.
+- No schema, migration, feature flag, live provider, credential, network, or deployment change was introduced.
