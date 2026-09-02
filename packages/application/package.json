@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ii-tonya/contracts": "workspace:*",
-    "@ii-tonya/domain": "workspace:*"
+    "@ii-tonya/domain": "workspace:*",
+    "@ii-tonya/observability": "workspace:*"
   }
 }

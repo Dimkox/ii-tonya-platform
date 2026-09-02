@@ -1,3 +1,4 @@
+import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
 import type { AdminPrincipal } from "./admin-service.js";
 
 export const EXPERT_REFERRAL_FEATURE_CONTROL_OBJECT_ID =
@@ -327,25 +328,70 @@ export const createExpertReferralAdminService = (
     if (!dependencies.environment.read().referralEnabled) {
       fail("feature_disabled", 403);
     }
-    return dependencies.referrals.issueBatch({
-      ...evidence(principal, command),
-      inviterExpertId: command.inviterExpertId,
-      count: command.count,
-      ...(command.overrideId === undefined
-        ? {}
-        : { overrideId: command.overrideId }),
-    });
+    try {
+      const result = await dependencies.referrals.issueBatch({
+        ...evidence(principal, command),
+        inviterExpertId: command.inviterExpertId,
+        count: command.count,
+        ...(command.overrideId === undefined
+          ? {}
+          : { overrideId: command.overrideId }),
+      });
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "batch_lifecycle",
+        outcome: "issued",
+        errorCode: "none",
+      });
+      if (result.codes.length > 0) {
+        recordExpertReferralLifecycle(
+          {
+            module: "expert_referral",
+            operation: "code_lifecycle",
+            outcome: "issued",
+            errorCode: "none",
+          },
+          result.codes.length,
+        );
+      }
+      return result;
+    } catch (error) {
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "batch_lifecycle",
+        outcome: "failed",
+        errorCode: "unknown",
+      });
+      throw error;
+    }
   },
 
   async revokeCode(principal, command) {
     authorize(principal);
     exactTarget(command.routeObjectId, command.codeId);
     boundedReason(command.reasonCode);
-    return dependencies.referrals.revokeCode({
-      ...evidence(principal, command),
-      codeId: command.codeId,
-      reasonCode: command.reasonCode,
-    });
+    try {
+      const result = await dependencies.referrals.revokeCode({
+        ...evidence(principal, command),
+        codeId: command.codeId,
+        reasonCode: command.reasonCode,
+      });
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "code_lifecycle",
+        outcome: "revoked",
+        errorCode: "none",
+      });
+      return result;
+    } catch (error) {
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "code_lifecycle",
+        outcome: "failed",
+        errorCode: "unknown",
+      });
+      throw error;
+    }
   },
 
   async createIssuanceOverride(principal, command) {

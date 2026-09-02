@@ -7,6 +7,10 @@ export default defineConfig({
         "./packages/integrations/src/index.ts",
         import.meta.url,
       ).pathname,
+      "@ii-tonya/observability": new URL(
+        "./packages/observability/src/index.ts",
+        import.meta.url,
+      ).pathname,
     },
   },
   test: {

@@ -1,3 +1,8 @@
+import {
+  observeExpertReferralDuration,
+  recordExpertReferralLifecycle,
+} from "@ii-tonya/observability";
+
 export interface ExpertResidencyExpiryResult {
   readonly examined: number;
   readonly changed: number;
@@ -29,8 +34,65 @@ export async function expireExpertResidencyOrders(
   batchSize: number,
 ): Promise<ExpertResidencyExpiryResult> {
   assertBatchInput(now, batchSize);
-  return repository.expireDueBatch({
-    now: new Date(now.getTime()),
-    batchSize,
-  });
+  const startedAt = performance.now();
+  try {
+    const result = await repository.expireDueBatch({
+      now: new Date(now.getTime()),
+      batchSize,
+    });
+    if (result.changed > 0) {
+      recordExpertReferralLifecycle(
+        {
+          module: "expert_residency",
+          operation: "credit_expiry",
+          outcome: "expired",
+          errorCode: "none",
+        },
+        result.changed,
+      );
+    }
+    if (result.failed > 0) {
+      recordExpertReferralLifecycle(
+        {
+          module: "expert_residency",
+          operation: "credit_expiry",
+          outcome: "failed",
+          errorCode: "unknown",
+        },
+        result.failed,
+      );
+    }
+    observeExpertReferralDuration(
+      {
+        module: "expert_residency",
+        operation: "credit_expiry",
+        outcome:
+          result.changed > 0
+            ? "expired"
+            : result.failed > 0
+              ? "failed"
+              : "unchanged",
+        errorCode: result.failed > 0 ? "unknown" : "none",
+      },
+      Math.min(performance.now() - startedAt, 3_600_000),
+    );
+    return result;
+  } catch (error) {
+    recordExpertReferralLifecycle({
+      module: "expert_residency",
+      operation: "credit_expiry",
+      outcome: "failed",
+      errorCode: "unknown",
+    });
+    observeExpertReferralDuration(
+      {
+        module: "expert_residency",
+        operation: "credit_expiry",
+        outcome: "failed",
+        errorCode: "unknown",
+      },
+      Math.min(performance.now() - startedAt, 3_600_000),
+    );
+    throw error;
+  }
 }

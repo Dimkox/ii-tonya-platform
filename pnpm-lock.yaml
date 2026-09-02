@@ -102,6 +102,9 @@ importers:
       '@ii-tonya/domain':
         specifier: workspace:*
         version: link:../domain
+      '@ii-tonya/observability':
+        specifier: workspace:*
+        version: link:../observability
 
   packages/config:
     dependencies:
@@ -187,6 +190,9 @@ importers:
       '@ii-tonya/integrations':
         specifier: workspace:*
         version: link:../integrations
+      '@ii-tonya/observability':
+        specifier: workspace:*
+        version: link:../observability
 
 packages:
 

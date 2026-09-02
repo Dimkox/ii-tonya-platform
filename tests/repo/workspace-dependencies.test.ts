@@ -45,7 +45,11 @@ const required = {
     devDependencies: [],
   },
   "packages/application": {
-    dependencies: ["@ii-tonya/contracts", "@ii-tonya/domain"],
+    dependencies: [
+      "@ii-tonya/contracts",
+      "@ii-tonya/domain",
+      "@ii-tonya/observability",
+    ],
     devDependencies: [],
   },
   "packages/config": { dependencies: ["zod"], devDependencies: [] },
@@ -76,6 +80,7 @@ const required = {
       "@ii-tonya/db",
       "@ii-tonya/domain",
       "@ii-tonya/integrations",
+      "@ii-tonya/observability",
     ],
     devDependencies: [],
   },

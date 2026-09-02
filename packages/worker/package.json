@@ -21,6 +21,7 @@
     "@ii-tonya/contracts": "workspace:*",
     "@ii-tonya/db": "workspace:*",
     "@ii-tonya/domain": "workspace:*",
-    "@ii-tonya/integrations": "workspace:*"
+    "@ii-tonya/integrations": "workspace:*",
+    "@ii-tonya/observability": "workspace:*"
   }
 }

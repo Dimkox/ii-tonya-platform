@@ -1,3 +1,5 @@
+import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
+
 export interface ExpertPrincipal {
   readonly expertId: string;
   readonly userId: string;
@@ -88,19 +90,65 @@ export const createExpertReferralService = (
   dependencies: ExpertReferralDependencies,
 ): ExpertReferralService => ({
   async redeemCode(principal, code, idempotencyKey) {
-    const identity = await authorizeExpert(dependencies.identity, principal);
-    if (!dependencies.referralEnabled) return { kind: "disabled" };
-    if (identity === null) return { kind: "forbidden" };
-    const control = await dependencies.controls.readForCommand();
-    if (!control.newCommandsEnabled) return { kind: "disabled" };
-    const redeemed = await dependencies.commands.redeem({
-      plaintext: code,
-      inviteeExpertId: identity.expertId,
-      provider: identity.provider,
-      externalId: identity.externalId,
-      idempotencyKey,
-    });
-    return { kind: "redeemed", referralId: redeemed.referralId };
+    try {
+      const identity = await authorizeExpert(dependencies.identity, principal);
+      if (!dependencies.referralEnabled) {
+        recordExpertReferralLifecycle({
+          module: "expert_referral",
+          operation: "redemption",
+          outcome: "rejected",
+          errorCode: "invalid_state",
+        });
+        return { kind: "disabled" };
+      }
+      if (identity === null) {
+        recordExpertReferralLifecycle({
+          module: "expert_referral",
+          operation: "redemption",
+          outcome: "rejected",
+          errorCode: "invalid_state",
+        });
+        return { kind: "forbidden" };
+      }
+      const control = await dependencies.controls.readForCommand();
+      if (!control.newCommandsEnabled) {
+        recordExpertReferralLifecycle({
+          module: "expert_referral",
+          operation: "redemption",
+          outcome: "rejected",
+          errorCode: "invalid_state",
+        });
+        return { kind: "disabled" };
+      }
+      const redeemed = await dependencies.commands.redeem({
+        plaintext: code,
+        inviteeExpertId: identity.expertId,
+        provider: identity.provider,
+        externalId: identity.externalId,
+        idempotencyKey,
+      });
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "redemption",
+        outcome: "redeemed",
+        errorCode: "none",
+      });
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "code_lifecycle",
+        outcome: "redeemed",
+        errorCode: "none",
+      });
+      return { kind: "redeemed", referralId: redeemed.referralId };
+    } catch (error) {
+      recordExpertReferralLifecycle({
+        module: "expert_referral",
+        operation: "redemption",
+        outcome: "failed",
+        errorCode: "unknown",
+      });
+      throw error;
+    }
   },
 
   async summary(principal) {

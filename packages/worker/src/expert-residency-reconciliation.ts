@@ -1,3 +1,5 @@
+import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
+
 export interface ExpertResidencyReconciliationCandidate {
   readonly attemptId: string;
   readonly providerPaymentId: string;
@@ -57,16 +59,49 @@ export async function reconcileExpertResidencyPayments(
       const event = await provider.reconcile(candidate.providerPaymentId);
       if (event === null) {
         providerDisabled += 1;
+        recordExpertReferralLifecycle({
+          module: "expert_residency",
+          operation: "reconciliation_mismatch",
+          outcome: "provider_disabled",
+          errorCode: "provider_disabled",
+        });
         continue;
       }
       const result = await repository.compareAndRecordReconciliation(
         candidate,
         event,
       );
-      if (result === "matched") matched += 1;
-      else mismatches += 1;
+      if (result === "matched") {
+        matched += 1;
+        recordExpertReferralLifecycle({
+          module: "expert_residency",
+          operation: "reconciliation_mismatch",
+          outcome: "matched",
+          errorCode: "none",
+        });
+        recordExpertReferralLifecycle({
+          module: "expert_residency",
+          operation: "duplicate_event",
+          outcome: "duplicate",
+          errorCode: "none",
+        });
+      } else {
+        mismatches += 1;
+        recordExpertReferralLifecycle({
+          module: "expert_residency",
+          operation: "reconciliation_mismatch",
+          outcome: "mismatch",
+          errorCode: "conflicting_fact",
+        });
+      }
     } catch {
       failed += 1;
+      recordExpertReferralLifecycle({
+        module: "expert_residency",
+        operation: "reconciliation_mismatch",
+        outcome: "failed",
+        errorCode: "unknown",
+      });
     }
   }
   return {
