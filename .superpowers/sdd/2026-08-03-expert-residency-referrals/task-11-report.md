@@ -93,3 +93,24 @@ At shared HEAD `17a0dd22b11d`, the protected worktree blobs are:
 - `packages/config/src/env.ts`: `89c8cecb24079b66707a0187d9fe85a5784e4896`
 
 Their corresponding HEAD blobs are `f64f9c0d0a4301553a0689c6be67627614358529` and `0a34abc369702778ec90398fdf9b4ac62de04ee0`. The protected staged diff is empty (`sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`). The combined unstaged diff hash at this newer HEAD is `sha256:b4ff0464a597ddc42ac78a6212434e65f53ca8a6d184320438e5b2acc5ae1aa8`; the earlier `6a35…` value was diff-relative to the pre-Task-11 runtime base, so content-blob hashes are the reproducible cross-base proof.
+
+## Integrated metric remediation and final fix gate
+
+Commits integrated after the DB remediation:
+
+- `97f401f3` — DB lease/CAS, stable locked projection, transaction-owned held replay, and DB report evidence.
+- `1a7edb59` — production-boundary financial lifecycle metrics from the independently verified metric worktree.
+
+### Metric TDD evidence
+
+- RED: the production-boundary metric test required every approved finite lifecycle category to be emitted through the real application/admin/worker functions; before instrumentation those boundaries had no validated metric calls or observability dependency and the expectation could not pass.
+- GREEN: the independent metric gate passed 12 focused files / 110 tests, plus TypeScript, ESLint, and diff checks. The in-memory OpenTelemetry production test observes batch/code lifecycle, redemption, first-payment qualification, reward, bonus share, credit spend/expiry, debt, duplicate, held replay, refund/reversal, and reconciliation matched/mismatch emissions. Every observed point has exactly `module`, `operation`, `outcome`, and `errorCode`; entity IDs, plaintext/code suffixes, payloads, reasons, URLs, and exception text are absent.
+
+### Integrated verification
+
+- Application, worker, observability, runtime/main, and repository guard batch: 16 files passed; the initial integrated run was `250 passed / 1 failed` because the recursive scope guard had not yet approved the two exact new `@ii-tonya/observability` workspace edges or refreshed their manifest hashes.
+- The scope guard was narrowed to only `packages/application/package.json` and `packages/worker/package.json`, with exact current SHA-256 pins. Its focused rerun passed `112/112`.
+- Real PostgreSQL reconciliation selection passed `3/3`: immutable incident/no repair, clean locked match/no incident, and stale-owner rejection with expired-lease recovery.
+- Real PostgreSQL held replay selection passed `3/3`: disabled-to-re-enabled grant, poisoned-item isolation/lock recovery, and refund serialization. The planned concurrency ownership tests remain capped at the already recorded three runs and were not rerun in the integrated gate.
+- Dependency-ordered workspace builds passed `10/10`, followed by workspace typechecks `10/10`.
+- Exact changed-TypeScript ESLint passed. Every changed file that was Prettier-clean at the base remains clean. The excluded failures are existing baseline formatting in the minimally extracted provider-inbox body, `packages/observability/src/metrics.ts`, the two compact workspace manifests, and `pnpm-lock.yaml`; no unrelated formatting rewrite was included. `git diff --check 17a0dd22b11d` passed.

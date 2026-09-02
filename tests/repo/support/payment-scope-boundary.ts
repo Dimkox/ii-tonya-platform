@@ -106,7 +106,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/application/package.json",
-    "507dfff15d9c8b52a4fa3a30f97219c839921cee18ff2661ac15fb6bdbfcfe89",
+    "54903f8fc0b193df9b0ad5d7b81757af1d72b95ff007f1aca4d9a18143932c6a",
   ],
   [
     "packages/config/package.json",
@@ -134,7 +134,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/worker/package.json",
-    "da18d8b8bbfa95815d8d9bfae9a2de15125c8bd91e2c84be1e4de73706fa8cd7",
+    "72cd34546a54330022b159395774eb01646a66c39e5bece174c7fcd94f3261a5",
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
@@ -215,7 +215,11 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ],
   [
     "packages/application/package.json",
-    new Set(["@ii-tonya/contracts", "@ii-tonya/domain"]),
+    new Set([
+      "@ii-tonya/contracts",
+      "@ii-tonya/domain",
+      "@ii-tonya/observability",
+    ]),
   ],
   ["packages/config/package.json", new Set(["zod"])],
   ["packages/contracts/package.json", new Set(["zod"])],
@@ -249,6 +253,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
       "@ii-tonya/db",
       "@ii-tonya/domain",
       "@ii-tonya/integrations",
+      "@ii-tonya/observability",
     ]),
   ],
 ]);
