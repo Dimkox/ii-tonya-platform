@@ -137,6 +137,31 @@ describe("CI and release workflow semantics", () => {
     );
   });
 
+  it("distinguishes provider-neutral reconciliation state from live payment activation", () => {
+    const reconciliation = readFileSync(
+      "docs/operations/reconciliation.md",
+      "utf8",
+    );
+
+    expect(reconciliation).toContain("PAYMENT_PROVIDER=disabled");
+    expect(reconciliation).toMatch(/provider-neutral contracts and tables/iu);
+    expect(reconciliation).toContain("expert_residency_payment_attempts");
+    expect(reconciliation).toContain("expert_residency_provider_event_inbox");
+    for (const forbiddenLiveSurface of [
+      "route",
+      "adapter",
+      "SDK",
+      "credential",
+      "provider configuration activation",
+      "composition",
+    ]) {
+      expect(reconciliation).toContain(forbiddenLiveSurface);
+    }
+    expect(reconciliation).not.toContain(
+      "no payment routes, tables, or provider configuration exist",
+    );
+  });
+
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];
