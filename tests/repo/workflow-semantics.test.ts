@@ -11,25 +11,34 @@ describe("CI and release workflow semantics", () => {
       "docs/superpowers/plans/2026-08-03-expert-residency-referrals.md",
       "utf8",
     );
+    const traceabilityText = readFileSync(
+      "docs/spec/expert-residency-referrals-traceability.md",
+      "utf8",
+    );
+    const trackedDocumentationText = `${planText}\n${traceabilityText}`;
+    const trackedRepeatPolicyText = `${dbGateText}\n${trackedDocumentationText}`;
     const dbGate = parse(dbGateText);
     const workflowCommands = (
       dbGate.jobs["postgres-schema"].steps as WorkflowStep[]
     )
       .map((step) => step.run ?? "")
       .filter((run) => run.includes("pnpm test:repeat"));
-    const documentedCommands = planText.match(/pnpm test:repeat[^`\n]*/gu);
+    const documentedCommands = trackedDocumentationText.match(
+      /pnpm test:repeat[^`\n]*/gu,
+    );
     const plannedCommands = [
       ...workflowCommands,
       ...(documentedCommands ?? []),
     ];
 
+    expect(trackedRepeatPolicyText).toContain("## External release gates");
     expect(plannedCommands.length).toBeGreaterThan(0);
     expect(
       plannedCommands.every((command) =>
         /pnpm test:repeat\s+--\s+3(?:\s|$)/u.test(command),
       ),
     ).toBe(true);
-    expect(`${dbGateText}\n${planText}`).not.toMatch(
+    expect(trackedRepeatPolicyText).not.toMatch(
       /pnpm test:repeat[^`\n]*(?:--\s+20\b|\b20\s*$)/u,
     );
   });
