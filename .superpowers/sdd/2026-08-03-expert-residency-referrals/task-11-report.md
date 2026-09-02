@@ -114,3 +114,28 @@ Commits integrated after the DB remediation:
 - Real PostgreSQL held replay selection passed `3/3`: disabled-to-re-enabled grant, poisoned-item isolation/lock recovery, and refund serialization. The planned concurrency ownership tests remain capped at the already recorded three runs and were not rerun in the integrated gate.
 - Dependency-ordered workspace builds passed `10/10`, followed by workspace typechecks `10/10`.
 - Exact changed-TypeScript ESLint passed. Every changed file that was Prettier-clean at the base remains clean. The excluded failures are existing baseline formatting in the minimally extracted provider-inbox body, `packages/observability/src/metrics.ts`, the two compact workspace manifests, and `pnpm-lock.yaml`; no unrelated formatting rewrite was included. `git diff --check 17a0dd22b11d` passed.
+
+## Independent-review remediation round 2 — stable projection and replay fairness
+
+Base: `ae0561f27afeee44a97d720dcf7f96ffbc2f4f39`
+
+DB commit: `53ffdb7ea254a327279ddca81d4b73045dcdece3`
+
+- Reconciliation now takes separate statements in the established order: feature control, order, exact attempt lease/CAS, first-settlement marker, referral, reward grants, ledger entries, allocations, and residency rows. The complete projection runs in a new READ COMMITTED statement after those locks, so a waiter cannot report an incident from the snapshot that preceded a committed terminal transition.
+- Provider identity now requires both the attempt-side and order-side provider/payment identifiers. Reservation validation independently proves reservation, terminal, and per-grant allocation totals. Reward validation requires the exact marker/referral/inviter/order binding and reward ledger fact. Allocation completeness covers all seven balance-affecting kinds, including reversal and debt repayment; debt validation proves reversal/reward bindings, allocated debt position, and the repayment bound. Residency validation independently proves the exact quoted duration.
+- Held replay uses `expert_residency_orders.updated_at` as a durable schema-free cursor. The cursor update is in the outer control/order claim transaction and outside the per-item savepoint, so `batchSize=1` advances past both `still_held` and poisoned outcomes while preserving retry visibility and the Task 7 financial transaction.
+- The worker reconciliation candidate contract now requires and forwards `claimedAt`; the exact database repository lease remains mandatory and was not weakened for test fixtures.
+
+### Round-2 RED/GREEN evidence
+
+- RED: worker typecheck failed with `TS2353` because `claimedAt` was absent from the worker candidate interface. Real PostgreSQL fairness failed `2/2`: the second `batchSize=1` call selected the same oldest still-held/poisoned marker. The projection returned `matched` for seven independent corruptions: order provider, order provider payment ID, terminal/reservation total, reward binding, reversal allocation, debt-repayment allocation, and debt source/binding. The exact-duration probe required a deliberately dropped/re-added `NOT VALID` test constraint because the normal write-time check correctly rejects that corruption.
+- GREEN: the independent projection matrix passed `8/8`, the clean locked projection passed, and the fresh-statement terminal-transition lock-wait race passed `1/1` with zero false incident. The affected worker repository gate passed `26/26`; the already exhausted three old skip-locked concurrency repetitions were selected out. Worker reconciliation passed `5/5`. Real PostgreSQL held replay passed `3/3`, including the two new fairness cases.
+- Every mismatch remains one of seven finite codes. Each corruption retry produced one idempotent incident/audit pair and no corrective financial mutation.
+
+### Integrated telemetry and final gate
+
+- Integrated effect-based telemetry commit `ad3f885` (source `cb842d6e9e66fa530409048893dfb9b4d8210133`). Three telemetry test candidates were updated with the now-authoritative `claimedAt` lease; production interfaces were not weakened.
+- Integrated focused/application/worker/observability/scope guard gate: 11 files, `85/85` tests.
+- Integrated real PostgreSQL repository gate: `26/26`, with only the exhausted old concurrency repetitions skipped. Integrated held-replay affected gate: `3/3`.
+- Dependency-ordered builds passed `10/10`. The first integrated typecheck exposed the third new telemetry fixture missing `claimedAt`; after correcting that fixture, dependency-ordered typechecks passed `10/10`.
+- Exact changed-TypeScript ESLint, changed-file Prettier, and `git diff --check` passed. No migration, schema, flag, live provider, credential, or network change was introduced.

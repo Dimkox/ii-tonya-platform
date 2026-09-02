@@ -27,9 +27,8 @@ vi.mock("@opentelemetry/api", async (importOriginal) => {
 describe("expert financial telemetry failure isolation", () => {
   it("returns committed success when the OTel instrument throws", async () => {
     metricAttempts.length = 0;
-    const { createExpertResidencyService } = await import(
-      "../../application/src/expert-residency-service.js"
-    );
+    const { createExpertResidencyService } =
+      await import("../../application/src/expert-residency-service.js");
     const committed = {
       kind: "settled" as const,
       telemetry: {
@@ -46,7 +45,9 @@ describe("expert financial telemetry failure isolation", () => {
     const service = createExpertResidencyService({
       billingEnabled: false,
       identity: { authorize: async () => null },
-      controls: { readForCommand: async () => ({ version: 1, newCommandsEnabled: false }) },
+      controls: {
+        readForCommand: async () => ({ version: 1, newCommandsEnabled: false }),
+      },
       orders: {} as never,
       payment: {} as never,
       existingState: {

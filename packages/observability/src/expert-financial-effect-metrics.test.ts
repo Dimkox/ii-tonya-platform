@@ -32,16 +32,14 @@ describe("authoritative expert financial effect metrics", () => {
   });
   const provider = new sdkMetrics.MeterProvider({ readers: [reader] });
   let createService: CreateService;
-  let reconcilePayments: typeof import("../../worker/src/expert-residency-reconciliation.js")["reconcileExpertResidencyPayments"];
+  let reconcilePayments: (typeof import("../../worker/src/expert-residency-reconciliation.js"))["reconcileExpertResidencyPayments"];
 
   beforeAll(async () => {
     expect(apiMetrics.setGlobalMeterProvider(provider)).toBe(true);
-    ({ createExpertResidencyService: createService } = await import(
-      "../../application/src/expert-residency-service.js"
-    ));
-    ({ reconcileExpertResidencyPayments: reconcilePayments } = await import(
-      "../../worker/src/expert-residency-reconciliation.js"
-    ));
+    ({ createExpertResidencyService: createService } =
+      await import("../../application/src/expert-residency-service.js"));
+    ({ reconcileExpertResidencyPayments: reconcilePayments } =
+      await import("../../worker/src/expert-residency-reconciliation.js"));
   });
 
   afterAll(async () => {
@@ -59,15 +57,21 @@ describe("authoritative expert financial effect metrics", () => {
         }
         for (const point of metric.dataPoints) {
           const operation = String(point.attributes.operation);
-          result.set(operation, (result.get(operation) ?? 0) + Number(point.value));
+          result.set(
+            operation,
+            (result.get(operation) ?? 0) + Number(point.value),
+          );
         }
       }
     }
     return result;
   };
 
-  const change = (before: Map<string, number>, after: Map<string, number>, operation: string) =>
-    (after.get(operation) ?? 0) - (before.get(operation) ?? 0);
+  const change = (
+    before: Map<string, number>,
+    after: Map<string, number>,
+    operation: string,
+  ) => (after.get(operation) ?? 0) - (before.get(operation) ?? 0);
 
   const dependencies = (
     overrides: Partial<ExpertResidencyDependencies> = {},
@@ -200,7 +204,11 @@ describe("authoritative expert financial effect metrics", () => {
     await reconcilePayments(
       {
         claimReconciliationBatch: async () => [
-          { attemptId: "private-attempt", providerPaymentId: "private-payment" },
+          {
+            attemptId: "private-attempt",
+            providerPaymentId: "private-payment",
+            claimedAt: "2026-09-02T00:00:00.000Z",
+          },
         ],
         compareAndRecordReconciliation: async () => "matched",
       },
@@ -246,7 +254,9 @@ describe("authoritative expert financial effect metrics", () => {
 
     const afterReplay = await totals();
     expect(change(beforeReplay, afterReplay, "duplicate_event")).toBe(1);
-    expect(change(beforeReplay, afterReplay, "first_payment_qualification")).toBe(0);
+    expect(
+      change(beforeReplay, afterReplay, "first_payment_qualification"),
+    ).toBe(0);
     expect(change(beforeReplay, afterReplay, "credit_spend")).toBe(0);
     expect(change(beforeReplay, afterReplay, "reward_grant")).toBe(0);
   });

@@ -332,6 +332,7 @@ describe("expert financial production-boundary metrics", () => {
           {
             attemptId: "private-attempt-id",
             providerPaymentId: "private-payment-id",
+            claimedAt: "2026-09-02T00:00:00.000Z",
           },
         ],
         compareAndRecordReconciliation: async () => "mismatch" as const,
@@ -346,6 +347,7 @@ describe("expert financial production-boundary metrics", () => {
           {
             attemptId: "private-attempt-id",
             providerPaymentId: "private-payment-id",
+            claimedAt: "2026-09-02T00:00:00.000Z",
           },
         ],
         compareAndRecordReconciliation: async () => "matched" as const,
