@@ -23,6 +23,7 @@ export interface ExpertReferralWorkerBatchCommand {
 export interface ExpertReferralWorkerBatchResult {
   readonly examined: number;
   readonly changed: number;
+  readonly creditChanged: number;
   readonly failed: number;
 }
 
@@ -191,6 +192,7 @@ export class PostgresExpertReferralWorkerRepository {
         `)
       ).rows;
       let changed = 0;
+      let creditChanged = 0;
       let failed = 0;
       for (const candidate of candidates) {
         try {
@@ -199,12 +201,15 @@ export class PostgresExpertReferralWorkerRepository {
               orderId: candidate.orderId,
             }),
           );
-          if (result.kind === "expired") changed += 1;
+          if (result.kind === "expired") {
+            changed += 1;
+            if (result.released) creditChanged += 1;
+          }
         } catch {
           failed += 1;
         }
       }
-      return { examined: candidates.length, changed, failed };
+      return { examined: candidates.length, changed, creditChanged, failed };
     });
   }
 
@@ -424,9 +429,27 @@ export class PostgresExpertReferralWorkerRepository {
                   select 1 from expert_referral_ledger_entries repayment_row
                   where repayment_row.original_entry_id = reversal.id
                     and repayment_row.entry_kind = 'debt_repayment'
-                    and (repayment_row.source_id <> reversal.source_id
+                    and (repayment_row.source_type <> 'reward_grant'
+                      or repayment_row.source_id = reversal.source_id
                       or repayment_row.account_expert_id
-                        <> reversal.account_expert_id)
+                        <> reversal.account_expert_id
+                      or not exists (
+                        select 1 from expert_referral_reward_grants repayment_grant
+                        where repayment_grant.id = repayment_row.source_id
+                          and repayment_grant.inviter_expert_id
+                            = repayment_row.account_expert_id
+                      )
+                      or not exists (
+                        select 1
+                        from expert_referral_ledger_allocations repayment_a
+                        where repayment_a.ledger_entry_id = repayment_row.id
+                        group by repayment_a.ledger_entry_id
+                        having count(*) = 1
+                          and min(repayment_a.reward_grant_id::text)
+                            = repayment_row.source_id::text
+                          and sum(repayment_a.amount_minor)
+                            = repayment_row.amount_minor
+                      ))
                 )
             ) as "debtProjectionValid",
             case
@@ -510,6 +533,9 @@ export class PostgresExpertReferralWorkerRepository {
                 and grant_row.referral_id = referral.id
                 and grant_row.first_settlement_id = marker.id
                 and grant_row.qualifying_order_id = o.id
+                and grant_row.amount_minor = 100000
+                and extract(epoch from
+                  (grant_row.expires_at - grant_row.granted_at)) = 31536000
                 and exists (
                   select 1 from expert_referral_ledger_entries reward
                   where reward.entry_kind = 'reward_grant'

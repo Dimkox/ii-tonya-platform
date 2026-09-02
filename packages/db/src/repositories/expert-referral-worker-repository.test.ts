@@ -62,7 +62,12 @@ describe("expert referral worker repository", () => {
         now: new Date("2026-09-02T00:00:00.000Z"),
         batchSize: 100,
       }),
-    ).resolves.toEqual({ examined: 1, changed: 1, failed: 0 });
+    ).resolves.toEqual({
+      examined: 1,
+      changed: 1,
+      creditChanged: 1,
+      failed: 0,
+    });
 
     const claimSql = rendered(fake.execute.mock.calls[0]![0]);
     expect(claimSql).toMatch(
@@ -93,7 +98,12 @@ describe("expert referral worker repository", () => {
         now: new Date("2026-09-02T00:00:00.000Z"),
         batchSize: 2,
       }),
-    ).resolves.toEqual({ examined: 2, changed: 1, failed: 1 });
+    ).resolves.toEqual({
+      examined: 2,
+      changed: 1,
+      creditChanged: 0,
+      failed: 1,
+    });
   });
 
   it("claims reconciliation candidates with no network call under the database lock", async () => {
@@ -296,8 +306,9 @@ describe("expert referral worker PostgreSQL claims", () => {
   beforeEach(async () => testDb.reset());
   afterAll(async () => testDb?.stop(), 120_000);
 
-  async function seedDueOrder(): Promise<string> {
-    const expert = await fixtures.createExpert();
+  async function seedDueOrder(existingExpertId?: string): Promise<string> {
+    const expertId =
+      existingExpertId ?? (await fixtures.createExpert()).expertId;
     const tariffVersionId = randomUUID();
     const orderId = randomUUID();
     const tariffKey = `worker-expiry-${orderId}`;
@@ -333,7 +344,7 @@ describe("expert referral worker PostgreSQL claims", () => {
         price_minor, currency, duration_seconds, credit_minor, cash_minor,
         payment_deadline, provider_deadline, idempotency_key, status, quoted_at
       ) values (
-        ${orderId}::uuid, ${expert.expertId}::uuid, ${tariffVersionId}::uuid,
+        ${orderId}::uuid, ${expertId}::uuid, ${tariffVersionId}::uuid,
         'Worker expiry', 'Exact database deadline fixture', 100000, 'RUB',
         86400, 0, 100000, transaction_timestamp(),
         transaction_timestamp() + interval '1 day', ${`worker-expiry:${orderId}`},
@@ -413,6 +424,7 @@ describe("expert referral worker PostgreSQL claims", () => {
   async function seedRewardProjection(input: {
     orderId: string;
     expertId: string;
+    inviterId?: string;
   }): Promise<{
     inviterId: string;
     referralId: string;
@@ -420,9 +432,16 @@ describe("expert referral worker PostgreSQL claims", () => {
     grantId: string;
     rewardEntryId: string;
   }> {
-    const inviter = await fixtures.createExpert();
-    await fixtures.seedIssuedQuota(inviter.expertId, 1);
-    const code = (await fixtures.storedCodes())[0]!;
+    const inviterId =
+      input.inviterId ?? (await fixtures.createExpert()).expertId;
+    await fixtures.seedIssuedQuota(inviterId, 1);
+    const code = (
+      await testDb.db.execute<{ id: string }>(sql`select code.id
+        from expert_referral_codes code
+        join expert_referral_code_batches batch on batch.id = code.batch_id
+        where batch.inviter_expert_id = ${inviterId}::uuid
+        order by code.issued_at desc, code.id desc limit 1`)
+    ).rows[0]!;
     const referralId = randomUUID();
     const markerId = randomUUID();
     const grantId = randomUUID();
@@ -432,7 +451,7 @@ describe("expert referral worker PostgreSQL claims", () => {
       await tx.execute(sql`insert into expert_referrals (
         id, code_id, inviter_expert_id, invitee_expert_id
       ) values (${referralId}::uuid, ${code.id}::uuid,
-        ${inviter.expertId}::uuid, ${input.expertId}::uuid)`);
+        ${inviterId}::uuid, ${input.expertId}::uuid)`);
       await tx.execute(sql`insert into expert_first_residency_settlements (
         id, expert_id, qualifying_order_id, eligibility_status,
         eligibility_reason_code, expert_active, expert_verified,
@@ -443,14 +462,14 @@ describe("expert referral worker PostgreSQL claims", () => {
       await tx.execute(sql`insert into expert_referral_reward_grants (
         id, inviter_expert_id, referral_id, qualifying_order_id,
         first_settlement_id, amount_minor, granted_at, expires_at
-      ) values (${grantId}::uuid, ${inviter.expertId}::uuid,
+      ) values (${grantId}::uuid, ${inviterId}::uuid,
         ${referralId}::uuid, ${input.orderId}::uuid, ${markerId}::uuid,
         100000, '2026-09-01T00:00:00.000Z'::timestamptz,
         '2027-09-01T00:00:00.000Z'::timestamptz)`);
       await tx.execute(sql`insert into expert_referral_ledger_entries (
         id, account_expert_id, entry_kind, amount_minor, source_type,
         source_id, reward_grant_id, idempotency_key
-      ) values (${rewardEntryId}::uuid, ${inviter.expertId}::uuid,
+      ) values (${rewardEntryId}::uuid, ${inviterId}::uuid,
         'reward_grant', 100000, 'reward_grant', ${grantId}::uuid,
         ${grantId}::uuid, ${`projection-reward:${grantId}`})`);
       await tx.execute(sql`insert into expert_referral_ledger_allocations (
@@ -458,7 +477,7 @@ describe("expert referral worker PostgreSQL claims", () => {
       ) values (${rewardEntryId}::uuid, ${grantId}::uuid, 100000)`);
     });
     return {
-      inviterId: inviter.expertId,
+      inviterId,
       referralId,
       markerId,
       grantId,
@@ -471,14 +490,55 @@ describe("expert referral worker PostgreSQL claims", () => {
 
     await expect(
       repository.expireDueBatch({ now: new Date(0), batchSize: 1 }),
-    ).resolves.toEqual({ examined: 1, changed: 1, failed: 0 });
+    ).resolves.toEqual({
+      examined: 1,
+      changed: 1,
+      creditChanged: 0,
+      failed: 0,
+    });
     await expect(
       repository.expireDueBatch({ now: new Date(0), batchSize: 1 }),
-    ).resolves.toEqual({ examined: 0, changed: 0, failed: 0 });
+    ).resolves.toEqual({
+      examined: 0,
+      changed: 0,
+      creditChanged: 0,
+      failed: 0,
+    });
     const stored = await testDb.db.execute<{ status: string }>(sql`
       select status from expert_residency_orders where id = ${orderId}::uuid
     `);
     expect(stored.rows[0]?.status).toBe("expired");
+  });
+
+  it("counts only an actual credit reservation release as creditChanged", async () => {
+    const qualifying = await seedSettledReconciliation();
+    const reward = await seedRewardProjection(qualifying);
+    const orderId = await seedDueOrder(reward.inviterId);
+    const reservationId = randomUUID();
+    await testDb.db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role = replica`);
+      await tx.execute(sql`update expert_residency_orders
+        set credit_minor = 5, cash_minor = 99995
+        where id = ${orderId}::uuid`);
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type,
+        source_id, idempotency_key
+      ) values (${reservationId}::uuid, ${reward.inviterId}::uuid,
+        'reservation', -5, 'residency_order', ${orderId}::uuid,
+        ${`worker-expiry-reservation:${orderId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${reservationId}::uuid, ${reward.grantId}::uuid, 5)`);
+    });
+
+    await expect(
+      repository.expireDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toEqual({
+      examined: 1,
+      changed: 1,
+      creditChanged: 1,
+      failed: 0,
+    });
   });
 
   it("records one immutable incident for a verified mismatch and never repairs local state", async () => {
@@ -686,6 +746,142 @@ describe("expert referral worker PostgreSQL claims", () => {
           : "provider_identity",
       ]);
     },
+  );
+
+  it.each(["reward_amount", "reward_lifetime"] as const)(
+    "rejects independent %s projection corruption",
+    async (corruption) => {
+      const prepared = await seedSettledReconciliation();
+      const reward = await seedRewardProjection(prepared);
+      await testDb.db.transaction(async (tx) => {
+        if (corruption === "reward_amount") {
+          await tx.execute(sql`alter table expert_referral_reward_grants
+            drop constraint expert_reward_exact_amount`);
+          await tx.execute(sql`set local session_replication_role = replica`);
+          await tx.execute(sql`update expert_referral_reward_grants
+            set amount_minor = 99999 where id = ${reward.grantId}::uuid`);
+          await tx.execute(sql`update expert_referral_ledger_entries
+            set amount_minor = 99999 where id = ${reward.rewardEntryId}::uuid`);
+          await tx.execute(sql`update expert_referral_ledger_allocations
+            set amount_minor = 99999
+            where ledger_entry_id = ${reward.rewardEntryId}::uuid`);
+          await tx.execute(sql`alter table expert_referral_reward_grants
+            add constraint expert_reward_exact_amount
+            check (amount_minor = 100000) not valid`);
+        } else {
+          await tx.execute(sql`alter table expert_referral_reward_grants
+            drop constraint expert_reward_exact_expiry`);
+          await tx.execute(sql`set local session_replication_role = replica`);
+          await tx.execute(sql`update expert_referral_reward_grants
+            set expires_at = expires_at + interval '1 second'
+            where id = ${reward.grantId}::uuid`);
+          await tx.execute(sql`alter table expert_referral_reward_grants
+            add constraint expert_reward_exact_expiry check (
+              extract(epoch from (expires_at - granted_at)) = 31536000
+            ) not valid`);
+        }
+      });
+      const candidate = await claimedProjectionCandidate(prepared);
+
+      await expect(
+        repository.compareAndRecordReconciliation(candidate, prepared.event),
+      ).resolves.toBe("mismatch");
+      const incident = await testDb.db.execute<{
+        payload: { mismatchCodes: string[] };
+      }>(sql`select payload from integration_outbox
+        where topic = 'worker.expert_residency_reconciliation_mismatch'`);
+      expect(incident.rows).toHaveLength(1);
+      expect(incident.rows[0]?.payload.mismatchCodes).toContain(
+        "reward_grant_projection",
+      );
+    },
+  );
+
+  async function seedDebtRepaidReconciliation(
+    binding:
+      "clean" | "old_source_new_allocation" | "old_source_old_allocation",
+  ) {
+    const oldOrder = await seedSettledReconciliation();
+    const oldReward = await seedRewardProjection(oldOrder);
+    const prepared = await seedSettledReconciliation();
+    const newReward = await seedRewardProjection({
+      ...prepared,
+      inviterId: oldReward.inviterId,
+    });
+    await testDb.db.execute(sql`update expert_residency_payment_attempts
+      set status = 'failed' where id = ${oldOrder.attemptId}::uuid`);
+    const spendId = randomUUID();
+    const reversalId = randomUUID();
+    const repaymentId = randomUUID();
+    await testDb.db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role = replica`);
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type,
+        source_id, original_entry_id, idempotency_key
+      ) values (${spendId}::uuid, ${oldReward.inviterId}::uuid, 'spend',
+        -100000, 'projection_probe', ${randomUUID()}::uuid,
+        ${oldReward.rewardEntryId}::uuid, ${`projection-spent:${oldReward.grantId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${spendId}::uuid, ${oldReward.grantId}::uuid, 100000)`);
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type,
+        source_id, original_entry_id, idempotency_key
+      ) values (${reversalId}::uuid, ${oldReward.inviterId}::uuid, 'reversal',
+        -100000, 'reward_grant', ${oldReward.grantId}::uuid,
+        ${oldReward.rewardEntryId}::uuid,
+        ${`projection-debt:${oldReward.grantId}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${reversalId}::uuid, ${oldReward.grantId}::uuid, 100000)`);
+      const repaymentSourceId =
+        binding === "clean" ? newReward.grantId : oldReward.grantId;
+      const repaymentAllocationId =
+        binding === "old_source_old_allocation"
+          ? oldReward.grantId
+          : newReward.grantId;
+      await tx.execute(sql`insert into expert_referral_ledger_entries (
+        id, account_expert_id, entry_kind, amount_minor, source_type,
+        source_id, original_entry_id, idempotency_key
+      ) values (${repaymentId}::uuid, ${oldReward.inviterId}::uuid,
+        'debt_repayment', 40000, 'reward_grant',
+        ${repaymentSourceId}::uuid, ${reversalId}::uuid,
+        ${`projection-debt-repayment:${newReward.grantId}:${binding}`})`);
+      await tx.execute(sql`insert into expert_referral_ledger_allocations (
+        ledger_entry_id, reward_grant_id, amount_minor
+      ) values (${repaymentId}::uuid, ${repaymentAllocationId}::uuid, 40000)`);
+    });
+    return prepared;
+  }
+
+  it("matches a production-shaped debt repayment from a new reward grant", async () => {
+    const prepared = await seedDebtRepaidReconciliation("clean");
+    const candidate = await claimedProjectionCandidate(prepared);
+
+    await expect(
+      repository.compareAndRecordReconciliation(candidate, prepared.event),
+    ).resolves.toBe("matched");
+  });
+
+  it.each(["old_source_new_allocation", "old_source_old_allocation"] as const)(
+    "rejects corrupt debt repayment binding %s",
+    async (binding) => {
+      const prepared = await seedDebtRepaidReconciliation(binding);
+      const candidate = await claimedProjectionCandidate(prepared);
+
+      await expect(
+        repository.compareAndRecordReconciliation(candidate, prepared.event),
+      ).resolves.toBe("mismatch");
+      const incident = await testDb.db.execute<{
+        payload: { mismatchCodes: string[] };
+      }>(sql`select payload from integration_outbox
+        where topic = 'worker.expert_residency_reconciliation_mismatch'`);
+      expect(incident.rows).toHaveLength(1);
+      expect(incident.rows[0]?.payload.mismatchCodes).toContain(
+        "debt_projection",
+      );
+    },
+    30_000,
   );
 
   it.each([
