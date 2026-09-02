@@ -1,10 +1,142 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 type WorkflowStep = { name?: string; run?: string; uses?: string };
 
 describe("CI and release workflow semantics", () => {
+  it("runs every planned repeat gate count-first exactly three times", () => {
+    const dbGateText = readFileSync(".github/workflows/db-gate.yml", "utf8");
+    const planText = readFileSync(
+      "docs/superpowers/plans/2026-08-03-expert-residency-referrals.md",
+      "utf8",
+    );
+    const dbGate = parse(dbGateText);
+    const workflowCommands = (
+      dbGate.jobs["postgres-schema"].steps as WorkflowStep[]
+    )
+      .map((step) => step.run ?? "")
+      .filter((run) => run.includes("pnpm test:repeat"));
+    const documentedCommands = planText.match(/pnpm test:repeat[^`\n]*/gu);
+    const plannedCommands = [
+      ...workflowCommands,
+      ...(documentedCommands ?? []),
+    ];
+
+    expect(plannedCommands.length).toBeGreaterThan(0);
+    expect(
+      plannedCommands.every((command) =>
+        /pnpm test:repeat\s+--\s+3(?:\s|$)/u.test(command),
+      ),
+    ).toBe(true);
+    expect(`${dbGateText}\n${planText}`).not.toMatch(
+      /pnpm test:repeat[^`\n]*(?:--\s+20\b|\b20\s*$)/u,
+    );
+  });
+
+  it("makes the expert referral database and release gates executable", () => {
+    const workflow = parse(
+      readFileSync(".github/workflows/db-gate.yml", "utf8"),
+    );
+    const dbRuns = (workflow.jobs["postgres-schema"].steps as WorkflowStep[])
+      .map((step) => step.run ?? "")
+      .join("\n");
+    for (const path of [
+      "tests/integration/expert-referral-redemption-concurrency.test.ts",
+      "tests/integration/expert-residency-checkout-concurrency.test.ts",
+      "tests/integration/expert-residency-settlement-concurrency.test.ts",
+      "tests/integration/expert-residency-deadline.test.ts",
+      "tests/integration/expert-residency-hold-replay.test.ts",
+      "tests/integration/expert-residency-refund-reversal.test.ts",
+      "tests/integration/expert-referral-migration-upgrade.test.ts",
+      "tests/repo/db-schema-parity.test.ts",
+      "tests/repo/scope-boundary.test.ts",
+    ]) {
+      expect(dbRuns).toContain(path);
+    }
+    expect(dbRuns).toContain("pnpm test:repeat -- 3 ");
+
+    const ci = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+    const ciRuns = (ci.jobs.verify.steps as WorkflowStep[])
+      .map((step) => step.run ?? "")
+      .join("\n");
+    expect(ciRuns).toContain("pnpm verify:expert-residency-release");
+
+    const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    expect(manifest.scripts?.verify).toContain(
+      "pnpm verify:expert-residency-release",
+    );
+    expect(manifest.scripts?.["verify:expert-residency-release"]).toBeTruthy();
+    expect(manifest.scripts?.["test:integration"]).toContain("--maxWorkers=4");
+    expect(manifest.scripts?.verify).not.toContain("pnpm verify &&");
+  });
+
+  it("ships complete and path-valid ERR-FR-001 through ERR-FR-042 traceability", () => {
+    const path = "docs/spec/expert-residency-referrals-traceability.md";
+    expect(existsSync(path)).toBe(true);
+    const traceability = readFileSync(path, "utf8");
+    const rows = traceability
+      .split(/\r?\n/u)
+      .filter((line) => /^\|\s*ERR-FR-\d{3}\s*\|/u.test(line));
+    const expectedIds = Array.from(
+      { length: 42 },
+      (_, index) => `ERR-FR-${String(index + 1).padStart(3, "0")}`,
+    );
+    expect(rows.map((row) => row.split("|")[1]?.trim())).toEqual(expectedIds);
+
+    for (const row of rows) {
+      const cells = row
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim());
+      expect(cells).toHaveLength(7);
+      expect(cells.every((cell) => cell.length > 0 && cell !== "covered")).toBe(
+        true,
+      );
+      const citedPaths = [
+        ...row.matchAll(
+          /`([^`# ]+\/[^`# ]+\.(?:ts|md|yml|yaml|json|sql|mjs))(?:#[^`]*)?`/gu,
+        ),
+      ].map((match) => match[1]!);
+      expect(citedPaths.length).toBeGreaterThanOrEqual(2);
+      expect(citedPaths.every((citedPath) => existsSync(citedPath))).toBe(true);
+    }
+  });
+
+  it("keeps expert release runbooks fail-closed, synthetic, and redacted", () => {
+    const operations = readFileSync(
+      "docs/runbooks/expert-residency-referrals.md",
+      "utf8",
+    );
+    const rollback = readFileSync(
+      "docs/runbooks/expert-residency-referrals-rollback.md",
+      "utf8",
+    );
+    const combined = `${operations}\n${rollback}`;
+    for (const required of [
+      "SYNTHETIC-ONLY",
+      "PENDING/BLOCKING",
+      "EXPERT_REFERRAL_ENABLED=false",
+      "EXPERT_RESIDENCY_BILLING_ENABLED=false",
+      "HMAC",
+      "kill switch",
+      "held replay",
+      "chargeback",
+      "debt",
+      "reconciliation",
+      "500/500",
+      "forward-fix",
+    ]) {
+      expect(combined).toContain(required);
+    }
+    expect(combined).not.toMatch(/rm\s+-rf|truncate\s+table|delete\s+from/iu);
+    expect(combined).not.toMatch(
+      /(?:api[_-]?key|token|secret)\s*=\s*(?!<REDACTED>)/iu,
+    );
+  });
+
   it("installs the frozen dependency graph before every pnpm execution", () => {
     const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
     const steps = workflow.jobs.verify.steps as WorkflowStep[];

@@ -85,6 +85,10 @@ describe("environment credential policy", () => {
     expect(runtimeText).toContain(
       "EXPERT_REFERRAL_HMAC_KEYS_JSON is secret-managed and intentionally absent",
     );
+
+    expect(
+      Object.keys(example).filter((key) => /^EXPERT_.+_ENABLED$/u.test(key)),
+    ).toEqual(["EXPERT_REFERRAL_ENABLED", "EXPERT_RESIDENCY_BILLING_ENABLED"]);
   });
 
   it("validates a release only with disabled expert ceilings and no inline key map", () => {

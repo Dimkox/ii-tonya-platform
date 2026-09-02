@@ -102,7 +102,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "72663e3c3fec8213589133841b9f10cd39ee1a7cefe00967fa279befa1deb891",
+    "317c2794b111bd2643072e169310d78a5ed33a008042c0ecbf96f41233a8a968",
   ],
   [
     "packages/application/package.json",
@@ -140,11 +140,11 @@ const approvedPackageManifestHashes = new Map([
 const approvedAutomationArtifactHashes = new Map([
   [
     ".github/workflows/ci.yml",
-    "9f2991da5e1a5721953b467d585a87dbee14a865f98f2481060a09d6c68150fb",
+    "7cf52f0bcb229349ddf8ee52972bd72982b414b6d2ffa20ea818b92a21f30fe3",
   ],
   [
     ".github/workflows/db-gate.yml",
-    "e4d0009d9c9af5b053478a0070adfddf08a2f49df6bec365a92d91f52a673811",
+    "9a4b9c981cb5bfae8c97c1d595b00dad2bf28dd537ac8ed526a72c0b42cd60c5",
   ],
   [
     ".github/workflows/release.yml",

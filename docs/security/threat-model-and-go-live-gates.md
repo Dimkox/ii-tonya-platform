@@ -50,30 +50,30 @@ and the named owner has signed it.
 The controls below intentionally replace unsafe or incomplete mechanics in the
 source:
 
-| Source area | Relevant source lines | Security concern |
-| --- | ---: | --- |
-| Progressive client profile | 66-107, 194-218 | Inferred sensitive data, profiling, and no consent model |
-| Crisis behavior | 514-532, 641-664 | Keyword-only triage, paid-message dependency, and unsupported monitoring promise |
-| Message billing | 788-842, 1509-1632 | Duplicate charging, recursion, and non-atomic counters |
-| Booking and waitlist | 296-395, 848-992, 1639-2109 | Read-check-write races, stale callbacks, and partial failures |
-| Expert access | 1155-1178, 1361-1377, 4372-4395 | Global name lookup and unnecessary financial/profile disclosure |
-| Raw dialog and event logging | 2205-2460, 3120-3145 | Sensitive indefinite logs and Telegram disclosure |
-| Credentials and webhooks | 2162-2189, 2655-2686, 3336-3375, 3842-3852 | Plaintext secret substitution and token-bearing URLs |
+| Source area                  |                      Relevant source lines | Security concern                                                                 |
+| ---------------------------- | -----------------------------------------: | -------------------------------------------------------------------------------- |
+| Progressive client profile   |                            66-107, 194-218 | Inferred sensitive data, profiling, and no consent model                         |
+| Crisis behavior              |                           514-532, 641-664 | Keyword-only triage, paid-message dependency, and unsupported monitoring promise |
+| Message billing              |                         788-842, 1509-1632 | Duplicate charging, recursion, and non-atomic counters                           |
+| Booking and waitlist         |                296-395, 848-992, 1639-2109 | Read-check-write races, stale callbacks, and partial failures                    |
+| Expert access                |            1155-1178, 1361-1377, 4372-4395 | Global name lookup and unnecessary financial/profile disclosure                  |
+| Raw dialog and event logging |                       2205-2460, 3120-3145 | Sensitive indefinite logs and Telegram disclosure                                |
+| Credentials and webhooks     | 2162-2189, 2655-2686, 3336-3375, 3842-3852 | Plaintext secret substitution and token-bearing URLs                             |
 
 ## 4. Protected assets
 
-| Asset | Examples | Required protection |
-| --- | --- | --- |
-| Identity and contact data | Name, phone, email, Telegram numeric ID | Purpose limitation, encryption, object-level authorization, deletion workflow |
-| Sensitive profile data | Health, mental state, sexuality, family, location, budget | Explicit approved basis, separate consent where required, strict minimization |
-| Conversations and crisis signals | Raw messages, inferred risk, human-escalation notes | Restricted access, redaction, short approved retention, safety audit |
-| Consent evidence | Consent type, version, source, grant/withdrawal timestamps | Append-only evidence, current-state derivation, exportability |
-| Booking state | Slot, expert, client, capacity, status, version, expiry | Transactional state machine, concurrency control, immutable event history |
-| Financial state | Payments, package units, coupon grants/holds/redemptions | Append-only ledgers, provider reconciliation, exactly-once commands |
-| Provider credentials | API keys, bot tokens, webhook secrets, service accounts | Managed secret storage, minimum scope, rotation, access audit |
-| Meeting and media links | Meeting URL, address, audio URL | Authorization, expiry where possible, allowlist, no public logs |
-| Audit and security evidence | Actor, action, target, result, correlation ID | Tamper evidence, redaction, controlled retention, searchable incident trail |
-| Availability and safety routing | Crisis classifier, contact directory, on-call queue | Fail-safe behavior, monitoring, tested fallback, named operational owner |
+| Asset                            | Examples                                                   | Required protection                                                           |
+| -------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Identity and contact data        | Name, phone, email, Telegram numeric ID                    | Purpose limitation, encryption, object-level authorization, deletion workflow |
+| Sensitive profile data           | Health, mental state, sexuality, family, location, budget  | Explicit approved basis, separate consent where required, strict minimization |
+| Conversations and crisis signals | Raw messages, inferred risk, human-escalation notes        | Restricted access, redaction, short approved retention, safety audit          |
+| Consent evidence                 | Consent type, version, source, grant/withdrawal timestamps | Append-only evidence, current-state derivation, exportability                 |
+| Booking state                    | Slot, expert, client, capacity, status, version, expiry    | Transactional state machine, concurrency control, immutable event history     |
+| Financial state                  | Payments, package units, coupon grants/holds/redemptions   | Append-only ledgers, provider reconciliation, exactly-once commands           |
+| Provider credentials             | API keys, bot tokens, webhook secrets, service accounts    | Managed secret storage, minimum scope, rotation, access audit                 |
+| Meeting and media links          | Meeting URL, address, audio URL                            | Authorization, expiry where possible, allowlist, no public logs               |
+| Audit and security evidence      | Actor, action, target, result, correlation ID              | Tamper evidence, redaction, controlled retention, searchable incident trail   |
+| Availability and safety routing  | Crisis classifier, contact directory, on-call queue        | Fail-safe behavior, monitoring, tested fallback, named operational owner      |
 
 ## 5. Actors and trust boundaries
 
@@ -93,18 +93,18 @@ source:
 
 ### 5.2 Trust-boundary flow
 
-| Boundary | Data crossing it | Required enforcement |
-| --- | --- | --- |
-| Client -> Selarti -> webhook ingress | Client identity, message, event ID | Provider authentication, signature/secret verification, freshness, dedupe, schema limits |
-| Expert -> Telegram -> webhook ingress | Numeric user/chat ID, command, callback | Telegram webhook secret, immutable identity binding, signed callback context, RBAC |
-| Admin -> back office | Search, overrides, refunds, safety actions | MFA, least privilege, reason codes, dual control for high-risk actions, audit |
-| Ingress -> application services | Normalized command and actor context | Server-derived identity, authorization, rate limit, idempotency |
-| Application -> PostgreSQL | Consent, ledger, booking, audit mutations | Transaction, constraints, version checks, encryption, append-only records where required |
-| Application -> LLM | Minimized conversation and catalog context | Tenant scoping, redaction, untrusted-content markers, no credentials |
-| LLM -> application | Text or typed intent | Schema validation, policy check, authorization, deterministic calculation |
-| Application -> provider adapters | Outbound message, slot sync, payment action | Transactional outbox, idempotency key, timeout, retry policy, response validation |
-| Backend -> Make/Sheets | Non-authoritative projection | One-way scoped credentials, redaction, reconciliation, no reverse authority |
-| Production -> logs/backups | Operational evidence and snapshots | Redaction, encryption, access audit, retention and tested destruction |
+| Boundary                              | Data crossing it                            | Required enforcement                                                                     |
+| ------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Client -> Selarti -> webhook ingress  | Client identity, message, event ID          | Provider authentication, signature/secret verification, freshness, dedupe, schema limits |
+| Expert -> Telegram -> webhook ingress | Numeric user/chat ID, command, callback     | Telegram webhook secret, immutable identity binding, signed callback context, RBAC       |
+| Admin -> back office                  | Search, overrides, refunds, safety actions  | MFA, least privilege, reason codes, dual control for high-risk actions, audit            |
+| Ingress -> application services       | Normalized command and actor context        | Server-derived identity, authorization, rate limit, idempotency                          |
+| Application -> PostgreSQL             | Consent, ledger, booking, audit mutations   | Transaction, constraints, version checks, encryption, append-only records where required |
+| Application -> LLM                    | Minimized conversation and catalog context  | Tenant scoping, redaction, untrusted-content markers, no credentials                     |
+| LLM -> application                    | Text or typed intent                        | Schema validation, policy check, authorization, deterministic calculation                |
+| Application -> provider adapters      | Outbound message, slot sync, payment action | Transactional outbox, idempotency key, timeout, retry policy, response validation        |
+| Backend -> Make/Sheets                | Non-authoritative projection                | One-way scoped credentials, redaction, reconciliation, no reverse authority              |
+| Production -> logs/backups            | Operational evidence and snapshots          | Redaction, encryption, access audit, retention and tested destruction                    |
 
 No provider-supplied `client_id`, `expert_id`, price, balance, role, or booking
 status is trusted without resolving it against server-owned identity and state.
@@ -150,15 +150,15 @@ status is trusted without resolving it against server-owned identity and state.
 
 ### 6.3 Retention classes required before production
 
-| Class | Examples | Gate requirement |
-| --- | --- | --- |
-| Active service data | Contact and current booking data | Documented purpose and deletion trigger |
-| Optional profile memory | Preferences and self-reported context | Separate consent and user-visible edit/delete |
-| Sensitive/safety data | Crisis signal and escalation record | Clinical/privacy-approved scope and retention |
-| Financial records | Payments, refunds, coupon and package ledgers | Statutory period documented by legal owner |
-| Security/audit logs | Authentication and authorization evidence | Redacted retention with restricted access |
-| Provider evidence | Raw webhook evidence | PII-minimized, encrypted, short retention |
-| Backups | Database and configuration snapshots | Expiry schedule and verified purge behavior |
+| Class                   | Examples                                      | Gate requirement                              |
+| ----------------------- | --------------------------------------------- | --------------------------------------------- |
+| Active service data     | Contact and current booking data              | Documented purpose and deletion trigger       |
+| Optional profile memory | Preferences and self-reported context         | Separate consent and user-visible edit/delete |
+| Sensitive/safety data   | Crisis signal and escalation record           | Clinical/privacy-approved scope and retention |
+| Financial records       | Payments, refunds, coupon and package ledgers | Statutory period documented by legal owner    |
+| Security/audit logs     | Authentication and authorization evidence     | Redacted retention with restricted access     |
+| Provider evidence       | Raw webhook evidence                          | PII-minimized, encrypted, short retention     |
+| Backups                 | Database and configuration snapshots          | Expiry schedule and verified purge behavior   |
 
 If a class has no approved duration and deletion owner, production is blocked.
 
@@ -252,6 +252,24 @@ For every coupon account:
   the corresponding provider state.
 - Manual financial adjustments require authorization, a reason, and immutable
   audit evidence.
+
+### 8.4 Expert residency referral release gate
+
+The expert referral/residency bounded context is a disabled release candidate.
+Its provider-neutral implementation and local tests do not authorize staging or
+production. New commands and reward grants remain false in durable control;
+environment ceilings remain `EXPERT_REFERRAL_ENABLED=false` and
+`EXPERT_RESIDENCY_BILLING_ENABLED=false`; live payment composition remains
+forbidden. The traceability matrix and operating/rollback procedures are in
+`docs/spec/expert-residency-referrals-traceability.md` and
+`docs/runbooks/expert-residency-referrals.md`.
+
+The following are **PENDING/BLOCKING** until linked by the Release operator:
+named human AI spot-check, independent migration and financial reviews,
+exact-SHA hosted CI, authenticated external sandbox settlement/refund/replay
+evidence, and explicit staging authorization. Production requires a separate
+explicit authorization after staging evidence. No pending gate may be inferred
+from a local PASS.
 
 ## 9. Booking and waitlist concurrency
 
@@ -411,44 +429,44 @@ For every event instance:
 
 ## 14. Mandatory security and safety test cases
 
-| ID | Test | Expected result |
-| --- | --- | --- |
-| PRIV-01 | User declines optional profile memory | No optional or sensitive profile field is persisted |
-| PRIV-02 | User withdraws marketing and checkup consent | No later marketing/checkup is scheduled or sent |
-| PRIV-03 | Expert requests an unrelated client by name | Request is denied and audited without existence disclosure |
-| PRIV-04 | End-to-end deletion request | Data is deleted/restricted across all processors and expires from backups per policy |
-| PRIV-05 | Raw health/crisis message reaches logging pipeline | Approved redaction and retention class are applied; no Sheets/Telegram copy |
-| SAFE-01 | Crisis message arrives with zero package balance | Safety response and escalation run; no debit is created |
-| SAFE-02 | Negation, quotation, typo, slang, and multilingual crisis corpus | Clinically approved behavior meets the release evaluation thresholds |
-| SAFE-03 | Selarti or LLM is unavailable during a high-risk event | Provider-independent safety fallback is returned and alerted |
-| SAFE-04 | Human escalation is not acknowledged within SLA | Escalation alert and documented fallback execute |
-| SAFE-05 | Contact record is stale or wrong for age/region | It is not presented; fallback policy executes |
-| BILL-01 | Same billable webhook is delivered 100 times | Exactly one debit exists |
-| BILL-02 | 100 concurrent debits target the last package unit | At most one succeeds; balance remains nonnegative |
-| BILL-03 | Zero-balance notice is emitted | It creates no recursive event and no debit |
-| BILL-04 | Crash occurs after ledger commit but before provider send | Retry sends once and does not debit again |
-| COUP-01 | Same coupon redemption is replayed | Exactly one redemption exists |
-| COUP-02 | Coupon expires while held | Approved expiry/hold policy executes without negative balance |
-| COUP-03 | Expert cancels or reservation expires | Hold is released or reversed exactly once |
-| PAY-01 | Client forges price or `payment_succeeded` | Backend rejects it and trusts only verified provider state |
-| BOOK-01 | 100 clients request one remaining seat concurrently | Exactly one active reservation is created |
-| BOOK-02 | Expired reservation callback is replayed | Confirmation is rejected/no-op and capacity is unchanged |
-| BOOK-03 | Cancel callback is delivered repeatedly | One transition and one compensation occur |
-| BOOK-04 | Failure occurs at every reschedule step | Either old booking remains or new booking is fully committed |
-| BOOK-05 | Two workers promote the same waitlist head | One reservation and one notification are produced |
-| BOOK-06 | Client selects a stale or too-near slot directly | Server-side recheck rejects it |
-| WH-01 | Webhook signature is missing or invalid | Request is rejected before business parsing |
-| WH-02 | Valid webhook is replayed outside freshness window | No business state changes |
-| IAM-01 | Callback comes from another expert or chat | Request is denied and audited |
-| IAM-02 | Deactivated expert replays an old signed callback | Request is denied |
-| LLM-01 | User asks model to reveal another client's record | No data is retrieved or disclosed |
-| LLM-02 | Catalog text contains persistent tool instructions | Text remains data and cannot cause a tool mutation |
-| LLM-03 | Model emits a valid-looking unauthorized intent | Backend authorization rejects it |
-| LLM-04 | Meeting/audio link uses an unapproved destination | Link is rejected or rendered non-actionable |
-| SEC-01 | Secret scan runs over repository and artifacts | Zero live credentials are found |
-| RES-01 | Each provider call is fault-injected before and after send | State is consistent or recoverable through outbox/DLQ |
-| RES-02 | Projection is manually corrupted in Sheets | Reconciliation repairs projection without changing authority |
-| RES-03 | Database restore drill runs | RPO/RTO are met and deleted data is not improperly resurrected |
+| ID      | Test                                                             | Expected result                                                                      |
+| ------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| PRIV-01 | User declines optional profile memory                            | No optional or sensitive profile field is persisted                                  |
+| PRIV-02 | User withdraws marketing and checkup consent                     | No later marketing/checkup is scheduled or sent                                      |
+| PRIV-03 | Expert requests an unrelated client by name                      | Request is denied and audited without existence disclosure                           |
+| PRIV-04 | End-to-end deletion request                                      | Data is deleted/restricted across all processors and expires from backups per policy |
+| PRIV-05 | Raw health/crisis message reaches logging pipeline               | Approved redaction and retention class are applied; no Sheets/Telegram copy          |
+| SAFE-01 | Crisis message arrives with zero package balance                 | Safety response and escalation run; no debit is created                              |
+| SAFE-02 | Negation, quotation, typo, slang, and multilingual crisis corpus | Clinically approved behavior meets the release evaluation thresholds                 |
+| SAFE-03 | Selarti or LLM is unavailable during a high-risk event           | Provider-independent safety fallback is returned and alerted                         |
+| SAFE-04 | Human escalation is not acknowledged within SLA                  | Escalation alert and documented fallback execute                                     |
+| SAFE-05 | Contact record is stale or wrong for age/region                  | It is not presented; fallback policy executes                                        |
+| BILL-01 | Same billable webhook is delivered 100 times                     | Exactly one debit exists                                                             |
+| BILL-02 | 100 concurrent debits target the last package unit               | At most one succeeds; balance remains nonnegative                                    |
+| BILL-03 | Zero-balance notice is emitted                                   | It creates no recursive event and no debit                                           |
+| BILL-04 | Crash occurs after ledger commit but before provider send        | Retry sends once and does not debit again                                            |
+| COUP-01 | Same coupon redemption is replayed                               | Exactly one redemption exists                                                        |
+| COUP-02 | Coupon expires while held                                        | Approved expiry/hold policy executes without negative balance                        |
+| COUP-03 | Expert cancels or reservation expires                            | Hold is released or reversed exactly once                                            |
+| PAY-01  | Client forges price or `payment_succeeded`                       | Backend rejects it and trusts only verified provider state                           |
+| BOOK-01 | 100 clients request one remaining seat concurrently              | Exactly one active reservation is created                                            |
+| BOOK-02 | Expired reservation callback is replayed                         | Confirmation is rejected/no-op and capacity is unchanged                             |
+| BOOK-03 | Cancel callback is delivered repeatedly                          | One transition and one compensation occur                                            |
+| BOOK-04 | Failure occurs at every reschedule step                          | Either old booking remains or new booking is fully committed                         |
+| BOOK-05 | Two workers promote the same waitlist head                       | One reservation and one notification are produced                                    |
+| BOOK-06 | Client selects a stale or too-near slot directly                 | Server-side recheck rejects it                                                       |
+| WH-01   | Webhook signature is missing or invalid                          | Request is rejected before business parsing                                          |
+| WH-02   | Valid webhook is replayed outside freshness window               | No business state changes                                                            |
+| IAM-01  | Callback comes from another expert or chat                       | Request is denied and audited                                                        |
+| IAM-02  | Deactivated expert replays an old signed callback                | Request is denied                                                                    |
+| LLM-01  | User asks model to reveal another client's record                | No data is retrieved or disclosed                                                    |
+| LLM-02  | Catalog text contains persistent tool instructions               | Text remains data and cannot cause a tool mutation                                   |
+| LLM-03  | Model emits a valid-looking unauthorized intent                  | Backend authorization rejects it                                                     |
+| LLM-04  | Meeting/audio link uses an unapproved destination                | Link is rejected or rendered non-actionable                                          |
+| SEC-01  | Secret scan runs over repository and artifacts                   | Zero live credentials are found                                                      |
+| RES-01  | Each provider call is fault-injected before and after send       | State is consistent or recoverable through outbox/DLQ                                |
+| RES-02  | Projection is manually corrupted in Sheets                       | Reconciliation repairs projection without changing authority                         |
+| RES-03  | Database restore drill runs                                      | RPO/RTO are met and deleted data is not improperly resurrected                       |
 
 Concurrency tests must run repeatedly with randomized ordering and provider
 retries. A single happy-path pass is not evidence.
@@ -484,20 +502,20 @@ Failure of any staging gate blocks provider-connected end-to-end testing.
 
 Production requires current evidence and explicit sign-off for every gate:
 
-| Gate | Required evidence | Sign-off owner |
-| --- | --- | --- |
-| PROD-01 Requirements and architecture | Versioned normalized requirements, approved trust boundaries, no unresolved security-critical ambiguity | Platform owner |
-| PROD-02 Privacy and consent | Data inventory, consent UX/evidence, vendor assessment, retention/deletion test, minor policy, privacy review | Privacy/legal owner |
-| PROD-03 Clinical safety | Approved decision policy, evaluation results, verified contact directory, human operating model, crisis drills | Clinical Safety owner |
-| PROD-04 Billing and payments | Ledger invariants, provider sandbox reconciliation, refund/chargeback/receipt tests, tariff approval | Payments owner |
-| PROD-05 Coupons | Hold/redemption/release/expiry/reversal tests and published terms | Payments/Product owners |
-| PROD-06 Booking concurrency | Repeated load/property tests, state-machine review, waitlist/reschedule failure tests | Booking/Platform owner |
-| PROD-07 Webhook and IAM | Provider auth, replay tests, RBAC/ABAC review, expert/admin lifecycle, penetration test | Security owner |
-| PROD-08 LLM safety | Prompt-injection red team, scoped retrieval tests, typed-intent enforcement, no direct mutation path | Security/AI owner |
-| PROD-09 Secrets | Clean scans, managed storage, minimum scopes, rotation and compromise drill | Security/Operations owner |
-| PROD-10 Resilience | Fault injection, reconciliation, alerting, DLQ replay, restore drill, RPO/RTO evidence | Operations owner |
-| PROD-11 Operational readiness | On-call roster, runbooks, incident classification, kill switches, support and rollback drill | Operations/Product owners |
-| PROD-12 Limited pilot | Synthetic staging complete, approved small cohort, live monitoring, daily reconciliation, rollback criteria | Release authority |
+| Gate                                  | Required evidence                                                                                              | Sign-off owner            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| PROD-01 Requirements and architecture | Versioned normalized requirements, approved trust boundaries, no unresolved security-critical ambiguity        | Platform owner            |
+| PROD-02 Privacy and consent           | Data inventory, consent UX/evidence, vendor assessment, retention/deletion test, minor policy, privacy review  | Privacy/legal owner       |
+| PROD-03 Clinical safety               | Approved decision policy, evaluation results, verified contact directory, human operating model, crisis drills | Clinical Safety owner     |
+| PROD-04 Billing and payments          | Ledger invariants, provider sandbox reconciliation, refund/chargeback/receipt tests, tariff approval           | Payments owner            |
+| PROD-05 Coupons                       | Hold/redemption/release/expiry/reversal tests and published terms                                              | Payments/Product owners   |
+| PROD-06 Booking concurrency           | Repeated load/property tests, state-machine review, waitlist/reschedule failure tests                          | Booking/Platform owner    |
+| PROD-07 Webhook and IAM               | Provider auth, replay tests, RBAC/ABAC review, expert/admin lifecycle, penetration test                        | Security owner            |
+| PROD-08 LLM safety                    | Prompt-injection red team, scoped retrieval tests, typed-intent enforcement, no direct mutation path           | Security/AI owner         |
+| PROD-09 Secrets                       | Clean scans, managed storage, minimum scopes, rotation and compromise drill                                    | Security/Operations owner |
+| PROD-10 Resilience                    | Fault injection, reconciliation, alerting, DLQ replay, restore drill, RPO/RTO evidence                         | Operations owner          |
+| PROD-11 Operational readiness         | On-call roster, runbooks, incident classification, kill switches, support and rollback drill                   | Operations/Product owners |
+| PROD-12 Limited pilot                 | Synthetic staging complete, approved small cohort, live monitoring, daily reconciliation, rollback criteria    | Release authority         |
 
 Checkboxes in a document are not sign-off evidence. Each approval must link to a
 dated test result, review record, or drill artifact for the exact release.

@@ -1199,14 +1199,24 @@ describe("expert referral worker PostgreSQL claims", () => {
       try {
         await expect(
           repository.expireDueBatch({ now: new Date(0), batchSize: 2 }),
-        ).resolves.toEqual({ examined: 1, changed: 1, failed: 0 });
+        ).resolves.toEqual({
+          examined: 1,
+          changed: 1,
+          creditChanged: 0,
+          failed: 0,
+        });
       } finally {
         release();
         await holding;
       }
       await expect(
         repository.expireDueBatch({ now: new Date(0), batchSize: 2 }),
-      ).resolves.toEqual({ examined: 1, changed: 1, failed: 0 });
+      ).resolves.toEqual({
+        examined: 1,
+        changed: 1,
+        creditChanged: 0,
+        failed: 0,
+      });
     },
     30_000,
   );

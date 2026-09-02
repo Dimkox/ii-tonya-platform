@@ -8,63 +8,63 @@ import {
 } from "../../packages/db/src/testkit/postgres.js";
 
 describe("catalog repository", () => {
-  let testDb: TestDatabase;
+  let testDb: TestDatabase | undefined;
 
   beforeAll(async () => {
     testDb = await startTestPostgres();
     await testDb.migrate();
-  });
+  }, 120_000);
 
   beforeEach(async () => {
-    await testDb.reset();
+    await testDb!.reset();
   });
 
   afterAll(async () => {
-    await testDb.stop();
-  });
+    await testDb?.stop();
+  }, 120_000);
 
   it("returns only verified, active, fresh, future, matching experts with capacity", async () => {
     const now = new Date("2026-07-28T10:00:00.000Z");
-    const eligible = await seedCatalogEntry(testDb, {
+    const eligible = await seedCatalogEntry(testDb!, {
       suffix: "eligible",
       startsAt: new Date("2026-07-30T10:00:00.000Z"),
       observedAt: now,
     });
-    await seedCatalogEntry(testDb, {
+    await seedCatalogEntry(testDb!, {
       suffix: "unverified",
       verified: false,
       startsAt: new Date("2026-07-30T11:00:00.000Z"),
       observedAt: now,
     });
-    await seedCatalogEntry(testDb, {
+    await seedCatalogEntry(testDb!, {
       suffix: "inactive-expert",
       active: false,
       startsAt: new Date("2026-07-30T12:00:00.000Z"),
       observedAt: now,
     });
-    await seedCatalogEntry(testDb, {
+    await seedCatalogEntry(testDb!, {
       suffix: "inactive-service",
       serviceActive: false,
       startsAt: new Date("2026-07-30T13:00:00.000Z"),
       observedAt: now,
     });
-    await seedCatalogEntry(testDb, {
+    await seedCatalogEntry(testDb!, {
       suffix: "stale",
       startsAt: new Date("2026-07-30T14:00:00.000Z"),
       observedAt: new Date("2026-07-28T09:44:59.999Z"),
     });
-    await seedCatalogEntry(testDb, {
+    await seedCatalogEntry(testDb!, {
       suffix: "too-soon",
       startsAt: new Date("2026-07-29T09:59:59.999Z"),
       observedAt: now,
     });
-    const full = await seedCatalogEntry(testDb, {
+    const full = await seedCatalogEntry(testDb!, {
       suffix: "full",
       startsAt: new Date("2026-07-30T15:00:00.000Z"),
       observedAt: now,
     });
-    const clientId = await testDb.createUser();
-    await testDb.db.execute(sql`
+    const clientId = await testDb!.createUser();
+    await testDb!.db.execute(sql`
       insert into reservations (
         user_id, slot_id, expert_id, expert_service_id, status,
         idempotency_key, reserved_until
@@ -75,19 +75,19 @@ describe("catalog repository", () => {
       )
     `);
 
-    const result = await new PostgresCatalogRepository(
-      testDb.db,
-    ).findEligible({
-      serviceCode: "consultation",
-      language: "ru",
-      from: new Date("2026-07-29T00:00:00.000Z"),
-      to: new Date("2026-08-06T00:00:00.000Z"),
-      now,
-      minimumLeadMs: 86_400_000,
-      requireExpertActive: true,
-      requireExpertVerified: true,
-      requireServiceActive: true,
-    });
+    const result = await new PostgresCatalogRepository(testDb!.db).findEligible(
+      {
+        serviceCode: "consultation",
+        language: "ru",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+        now,
+        minimumLeadMs: 86_400_000,
+        requireExpertActive: true,
+        requireExpertVerified: true,
+        requireServiceActive: true,
+      },
+    );
 
     expect(result).toEqual([
       expect.objectContaining({

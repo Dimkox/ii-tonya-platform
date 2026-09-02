@@ -11,3 +11,23 @@ Checks:
 5. Assert payments remain disabled and no payment routes, tables, or provider configuration exist.
 
 Local checks: `pnpm exec vitest run packages/worker/src/reconciliation.test.ts tests/integration/message-ledger-concurrency.test.ts tests/integration/outbox-runner.test.ts`. A release receipt must include counts before/after, mismatches, repairs, owner, reviewer, time window, and evidence URI. Any mismatch is NO-GO until resolved or explicitly accepted by the accountable owner.
+
+## Expert residency referral projection
+
+While both expert environment ceilings and durable new-command/reward controls
+are false, existing-state processing continues. Compare provider-neutral payment
+attempts and verified inbox results with orders, cash captured/refunded,
+reservation allocations, immutable reward/expiry/reversal/debt facts,
+first-settlement/held markers, and residency intervals. A mismatch emits bounded
+`ii_tonya_expert_referral_lifecycle{operation="reconciliation_mismatch",outcome="mismatch"}`
+telemetry and creates an immutable incident; automatic financial correction is
+forbidden.
+
+Operations owns the bounded job, the financial reviewer owns fact acceptance,
+and the Release operator owns release evidence. Any mismatch, failed batch,
+unexpected provider availability, or client `500/500` table access is NO-GO.
+Recovery follows `docs/runbooks/expert-residency-referrals-rollback.md`: drain
+existing-state work, reconcile, preserve all facts and applied migrations, and
+forward-fix. External sandbox, exact-SHA hosted CI, migration/financial review,
+AI spot-check, and staging approval remain **PENDING/BLOCKING** until real linked
+evidence exists.

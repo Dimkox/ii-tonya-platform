@@ -13,7 +13,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { PostgresExpertReferralControlRepository } from "../../packages/db/src/repositories/expert-referral-control-repository.js";
 import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
+import { ExpertReferralTestkit } from "../../packages/db/src/testkit/expert-referral.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -242,6 +244,15 @@ describe("residency provider deadline corrective upgrade", () => {
         createdAt: String(corrective0020.folderMillis),
       },
     ]);
+    const controlRepository = new PostgresExpertReferralControlRepository(
+      upgradeDb.db,
+    );
+    expect(await controlRepository.readForCommand()).toMatchObject({
+      persisted: false,
+      newCommandsEnabled: false,
+      rewardGrantsEnabled: false,
+    });
+    await new ExpertReferralTestkit(upgradeDb.db).enableFeatureControl();
     expect(
       metadataAfter.filter(
         (row) =>

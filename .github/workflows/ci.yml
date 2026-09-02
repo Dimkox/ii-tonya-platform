@@ -49,6 +49,9 @@ jobs:
       - name: Verify runtime environment policy
         run: pnpm exec vitest run tests/repo/env-policy.test.ts
 
+      - name: Verify expert residency disabled release contract
+        run: pnpm verify:expert-residency-release
+
       - name: Run repository verification
         run: pnpm verify
 
