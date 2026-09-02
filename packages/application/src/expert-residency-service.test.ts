@@ -187,10 +187,10 @@ describe("expert residency application boundary", () => {
     fixture.setNewCommandsEnabled(false);
     const service = createExpertResidencyService(fixture);
 
-    await expect(service.settle(fixture.settledEvent)).resolves.toEqual({
+    await expect(service.settle(fixture.settledEvent)).resolves.toMatchObject({
       kind: "settled",
     });
-    await expect(service.refund(fixture.refundEvent)).resolves.toEqual({
+    await expect(service.refund(fixture.refundEvent)).resolves.toMatchObject({
       kind: "refunded",
     });
     expect(fixture.existingStateOperations()).toEqual(["settle", "refund"]);
@@ -202,12 +202,12 @@ describe("expert residency application boundary", () => {
     fixture.setNewCommandsEnabled(false);
     const service = createExpertResidencyService(fixture);
 
-    await expect(service.reconcile("pay_811")).resolves.toEqual({
+    await expect(service.reconcile("pay_811")).resolves.toMatchObject({
       kind: "settled",
     });
     await expect(
       service.releaseExpiredOrder({ orderId: "order_811" }),
-    ).resolves.toEqual({ kind: "expired", released: true });
+    ).resolves.toMatchObject({ kind: "expired", released: true });
     await expect(
       service.reverseReward({
         grantId: "grant_811",
@@ -220,7 +220,7 @@ describe("expert residency application boundary", () => {
         expertId: fixture.owner.expertId,
         qualifyingOrderId: "order_811",
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       kind: "reward_granted",
       amountMinor: "100000",
     });

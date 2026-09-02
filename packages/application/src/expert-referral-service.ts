@@ -1,4 +1,4 @@
-import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
+import { safelyRecordExpertReferralLifecycle } from "@ii-tonya/observability";
 
 export interface ExpertPrincipal {
   readonly expertId: string;
@@ -93,7 +93,7 @@ export const createExpertReferralService = (
     try {
       const identity = await authorizeExpert(dependencies.identity, principal);
       if (!dependencies.referralEnabled) {
-        recordExpertReferralLifecycle({
+        safelyRecordExpertReferralLifecycle({
           module: "expert_referral",
           operation: "redemption",
           outcome: "rejected",
@@ -102,7 +102,7 @@ export const createExpertReferralService = (
         return { kind: "disabled" };
       }
       if (identity === null) {
-        recordExpertReferralLifecycle({
+        safelyRecordExpertReferralLifecycle({
           module: "expert_referral",
           operation: "redemption",
           outcome: "rejected",
@@ -112,7 +112,7 @@ export const createExpertReferralService = (
       }
       const control = await dependencies.controls.readForCommand();
       if (!control.newCommandsEnabled) {
-        recordExpertReferralLifecycle({
+        safelyRecordExpertReferralLifecycle({
           module: "expert_referral",
           operation: "redemption",
           outcome: "rejected",
@@ -127,13 +127,13 @@ export const createExpertReferralService = (
         externalId: identity.externalId,
         idempotencyKey,
       });
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "redemption",
         outcome: "redeemed",
         errorCode: "none",
       });
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "code_lifecycle",
         outcome: "redeemed",
@@ -141,7 +141,7 @@ export const createExpertReferralService = (
       });
       return { kind: "redeemed", referralId: redeemed.referralId };
     } catch (error) {
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "redemption",
         outcome: "failed",

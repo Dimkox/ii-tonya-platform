@@ -1,4 +1,4 @@
-import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
+import { safelyRecordExpertReferralLifecycle } from "@ii-tonya/observability";
 import type { AdminPrincipal } from "./admin-service.js";
 
 export const EXPERT_REFERRAL_FEATURE_CONTROL_OBJECT_ID =
@@ -337,14 +337,14 @@ export const createExpertReferralAdminService = (
           ? {}
           : { overrideId: command.overrideId }),
       });
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "batch_lifecycle",
         outcome: "issued",
         errorCode: "none",
       });
       if (result.codes.length > 0) {
-        recordExpertReferralLifecycle(
+        safelyRecordExpertReferralLifecycle(
           {
             module: "expert_referral",
             operation: "code_lifecycle",
@@ -356,7 +356,7 @@ export const createExpertReferralAdminService = (
       }
       return result;
     } catch (error) {
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "batch_lifecycle",
         outcome: "failed",
@@ -376,7 +376,7 @@ export const createExpertReferralAdminService = (
         codeId: command.codeId,
         reasonCode: command.reasonCode,
       });
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "code_lifecycle",
         outcome: "revoked",
@@ -384,7 +384,7 @@ export const createExpertReferralAdminService = (
       });
       return result;
     } catch (error) {
-      recordExpertReferralLifecycle({
+      safelyRecordExpertReferralLifecycle({
         module: "expert_referral",
         operation: "code_lifecycle",
         outcome: "failed",

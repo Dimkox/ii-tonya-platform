@@ -1,6 +1,6 @@
 import {
-  observeExpertReferralDuration,
-  recordExpertReferralLifecycle,
+  safelyObserveExpertReferralDuration,
+  safelyRecordExpertReferralLifecycle,
 } from "@ii-tonya/observability";
 
 export interface ExpertResidencyExpiryResult {
@@ -41,7 +41,7 @@ export async function expireExpertResidencyOrders(
       batchSize,
     });
     if (result.changed > 0) {
-      recordExpertReferralLifecycle(
+      safelyRecordExpertReferralLifecycle(
         {
           module: "expert_residency",
           operation: "credit_expiry",
@@ -52,7 +52,7 @@ export async function expireExpertResidencyOrders(
       );
     }
     if (result.failed > 0) {
-      recordExpertReferralLifecycle(
+      safelyRecordExpertReferralLifecycle(
         {
           module: "expert_residency",
           operation: "credit_expiry",
@@ -62,7 +62,7 @@ export async function expireExpertResidencyOrders(
         result.failed,
       );
     }
-    observeExpertReferralDuration(
+    safelyObserveExpertReferralDuration(
       {
         module: "expert_residency",
         operation: "credit_expiry",
@@ -78,13 +78,13 @@ export async function expireExpertResidencyOrders(
     );
     return result;
   } catch (error) {
-    recordExpertReferralLifecycle({
+    safelyRecordExpertReferralLifecycle({
       module: "expert_residency",
       operation: "credit_expiry",
       outcome: "failed",
       errorCode: "unknown",
     });
-    observeExpertReferralDuration(
+    safelyObserveExpertReferralDuration(
       {
         module: "expert_residency",
         operation: "credit_expiry",

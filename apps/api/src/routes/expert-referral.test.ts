@@ -217,6 +217,16 @@ describe("authenticated expert referral API", () => {
         paymentDeadline: new Date("2026-08-03T00:15:00.000Z"),
         status: "pending",
         allocations: [{ grantId: "private-grant", amountMinor: "100000" }],
+        telemetry: {
+          disposition: "applied" as const,
+          effects: [
+            {
+              operation: "bonus_share" as const,
+              outcome: "applied" as const,
+              errorCode: "none" as const,
+            },
+          ],
+        },
       },
       payment: {
         kind: "pending_reconciliation" as const,

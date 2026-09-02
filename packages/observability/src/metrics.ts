@@ -5,11 +5,17 @@ const meter = metrics.getMeter("ii-tonya");
 export const operationalMetrics = {
   inboxDuplicates: meter.createCounter("ii_tonya_inbox_duplicates"),
   debitOutcomes: meter.createCounter("ii_tonya_debit_outcomes"),
-  reservationTransitions: meter.createCounter("ii_tonya_reservation_transitions"),
-  outboxUnknownOutcomes: meter.createCounter("ii_tonya_outbox_unknown_outcomes"),
+  reservationTransitions: meter.createCounter(
+    "ii_tonya_reservation_transitions",
+  ),
+  outboxUnknownOutcomes: meter.createCounter(
+    "ii_tonya_outbox_unknown_outcomes",
+  ),
   outboxLagMs: meter.createHistogram("ii_tonya_outbox_lag_ms"),
   outboxDeadLetters: meter.createCounter("ii_tonya_outbox_dead_letters"),
-  providerCircuitState: meter.createUpDownCounter("ii_tonya_provider_circuit_state"),
+  providerCircuitState: meter.createUpDownCounter(
+    "ii_tonya_provider_circuit_state",
+  ),
   safetyHandoffs: meter.createCounter("ii_tonya_safety_handoffs"),
   reconciliationDrift: meter.createCounter("ii_tonya_reconciliation_drift"),
 } as const;
@@ -140,6 +146,17 @@ export function recordExpertReferralLifecycle(input: unknown, count = 1): void {
   expertReferralMetrics.lifecycle.add(count, referralMetricLabels(input));
 }
 
+export function safelyRecordExpertReferralLifecycle(
+  input: ReferralMetricLabels,
+  count = 1,
+): void {
+  try {
+    recordExpertReferralLifecycle(input, count);
+  } catch {
+    // Telemetry must never change an already-decided financial outcome.
+  }
+}
+
 export function observeExpertReferralDuration(
   input: unknown,
   durationMs: number,
@@ -155,4 +172,15 @@ export function observeExpertReferralDuration(
     durationMs,
     referralMetricLabels(input),
   );
+}
+
+export function safelyObserveExpertReferralDuration(
+  input: ReferralMetricLabels,
+  durationMs: number,
+): void {
+  try {
+    observeExpertReferralDuration(input, durationMs);
+  } catch {
+    // Telemetry must never change an already-decided financial outcome.
+  }
 }

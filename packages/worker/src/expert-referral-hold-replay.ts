@@ -1,4 +1,4 @@
-import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
+import { safelyRecordExpertReferralLifecycle } from "@ii-tonya/observability";
 
 export interface HeldRewardReplayBatchResult {
   readonly examined: number;
@@ -49,7 +49,7 @@ export async function replayHeldRewards(
       errorCode: "none" | "unknown" = "none",
     ): void => {
       if (count < 1) return;
-      recordExpertReferralLifecycle(
+      safelyRecordExpertReferralLifecycle(
         {
           module: "expert_referral",
           operation,
@@ -70,7 +70,7 @@ export async function replayHeldRewards(
     emit(result.failed, "held_replay", "failed", "unknown");
     return result;
   } catch (error) {
-    recordExpertReferralLifecycle({
+    safelyRecordExpertReferralLifecycle({
       module: "expert_referral",
       operation: "held_replay",
       outcome: "failed",

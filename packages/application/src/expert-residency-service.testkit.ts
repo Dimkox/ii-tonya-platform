@@ -1,4 +1,6 @@
 import type {
+  ExpertFinancialTelemetry,
+  ExpertFinancialTelemetryEffect,
   ExpertResidencyDependencies,
   VerifiedExpertResidencyEvent,
 } from "./expert-residency-service.js";
@@ -17,6 +19,10 @@ export interface ExpertResidencyFixture extends ExpertResidencyDependencies {
   checkoutCount(): number;
   existingStateOperations(): readonly string[];
 }
+
+const appliedTelemetry = (
+  effects: readonly ExpertFinancialTelemetryEffect[],
+): ExpertFinancialTelemetry => ({ disposition: "applied", effects });
 
 export const expertResidencyFixture = (
   options: { readonly billingEnabled?: boolean } = {},
@@ -131,11 +137,28 @@ export const expertResidencyFixture = (
           paymentDeadline: new Date("2026-08-03T00:30:00.000Z"),
           status: "quoted" as const,
           allocations: [],
+          telemetry: appliedTelemetry([
+            {
+              operation: "bonus_share",
+              outcome: "applied",
+              errorCode: "none",
+            },
+          ]),
         };
       },
       async releaseExpiredOrders() {
         operations.push("release");
-        return { kind: "expired" as const, released: true };
+        return {
+          kind: "expired" as const,
+          released: true,
+          telemetry: appliedTelemetry([
+            {
+              operation: "credit_expiry",
+              outcome: "expired",
+              errorCode: "none",
+            },
+          ]),
+        };
       },
       async reverseRewardGrant() {
         operations.push("reverse");
@@ -144,6 +167,13 @@ export const expertResidencyFixture = (
           removedCreditMinor: 50_000n,
           cancelledReservationMinor: 0n,
           debtMinor: 0n,
+          telemetry: appliedTelemetry([
+            {
+              operation: "reversal",
+              outcome: "reversed",
+              errorCode: "none",
+            },
+          ]),
         };
       },
     },
@@ -166,15 +196,58 @@ export const expertResidencyFixture = (
     existingState: {
       async settle() {
         operations.push("settle");
-        return { kind: "settled" as const };
+        return {
+          kind: "settled" as const,
+          telemetry: appliedTelemetry([
+            {
+              operation: "first_payment_qualification",
+              outcome: "eligible",
+              errorCode: "none",
+            },
+            {
+              operation: "credit_spend",
+              outcome: "spent",
+              errorCode: "none",
+            },
+            {
+              operation: "reward_grant",
+              outcome: "granted",
+              errorCode: "none",
+            },
+          ]),
+        };
       },
       async refund() {
         operations.push("refund");
-        return { kind: "refunded" as const };
+        return {
+          kind: "refunded" as const,
+          telemetry: appliedTelemetry([
+            {
+              operation: "refund",
+              outcome: "refunded",
+              errorCode: "none",
+            },
+          ]),
+        };
       },
       async replayHeldReward() {
         operations.push("replay");
-        return { kind: "reward_granted" as const, amountMinor: "100000" };
+        return {
+          kind: "reward_granted" as const,
+          amountMinor: "100000",
+          telemetry: appliedTelemetry([
+            {
+              operation: "held_replay",
+              outcome: "granted",
+              errorCode: "none",
+            },
+            {
+              operation: "reward_grant",
+              outcome: "granted",
+              errorCode: "none",
+            },
+          ]),
+        };
       },
     },
     setAuthorized(expertId, authorized) {

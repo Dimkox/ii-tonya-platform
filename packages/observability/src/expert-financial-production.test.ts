@@ -92,30 +92,60 @@ describe("expert financial production-boundary metrics", () => {
           creditMinor: "100000",
           cashMinor: "100000",
         }),
-        createCheckoutOrder: async ({ expertId }) => ({
-          orderId: "private-order-id",
-          expertId,
-          tariffVersionId: "private-tariff-id",
-          displayName: "Private tariff name",
-          description: "Private tariff description",
-          priceMinor: "200000",
-          currency: "RUB" as const,
-          durationSeconds: 31_536_000,
-          creditMinor: "100000",
-          cashMinor: "100000",
-          paymentDeadline: new Date("2026-09-02T01:00:00.000Z"),
-          status: "quoted",
-          allocations: [],
-        }),
+        createCheckoutOrder: async ({ expertId }) =>
+          ({
+            orderId: "private-order-id",
+            expertId,
+            tariffVersionId: "private-tariff-id",
+            displayName: "Private tariff name",
+            description: "Private tariff description",
+            priceMinor: "200000",
+            currency: "RUB" as const,
+            durationSeconds: 31_536_000,
+            creditMinor: "100000",
+            cashMinor: "100000",
+            paymentDeadline: new Date("2026-09-02T01:00:00.000Z"),
+            status: "quoted",
+            allocations: [],
+            telemetry: {
+              disposition: "applied",
+              effects: [
+                {
+                  operation: "bonus_share",
+                  outcome: "applied",
+                  errorCode: "none",
+                },
+              ],
+            },
+          }) as const,
         releaseExpiredOrders: async () => ({
           kind: "expired" as const,
           released: true as const,
+          telemetry: {
+            disposition: "applied" as const,
+            effects: [],
+          },
         }),
         reverseRewardGrant: async () => ({
           rewardReversed: true,
           removedCreditMinor: 25_000n,
           cancelledReservationMinor: 5_000n,
           debtMinor: 10_000n,
+          telemetry: {
+            disposition: "applied" as const,
+            effects: [
+              {
+                operation: "reversal" as const,
+                outcome: "reversed" as const,
+                errorCode: "none" as const,
+              },
+              {
+                operation: "debt" as const,
+                outcome: "debt_created" as const,
+                errorCode: "none" as const,
+              },
+            ],
+          },
         }),
       },
       payment: {
@@ -129,15 +159,100 @@ describe("expert financial production-boundary metrics", () => {
         reconcile: async () => null,
       },
       existingState: {
-        settle: async () => ({ kind: "settled" as const }),
-        refund: async () => ({ kind: "refunded" as const }),
+        settle: (() => {
+          let applied = false;
+          return async () => {
+            if (applied) {
+              return {
+                kind: "settled" as const,
+                telemetry: {
+                  disposition: "duplicate" as const,
+                  effects: [] as const,
+                },
+              };
+            }
+            applied = true;
+            return {
+              kind: "settled" as const,
+              telemetry: {
+                disposition: "applied" as const,
+                effects: [
+                  {
+                    operation: "first_payment_qualification" as const,
+                    outcome: "eligible" as const,
+                    errorCode: "none" as const,
+                  },
+                  {
+                    operation: "credit_spend" as const,
+                    outcome: "spent" as const,
+                    errorCode: "none" as const,
+                  },
+                  {
+                    operation: "reward_grant" as const,
+                    outcome: "granted" as const,
+                    errorCode: "none" as const,
+                  },
+                ],
+              },
+            };
+          };
+        })(),
+        refund: async () => ({
+          kind: "refunded" as const,
+          telemetry: {
+            disposition: "applied" as const,
+            effects: [
+              {
+                operation: "refund" as const,
+                outcome: "refunded" as const,
+                errorCode: "none" as const,
+              },
+              {
+                operation: "reversal" as const,
+                outcome: "reversed" as const,
+                errorCode: "none" as const,
+              },
+              {
+                operation: "debt" as const,
+                outcome: "debt_created" as const,
+                errorCode: "none" as const,
+              },
+            ],
+          },
+        }),
         replayHeldReward: async () => ({
           kind: "debt_repaid" as const,
           amountMinor: "10000",
+          telemetry: {
+            disposition: "applied" as const,
+            effects: [
+              {
+                operation: "held_replay" as const,
+                outcome: "debt_repaid" as const,
+                errorCode: "none" as const,
+              },
+              {
+                operation: "reward_grant" as const,
+                outcome: "debt_repaid" as const,
+                errorCode: "none" as const,
+              },
+              {
+                operation: "debt" as const,
+                outcome: "debt_repaid" as const,
+                errorCode: "none" as const,
+              },
+            ],
+          },
         }),
       },
     });
     await residency.quote(principal, "private-tariff-id");
+    await residency.checkout(principal, {
+      tariffKey: "private-tariff-id",
+      idempotencyKey: "private-checkout-idempotency",
+      providerDeadline: new Date("2026-09-02T01:00:00.000Z"),
+    });
+    await residency.settle({} as never);
     await residency.settle({} as never);
     await residency.refund({} as never);
     await residency.releaseExpiredOrder({ orderId: "private-order-id" });

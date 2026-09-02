@@ -12,7 +12,7 @@ import {
   type ExpertReferralControlPort,
 } from "./expert-referral-service.js";
 import {
-  recordExpertReferralLifecycle,
+  safelyRecordExpertReferralLifecycle,
   type ReferralMetricLabels,
 } from "@ii-tonya/observability";
 
@@ -27,6 +27,25 @@ export interface ResidencyQuote {
   readonly cashMinor: string;
 }
 
+export type ExpertFinancialTelemetryEffect = Readonly<{
+  readonly operation: Exclude<
+    ReferralMetricLabels["operation"],
+    "duplicate_event"
+  >;
+  readonly outcome: ReferralMetricLabels["outcome"];
+  readonly errorCode: NonNullable<ReferralMetricLabels["errorCode"]>;
+}>;
+
+export type ExpertFinancialTelemetry =
+  | Readonly<{
+      readonly disposition: "applied";
+      readonly effects: readonly ExpertFinancialTelemetryEffect[];
+    }>
+  | Readonly<{
+      readonly disposition: "duplicate";
+      readonly effects: readonly [];
+    }>;
+
 export interface ResidencyCheckoutOrder extends ResidencyQuote {
   readonly orderId: string;
   readonly expertId: string;
@@ -36,6 +55,7 @@ export interface ResidencyCheckoutOrder extends ResidencyQuote {
     readonly grantId: string;
     readonly amountMinor: string;
   }[];
+  readonly telemetry: ExpertFinancialTelemetry;
 }
 
 export type VerifiedExpertResidencyEvent = Readonly<
@@ -52,12 +72,14 @@ export type ExpertResidencySettlementResult = Readonly<{
     | Readonly<{ kind: "none" }>
     | Readonly<{ kind: "reward_granted"; amountMinor: string }>
     | Readonly<{ kind: "debt_repaid"; amountMinor: string }>;
+  readonly telemetry: ExpertFinancialTelemetry;
 }>;
 
 export type ExpertResidencyRefundResult = Readonly<{
   readonly kind: "refunded" | "charged_back";
   readonly rewardReversed?: boolean;
   readonly debtMinor?: string;
+  readonly telemetry: ExpertFinancialTelemetry;
 }>;
 
 export type HeldRewardReplayResult = Readonly<{
@@ -70,6 +92,7 @@ export type HeldRewardReplayResult = Readonly<{
     | "debt_repaid";
   readonly amountMinor?: string;
   readonly reason?: string;
+  readonly telemetry: ExpertFinancialTelemetry;
 }>;
 
 export interface ExpertResidencyOrderPort {
@@ -83,11 +106,17 @@ export interface ExpertResidencyOrderPort {
     readonly providerDeadline: Date;
     readonly idempotencyKey: string;
   }): Promise<ResidencyCheckoutOrder>;
-  releaseExpiredOrders(command: {
-    readonly orderId: string;
-  }): Promise<
-    | { readonly kind: "settlement_allowed"; readonly released: false }
-    | { readonly kind: "expired"; readonly released: boolean }
+  releaseExpiredOrders(command: { readonly orderId: string }): Promise<
+    | {
+        readonly kind: "settlement_allowed";
+        readonly released: false;
+        readonly telemetry: ExpertFinancialTelemetry;
+      }
+    | {
+        readonly kind: "expired";
+        readonly released: boolean;
+        readonly telemetry: ExpertFinancialTelemetry;
+      }
   >;
   reverseRewardGrant(command: {
     readonly grantId: string;
@@ -98,6 +127,7 @@ export interface ExpertResidencyOrderPort {
     readonly removedCreditMinor: bigint;
     readonly cancelledReservationMinor: bigint;
     readonly debtMinor: bigint;
+    readonly telemetry: ExpertFinancialTelemetry;
   }>;
 }
 
@@ -198,7 +228,7 @@ const financialMetric = (
   outcome: ReferralMetricLabels["outcome"],
   errorCode: NonNullable<ReferralMetricLabels["errorCode"]> = "none",
 ): void => {
-  recordExpertReferralLifecycle({
+  safelyRecordExpertReferralLifecycle({
     module: "expert_residency",
     operation,
     outcome,
@@ -206,61 +236,19 @@ const financialMetric = (
   });
 };
 
-const positiveDecimal = (value: string | undefined): boolean =>
-  value !== undefined && /^(?:[1-9][0-9]*)$/u.test(value);
-
-const recordSettlementMetrics = (
-  result: ExpertResidencySettlementResult,
+const recordFinancialTelemetry = (
+  telemetry: ExpertFinancialTelemetry,
 ): void => {
-  financialMetric(
-    "first_payment_qualification",
-    result.kind === "expired"
-      ? "expired"
-      : (result.eligibilityStatus ?? "not_first_settlement"),
-  );
-  if (result.kind !== "settled") return;
-  financialMetric("credit_spend", "spent");
-  const rewardOutcome =
-    result.rewardEffect?.kind === "reward_granted"
-      ? "granted"
-      : result.rewardEffect?.kind === "debt_repaid"
-        ? "debt_repaid"
-        : result.eligibilityStatus === "pending_feature_hold"
-          ? "pending_feature_hold"
-          : "not_granted";
-  financialMetric("reward_grant", rewardOutcome);
-  if (result.rewardEffect?.kind === "debt_repaid") {
-    financialMetric("debt", "debt_repaid");
-  }
-};
-
-const recordRefundMetrics = (result: ExpertResidencyRefundResult): void => {
-  financialMetric("refund", result.kind);
-  financialMetric(
-    "reversal",
-    result.rewardReversed === true ? "reversed" : "not_reversed",
-  );
-  financialMetric(
-    "debt",
-    positiveDecimal(result.debtMinor) ? "debt_created" : "unchanged",
-  );
-};
-
-const heldReplayOutcome = (
-  kind: HeldRewardReplayResult["kind"],
-): ReferralMetricLabels["outcome"] => {
-  switch (kind) {
-    case "reward_granted":
-      return "granted";
-    case "debt_repaid":
-      return "debt_repaid";
-    case "cancelled_by_refund":
-      return "cancelled";
-    case "still_held":
-      return "still_held";
-    case "ineligible":
-    case "terminated_after_grant":
-      return "ineligible";
+  try {
+    if (telemetry.disposition === "duplicate") {
+      financialMetric("duplicate_event", "duplicate");
+      return;
+    }
+    for (const effect of telemetry.effects) {
+      financialMetric(effect.operation, effect.outcome, effect.errorCode);
+    }
+  } catch {
+    // Invalid or unavailable telemetry must not alter financial semantics.
   }
 };
 
@@ -268,22 +256,12 @@ export const createExpertResidencyService = (
   dependencies: ExpertResidencyDependencies,
 ): ExpertResidencyService => ({
   async quote(principal, tariffKey) {
-    try {
-      const identity = await commandIdentity(dependencies, principal);
-      if (isDenied(identity)) return identity;
-      const result = await dependencies.orders.quote({
-        expertId: identity.expertId,
-        tariffKey,
-      });
-      financialMetric(
-        "bonus_share",
-        result.creditMinor === "0" ? "not_applied" : "applied",
-      );
-      return result;
-    } catch (error) {
-      financialMetric("bonus_share", "failed", "unknown");
-      throw error;
-    }
+    const identity = await commandIdentity(dependencies, principal);
+    if (isDenied(identity)) return identity;
+    return dependencies.orders.quote({
+      expertId: identity.expertId,
+      tariffKey,
+    });
   },
 
   async checkout(principal, request) {
@@ -298,6 +276,7 @@ export const createExpertResidencyService = (
     if (order.expertId !== identity.expertId) {
       throw new Error("expert_residency_order_ownership_mismatch");
     }
+    recordFinancialTelemetry(order.telemetry);
     const payment = await dependencies.payment.createCheckout({
       orderId: order.orderId,
       idempotencyKey: request.idempotencyKey,
@@ -309,81 +288,40 @@ export const createExpertResidencyService = (
   },
 
   async settle(event) {
-    try {
-      const result = await dependencies.existingState.settle(event);
-      recordSettlementMetrics(result);
-      return result;
-    } catch (error) {
-      financialMetric("first_payment_qualification", "failed", "unknown");
-      throw error;
-    }
+    const result = await dependencies.existingState.settle(event);
+    recordFinancialTelemetry(result.telemetry);
+    return result;
   },
   async refund(event) {
-    try {
-      const result = await dependencies.existingState.refund(event);
-      recordRefundMetrics(result);
-      return result;
-    } catch (error) {
-      financialMetric("refund", "failed", "unknown");
-      throw error;
-    }
+    const result = await dependencies.existingState.refund(event);
+    recordFinancialTelemetry(result.telemetry);
+    return result;
   },
   async reconcile(paymentId) {
     const event = await dependencies.payment.reconcile(paymentId);
     if (event === null) return null;
     if (event.kind === "settled") {
       const result = await dependencies.existingState.settle(event);
-      recordSettlementMetrics(result);
+      recordFinancialTelemetry(result.telemetry);
       return result;
     }
     const result = await dependencies.existingState.refund(event);
-    recordRefundMetrics(result);
+    recordFinancialTelemetry(result.telemetry);
     return result;
   },
   async releaseExpiredOrder(command) {
-    try {
-      const result = await dependencies.orders.releaseExpiredOrders(command);
-      financialMetric(
-        "credit_expiry",
-        result.kind === "expired" ? "expired" : "unchanged",
-      );
-      return result;
-    } catch (error) {
-      financialMetric("credit_expiry", "failed", "unknown");
-      throw error;
-    }
+    const result = await dependencies.orders.releaseExpiredOrders(command);
+    recordFinancialTelemetry(result.telemetry);
+    return result;
   },
   async reverseReward(command) {
-    try {
-      const result = await dependencies.orders.reverseRewardGrant(command);
-      financialMetric(
-        "reversal",
-        result.rewardReversed ? "reversed" : "not_reversed",
-      );
-      financialMetric(
-        "debt",
-        result.debtMinor > 0n ? "debt_created" : "unchanged",
-      );
-      return result;
-    } catch (error) {
-      financialMetric("reversal", "failed", "unknown");
-      throw error;
-    }
+    const result = await dependencies.orders.reverseRewardGrant(command);
+    recordFinancialTelemetry(result.telemetry);
+    return result;
   },
   async replayHeldReward(command) {
-    try {
-      const result = await dependencies.existingState.replayHeldReward(command);
-      financialMetric("held_replay", heldReplayOutcome(result.kind));
-      if (result.kind === "reward_granted") {
-        financialMetric("reward_grant", "granted");
-      } else if (result.kind === "debt_repaid") {
-        financialMetric("reward_grant", "debt_repaid");
-        financialMetric("debt", "debt_repaid");
-      }
-      return result;
-    } catch (error) {
-      financialMetric("held_replay", "failed", "unknown");
-      throw error;
-    }
+    const result = await dependencies.existingState.replayHeldReward(command);
+    recordFinancialTelemetry(result.telemetry);
+    return result;
   },
 });
