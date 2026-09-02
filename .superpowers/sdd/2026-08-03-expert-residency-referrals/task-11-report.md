@@ -103,7 +103,7 @@ Commits integrated after the DB remediation:
 
 ### Metric TDD evidence
 
-- RED: the production-boundary metric test required every approved finite lifecycle category to be emitted through the real application/admin/worker functions; before instrumentation those boundaries had no validated metric calls or observability dependency and the expectation could not pass.
+- RED: the production-boundary OpenTelemetry test failed `1/1`; the collected operation set was empty while all 14 approved finite lifecycle categories were required from the real application/admin/worker functions.
 - GREEN: the independent metric gate passed 12 focused files / 110 tests, plus TypeScript, ESLint, and diff checks. The in-memory OpenTelemetry production test observes batch/code lifecycle, redemption, first-payment qualification, reward, bonus share, credit spend/expiry, debt, duplicate, held replay, refund/reversal, and reconciliation matched/mismatch emissions. Every observed point has exactly `module`, `operation`, `outcome`, and `errorCode`; entity IDs, plaintext/code suffixes, payloads, reasons, URLs, and exception text are absent.
 
 ### Integrated verification
