@@ -3,6 +3,7 @@ import { recordExpertReferralLifecycle } from "@ii-tonya/observability";
 export interface ExpertResidencyReconciliationCandidate {
   readonly attemptId: string;
   readonly providerPaymentId: string;
+  readonly claimedAt: string;
 }
 
 export interface ExpertResidencyReconciliationRepository {

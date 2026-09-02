@@ -65,6 +65,8 @@ interface ReconciliationRow extends Record<string, unknown> {
   expertId: string;
   provider: string;
   providerPaymentId: string;
+  orderProvider: string | null;
+  orderProviderPaymentId: string | null;
   expectedAmountMinor: bigint | string;
   currency: string;
   attemptStatus:
@@ -122,6 +124,8 @@ function reconciliationMismatchCodes(
   if (
     event.provider !== row.provider ||
     event.paymentId !== row.providerPaymentId ||
+    event.provider !== row.orderProvider ||
+    event.paymentId !== row.orderProviderPaymentId ||
     event.orderId !== row.orderId ||
     event.amountMinor !== BigInt(row.expectedAmountMinor).toString() ||
     event.currency !== row.currency
@@ -243,32 +247,127 @@ export class PostgresExpertReferralWorkerRepository {
   ): Promise<"matched" | "mismatch"> {
     const event = requireVerifiedExpertResidencyPaymentEvent(verifiedEvent);
     return this.db.transaction(async (tx) => {
-      // All referral financial state machines take this lock before their
-      // order/account locks. Holding it makes the complete projection below a
-      // stable snapshot without inventing a second lock order.
+      // Match the established financial lock order. Each lock is its own
+      // statement so a waiter never projects from the statement snapshot that
+      // existed before the conflicting state machine committed.
       await tx.execute(sql`select feature_key
         from expert_referral_feature_controls
         where feature_key = 'expert_referrals' for update`);
+      const resolved = (
+        await tx.execute<{ orderId: string }>(sql`select order_id as "orderId"
+          from expert_residency_payment_attempts
+          where id = ${candidate.attemptId}::uuid`)
+      ).rows[0];
+      if (resolved === undefined) throw new Error("reconciliation_claim_lost");
+      await tx.execute(sql`select id from expert_residency_orders
+        where id = ${resolved.orderId}::uuid for update`);
+      const claimedAttempt = (
+        await tx.execute<{ attemptId: string }>(sql`select id as "attemptId"
+          from expert_residency_payment_attempts
+          where id = ${candidate.attemptId}::uuid
+            and order_id = ${resolved.orderId}::uuid
+            and provider_request_id = ${candidate.providerPaymentId}
+            and updated_at = ${candidate.claimedAt}::timestamptz
+          for update`)
+      ).rows[0];
+      if (claimedAttempt === undefined)
+        throw new Error("reconciliation_claim_lost");
+      await tx.execute(sql`select id from expert_first_residency_settlements
+        where qualifying_order_id = ${resolved.orderId}::uuid
+        order by id for update`);
+      await tx.execute(sql`select referral.id from expert_referrals referral
+        join expert_residency_orders orders
+          on orders.expert_id = referral.invitee_expert_id
+        where orders.id = ${resolved.orderId}::uuid
+        order by referral.id for update of referral`);
+      await tx.execute(sql`select grant_row.id
+        from expert_referral_reward_grants grant_row
+        where grant_row.qualifying_order_id = ${resolved.orderId}::uuid
+          or grant_row.referral_id in (
+            select referral.id from expert_referrals referral
+            join expert_residency_orders orders
+              on orders.expert_id = referral.invitee_expert_id
+            where orders.id = ${resolved.orderId}::uuid
+          )
+        order by grant_row.id for update`);
+      await tx.execute(sql`select entry.id
+        from expert_referral_ledger_entries entry
+        where entry.account_expert_id in (
+            select orders.expert_id from expert_residency_orders orders
+              where orders.id = ${resolved.orderId}::uuid
+            union
+            select referral.inviter_expert_id from expert_referrals referral
+              join expert_residency_orders orders
+                on orders.expert_id = referral.invitee_expert_id
+              where orders.id = ${resolved.orderId}::uuid
+          )
+          or (entry.source_type = 'residency_order'
+            and entry.source_id = ${resolved.orderId}::uuid)
+          or entry.reward_grant_id in (
+            select id from expert_referral_reward_grants
+              where qualifying_order_id = ${resolved.orderId}::uuid
+          )
+        order by entry.created_at, entry.id for update`);
+      await tx.execute(sql`select allocation.ledger_entry_id,
+          allocation.reward_grant_id
+        from expert_referral_ledger_allocations allocation
+        join expert_referral_ledger_entries entry
+          on entry.id = allocation.ledger_entry_id
+        where entry.account_expert_id in (
+            select orders.expert_id from expert_residency_orders orders
+              where orders.id = ${resolved.orderId}::uuid
+            union
+            select referral.inviter_expert_id from expert_referrals referral
+              join expert_residency_orders orders
+                on orders.expert_id = referral.invitee_expert_id
+              where orders.id = ${resolved.orderId}::uuid
+          )
+          or (entry.source_type = 'residency_order'
+            and entry.source_id = ${resolved.orderId}::uuid)
+        order by allocation.ledger_entry_id, allocation.reward_grant_id
+        for update of allocation`);
+      await tx.execute(sql`select residency.id
+        from expert_residency_orders residency
+        join expert_residency_orders candidate_order
+          on candidate_order.expert_id = residency.expert_id
+        where candidate_order.id = ${resolved.orderId}::uuid
+        order by residency.residency_starts_at nulls first,
+          residency.residency_ends_at nulls first, residency.id
+        for update of residency`);
+
+      // READ COMMITTED gives this statement a fresh snapshot after every
+      // relevant row has been locked.
       const row = (
         await tx.execute<ReconciliationRow>(sql`
           select p.id as "attemptId", p.order_id as "orderId",
             o.expert_id as "expertId", p.provider,
             p.provider_request_id as "providerPaymentId",
+            o.payment_provider as "orderProvider",
+            o.provider_payment_id as "orderProviderPaymentId",
             p.expected_amount_minor as "expectedAmountMinor", p.currency,
             p.status as "attemptStatus", o.status as "orderStatus",
             (
-              coalesce(order_ledger.active_reserved_minor, 0) = case
-                when o.status in ('quoted', 'payment_pending') then o.credit_minor
-                else 0
-              end
-              and coalesce(order_ledger.spent_minor, 0) = case
-                when o.settled_at is not null then o.credit_minor else 0
+              order_ledger.reservation_minor = o.credit_minor
+              and order_ledger.allocation_shape_valid
+              and case
+                when o.status in ('quoted', 'payment_pending') then
+                  order_ledger.active_reserved_minor = o.credit_minor
+                  and order_ledger.terminal_minor = 0
+                when o.settled_at is not null then
+                  order_ledger.active_reserved_minor = 0
+                  and order_ledger.spent_minor = o.credit_minor
+                  and order_ledger.released_minor = 0
+                else order_ledger.active_reserved_minor = 0
+                  and order_ledger.released_minor = o.credit_minor
+                  and order_ledger.spent_minor = 0
               end
             ) as "reservationProjectionValid",
             (
-              coalesce(first_reward.eligible_count, 0)
-                = coalesce(first_reward.grant_count, 0)
-              and coalesce(first_reward.grant_count, 0) <= 1
+              case when first_reward.reward_expected
+                then first_reward.grant_count = 1
+                  and first_reward.exact_grant_count = 1
+                else first_reward.grant_count = 0
+              end
             ) as "rewardGrantProjectionValid",
             not exists (
               select 1
@@ -282,7 +381,8 @@ export class PostgresExpertReferralWorkerRepository {
                   where referral.invitee_expert_id = o.expert_id), o.expert_id)
               )
                 and entry.entry_kind in (
-                  'reward_grant', 'reservation', 'release', 'spend', 'expiry'
+                  'reward_grant', 'reservation', 'release', 'spend', 'expiry',
+                  'reversal', 'debt_repayment'
                 )
               group by entry.id, entry.amount_minor
               having coalesce(sum(allocation.amount_minor), 0)
@@ -291,9 +391,10 @@ export class PostgresExpertReferralWorkerRepository {
             not exists (
               select 1
               from expert_referral_ledger_entries reversal
-              left join expert_referral_ledger_entries repayment
-                on repayment.original_entry_id = reversal.id
-                and repayment.entry_kind = 'debt_repayment'
+              left join expert_referral_reward_grants grant_row
+                on grant_row.id = reversal.source_id
+              left join expert_referral_ledger_entries original
+                on original.id = reversal.original_entry_id
               where reversal.account_expert_id in (
                 o.expert_id,
                 coalesce((select referral.inviter_expert_id
@@ -301,9 +402,32 @@ export class PostgresExpertReferralWorkerRepository {
                   where referral.invitee_expert_id = o.expert_id), o.expert_id)
               )
                 and reversal.entry_kind = 'reversal'
-              group by reversal.id, reversal.amount_minor
-              having coalesce(sum(repayment.amount_minor), 0)
-                > -reversal.amount_minor
+              group by reversal.id, reversal.amount_minor, reversal.source_type,
+                reversal.source_id, reversal.account_expert_id, grant_row.id,
+                grant_row.inviter_expert_id, original.entry_kind,
+                original.reward_grant_id
+              having reversal.source_type <> 'reward_grant'
+                or grant_row.id is null
+                or grant_row.inviter_expert_id <> reversal.account_expert_id
+                or original.entry_kind <> 'reward_grant'
+                or original.reward_grant_id <> grant_row.id
+                or (select coalesce(sum(a.amount_minor), 0)
+                  from expert_referral_ledger_allocations a
+                  where a.ledger_entry_id = reversal.id)
+                    <> -reversal.amount_minor
+                or (select coalesce(sum(repayment.amount_minor), 0)
+                  from expert_referral_ledger_entries repayment
+                  where repayment.original_entry_id = reversal.id
+                    and repayment.entry_kind = 'debt_repayment')
+                    > -reversal.amount_minor
+                or exists (
+                  select 1 from expert_referral_ledger_entries repayment_row
+                  where repayment_row.original_entry_id = reversal.id
+                    and repayment_row.entry_kind = 'debt_repayment'
+                    and (repayment_row.source_id <> reversal.source_id
+                      or repayment_row.account_expert_id
+                        <> reversal.account_expert_id)
+                )
             ) as "debtProjectionValid",
             case
               when o.status = 'settled' then
@@ -311,11 +435,17 @@ export class PostgresExpertReferralWorkerRepository {
                 and o.residency_starts_at is not null
                 and o.residency_ends_at is not null
                 and o.residency_starts_at >= o.settled_at
+                and extract(epoch from
+                  (o.residency_ends_at - o.residency_starts_at))
+                  = o.duration_seconds
               when o.status in ('refunded', 'charged_back')
                 and o.settled_at is not null then
                 o.residency_starts_at is not null
                 and o.residency_ends_at is not null
                 and o.residency_starts_at >= o.settled_at
+                and extract(epoch from
+                  (o.residency_ends_at - o.residency_starts_at))
+                  = o.duration_seconds
               else o.settled_at is null
                 and o.residency_starts_at is null
                 and o.residency_ends_at is null
@@ -324,12 +454,44 @@ export class PostgresExpertReferralWorkerRepository {
           join expert_residency_orders o on o.id = p.order_id
           left join lateral (
             select
+              coalesce(sum(-reservation.amount_minor), 0)::bigint
+                as reservation_minor,
               coalesce(sum(-reservation.amount_minor) filter (
                 where terminal.id is null
               ), 0)::bigint as active_reserved_minor,
+              coalesce(sum(abs(terminal.amount_minor)), 0)::bigint
+                as terminal_minor,
               coalesce(sum(-terminal.amount_minor) filter (
                 where terminal.entry_kind = 'spend'
-              ), 0)::bigint as spent_minor
+              ), 0)::bigint as spent_minor,
+              coalesce(sum(terminal.amount_minor) filter (
+                where terminal.entry_kind = 'release'
+              ), 0)::bigint as released_minor,
+              coalesce(bool_and(
+                coalesce((select sum(a.amount_minor)
+                  from expert_referral_ledger_allocations a
+                  where a.ledger_entry_id = reservation.id), 0)
+                    = -reservation.amount_minor
+                and (terminal.id is null or (
+                  abs(terminal.amount_minor) = -reservation.amount_minor
+                  and coalesce((select sum(a.amount_minor)
+                    from expert_referral_ledger_allocations a
+                    where a.ledger_entry_id = terminal.id), 0)
+                      = abs(terminal.amount_minor)
+                  and not exists (
+                    select 1
+                    from expert_referral_ledger_allocations reservation_a
+                    full join expert_referral_ledger_allocations terminal_a
+                      on terminal_a.ledger_entry_id = terminal.id
+                      and terminal_a.reward_grant_id
+                        = reservation_a.reward_grant_id
+                    where reservation_a.ledger_entry_id = reservation.id
+                      and (terminal_a.reward_grant_id is null
+                        or terminal_a.amount_minor
+                          <> reservation_a.amount_minor)
+                  )
+                ))
+              ), true) as allocation_shape_valid
             from expert_referral_ledger_entries reservation
             left join expert_referral_ledger_entries terminal
               on terminal.original_entry_id = reservation.id
@@ -340,11 +502,29 @@ export class PostgresExpertReferralWorkerRepository {
           ) order_ledger on true
           left join lateral (
             select
-              count(*) filter (
-                where marker.eligibility_status = 'eligible'
-                  and referral.id is not null
-              )::integer as eligible_count,
-              count(grant_row.id)::integer as grant_count
+              coalesce(bool_or(marker.eligibility_status = 'eligible'
+                and referral.id is not null), false) as reward_expected,
+              count(grant_row.id)::integer as grant_count,
+              count(grant_row.id) filter (where
+                grant_row.inviter_expert_id = referral.inviter_expert_id
+                and grant_row.referral_id = referral.id
+                and grant_row.first_settlement_id = marker.id
+                and grant_row.qualifying_order_id = o.id
+                and exists (
+                  select 1 from expert_referral_ledger_entries reward
+                  where reward.entry_kind = 'reward_grant'
+                    and reward.reward_grant_id = grant_row.id
+                    and reward.account_expert_id = grant_row.inviter_expert_id
+                    and reward.source_type = 'reward_grant'
+                    and reward.source_id = grant_row.id
+                    and reward.amount_minor = grant_row.amount_minor
+                    and (select coalesce(sum(a.amount_minor), 0)
+                      from expert_referral_ledger_allocations a
+                      where a.ledger_entry_id = reward.id
+                        and a.reward_grant_id = grant_row.id)
+                      = grant_row.amount_minor
+                )
+              )::integer as exact_grant_count
             from expert_first_residency_settlements marker
             left join expert_referrals referral
               on referral.invitee_expert_id = marker.expert_id
@@ -354,9 +534,9 @@ export class PostgresExpertReferralWorkerRepository {
             where marker.qualifying_order_id = o.id
           ) first_reward on true
           where p.id = ${candidate.attemptId}::uuid
+            and o.id = ${resolved.orderId}::uuid
             and p.provider_request_id = ${candidate.providerPaymentId}
             and p.updated_at = ${candidate.claimedAt}::timestamptz
-          for update of p, o
         `)
       ).rows[0];
       if (row === undefined) throw new Error("reconciliation_claim_lost");
@@ -427,11 +607,25 @@ export class PostgresExpertReferralWorkerRepository {
           join expert_residency_orders orders
             on orders.id = marker.qualifying_order_id
           where marker.eligibility_status = 'pending_feature_hold'
-          order by marker.settlement_sequence, marker.id
+          order by orders.updated_at, marker.settlement_sequence, marker.id
           for update of orders skip locked
           limit ${command.batchSize}
         `)
       ).rows;
+      if (candidates.length > 0) {
+        const claimedOrderIds = sql.join(
+          candidates.map(
+            ({ qualifyingOrderId }) => sql`${qualifyingOrderId}::uuid`,
+          ),
+          sql`, `,
+        );
+        // This cursor is part of the outer claim transaction, not the
+        // per-item savepoint. A still-held or poisoned oldest row therefore
+        // moves behind untouched work without losing retry visibility.
+        await tx.execute(sql`update expert_residency_orders
+          set updated_at = clock_timestamp()
+          where id in (${claimedOrderIds})`);
+      }
       let granted = 0;
       let debtRepaid = 0;
       let ineligible = 0;

@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { sql } from "drizzle-orm";
 import type { ExpertResidencyPaymentEvent } from "../../packages/contracts/src/index.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
@@ -798,6 +806,41 @@ describe("expert residency held reward replay", () => {
     });
   });
 
+  it("advances a durable cursor past still-held work when batchSize is one", async () => {
+    const first = await scenario({ rewardEnabled: false });
+    const provider = new PostgresExpertResidencyProviderInboxRepository(
+      testDb.db,
+    );
+    await provider.settle(first.settlement);
+    const second = await scenario({
+      rewardEnabled: false,
+      featureAlreadyInitialized: true,
+    });
+    await provider.settle(second.settlement);
+    const replayHeldRewardInTransaction = vi.fn(async (_tx, command) =>
+      command.qualifyingOrderId === first.orderId
+        ? ({ kind: "still_held" } as const)
+        : ({ kind: "reward_granted", amountMinor: "100000" } as const),
+    );
+    const worker = new PostgresExpertReferralWorkerRepository(testDb.db, {
+      releaseExpiredOrderInTransaction: vi.fn(),
+      replayHeldRewardInTransaction,
+    });
+
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, stillHeld: 1 });
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, granted: 1 });
+    expect(
+      replayHeldRewardInTransaction.mock.calls.map((call) => call[1]),
+    ).toEqual([
+      expect.objectContaining({ qualifyingOrderId: first.orderId }),
+      expect.objectContaining({ qualifyingOrderId: second.orderId }),
+    ]);
+  });
+
   it("isolates a poisoned worker item, serves the next row, and releases locks", async () => {
     const poisoned = await scenario({ rewardEnabled: false });
     const provider = new PostgresExpertResidencyProviderInboxRepository(
@@ -826,8 +869,11 @@ describe("expert residency held reward replay", () => {
     const worker = new PostgresExpertReferralWorkerRepository(testDb.db);
 
     await expect(
-      worker.replayDueBatch({ now: new Date(0), batchSize: 2 }),
-    ).resolves.toMatchObject({ examined: 2, granted: 1, failed: 1 });
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, granted: 0, failed: 1 });
+    await expect(
+      worker.replayDueBatch({ now: new Date(0), batchSize: 1 }),
+    ).resolves.toMatchObject({ examined: 1, granted: 1, failed: 0 });
     expect(await heldFacts(eligible)).toMatchObject({
       eligibility: "eligible",
       grants: 1,

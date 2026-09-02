@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { reconcileExpertResidencyPayments } from "./expert-residency-reconciliation.js";
+import {
+  reconcileExpertResidencyPayments,
+  type ExpertResidencyReconciliationCandidate,
+} from "./expert-residency-reconciliation.js";
 
 const at = new Date("2026-09-02T00:00:00.000Z");
 
 describe("expert residency reconciliation job", () => {
   it("returns an explicit bounded disabled-provider outcome without inventing a mismatch", async () => {
-    const candidate = {
+    const candidate: ExpertResidencyReconciliationCandidate = {
       attemptId: "00000000-0000-4000-8000-000000000001",
       providerPaymentId: "disabled-payment",
+      claimedAt: "2026-09-02T00:00:00.000Z",
     };
     const repository = {
       claimReconciliationBatch: vi.fn(async () => [candidate]),
@@ -27,11 +31,44 @@ describe("expert residency reconciliation job", () => {
     expect(repository.compareAndRecordReconciliation).not.toHaveBeenCalled();
   });
 
+  it("forwards the exact reconciliation lease including claimedAt", async () => {
+    const candidate = {
+      attemptId: "00000000-0000-4000-8000-000000000001",
+      providerPaymentId: "payment-1",
+      claimedAt: "2026-09-02T00:00:00.000Z",
+    };
+    const event = { paymentId: "payment-1" };
+    const repository = {
+      claimReconciliationBatch: vi.fn(async () => [candidate]),
+      compareAndRecordReconciliation: vi.fn(async () => "matched" as const),
+    };
+    const provider = { reconcile: vi.fn(async () => event) };
+
+    await reconcileExpertResidencyPayments(repository, provider, at, 1);
+
+    expect(repository.compareAndRecordReconciliation).toHaveBeenCalledWith(
+      candidate,
+      event,
+    );
+  });
+
   it("isolates a poisoned item and continues the bounded batch", async () => {
     const candidates = [
-      { attemptId: "attempt-1", providerPaymentId: "payment-1" },
-      { attemptId: "attempt-2", providerPaymentId: "payment-2" },
-      { attemptId: "attempt-3", providerPaymentId: "payment-3" },
+      {
+        attemptId: "attempt-1",
+        providerPaymentId: "payment-1",
+        claimedAt: at.toISOString(),
+      },
+      {
+        attemptId: "attempt-2",
+        providerPaymentId: "payment-2",
+        claimedAt: at.toISOString(),
+      },
+      {
+        attemptId: "attempt-3",
+        providerPaymentId: "payment-3",
+        claimedAt: at.toISOString(),
+      },
     ];
     const events = new Map([
       ["payment-1", { paymentId: "payment-1" }],
