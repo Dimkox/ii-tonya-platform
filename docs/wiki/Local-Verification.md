@@ -34,9 +34,15 @@ export II_TONYA_TEST_POSTGRES_ADMIN_URL='postgresql://postgres:test@localhost:55
 `Test timed out`, **хотя поодиночке и малыми батчами проходят полностью**. Перед прогоном:
 
 ```bash
-docker exec ii-tonya-test-pg psql -U postgres   -c "alter system set max_connections=500" -c "alter system set shared_buffers=256MB"
+docker exec ii-tonya-test-pg psql -U postgres \
+  -c "alter system set max_connections = 500"
 docker restart ii-tonya-test-pg
 ```
+
+Единицы измерения в `alter system` требуют кавычек: `shared_buffers=256MB` без кавычек даёт
+`ERROR: trailing junk after numeric literal at or near "256MB"`, и `psql` с несколькими `-c` возвращает
+при этом 0 — команда выглядит применённой, а значение остаётся заводским. Результат ниже получен
+**только** за счёт `max_connections`, `shared_buffers` не менялся.
 
 ## Порядок и результат
 
@@ -69,14 +75,14 @@ pnpm test:e2e           # 6
 
 `test:integration` (116 файлов, `--maxWorkers=4`):
 
-| Конфиг Postgres                               | Итог                                                                                |
-| --------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `max_connections=100` (дефолт образа)         | 25 файлов FAIL, `Failed query: …`, `Test timed out`                                 |
-| `max_connections=500`, `shared_buffers=256MB` | **3 файла FAIL, 113 passed; утверждений не провалено ни одного — 669 passed / 669** |
+| Конфиг Postgres                                                                           | Итог                                                                                |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `max_connections=100` (дефолт образа)                                                     | 25 файлов FAIL, `Failed query: …`, `Test timed out`                                 |
+| после `max_connections = 500` (`shared_buffers` не менялся: команда с `256MB` отвалилась) | **3 файла FAIL, 113 passed; утверждений не провалено ни одного — 669 passed / 669** |
 
-Оставшиеся 3 — это не дефекты кода, а таймауты ресурсы: `tests/integration/commercial-core-v2-migration.test.ts:17`, `hybrid-message-gateway-b3.test.ts:52`, `partner-commerce-a-migration.test.ts:8`, все три — `Error: Hook timed out in 45000ms` на `afterAll → database.stop()`. Эти сюиты поднимают БД через testcontainers (`startTestPostgres()`), а остальные 24 — через внешний профиль, и на общем хосте остановка контейнера не успевает в дефолтный `hookTimeout`.
+Оставшиеся 3 — это не дефекты кода, а таймауты teardown: `tests/integration/commercial-core-v2-migration.test.ts:17`, `hybrid-message-gateway-b3.test.ts:52`, `partner-commerce-a-migration.test.ts:8`, все три — `Error: Hook timed out in 45000ms` на `afterAll → database.stop()`. Эти сюиты поднимают БД через testcontainers (`startTestPostgres()`), а остальные 24 — через внешний профиль, и на общем хосте остановка контейнера не успевает в дефолтный `hookTimeout`.
 
-Вывод для #47 и #51: код main проходит собственные проверки, а «красный» результат даёт невоспроизводимость окружения — два разных способа поднять Postgres внутри одного яруса, undeocumented требование БД даже для unit-яруса и дефолтный лимит соединений. Именно это и нужно зафиксировать в возвращаемом гейте, иначе он будет давать ложные падения.
+Вывод для #47 и #51: код main проходит собственные проверки, а «красный» результат даёт невоспроизводимость окружения — два разных способа поднять Postgres внутри одного яруса, незадокументированное требование БД даже для unit-яруса и дефолтный лимит соединений. Именно это и нужно зафиксировать в возвращаемом гейте, иначе он будет давать ложные падения.
 
 Вывод: продуктовый код на main проходит собственные проверки; «красный» прогон получается из-за
 недокументированных требований к окружению (БД даже для unit-яруса и лимит соединений). Их стоит
