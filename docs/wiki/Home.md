@@ -26,6 +26,7 @@ Wiki-репозиторий GitHub для приватных репозитор�
 - [Production-контур](Production.md) · [Верификация и Claw](Verification-Claw.md)
 - [Состав, флаги и точка сборки](Composition-and-Flags.md)
 - [Гейты go-live](Release-Gates.md) · [Словарь нумерации](Numbering.md)
+- [Целостность миграций](Data-and-Migrations.md) · [Локальный прогон](Local-Verification.md)
 
 ## Этапы
 

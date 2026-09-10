@@ -8,6 +8,8 @@
 - [Верификация и Claw](Verification-Claw.md)
 - [Production](Production.md)
 - [Нумерация](Numbering.md)
+- [Целостность миграций](Data-and-Migrations.md)
+- [Локальный прогон](Local-Verification.md)
 
 ### Ссылки
 
