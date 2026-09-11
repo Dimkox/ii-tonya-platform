@@ -43,10 +43,10 @@ AC-025 прогоняет библиотечные сервисы против �
 
 ## PR этапа
 
-[#25](https://github.com/Dimkox/ii-tonya-platform/pull/25), [#26](https://github.com/Dimkox/ii-tonya-platform/pull/26), [#27](https://github.com/Dimkox/ii-tonya-platform/pull/27), [#28](https://github.com/Dimkox/ii-tonya-platform/pull/28), [#29](https://github.com/Dimkox/ii-tonya-platform/pull/29)
+[#25](https://github.com/Dimkox/ii-tonya-platform/pull/25), [#26](https://github.com/Dimkox/ii-tonya-platform/pull/26), [#27](https://github.com/Dimkox/ii-tonya-platform/pull/27), [#28](https://github.com/Dimkox/ii-tonya-platform/pull/28), [#29](https://github.com/Dimkox/ii-tonya-platform/pull/29), [#65](https://github.com/Dimkox/ii-tonya-platform/pull/65)
 
 ## Открытые issues этапа
 
-[#46](https://github.com/Dimkox/ii-tonya-platform/issues/46)
+—
 
 ← [все этапы](Stages.md) · [Home](Home.md)
