@@ -50,6 +50,33 @@ if [[ "$mode" == release ]]; then
 fi
 container_script="$(mktemp)"
 evidence_dir="$source_root/docs/test-evidence/claw/$source_sha"
+
+# Seal the bundle once. ARTIFACTS.sha256 covers every file except itself and the seal's own
+# scratch name, so a later edit to any evidence file is detectable without trusting prose;
+# scripts/verify-claw-evidence.mjs re-checks it.
+claw_bundle_sealed=""
+claw_seal_bundle() {
+  local dir="$1" status="${2:-0}"
+  [[ -n "$claw_bundle_sealed" ]] && return 0
+  [[ -n "$dir" ]] || return 0
+  claw_bundle_sealed=1
+  [[ -f "$dir/environment.txt" ]] &&
+    printf 'exit_code=%s\n' "$status" >> "$dir/environment.txt"
+  [[ -d "$dir" ]] || return 0
+  (
+    cd "$dir" || exit 1
+    rm -f ARTIFACTS.sha256.tmp
+    : > ARTIFACTS.sha256.tmp
+    local file
+    for file in *; do
+      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
+      [[ -f "$file" ]] || continue
+      sha256sum "$file" >> ARTIFACTS.sha256.tmp
+    done
+    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
+  )
+}
+
 release_output="$source_root/.native-release"
 mkdir -p "$evidence_dir" "$release_output"
 
@@ -272,28 +299,3 @@ EOF
 
 claw_seal_bundle "$evidence_dir" 0
 
-# Seal the bundle once. ARTIFACTS.sha256 covers every file except itself and the seal's own
-# scratch name, so a later edit to any evidence file is detectable without trusting prose;
-# scripts/verify-claw-evidence.mjs re-checks it.
-claw_bundle_sealed=""
-claw_seal_bundle() {
-  local dir="$1" status="${2:-0}"
-  [[ -n "$claw_bundle_sealed" ]] && return 0
-  [[ -n "$dir" ]] || return 0
-  claw_bundle_sealed=1
-  [[ -f "$dir/environment.txt" ]] &&
-    printf 'exit_code=%s\n' "$status" >> "$dir/environment.txt"
-  [[ -d "$dir" ]] || return 0
-  (
-    cd "$dir" || exit 1
-    rm -f ARTIFACTS.sha256.tmp
-    : > ARTIFACTS.sha256.tmp
-    local file
-    for file in *; do
-      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
-      [[ -f "$file" ]] || continue
-      sha256sum "$file" >> ARTIFACTS.sha256.tmp
-    done
-    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
-  )
-}
