@@ -46,6 +46,31 @@ Read these files before continuing the expert residency referral extension:
 If the environment check fails, repair or isolate the environment. Do not weaken engine
 constraints, lockfiles, tests, feature flags, or CI to fit the machine.
 
+## Migration history is hand-authored
+
+Migrations in `packages/db/migrations` are authored, reviewed, and applied as SQL. The Drizzle
+snapshot chain stops at `0021`: journal entries `0014`, `0019`, `0020`, and `0022`-`0038` have SQL
+but no `meta/NNNN_snapshot.json`.
+
+- Do not run `drizzle-kit generate`. It diffs against the newest stored snapshot (`0021`) and
+  therefore re-emits every object added afterwards - a 2026-09-10 probe produced a 215-statement
+  `0039_*.sql` recreating existing tables. It also aborts before that on the BigInt default
+  `bigint("next_delivery_sequence", { mode: "bigint" }).notNull().default(0n)` in
+  `packages/db/src/schema/integration.ts`, with
+  `TypeError: Do not know how to serialize a BigInt`.
+- Do not read `drizzle-kit check` or `drizzle-kit up` as a safety net here: both report
+  `Everything's fine`, and neither restores the missing snapshots. The Database Gate step
+  `Validate Drizzle metadata` is therefore green regardless.
+- Add a migration by hand: the `.sql` file plus its `_journal.json` entry in the same change, with a
+  contiguous `idx`, a matching `NNNN_tag`, and `breakpoints: true`.
+- `tests/repo/migration-history-integrity.test.ts` freezes the grandfathered gap list and the
+  bigint-default list. Closing a real gap is welcome - shrink that baseline in the same change; a new
+  gap fails the guard.
+
+Rebuilding the snapshot chain (the only way to make `generate` usable again) needs a state-based
+snapshot for the newest migration; `drizzle-kit introspect` emits a Drizzle schema, not snapshot JSON,
+so there is no tool-supported path. Track that in the migration-integrity issue before attempting it.
+
 ## Test execution rules
 
 These rules override plan steps that ask an agent to burn time or tokens on repeated
