@@ -1,3 +1,23 @@
+claw_seal_bundle() {
+  local dir="$1"
+  # cleanup() and the success path can both reach this; sealing twice used to list the
+  # seal's own scratch file in the manifest it produced.
+  [[ -n "${claw_bundle_sealed:-}" ]] && return 0
+  claw_bundle_sealed=1
+  (
+    cd "$dir" || exit 1
+    rm -f ARTIFACTS.sha256.tmp
+    : > ARTIFACTS.sha256.tmp
+    local file
+    for file in *; do
+      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
+      [[ -f "$file" ]] || continue
+      sha256sum "$file" >> ARTIFACTS.sha256.tmp
+    done
+    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
+  )
+}
+
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -126,7 +146,7 @@ case "$CLAW_GATE_MODE" in
     step lint pnpm lint
     step typecheck env NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
     step coverage pnpm exec vitest run --coverage --maxWorkers=1
-    docker run --rm \
+    step gitleaks env docker run --rm \
       -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
       -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
       ghcr.io/gitleaks/gitleaks:v8.28.0 \
@@ -138,19 +158,19 @@ case "$CLAW_GATE_MODE" in
     step drizzle-check pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
     step schema pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
     step referral-schema pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-referral-redemption-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-checkout-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/test-expert-trial-postgres.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
+    step message-ledger pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
+    step conversation-messages pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
+    step booking-concurrency pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
+    step redemption-concurrency pnpm exec vitest run tests/integration/expert-referral-redemption-concurrency.test.ts --maxWorkers=1
+    step checkout-concurrency pnpm exec vitest run tests/integration/expert-residency-checkout-concurrency.test.ts --maxWorkers=1
+    step settlement-concurrency pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
+    step residency-deadline pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
+    step hold-replay pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
+    step test-expert-trial pnpm exec vitest run tests/integration/test-expert-trial-postgres.test.ts --maxWorkers=1
+    step yookassa-migration pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
+    step yookassa-concurrency pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
+    step yookassa-reconciliation pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
+    step sandbox-provider pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
     ;;
   release)
     SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
