@@ -365,6 +365,17 @@ const approvedAutomationArtifactHashes = new Map([
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
   ],
+  // Host-side Claw drivers. They were the single unversioned copy of the test ladder that
+  // repeats a suite and uses the container's proxy egress - neither of which
+  // scripts/run-claw-ci.sh does. Registered on first versioning, content unchanged.
+  [
+    "deploy/claw/claw-final-policy.sh",
+    "319d62945717789e475a53883c7c74e166f1d646a3b950a35f48229f9b852180",
+  ],
+  [
+    "deploy/claw/claw-final-three-pass.sh",
+    "79d791ba5556de31ee0fe5972ed286cc3ab01202bb0149767dd03a6aa40320d2",
+  ],
   [
     "scripts/validate-runtime-env.sh",
     "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
