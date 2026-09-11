@@ -28,6 +28,9 @@ describe("release assets", () => {
       "docs/runbooks/go-live-evidence.md",
       "docs/runbooks/provider-staging-evidence.md",
       "docs/runbooks/rollback.md",
+      "scripts/pre-push-gate.sh",
+      "scripts/install-git-hooks.sh",
+      "scripts/git-hooks/pre-push",
     ];
     expect(required.filter((path) => !existsSync(path))).toEqual([]);
   });
@@ -200,12 +203,59 @@ describe("release assets", () => {
       scripts: Record<string, string>;
     };
     const deployCheck = manifest.scripts["verify:deploy"] ?? "";
-    expect(deployCheck).toContain("bash -n scripts/run-claw-ci.sh");
+    // bash -n validates only its first operand: extra paths become positional parameters of
+    // the first script. The previous single call therefore syntax-checked run-claw-ci.sh and
+    // reported success for three unchecked deploy scripts, so the loop must stay per-file.
+    expect(deployCheck).toContain("for clawScript in scripts/run-claw-ci.sh");
     expect(deployCheck).toContain("scripts/build-native-release.sh");
     expect(deployCheck).toContain("scripts/deploy-native-remote.sh");
+    expect(deployCheck).toContain("scripts/validate-runtime-env.sh");
+    expect(deployCheck).toContain('bash -n "$clawScript" || exit 1');
+    expect(deployCheck).not.toMatch(
+      /bash -n scripts\/run-claw-ci\.sh scripts\//u,
+    );
     expect(deployCheck).toContain(
       "tests/repo/native-production-release.test.ts",
     );
     expect(manifest.scripts.verify).toContain("pnpm verify:deploy");
+    expect(manifest.scripts["verify:gate"]).toBe(
+      "bash scripts/pre-push-gate.sh",
+    );
+    expect(manifest.scripts["hooks:install"]).toBe(
+      "bash scripts/install-git-hooks.sh",
+    );
+    expect(manifest.scripts["hooks:check"]).toBe(
+      "bash scripts/install-git-hooks.sh --check",
+    );
+  });
+
+  it("catches a syntax error in a script that is not first in the list", () => {
+    // Pins the trap itself rather than the wording: one broken script anywhere in the loop must
+    // fail, which the multi-file `bash -n a b` form does not do.
+    const dir = mkdtempSync(join(tmpdir(), "gate-syntax-"));
+    const good = join(dir, "good.sh");
+    const broken = join(dir, "broken.sh");
+    writeFileSync(good, "#!/usr/bin/env bash\necho ok\n");
+    writeFileSync(broken, "#!/usr/bin/env bash\nif true then\n");
+
+    const singleCall = spawnSync("bash", ["-n", good, broken], {
+      encoding: "utf8",
+    });
+    expect(singleCall.status, "multi-file bash -n hides later files").toBe(0);
+
+    const looped = spawnSync(
+      "bash",
+      [
+        "-c",
+        'for clawScript in "$1" "$2"; do bash -n "$clawScript" || exit 1; done',
+        "gate",
+        good,
+        broken,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(looped.status, "per-file loop must reject the broken script").toBe(
+      1,
+    );
   });
 });

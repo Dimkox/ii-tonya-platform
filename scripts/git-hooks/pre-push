@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# git pre-push hook. Activate with `bash scripts/install-git-hooks.sh` (sets core.hooksPath);
+# bypass on purpose with `git push --no-verify`.
+#
+# git invokes this with $1 = remote name, $2 = remote url, and one line per ref on stdin:
+#   local_ref local_oid remote_ref remote_oid
+# A local_oid of all zeros means the branch is being deleted, which needs no gate.
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+changed_list="$(mktemp)"
+trap 'rm -f "$changed_list"' EXIT
+
+range=""
+pushes_main="false"
+seen_ref="false"
+pushed_oids=""
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  [[ -n "${local_ref:-}" ]] || continue
+  seen_ref="true"
+  case "$remote_ref" in
+    refs/heads/main)
+      pushes_main="true"
+      pushed_oids="$pushed_oids $local_oid"
+      ;;
+  esac
+  [[ "$local_oid" =~ ^0+$ ]] && continue
+
+  if [[ -n "${remote_oid:-}" && ! "$remote_oid" =~ ^0+$ ]]; then
+    range="$remote_oid..$local_oid"
+  else
+    # New branch: gate against its fork point rather than the whole history.
+    base="$(git merge-base origin/main "$local_oid" 2>/dev/null || true)"
+    [[ -n "$base" ]] && range="$base..$local_oid"
+  fi
+
+  git diff --name-only "$range" >>"$changed_list" 2>/dev/null || true
+done
+
+if [[ "$seen_ref" != "true" ]]; then
+  exit 0
+fi
+
+sort -u "$changed_list" -o "$changed_list"
+
+gate_args=(--changed-file "$changed_list")
+[[ -n "$range" ]] && gate_args+=(--range "$range")
+[[ "$pushes_main" == "true" ]] && gate_args+=(--full)
+
+# The gate reads the working tree, so its verdict only describes what is being pushed when the
+# tree is clean and HEAD is one of the commits going out. For a push to main that has to hold;
+# otherwise a green gate would be vouching for content other than the pushed SHA.
+if [[ "$pushes_main" == "true" ]]; then
+  head_sha="$(git rev-parse HEAD)"
+  if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    printf 'pre-push: refusing — the working tree has uncommitted changes, so a green gate\n' >&2
+    printf 'pre-push: would describe the tree, not the commit being pushed to main.\n' >&2
+    printf 'pre-push: commit them (or stash) and push again.\n' >&2
+    exit 1
+  fi
+  case " $pushed_oids " in
+    *" $head_sha "*) ;;
+    *)
+      printf 'pre-push: refusing — HEAD %s is not the commit being pushed to main (%s).\n' \
+        "${head_sha:0:7}" "$(printf '%s' "$pushed_oids" | cut -c2-8)" >&2
+      printf 'pre-push: check out that commit (or push from where it is HEAD) so the gate tests it.\n' >&2
+      exit 1
+      ;;
+  esac
+fi
+
+printf 'pre-push: %s changed path(s), running the repository gate (%s)\n' \
+  "$(grep -c . "$changed_list" || true)" \
+  "$([[ "$pushes_main" == "true" ]] && printf 'full: push targets main' || printf 'branch mode')"
+
+if ! bash scripts/pre-push-gate.sh "${gate_args[@]}"; then
+  exit 1
+fi

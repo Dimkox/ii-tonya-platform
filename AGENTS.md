@@ -110,6 +110,22 @@ Database Gate runs.
 Do not force-push or rewrite shared history. Preserve failed CI runs as diagnostic
 evidence. Keep PR #4 Draft until Tasks 10–12 and their final checks are complete.
 
+### Pre-push gate
+
+There is no hosted CI: `.github/workflows` is empty by repository policy
+(`tests/repo/workflow-semantics.test.ts` asserts it) and branch protection is unavailable on
+the current plan, so a push is otherwise entirely unchecked. Install the gate once per clone
+— the hook it writes lives outside the worktree and therefore covers every linked worktree:
+
+`pnpm hooks:install`
+
+It refuses a push when `tests/repo`, formatting, evidence integrity, whitespace checks, or the
+syntax of any automation script fails, and it lints the files in the outgoing range.
+`pnpm hooks:check` reports whether the gate is active; `pnpm verify:gate` runs the same checks
+without pushing. A push targeting `main` additionally requires a clean working tree whose HEAD
+is the commit being pushed, and also runs the tests typecheck. Bypass only deliberately with
+`git push --no-verify`, and state the reason in the PR description.
+
 ## Authority and safety boundaries
 
 - Client coupons and expert referral codes are separate products, tables, ledgers, code
