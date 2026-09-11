@@ -38,10 +38,10 @@ Milestone: [3](https://github.com/Dimkox/ii-tonya-platform/milestone/3) · Label
 
 ## PR этапа
 
-[#2](https://github.com/Dimkox/ii-tonya-platform/pull/2), [#10](https://github.com/Dimkox/ii-tonya-platform/pull/10), [#14](https://github.com/Dimkox/ii-tonya-platform/pull/14), [#15](https://github.com/Dimkox/ii-tonya-platform/pull/15), [#16](https://github.com/Dimkox/ii-tonya-platform/pull/16), [#31](https://github.com/Dimkox/ii-tonya-platform/pull/31), [#40](https://github.com/Dimkox/ii-tonya-platform/pull/40)
+[#2](https://github.com/Dimkox/ii-tonya-platform/pull/2), [#10](https://github.com/Dimkox/ii-tonya-platform/pull/10), [#14](https://github.com/Dimkox/ii-tonya-platform/pull/14), [#15](https://github.com/Dimkox/ii-tonya-platform/pull/15), [#16](https://github.com/Dimkox/ii-tonya-platform/pull/16), [#31](https://github.com/Dimkox/ii-tonya-platform/pull/31), [#40](https://github.com/Dimkox/ii-tonya-platform/pull/40), [#70](https://github.com/Dimkox/ii-tonya-platform/pull/70), [#66](https://github.com/Dimkox/ii-tonya-platform/pull/66)
 
 ## Открытые issues этапа
 
-[#6](https://github.com/Dimkox/ii-tonya-platform/issues/6), [#47](https://github.com/Dimkox/ii-tonya-platform/issues/47), [#48](https://github.com/Dimkox/ii-tonya-platform/issues/48), [#49](https://github.com/Dimkox/ii-tonya-platform/issues/49), [#50](https://github.com/Dimkox/ii-tonya-platform/issues/50), [#51](https://github.com/Dimkox/ii-tonya-platform/issues/51), [#58](https://github.com/Dimkox/ii-tonya-platform/issues/58)
+[#6](https://github.com/Dimkox/ii-tonya-platform/issues/6), [#47](https://github.com/Dimkox/ii-tonya-platform/issues/47), [#48](https://github.com/Dimkox/ii-tonya-platform/issues/48), [#49](https://github.com/Dimkox/ii-tonya-platform/issues/49), [#51](https://github.com/Dimkox/ii-tonya-platform/issues/51), [#58](https://github.com/Dimkox/ii-tonya-platform/issues/58), [#71](https://github.com/Dimkox/ii-tonya-platform/issues/71)
 
 ← [все этапы](Stages.md) · [Home](Home.md)
