@@ -45,6 +45,6 @@ Milestone: [2](https://github.com/Dimkox/ii-tonya-platform/milestone/2) · Label
 
 ## Открытые issues этапа
 
-[#52](https://github.com/Dimkox/ii-tonya-platform/issues/52)
+[#52](https://github.com/Dimkox/ii-tonya-platform/issues/52), [#73](https://github.com/Dimkox/ii-tonya-platform/issues/73)
 
 ← [все этапы](Stages.md) · [Home](Home.md)
