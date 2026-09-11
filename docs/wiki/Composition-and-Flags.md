@@ -24,13 +24,18 @@
 Следствие: продукт «диалог в Telegram» не исполняется, потому что не собраны `conversation ingress` и
 Telegram-колбэки, а не потому что нет доменных сервисов. Детали — [https://github.com/Dimkox/ii-tonya-platform/issues/45](https://github.com/Dimkox/ii-tonya-platform/issues/45).
 
-## Разрыв «тесты vs боевая сборка»
+## Покрытие боевой сборки
 
-`tests/e2e/client-session-catalog.test.ts` собирает HTTP-приложение через `buildTestApp` из
-`apps/api/src/app.js` с **инъекцией** реальных capabilities. Боевой `createDefaultLifecycle` из
-`server.ts` не покрывается ни одним e2e-сюжетом, а `tests/e2e/mvp-smoke.test.ts` (AC-025) вызывает
-сервисы напрямую против Postgres. Отсюда сосуществование зелёной лестницы `pnpm verify` и четырёх
-заглушек в проде — [https://github.com/Dimkox/ii-tonya-platform/issues/46](https://github.com/Dimkox/ii-tonya-platform/issues/46).
+Раньше боевой `createDefaultLifecycle` не покрывался ни одним e2e: `client-session-catalog.test.ts`
+собирал приложение через `buildTestApp` с инжекцией сервисов, а AC-025 вызывал сервисы напрямую.
+Теперь это закрыто — `tests/e2e/production-composition.test.ts` (issue
+[https://github.com/Dimkox/ii-tonya-platform/issues/46](https://github.com/Dimkox/ii-tonya-platform/issues/46) закрыт PR-ом [https://github.com/Dimkox/ii-tonya-platform/pull/65]) поднимает lifecycle через
+`composeServer` против реального PostgreSQL, проверяет клиентские маршруты, fail-closed при активации
+без capability, и держит пин на списке `disabledService()`: новая или переименованная заглушка тест
+роняет.
+
+Остаток: сам факт заглушек (см. [https://github.com/Dimkox/ii-tonya-platform/issues/45]) и то, что у `pnpm verify` нет исполняемого гейта
+на main (см. [https://github.com/Dimkox/ii-tonya-platform/issues/47]).
 
 ## Рабочие пространства
 

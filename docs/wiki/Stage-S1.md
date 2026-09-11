@@ -35,7 +35,7 @@ Milestone: [1](https://github.com/Dimkox/ii-tonya-platform/milestone/1) · Label
 
 ## PR этапа
 
-[#1](https://github.com/Dimkox/ii-tonya-platform/pull/1), [#2](https://github.com/Dimkox/ii-tonya-platform/pull/2)
+[#1](https://github.com/Dimkox/ii-tonya-platform/pull/1), [#2](https://github.com/Dimkox/ii-tonya-platform/pull/2), [#63](https://github.com/Dimkox/ii-tonya-platform/pull/63)
 
 ## Открытые issues этапа
 
