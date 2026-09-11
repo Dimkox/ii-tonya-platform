@@ -1,0 +1,10 @@
+source_sha=7498ce656e1e49fe2d92c83f02d9667eb3f86b9b
+gate_mode=release
+container_hostname=52e38a20d3ea
+node=v24.18.0
+pnpm=11.9.0
+kernel=6.8.0-110-generic
+cpu_max=100000 100000
+memory_max=1073741824
+pids_max=18966
+exit_code=0
