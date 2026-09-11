@@ -46,10 +46,10 @@ Dispatch, response ingress и sensitive retention независимо выкл�
 
 ## PR этапа
 
-[#38](https://github.com/Dimkox/ii-tonya-platform/pull/38), [#39](https://github.com/Dimkox/ii-tonya-platform/pull/39)
+[#38](https://github.com/Dimkox/ii-tonya-platform/pull/38), [#39](https://github.com/Dimkox/ii-tonya-platform/pull/39), [#69](https://github.com/Dimkox/ii-tonya-platform/pull/69)
 
 ## Открытые issues этапа
 
-[#54](https://github.com/Dimkox/ii-tonya-platform/issues/54), [#57](https://github.com/Dimkox/ii-tonya-platform/issues/57)
+[#57](https://github.com/Dimkox/ii-tonya-platform/issues/57)
 
 ← [все этапы](Stages.md) · [Home](Home.md)
