@@ -326,8 +326,12 @@ const approvedAutomationArtifactHashes = new Map([
     "f8157d9d0c23de1cf813f32664e702f25c06ec4f6cad0b2404808307b2cfd0b5",
   ],
   [
+    // 87f6270 switched the release signature check to `cosign verify-blob --bundle` (the
+    // artifact is a sigstore bundle, not a bare signature) and added `--retry-connrefused`
+    // to the readiness probe, so a cold API start no longer aborts a good deployment.
+    // Registering the new normalized-content hash instead of relaxing the rule.
     "scripts/deploy-native-remote.sh",
-    "6bd755bf0e4b0ee994e1b04267c4e175fb49c6355f7dec38ed0fbc704dd78891",
+    "0bfe4350610d253d0cdc56c19df2fc715d29300f1d056f529dd8b7a514655af2",
   ],
   [
     "scripts/provision-claw-syft.sh",
