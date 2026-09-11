@@ -320,8 +320,12 @@ const approvedAutomationArtifactHashes = new Map([
     "a0e47f22d78674efa3dcdac1e7119bdf09d7d12e1baba7ec3c94c34daa255b0b",
   ],
   [
+    // #81 gave every gate mode its own step log and environment snapshot
+    // (summary-<mode>.tsv, environment-<mode>.txt) instead of one shared pair that every run
+    // truncated, and wrapped the release gate body in step() so the artifact build is
+    // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "908ca61a9ebb0bb70374388c51acc7041f22e54fdfe9e29e6182b43d2a2c9e34",
+    "0151459fce14199efb65e25e71025ba9c4cbcf6023aa7639436cae994082812a",
   ],
   [
     "scripts/build-native-release.sh",
