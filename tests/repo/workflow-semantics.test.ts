@@ -143,9 +143,13 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain("claw_test_container: true");
     expect(runner).toContain("production_container: false");
     expect(runner).toContain("trap cleanup EXIT");
-    expect(runner).toContain('summary_tsv="$evidence_dir/summary.tsv"');
     expect(runner).toContain("printf 'source_sha=%s\\n' \"$CLAW_SOURCE_SHA\"");
     expect(runner).toContain('claw_seal_bundle "$evidence_dir"');
+    // Every step is recorded with its exit status and both timestamps, and the record is
+    // appended: that printf is what turns a step name into a measured duration.
+    expect(runner).toContain(
+      'printf \'%s\\t%s\\t%s\\t%s\\n\' "$name" "$code" "$started" "$finished" >> "$summary_tsv"',
+    );
     // Bash resolves a function call only if the definition has already executed, so a
     // seal defined after its first call fails with 127 and leaves an unsealed bundle.
     const sealDefinition = runner.indexOf("claw_seal_bundle() {");
@@ -153,6 +157,81 @@ describe("direct Claw verification semantics", () => {
     expect(sealDefinition).toBeGreaterThan(-1);
     expect(firstSealCall).toBeGreaterThan(sealDefinition);
     expect(runner.match(/^claw_seal_bundle\(\) \{/gmu)).toHaveLength(1);
+  });
+
+  it("keeps one step log and one environment snapshot per gate mode", () => {
+    // #81: summary.tsv and environment.txt were shared by every mode and truncated at the
+    // start of each run, so a release run after a ci run on the same SHA destroyed the proof
+    // that ci had ever happened, and the bundle showed one step out of dozens while three
+    // mode reports claimed PASS.
+    const runner = read("scripts/run-claw-ci.sh");
+    expect(runner).toContain(
+      'summary_tsv="$evidence_dir/summary-$CLAW_GATE_MODE.tsv"',
+    );
+    expect(runner).toContain(
+      'environment_txt="$evidence_dir/environment-$CLAW_GATE_MODE.txt"',
+    );
+    expect(runner).toContain('} > "$environment_txt"');
+    expect(runner).not.toContain('"$evidence_dir/summary.tsv"');
+    expect(runner).not.toContain('"$evidence_dir/environment.txt"');
+    // Repeating one mode must still replace that mode's own record, but by removing the log
+    // rather than truncating it: a mode that records no step then leaves no empty file.
+    expect(runner).toContain('rm -f "$summary_tsv"');
+    expect(runner).not.toContain(': > "$summary_tsv"');
+    // The human-readable report was already per-mode and stays that way.
+    expect(runner).toContain('cat > "$evidence_dir/${mode}.md" <<EOF');
+    // The seal appends the exit code to the snapshot this run owns, never to another
+    // mode's or to the legacy shared one.
+    expect(runner).toContain('[[ -f "$dir/environment-$mode.txt" ]]');
+    expect(runner).toContain(
+      'printf \'exit_code=%s\\n\' "$status" >> "$dir/environment-$mode.txt"',
+    );
+  });
+
+  it("records every gate body, the release build included, as a timed step", () => {
+    const runner = read("scripts/run-claw-ci.sh");
+    const gateCase = runner.indexOf('case "$CLAW_GATE_MODE" in');
+    expect(gateCase).toBeGreaterThan(-1);
+    const bodyOf = (mode: string): string[] => {
+      const start = runner.indexOf(`  ${mode})`, gateCase);
+      expect(start).toBeGreaterThan(gateCase);
+      const body = runner.slice(start, runner.indexOf("    ;;", start));
+      const statements: string[] = [];
+      let pending = "";
+      for (const rawLine of body.split("\n")) {
+        const line =
+          pending.length > 0 ? `${pending} ${rawLine.trim()}` : rawLine.trim();
+        if (line.endsWith("\\")) {
+          pending = line.slice(0, -1).trim();
+          continue;
+        }
+        pending = "";
+        if (line.length === 0 || line.startsWith("#")) {
+          continue;
+        }
+        statements.push(line);
+      }
+      // Drop the case label and the terminator, keep the commands.
+      return statements.filter((line) => line !== ";;" && !line.endsWith(")"));
+    };
+    for (const mode of ["ci", "database", "release"]) {
+      const statements = bodyOf(mode);
+      expect(statements.length, `${mode} gate body is empty`).toBeGreaterThan(
+        0,
+      );
+      for (const statement of statements) {
+        expect(statement, `${mode}: ${statement}`).toMatch(
+          /^step [a-z0-9][a-z0-9-]* /u,
+        );
+      }
+    }
+    // Done-when #2: the release bundle must carry the artifact build itself, with an exit
+    // code and a measured duration, not just the report that claims it passed.
+    const release = bodyOf("release");
+    expect(release).toEqual([
+      'step build-native-release env SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output bash scripts/build-native-release.sh',
+      "step release-artifact-present test -f /workspace/release-output/native-release.tar.gz",
+    ]);
   });
 
   it("freezes the one-process client-booking gate and its secret-safe cleanup", () => {

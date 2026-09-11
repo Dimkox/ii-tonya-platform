@@ -15,9 +15,16 @@
 
 ## Как устроены Claw-доказательства
 
-Каждый прогон оставляет каталог по SHA исходника: `verification.md` (таблица гейтов с парами
-RED/GREEN), `environment.txt` (версии node/pnpm/docker, лимиты cgroup), `summary.tsv` (статус и время
-каждого шага), `ARTIFACTS.sha256`, `remote-SHA256SUMS`.
+Каждый прогон оставляет каталог по SHA исходника: отчёт режима (`ci.md`, `database.md`,
+`release.md`, `client-booking.md`; у самодельных пакетов — `verification.md` с таблицей гейтов и
+парами RED/GREEN), `environment-<mode>.txt` (версии node/pnpm, лимиты cgroup, `exit_code`),
+`summary-<mode>.tsv` (статус и время каждого шага), `ARTIFACTS.sha256`, `remote-SHA256SUMS`.
+Имена с суффиксом режима — с #81: раньше все режимы писали в общие `summary.tsv` и
+`environment.txt` и обрезали их при каждом прогоне, поэтому release-прогон после ci стирал
+доказательство ci. История не переименовывается — пакеты, записанные до #81, несут старые имена, и
+`scripts/verify-claw-evidence.mjs` принимает и те, и другие. С #81 тот же скрипт считает ошибкой
+пакет, в котором из шагов записана только установка зависимостей: такой пакет доказывает наличие
+pnpm-store, а не прохождение гейта.
 
 Записи честно помечают границу: «CODE CHECKPOINT PASS / … ACTIVATION BLOCKED», «No GitHub Actions,
 image rebuild, production container, production SSH, merchant credential, or provider network call was

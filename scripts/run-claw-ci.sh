@@ -60,8 +60,10 @@ claw_seal_bundle() {
   [[ -n "$claw_bundle_sealed" ]] && return 0
   [[ -n "$dir" ]] || return 0
   claw_bundle_sealed=1
-  [[ -f "$dir/environment.txt" ]] &&
-    printf 'exit_code=%s\n' "$status" >> "$dir/environment.txt"
+  # The snapshot is per-mode, so a seal annotates only the snapshot this run owns and never
+  # touches the one a different mode of the same SHA left behind.
+  [[ -f "$dir/environment-$mode.txt" ]] &&
+    printf 'exit_code=%s\n' "$status" >> "$dir/environment-$mode.txt"
   [[ -d "$dir" ]] || return 0
   (
     cd "$dir" || exit 1
@@ -101,8 +103,16 @@ export CI=true
 # leaves a checkable bundle instead of silence.
 evidence_dir="/workspace/source/docs/test-evidence/claw/$CLAW_SOURCE_SHA"
 mkdir -p "$evidence_dir"
-summary_tsv="$evidence_dir/summary.tsv"
-: > "$summary_tsv"
+# One step log and one environment snapshot per gate mode (#81). Before this, every run
+# truncated the single shared summary.tsv and environment.txt, so a release run after a ci
+# run on the same SHA erased the proof that the ci gate ever happened and the bundle showed
+# one step out of dozens. Repeating the same mode still replaces that mode's own record:
+# the previous log of this mode is removed rather than appended to, so a re-run cannot
+# accumulate stale steps. A mode that records no step at all leaves no log instead of an
+# empty one.
+summary_tsv="$evidence_dir/summary-$CLAW_GATE_MODE.tsv"
+environment_txt="$evidence_dir/environment-$CLAW_GATE_MODE.txt"
+rm -f "$summary_tsv"
 
 # step <name> <command...>: record exit status and wall clock without swallowing the status.
 step() {
@@ -130,7 +140,7 @@ step() {
   printf 'cpu_max=%s\n' "$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unknown)"
   printf 'memory_max=%s\n' "$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo unknown)"
   printf 'pids_max=%s\n' "$(cat /sys/fs/cgroup/pids.max 2>/dev/null || echo unknown)"
-} > "$evidence_dir/environment.txt"
+} > "$environment_txt"
 if [[ "$CLAW_GATE_MODE" != client-booking ]]; then
   step frozen-install pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
 fi
@@ -170,9 +180,12 @@ case "$CLAW_GATE_MODE" in
     step sandbox-provider pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
     ;;
   release)
-    SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
+    # #81: this was the only gate body that ran outside `step`, so the bundle recorded nothing
+    # about the release build - not that it ran, not its exit status, not how long it took.
+    # Both the build and the artifact assertion are recorded now.
+    step build-native-release env SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
       bash scripts/build-native-release.sh
-    test -f /workspace/release-output/native-release.tar.gz
+    step release-artifact-present test -f /workspace/release-output/native-release.tar.gz
     ;;
   client-booking)
     mkdir node_modules
