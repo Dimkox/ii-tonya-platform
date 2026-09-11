@@ -1,0 +1,23 @@
+{
+  "$comment": "Documented deviations in docs/test-evidence/claw/ bundles. An entry here does not excuse a failure silently: it records both hashes, so the deviation stays re-checkable by scripts/verify-claw-evidence.mjs, and the verifier still exits 1 if a mismatch is not listed or if a listed pair stops matching. Never re-hash a manifest to make a bundle pass - that destroys the provenance the bundle exists to provide.",
+  "exemptions": [
+    {
+      "dir": "c560cbb65e105e1aaeb8d86f544ff95cfd218346",
+      "reason": "verification.md was edited after ARTIFACTS.sha256 had been written, so the manifest no longer describes the committed file. The evidence content itself is unaffected; the bundle simply lost self-consistency and nobody noticed for a month because no check existed.",
+      "manifest": "ARTIFACTS.sha256",
+      "deviations": [
+        {
+          "file": "verification.md",
+          "hashAtManifestTime": "dc2ed9f0289c70ac912cacc4d4f886c0ff214812f451f8f45ad064bb96782bb9",
+          "hashNow": "036053d4713a1ff73634d1d1a48d6f89dde1df1a9a95004394a35f4f2efbb836"
+        }
+      ],
+      "evidence": {
+        "manifestWrittenIn": "3f8ed564 (2026-08-12T00:28:12+03:00, 'docs: record focused expert residency e2e evidence')",
+        "fileLastModifiedIn": "ebd40858 (2026-08-12T19:41:47+03:00, 'Add provider-neutral expert Bearer principal boundary (#9)')",
+        "observed": "2026-09-11 by scripts/verify-claw-evidence.mjs"
+      },
+      "resolution": "Leave both files as they are. Either regenerate the manifest on the next gate run for this SHA, or add the amendment hash pair; do not overwrite history."
+    }
+  ]
+}
