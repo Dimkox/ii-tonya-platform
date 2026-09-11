@@ -1,23 +1,3 @@
-claw_seal_bundle() {
-  local dir="$1"
-  # cleanup() and the success path can both reach this; sealing twice used to list the
-  # seal's own scratch file in the manifest it produced.
-  [[ -n "${claw_bundle_sealed:-}" ]] && return 0
-  claw_bundle_sealed=1
-  (
-    cd "$dir" || exit 1
-    rm -f ARTIFACTS.sha256.tmp
-    : > ARTIFACTS.sha256.tmp
-    local file
-    for file in *; do
-      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
-      [[ -f "$file" ]] || continue
-      sha256sum "$file" >> ARTIFACTS.sha256.tmp
-    done
-    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
-  )
-}
-
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -75,14 +55,8 @@ mkdir -p "$evidence_dir" "$release_output"
 
 cleanup() {
   local status=$?
+  claw_seal_bundle "${evidence_dir:-}" "$status"
   rm -f "$container_script"
-  # A failed gate must still leave a sealed, checkable bundle: silence is what let a
-  # prose-only evidence trail accumulate for weeks.
-  if [[ -n "${evidence_dir:-}" && -f "$evidence_dir/environment.txt" ]] &&
-    declare -f claw_seal_bundle >/dev/null; then
-    printf 'exit_code=%s\n' "$status" >> "$evidence_dir/environment.txt"
-    claw_seal_bundle "$evidence_dir"
-  fi
   if [[ "$mode" == client-booking && -f "$source_root/.claw-client-booking-node-modules" ]]; then
     rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"
   fi
@@ -96,18 +70,14 @@ set -Eeuo pipefail
 cd /workspace/source
 export CI=true
 
-# Evidence is written into the mounted source tree, so a run that dies part-way still
-# leaves a sealed bundle behind instead of silence.
+# Evidence goes into the mounted source tree so that a gate which dies half-way still
+# leaves a checkable bundle instead of silence.
 evidence_dir="/workspace/source/docs/test-evidence/claw/$CLAW_SOURCE_SHA"
 mkdir -p "$evidence_dir"
 summary_tsv="$evidence_dir/summary.tsv"
 : > "$summary_tsv"
 
-record_step() {
-  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$summary_tsv"
-}
-
-# step <name> <command...> records exit status and wall clock without swallowing it.
+# step <name> <command...>: record exit status and wall clock without swallowing the status.
 step() {
   local name="$1"
   shift
@@ -119,14 +89,14 @@ step() {
     code=$?
   fi
   finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  record_step "$name" "$code" "$started" "$finished"
+  printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$started" "$finished" >> "$summary_tsv"
   return "$code"
 }
 
 {
   printf 'source_sha=%s\n' "$CLAW_SOURCE_SHA"
   printf 'gate_mode=%s\n' "$CLAW_GATE_MODE"
-  printf 'host=%s\n' "$(hostname -s)"
+  printf 'container_hostname=%s\n' "$(hostname -s)"
   printf 'node=%s\n' "$(node --version)"
   printf 'pnpm=%s\n' "$(pnpm --version)"
   printf 'kernel=%s\n' "$(uname -r)"
@@ -146,7 +116,7 @@ case "$CLAW_GATE_MODE" in
     step lint pnpm lint
     step typecheck env NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
     step coverage pnpm exec vitest run --coverage --maxWorkers=1
-    step gitleaks env docker run --rm \
+    step gitleaks docker run --rm \
       -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
       -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
       ghcr.io/gitleaks/gitleaks:v8.28.0 \
@@ -300,22 +270,30 @@ cat > "$evidence_dir/${mode}.md" <<EOF
 - github_actions: not_used
 EOF
 
-printf 'exit_code=0\n' >> "$evidence_dir/environment.txt"
+claw_seal_bundle "$evidence_dir" 0
 
-# ARTIFACTS.sha256 seals everything except itself, so a later edit to any evidence file
-# is detectable without trusting the prose. scripts/verify-claw-evidence.mjs checks it.
+# Seal the bundle once. ARTIFACTS.sha256 covers every file except itself and the seal's own
+# scratch name, so a later edit to any evidence file is detectable without trusting prose;
+# scripts/verify-claw-evidence.mjs re-checks it.
+claw_bundle_sealed=""
 claw_seal_bundle() {
-  local dir="$1"
+  local dir="$1" status="${2:-0}"
+  [[ -n "$claw_bundle_sealed" ]] && return 0
+  [[ -n "$dir" ]] || return 0
+  claw_bundle_sealed=1
+  [[ -f "$dir/environment.txt" ]] &&
+    printf 'exit_code=%s\n' "$status" >> "$dir/environment.txt"
+  [[ -d "$dir" ]] || return 0
   (
-    cd "$dir"
+    cd "$dir" || exit 1
+    rm -f ARTIFACTS.sha256.tmp
+    : > ARTIFACTS.sha256.tmp
     local file
     for file in *; do
-      [[ "$file" == "ARTIFACTS.sha256" ]] && continue
+      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
       [[ -f "$file" ]] || continue
-      sha256sum "$file"
-    done > ARTIFACTS.sha256.tmp
+      sha256sum "$file" >> ARTIFACTS.sha256.tmp
+    done
     mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
   )
 }
-
-claw_seal_bundle "$evidence_dir"
