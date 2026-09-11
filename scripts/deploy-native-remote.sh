@@ -84,7 +84,7 @@ test "$(basename "$checksum")" = native-release.sha256
 test "$(basename "$sbom")" = native-release.spdx.json
 test "$(basename "$provenance")" = native-release.provenance.json
 grep -Eq '^[0-9a-f]{64}  native-release\.tar\.gz$' "$checksum"
-cosign verify-blob --key "$signing_public_key" --signature "$signature" "$checksum" >/dev/null
+cosign verify-blob --key "$signing_public_key" --bundle "$signature" "$checksum" >/dev/null
 
 incoming="ii-tonya-$release_sha"
 ssh "${ssh_options[@]}" "$remote" bash -s -- "$deploy_root/incoming/$incoming" <<'REMOTE'
@@ -187,7 +187,7 @@ symlink_switched="true"
 sudo systemctl start ii-tonya-migrate.service
 sudo systemctl restart ii-tonya-api.service
 sudo systemctl restart ii-tonya-worker.service
-curl --retry 20 --retry-delay 2 --fail --silent --show-error \
+curl --retry 20 --retry-delay 2 --retry-connrefused --fail --silent --show-error \
   http://127.0.0.1:3000/health/ready >/dev/null
 sudo systemctl is-active --quiet ii-tonya-api.service
 sudo systemctl is-active --quiet ii-tonya-worker.service
