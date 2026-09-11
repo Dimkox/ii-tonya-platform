@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const MIGRATIONS = "packages/db/migrations";
 const META = `${MIGRATIONS}/meta`;
+const SCHEMA_DIR = "packages/db/src/schema";
 
 type JournalEntry = {
   idx: number;
@@ -211,5 +212,42 @@ describe("migration history integrity", () => {
     expect(
       collect(/create\s+extension\s+(?:if not exists\s+)?([a-z_]+)/gi),
     ).toEqual([...HAND_SQL_EXTENSIONS]);
+  });
+  it("keeps declared tables and migrated tables identical", () => {
+    const schemaFiles = readdirSync(SCHEMA_DIR).filter((name) =>
+      name.endsWith(".ts"),
+    );
+    const declared = new Set<string>();
+    for (const name of schemaFiles) {
+      const source = readFileSync(`${SCHEMA_DIR}/${name}`, "utf8");
+      for (const match of source.matchAll(/pgTable\(\s*"([a-z0-9_]+)"/g)) {
+        declared.add(match[1] as string);
+      }
+      for (const match of source.matchAll(
+        /pgTable\(\s*\{\s*schema:\s*"[a-z_]+",\s*name:\s*"([a-z0-9_]+)"/g,
+      )) {
+        declared.add(match[1] as string);
+      }
+    }
+
+    const migrated = new Set<string>();
+    for (const name of readdirSync(MIGRATIONS).filter((file) =>
+      file.endsWith(".sql"),
+    )) {
+      const source = readFileSync(`${MIGRATIONS}/${name}`, "utf8");
+      for (const match of source.matchAll(
+        /create\s+table(?:\s+if\s+not\s+exists)?\s+(?:public\.)?"?([a-z0-9_]+)"?\s*\(/gi,
+      )) {
+        migrated.add(match[1] as string);
+      }
+    }
+
+    const onlyDeclared = [...declared].filter((table) => !migrated.has(table));
+    const onlyMigrated = [...migrated].filter((table) => !declared.has(table));
+    expect(
+      { tables: declared.size, onlyDeclared, onlyMigrated },
+      "every pgTable must be created by a migration and every migrated table must be declared",
+    ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
+    expect(declared.size).toBe(96);
   });
 });
