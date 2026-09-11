@@ -1,0 +1,206 @@
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m11.30 KB[39m
+[32mESM[39m ⚡️ Build success in 31ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m10.82 KB[39m
+[32mESM[39m ⚡️ Build success in 91ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m2.55 KB[39m
+[32mESM[39m ⚡️ Build success in 95ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m69.79 KB[39m
+[32mESM[39m ⚡️ Build success in 113ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m99.90 KB[39m
+[32mESM[39m ⚡️ Build success in 193ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m504.62 KB[39m
+[32mESM[39m ⚡️ Build success in 394ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m12.59 KB[39m
+[32mESM[39m ⚡️ Build success in 29ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m39.63 KB[39m
+[32mESM[39m ⚡️ Build success in 100ms
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/workspace/mvp-client-booking-final-6bb751d5[39m
+
+ [32m✓[39m tests/repo/db-schema-parity.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/repo/workflow-semantics.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [31m❯[39m apps/worker/src/main.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m12 failed[39m[2m)[22m[32m 100[2mms[22m[39m
+[31m   [31m×[31m worker main[2m > [22mcan be imported without starting the polling loop[39m[32m 94[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mkeeps expert residency provider reads disabled by default[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mconstructs the worker outbox registry lazily only for enabled config[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mfails closed before registry use when enabled composition is incomplete[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mdoes not accept a prebuilt registry as a disabled-mode bypass[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22maccepts an injected YooKassa reader only with complete enabled metadata[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mfinishes the current bounded cycle and closes on a signal[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mupdates the configured heartbeat after a successful built-worker cycle[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mdoes not accumulate abort listeners between polling intervals[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mstarts bounded close when a signal arrives during a hung cycle[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mhard-exits after the shutdown grace period when close never settles[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m   [31m×[31m worker main[2m > [22mclears the hard-exit watchdog after a clean signal close[39m[32m 0[2mms[22m[39m
+[31m     → Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+ [32m✓[39m apps/api/src/client-booking-principal-resolver.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m packages/worker/src/client-booking-erasure.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/e2e/client-booking-boundary.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/repo/client-booking-boundaries.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m packages/contracts/src/worker-outbox.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 8 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/client-booking-privacy.test.ts[2m [ tests/integration/client-booking-privacy.test.ts ][22m
+[41m[1m FAIL [22m[49m tests/integration/client-booking-repository.test.ts[2m [ tests/integration/client-booking-repository.test.ts ][22m
+[41m[1m FAIL [22m[49m tests/integration/client-catalog-booking-choice.test.ts[2m [ tests/integration/client-catalog-booking-choice.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'pg' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/db/src/client.ts'[39m
+[36m [2m❯[22m packages/db/src/client.ts:[2m5:1[22m[39m
+    [90m  3| [39m[35mimport[39m { sql } [35mfrom[39m [32m"drizzle-orm"[39m[33m;[39m
+    [90m  4| [39m[35mimport[39m { fileURLToPath } [35mfrom[39m [32m"node:url"[39m[33m;[39m
+    [90m  5| [39m[35mimport[39m { [33mPool[39m } [35mfrom[39m [32m"pg"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  6| [39m[35mimport[39m [33m*[39m [35mas[39m schema [35mfrom[39m [32m"./schema/index.js"[39m[33m;[39m
+    [90m  7| [39m
+
+[31m[1mCaused by: Error[22m: Failed to load url pg (resolved id: pg) in /workspace/mvp-client-booking-final-6bb751d5/packages/db/src/client.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/20]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/client-booking-schema.test.ts[2m [ tests/integration/client-booking-schema.test.ts ][22m
+[31m[1mError[22m: Cannot find package '@testcontainers/postgresql' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/db/src/testkit/postgres.ts'[39m
+[36m [2m❯[22m packages/db/src/testkit/postgres.ts:[2m2:1[22m[39m
+    [90m  1| [39m[35mimport[39m { randomUUID } [35mfrom[39m [32m"node:crypto"[39m[33m;[39m
+    [90m  2| [39m[35mimport[39m { [33mPostgreSqlContainer[39m } [35mfrom[39m [32m"@testcontainers/postgresql"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  3| [39m[35mimport[39m { drizzle } [35mfrom[39m [32m"drizzle-orm/node-postgres"[39m[33m;[39m
+    [90m  4| [39m[35mimport[39m { sql } [35mfrom[39m [32m"drizzle-orm"[39m[33m;[39m
+
+[31m[1mCaused by: Error[22m: Failed to load url @testcontainers/postgresql (resolved id: @testcontainers/postgresql) in /workspace/mvp-client-booking-final-6bb751d5/packages/db/src/testkit/postgres.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/20]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m apps/worker/src/runtime.test.ts[2m [ apps/worker/src/runtime.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/contracts/dist/index.js'[39m
+[31m[1mCaused by: Error[22m: Failed to load url zod (resolved id: zod) in /workspace/mvp-client-booking-final-6bb751d5/packages/contracts/dist/index.js. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/20]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m packages/observability/src/logger.test.ts[2m [ packages/observability/src/logger.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'pino' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/observability/src/logger.ts'[39m
+[36m [2m❯[22m packages/observability/src/logger.ts:[2m1:1[22m[39m
+    [90m  1| [39m[35mimport[39m pino[33m,[39m {
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m  type [33mDestinationStream[39m[33m,[39m
+    [90m  3| [39m  type [33mLogger[39m[33m,[39m
+
+[31m[1mCaused by: Error[22m: Failed to load url pino (resolved id: pino) in /workspace/mvp-client-booking-final-6bb751d5/packages/observability/src/logger.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/20]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m packages/observability/src/metrics.test.ts[2m [ packages/observability/src/metrics.test.ts ][22m
+[31m[1mError[22m: Cannot find package '@opentelemetry/api' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/observability/src/metrics.ts'[39m
+[36m [2m❯[22m packages/observability/src/metrics.ts:[2m1:1[22m[39m
+    [90m  1| [39m[35mimport[39m { metrics } [35mfrom[39m [32m"@opentelemetry/api"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m
+    [90m  3| [39m[35mconst[39m meter [33m=[39m metrics[33m.[39m[34mgetMeter[39m([32m"ii-tonya"[39m)[33m;[39m
+
+[31m[1mCaused by: Error[22m: Failed to load url @opentelemetry/api (resolved id: @opentelemetry/api) in /workspace/mvp-client-booking-final-6bb751d5/packages/observability/src/metrics.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/20]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m apps/api/src/routes/client-booking.test.ts[2m [ apps/api/src/routes/client-booking.test.ts ][22m
+[31m[1mError[22m: Cannot find package 'fastify' imported from '/workspace/mvp-client-booking-final-6bb751d5/apps/api/src/routes/client-booking.test.ts'[39m
+[36m [2m❯[22m apps/api/src/routes/client-booking.test.ts:[2m1:1[22m[39m
+    [90m  1| [39m[35mimport[39m [33mFastify[39m [35mfrom[39m [32m"fastify"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m[35mimport[39m { describe[33m,[39m expect[33m,[39m it[33m,[39m vi } [35mfrom[39m [32m"vitest"[39m[33m;[39m
+    [90m  3| [39m
+
+[31m[1mCaused by: Error[22m: Failed to load url fastify (resolved id: fastify) in /workspace/mvp-client-booking-final-6bb751d5/apps/api/src/routes/client-booking.test.ts. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/20]⎯[22m[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 12 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mcan be imported without starting the polling loop
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mkeeps expert residency provider reads disabled by default
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mconstructs the worker outbox registry lazily only for enabled config
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mfails closed before registry use when enabled composition is incomplete
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mdoes not accept a prebuilt registry as a disabled-mode bypass
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22maccepts an injected YooKassa reader only with complete enabled metadata
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mfinishes the current bounded cycle and closes on a signal
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mupdates the configured heartbeat after a successful built-worker cycle
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mdoes not accumulate abort listeners between polling intervals
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mstarts bounded close when a signal arrives during a hung cycle
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mhard-exits after the shutdown grace period when close never settles
+[41m[1m FAIL [22m[49m apps/worker/src/main.test.ts[2m > [22mworker main[2m > [22mclears the hard-exit watchdog after a clean signal close
+[31m[1mError[22m: Cannot find package 'zod' imported from '/workspace/mvp-client-booking-final-6bb751d5/packages/config/dist/index.js'[39m
+[31m[1mCaused by: Error[22m: Failed to load url zod (resolved id: zod) in /workspace/mvp-client-booking-final-6bb751d5/packages/contracts/dist/index.js. Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:[2m22739:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/20]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m7 passed[39m[22m[90m (16)[39m
+[2m      Tests [22m [1m[31m12 failed[39m[22m[2m | [22m[1m[32m30 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 15:10:33
+[2m   Duration [22m 14.51s[2m (transform 1.60s, setup 0ms, collect 2.31s, tests 189ms, environment 5ms, prepare 2.19s)[22m
+

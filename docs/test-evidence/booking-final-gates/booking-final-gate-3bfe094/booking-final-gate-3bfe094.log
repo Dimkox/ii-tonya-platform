@@ -1,0 +1,39 @@
+started_at=2026-08-14T14:59:21Z
+source_sha_expected=3bfe09480d259741d0e019fe5501c31339bdfd69
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m11.30 KB[39m
+[32mESM[39m ⚡️ Build success in 105ms
+[34mDTS[39m Build start
+[32mDTS[39m ⚡️ Build success in 4458ms
+[32mDTS[39m [1mdist/index.d.ts [22m[32m7.17 KB[39m
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m10.82 KB[39m
+[32mESM[39m ⚡️ Build success in 86ms
+[34mDTS[39m Build start
+src/env.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/env.ts(4,4): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(83,16): error TS7006: Parameter 'raw' implicitly has an 'any' type.
+src/env.ts(94,8): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(103,8): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(116,8): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(134,8): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(144,17): error TS7006: Parameter 'value' implicitly has an 'any' type.
+src/env.ts(144,24): error TS7006: Parameter 'context' implicitly has an 'any' type.
+
+[31mError: error occurred in dts build
+    at Worker.<anonymous> (/seed/node_modules/.pnpm/tsup@8.5.1_postcss@8.5.23_tsx@4.23.1_typescript@5.9.3_yaml@2.9.0/node_modules/tsup/dist/index.js:1545:26)
+    at Worker.emit (node:events:509:28)
+    at MessagePort.<anonymous> (node:internal/worker:350:14)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:843:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)[39m
+[31mDTS[39m [31mBuild error[39m
