@@ -1,6 +1,6 @@
 # Бэклог открытых вопросов
 
-Открытых issues: 16. Получены из разбора репозитория,
+Открытых issues: 17. Получены из разбора репозитория,
 production-контура и документации 10.09.2026.
 
 | #                                                            | Этап  | Заголовок                                                                                                                                                            | Labels                                                                   |
@@ -8,7 +8,8 @@ production-контура и документации 10.09.2026.
 | [#45](https://github.com/Dimkox/ii-tonya-platform/issues/45) | `S10` | Точка сборки: 4 ingress-сервиса подставлены disabledService(), Telegram-границы захардкожены                                                                         | `gate:no-go`, `type:product-gap`                                         |
 | [#53](https://github.com/Dimkox/ii-tonya-platform/issues/53) | `S10` | 7 открытых PR в статусе CONFLICTING/DIRTY: #30 #31 #32 #34 #35 #38 #42                                                                                               | `gate:no-go`, `gate:pending`                                             |
 | [#62](https://github.com/Dimkox/ii-tonya-platform/issues/62) | `S10` | Карта этапов S1–S10: milestone, PR, гейты и остаток                                                                                                                  | `documentation`, `gate:no-go`                                            |
-| [#52](https://github.com/Dimkox/ii-tonya-platform/issues/52) | `S2`  | Перенести expert-referral линейку (task25) на актуальный main: ветка ни разу не синхронизировалась                                                                   | `stage:expert-residency`, `gate:pending`                                 |
+| [#52](https://github.com/Dimkox/ii-tonya-platform/issues/52) | `S2`  | Сверить остатки epic task25 с main и добрать недостающее новой миграцией (см. #73: разные миграции под одними индексами)                                             | `stage:expert-residency`, `gate:pending`, `area:data`                    |
+| [#73](https://github.com/Dimkox/ii-tonya-platform/issues/73) | `S2`  | Разные миграции под одинаковыми индексами 0019–0024 в main и в ветке task25-expert-referral-design                                                                   | `stage:expert-residency`, `gate:pending`, `area:data`                    |
 | [#6](https://github.com/Dimkox/ii-tonya-platform/issues/6)   | `S3`  | ops/server-control                                                                                                                                                   | `stage:release-eng`, `type:ops`                                          |
 | [#47](https://github.com/Dimkox/ii-tonya-platform/issues/47) | `S3`  | Гейт на main отсутствует по собственной policy (workflow-semantics требует пустой .github/workflows): выбрать между переносимым Claw-прогоном (#51) и отменой policy | `stage:release-eng`, `gate:pending`, `type:ops`                          |
 | [#48](https://github.com/Dimkox/ii-tonya-platform/issues/48) | `S3`  | Дрейф релиза: прод = 233f3cf (14 авг), main на 33 коммита впереди; деплой помечен not reproducible                                                                   | `stage:release-eng`, `gate:pending`, `type:ops`                          |
@@ -22,7 +23,7 @@ production-контура и документации 10.09.2026.
 | [#59](https://github.com/Dimkox/ii-tonya-platform/issues/59) | `S8`  | Веб-статика на проде новее API-релиза: index.html от 27 авг против API 233f3cf от 14 авг                                                                             | `stage:web`, `type:ops`                                                  |
 | [#61](https://github.com/Dimkox/ii-tonya-platform/issues/61) | `S9`  | Retention / legal / minor-data approval: blocked, independent reviewer unassigned                                                                                    | `stage:compliance`, `gate:no-go`                                         |
 
-Используемые labels: `area:payments`, `area:telegram`, `documentation`, `evidence:claw`, `gate:no-go`, `gate:pending`, `stage:compliance`, `stage:expert-residency`, `stage:expert-verticals`, `stage:hybrid`, `stage:payments`, `stage:release-eng`, `stage:web`, `type:ops`, `type:product-gap`, `type:security`
+Используемые labels: `area:data`, `area:payments`, `area:telegram`, `documentation`, `evidence:claw`, `gate:no-go`, `gate:pending`, `stage:compliance`, `stage:expert-residency`, `stage:expert-verticals`, `stage:hybrid`, `stage:payments`, `stage:release-eng`, `stage:web`, `type:ops`, `type:product-gap`, `type:security`
 
 ## Приоритет, который зафиксирован при разборе
 
