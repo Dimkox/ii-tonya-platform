@@ -1,0 +1,3 @@
+# These files are shipped byte-for-byte: SHA256SUMS covers their exact bytes and the
+# Windows launcher expects the line endings it was authored with.
+* -text
