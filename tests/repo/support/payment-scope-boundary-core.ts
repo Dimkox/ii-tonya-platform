@@ -303,6 +303,20 @@ const approvedPackageManifestHashes = new Map([
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
+  // Host bootstrap for the native production runtime (PR #70). These mutate the server
+  // out of band, so their content is pinned here as well as in deploy/bootstrap/SHA256SUMS.
+  [
+    "deploy/bootstrap/bootstrap-ii-tonya-remote.sh",
+    "a8a191b91ce4510137a8018af9fe4111570988ef52445c645ef50adfb7cf7372",
+  ],
+  [
+    "deploy/bootstrap/bootstrap-ii-tonya-deploy.ps1",
+    "34a3b1a8df60c835f221117ad17013efe758838abfe7739d0cdf2fda4889ec1f",
+  ],
+  [
+    "deploy/bootstrap/bootstrap-ii-tonya-deploy.cmd",
+    "a0e47f22d78674efa3dcdac1e7119bdf09d7d12e1baba7ec3c94c34daa255b0b",
+  ],
   [
     "scripts/run-claw-ci.sh",
     "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
