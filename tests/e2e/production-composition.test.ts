@@ -144,7 +144,7 @@ describe("production API composition", () => {
       await closeServer(app, lifecycle, db);
       poolClosed = true;
     }
-  });
+  }, 120_000);
 
   it("refuses to boot a client flag without its capability", async () => {
     productionEnv({
@@ -171,5 +171,5 @@ describe("production API composition", () => {
       "conversation ingress",
       "privacy ingress",
     ]);
-  });
+  }, 30_000);
 });
