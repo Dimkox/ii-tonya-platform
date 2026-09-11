@@ -1,0 +1,10 @@
+source_sha=982fab2c5c4899fab597de12c9a3de5fec451500
+gate_mode=database
+container_hostname=065aa9a1e080
+node=v24.18.0
+pnpm=11.9.0
+kernel=6.8.0-110-generic
+cpu_max=100000 100000
+memory_max=1073741824
+pids_max=18966
+exit_code=0
