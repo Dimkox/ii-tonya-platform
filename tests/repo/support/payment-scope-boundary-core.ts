@@ -319,7 +319,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/run-claw-ci.sh",
-    "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
+    "908ca61a9ebb0bb70374388c51acc7041f22e54fdfe9e29e6182b43d2a2c9e34",
   ],
   [
     "scripts/build-native-release.sh",

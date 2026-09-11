@@ -41,12 +41,13 @@ describe("claw evidence integrity", () => {
   it("keeps the machine-checkable coverage as a floor, never a ceiling", () => {
     // 24 of 26 bundles are prose only: nothing an outside reviewer can re-check.
     // Raising coverage is the point of #51, so the number is pinned from below.
-    expect(result.summary.machineVerifiable).toBeGreaterThanOrEqual(2);
-    expect(result.summary.manifestEntriesChecked).toBeGreaterThanOrEqual(23);
+    // The runner now seals its own bundle, so a generated run counts too.
+    expect(result.summary.machineVerifiable).toBeGreaterThanOrEqual(3);
+    expect(result.summary.manifestEntriesChecked).toBeGreaterThanOrEqual(26);
     expect(result.summary.proseOnly).toBe(
       result.summary.bundles - result.summary.machineVerifiable,
     );
-    expect(result.summary.bundles).toBeGreaterThanOrEqual(26);
+    expect(result.summary.bundles).toBeGreaterThanOrEqual(27);
   });
 
   it("documents every exemption with both hashes and a reason", () => {
