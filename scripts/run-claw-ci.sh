@@ -54,7 +54,15 @@ release_output="$source_root/.native-release"
 mkdir -p "$evidence_dir" "$release_output"
 
 cleanup() {
+  local status=$?
   rm -f "$container_script"
+  # A failed gate must still leave a sealed, checkable bundle: silence is what let a
+  # prose-only evidence trail accumulate for weeks.
+  if [[ -n "${evidence_dir:-}" && -f "$evidence_dir/environment.txt" ]] &&
+    declare -f claw_seal_bundle >/dev/null; then
+    printf 'exit_code=%s\n' "$status" >> "$evidence_dir/environment.txt"
+    claw_seal_bundle "$evidence_dir"
+  fi
   if [[ "$mode" == client-booking && -f "$source_root/.claw-client-booking-node-modules" ]]; then
     rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"
   fi
@@ -67,18 +75,57 @@ cat > "$container_script" <<'SCRIPT'
 set -Eeuo pipefail
 cd /workspace/source
 export CI=true
+
+# Evidence is written into the mounted source tree, so a run that dies part-way still
+# leaves a sealed bundle behind instead of silence.
+evidence_dir="/workspace/source/docs/test-evidence/claw/$CLAW_SOURCE_SHA"
+mkdir -p "$evidence_dir"
+summary_tsv="$evidence_dir/summary.tsv"
+: > "$summary_tsv"
+
+record_step() {
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$summary_tsv"
+}
+
+# step <name> <command...> records exit status and wall clock without swallowing it.
+step() {
+  local name="$1"
+  shift
+  local started finished code
+  started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  if "$@"; then
+    code=0
+  else
+    code=$?
+  fi
+  finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  record_step "$name" "$code" "$started" "$finished"
+  return "$code"
+}
+
+{
+  printf 'source_sha=%s\n' "$CLAW_SOURCE_SHA"
+  printf 'gate_mode=%s\n' "$CLAW_GATE_MODE"
+  printf 'host=%s\n' "$(hostname -s)"
+  printf 'node=%s\n' "$(node --version)"
+  printf 'pnpm=%s\n' "$(pnpm --version)"
+  printf 'kernel=%s\n' "$(uname -r)"
+  printf 'cpu_max=%s\n' "$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unknown)"
+  printf 'memory_max=%s\n' "$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo unknown)"
+  printf 'pids_max=%s\n' "$(cat /sys/fs/cgroup/pids.max 2>/dev/null || echo unknown)"
+} > "$evidence_dir/environment.txt"
 if [[ "$CLAW_GATE_MODE" != client-booking ]]; then
-  pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+  step frozen-install pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
 fi
 case "$CLAW_GATE_MODE" in
   ci)
-    pnpm build
-    pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
-    pnpm format:check
-    pnpm verify:deploy
-    pnpm lint
-    NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
-    pnpm exec vitest run --coverage --maxWorkers=1
+    step build pnpm build
+    step env-policy pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
+    step format pnpm format:check
+    step deploy-contract pnpm verify:deploy
+    step lint pnpm lint
+    step typecheck env NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
+    step coverage pnpm exec vitest run --coverage --maxWorkers=1
     docker run --rm \
       -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
       -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
@@ -87,10 +134,10 @@ case "$CLAW_GATE_MODE" in
       --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact --exit-code=1
     ;;
   database)
-    pnpm build
-    pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
-    pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
+    step build pnpm build
+    step drizzle-check pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
+    step schema pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
+    step referral-schema pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
     pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
@@ -232,3 +279,23 @@ cat > "$evidence_dir/${mode}.md" <<EOF
 - repeat_limit: 1
 - github_actions: not_used
 EOF
+
+printf 'exit_code=0\n' >> "$evidence_dir/environment.txt"
+
+# ARTIFACTS.sha256 seals everything except itself, so a later edit to any evidence file
+# is detectable without trusting the prose. scripts/verify-claw-evidence.mjs checks it.
+claw_seal_bundle() {
+  local dir="$1"
+  (
+    cd "$dir"
+    local file
+    for file in *; do
+      [[ "$file" == "ARTIFACTS.sha256" ]] && continue
+      [[ -f "$file" ]] || continue
+      sha256sum "$file"
+    done > ARTIFACTS.sha256.tmp
+    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
+  )
+}
+
+claw_seal_bundle "$evidence_dir"

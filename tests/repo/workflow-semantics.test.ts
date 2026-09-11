@@ -143,6 +143,9 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain("claw_test_container: true");
     expect(runner).toContain("production_container: false");
     expect(runner).toContain("trap cleanup EXIT");
+    expect(runner).toContain('summary_tsv="$evidence_dir/summary.tsv"');
+    expect(runner).toContain("printf 'source_sha=%s\\n' \"$CLAW_SOURCE_SHA\"");
+    expect(runner).toContain("claw_seal_bundle \"$evidence_dir\"");
   });
 
   it("freezes the one-process client-booking gate and its secret-safe cleanup", () => {
