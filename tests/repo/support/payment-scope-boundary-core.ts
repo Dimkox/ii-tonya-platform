@@ -263,7 +263,9 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "3e656cfe463533a05e0c55be93a963811d7c01a2f5e203e61a96e232964d88a0",
+    // Re-registered: verify:deploy now syntax-checks each script separately (a multi-file
+    // `bash -n` validated only the first operand), and the pre-push gate scripts are wired in.
+    "a876cdc0275f096e74209dbf94da4d689d1d28cb7d5fb82bbd4b6f22a0530665",
   ],
   [
     "packages/application/package.json",
@@ -379,6 +381,18 @@ const approvedAutomationArtifactHashes = new Map([
   [
     "scripts/validate-runtime-env.sh",
     "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
+  ],
+  // Pre-push gate: this repository has no hosted CI by its own policy
+  // (workflow-semantics requires .github/workflows to be empty) and branch protection is
+  // unavailable on the current plan, so these scripts are the only automatic check between a
+  // commit and a push.
+  [
+    "scripts/pre-push-gate.sh",
+    "435e4e1c4242f66acf18b22a5465f2e1413406cf1968530445781522ffb29ca6",
+  ],
+  [
+    "scripts/install-git-hooks.sh",
+    "a10b4d8c12942164e0636ee04403091c389c8311bcad591e923e8ff76dd1574d",
   ],
   [
     "scripts/run-claw-container-tests.sh",
