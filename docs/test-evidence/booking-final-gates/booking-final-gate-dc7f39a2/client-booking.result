@@ -1,0 +1,9 @@
+exit_code=1
+status=FAIL
+source_sha=dc7f39a2ea3b9cbc7033933547712e4c53febb8c
+raw_log=/home/pall/app-stack/ii-tonya-test-workspace/results/dc7f39a2ea3b9cbc7033933547712e4c53febb8c-client-booking-20260817/client-booking.raw.log
+test_output_lines=0
+failed_test_files=0
+failed_tests=0
+remaining_test_containers=0
+source_node_modules_present=no

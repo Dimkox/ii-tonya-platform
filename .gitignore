@@ -5,6 +5,11 @@ coverage/
 .env.*
 !.env.example
 *.log
+# ...except committed gate evidence: the rule above silently swallowed 14 of the 29 files in
+# docs/test-evidence/booking-final-gates (the raw run output, i.e. the actual failure text),
+# while local-SHA256SUMS lists them and would fail on a fresh clone. Scoped negation rather
+# than removing the rule: ordinary build and test logs stay ignored everywhere else.
+!docs/test-evidence/**/*.log
 .pnpm-store/
 .turbo/
 .cache/

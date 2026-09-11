@@ -1,0 +1,72 @@
+Unable to find image 'node:24-bookworm' locally
+24-bookworm: Pulling from library/node
+a231f13d9138: Pulling fs layer
+d32ed818f20f: Pulling fs layer
+3af9207d3799: Pulling fs layer
+6b02178232c4: Pulling fs layer
+c5a4625b5331: Pulling fs layer
+5433215e86aa: Pulling fs layer
+55a48d3ec1a8: Pulling fs layer
+590db35306d4: Pulling fs layer
+84d40abfe99e: Download complete
+a231f13d9138: Download complete
+9f9bf876357a: Download complete
+6b02178232c4: Download complete
+3af9207d3799: Download complete
+3af9207d3799: Pull complete
+6b02178232c4: Pull complete
+590db35306d4: Download complete
+55a48d3ec1a8: Download complete
+c5a4625b5331: Download complete
+5433215e86aa: Download complete
+c5a4625b5331: Pull complete
+d32ed818f20f: Download complete
+590db35306d4: Pull complete
+d32ed818f20f: Pull complete
+55a48d3ec1a8: Pull complete
+5433215e86aa: Pull complete
+a231f13d9138: Pull complete
+Digest: sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
+Status: Downloaded newer image for node:24-bookworm
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.9.0.tgz
+node:events:487
+      throw er; // Unhandled 'error' event
+      ^
+
+TypeError: terminated
+    at Fetch.onAborted (node:internal/deps/undici/undici:13842:53)
+    at Fetch.emit (node:events:509:28)
+    at Fetch.terminate (node:internal/deps/undici/undici:12972:14)
+    at Object.onError (node:internal/deps/undici/undici:13976:38)
+    at Request.onError (node:internal/deps/undici/undici:3121:31)
+    at Object.errorRequest (node:internal/deps/undici/undici:1942:17)
+    at TLSSocket.onHttpSocketClose (node:internal/deps/undici/undici:7860:14)
+    at TLSSocket.emit (node:events:521:24)
+    at node:net:355:12
+    at TCP.done (node:internal/tls/wrap:770:7)
+Emitted 'error' event on Readable instance at:
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  [cause]: Error: read ETIMEDOUT
+      at TLSWrap.onStreamRead (node:internal/stream_base_commons:216:20) {
+    errno: -110,
+    code: 'ETIMEDOUT',
+    syscall: 'read'
+  }
+}
+
+Node.js v24.19.0
+source_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+ci=true
+max_workers=1
+preexisting_testcontainers=none
+actual_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+exit_code=1
+test_output_lines=0
+failed_test_files=
+failed_tests=
+remaining_testcontainers=none
+source_exists_after_cleanup=no
+remote_raw=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-clone/client-booking.raw.log
+remote_result=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-clone/client-booking.result

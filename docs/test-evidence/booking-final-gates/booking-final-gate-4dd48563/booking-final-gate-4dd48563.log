@@ -1,0 +1,183 @@
+
+ RUN  v3.2.7 /workspace/mvp-client-booking-final-4dd48563
+
+ ❯ apps/worker/src/main.test.ts (12 tests | 12 failed) 90ms
+   × worker main > can be imported without starting the polling loop 80ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > keeps expert residency provider reads disabled by default 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > constructs the worker outbox registry lazily only for enabled config 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > fails closed before registry use when enabled composition is incomplete 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > does not accept a prebuilt registry as a disabled-mode bypass 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > accepts an injected YooKassa reader only with complete enabled metadata 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > finishes the current bounded cycle and closes on a signal 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > updates the configured heartbeat after a successful built-worker cycle 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > does not accumulate abort listeners between polling intervals 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > starts bounded close when a signal arrives during a hung cycle 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > hard-exits after the shutdown grace period when close never settles 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+   × worker main > clears the hard-exit watchdog after a clean signal close 1ms
+     → Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/client-booking-privacy.test.ts [ tests/integration/client-booking-privacy.test.ts ]
+ FAIL  tests/integration/client-catalog-booking-choice.test.ts [ tests/integration/client-catalog-booking-choice.test.ts ]
+Error: Cannot find package 'pg' imported from '/workspace/mvp-client-booking-final-4dd48563/packages/db/src/client.ts'
+ ❯ packages/db/src/client.ts:5:1
+      3| import { sql } from "drizzle-orm";
+      4| import { fileURLToPath } from "node:url";
+      5| import { Pool } from "pg";
+       | ^
+      6| import * as schema from "./schema/index.js";
+      7| 
+
+Caused by: Error: Failed to load url pg (resolved id: pg) in /workspace/mvp-client-booking-final-4dd48563/packages/db/src/client.ts. Does the file exist?
+ ❯ loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/20]⎯
+
+ FAIL  tests/integration/client-booking-repository.test.ts [ tests/integration/client-booking-repository.test.ts ]
+Error: Failed to resolve entry for package "@ii-tonya/domain". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /workspace/mvp-client-booking-final-4dd48563/packages/db/src/repositories/booking-repository.ts:8:7
+  4  |    computeReservedUntil,
+  5  |    transitionReservation
+  6  |  } from "@ii-tonya/domain";
+     |          ^
+  7  |  const outboxTopicsFor = (action) => {
+  8  |    switch (action) {
+ ❯ packageEntryFailure ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32896:32
+ ❯ resolvePackageEntry ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32893:2
+ ❯ tryNodeResolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32796:70
+ ❯ ResolveIdContext.handler ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32635:16
+ ❯ EnvironmentPluginContainer.resolveId ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:28797:56
+ ❯ TransformPluginContext.resolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:29009:13
+ ❯ normalizeUrl ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27191:22
+ ❯ ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27257:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/20]⎯
+
+ FAIL  tests/integration/client-booking-schema.test.ts [ tests/integration/client-booking-schema.test.ts ]
+Error: Cannot find package '@testcontainers/postgresql' imported from '/workspace/mvp-client-booking-final-4dd48563/packages/db/src/testkit/postgres.ts'
+ ❯ packages/db/src/testkit/postgres.ts:2:1
+      1| import { randomUUID } from "node:crypto";
+      2| import { PostgreSqlContainer } from "@testcontainers/postgresql";
+       | ^
+      3| import { drizzle } from "drizzle-orm/node-postgres";
+      4| import { sql } from "drizzle-orm";
+
+Caused by: Error: Failed to load url @testcontainers/postgresql (resolved id: @testcontainers/postgresql) in /workspace/mvp-client-booking-final-4dd48563/packages/db/src/testkit/postgres.ts. Does the file exist?
+ ❯ loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/20]⎯
+
+ FAIL  apps/worker/src/runtime.test.ts [ apps/worker/src/runtime.test.ts ]
+Error: Failed to resolve entry for package "@ii-tonya/worker". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /workspace/mvp-client-booking-final-4dd48563/apps/worker/src/runtime.ts:9:7
+  3  |    reconcileExpertResidencyPayments,
+  4  |    replayHeldRewards
+  5  |  } from "@ii-tonya/worker";
+     |          ^
+  6  |  export const disabledExpertResidencyProviderReader = {
+  7  |    async readPayments() {
+ ❯ packageEntryFailure ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32896:32
+ ❯ resolvePackageEntry ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32893:2
+ ❯ tryNodeResolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32796:70
+ ❯ ResolveIdContext.handler ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32635:16
+ ❯ EnvironmentPluginContainer.resolveId ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:28797:56
+ ❯ TransformPluginContext.resolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:29009:13
+ ❯ normalizeUrl ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27191:22
+ ❯ ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27257:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/20]⎯
+
+ FAIL  packages/observability/src/logger.test.ts [ packages/observability/src/logger.test.ts ]
+Error: Cannot find package 'pino' imported from '/workspace/mvp-client-booking-final-4dd48563/packages/observability/src/logger.ts'
+ ❯ packages/observability/src/logger.ts:1:1
+      1| import pino, {
+       | ^
+      2|   type DestinationStream,
+      3|   type Logger,
+
+Caused by: Error: Failed to load url pino (resolved id: pino) in /workspace/mvp-client-booking-final-4dd48563/packages/observability/src/logger.ts. Does the file exist?
+ ❯ loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/20]⎯
+
+ FAIL  packages/observability/src/metrics.test.ts [ packages/observability/src/metrics.test.ts ]
+Error: Cannot find package '@opentelemetry/api' imported from '/workspace/mvp-client-booking-final-4dd48563/packages/observability/src/metrics.ts'
+ ❯ packages/observability/src/metrics.ts:1:1
+      1| import { metrics } from "@opentelemetry/api";
+       | ^
+      2| 
+      3| const meter = metrics.getMeter("ii-tonya");
+
+Caused by: Error: Failed to load url @opentelemetry/api (resolved id: @opentelemetry/api) in /workspace/mvp-client-booking-final-4dd48563/packages/observability/src/metrics.ts. Does the file exist?
+ ❯ loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/20]⎯
+
+ FAIL  apps/api/src/routes/client-booking.test.ts [ apps/api/src/routes/client-booking.test.ts ]
+Error: Cannot find package 'fastify' imported from '/workspace/mvp-client-booking-final-4dd48563/apps/api/src/routes/client-booking.test.ts'
+ ❯ apps/api/src/routes/client-booking.test.ts:1:1
+      1| import Fastify from "fastify";
+       | ^
+      2| import { describe, expect, it, vi } from "vitest";
+      3| 
+
+Caused by: Error: Failed to load url fastify (resolved id: fastify) in /workspace/mvp-client-booking-final-4dd48563/apps/api/src/routes/client-booking.test.ts. Does the file exist?
+ ❯ loadAndTransform ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/20]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/worker/src/main.test.ts > worker main > can be imported without starting the polling loop
+ FAIL  apps/worker/src/main.test.ts > worker main > keeps expert residency provider reads disabled by default
+ FAIL  apps/worker/src/main.test.ts > worker main > constructs the worker outbox registry lazily only for enabled config
+ FAIL  apps/worker/src/main.test.ts > worker main > fails closed before registry use when enabled composition is incomplete
+ FAIL  apps/worker/src/main.test.ts > worker main > does not accept a prebuilt registry as a disabled-mode bypass
+ FAIL  apps/worker/src/main.test.ts > worker main > accepts an injected YooKassa reader only with complete enabled metadata
+ FAIL  apps/worker/src/main.test.ts > worker main > finishes the current bounded cycle and closes on a signal
+ FAIL  apps/worker/src/main.test.ts > worker main > updates the configured heartbeat after a successful built-worker cycle
+ FAIL  apps/worker/src/main.test.ts > worker main > does not accumulate abort listeners between polling intervals
+ FAIL  apps/worker/src/main.test.ts > worker main > starts bounded close when a signal arrives during a hung cycle
+ FAIL  apps/worker/src/main.test.ts > worker main > hard-exits after the shutdown grace period when close never settles
+ FAIL  apps/worker/src/main.test.ts > worker main > clears the hard-exit watchdog after a clean signal close
+Error: Failed to resolve entry for package "@ii-tonya/config". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /workspace/mvp-client-booking-final-4dd48563/apps/worker/src/main.ts:5:24
+  3  |  import { resolve } from "node:path";
+  4  |  import { fileURLToPath } from "node:url";
+  5  |  import { loadEnv } from "@ii-tonya/config";
+     |                           ^
+  6  |  import {
+  7  |    createDb,
+ ❯ packageEntryFailure ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32896:32
+ ❯ resolvePackageEntry ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32893:2
+ ❯ tryNodeResolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32796:70
+ ❯ ResolveIdContext.handler ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:32635:16
+ ❯ EnvironmentPluginContainer.resolveId ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:28797:56
+ ❯ TransformPluginContext.resolve ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:29009:13
+ ❯ normalizeUrl ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27191:22
+ ❯ ../../seed/node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:27257:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/20]⎯
+
+
+ Test Files  9 failed (9)
+      Tests  12 failed (12)
+   Start at  15:16:21
+   Duration  8.89s (transform 982ms, setup 0ms, collect 99ms, tests 90ms, environment 3ms, prepare 1.30s)
+
