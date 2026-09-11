@@ -251,8 +251,9 @@ export function createProductionWorkerRuntime(
   const expertResidencyProviderReader =
     deps.expertResidencyProviderReader ?? disabledExpertResidencyProviderReader;
   const workerOutboxEnabled = deps.workerOutboxRegistry !== undefined;
+  const maturityEnabled = deps.expertReferralMaturityWorkerEnabled === true;
   if (
-    deps.expertReferralMaturityWorkerEnabled === true &&
+    maturityEnabled &&
     deps.expertReferralJobsRepository.grantDueMaturityBatch === undefined
   ) {
     throw new Error("expert_referral_maturity_worker_capability_unavailable");
@@ -315,32 +316,42 @@ export function createProductionWorkerRuntime(
         deps.now(),
         batchSize,
       ),
-    expertReferralMaturity: async () => {
-      try {
-        const result =
-          ((await deps.expertReferralJobsRepository.grantDueMaturityBatch?.({
-            now: deps.now(),
-            batchSize,
-          })) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 }) as {
-            examined: number;
-            granted: number;
-            cancelled: number;
-            pending: number;
-          };
-        for (const [outcome, count] of [
-          ["examined", result.examined],
-          ["granted", result.granted],
-          ["cancelled", result.cancelled],
-          ["retry", result.pending],
-        ] as const)
-          if (count > 0)
-            deps.expertReferralMaturityMetrics?.record(outcome, count);
-        return result;
-      } catch (error) {
-        deps.expertReferralMaturityMetrics?.record("failed");
-        throw error;
-      }
-    },
+    expertReferralMaturity: maturityEnabled
+      ? async () => {
+          try {
+            const result =
+              ((await deps.expertReferralJobsRepository.grantDueMaturityBatch?.(
+                {
+                  now: deps.now(),
+                  batchSize,
+                },
+              )) ?? { examined: 0, granted: 0, cancelled: 0, pending: 0 }) as {
+                examined: number;
+                granted: number;
+                cancelled: number;
+                pending: number;
+              };
+            for (const [outcome, count] of [
+              ["examined", result.examined],
+              ["granted", result.granted],
+              ["cancelled", result.cancelled],
+              ["retry", result.pending],
+            ] as const)
+              if (count > 0)
+                deps.expertReferralMaturityMetrics?.record(outcome, count);
+            return result;
+          } catch (error) {
+            deps.expertReferralMaturityMetrics?.record("failed");
+            throw error;
+          }
+        }
+      : async () => ({
+          examined: 0,
+          granted: 0,
+          cancelled: 0,
+          pending: 0,
+          reason: "maturity_worker_disabled",
+        }),
     deliverConfirmedOutbox: workerOutboxEnabled
       ? deps.workerOutboxRunner!
       : async () =>
