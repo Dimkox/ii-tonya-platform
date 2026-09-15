@@ -2142,12 +2142,15 @@
         ],
         "modify": [
           "apps/web/src/content.ts",
-          "packages/domain/src/safety.ts"
+          "packages/domain/src/safety.ts",
+          "packages/domain/src/index.ts",
+          "packages/application/src/conversation-service.ts"
         ],
         "create": [],
         "tests": [
           "apps/web/src/content.test.ts",
-          "packages/application/src/prompt-safety.test.ts"
+          "packages/application/src/prompt-safety.test.ts",
+          "tests/repo/client-copy-guard.test.ts"
         ]
       },
       "current_state": "Лендинг использует имя «ии-Тоня»; единый runtime-guard клиентской копии не подтверждён.",
@@ -2169,7 +2172,7 @@
         "pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-safety.test.ts"
       ],
       "priority": "P0",
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [

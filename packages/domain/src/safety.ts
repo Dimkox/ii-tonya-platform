@@ -141,3 +141,201 @@ export function transitionHandoff(state: HandoffState, action: HandoffAction, no
   }
   throw new Error("Invalid handoff transition");
 }
+
+export const CLIENT_ASSISTANT_NAME = "ии-Тоня";
+
+export type ClientCopyRejectionReason =
+  | "client_copy_brand_name_variant"
+  | "prohibited_copy_marketing_term"
+  | "prohibited_copy_medical_claim"
+  | "prohibited_copy_pressure"
+  | "prohibited_copy_interruption_or_spam";
+
+export type ClientCopyGuardResult =
+  | { readonly accepted: true }
+  | { readonly accepted: false; readonly reasonCode: ClientCopyRejectionReason };
+
+export interface ClientCopyRule {
+  readonly reasonCode: ClientCopyRejectionReason;
+  readonly label: string;
+  readonly pattern: RegExp;
+  /**
+   * Claim rules keep a negated clause («не назначает лечение», «без спама») readable, because the
+   * approved disclaimers use exactly those words. The marketing word list of REQ-EXP-001.02 has no
+   * such exemption: every word form is rejected.
+   */
+  readonly negationExempt?: boolean;
+}
+
+const notWord = String.raw`(?![\p{L}\p{N}_])`;
+const notWordBefore = String.raw`(?<![\p{L}\p{N}_])`;
+
+export const CLIENT_COPY_PROHIBITED_RULES: readonly ClientCopyRule[] = [
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "лучший",
+    pattern: new RegExp(`${notWordBefore}лучш[а-яё]{0,4}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "топ",
+    pattern: new RegExp(
+      `${notWordBefore}топ(?:ова[яё]|ов[а-яё]{1,3}|ы|а|у|ом|ов|ам|ах)?${notWord}`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "хит",
+    pattern: new RegExp(
+      `${notWordBefore}хит(?:ова[яё]|ов[а-яё]{1,3}|ы|а|у|ом|ов|ам|ах)?${notWord}`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "скидка",
+    pattern: new RegExp(`${notWordBefore}скидк[а-яё]{0,4}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "выгода",
+    pattern: new RegExp(`${notWordBefore}выгод[а-яё]{0,5}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "экономия",
+    pattern: new RegExp(`${notWordBefore}эконом[а-яё]{1,5}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "успей",
+    pattern: new RegExp(`${notWordBefore}успей[а-яё]{0,3}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "специально для вас",
+    pattern: new RegExp(
+      `${notWordBefore}специально\\s+для\\s+(?:вас|тебя)${notWord}`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "рекомендуем",
+    pattern: new RegExp(
+      `${notWordBefore}(?:рекоменду[а-яё]{0,4}|рекомендова[а-яё]{0,3})${notWord}`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_marketing_term",
+    label: "запишитесь сейчас",
+    pattern: new RegExp(
+      `${notWordBefore}(?:запишит[е]?сь|запишись)\\s+сейчас`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_medical_claim",
+    label: "diagnosis",
+    negationExempt: true,
+    pattern: new RegExp(`${notWordBefore}диагно[а-яё]{1,4}${notWord}`, "giu"),
+  },
+  {
+    reasonCode: "prohibited_copy_medical_claim",
+    label: "treatment",
+    negationExempt: true,
+    pattern: new RegExp(
+      `${notWordBefore}(?:вылеч|излеч|исцел|выздоров|лечени|препарат|симптом)[а-яё]{0,6}${notWord}`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_pressure",
+    label: "urgency",
+    negationExempt: true,
+    pattern: new RegExp(
+      `${notWordBefore}(?:купите|оформите|запишит[е]?сь|решай[а-яё]{0,3}|бер[её]те|бронир[у]?йте)[^.!?\\n]{0,32}?(?:сейчас|сегодня|быстрее|немедленно|пока[^.!?\n]{0,12}?не\\s+(?:вырос|подорож|законч|ист[ёе]к|прошл)|иначе)`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_pressure",
+    label: "scarcity",
+    negationExempt: true,
+    pattern: new RegExp(
+      `${notWordBefore}(?:осталось\\s+послед\\p{L}*|мест\\s+осталось|последн\\p{L}*\\s+(?:мест|слот)\\p{L}*|только\\s+(?:сегодня|сейчас)|цена\\s+(?:вырастет|подорожа\\p{L}*)|подорожа\\p{L}*|давлени[а-яё]{0,4})`,
+      "giu",
+    ),
+  },
+  {
+    reasonCode: "prohibited_copy_interruption_or_spam",
+    label: "broadcast or interruption",
+    negationExempt: true,
+    pattern: new RegExp(
+      `${notWordBefore}(?:перебива\\p{L}*|прерв[а-яё]{0,4}\\s+(?:вас|тебя)|без\\s+(?:вашего|твоего|ваше|наше)\\s+запроса|пиш\\p{L}{0,3}\\s+(?:вам|тебе|тебя)\\s+(?:перв|сам)\\p{L}*|рассыл[а-яё]{0,5}|(?:массово|массов\\p{L}*)\\s+(?:отправ\\p{L}*|рассыл\\p{L}*|шл\\p{L}*)|(?:шл|отправ)\\p{L}*\\s+спам|спам\\p{L}*\\s+(?:сообщени|письм|рассыл))`,
+      "giu",
+    ),
+  },
+];
+
+const brandMention = new RegExp(
+  `${notWordBefore}(?:[Ии]{2}[\\s\\u00A0\\u2011\\u2010\\u2012\\u2013\\u2014-]?)?[Тт]он(?:ей|я|и|е|ю)${notWord}`,
+  "gu",
+);
+
+const canonicalBrandForms = new Set<string>([
+  "ии-Тоня",
+  "ии-Тоне",
+  "ии-Тоню",
+  "ии-Тоней",
+  "ии-Тони",
+]);
+
+const clauseBoundary = /[.!?\n,;:—]/u;
+
+const isNegatedClause = (text: string, index: number): boolean => {
+  let start = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (clauseBoundary.test(text.slice(cursor, cursor + 1))) {
+      start = cursor + 1;
+      break;
+    }
+  }
+  return /(?:^|[\s«"])(?:не|без|никак|никогда|нельзя|запрет\w*)(?:\s|$)/iu.test(
+    text.slice(start, index),
+  );
+};
+
+const firstViolation = (
+  pattern: RegExp,
+  text: string,
+  negationExempt: boolean | undefined,
+): boolean => {
+  pattern.lastIndex = 0;
+  let match: RegExpExecArray | null = pattern.exec(text);
+  while (match !== null) {
+    if (!negationExempt || !isNegatedClause(text, match.index)) return true;
+    match = pattern.exec(text);
+  }
+  return false;
+};
+
+export const guardClientCopy = (text: string): ClientCopyGuardResult => {
+  brandMention.lastIndex = 0;
+  let mention: RegExpExecArray | null = brandMention.exec(text);
+  while (mention !== null) {
+    if (!canonicalBrandForms.has(mention[0] ?? "")) {
+      return { accepted: false, reasonCode: "client_copy_brand_name_variant" };
+    }
+    mention = brandMention.exec(text);
+  }
+
+  for (const rule of CLIENT_COPY_PROHIBITED_RULES) {
+    if (firstViolation(rule.pattern, text, rule.negationExempt)) {
+      return { accepted: false, reasonCode: rule.reasonCode };
+    }
+  }
+  return { accepted: true };
+};
