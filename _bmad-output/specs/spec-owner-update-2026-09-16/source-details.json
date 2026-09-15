@@ -1,0 +1,6309 @@
+[
+  {
+    "id": "DET-001",
+    "text": "Приветствие: «Привет, я ии-Тоня. Помогу сориентироваться в сервисе: расскажу, как работают пакеты, купоны и запись к экспертам.»",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-002",
+    "text": "Предоставлять информацию о сервисе, тарифах и экспертах.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-003",
+    "text": "Помогать выбрать подходящий формат работы на основе запроса.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-004",
+    "text": "Отвечать о купонах, пакетах сообщений и сроках их действия.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-005",
+    "text": "Записывать к экспертам через Planerka.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-006",
+    "text": "Собирать обратную связь после визитов только по желанию клиента.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-007",
+    "text": "Вести историю состояний и отражать изменения только по запросу клиента.",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-008",
+    "text": "Справочно сообщать о новых экспертах и мероприятиях словами «в базе появился» и «доступны слоты».",
+    "source_claim_ids": [
+      "A003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            28,
+            41
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-001.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-001"
+    ],
+    "primary_task_id": "TASK-EXP-001",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-009",
+    "text": "ФИО: «Как мне к вам обращаться?».",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-010",
+    "text": "Возраст: игривое «В каком возрасте вы себя чувствуете?» либо контекстное «Вам около 30-ти?».",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-011",
+    "text": "Пол определяется по обращению, если клиент представился.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-012",
+    "text": "Дата рождения собирается в контексте праздников.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-013",
+    "text": "Дети/внуки и их возраст — если клиент упоминает семью.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-014",
+    "text": "Профессиональные навыки: чем занимается и что приносит радость в работе.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-015",
+    "text": "Район/локация — в контексте очной записи.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-016",
+    "text": "Интересы и хобби — чем занимается в свободное время и что вдохновляет.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-017",
+    "text": "Семейное положение — личная жизнь и близкий человек для общения.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-018",
+    "text": "Социальный статус/уровень жизни определяется по запросу, например бюджет до 3000 ₽ или премиум-эксперт.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-019",
+    "text": "Предпочтения по эксперту: опыт, подход, стоимость или отзывы.",
+    "source_claim_ids": [
+      "A005"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            56,
+            76
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-008.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-008"
+    ],
+    "primary_task_id": "TASK-PLT-008",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-020",
+    "text": "«Голова и душа»: психолог, коуч, гештальт-терапевт, КПТ-специалист, арт-терапевт, сексолог, профориентолог, сказкотерапевт, песочный терапевт, супервизор; ключевые слова: тревога, паника, депрессия, отношения, смысл, выбор, самооценка, травма, РПП, ОКР, выгорание, профориентация, сексуальность.",
+    "source_claim_ids": [
+      "A006"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            82,
+            87
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-021",
+    "text": "«Тело»: массажист, остеопат, телесный терапевт, кинезиолог, мануальный терапевт, специалист по дыхательным практикам; ключевые слова: боль, напряжение, зажимы, осанка, дыхание, энергия, расслабление, восстановление, психосоматика.",
+    "source_claim_ids": [
+      "A006"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            82,
+            87
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-022",
+    "text": "«Движение»: инструктор йоги, пилатеса, стретчинга, цигун, тайцзи, фитнес-тренер, тренер по бегу, боевым искусствам; слова: гибкость, сила, осознанность, энергия, восстановление, баланс, координация.",
+    "source_claim_ids": [
+      "A007"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            88,
+            91
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-023",
+    "text": "«Здоровье и образ жизни»: нутрициолог, диетолог, аюрведа-консультант, специалист по здоровому сну, ЗОЖ-коуч; слова: вес, питание, ЖКТ, гормоны, сон, иммунитет, энергия, детокс, привычки.",
+    "source_claim_ids": [
+      "A007"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            88,
+            91
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-024",
+    "text": "«Духовные и эзотерические практики»: астролог, таролог, регрессолог, нумеролог, проводник медитаций, энергопрактик, мастер Рейки; слова: предназначение, смысл, карма, энергия, прошлые жизни, интуиция, внутренний мир, ресурс.",
+    "source_claim_ids": [
+      "A007"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            88,
+            91
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-025",
+    "text": "«Группы и мероприятия»: тренер личностного роста, ведущий женских/мужских кругов, организатор ретритов, фестивалей, марафонов, фасилитатор; слова: поддержка, единомышленники, общение, рост, трансформация, сообщество, безопасное пространство.",
+    "source_claim_ids": [
+      "A007"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            88,
+            91
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-002.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-002"
+    ],
+    "primary_task_id": "TASK-EXP-002",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-026",
+    "text": "Clients: client_id, name, phone, email, registration_date, last_reminder_sent.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-027",
+    "text": "Packages: package_id, client_id, type, messages_total, messages_used, messages_available, package_start_date, package_end_date, coupons_total, coupons_used, coupons_available, coupon_issue_date, coupon_expiry_date, last_reminder_sent.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-028",
+    "text": "Расчёты Make: messages_available = messages_total − messages_used; coupon_expiry_date = coupon_issue_date + 90 days; package_end_date = package_start_date + 60 days.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-029",
+    "text": "Events: event_id, title, author, type, total_seats, current_seats, has_audiocast; total_seats и current_seats могут быть ∞.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-030",
+    "text": "Reservations: reservation_id, event_instance_id, client_id, status, reserved_until, created_at.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-031",
+    "text": "Waitlist: waitlist_id, event_instance_id, client_id, created_at, position.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-032",
+    "text": "Experts: expert_id, name, specialization, format, price, telegram_id, has_audiocast.",
+    "source_claim_ids": [
+      "A032"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            701,
+            769
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-033",
+    "text": "Selarti: диалоги с клиентами и ИИ-Тоня.",
+    "source_claim_ids": [
+      "A043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1403,
+            1442
+          ],
+          [
+            1723,
+            1740
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-004",
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-004",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-034",
+    "text": "Planerka: слоты, расписание и статусы записи экспертов.",
+    "source_claim_ids": [
+      "A043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1403,
+            1442
+          ],
+          [
+            1723,
+            1740
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-004",
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-004",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-035",
+    "text": "Make+Google Sheets: списание сообщений, купоны, резервы и логи.",
+    "source_claim_ids": [
+      "A043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1403,
+            1442
+          ],
+          [
+            1723,
+            1740
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-004",
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-004",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-036",
+    "text": "Clients — клиенты; Packages — пакеты сообщений и купоны; Events — мероприятия и слоты; Reservations — резервы и брони; Waitlist — лист ожидания; Experts — эксперты; Dialogs — логи диалогов; Events_Log — лог событий.",
+    "source_claim_ids": [
+      "A044"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1453,
+            1482
+          ],
+          [
+            1760,
+            1780
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-006.01"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-037",
+    "text": "01_Deduct_Message_On_Chat — webhook Selarti входящего/исходящего сообщения; списывает 1 из ближайшего package_end_date.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-038",
+    "text": "02_Reminder_3_Days — ежедневный schedule; одно сообщение по всем пакетам.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-039",
+    "text": "03_Create_Reservation_72h — webhook выбора слота; 72ч, места, купоны.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-040",
+    "text": "04_Auto_Remove_Reservation — ежечасный schedule; снимает срок, места, waitlist.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-041",
+    "text": "05_Expert_Action_Telegram — Telegram webhook; confirm/cancel/reschedule.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-042",
+    "text": "06_Waitlist_Add — Selarti webhook вступления в очередь.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-043",
+    "text": "07_Client_Cancel_Booking — Selarti webhook отмены клиентом.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-044",
+    "text": "08_Send_Audiocast — Selarti webhook решения ии-Тони; ссылка+пояснение одним сообщением.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-045",
+    "text": "09_Log_Dialog встроен во все сценарии; 10_Log_Event — отдельный; 11_Negative_Feedback_Alert — Selarti webhook негативного отзыва; 12_Filter_Slots_24h встроен в показ слотов; 13_Apply_Coupons встроен в резерв.",
+    "source_claim_ids": [
+      "A045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1487,
+            1503
+          ],
+          [
+            1786,
+            1819
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.02"
+    ],
+    "task_ids": [
+      "TASK-PLT-005"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-046",
+    "text": "Имена листов: clients_sheet_name, packages_sheet_name, events_sheet_name, reservations_sheet_name, waitlist_sheet_name, experts_sheet_name, dialogs_sheet_name, events_log_sheet_name.",
+    "source_claim_ids": [
+      "A046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1509,
+            1559
+          ],
+          [
+            1869,
+            1882
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-005",
+      "TASK-PLT-013"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-047",
+    "text": "Интеграционные значения: google_sheets_id, planerka_api_key/base_url, selarti_webhook_url/api_key, telegram_bot_token/admin_chat_id.",
+    "source_claim_ids": [
+      "A046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            1509,
+            1559
+          ],
+          [
+            1869,
+            1882
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-005",
+      "TASK-PLT-013"
+    ],
+    "primary_task_id": "TASK-PLT-005",
+    "decision_ids": [
+      "DEC-PLT-003",
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-048",
+    "text": "Коэффициент начисления: x2 от суммы оплаты.",
+    "source_claim_ids": [
+      "B003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3083,
+            3095
+          ],
+          [
+            4571,
+            4581
+          ],
+          [
+            5341,
+            5350
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-004.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-005"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-049",
+    "text": "Примеры: 500 ₽ → 1 000 купонов; 1 000 ₽ → 2 000; 2 000 ₽ → 4 000; 5 000 ₽ → 10 000.",
+    "source_claim_ids": [
+      "B003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3083,
+            3095
+          ],
+          [
+            4571,
+            4581
+          ],
+          [
+            5341,
+            5350
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-004.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-005"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-050",
+    "text": "Назначение: частичная оплата услуг экспертов и мероприятий.",
+    "source_claim_ids": [
+      "B003"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3083,
+            3095
+          ],
+          [
+            4571,
+            4581
+          ],
+          [
+            5341,
+            5350
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-004.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-005"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-051",
+    "text": "Стоимость в тарифной таблице: от 12 000 ₽ в месяц.",
+    "source_claim_ids": [
+      "B009"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3251,
+            3266
+          ],
+          [
+            3737,
+            3748
+          ],
+          [
+            4692,
+            4699
+          ],
+          [
+            5485,
+            5490
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-008.02",
+      "REQ-FIN-013.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-023",
+      "TASK-FIN-008",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-052",
+    "text": "Индивидуальные услуги и сессии: неограниченное количество позиций и наименований.",
+    "source_claim_ids": [
+      "B009"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3251,
+            3266
+          ],
+          [
+            3737,
+            3748
+          ],
+          [
+            4692,
+            4699
+          ],
+          [
+            5485,
+            5490
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-008.02",
+      "REQ-FIN-013.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-023",
+      "TASK-FIN-008",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-053",
+    "text": "Групповое включение: ровно 1 мероприятие до 20 человек в месяц.",
+    "source_claim_ids": [
+      "B009"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3251,
+            3266
+          ],
+          [
+            3737,
+            3748
+          ],
+          [
+            4692,
+            4699
+          ],
+          [
+            5485,
+            5490
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-008.02",
+      "REQ-FIN-013.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-023",
+      "TASK-FIN-008",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-054",
+    "text": "Первичное включение карточки: 3 000 ₽.",
+    "source_claim_ids": [
+      "B009"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3251,
+            3266
+          ],
+          [
+            3737,
+            3748
+          ],
+          [
+            4692,
+            4699
+          ],
+          [
+            5485,
+            5490
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-008.02",
+      "REQ-FIN-013.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-023",
+      "TASK-FIN-008",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-055",
+    "text": "Новые или обновлённые сведения для карточки добавляются без доплаты.",
+    "source_claim_ids": [
+      "B009"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3251,
+            3266
+          ],
+          [
+            3737,
+            3748
+          ],
+          [
+            4692,
+            4699
+          ],
+          [
+            5485,
+            5490
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-008.02",
+      "REQ-FIN-013.01"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-023",
+      "TASK-FIN-008",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-056",
+    "text": "Расчётная выручка: сумма «количество мест × цена места» по всем тарифам.",
+    "source_claim_ids": [
+      "B010"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3272,
+            3284
+          ],
+          [
+            3703,
+            3719
+          ],
+          [
+            4716,
+            4729
+          ],
+          [
+            5524,
+            5546
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-013.01",
+      "REQ-FIN-013.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-023",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-023",
+    "decision_ids": [
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-057",
+    "text": "Резидент: услуга проекта = расчётная выручка × 10%.",
+    "source_claim_ids": [
+      "B010"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3272,
+            3284
+          ],
+          [
+            3703,
+            3719
+          ],
+          [
+            4716,
+            4729
+          ],
+          [
+            5524,
+            5546
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-013.01",
+      "REQ-FIN-013.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-023",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-023",
+    "decision_ids": [
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-058",
+    "text": "Алгоритм источника: бронь = услуга проекта × 30%; доплата = услуга проекта − бронь.",
+    "source_claim_ids": [
+      "B010"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3272,
+            3284
+          ],
+          [
+            3703,
+            3719
+          ],
+          [
+            4716,
+            4729
+          ],
+          [
+            5524,
+            5546
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-013.01",
+      "REQ-FIN-013.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-023",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-023",
+    "decision_ids": [
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-059",
+    "text": "Нерезидент: услуга проекта = расчётная выручка × 15% + 4 500 ₽ за заведение карточки.",
+    "source_claim_ids": [
+      "B010"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3272,
+            3284
+          ],
+          [
+            3703,
+            3719
+          ],
+          [
+            4716,
+            4729
+          ],
+          [
+            5524,
+            5546
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-013.01",
+      "REQ-FIN-013.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-023",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-023",
+    "decision_ids": [
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-060",
+    "text": "Отчёт строится по участникам, зарегистрированным в базе проекта.",
+    "source_claim_ids": [
+      "B010"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3272,
+            3284
+          ],
+          [
+            3703,
+            3719
+          ],
+          [
+            4716,
+            4729
+          ],
+          [
+            5524,
+            5546
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-013.01",
+      "REQ-FIN-013.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-023",
+      "TASK-FIN-014"
+    ],
+    "primary_task_id": "TASK-FIN-023",
+    "decision_ids": [
+      "DEC-FIN-012",
+      "DEC-FIN-013",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-061",
+    "text": "base_price = 12 000 ₽.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-062",
+    "text": "exclusive_price = 20 000 ₽.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-063",
+    "text": "setup_fee = 3 000 ₽.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-064",
+    "text": "week_discount: 1–7 дней = −4 000 ₽; 8–14 = −3 000 ₽; 15–21 = −2 000 ₽; 22+ = 0 ₽.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-065",
+    "text": "low_price: −1 000 ₽ только для базового тарифа при среднем чеке < 3 000 ₽.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-066",
+    "text": "million_city: +5 000 ₽ для обоих тарифов.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-067",
+    "text": "online_only: +3 000 ₽ для обоих тарифов независимо от региона.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-068",
+    "text": "referral: бонусами максимум 20% полной стоимости.",
+    "source_claim_ids": [
+      "B024"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3602,
+            3617
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-069",
+    "text": "Список содержит 16 городов: Москва; Санкт-Петербург; Новосибирск; Екатеринбург; Казань; Красноярск; Нижний Новгород; Челябинск; Уфа; Самара; Ростов-на-Дону; Краснодар; Омск; Воронеж; Пермь; Волгоград.",
+    "source_claim_ids": [
+      "B025"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3622,
+            3640
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-070",
+    "text": "Старт: final_price = base_price + week_discount.",
+    "source_claim_ids": [
+      "B026"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3646,
+            3669
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-071",
+    "text": "Условие low price: средний чек < 3 000 ₽ ИЛИ массаж, т-игра, рисование и подобная услуга; действие −1 000 ₽.",
+    "source_claim_ids": [
+      "B026"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3646,
+            3669
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-072",
+    "text": "Условие city: город из B025; действие +5 000 ₽.",
+    "source_claim_ids": [
+      "B026"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3646,
+            3669
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-073",
+    "text": "Условие format: только онлайн независимо от региона регистрации; действие +3 000 ₽.",
+    "source_claim_ids": [
+      "B026"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3646,
+            3669
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-074",
+    "text": "Итог равен final_price; setup fee 3 000 ₽ взимается отдельно только при первом подключении.",
+    "source_claim_ids": [
+      "B026"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3646,
+            3669
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-007.03",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-075",
+    "text": "Старт: final_price = exclusive_price + week_discount.",
+    "source_claim_ids": [
+      "B027"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3675,
+            3697
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-076",
+    "text": "Город из B025 добавляет +5 000 ₽.",
+    "source_claim_ids": [
+      "B027"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3675,
+            3697
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-077",
+    "text": "Только онлайн добавляет +3 000 ₽ независимо от региона.",
+    "source_claim_ids": [
+      "B027"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3675,
+            3697
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-078",
+    "text": "Низкий средний чек не изменяет «Эксклюзив».",
+    "source_claim_ids": [
+      "B027"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3675,
+            3697
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-079",
+    "text": "Итог равен final_price; setup fee 3 000 ₽ — отдельно при первом подключении.",
+    "source_claim_ids": [
+      "B027"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            3675,
+            3697
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-007.02",
+      "REQ-FIN-008.01",
+      "REQ-FIN-008.02"
+    ],
+    "task_ids": [
+      "TASK-FIN-022",
+      "TASK-FIN-008",
+      "TASK-FIN-020",
+      "TASK-FIN-007",
+      "TASK-FIN-009"
+    ],
+    "primary_task_id": "TASK-FIN-022",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-005",
+      "DEC-FIN-007",
+      "DEC-FIN-009",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-021",
+      "DEC-FIN-023",
+      "DEC-FIN-024",
+      "DEC-FIN-028"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-080",
+    "text": "1. ФИО эксперта.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-081",
+    "text": "2. Город работы.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-082",
+    "text": "3. Контактные данные: телефон, мессенджер.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-083",
+    "text": "4. Предлагаемые услуги и мероприятия.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-084",
+    "text": "5. Компетенции и специализация.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-085",
+    "text": "6. Желаемая форма: базовый, эксклюзив или групповые программы.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-086",
+    "text": "7. Особенности для менеджера.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-087",
+    "text": "8. Рассчитанная стоимость с графиком повышения и корректировками.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-088",
+    "text": "9. Дата входа: сейчас или позже.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-089",
+    "text": "10. Услуги для первоочередного продвижения.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-090",
+    "text": "11. Целевое число клиентов: в неделю, месяц, группу или индивидуально.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-091",
+    "text": "12. Текущие рекламные каналы.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-092",
+    "text": "13. Ссылки на экспертные соцсети и сайт.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-093",
+    "text": "14. Организация мероприятий/фестивалей, если есть.",
+    "source_claim_ids": [
+      "B034"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4037,
+            4065
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-005.05"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-094",
+    "text": "Автосбор: ФИО, город, контакты, услуги, компетенции, рекламные каналы, соцсети, организаторские навыки.",
+    "source_claim_ids": [
+      "B037"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4171,
+            4199
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.06"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-095",
+    "text": "Обязательные перед отправкой: ФИО; город; контакты; услуги и компетенции; форма сотрудничества; рассчитанная стоимость; первоочередные услуги; желаемое число клиентов; текущие каналы; соцсети и сайт; мероприятия; особенности для менеджера.",
+    "source_claim_ids": [
+      "B037"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4171,
+            4199
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.06"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-096",
+    "text": "Первая доставка: Telegram-чат менеджеров в структурированном виде.",
+    "source_claim_ids": [
+      "B037"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4171,
+            4199
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.06"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-097",
+    "text": "Вторая доставка: автоматическое добавление строки в Google-таблицу предзаписи.",
+    "source_claim_ids": [
+      "B037"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4171,
+            4199
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-004.06"
+    ],
+    "task_ids": [
+      "TASK-PLT-007"
+    ],
+    "primary_task_id": "TASK-PLT-007",
+    "decision_ids": [
+      "DEC-PLT-004",
+      "DEC-PLT-006"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-098",
+    "text": "Демо-профиль содержит name и social_link (Instagram, VK или Telegram).",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-099",
+    "text": "После предложения экспертов показывается отдельный вопрос о ссылках.",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-100",
+    "text": "Один или несколько названных экспертов дают соответствующие ссылки из базы.",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-101",
+    "text": "Ответы «нет», «не надо», «позже» и подобные не дают ссылок.",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-102",
+    "text": "После вопроса о ссылках в любом случае выбираются слоты.",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-103",
+    "text": "В реальном режиме ссылка размещается в карточке автоматически.",
+    "source_claim_ids": [
+      "B040"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4224,
+            4235
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-013.07"
+    ],
+    "task_ids": [
+      "TASK-PLT-016"
+    ],
+    "primary_task_id": "TASK-PLT-016",
+    "decision_ids": [
+      "DEC-PLT-004"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-104",
+    "text": "Аудитория 1: клиенты, CTA — написать «тест клиент».",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-105",
+    "text": "Аудитория 2: эксперты/мастера, CTA — написать «тест эксперт».",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-106",
+    "text": "Самостоятельные разделы: о проекте; клиентам; экспертам; условия размещения/продукты/цены; FAQ; контакты менеджера; футер.",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-107",
+    "text": "Контакт: чат ии-Тони/селарти либо оставление контакта для обратного звонка/сообщения.",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-108",
+    "text": "Футер: соцсети, меню «о проекте/экспертам/клиентам/FAQ/контакты», политика, оферта, данные ИП, 2026.",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-109",
+    "text": "Смысловые модули имеют структуру «проблема клиента → решение сервисом → призыв к действию».",
+    "source_claim_ids": [
+      "B042"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4276,
+            4404
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-110",
+    "text": "Персонаж: женщина 30–40 лет, тёплый взгляд, мудрая улыбка, естественная красота; не «училка», а партнёр в пути.",
+    "source_claim_ids": [
+      "B043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4290,
+            4304
+          ],
+          [
+            4407,
+            4414
+          ],
+          [
+            4433,
+            4463
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-111",
+    "text": "Фон: мягкий и нейтральный, с намёком на путь/развитие/эволюцию.",
+    "source_claim_ids": [
+      "B043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4290,
+            4304
+          ],
+          [
+            4407,
+            4414
+          ],
+          [
+            4433,
+            4463
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-112",
+    "text": "Палитры: тёплый эко, мягкий лавандовый, глубокий синий с акцентами.",
+    "source_claim_ids": [
+      "B043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4290,
+            4304
+          ],
+          [
+            4407,
+            4414
+          ],
+          [
+            4433,
+            4463
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-113",
+    "text": "Текст: «Привет, я ии-Тоня 👋»; «Я помогу тебе найти того, кто поможет на твоём пути развития»; «Твой персональный навигатор по миру саморазвития».",
+    "source_claim_ids": [
+      "B043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4290,
+            4304
+          ],
+          [
+            4407,
+            4414
+          ],
+          [
+            4433,
+            4463
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-114",
+    "text": "CTA: «Попробовать бесплатно» ведёт в диалог мессенджера.",
+    "source_claim_ids": [
+      "B043"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4290,
+            4304
+          ],
+          [
+            4407,
+            4414
+          ],
+          [
+            4433,
+            4463
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-115",
+    "text": "Направления: голова и душа (психологи, коучи, терапевты); тело (массаж, телесные практики, дыхание); движение (йога, пилатес, фитнес, цигун); творчество (живопись, керамика, фотография); здоровье (нутрициология, сон, аюрведа); духовное (астрология, медитации, энергопрактики); группы (тренинги, круги, ретриты).",
+    "source_claim_ids": [
+      "B045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4518,
+            4592
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-116",
+    "text": "Пакеты: «Знакомство» 80–100, без срока; «Старт» 500/60 дней; «Базовый» 1 000/60 дней; «Глубокий» 1 500/60 дней; «Максимальный» 2 000/60 дней.",
+    "source_claim_ids": [
+      "B045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4518,
+            4592
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-117",
+    "text": "Каждое сообщение в диалоге — 1 сообщение из пакета.",
+    "source_claim_ids": [
+      "B045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4518,
+            4592
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-118",
+    "text": "Бонусная формулировка: оплата 1 000 ₽ даёт 2 000 купонов; купоны — для частичной оплаты; срок 90 дней.",
+    "source_claim_ids": [
+      "B045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4518,
+            4592
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-119",
+    "text": "CTA: «Попробовать как клиент» открывает мессенджер с «тест клиент».",
+    "source_claim_ids": [
+      "B045"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4518,
+            4592
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-120",
+    "text": "Схема: «Вы → ии-Тоня → Ваши клиенты».",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-121",
+    "text": "Шаг 1: эксперт заполняет анкету и попадает в базу.",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-122",
+    "text": "Шаг 2: ии-Тоня рекомендует эксперта по запросам клиентов.",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-123",
+    "text": "Шаг 3: клиент записывается, ии-Тоня подбирает время и бронирует слот.",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-124",
+    "text": "Шаг 4: эксперт получает уведомление, подтверждает запись и оказывает услугу.",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-125",
+    "text": "Преимущества: целевые клиенты; фиксированная плата за размещение; 24/7 без участия; переопыление клиентских баз; рост подписчиков; отсутствие маркировки рекламы.",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-126",
+    "text": "CTA «Попробовать как эксперт» ведёт в мессенджер с «тест эксперт».",
+    "source_claim_ids": [
+      "B046"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4598,
+            4668
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-127",
+    "text": "Базовый: от 12 000 ₽/месяц; все индивидуальные услуги без лимита; 1 группа до 20 человек/месяц; разово 3 000 ₽.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-128",
+    "text": "Эксклюзив: от 20 000 ₽/месяц; всё Базового; выделение в разделе «Эксклюзив»; доступ к высокобюджетным клиентам; разово 3 000 ₽.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-129",
+    "text": "Группы резидента: 10% выручки мероприятия.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-130",
+    "text": "Группы нерезидента: 15% выручки + 4 500 ₽ за карточку.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-131",
+    "text": "Порядок лендинга: бронь 30% предполагаемой выручки при заявке; остаток после набора; итоговый отчёт в чат.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-132",
+    "text": "Персональный тариф зависит от ниши/среднего чека, города и очного/онлайн/смешанного формата.",
+    "source_claim_ids": [
+      "B047"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4674,
+            4755
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-133",
+    "text": "Максимум: 20 кликабельных вопросов.",
+    "source_claim_ids": [
+      "B048"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4761,
+            4894
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-134",
+    "text": "Перечень 20 вопросов: что такое ии-Тоня; кто может пользоваться; стоимость для клиента; если не знаю, что нужно; как записаться; что такое купоны; клиентская реферальная программа; привести друга; как стать экспертом; цена размещения; разовый платёж; карточка при уходе; получение клиентов; плата за каждого клиента; причина фиксированной платы; скорость получения клиентов; отсутствие навыка соцсетей; запись к известному эксперту; отслеживание прогресса; если не понравился эксперт.",
+    "source_claim_ids": [
+      "B048"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4761,
+            4894
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-135",
+    "text": "FAQ о пакете: «Знакомство» 80–100 без срока; платные 500–2 000; одно сообщение = одна единица.",
+    "source_claim_ids": [
+      "B048"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4761,
+            4894
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-136",
+    "text": "FAQ о купонах: x2 от оплаты, частичная оплата, срок 90 дней.",
+    "source_claim_ids": [
+      "B048"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4761,
+            4894
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-137",
+    "text": "FAQ о реферале: персональный промокод; 500 купонов пригласившему и другу при регистрации по тексту FAQ.",
+    "source_claim_ids": [
+      "B048"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4761,
+            4894
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-138",
+    "text": "Заголовок контактов: «Остались вопросы?»; текст — ответ о сервисе, тарифах и сотрудничестве.",
+    "source_claim_ids": [
+      "B049"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4900,
+            4966
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-139",
+    "text": "Первый канал: «Написать в чат с ии-Тоней» / кнопка «Открыть чат».",
+    "source_claim_ids": [
+      "B049"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4900,
+            4966
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-140",
+    "text": "Второй канал: «Связаться с менеджером»; обещание перезвонить или написать в течение 24 часов.",
+    "source_claim_ids": [
+      "B049"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4900,
+            4966
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-141",
+    "text": "Поле: «Телефон / Telegram / WhatsApp»; действие «Отправить».",
+    "source_claim_ids": [
+      "B049"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4900,
+            4966
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-142",
+    "text": "Футер: логотип; Telegram, VK, Instagram, WhatsApp; меню «О проекте», «Экспертам», «Клиентам», «FAQ», «Контакты»; политика и публичная оферта; реквизиты ИП; © 2026.",
+    "source_claim_ids": [
+      "B049"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4900,
+            4966
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.03"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-143",
+    "text": "В head: meta charset=UTF-8; meta viewport width=device-width, initial-scale=1.0; title «ии-Тоня — сервис персонального сопровождения в саморазвитии».",
+    "source_claim_ids": [
+      "B050"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4972,
+            4997
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-144",
+    "text": "Порядок body: 1 герой; 2 о проекте; 3 клиентам; 4 экспертам; 5 условия размещения; 6 FAQ; 7 контакты менеджера; 8 футер.",
+    "source_claim_ids": [
+      "B050"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            4972,
+            4997
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-013.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-013"
+    ],
+    "primary_task_id": "TASK-EXP-013",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-145",
+    "text": "Эко: primary #C67B5C; secondary #E8D5C4; accent #8FBC8F; background #FAF7F2; text #3D2C1E; light #FDFBF7.",
+    "source_claim_ids": [
+      "B051"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5000,
+            5048
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-146",
+    "text": "Лавандовая: primary #9B7B9B; secondary #D4C5D4; accent #E8D5E8; background #F9F5F9; text #3D2C3D; light #FDFBFD.",
+    "source_claim_ids": [
+      "B051"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5000,
+            5048
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-147",
+    "text": "Синяя: primary #2C3E6B; secondary #4A6A8B; accent #C9A84C; background #F5F7FA; text #1A2332; light #FFFFFF.",
+    "source_claim_ids": [
+      "B051"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5000,
+            5048
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-014.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-014"
+    ],
+    "primary_task_id": "TASK-EXP-014",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-148",
+    "text": "Единственный H1: «Привет, я ии-Тоня» на первом экране.",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-149",
+    "text": "H2: названия блоков, включая «О проекте», «Клиентам», «Экспертам».",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-150",
+    "text": "Title: «ии-Тоня — сервис персонального сопровождения в саморазвитии».",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-151",
+    "text": "Description: «Персональный ассистент по подбору экспертов и мероприятий для развития. Психологи, коучи, массажисты, йога — в одном диалоге. Запишись сейчас.»",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-152",
+    "text": "Keywords: саморазвитие, психолог, коуч, массаж, йога, персональный помощник, ИИ-ассистент, Тамбов.",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-153",
+    "text": "Сборка: один CSS, один JS, WebP-изображения, Google Fonts.",
+    "source_claim_ids": [
+      "B055"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5148,
+            5165
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-015.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-015"
+    ],
+    "primary_task_id": "TASK-EXP-015",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-012",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-020"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-154",
+    "text": "Списываемые типы: исходящее, входящее, сервисное уведомление, напоминание, кнопка, аудиосообщение.",
+    "source_claim_ids": [
+      "B061"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5313,
+            5335
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-001.02",
+      "REQ-FIN-001.03",
+      "REQ-FIN-002.01",
+      "REQ-FIN-002.02",
+      "REQ-FIN-003.01",
+      "REQ-FIN-003.02",
+      "REQ-FIN-004.01",
+      "REQ-FIN-004.03"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-003",
+      "TASK-FIN-005",
+      "TASK-FIN-020",
+      "TASK-FIN-002",
+      "TASK-FIN-004"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-007",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-155",
+    "text": "«Знакомство»: бесплатно, 80–100 сообщений, срок не ограничен.",
+    "source_claim_ids": [
+      "B061"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5313,
+            5335
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-001.02",
+      "REQ-FIN-001.03",
+      "REQ-FIN-002.01",
+      "REQ-FIN-002.02",
+      "REQ-FIN-003.01",
+      "REQ-FIN-003.02",
+      "REQ-FIN-004.01",
+      "REQ-FIN-004.03"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-003",
+      "TASK-FIN-005",
+      "TASK-FIN-020",
+      "TASK-FIN-002",
+      "TASK-FIN-004"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-007",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-156",
+    "text": "«Старт»: 500, 60 календарных дней; «Базовый»: 1 000, 60; «Глубокий»: 1 500, 60; «Максимальный»: 2 000, 60.",
+    "source_claim_ids": [
+      "B061"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5313,
+            5335
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-001.02",
+      "REQ-FIN-001.03",
+      "REQ-FIN-002.01",
+      "REQ-FIN-002.02",
+      "REQ-FIN-003.01",
+      "REQ-FIN-003.02",
+      "REQ-FIN-004.01",
+      "REQ-FIN-004.03"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-003",
+      "TASK-FIN-005",
+      "TASK-FIN-020",
+      "TASK-FIN-002",
+      "TASK-FIN-004"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-007",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-157",
+    "text": "60-дневный срок отсчитывается с оплаты; остаток сгорает; предупреждение за 3 дня.",
+    "source_claim_ids": [
+      "B061"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5313,
+            5335
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-001.02",
+      "REQ-FIN-001.03",
+      "REQ-FIN-002.01",
+      "REQ-FIN-002.02",
+      "REQ-FIN-003.01",
+      "REQ-FIN-003.02",
+      "REQ-FIN-004.01",
+      "REQ-FIN-004.03"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-003",
+      "TASK-FIN-005",
+      "TASK-FIN-020",
+      "TASK-FIN-002",
+      "TASK-FIN-004"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-007",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-158",
+    "text": "При нескольких пакетах расходуется «горящий», то есть с ближайшей датой окончания.",
+    "source_claim_ids": [
+      "B061"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            5313,
+            5335
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-FIN-001.02",
+      "REQ-FIN-001.03",
+      "REQ-FIN-002.01",
+      "REQ-FIN-002.02",
+      "REQ-FIN-003.01",
+      "REQ-FIN-003.02",
+      "REQ-FIN-004.01",
+      "REQ-FIN-004.03"
+    ],
+    "task_ids": [
+      "TASK-FIN-021",
+      "TASK-FIN-003",
+      "TASK-FIN-005",
+      "TASK-FIN-020",
+      "TASK-FIN-002",
+      "TASK-FIN-004"
+    ],
+    "primary_task_id": "TASK-FIN-021",
+    "decision_ids": [
+      "DEC-FIN-001",
+      "DEC-FIN-002",
+      "DEC-FIN-003",
+      "DEC-FIN-004",
+      "DEC-FIN-005",
+      "DEC-FIN-006",
+      "DEC-FIN-007",
+      "DEC-FIN-010",
+      "DEC-FIN-011",
+      "DEC-FIN-016",
+      "DEC-FIN-017",
+      "DEC-FIN-019",
+      "DEC-FIN-026",
+      "DEC-FIN-027"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-159",
+    "text": "Сервис — AI-навигатор саморазвития в мессенджерах; аудитория: эксперты, центры/студии, организаторы, владельцы пространств и клиенты.",
+    "source_claim_ids": [
+      "C064"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8630,
+            8703
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-160",
+    "text": "Центральный образ — женская фигура Тони с раскрытыми руками; вокруг — круги, точки и соединительные линии как экосистема клиентов, экспертов и пространств; настроение: гостеприимство, забота, объединение, движение, премиальность.",
+    "source_claim_ids": [
+      "C064"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8630,
+            8703
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-161",
+    "text": "Сдать AI, EPS, SVG, PNG с прозрачным фоном и JPG; знак читаем от 16×16 до 2000×2000 px; отдельный знак для Telegram 100×100 px; версии для светлого и тёмного фона.",
+    "source_claim_ids": [
+      "C064"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8630,
+            8703
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-162",
+    "text": "Стиль — минимализм, плоская графика с мягкими градиентами и скруглёнными линиями; умеренная детализация; лицо обязательно живое, узнаваемое, с мудростью, эмпатией, спокойствием и доверием.",
+    "source_claim_ids": [
+      "C064"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8630,
+            8703
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-163",
+    "text": "«Премиальная мудрость»: #2D1B4E и #F5B041 для брендбука, VIP и дорогих тарифов.",
+    "source_claim_ids": [
+      "C065"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8708,
+            8770
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-020.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-020"
+    ],
+    "primary_task_id": "TASK-EXP-020",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-164",
+    "text": "«Живая энергия»: #9B72AA с #FF8C69 либо #98D8C8 для соцсетей, сторис, молодёжной аудитории и акций.",
+    "source_claim_ids": [
+      "C065"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8708,
+            8770
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-020.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-020"
+    ],
+    "primary_task_id": "TASK-EXP-020",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-165",
+    "text": "«Чистота и ясность»: #1A2B4C, #A8C8E0 и фон #FFFFFF для оферты, документов, клиентского сайта и бота.",
+    "source_claim_ids": [
+      "C065"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8708,
+            8770
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-020.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-020"
+    ],
+    "primary_task_id": "TASK-EXP-020",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-166",
+    "text": "«Тепло и забота»: #F5E6D3, #A0522D и #B8D4C3 для историй, раздела «О нас» и подарков.",
+    "source_claim_ids": [
+      "C065"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8708,
+            8770
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-020.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-020"
+    ],
+    "primary_task_id": "TASK-EXP-020",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-167",
+    "text": "Заголовки и название — Montserrat Bold/SemiBold; текст и слоган — Inter Regular/Medium; имя «ии-Тоня», слоган «Навигатор твоего роста»; шрифты должны быть лицензионными или свободными для коммерции, с кернингом для малого размера.",
+    "source_claim_ids": [
+      "C065"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8708,
+            8770
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-020.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-020"
+    ],
+    "primary_task_id": "TASK-EXP-020",
+    "decision_ids": [
+      "DEC-EXP-005"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-168",
+    "text": "Логотип: основная версия знак+название+слоган, упрощённый знак, светлая, тёмная и монохромная версии.",
+    "source_claim_ids": [
+      "C066"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8776,
+            8837
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-169",
+    "text": "Палитра содержит HEX/RGB/CMYK и сочетания; правила включают охранное поле, минимумы в мм и px, примеры допустимого фона/масштабирования и запреты на растяжение, кислотные цвета, тени, обводки и поворот.",
+    "source_claim_ids": [
+      "C066"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8776,
+            8837
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-170",
+    "text": "Mockups: Telegram-аватар 100×100, сайт включая favicon 32×32, визитка эксперта, слайд презентации, квадратный и вертикальный пост Instagram/Telegram, оферта/договор.",
+    "source_claim_ids": [
+      "C066"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8776,
+            8837
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-171",
+    "text": "Опционально: иконки психолога, коуча, массажиста/остеопата, йоги/телесных практик, эзотерики, ретритов и аренды; шаблоны поста 1080×1080, сторис 1080×1920, анонса и цитаты/отзыва.",
+    "source_claim_ids": [
+      "C066"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8776,
+            8837
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-172",
+    "text": "Эскизы: 3–5 вариантов за 3–5 рабочих дней; доработка утверждённого варианта: 2–3; финальная отрисовка и брендбук: 5–7 рабочих дней.",
+    "source_claim_ids": [
+      "C067"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8843,
+            8906
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-012.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-015"
+    ],
+    "primary_task_id": "TASK-PLT-015",
+    "decision_ids": [
+      "DEC-PLT-010"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-173",
+    "text": "Итог: AI/EPS/SVG, PNG transparent и JPG white в 16/32/64/128/256/512/1024/2048 px, интерактивный PDF-брендбук с оглавлением, ссылки либо файлы шрифтов.",
+    "source_claim_ids": [
+      "C067"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8843,
+            8906
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-012.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-015"
+    ],
+    "primary_task_id": "TASK-PLT-015",
+    "decision_ids": [
+      "DEC-PLT-010"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-174",
+    "text": "Ориентиры: premium wellness, человеческое лицо, чистая эзотерическая эстетика и тёплый минимализм; исключить роботов/микросхемы, перегруз, кислотные цвета, лампочки, шестерёнки и стандартные галочки.",
+    "source_claim_ids": [
+      "C067"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8843,
+            8906
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-012.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-015"
+    ],
+    "primary_task_id": "TASK-PLT-015",
+    "decision_ids": [
+      "DEC-PLT-010"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-175",
+    "text": "Приёмка проверяет logo 16×16, четыре цветовые версии, упрощённый знак, живое лицо, все файлы, брендбук с можно/нельзя, коды шрифтов/цветов и реальные mockups.",
+    "source_claim_ids": [
+      "C067"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8843,
+            8906
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-PLT-012.03"
+    ],
+    "task_ids": [
+      "TASK-PLT-015"
+    ],
+    "primary_task_id": "TASK-PLT-015",
+    "decision_ids": [
+      "DEC-PLT-010"
+    ],
+    "status": "source_detail_pending_linked_decisions"
+  },
+  {
+    "id": "DET-176",
+    "text": "Повторяет назначение сервиса, миссию и аудитории: эксперты, центры/студии, организаторы, владельцы пространства и клиенты.",
+    "source_claim_ids": [
+      "C068"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8937,
+            9003
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-177",
+    "text": "Логотип: фигура Тони с раскрытыми руками и сетью связей; живое лицо; минимализм с мягкими градиентами и скруглёнными линиями; AI/EPS/SVG и прозрачный PNG; читаемость 16×16–2000×2000; знак 100×100.",
+    "source_claim_ids": [
+      "C068"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8937,
+            9003
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-178",
+    "text": "Все четыре палитры сохраняют форму; каждый вариант проверяется в чёрно-белом виде, а кислотные оттенки исключены.",
+    "source_claim_ids": [
+      "C068"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            8937,
+            9003
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-179",
+    "text": "Типографика: Montserrat Bold/SemiBold для заголовка и названия, Inter Regular/Medium для текста, имя «ии-Тоня», слоган «Навигатор твоего роста».",
+    "source_claim_ids": [
+      "C069"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9009,
+            9054
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-180",
+    "text": "Персонаж: мудрая, тёплая, эмпатичная, уверенная современная проводница; визуально 30–40 лет; мягкое лицо, длинные волосы с фиолетовым отливом или золотистыми прядями, минималистичное платье/туника, лёгкое золотистое свечение.",
+    "source_claim_ids": [
+      "C069"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9009,
+            9054
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-181",
+    "text": "Восемь поз и эмоций: приветствие/доброжелательность; принятие/забота; навигация/уверенность; размышление/мудрость; радость/вдохновение; объяснение/экспертность; связь-экосистема/единство; спокойствие/гармония.",
+    "source_claim_ids": [
+      "C069"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9009,
+            9054
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-182",
+    "text": "Допустимые атрибуты: телефон, звёзды, сеть, календарь, сердечко, росток, QR; сдать AI/EPS/SVG и PNG, в одном стиле, четырёх палитрах, читаемых в 100×100; срок 7–10 рабочих дней после логотипа.",
+    "source_claim_ids": [
+      "C069"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9009,
+            9054
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-019.02"
+    ],
+    "task_ids": [
+      "TASK-EXP-019"
+    ],
+    "primary_task_id": "TASK-EXP-019",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-183",
+    "text": "Поставка включает логотипные версии, HEX/RGB/CMYK, правила, mockups; опциональные иконки семи категорий и соцшаблоны 1080×1080/1080×1920.",
+    "source_claim_ids": [
+      "C070"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9060,
+            9129
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-184",
+    "text": "Сроки: 3–5 эскизов за 3–5 дней, доработка 2–3, персонаж 8 поз×4 цвета за 7–10, финал/брендбук 5–7; файлы AI/EPS/SVG, PNG/JPG 16–2048, интерактивный PDF и шрифты.",
+    "source_claim_ids": [
+      "C070"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9060,
+            9129
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-185",
+    "text": "Референсы — Calm, Headspace, IT с человеческим лицом, чистая эзотерика, тёплый минимализм; запрещены холодные IT-образы, перегруженность, кислотность и штампы.",
+    "source_claim_ids": [
+      "C070"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9060,
+            9129
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  },
+  {
+    "id": "DET-186",
+    "text": "Чек-лист: logo 16×16, 4 палитры, упрощённый знак, живое лицо, все 8 поз в едином стиле и 4 цветах, читаемость персонажа 100×100, все форматы, правила и mockups, коды шрифтов и цветов.",
+    "source_claim_ids": [
+      "C070"
+    ],
+    "source_refs": [
+      {
+        "source_id": "source-main",
+        "ranges": [
+          [
+            9060,
+            9129
+          ]
+        ]
+      }
+    ],
+    "item_ids": [
+      "REQ-EXP-021.01"
+    ],
+    "task_ids": [
+      "TASK-EXP-021"
+    ],
+    "primary_task_id": "TASK-EXP-021",
+    "decision_ids": [],
+    "status": "source_detail_to_implement_or_verify"
+  }
+]

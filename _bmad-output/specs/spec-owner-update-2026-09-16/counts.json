@@ -1,0 +1,12 @@
+{
+  "requirements": 49,
+  "atomic_items": 194,
+  "catalog_details": 186,
+  "tasks": 84,
+  "implementation_tasks": 50,
+  "decision_tasks": 34,
+  "decisions": 39,
+  "source_claims": 319,
+  "open_questions": 208,
+  "classified_nonempty_source_lines": 4791
+}
