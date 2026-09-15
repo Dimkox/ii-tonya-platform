@@ -4831,7 +4831,8 @@
         ],
         "tests": [
           "tests/repo/env-policy.test.ts",
-          "packages/config/src/env.test.ts"
+          "packages/config/src/env.test.ts",
+          "packages/observability/src/logger.test.ts"
         ]
       },
       "current_state": "Исходные компоненты есть на базовом SHA; соответствие новым условиям требует проверки и указанных изменений.",
@@ -4850,10 +4851,11 @@
         "Инвентарь содержит только имена и ответственных, без открытых значений."
       ],
       "verification_commands": [
-        "pnpm exec vitest run tests/repo/env-policy.test.ts"
+        "pnpm exec vitest run tests/repo/env-policy.test.ts",
+        "pnpm exec vitest run tests/repo/env-policy.test.ts packages/config/src/env.test.ts packages/observability/src/logger.test.ts tests/repo/gitleaks-policy.test.ts"
       ],
       "priority": "P0",
-      "state": "planned",
+      "state": "verified_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-038"

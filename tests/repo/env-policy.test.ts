@@ -80,4 +80,23 @@ describe("environment credential policy", () => {
       ),
     ).toEqual([]);
   });
+
+  it("declares each environment name exactly once in the tracked templates", () => {
+    // parseEnv collapses duplicate keys onto the last value, which is how a
+    // repeated assignment survived unnoticed in .env.example; count raw lines.
+    for (const file of [".env.example", "deploy/runtime.env.example"]) {
+      const names = readFileSync(file, "utf8")
+        .split(/\r?\n/)
+        .filter((line) => /^[A-Z0-9_]+=/u.test(line))
+        .map((line) => line.slice(0, line.indexOf("=")));
+
+      const duplicates = [
+        ...new Set(
+          names.filter((name, index) => names.indexOf(name) !== index),
+        ),
+      ];
+      expect(duplicates, `${file} duplicate names`).toEqual([]);
+      expect(names.length).toBeGreaterThan(0);
+    }
+  });
 });

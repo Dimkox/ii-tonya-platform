@@ -63,4 +63,76 @@ describe("logger redaction", () => {
       expect(line).not.toContain(sentinel);
     }
   });
+
+  const collect = async (
+    write: (logger: ReturnType<typeof createLogger>) => void,
+  ): Promise<string> => {
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on("data", (chunk: Buffer) => chunks.push(chunk));
+    write(createLogger(output));
+    await new Promise((resolve) => output.once("data", resolve));
+    return Buffer.concat(chunks).toString("utf8");
+  };
+
+  it("redacts a bare Telegram bot token that is not inside a /bot…/ URL", async () => {
+    const line = await collect((logger) =>
+      logger.info(
+        "telegram getMe failed for 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw",
+      ),
+    );
+    expect(line).not.toContain("AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw");
+    expect(line).not.toContain("123456789:AAH");
+    expect(line).toContain("telegram getMe failed");
+  });
+
+  it("redacts provider key-shaped secrets appearing in message text", async () => {
+    const line = await collect((logger) =>
+      logger.info(
+        "rejected planerka key sk_live_51H8qWxLe9RtAbCdEfGh and selarti sk_test_9ZmNpQrStUvWxYz",
+      ),
+    );
+    expect(line).not.toContain("sk_live_51H8qWxLe9RtAbCdEfGh");
+    expect(line).not.toContain("sk_test_9ZmNpQrStUvWxYz");
+    expect(line).toContain("rejected");
+  });
+
+  it("redacts credential-bearing object keys that the old list missed", async () => {
+    const line = await collect((logger) =>
+      logger.info({
+        envelope: {
+          apiKey: "apikey-sentinel-never-log",
+          password: "password-sentinel-never-log",
+          credential: "credential-sentinel-never-log",
+          secretKey: "secretkey-sentinel-never-log",
+          signingKey: "signingkey-sentinel-never-log",
+        },
+      }),
+    );
+    for (const sentinel of [
+      "apikey-sentinel-never-log",
+      "password-sentinel-never-log",
+      "credential-sentinel-never-log",
+      "secretkey-sentinel-never-log",
+      "signingkey-sentinel-never-log",
+    ]) {
+      expect(line).not.toContain(sentinel);
+    }
+  });
+
+  it("keeps non-secret identifier fields ending in Key observable", async () => {
+    const line = await collect((logger) =>
+      logger.info(
+        {
+          idempotencyKey: "idem-77",
+          requestKey: "rq-77",
+          botKey: "bot-client-placeholder",
+        },
+        "dispatch",
+      ),
+    );
+    expect(line).toContain("idem-77");
+    expect(line).toContain("rq-77");
+    expect(line).toContain("bot-client-placeholder");
+  });
 });
