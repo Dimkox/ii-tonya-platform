@@ -305,6 +305,11 @@ const approvedPackageManifestHashes = new Map([
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
+  // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
+  [
+    "_bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py",
+    "c9fe761993a035ff74b6ce6c8469eab888bb4469e509e9e0c54423cc56977395",
+  ],
   // Host bootstrap for the native production runtime (PR #70). These mutate the server
   // out of band, so their content is pinned here as well as in deploy/bootstrap/SHA256SUMS.
   [
