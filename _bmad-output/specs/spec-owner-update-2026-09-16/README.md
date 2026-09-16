@@ -12,6 +12,7 @@
 
 ## Читать по порядку
 
+0. [AGENT-STATUS.md](../../../AGENT-STATUS.md) — живой статус для агентов (с разбегу).
 1. [SPEC.md](SPEC.md) — границы и назначение.
 2. [Решения владельца](decision-register.md) — несовместимые варианты.
 3. [План и очередь задач](../../../docs/superpowers/plans/2026-09-16-owner-requirements-backlog.md) — карточки и зависимости.
