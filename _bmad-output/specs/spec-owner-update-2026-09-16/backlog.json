@@ -1242,7 +1242,7 @@
         "REQ-FIN-016.02"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-053",
         "Q-054",
@@ -5348,7 +5348,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
