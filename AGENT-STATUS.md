@@ -35,7 +35,7 @@ Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-
 reactive ban; T0-B re-consent campaign 60 days; already-paid/active **grandfathered**. Next target:
 keystone **PLT-008** (its legal Q-001/117/139/143/144 are answered by the rule; Q-031 technical).
 Public-text propagation is **TASK-PLT-012**, left open on purpose. SPEC.md re-derive = bmad-spec/Claw
-step (no derive script in this checkout; do not hand-edit SPEC). 33 owner decisions still open (accepted: DEC-PLT-004, DEC-FIN-017, DEC-FIN-001, DEC-FIN-002, DEC-FIN-003, DEC-FIN-011; 2026-09-17). Pending price data (DEC-FIN-003): absolute package prices not in source, carried as TASK-FIN-003 open questions.
+step (no derive script in this checkout; do not hand-edit SPEC). 32 owner decisions still open (accepted: DEC-PLT-004, DEC-FIN-017, DEC-FIN-001, DEC-FIN-002, DEC-FIN-003, DEC-FIN-011, DEC-FIN-012; 2026-09-17). Pending price data (DEC-FIN-003): absolute package prices not in source, carried as TASK-FIN-003 open questions.
 accepting DEC-PLT-004 unblocked 0 tasks straight to `ready`.
 
 Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —

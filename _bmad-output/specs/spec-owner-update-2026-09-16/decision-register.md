@@ -250,7 +250,9 @@
 
 **Блокирует:** [TASK-EXP-011](tasks/TASK-EXP-011.md), [TASK-EXP-012](tasks/TASK-EXP-012.md), [TASK-EXP-015](tasks/TASK-EXP-015.md), [TASK-EXP-016](tasks/TASK-EXP-016.md), [TASK-FIN-013](tasks/TASK-FIN-013.md), [TASK-FIN-023](tasks/TASK-FIN-023.md).
 
-**Статус:** open.
+**Принято (вариант ①, 2026‑09‑17, product‑owner):** thresholds центра/организатора **`>=6` и `>=10`** (ровно **5** приведённых экспертов ⇒ **нижняя** полоса 12000; 15000 — с 6); consumption — **strict matching band** (малое событие **не** расходует корзину большей полосы). Совпадает с текущим `>=6` в `packages/domain/src/partner-pricing.ts` ⇒ без ретро‑смены тарификации; conservation‑тест полос не затронут. Снимает противоречие источников «>5» vs «5–9» в пользу `>=6` (C022/C023/C024, D037/D039/D040). Readiness: ни одна задача не покинула `blocked_by_decision` (у затронутых остаются прочие DEC).
+
+**Статус:** accepted.
 
 ## DEC-FIN-013: База 30% event deposit
 
