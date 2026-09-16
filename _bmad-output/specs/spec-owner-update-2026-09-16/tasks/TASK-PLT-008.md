@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `implemented_pending_review`; readiness: `pending_dependencies`.
 - Тип: implementation; исполнитель: backend; приоритет: P0.
 - Depends on: [TASK-DEC-PLT-004](TASK-DEC-PLT-004.md).
 - Решения: DEC-PLT-004.
@@ -20,7 +20,9 @@
 
 ## Что уже есть
 
-Исходные компоненты есть на базовом SHA; соответствие новым условиям требует проверки и указанных изменений.
+Исходные компоненты были на базовом SHA. **Реализовано в этой задаче (ветка `codex/plt-008-consents-data-matrix`):** матрица данных `docs/operations/owner-update-data-matrix.md` (все DET-009..019 / B087-цели → разрешённое основание либо явное исключение); домен `consent.ts` получил `expert_handoff` и гейт минимизации expert-view; `privacy-service`/`privacy-repository` принимают отзыв `expert_handoff` и каскадируют `expert_note⇒expert_handoff` с outbox-событием `booking.handoff_revoked` (one-way). Проверено: unit (consent 6, privacy-service 9, config env 24) + Postgres-набор (privacy-workflow/booking-concurrency/expert-telegram-queries/hybrid-b1/client-booking-privacy + новые expert-handoff-consent 4 = 45 зелёные), `pre-push-gate.sh --full` зелёный. Юридические вопросы Q-001/117/139/143/144 отвечены правилом DEC-PLT-004 (§1–§7).
+
+**Осталось в зависимых задачах (вне файлов PLT-008):** feed латерали `expert_handoff` в read-path (`booking-repository`, `expert-telegram-query-repository`) и модель подтверждённого principal (Q-031) → PLT-016/PLT-013; колонки привязки согласия к броне (`decided_at<reserved_at`, `recipient_id`, `text_hash`, `evidence_uri`) → ручная миграция `0039` + локстеп `migration-history-integrity`/`payment-scope-boundary-core`/`db-schema-parity`. Live-активация не объявлена.
 
 ## Файлы
 
