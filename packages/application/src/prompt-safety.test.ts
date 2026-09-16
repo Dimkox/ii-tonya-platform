@@ -286,6 +286,8 @@ describe("client copy guard", () => {
     "Я помогу вылечить бессонницу.",
     "Это излечимо за две недели.",
     "Симптомы уйдут после первого пакета.",
+    "Я не врач и поставлю диагноз по переписке.",
+    "Работаем без лечения и вылечиваем за месяц.",
   ])("rejects the diagnosis or treatment claim: %s", (text) => {
     expect(gateClientAnswer(text)).toEqual({
       accepted: false,
@@ -335,6 +337,7 @@ describe("client copy guard", () => {
     "Напиши ии-Тоне в мессенджере, и мы подберём формат.",
     "Вместе с ии-Тоней вы получите историю обращений.",
     "ии-Тоня записывает к экспертам через Planerka.",
+    "Ии-Тоня отвечает быстро.",
   ])("accepts the canonical name and its case forms: %s", (text) => {
     expect(gateClientAnswer(text)).toEqual({
       accepted: true,

@@ -2142,14 +2142,21 @@
         ],
         "modify": [
           "apps/web/src/content.ts",
+          "apps/web/src/landing-view.ts",
+          "apps/web/src/legal-view.ts",
+          "apps/web/src/styles.css",
           "packages/domain/src/safety.ts",
           "packages/domain/src/index.ts",
-          "packages/application/src/conversation-service.ts"
+          "packages/application/src/conversation-service.ts",
+          "packages/application/src/selarti-response-service.ts"
         ],
         "create": [],
         "tests": [
           "apps/web/src/content.test.ts",
+          "apps/web/src/landing-view.test.ts",
+          "apps/web/src/legal-view.test.ts",
           "packages/application/src/prompt-safety.test.ts",
+          "packages/application/src/selarti-response-service.test.ts",
           "tests/repo/client-copy-guard.test.ts"
         ]
       },

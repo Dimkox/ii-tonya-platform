@@ -158,7 +158,6 @@ export type ClientCopyGuardResult =
 export interface ClientCopyRule {
   readonly reasonCode: ClientCopyRejectionReason;
   readonly label: string;
-  readonly pattern: RegExp;
   /**
    * Claim rules keep a negated clause («не назначает лечение», «без спама») readable, because the
    * approved disclaimers use exactly those words. The marketing word list of REQ-EXP-001.02 has no
@@ -167,10 +166,12 @@ export interface ClientCopyRule {
   readonly negationExempt?: boolean;
 }
 
+type ClientCopyRulePattern = ClientCopyRule & { readonly pattern: RegExp };
+
 const notWord = String.raw`(?![\p{L}\p{N}_])`;
 const notWordBefore = String.raw`(?<![\p{L}\p{N}_])`;
 
-export const CLIENT_COPY_PROHIBITED_RULES: readonly ClientCopyRule[] = [
+const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "лучший",
@@ -216,7 +217,7 @@ export const CLIENT_COPY_PROHIBITED_RULES: readonly ClientCopyRule[] = [
     reasonCode: "prohibited_copy_marketing_term",
     label: "специально для вас",
     pattern: new RegExp(
-      `${notWordBefore}специально\\s+для\\s+(?:вас|тебя)${notWord}`,
+      `${notWordBefore}специально\\s*для\\s*(?:вас|тебя)${notWord}`,
       "giu",
     ),
   },
@@ -280,10 +281,29 @@ export const CLIENT_COPY_PROHIBITED_RULES: readonly ClientCopyRule[] = [
   },
 ];
 
+export const CLIENT_COPY_PROHIBITED_RULES: readonly ClientCopyRule[] =
+  CLIENT_COPY_RULES.map(({ reasonCode, label, negationExempt }) =>
+    negationExempt === undefined
+      ? { reasonCode, label }
+      : { reasonCode, label, negationExempt },
+  );
+
+const brandSeparator = String.raw`[\s\u00A0\u2010-\u2014-]*`;
+const brandEnding = String.raw`(?:ей|ья|ь|я|и|е|ю)`;
 const brandMention = new RegExp(
-  `${notWordBefore}(?:[Ии]{2}[\\s\\u00A0\\u2011\\u2010\\u2012\\u2013\\u2014-]?)?[Тт]он(?:ей|я|и|е|ю)${notWord}`,
-  "gu",
+  `${notWordBefore}(?:ии${brandSeparator})?тон${brandEnding}${notWord}`,
+  "giu",
 );
+const prefixedBrandCore = new RegExp(
+  `${notWordBefore}ии${brandSeparator}тон${brandEnding}`,
+  "giu",
+);
+const latinBrandMention = new RegExp(
+  `${notWordBefore}(?:ii|ии)${brandSeparator}ton(?:ya|ey|ia|e|i|u)?`,
+  "giu",
+);
+const junkSuffix = /^(?:[\p{L}\p{N}_]|-[\p{L}\p{N}])/u;
+const hostOrEmailAfter = /^(?:@[^\s]+|\.[a-z]{2,})/iu;
 
 const canonicalBrandForms = new Set<string>([
   "ии-Тоня",
@@ -291,21 +311,68 @@ const canonicalBrandForms = new Set<string>([
   "ии-Тоню",
   "ии-Тоней",
   "ии-Тони",
+  "Ии-Тоня",
+  "Ии-Тоне",
+  "Ии-Тоню",
+  "Ии-Тоней",
+  "Ии-Тони",
 ]);
 
-const clauseBoundary = /[.!?\n,;:—]/u;
+const formatNoise = /[\u00AD\u200B-\u200D\u2060\uFEFF]/gu;
+const nbsp = /[\u00A0\u202F\u2007]/gu;
 
-const isNegatedClause = (text: string, index: number): boolean => {
-  let start = 0;
+const normalizeClientCopy = (text: string): string =>
+  text.normalize("NFKC").replace(formatNoise, "").replace(nbsp, " ");
+
+const CLAUSE_BOUNDARY = new Set([
+  ".",
+  "!",
+  "?",
+  "\n",
+  ",",
+  ";",
+  ":",
+  "—",
+  "–",
+  "…",
+  "(",
+  ")",
+  "«",
+  "»",
+]);
+
+const clauseStart = (text: string, index: number): number => {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    if (clauseBoundary.test(text.slice(cursor, cursor + 1))) {
-      start = cursor + 1;
-      break;
-    }
+    if (CLAUSE_BOUNDARY.has(text[cursor] ?? "")) return cursor + 1;
   }
-  return /(?:^|[\s«"])(?:не|без|никак|никогда|нельзя|запрет\w*)(?:\s|$)/iu.test(
-    text.slice(start, index),
-  );
+  return 0;
+};
+
+const clauseEnd = (text: string, index: number): number => {
+  for (let cursor = index; cursor < text.length; cursor += 1) {
+    if (CLAUSE_BOUNDARY.has(text[cursor] ?? "")) return cursor;
+  }
+  return text.length;
+};
+
+const stripToken = (token: string): string =>
+  token.replace(/^[«"'(]+|[»"').]+$/gu, "");
+
+const tokensIn = (text: string): string[] =>
+  text.split(/\s+/u).map(stripToken).filter((token) => token.length > 0);
+
+const negationBefore = /^(?:не|без|никак|никогда|нельзя|нет)$/iu;
+const negationAfter = /^(?:не|нет)$/iu;
+
+const isNegatedClaim = (
+  text: string,
+  matchStart: number,
+  matchEnd: number,
+): boolean => {
+  const before = tokensIn(text.slice(clauseStart(text, matchStart), matchStart));
+  const after = tokensIn(text.slice(matchEnd, clauseEnd(text, matchEnd)));
+  if (before.slice(-2).some((token) => negationBefore.test(token))) return true;
+  return after.slice(0, 4).some((token) => negationAfter.test(token));
 };
 
 const firstViolation = (
@@ -316,24 +383,56 @@ const firstViolation = (
   pattern.lastIndex = 0;
   let match: RegExpExecArray | null = pattern.exec(text);
   while (match !== null) {
-    if (!negationExempt || !isNegatedClause(text, match.index)) return true;
+    const start = match.index;
+    const end = start + (match[0] ?? "").length;
+    if (!negationExempt || !isNegatedClaim(text, start, end)) return true;
     match = pattern.exec(text);
   }
   return false;
 };
 
-export const guardClientCopy = (text: string): ClientCopyGuardResult => {
+const isHostOrEmailContext = (
+  text: string,
+  start: number,
+  end: number,
+): boolean => {
+  const before = text.slice(Math.max(0, start - 1), start);
+  const after = text.slice(end);
+  return /[@/]/u.test(before) || hostOrEmailAfter.test(after);
+};
+
+const hasBrandViolation = (text: string): boolean => {
+  prefixedBrandCore.lastIndex = 0;
+  let prefixed: RegExpExecArray | null = prefixedBrandCore.exec(text);
+  while (prefixed !== null) {
+    const end = prefixed.index + (prefixed[0] ?? "").length;
+    if (junkSuffix.test(text.slice(end))) return true;
+    prefixed = prefixedBrandCore.exec(text);
+  }
+  latinBrandMention.lastIndex = 0;
+  let latin: RegExpExecArray | null = latinBrandMention.exec(text);
+  while (latin !== null) {
+    const start = latin.index;
+    const end = start + (latin[0] ?? "").length;
+    if (!isHostOrEmailContext(text, start, end)) return true;
+    latin = latinBrandMention.exec(text);
+  }
   brandMention.lastIndex = 0;
   let mention: RegExpExecArray | null = brandMention.exec(text);
   while (mention !== null) {
-    if (!canonicalBrandForms.has(mention[0] ?? "")) {
-      return { accepted: false, reasonCode: "client_copy_brand_name_variant" };
-    }
+    if (!canonicalBrandForms.has(mention[0] ?? "")) return true;
     mention = brandMention.exec(text);
   }
+  return false;
+};
 
-  for (const rule of CLIENT_COPY_PROHIBITED_RULES) {
-    if (firstViolation(rule.pattern, text, rule.negationExempt)) {
+export const guardClientCopy = (text: string): ClientCopyGuardResult => {
+  const normalized = normalizeClientCopy(text);
+  if (hasBrandViolation(normalized)) {
+    return { accepted: false, reasonCode: "client_copy_brand_name_variant" };
+  }
+  for (const rule of CLIENT_COPY_RULES) {
+    if (firstViolation(rule.pattern, normalized, rule.negationExempt)) {
       return { accepted: false, reasonCode: rule.reasonCode };
     }
   }

@@ -37,9 +37,13 @@
 **Изменить:**
 
 - [apps/web/src/content.ts](../../../../apps/web/src/content.ts)
+- [apps/web/src/landing-view.ts](../../../../apps/web/src/landing-view.ts)
+- [apps/web/src/legal-view.ts](../../../../apps/web/src/legal-view.ts)
+- [apps/web/src/styles.css](../../../../apps/web/src/styles.css)
 - [packages/domain/src/safety.ts](../../../../packages/domain/src/safety.ts)
 - [packages/domain/src/index.ts](../../../../packages/domain/src/index.ts)
 - [packages/application/src/conversation-service.ts](../../../../packages/application/src/conversation-service.ts)
+- [packages/application/src/selarti-response-service.ts](../../../../packages/application/src/selarti-response-service.ts)
 
 **Создать:**
 
@@ -48,7 +52,10 @@
 **Проверки:**
 
 - [apps/web/src/content.test.ts](../../../../apps/web/src/content.test.ts)
+- [apps/web/src/landing-view.test.ts](../../../../apps/web/src/landing-view.test.ts)
+- [apps/web/src/legal-view.test.ts](../../../../apps/web/src/legal-view.test.ts)
 - [packages/application/src/prompt-safety.test.ts](../../../../packages/application/src/prompt-safety.test.ts)
+- [packages/application/src/selarti-response-service.test.ts](../../../../packages/application/src/selarti-response-service.test.ts)
 - [tests/repo/client-copy-guard.test.ts](../../../../tests/repo/client-copy-guard.test.ts)
 
 ## Пункты задачи
@@ -100,31 +107,34 @@ pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-saf
 ### Что реализовано
 
 - `packages/domain/src/safety.ts`: `guardClientCopy`, таблица `CLIENT_COPY_PROHIBITED_RULES` (15 правил, 5 кодов отказа), `CLIENT_ASSISTANT_NAME`, правило канонического имени с разрешёнными падежными формами («ии-Тоня», «ии-Тоне», «ии-Тоню», «ии-Тоней», «ии-Тони»). Экспорт — `packages/domain/src/index.ts`.
-- `packages/application/src/conversation-service.ts`: guard подключён в ветке `kind === "answer"` до формирования `selarti.send`, то есть отказ происходит до отправки клиентского текста; коды guard'а добавлены в `IntentRejectionReason`. Экспертский путь (`validateExpertIntentProposal`) не затронут. Отказ рождает `human_handoff` с тем же `reasonCode` — поведение fail-closed, новых обращений в БД не появляется (`reason_code` в миграциях — `text` без CHECK по значениям, миграция не требуется).
+- `packages/application/src/conversation-service.ts`: guard подключён в ветке `kind === "answer"` до формирования `selarti.send`; коды guard'а добавлены в `IntentRejectionReason`. Экспертский путь (`validateExpertIntentProposal`) не затронут. Отказ рождает `human_handoff` с тем же `reasonCode` — поведение fail-closed, новых обращений в БД не появляется (`reason_code` в миграциях — `text` без CHECK по значениям, миграция не требуется).
+- `packages/application/src/selarti-response-service.ts`: тот же `guardClientCopy` стоит в `decodeProviderTextProposal` до `proposals.accept` (ошибка `selarti_response_copy_prohibited` → `rejected`, репозиторий не мутируется). Это второй путь клиентского текста: webhook `POST /v1/webhooks/selarti/responses` → outbox `telegram.send_text.v1`.
 - `apps/web/src/content.ts`: три нарушения исходной копии переписаны — «подбираю ~~лучшие~~ → подходящие варианты», «ии-Тоня ~~рекомендует~~ → показывает вас/тебя клиентам» (`expertSteps[1]`, `faq[12]`). Дайджест FAQ в `content.test.ts` перепоставлен на `905e710c596a95446b1dd6866e1be3719add17f1f5f58a41e462838d53a7a38e` (менялся только этот ответ).
+- Публичный бренд в `landing-view.ts` и `legal-view.ts`: видимый текст `<span>ии-</span>Тоня`, `gap: 0` у `.brand`. Рендер больше не даёт DOM-текст «ииТоня».
 
 ### Решения по толкованию (проверяющие могут оспорить)
 
-1. Отрицание сохраняется: классовые запреты (диагноз/лечение/давление/перебивание и спам) не срабатывают, если в том же предложении есть явное отрицание. Причина — согласованная владельцем копия «Не назначает лечение», «Без спама, без перегруза», «Я не ставлю диагнозы»; без exemption guard отклонял бы собственную обязательную дисклеймер-копию.
+1. Отрицание сохраняется для классовых запретов (диагноз/лечение/давление/перебивание и спам), если в той же клаузе есть явное отрицание: `не|без|никак|никогда|нельзя|нет` в двух токенах перед совпадением или `не|нет` в четырёх токенах после. Это покрывает и препозицию («Не назначает лечение», «Я не ставлю диагнозы»), и инверсию («Диагнозы не ставим», «Давления с моей стороны нет»). Отрицание внутри самого совпадения не освобождает: иначе «Без вашего запроса пришлю…» и «пока цены не выросли» проходили бы как дисклеймер. Маркетинговый список по-прежнему без exemption.
 2. Список из десяти слов отсекается безусловно, без exemption, как и требует критерий «Все слова … отклоняются».
 3. «рекомендации» (существительное) не запрещено: в списке стоит глагольная форма «рекомендуем», а в лендинге остаётся карточка «Адресные рекомендации по запросу клиента». Если владелец имел в виду всё семейство слова — расширить правило одним элементом таблицы.
 4. Правила строятся на `\p{L}`/lookaround, а не на `\b`/`\w`: в JavaScript `\b` и `\w` ASCII-ориентированы и на кириллице не работают (в частности, `\b` не срабатывает после «ь»), поэтому `\w*`/`\b` в русских паттернах молча ломали бы покрытие. Анти-кейсы закреплены тестами: «Фототерапия», «Архитектор», «Топливо», «Затопить подвал», «Экономический эффект», «не тонул».
 
 ### Отклонения от карточки
 
-- Шаг 3 («подключить отклонение до отправки») невыполним в двух объявленных файлах: точка отправки находится в `packages/application/src/conversation-service.ts`, поэтому он добавлен в «Изменить» и в `backlog.json`.
-- `apps/web` намеренно не получает зависимостей (в `apps/web/package.json` нет ни одной, и `pnpm install --frozen-lockfile` после её добавления перестал бы совпадать с `pnpm-lock.yaml`). Поэтому проверка публичной копии через доменный guard вынесена в репозиторный тест `tests/repo/client-copy-guard.test.ts` с относительными импортами — тот же приём, что уже применяется в `tests/repo` (пакеты — `tests/repo/booking-repository-guards.test.ts`, приложения — `tests/repo/sandbox-production-isolation.test.ts`).
+- Шаг 3 («подключить отклонение до отправки») невыполним в двух объявленных файлах: точки отправки — `packages/application/src/conversation-service.ts` и `packages/application/src/selarti-response-service.ts`, оба добавлены в «Изменить» и в `backlog.json`.
+- `apps/web` намеренно не получает зависимостей (в `apps/web/package.json` нет ни одной, и `pnpm install --frozen-lockfile` после её добавления перестал бы совпадать с `pnpm-lock.yaml`). Поэтому проверка публичной копии через доменный guard вынесена в репозиторный тест `tests/repo/client-copy-guard.test.ts` с относительными импортами — тот же приём, что уже применяется в `tests/repo` (пакеты — `tests/repo/booking-repository-guards.test.ts`, приложения — `tests/repo/sandbox-production-isolation.test.ts`). Тест дополнительно сверяет видимый HTML бренда (`<span>ии-</span>Тоня`) у лендинга и юридических страниц.
 
-### Прогон проверок (claw, 2026-09-15)
+### Прогон проверок (claw, 2026-09-16; после закрытия Critical review)
 
 | Проверка | Результат |
 |---|---|
-| `vitest run packages/application/src/prompt-safety.test.ts` | 107 passed |
-| `vitest run tests/repo/client-copy-guard.test.ts apps/web/src/content.test.ts apps/web/src/landing-view.test.ts` | 16 passed |
+| `vitest run packages/application/src/prompt-safety.test.ts` | 110 passed |
+| `vitest run packages/application/src/selarti-response-service.test.ts` | 17 passed |
+| `vitest run tests/repo/client-copy-guard.test.ts apps/web/src/content.test.ts apps/web/src/landing-view.test.ts apps/web/src/legal-view.test.ts` | 35 passed |
 | `vitest run packages/application/src/conversation-service.test.ts` (сопредельный регресс) | 66 passed |
 | `vitest run packages/domain` | 67 passed |
-| `tsc --noEmit` для `packages/domain`, `packages/application`, `apps/web`, `tsconfig.tests.json` | exit 0 |
-| `eslint` по семи изменённым файлам | exit 0 |
+| `tsc --noEmit -p tsconfig.tests.json` и `-p apps/web` | exit 0 |
+| `eslint` по изменённым `.ts` | exit 0 |
 | `git diff --check` | exit 0 |
-| зонд: все 155 строк `landingContent` через `guardClientCopy` | 0 нарушений |
-| `validate_backlog.py --repo-root .` | ok, 0 ошибок |
+
+Независимый review нашёл два Critical (бренд в рендере без дефиса; provider ingress без guard) и ряд Warning. В этом проходе закрыты оба Critical и наиболее опасные Warning: окно отрицания, регистр начала предложения «Ии-Тоня», суффиксы/латиница имени вне URL/email, нормализация soft hyphen/ZWSP, `CLIENT_COPY_PROHIBITED_RULES` больше не экспортирует `RegExp`. Остальные Warning (словоформы вроде «успеем», «лечим», омографы) в этом проходе не трогались.
