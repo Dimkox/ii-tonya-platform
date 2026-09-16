@@ -210,7 +210,9 @@
 
 **Блокирует:** [TASK-EXP-015](tasks/TASK-EXP-015.md), [TASK-EXP-017](tasks/TASK-EXP-017.md), [TASK-EXP-018](tasks/TASK-EXP-018.md), [TASK-FIN-011](tasks/TASK-FIN-011.md), [TASK-FIN-020](tasks/TASK-FIN-020.md), [TASK-FIN-022](tasks/TASK-FIN-022.md).
 
-**Статус:** open.
+**Принято (вариант ①, 2026-09-17, product-owner):** границы этапов «Энергии начала» — точные получтокрытые интервалы от calculation_timestamp: `[0,72ч)`/`[72,144ч)`/`[144,216ч)`, далее полная цена. Совпадает с текущим `deriveEarlyEnergyStage` и тестом «0% после 216ч» ⇒ без ретро-смены; TZ-независимо; величина скидки (40% ≡ коэф. 0.6) не меняется. Снимает decision-гейт по отсчёту этапов у FIN-010/011/020/022, EXP-015/017/018.
+
+**Статус:** accepted.
 
 ## DEC-FIN-011: Start, floor и 2-for-1
 

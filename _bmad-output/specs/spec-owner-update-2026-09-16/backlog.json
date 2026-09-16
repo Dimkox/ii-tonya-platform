@@ -3415,7 +3415,7 @@
       ],
       "priority": "P2",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-195"
       ],
