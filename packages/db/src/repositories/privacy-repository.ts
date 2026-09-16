@@ -208,6 +208,41 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           and n.callback_action = 'follow_up' and n.callback_consumed_at is null returning 1 as count
       `)
             : { rows: [] as { count: number }[] };
+        // DEC-PLT-004 §3: withdrawing the note content also withdraws the transfer (never the
+        // reverse), and either way receivers must delete their copies in the same transaction.
+        const handoffConsentId =
+          command.purpose === "expert_handoff"
+            ? consent.id
+            : command.purpose === "expert_note"
+              ? one(
+                  (
+                    await tx.execute<{ id: string }>(sql`
+          insert into consents (user_id, consent_type, decision, policy_version)
+          values (${command.targetUserId}::uuid, 'expert_handoff', 'denied', ${command.policyVersion})
+          returning id
+        `)
+                  ).rows,
+                  "cascaded handoff withdrawal consent fact",
+                )
+              : undefined;
+        if (handoffConsentId !== undefined) {
+          const handoffPayload = {
+            userId: command.targetUserId,
+            consentDecisionId: handoffConsentId,
+            purpose: "expert_handoff",
+          };
+          await tx.execute(sql`
+          insert into integration_outbox (idempotency_key, topic, payload, correlation_id, reconciliation_key, payload_hash)
+          values (
+            ${`privacy:booking.handoff_revoked:${handoffConsentId}`},
+            'booking.handoff_revoked',
+            ${JSON.stringify(handoffPayload)}::jsonb,
+            ${command.correlationId},
+            ${`booking.handoff_revoked:${handoffConsentId}`},
+            ${hash(handoffPayload)}
+          )
+        `);
+        }
         await this.options.beforeWithdrawalAudit?.();
         await this.auditAndProjection(tx, {
           actorId: command.targetUserId,
