@@ -13,6 +13,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
 | `main` SHA | `92993646` = squash of PR [#88](https://github.com/Dimkox/ii-tonya-platform/pull/88) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
+| Copy-guard follow-up | `codex/copy-guard-warnings-2026-09-16` @ `f7a899c` in the canonical checkout — warning triage on top of `main`; PR pending |
 | Copy-guard pre-squash tip | `b6215e8` (history rewritten by squash; use `92993646` on main) |
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
@@ -28,15 +29,27 @@ State on the card: `implemented_pending_review`. Live activation is **not** in s
 - `guardClientCopy` in `packages/domain/src/safety.ts`.
 - Wired in `conversation-service.ts` (`kind === "answer"`) and in `decodeProviderTextProposal` (`selarti_response_copy_prohibited` → `rejected` before `proposals.accept`).
 - Public brand markup is `<span>ии-</span>Тоня` with `.brand { gap: 0 }` in landing and legal views.
-- Commits: `5eab17e` (guard), `0bae85a` (brand + provider ingress + negation/brand/normalize), `b6215e8` (word forms).
+- Commits: `5eab17e` (guard), `0bae85a` (brand + provider ingress + negation/brand/normalize), `b6215e8` (word forms). Follow-up warning triage: `f7a899c` on `codex/copy-guard-warnings-2026-09-16`.
 
 Focused tests after `b6215e8`: prompt-safety 121, selarti-response-service 17, client-copy-guard + web 35, conversation-service 66, domain 67.
 
-Independent re-review after `b6215e8`: **no remaining Critical**. Card checkbox «Пройти независимый review» is still unchecked. Remaining Warning (do not reopen as Critical unless the owner expands the card):
+Independent re-review after `b6215e8`: **no remaining Critical**. Follow-up `f7a899c` triages the
+Warnings; a second independent review of that commit caught three false positives (`перебираю`
+rejected, `оформляет … сегодня` rejected, the disclaimer word-order break) and those edits were
+reverted / narrowed. Closed in `f7a899c`:
 
-- 4-token after-window: «Поставлю диагноз вам точно не сразу» still accepted.
-- Inflections/prefixes: наилучший, скидочный, выгоднейший, сэкономите, успевайте, порекомендуем, перебью, оформи сегодня.
-- Format chars beyond ZWSP/soft-hyphen: U+200E LTR, bidi overrides.
+- Marketing word forms — наилучший, скидочный, выгоднейший, сэкономите, успевайте, порекомендуем —
+  each as a targeted variant, no word boundary loosened.
+- Format chars beyond ZWSP/soft-hyphen — LRM/RLM and the bidi embedding/override/isolate controls
+  are stripped before matching.
+- Pressure singular imperative «оформи сегодня» via whole-word `оформ(?:ите|и)`, so
+  `оформляет`/`оформить`/`оформление` stay neutral.
+
+Still open as accepted-by-design Warnings (a naive fix rejects approved copy — see commit body):
+
+- Negation after-window: «Поставлю диагноз вам точно не сразу» still accepted — a distance rule
+  cannot separate it from the protected «Диагноз по переписке не ставлю».
+- «перебью» still accepted — widening `перебива*` also rejects «перебираю варианты/слоты».
 - Homoglyphs (`лyчшие`) and landing «диагностика» were left on purpose.
 
 Rebuild domain dist with tsup before tests that import `@ii-tonya/domain` (vitest does not alias it to source).
@@ -62,7 +75,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 
 ## What is blocked / not done
 
-1. Formal close of TASK-EXP-001 review checkbox; optional Warning pass.
+1. ~~Formal close of TASK-EXP-001 review checkbox; optional Warning pass.~~ Done on
+   `codex/copy-guard-warnings-2026-09-16` (`f7a899c`): safe Warnings fixed, review passed,
+   card checkbox closed. Awaiting merge to `main`.
 2. Bind `ии-Тоня` AI to a task if that is wanted (currently `test expert` → `41nano`).
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
 4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
@@ -71,7 +86,10 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 
 ## Next actions (pick one, do not mix)
 
-- **Copy-guard:** mark TASK-EXP-001 review closed on the card *or* fix remaining Warnings with new RED tests, rebuild domain dist, re-review exact HEAD.
+- **Copy-guard:** ~~fix remaining Warnings~~ done in `f7a899c` (safe subset only; two naive fixes
+  reverted after an independent review found they rejected approved copy). Remaining: open the PR
+  and squash to `main`. The two accepted-by-design Warnings above stay open unless the owner
+  expands the card.
 - **Selarti wiring:** bind AI to task / add webhook secret and receiver — only if the owner asks; do not flip `SELARTI_ENABLED`.
 - **Owner decisions:** walk the 23 DEC cards; do not invent variants.
 - **Publish:** ~~push the feature branch.~~ Merged. Further work is a new `codex/*` branch from current `main`.
