@@ -11,14 +11,14 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `92993646` = squash of PR [#88](https://github.com/Dimkox/ii-tonya-platform/pull/88) |
+| `main` SHA | `b2b7af9c` = squash of PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89), on top of `92993646` (PR #88) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
-| Copy-guard follow-up | `codex/copy-guard-warnings-2026-09-16` @ `f7a899c` in the canonical checkout — warning triage on top of `main`; PR pending |
+| Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | Copy-guard pre-squash tip | `b6215e8` (history rewritten by squash; use `92993646` on main) |
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `92993646`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `b2b7af9c`**, not from the old feature-branch SHAs.
 
 ## What is done
 
@@ -75,9 +75,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 
 ## What is blocked / not done
 
-1. ~~Formal close of TASK-EXP-001 review checkbox; optional Warning pass.~~ Done on
-   `codex/copy-guard-warnings-2026-09-16` (`f7a899c`): safe Warnings fixed, review passed,
-   card checkbox closed. Awaiting merge to `main`.
+1. ~~Formal close of TASK-EXP-001 review checkbox; optional Warning pass.~~ Done: safe Warnings
+   fixed and review checkbox closed on `codex/copy-guard-warnings-2026-09-16`, squash-merged to
+   `main` as `b2b7af9c` (PR #89). Two accepted-by-design Warnings remain (see copy-guard section).
 2. Bind `ии-Тоня` AI to a task if that is wanted (currently `test expert` → `41nano`).
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
 4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
@@ -86,10 +86,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 
 ## Next actions (pick one, do not mix)
 
-- **Copy-guard:** ~~fix remaining Warnings~~ done in `f7a899c` (safe subset only; two naive fixes
-  reverted after an independent review found they rejected approved copy). Remaining: open the PR
-  and squash to `main`. The two accepted-by-design Warnings above stay open unless the owner
-  expands the card.
+- **Copy-guard:** ~~fix remaining Warnings~~ done and merged (PR #89 → `b2b7af9c`). The two
+  accepted-by-design Warnings above (negation timing-hedge, `перебью`) stay open unless the owner
+  expands the card; a POS-style fix is the only safe way to close them.
 - **Selarti wiring:** bind AI to task / add webhook secret and receiver — only if the owner asks; do not flip `SELARTI_ENABLED`.
 - **Owner decisions:** walk the 23 DEC cards; do not invent variants.
 - **Publish:** ~~push the feature branch.~~ Merged. Further work is a new `codex/*` branch from current `main`.
