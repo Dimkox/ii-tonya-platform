@@ -420,7 +420,9 @@
 
 **Блокирует:** [TASK-EXP-011](tasks/TASK-EXP-011.md), [TASK-EXP-012](tasks/TASK-EXP-012.md), [TASK-EXP-015](tasks/TASK-EXP-015.md), [TASK-EXP-016](tasks/TASK-EXP-016.md), [TASK-FIN-023](tasks/TASK-FIN-023.md).
 
-**Статус:** open.
+**Принято (вариант ①, 2026-09-17, product-owner):** создание карточки события ВХОДИТ в лимит одной включённой группы базового резидента (каждая карточка = расход единицы группы). Закрывает неопределённость B009 про лимит карточки. Снимает decision-гейт у EXP-011/012/016 (-> pending_dependencies) и частично EXP-015/FIN-023 (ждут прочие DEC).
+
+**Статус:** accepted.
 
 ## DEC-FIN-021: Точный renewal cadence
 

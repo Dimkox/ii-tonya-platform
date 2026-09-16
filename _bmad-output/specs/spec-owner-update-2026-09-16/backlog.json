@@ -2878,7 +2878,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-128",
         "Q-164",
@@ -2956,7 +2956,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-164",
         "Q-189"
@@ -3330,7 +3330,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-158",
         "Q-160",
