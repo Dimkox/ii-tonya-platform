@@ -4383,7 +4383,7 @@
         "pnpm exec vitest run packages/domain/src/consent.test.ts"
       ],
       "priority": "P0",
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-001",
