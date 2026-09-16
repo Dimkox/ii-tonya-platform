@@ -11,7 +11,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `6ec3f505` = squash of PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90), on top of `b2b7af9c` (#89) and `92993646` (#88) |
+| `main` SHA | `9437e727` = squash of PR [#91](https://github.com/Dimkox/ii-tonya-platform/pull/91), on top of `6ec3f505` (#90), `b2b7af9c` (#89), `92993646` (#88) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -19,7 +19,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `6ec3f505`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `9437e727`**, not from the old feature-branch SHAs.
 
 ## What is done
 
@@ -79,6 +79,19 @@ security surface closed the review checkbox; merged as PR [#90](https://github.c
     (DB authority store, not log printing → outside REQ-PLT-004.07; the derivation is the idempotency
     key asserted in `telegram-client-b1.integration.test.ts`, so it is not changed here).
 
+### TASK-EXP-019 design (partial — deterministic part merged)
+
+Merged as PR [#91](https://github.com/Dimkox/ii-tonya-platform/pull/91) (`9437e727`). Only the
+decision-free synthesis of `DET-159..182` was produced; the design finalization is deliberately
+left open. No live activation.
+
+- Done: `docs/design/ii-tonya-logo-character-brief.md` (REQ-EXP-019.01), `assets/brand/character/pose-inventory.json`
+  (8 poses, DET-181 → REQ-EXP-019.02 inventory check), `docs/design/ii-tonya-sketch-review.md`
+  (owner selection-record scaffold).
+- Open, owner-gated: the final `assets/brand/logo.svg`, the 3–5 sketches + owner's pick (the card
+  forbids a self-selected final variant), the rendered 8-pose set, and the palette — the palette is
+  blocked on **`DEC-EXP-005`**, which also gates EXP-014/EXP-020/EXP-021.
+
 ### Selarti credentials (local env only)
 
 Auth against `POST https://selarti.com/api/1.1/wf/auth` with `{"key":"<SELARTI_API_KEY>"}` now works (earlier the key was accidentally equal to `SELARTI_COMPANY_ID` and failed `NO_EMAIL`).
@@ -106,7 +119,7 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 2. Bind `ии-Тоня` AI to a task if that is wanted (currently `test expert` → `41nano`).
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
 4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
-5. Owner DEC pack (23 P0 cards) still holds FIN/PLT implementation. Decision sheet: `/home/pall/projects/ii-tonya-base/outputs/owner-decision-sheet-2026-09-16.md`.
+5. Owner DEC pack (23 P0 cards) still holds FIN/PLT implementation. Decision sheet: `/home/pall/projects/ii-tonya-base/outputs/owner-decision-sheet-2026-09-16.md`. **After #89/#90/#91 (EXP-001, PLT-013, EXP-019 deterministic) there is no unblocked engineering task left**: every remaining card is `blocked_by_decision` (40 of 50 non-decision), gated by an open owner question that is commercial/legal rather than technical (EXP-007 stage semantics + selling funnel: Q-055/056/057; EXP-013: 6 Q's), or an owner sketch/palette pick (EXP-019 final render, `DEC-EXP-005`). Implementers must not invent these.
 6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. YooKassa key exists; `PAYMENTS_ENABLED=false`.
 
 ## Next actions (pick one, do not mix)
@@ -115,8 +128,14 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
   accepted-by-design Warnings above (negation timing-hedge, `перебью`) stay open unless the owner
   expands the card; a POS-style fix is the only safe way to close them.
 - **Selarti wiring:** bind AI to task / add webhook secret and receiver — only if the owner asks; do not flip `SELARTI_ENABLED`.
-- **Owner decisions:** walk the 23 DEC cards; do not invent variants.
-- **Publish:** ~~push the feature branch.~~ Merged. Further work is a new `codex/*` branch from current `main`.
+- **Owner decisions:** this is now the **only** forward path for real feature work — walk the 23 DEC
+  cards (`/home/pall/projects/ii-tonya-base/outputs/owner-decision-sheet-2026-09-16.md`, already
+  prepared with verbatim variants + unblock-power ranking); record each via `_bmad/scripts/memlog.py`;
+  do not invent variants. Once the top decisions land (DEC-PLT-004, DEC-FIN-017, DEC-FIN-005,
+  DEC-FIN-026 each unblock 25–30 transitive tasks), re-derive readiness from `backlog.json`.
+- **EXP-019 design final:** needs the designer's 3–5 sketches + the owner's recorded pick
+  (`docs/design/ii-tonya-sketch-review.md`) and `DEC-EXP-005` (palette) before `logo.svg`/poses.
+- **Publish:** no branch pending — #89/#90/#91 all merged to `main` (`9437e727`). Further work is a new `codex/*` branch from current `main`.
 
 ## Standing rules for this branch
 
