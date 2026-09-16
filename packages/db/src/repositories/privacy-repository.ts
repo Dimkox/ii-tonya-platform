@@ -149,6 +149,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       ![
         "client_profile",
         "expert_note",
+        "expert_handoff",
         "follow_up",
         "client_messaging",
         "selarti_ai_processing",

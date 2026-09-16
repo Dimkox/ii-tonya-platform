@@ -93,7 +93,7 @@ describe("privacy lifecycle", () => {
     expect(repository.withdrawConsentAtomically).not.toHaveBeenCalled();
   });
 
-  it.each(["client_messaging", "selarti_ai_processing"])(
+  it.each(["client_messaging", "selarti_ai_processing", "expert_handoff"])(
     "allows runtime withdrawal of %s consent",
     async (purpose) => {
       const repository = {
