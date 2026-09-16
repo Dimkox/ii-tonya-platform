@@ -1,0 +1,107 @@
+{
+  "version": "exp-019-pose-inventory-v1",
+  "source": "_bmad-output/specs/spec-owner-update-2026-09-16",
+  "detailRefs": ["DET-160", "DET-162", "DET-180", "DET-181", "DET-182"],
+  "requirement": "REQ-EXP-019.02",
+  "persona": {
+    "name": "ии-Тоня",
+    "role": "AI-навигатор саморазвития в мессенджерах",
+    "ageRange": "30-40",
+    "temperament": ["мудрая", "тёплая", "эмпатичная", "уверенная"],
+    "appearance": "мягкое живое лицо; длинные волосы с фиолетовым отливом или золотистыми прядями; минималистичное платье/туника; лёгкое золотистое свечение",
+    "centralMotif": "женская фигура с раскрытыми руками; вокруг круги, точки и соединительные линии как экосистема клиентов, экспертов и пространств"
+  },
+  "renderConstraints": {
+    "style": "минимализм, плоская графика с мягкими градиентами и скруглёнными линиями; лицо живое и узнаваемое",
+    "exclude": [
+      "роботы",
+      "микросхемы",
+      "перегруз",
+      "кислотные цвета",
+      "лампочки",
+      "шестерёнки",
+      "стандартные галочки"
+    ],
+    "allowedAttributes": [
+      "телефон",
+      "звёзды",
+      "сеть",
+      "календарь",
+      "сердечко",
+      "росток",
+      "QR"
+    ],
+    "formats": ["AI", "EPS", "SVG", "PNG (transparent)", "JPG (white bg)"],
+    "readabilityPx": { "min": 16, "max": 2000, "telegramBadge": 100 },
+    "backgrounds": ["light", "dark"],
+    "paletteSelection": "DEC-EXP-005 (OPEN) — the pose art must be produced in all four brand palettes once the palette decision lands; no palette is fixed here."
+  },
+  "status": "invented-pending-owner-sketch-selection",
+  "count": 8,
+  "poses": [
+    {
+      "id": "pose-01",
+      "key": "greeting",
+      "emotion": "приветствие / доброжелательность",
+      "context": "первое сообщение ии-Тони в диалоге",
+      "suggestedAttributes": ["телефон"],
+      "rendered": false
+    },
+    {
+      "id": "pose-02",
+      "key": "acceptance",
+      "emotion": "принятие / забота",
+      "context": "выслушивает запрос клиента без оценки",
+      "suggestedAttributes": ["сердечко"],
+      "rendered": false
+    },
+    {
+      "id": "pose-03",
+      "key": "navigation",
+      "emotion": "навигация / уверенность",
+      "context": "ведёт к подходящему формату работы или эксперту",
+      "suggestedAttributes": ["сеть"],
+      "rendered": false
+    },
+    {
+      "id": "pose-04",
+      "key": "reflection",
+      "emotion": "размышление / мудрость",
+      "context": "помогает сформулировать запрос",
+      "suggestedAttributes": [],
+      "rendered": false
+    },
+    {
+      "id": "pose-05",
+      "key": "joy",
+      "emotion": "радость / вдохновение",
+      "context": "отмечает прогресс и результат",
+      "suggestedAttributes": ["звёзды"],
+      "rendered": false
+    },
+    {
+      "id": "pose-06",
+      "key": "explanation",
+      "emotion": "объяснение / экспертность",
+      "context": "рассказывает о тарифах, пакетах и записи",
+      "suggestedAttributes": ["календарь"],
+      "rendered": false
+    },
+    {
+      "id": "pose-07",
+      "key": "connection",
+      "emotion": "связь-экосистема / единство",
+      "context": "показывает связь клиента, эксперта и пространства",
+      "suggestedAttributes": ["сеть", "QR"],
+      "rendered": false
+    },
+    {
+      "id": "pose-08",
+      "key": "calm",
+      "emotion": "спокойствие / гармония",
+      "context": "завершает диалог и напоминание о следующем шаге",
+      "suggestedAttributes": ["росток"],
+      "rendered": false
+    }
+  ]
+}
