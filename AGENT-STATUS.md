@@ -21,11 +21,14 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 
 Continue new work from **`main` at `26b626d`**, not from the old feature-branch SHAs.
 
-Housekeeping (2026-09-16, no owner decision required): `backlog.json` per-task `state` reconciled —
+Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —
 EXP-001/PLT-013 now `merged` (`backlog.state` stays `planning_only`; delivery truth is AGENT-STATUS +
-git). Pruned 5 provably-ancestry-merged local `codex/*` branches (62 → 57). The remaining 57 are
-worktree-locked (10) or hold unique commits (likely squash-merged) — **not** force-deleted; a clean
-pass needs a per-PR check. There is no unblocked engineering task left (verified: every remaining
+git). Local `codex/*` pruned 62 → **34** (28 removed: 5 ancestry-merged, then 23 with a verified PR
+merged into `main` that were either fully synced to `origin` or whose remote was already deleted
+post-merge). Kept deliberately: **10** worktree-locked (removing breaks a live worktree) and **24**
+with no merged-into-`main` PR (content not provably in `main` — WIP or squash-merged under a renamed
+head; a deeper pass needs per-PR/patch-id verification). Recovery log for the 23: `git branch <name> <sha>`
+from this session's reflog. There is no unblocked engineering task left (verified: every remaining
 card needs ≥1 of the 39 open `DEC` decisions or an open owner question).
 
 ## What is done
