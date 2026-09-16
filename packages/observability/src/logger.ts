@@ -77,6 +77,21 @@ export function sanitizeTelemetry(
   if (value === null || typeof value !== "object") return value;
   if (seen.has(value)) return "[REDACTED:CIRCULAR]";
   seen.add(value);
+  // Errors serialize to {} under Object.entries (message/stack are non-enumerable), which
+  // silently destroys the boot-failure reason. Rebuild them explicitly, scrubbing each string.
+  if (value instanceof Error) {
+    const message =
+      typeof value.message === "string"
+        ? value.message
+        : String(value.message ?? "");
+    return {
+      type: value.constructor?.name ?? "Error",
+      message: sanitizeString(message),
+      ...(typeof value.stack === "string"
+        ? { stack: value.stack.split("\n").map(sanitizeString).join("\n") }
+        : {}),
+    };
+  }
   if (Array.isArray(value))
     return value.map((item) => sanitizeTelemetry(item, seen));
   const output: Record<string, unknown> = {};

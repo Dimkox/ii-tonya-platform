@@ -175,4 +175,37 @@ describe("logger redaction", () => {
     expect(line).toContain("idem-77");
     expect(line).toContain("rq-77");
   });
+
+  it("keeps a boot failure diagnosable: error name/message/stack survive, secrets scrubbed", async () => {
+    const line = await collect((logger) =>
+      logger.fatal(
+        {
+          err: new Error(
+            "connection refused to 203.0.113.9:5432 key=sk_live_aaaaaaaaaaaaaaaa",
+          ),
+        },
+        "api startup failed",
+      ),
+    );
+    expect(line).toContain("api startup failed");
+    // the reason and the error type survive...
+    expect(line).toContain("Error");
+    expect(line).toContain("connection refused");
+    expect(line).toContain("at ");
+    // ...but an embedded provider key still never reaches the log.
+    expect(line).not.toContain("sk_live_aaaaaaaaaaaaaaaa");
+  });
+
+  it("does not throw in the log hook when an Error has non-string message/stack", async () => {
+    const err = new Error("sentinel-ok");
+    // A deserialized error (Object.assign(serializedError)) can carry non-string members.
+    Object.assign(err, { message: 42, stack: ["at", "boom"] });
+    const line = await collect((logger) =>
+      logger.fatal({ err }, "api startup failed"),
+    );
+    expect(line).toContain("api startup failed");
+    expect(line).not.toContain("sentinel-ok"); // original message overwritten by 42
+    expect(line).toContain("42");
+    expect(line).not.toContain("boom"); // array stack is skipped, not joined blindly
+  });
 });
