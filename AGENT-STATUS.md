@@ -19,7 +19,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `584dd10`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `3cf2b42`**, not from the old feature-branch SHAs.
 
 **DEC-PLT-004 accepted 2026-09-17** (PR #92; §4/#3 made explicit via PR #93): owner chose variant A and ruled every §8 red-line; the
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
@@ -35,7 +35,7 @@ Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-
 reactive ban; T0-B re-consent campaign 60 days; already-paid/active **grandfathered**. Next target:
 keystone **PLT-008** (its legal Q-001/117/139/143/144 are answered by the rule; Q-031 technical).
 Public-text propagation is **TASK-PLT-012**, left open on purpose. SPEC.md re-derive = bmad-spec/Claw
-step (no derive script in this checkout; do not hand-edit SPEC). 37 owner decisions still open (DEC-PLT-004 + DEC-FIN-017 accepted 2026-09-17);
+step (no derive script in this checkout; do not hand-edit SPEC). 36 owner decisions still open (accepted: DEC-PLT-004, DEC-FIN-017, DEC-FIN-001; 2026-09-17);
 accepting DEC-PLT-004 unblocked 0 tasks straight to `ready`.
 
 Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —
