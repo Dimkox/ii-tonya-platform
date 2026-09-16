@@ -19,7 +19,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `f1e0b4b`** (or later HEAD after DEC-FIN-003 record), not from the old feature-branch SHAs.
+Continue new work from **`main` at `9ac614e`**, not from the old feature-branch SHAs..
 
 **DEC-PLT-004 accepted 2026-09-17** (PR #92; §4/#3 made explicit via PR #93): owner chose variant A and ruled every §8 red-line; the
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
