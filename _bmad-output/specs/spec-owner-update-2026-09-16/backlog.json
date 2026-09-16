@@ -2498,7 +2498,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-029",
         "Q-030",
@@ -4384,7 +4384,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-001",
         "Q-031",
@@ -4569,7 +4569,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-009",
         "Q-123"
@@ -5079,7 +5079,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-006",
         "Q-100"
@@ -5923,7 +5923,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
