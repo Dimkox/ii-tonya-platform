@@ -198,7 +198,7 @@
         "REQ-FIN-001.03"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-015",
         "Q-016",
