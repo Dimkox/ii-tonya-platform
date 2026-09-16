@@ -2179,7 +2179,7 @@
         "pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-safety.test.ts"
       ],
       "priority": "P0",
-      "state": "implemented_pending_review",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [
@@ -4862,7 +4862,7 @@
         "pnpm exec vitest run tests/repo/env-policy.test.ts packages/config/src/env.test.ts packages/observability/src/logger.test.ts tests/repo/gitleaks-policy.test.ts"
       ],
       "priority": "P0",
-      "state": "verified_pending_review",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [
         "Q-038"
