@@ -54,6 +54,30 @@ Still open as accepted-by-design Warnings (a naive fix rejects approved copy —
 
 Rebuild domain dist with tsup before tests that import `@ii-tonya/domain` (vitest does not alias it to source).
 
+### TASK-PLT-013 secret surface (verification)
+
+State on the card: `verified_pending_review`. An independent adversarial review of the merged
+security surface closed the review checkbox on `codex/plt-013-botkey-redaction`; it found no
+reachable credential→log leak in current paths. Live activation is not in scope.
+
+- Redaction (`packages/observability/src/logger.ts`): the review then found one gap *in scope* —
+  `botKey` / `CLIENT_TELEGRAM_BOT_KEY` was classified as a "bot identifier" and pinned visible by
+  a test, but the client webhook authenticates it with `secureEqual` and it is the request path
+  capability, i.e. a bearer secret. Fixed: `sensitiveKey` now matches `bot[-_]?key`; the test's
+  wrong expectation is corrected; the inventory is reclassified. Log-time only, no functional impact.
+- Recorded as SEPARATE follow-on findings (not in this fix, not blockers to closing PLT-013):
+  - **F3 — observability defect (worth its own card).** `sanitizeTelemetry` uses `Object.entries`
+    (drops prototype getters) and `sensitiveKey` has unanchored substrings `url|body|message|text|handle|proof|digest|cause`.
+    Net effect: Fastify `req/res/err` serialize to near-nothing — `method`, client IP, and
+    `statusCode` vanish from every access log, and the `server.ts` startup `fatal({err})` loses
+    the boot-failure message. Not a leak; a debuggability regression.
+  - **F2** `.child()` bindings bypass the `logMethod` hook (no `.child()` call exists in the repo today).
+  - **F4** value-form gaps with no live log path: a `providerUrl` whose credential is a path segment
+    (Make webhook), and `Buffer`/`Uint8Array` printed byte-by-byte.
+  - Residual, by design: `integration_outbox.correlation_id` stores `telegram:<botKey>:<updateId>`
+    (DB authority store, not log printing → outside REQ-PLT-004.07; the derivation is the idempotency
+    key asserted in `telegram-client-b1.integration.test.ts`, so it is not changed here).
+
 ### Selarti credentials (local env only)
 
 Auth against `POST https://selarti.com/api/1.1/wf/auth` with `{"key":"<SELARTI_API_KEY>"}` now works (earlier the key was accidentally equal to `SELARTI_COMPANY_ID` and failed `NO_EMAIL`).
