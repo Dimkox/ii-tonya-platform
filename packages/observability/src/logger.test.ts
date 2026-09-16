@@ -208,4 +208,57 @@ describe("logger redaction", () => {
     expect(line).toContain("42");
     expect(line).not.toContain("boom"); // array stack is skipped, not joined blindly
   });
+
+  it.each([
+    [
+      "postgres dsn creds",
+      "connect postgresql://tonya:SuPerTopSecret@db.internal:5432/app failed",
+      "SuPerTopSecret",
+    ],
+    [
+      "bearer token",
+      "upstream Authorization: Bearer abcdefghijklmnop0123456789ABCD",
+      "abcdefghijklmnop0123456789ABCD",
+    ],
+    [
+      "jwt",
+      "auth eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.qW3rT8yU accepted",
+      "eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+    ],
+    ["aws key id", "aws AKIAABCDEFGHIJKLMNOP leak", "AKIAABCDEFGHIJKLMNOP"],
+    [
+      "password assignment",
+      "config password=hunter2secret rejected",
+      "hunter2secret",
+    ],
+    [
+      "json token",
+      'log {"token": "leakedtokenvalue"} done',
+      "leakedtokenvalue",
+    ],
+    ["refresh token json", 'cfg {"refresh_token":"r3freshval"}', "r3freshval"],
+  ])(
+    "scrubs %s appearing in free-text message",
+    async (_label, text, secret) => {
+      const line = await collect((logger) => logger.info(text));
+      expect(line).not.toContain(secret);
+      expect(line).toContain("[REDACTED]");
+    },
+  );
+
+  it("keeps benign operational text intact", async () => {
+    const line = await collect((logger) =>
+      logger.info(
+        "reservationId=abc123 count=5 status=ok session token rotated for corr-9; selarti cost tokens=1234; booked time: 10:20; https://ii-tonya.ru/api/v1/reservations?city=tambov; handle bk1_AAAAAAAAAAAAAAAAAAAA",
+      ),
+    );
+    expect(line).toContain("reservationId=abc123");
+    expect(line).toContain("count=5");
+    expect(line).toContain("status=ok");
+    expect(line).toContain("token rotated");
+    expect(line).toContain("tokens=1234"); // plural must not trip the secret matcher
+    expect(line).toContain("time: 10:20"); // a colon in prose is not a secret assignment
+    expect(line).toContain("reservations?city=tambov"); // query url without creds is fine
+    expect(line).toContain("bk1_AAAAAAAAAAAAAAAAAAAA"); // booking handle is not a secret
+  });
 });
