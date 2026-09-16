@@ -128,7 +128,7 @@ pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-saf
 
 | Проверка | Результат |
 |---|---|
-| `vitest run packages/application/src/prompt-safety.test.ts` | 110 passed |
+| `vitest run packages/application/src/prompt-safety.test.ts` | 121 passed |
 | `vitest run packages/application/src/selarti-response-service.test.ts` | 17 passed |
 | `vitest run tests/repo/client-copy-guard.test.ts apps/web/src/content.test.ts apps/web/src/landing-view.test.ts apps/web/src/legal-view.test.ts` | 35 passed |
 | `vitest run packages/application/src/conversation-service.test.ts` (сопредельный регресс) | 66 passed |
@@ -137,4 +137,4 @@ pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-saf
 | `eslint` по изменённым `.ts` | exit 0 |
 | `git diff --check` | exit 0 |
 
-Независимый review нашёл два Critical (бренд в рендере без дефиса; provider ingress без guard) и ряд Warning. В этом проходе закрыты оба Critical и наиболее опасные Warning: окно отрицания, регистр начала предложения «Ии-Тоня», суффиксы/латиница имени вне URL/email, нормализация soft hyphen/ZWSP, `CLIENT_COPY_PROHIBITED_RULES` больше не экспортирует `RegExp`. Остальные Warning (словоформы вроде «успеем», «лечим», омографы) в этом проходе не трогались.
+Независимый review нашёл два Critical (бренд в рендере без дефиса; provider ingress без guard) и ряд Warning. Закрыты оба Critical и Warning: окно отрицания, регистр «Ии-Тоня», суффиксы/латиница имени вне URL/email, soft hyphen/ZWSP, экспорт без `RegExp`, словоформы «успеем/успеть», «топовейший», «скидочками», «запишется/записывайтесь сейчас», «забронируйте … сегодня», «осталось N мест», «лечим», «лекарство». Не трогались омографы («лyчшие») и «диагностика» как сервисный термин лендинга.

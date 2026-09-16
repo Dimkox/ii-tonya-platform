@@ -181,7 +181,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     reasonCode: "prohibited_copy_marketing_term",
     label: "топ",
     pattern: new RegExp(
-      `${notWordBefore}топ(?:ова[яё]|ов[а-яё]{1,3}|ы|а|у|ом|ов|ам|ах)?${notWord}`,
+      `${notWordBefore}топ(?:овейш[а-яё]{0,4}|ова[яё]|ов[а-яё]{1,3}|ы|а|у|ом|ов|ам|ах)?${notWord}`,
       "giu",
     ),
   },
@@ -196,7 +196,10 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "скидка",
-    pattern: new RegExp(`${notWordBefore}скидк[а-яё]{0,4}${notWord}`, "giu"),
+    pattern: new RegExp(
+      `${notWordBefore}скид(?:очк[а-яё]{0,4}|к[а-яё]{0,4})${notWord}`,
+      "giu",
+    ),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
@@ -211,7 +214,10 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "успей",
-    pattern: new RegExp(`${notWordBefore}успей[а-яё]{0,3}${notWord}`, "giu"),
+    pattern: new RegExp(
+      `${notWordBefore}успе(?:й[а-яё]{0,3}|ем|ете|ешь|ет|ют|ть|л[ао]?|ли)${notWord}`,
+      "giu",
+    ),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
@@ -233,7 +239,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     reasonCode: "prohibited_copy_marketing_term",
     label: "запишитесь сейчас",
     pattern: new RegExp(
-      `${notWordBefore}(?:запишит[е]?сь|запишись)\\s+сейчас`,
+      `${notWordBefore}(?:запиш(?:итесь|ись|ется|утся|емся)|записывай(?:тесь|ся))\\s+сейчас`,
       "giu",
     ),
   },
@@ -248,7 +254,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     label: "treatment",
     negationExempt: true,
     pattern: new RegExp(
-      `${notWordBefore}(?:вылеч|излеч|исцел|выздоров|лечени|препарат|симптом)[а-яё]{0,6}${notWord}`,
+      `${notWordBefore}(?:вылеч|излеч|исцел|выздоров|лечени|леч(?:у|ить|им|ит|ите|ат)|лекарств|препарат|симптом)[а-яё]{0,6}${notWord}`,
       "giu",
     ),
   },
@@ -257,7 +263,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     label: "urgency",
     negationExempt: true,
     pattern: new RegExp(
-      `${notWordBefore}(?:купите|оформите|запишит[е]?сь|решай[а-яё]{0,3}|бер[её]те|бронир[у]?йте)[^.!?\\n]{0,32}?(?:сейчас|сегодня|быстрее|немедленно|пока[^.!?\n]{0,12}?не\\s+(?:вырос|подорож|законч|ист[ёе]к|прошл)|иначе)`,
+      `${notWordBefore}(?:купите|оформите|запиш\\p{L}{0,12}|записывай\\p{L}{0,8}|решай[а-яё]{0,3}|бер[её]те|(?:за)?бронир\\p{L}{0,8})[^.!?\\n]{0,32}?(?:сейчас|сегодня|быстрее|немедленно|пока[^.!?\n]{0,12}?не\\s+(?:вырос|подорож|законч|ист[ёе]к|прошл)|иначе)`,
       "giu",
     ),
   },
@@ -266,7 +272,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     label: "scarcity",
     negationExempt: true,
     pattern: new RegExp(
-      `${notWordBefore}(?:осталось\\s+послед\\p{L}*|мест\\s+осталось|последн\\p{L}*\\s+(?:мест|слот)\\p{L}*|только\\s+(?:сегодня|сейчас)|цена\\s+(?:вырастет|подорожа\\p{L}*)|подорожа\\p{L}*|давлени[а-яё]{0,4})`,
+      `${notWordBefore}(?:осталось\\s+послед\\p{L}*|остал(?:ось|ись)\\s+\\d+\\s+мест\\p{L}*|мест\\s+осталось|мест\\s+почти\\s+нет|последн\\p{L}*\\s+(?:мест|слот)\\p{L}*|только\\s+(?:сегодня|сейчас)|цена\\s+(?:вырастет|подорожа\\p{L}*)|подорожа\\p{L}*|давлени[а-яё]{0,4})`,
       "giu",
     ),
   },
