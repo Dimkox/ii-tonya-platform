@@ -218,7 +218,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
                   (
                     await tx.execute<{ id: string }>(sql`
           insert into consents (user_id, consent_type, decision, policy_version)
-          values (${command.targetUserId}::uuid, 'expert_handoff', 'denied', ${command.policyVersion})
+          values (${command.targetUserId}::uuid, 'expert_handoff', 'denied', 'handoff-v1')
           returning id
         `)
                   ).rows,

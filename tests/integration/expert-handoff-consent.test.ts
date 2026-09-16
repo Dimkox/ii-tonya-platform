@@ -75,6 +75,22 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
       expert_handoff: "denied",
     });
     expect(await handoffRevokeCount("handoff-cascade")).toBe(1);
+    // The cascaded fact records the handoff's own consent version, never the note's
+    // (append-only provenance — DEC-PLT-004 §3).
+    const handoffRows = (
+      await testDb!.db.execute<{ decision: string; policyVersion: string }>(sql`
+        select decision, policy_version as "policyVersion" from consents
+        where user_id = ${userId}::uuid and consent_type = 'expert_handoff'
+          and decision = 'denied'
+      `)
+    ).rows;
+    expect(handoffRows.length).toBeGreaterThan(0);
+    expect(handoffRows.every((row) => row.policyVersion === "handoff-v1")).toBe(
+      true,
+    );
+    expect(handoffRows.some((row) => row.policyVersion === "note-v1")).toBe(
+      false,
+    );
   });
 
   it("withdrawing expert_handoff does NOT cascade expert_note (the reverse is forbidden)", async () => {
