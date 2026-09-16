@@ -11,7 +11,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `99b924d` = squash of PR [#92](https://github.com/Dimkox/ii-tonya-platform/pull/92) (DEC-PLT-004 accepted), on top of `9437e727` (#91) |
+| `main` SHA | `3333466` = squash of PR [#93](https://github.com/Dimkox/ii-tonya-platform/pull/93) (DEC-PLT-004 §4/#3 explicit: sole PII store = RF PostgreSQL), on top of `99b924d` (#92) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -19,9 +19,9 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `99b924d`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `3333466`**, not from the old feature-branch SHAs.
 
-**DEC-PLT-004 accepted 2026-09-17** (PR #92): owner chose variant A and ruled every §8 red-line; the
+**DEC-PLT-004 accepted 2026-09-17** (PR #92; §4/#3 made explicit via PR #93): owner chose variant A and ruled every §8 red-line; the
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
 status `accepted`; `TASK-DEC-PLT-004` merged; `backlog.json` readiness re-derived
 (EXP-006/PLT-008/PLT-010/PLT-016 → `pending_dependencies`). Key consequences: **owner-explicit rule
