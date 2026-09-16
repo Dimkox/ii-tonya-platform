@@ -1,8 +1,8 @@
 # Agent status — owner-spec 2026-09-16
 
-Updated: 2026-09-16. This is the live continuation file. Read it before
-`AGENTS.md` extras, the spec README, or any TASK card. Do not treat older
-handoffs (`docs/handoffs/2026-08-*`) as current for this branch.
+Updated: 2026-09-16 after squash-merge to main. This is the live continuation
+file. Read it before `AGENTS.md` extras, the spec README, or any TASK card. Do
+not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 
 **Do not print, commit, or paste `.env` values.** Names of variables only.
 
@@ -10,12 +10,14 @@ handoffs (`docs/handoffs/2026-08-*`) as current for this branch.
 
 | Item | Value |
 |---|---|
-| Worktree | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/owner-spec-2026-09-16` |
-| Branch | `codex/owner-spec-2026-09-16` (ahead of origin by 4 commits at last write) |
-| Copy-guard implementation HEAD | `b6215e8` (status docs land after it on this branch) |
-| Base | `18af66fe` / `origin/main` |
+| Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
+| `main` SHA | `92993646` = squash of PR [#88](https://github.com/Dimkox/ii-tonya-platform/pull/88) |
+| Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
+| Copy-guard pre-squash tip | `b6215e8` (history rewritten by squash; use `92993646` on main) |
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
-| Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env` — **not** in this worktree, mode `0600`, gitignored |
+| Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
+
+Continue new work from **`main` at `92993646`**, not from the old feature-branch SHAs.
 
 ## What is done
 
@@ -63,7 +65,7 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 1. Formal close of TASK-EXP-001 review checkbox; optional Warning pass.
 2. Bind `ии-Тоня` AI to a task if that is wanted (currently `test expert` → `41nano`).
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
-4. Push of the 4 local commits.
+4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
 5. Owner DEC pack (23 P0 cards) still holds FIN/PLT implementation. Decision sheet: `/home/pall/projects/ii-tonya-base/outputs/owner-decision-sheet-2026-09-16.md`.
 6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. YooKassa key exists; `PAYMENTS_ENABLED=false`.
 
@@ -72,7 +74,7 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 - **Copy-guard:** mark TASK-EXP-001 review closed on the card *or* fix remaining Warnings with new RED tests, rebuild domain dist, re-review exact HEAD.
 - **Selarti wiring:** bind AI to task / add webhook secret and receiver — only if the owner asks; do not flip `SELARTI_ENABLED`.
 - **Owner decisions:** walk the 23 DEC cards; do not invent variants.
-- **Publish:** push `codex/owner-spec-2026-09-16` when asked.
+- **Publish:** ~~push the feature branch.~~ Merged. Further work is a new `codex/*` branch from current `main`.
 
 ## Standing rules for this branch
 
