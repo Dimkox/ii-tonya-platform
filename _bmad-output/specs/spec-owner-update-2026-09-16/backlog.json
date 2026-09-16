@@ -789,7 +789,7 @@
         "REQ-FIN-010.03"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-162",
         "Q-196",

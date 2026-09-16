@@ -228,7 +228,9 @@
 
 **Блокирует:** [TASK-EXP-015](tasks/TASK-EXP-015.md), [TASK-EXP-017](tasks/TASK-EXP-017.md), [TASK-EXP-018](tasks/TASK-EXP-018.md), [TASK-FIN-011](tasks/TASK-FIN-011.md), [TASK-FIN-018](tasks/TASK-FIN-018.md), [TASK-FIN-020](tasks/TASK-FIN-020.md), [TASK-FIN-022](tasks/TASK-FIN-022.md).
 
-**Статус:** open.
+**Принято (вариант ①, 2026‑09‑17, product‑owner):** активные механики — **Energy Start + 3‑месячный Start 15%/10%**; **floor 5000 применяется ДО Start** (скидка не утащит цену ниже floor); **2‑for‑1 не включаем** (добавляется позже отдельным порядковым решением). Порядок: floor → Start% → (акции: нет). Числа из источника (C031/C038/C050/C079/D011/D051/D052) — не выдуманы. Совместимо с conservation `cash+credit=price` (FIN‑024). Снимает decision‑гейт наложения скидок у FIN‑011/018/020/022, EXP‑015/017/018.
+
+**Статус:** accepted.
 
 ## DEC-FIN-012: Границы centre/organizer tier и event-bands
 
