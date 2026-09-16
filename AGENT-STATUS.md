@@ -24,8 +24,11 @@ Continue new work from **`main` at `99b924d`**, not from the old feature-branch 
 **DEC-PLT-004 accepted 2026-09-17** (PR #92): owner chose variant A and ruled every §8 red-line; the
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
 status `accepted`; `TASK-DEC-PLT-004` merged; `backlog.json` readiness re-derived
-(EXP-006/PLT-008/PLT-010/PLT-016 → `pending_dependencies`). Key consequences: PII storage **RF by
-default** (§4, region proof in `go-live-evidence.md` still required before any enablement); A005
+(EXP-006/PLT-008/PLT-010/PLT-016 → `pending_dependencies`). Key consequences: **owner-explicit rule
+(§9, 2026-09-17): the operator's only PII store is PostgreSQL on RF servers** — Sheets/Make are *not* a
+PII store (de-identified projections or off; an RF "table with a mandate" as a second store was NOT
+chosen), Telegram is transport only, object_store/backups RF; region proof in `go-live-evidence.md`
+still required before any enablement. A005
 sensitive fields kept **only as ephemeral in-session presence/absence** — no persisted column, never
 sent to expert (the §2 «zero forbidden columns» invariant stands, enforced by checks §7.1/§7.5);
 Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-declaration +
