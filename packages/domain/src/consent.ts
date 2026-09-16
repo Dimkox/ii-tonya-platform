@@ -1,4 +1,5 @@
-export type ConsentPurpose = "client_profile" | "expert_note" | "follow_up";
+export type ConsentPurpose =
+  "client_profile" | "expert_note" | "expert_handoff" | "follow_up";
 
 export interface ConsentGrant {
   purpose: ConsentPurpose;
@@ -25,6 +26,10 @@ export interface ReservationViewInput {
   clientDisplayName: string;
   expertNote?: string;
   expertNoteConsent: boolean;
+  // DEC-PLT-004 §3: the transfer to the expert is its own grant, separate from `expert_note`.
+  // When explicitly false the expert sees the minimal handoff (pseudonym, no request note).
+  // Left undefined by callers that have not yet wired the `expert_handoff` lateral.
+  expertHandoffConsent?: boolean;
 }
 
 export interface ExpertView {
@@ -35,29 +40,53 @@ export interface ExpertView {
   expertNote?: string;
 }
 
-const granted = (purpose: ConsentPurpose, grants: readonly ConsentGrant[]): boolean => {
+const granted = (
+  purpose: ConsentPurpose,
+  grants: readonly ConsentGrant[],
+): boolean => {
   const entries = grants.filter((entry) => entry.purpose === purpose);
-  if (entries.some((entry) => !Number.isFinite(entry.recordedAt.getTime()))) return false;
-  const latestTimestamp = Math.max(...entries.map((entry) => entry.recordedAt.getTime()));
-  const latest = entries.filter((entry) => entry.recordedAt.getTime() === latestTimestamp);
+  if (entries.some((entry) => !Number.isFinite(entry.recordedAt.getTime())))
+    return false;
+  const latestTimestamp = Math.max(
+    ...entries.map((entry) => entry.recordedAt.getTime()),
+  );
+  const latest = entries.filter(
+    (entry) => entry.recordedAt.getTime() === latestTimestamp,
+  );
   return latest.length > 0 && latest.every((entry) => entry.granted);
 };
 
-export function buildProfilePatch(input: ProfileInput, grants: readonly ConsentGrant[]): ProfilePatch {
-  if (!granted("client_profile", grants)) return { displayName: input.displayName };
+export function buildProfilePatch(
+  input: ProfileInput,
+  grants: readonly ConsentGrant[],
+): ProfilePatch {
+  if (!granted("client_profile", grants))
+    return { displayName: input.displayName };
   return {
     displayName: input.displayName,
     ...(input.goals ? { goals: input.goals } : {}),
-    ...(input.expertNote && granted("expert_note", grants) ? { expertNote: input.expertNote } : {}),
+    ...(input.expertNote && granted("expert_note", grants)
+      ? { expertNote: input.expertNote }
+      : {}),
   };
 }
 
 export function buildExpertView(input: ReservationViewInput): ExpertView {
+  if (input.expertHandoffConsent === false) {
+    return {
+      reservationId: input.reservationId,
+      startsAt: input.startsAt,
+      displayTimezone: input.displayTimezone,
+      clientDisplayName: "Клиент",
+    };
+  }
   return {
     reservationId: input.reservationId,
     startsAt: input.startsAt,
     displayTimezone: input.displayTimezone,
     clientDisplayName: input.clientDisplayName,
-    ...(input.expertNoteConsent && input.expertNote ? { expertNote: input.expertNote } : {}),
+    ...(input.expertNoteConsent && input.expertNote
+      ? { expertNote: input.expertNote }
+      : {}),
   };
 }
