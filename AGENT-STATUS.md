@@ -11,14 +11,15 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `b2b7af9c` = squash of PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89), on top of `92993646` (PR #88) |
+| `main` SHA | `6ec3f505` = squash of PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90), on top of `b2b7af9c` (#89) and `92993646` (#88) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
+| PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
 | Copy-guard pre-squash tip | `b6215e8` (history rewritten by squash; use `92993646` on main) |
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `b2b7af9c`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `6ec3f505`**, not from the old feature-branch SHAs.
 
 ## What is done
 
@@ -57,8 +58,8 @@ Rebuild domain dist with tsup before tests that import `@ii-tonya/domain` (vites
 ### TASK-PLT-013 secret surface (verification)
 
 State on the card: `verified_pending_review`. An independent adversarial review of the merged
-security surface closed the review checkbox on `codex/plt-013-botkey-redaction`; it found no
-reachable credential→log leak in current paths. Live activation is not in scope.
+security surface closed the review checkbox; merged as PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90)
+(`6ec3f505`). It found no reachable credential→log leak in current paths. Live activation is not in scope.
 
 - Redaction (`packages/observability/src/logger.ts`): the review then found one gap *in scope* —
   `botKey` / `CLIENT_TELEGRAM_BOT_KEY` was classified as a "bot identifier" and pinned visible by
