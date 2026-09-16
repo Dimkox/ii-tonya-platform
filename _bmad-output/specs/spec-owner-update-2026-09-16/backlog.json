@@ -339,7 +339,7 @@
         "REQ-FIN-004.05"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-003",
         "Q-024",
@@ -431,7 +431,7 @@
         "REQ-FIN-006.02"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-071",
         "Q-082",
@@ -578,7 +578,7 @@
         "REQ-FIN-007.04"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-075",
         "Q-079",
@@ -1105,7 +1105,7 @@
         "REQ-FIN-015.03"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-053",
         "Q-054",
@@ -1173,7 +1173,7 @@
         "REQ-FIN-016.01"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-053",
         "Q-054",
@@ -1399,7 +1399,7 @@
         "REQ-FIN-017.01"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-016",
         "Q-018",
@@ -1565,7 +1565,7 @@
         "REQ-FIN-005.03"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-003",
         "Q-004",
@@ -1881,7 +1881,7 @@
         "REQ-FIN-013.02"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-075",
         "Q-076",
@@ -1998,7 +1998,7 @@
         "REQ-FIN-017.01"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-053",
         "Q-054",
@@ -2098,7 +2098,7 @@
         "REQ-FIN-018.03"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-082",
         "Q-083",
@@ -2423,7 +2423,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-014",
         "Q-028",
@@ -2798,7 +2798,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-125",
         "Q-182"
@@ -3226,7 +3226,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-105",
         "Q-107",
@@ -3495,7 +3495,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-156"
       ],
@@ -3770,7 +3770,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-010",
         "Q-024",
@@ -3849,7 +3849,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-012",
         "Q-013"
@@ -3999,7 +3999,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-035",
         "Q-039"
@@ -4087,7 +4087,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-025",
         "Q-026",
@@ -4197,7 +4197,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-070",
         "Q-073",
@@ -4279,7 +4279,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-058",
         "Q-078",
@@ -4488,7 +4488,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-141",
         "Q-142",
@@ -4644,7 +4644,7 @@
       ],
       "priority": "P0",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-020",
         "Q-074",
@@ -4752,7 +4752,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-114",
         "Q-115",
@@ -4929,7 +4929,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [],
       "source_claim_ids": [
         "C046",
@@ -5003,7 +5003,7 @@
       "verification_commands": [],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-042",
         "Q-043",

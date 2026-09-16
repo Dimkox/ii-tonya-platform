@@ -11,7 +11,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `584dd10` (docs: DEC-FIN-017 accepted) ; last feature merge = `7777ae5` PR #94 (TASK-PLT-008 substrate). Accepted decisions: DEC-PLT-004 (#92/#93), DEC-FIN-017. On top of #91/#90/#89. |
+| `main` SHA | (pending push) — DEC batch of 25 acceptances merged on top of `632184d` (PLT-008 substrate = `7777ae5` #94); 36/39 decisions accepted |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -35,7 +35,7 @@ Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-
 reactive ban; T0-B re-consent campaign 60 days; already-paid/active **grandfathered**. Next target:
 keystone **PLT-008** (its legal Q-001/117/139/143/144 are answered by the rule; Q-031 technical).
 Public-text propagation is **TASK-PLT-012**, left open on purpose. SPEC.md re-derive = bmad-spec/Claw
-step (no derive script in this checkout; do not hand-edit SPEC). 28 owner decisions still open (accepted 11/39: DEC-PLT-004, DEC-FIN-017/001/002/003/011/012/005/016/010/020; 2026-09-17). Pending price data (DEC-FIN-003): absolute package prices not in source, carried as TASK-FIN-003 open questions.
+step (no derive script in this checkout; do not hand-edit SPEC). DEC pack: 36/39 accepted (11 individually ruled + 25 по консервативному/без-ретро/keep-current варианту через делегацию «а дальше делай» 2026-09-17, суть в decision-register.md). OPEN: DEC-FIN-009 (Эксклюзив threshold), DEC-EXP-005 (палитра), DEC-EXP-006 (клинический ритм отзыв/пауза/чекап). Pending price data (DEC-FIN-003): absolute package prices not in source, carried as TASK-FIN-003 open questions.
 accepting DEC-PLT-004 unblocked 0 tasks straight to `ready`.
 
 Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —
