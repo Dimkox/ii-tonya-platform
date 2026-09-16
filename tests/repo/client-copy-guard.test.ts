@@ -40,12 +40,15 @@ describe("public copy obeys the client copy guard", () => {
   });
 
   it("is not vacuous: the same guard rejects a banned rewrite", () => {
-    expect(
-      guardClientCopy("Я подбираю лучшие варианты из моей базы."),
-    ).toEqual({ accepted: false, reasonCode: "prohibited_copy_marketing_term" });
+    expect(guardClientCopy("Я подбираю лучшие варианты из моей базы.")).toEqual(
+      { accepted: false, reasonCode: "prohibited_copy_marketing_term" },
+    );
     expect(
       guardClientCopy("ии-Тоня рекомендует вас клиентам под их запросы."),
-    ).toEqual({ accepted: false, reasonCode: "prohibited_copy_marketing_term" });
+    ).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_marketing_term",
+    });
     expect(guardClientCopy("Привет, я ИИ Тоня.")).toEqual({
       accepted: false,
       reasonCode: "client_copy_brand_name_variant",
@@ -94,17 +97,17 @@ describe("client copy guard semantics", () => {
       "Мы не звоним и пишем вам первыми без вашего ведома.",
       "prohibited_copy_interruption_or_spam",
     ],
-    [
-      "Мы не продаём и купите сейчас у нас.",
-      "prohibited_copy_pressure",
-    ],
+    ["Мы не продаём и купите сейчас у нас.", "prohibited_copy_pressure"],
     ["ИИ-ТОНЯ помогает.", "client_copy_brand_name_variant"],
     ["ии-Тоня-про помогает.", "client_copy_brand_name_variant"],
     ["ии-tonya помогает.", "client_copy_brand_name_variant"],
     ["ии-Тонь рядом.", "client_copy_brand_name_variant"],
-  ])("still rejects a real claim after a nearby negation: %s", (text, reasonCode) => {
-    expect(guardClientCopy(text)).toEqual({ accepted: false, reasonCode });
-  });
+  ])(
+    "still rejects a real claim after a nearby negation: %s",
+    (text, reasonCode) => {
+      expect(guardClientCopy(text)).toEqual({ accepted: false, reasonCode });
+    },
+  );
 
   it("treats soft hyphens and zero-width spaces as invisible", () => {
     expect(guardClientCopy("лу\u00ADчшие варианты")).toEqual({
@@ -116,4 +119,60 @@ describe("client copy guard semantics", () => {
       reasonCode: "prohibited_copy_marketing_term",
     });
   });
+});
+
+describe("client copy guard catches the review warnings (2026-09-16)", () => {
+  it.each([
+    "Подбираю наилучшие варианты.",
+    "Это выгоднейший формат.",
+    "Скидочный прайс.",
+    "Вы сэкономите время.",
+    "Успевайте на выходных.",
+    "Мы порекомендуем эксперта.",
+  ])("rejects a banned word form: %s", (text) => {
+    expect(guardClientCopy(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_marketing_term",
+    });
+  });
+
+  it.each([
+    "ЛУ\u200EЧШИЕ варианты",
+    "выго\u200Eдный формат",
+    "луч\u202Aшие варианты",
+    "лу\u2066чшие варианты",
+  ])("strips bidi controls before matching: %s", (text) => {
+    expect(guardClientCopy(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_marketing_term",
+    });
+  });
+
+  it("rejects a singular imperative booking push", () => {
+    expect(guardClientCopy("Оформи сегодня заявку.")).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_pressure",
+    });
+  });
+
+  // Guards the boundaries the hardening must NOT cross: each of these would be a false
+  // positive that blocks a neutral client answer, and an independent review caught a
+  // candidate regex that broke them.
+  it.each([
+    "Я перебираю варианты вручную.",
+    "Сначала перебираю все свободные слоты.",
+    "Заявку оформляет администратор, подтверждение сегодня.",
+    "Оформить пакет можно онлайн — это быстрее.",
+    "Диагноз по переписке не ставлю.",
+    "Давления на вас не оказываем.",
+    "Симптомы по фото я не определяю.",
+    "Лекарства и препараты мы не выписываем.",
+    "Рассылки по базе мы не делаем.",
+    "Экономический эффект оценим отдельно.",
+  ])(
+    "keeps accepting neutral copy that a broad match would wrongly reject: %s",
+    (text) => {
+      expect(guardClientCopy(text)).toEqual({ accepted: true });
+    },
+  );
 });

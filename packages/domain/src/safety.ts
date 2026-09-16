@@ -1,4 +1,5 @@
-export type SafetyRisk = "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
+export type SafetyRisk =
+  "self_harm" | "violence" | "medical" | "abuse" | "urgent" | "uncertain";
 export type AgeBand = "minor" | "adult" | "unknown";
 export type SafetyContactChannel = "phone" | "sms" | "url";
 
@@ -53,12 +54,13 @@ export interface SafetyInput {
 export type SafetyDecision =
   | { kind: "ordinary"; charge: -1; contacts: [] }
   | {
-    kind: "human_handoff";
-    charge: 0;
-    reason: SafetyRisk | "classifier_unavailable";
-    directoryState: "fresh" | "no_fresh_contact" | "fresh_fallback" | "fallback_required";
-    contacts: SafetyContact[];
-  };
+      kind: "human_handoff";
+      charge: 0;
+      reason: SafetyRisk | "classifier_unavailable";
+      directoryState:
+        "fresh" | "no_fresh_contact" | "fresh_fallback" | "fallback_required";
+      contacts: SafetyContact[];
+    };
 
 const normalizeCode = (code: string | null): string | null =>
   code === null ? null : code.trim().toUpperCase();
@@ -71,20 +73,28 @@ export async function evaluateSafety(
 ): Promise<SafetyDecision> {
   const countryCode = normalizeCode(input.countryCode);
   const regionCode = normalizeCode(input.regionCode);
-  const selectContacts = (risk: SafetyRisk): SafetyContact[] => directory.list().filter((contact) =>
-    normalizeCode(contact.countryCode) === countryCode
-    && (contact.regionCode === null || normalizeCode(contact.regionCode) === regionCode)
-    && contact.ageBands.includes(input.ageBand)
-    && contact.riskTypes.includes(risk)
-    && contact.verifiedAt.getTime() <= input.now.getTime()
-    && contact.validUntil.getTime() >= input.now.getTime()
-    && contact.sourceUrl.startsWith("https://")
-    && contact.owner.length > 0
-    && isActionableSafetyContact(contact));
+  const selectContacts = (risk: SafetyRisk): SafetyContact[] =>
+    directory
+      .list()
+      .filter(
+        (contact) =>
+          normalizeCode(contact.countryCode) === countryCode &&
+          (contact.regionCode === null ||
+            normalizeCode(contact.regionCode) === regionCode) &&
+          contact.ageBands.includes(input.ageBand) &&
+          contact.riskTypes.includes(risk) &&
+          contact.verifiedAt.getTime() <= input.now.getTime() &&
+          contact.validUntil.getTime() >= input.now.getTime() &&
+          contact.sourceUrl.startsWith("https://") &&
+          contact.owner.length > 0 &&
+          isActionableSafetyContact(contact),
+      );
 
   try {
-    const level = guard.detect(input.text) ?? await classifier.classify(input.text);
-    if (level === "ordinary") return { kind: "ordinary", charge: -1, contacts: [] };
+    const level =
+      guard.detect(input.text) ?? (await classifier.classify(input.text));
+    if (level === "ordinary")
+      return { kind: "ordinary", charge: -1, contacts: [] };
     const contacts = selectContacts(level);
     return {
       kind: "human_handoff",
@@ -99,7 +109,8 @@ export async function evaluateSafety(
       kind: "human_handoff",
       charge: 0,
       reason: "classifier_unavailable",
-      directoryState: contacts.length > 0 ? "fresh_fallback" : "fallback_required",
+      directoryState:
+        contacts.length > 0 ? "fresh_fallback" : "fallback_required",
       contacts,
     };
   }
@@ -121,23 +132,49 @@ export type HandoffAction =
   | { kind: "check_ack_sla" }
   | { kind: "resolve" };
 
-export function transitionHandoff(state: HandoffState, action: HandoffAction, now: Date): HandoffState {
-  if (action.kind === "assign" && state.status === "opened" && action.ownerId.length > 0) {
-    return { ...state, status: "assigned", ownerId: action.ownerId, version: state.version + 1 };
+export function transitionHandoff(
+  state: HandoffState,
+  action: HandoffAction,
+  now: Date,
+): HandoffState {
+  if (
+    action.kind === "assign" &&
+    state.status === "opened" &&
+    action.ownerId.length > 0
+  ) {
+    return {
+      ...state,
+      status: "assigned",
+      ownerId: action.ownerId,
+      version: state.version + 1,
+    };
   }
   if (
-    action.kind === "check_ack_sla"
-    && state.status === "assigned"
-    && state.acknowledgedAt === null
-    && now.getTime() >= state.acknowledgeBy.getTime()
+    action.kind === "check_ack_sla" &&
+    state.status === "assigned" &&
+    state.acknowledgedAt === null &&
+    now.getTime() >= state.acknowledgeBy.getTime()
   ) {
     return { ...state, status: "escalated", version: state.version + 1 };
   }
   if (action.kind === "acknowledge" && state.status === "assigned") {
-    return { ...state, status: "acknowledged", acknowledgedAt: now, version: state.version + 1 };
+    return {
+      ...state,
+      status: "acknowledged",
+      acknowledgedAt: now,
+      version: state.version + 1,
+    };
   }
-  if (action.kind === "resolve" && (state.status === "acknowledged" || state.status === "escalated")) {
-    return { ...state, status: "resolved", resolvedAt: now, version: state.version + 1 };
+  if (
+    action.kind === "resolve" &&
+    (state.status === "acknowledged" || state.status === "escalated")
+  ) {
+    return {
+      ...state,
+      status: "resolved",
+      resolvedAt: now,
+      version: state.version + 1,
+    };
   }
   throw new Error("Invalid handoff transition");
 }
@@ -153,7 +190,10 @@ export type ClientCopyRejectionReason =
 
 export type ClientCopyGuardResult =
   | { readonly accepted: true }
-  | { readonly accepted: false; readonly reasonCode: ClientCopyRejectionReason };
+  | {
+      readonly accepted: false;
+      readonly reasonCode: ClientCopyRejectionReason;
+    };
 
 export interface ClientCopyRule {
   readonly reasonCode: ClientCopyRejectionReason;
@@ -175,7 +215,10 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "лучший",
-    pattern: new RegExp(`${notWordBefore}лучш[а-яё]{0,4}${notWord}`, "giu"),
+    pattern: new RegExp(
+      `${notWordBefore}(?:наи)?лучш[а-яё]{0,4}${notWord}`,
+      "giu",
+    ),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
@@ -197,25 +240,28 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     reasonCode: "prohibited_copy_marketing_term",
     label: "скидка",
     pattern: new RegExp(
-      `${notWordBefore}скид(?:очк[а-яё]{0,4}|к[а-яё]{0,4})${notWord}`,
+      `${notWordBefore}скид(?:очк[а-яё]{0,4}|очн[а-яё]{0,4}|к[а-яё]{0,4})${notWord}`,
       "giu",
     ),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "выгода",
-    pattern: new RegExp(`${notWordBefore}выгод[а-яё]{0,5}${notWord}`, "giu"),
+    pattern: new RegExp(`${notWordBefore}выгод[а-яё]{0,6}${notWord}`, "giu"),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "экономия",
-    pattern: new RegExp(`${notWordBefore}эконом[а-яё]{1,5}${notWord}`, "giu"),
+    pattern: new RegExp(
+      `${notWordBefore}(?:с)?эконом[а-яё]{1,5}${notWord}`,
+      "giu",
+    ),
   },
   {
     reasonCode: "prohibited_copy_marketing_term",
     label: "успей",
     pattern: new RegExp(
-      `${notWordBefore}успе(?:й[а-яё]{0,3}|ем|ете|ешь|ет|ют|ть|л[ао]?|ли)${notWord}`,
+      `${notWordBefore}успе(?:й[а-яё]{0,3}|ва[а-яё]{0,3}|ем|ете|ешь|ет|ют|ть|л[ао]?|ли)${notWord}`,
       "giu",
     ),
   },
@@ -231,7 +277,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     reasonCode: "prohibited_copy_marketing_term",
     label: "рекомендуем",
     pattern: new RegExp(
-      `${notWordBefore}(?:рекоменду[а-яё]{0,4}|рекомендова[а-яё]{0,3})${notWord}`,
+      `${notWordBefore}(?:по)?(?:рекоменду[а-яё]{0,4}|рекомендова[а-яё]{0,3})${notWord}`,
       "giu",
     ),
   },
@@ -263,7 +309,7 @@ const CLIENT_COPY_RULES: readonly ClientCopyRulePattern[] = [
     label: "urgency",
     negationExempt: true,
     pattern: new RegExp(
-      `${notWordBefore}(?:купите|оформите|запиш\\p{L}{0,12}|записывай\\p{L}{0,8}|решай[а-яё]{0,3}|бер[её]те|(?:за)?бронир\\p{L}{0,8})[^.!?\\n]{0,32}?(?:сейчас|сегодня|быстрее|немедленно|пока[^.!?\n]{0,12}?не\\s+(?:вырос|подорож|законч|ист[ёе]к|прошл)|иначе)`,
+      `${notWordBefore}(?:купите|оформ(?:ите|и)${notWord}|запиш\\p{L}{0,12}|записывай\\p{L}{0,8}|решай[а-яё]{0,3}|бер[её]те|(?:за)?бронир\\p{L}{0,8})[^.!?\\n]{0,32}?(?:сейчас|сегодня|быстрее|немедленно|пока[^.!?\n]{0,12}?не\\s+(?:вырос|подорож|законч|ист[ёе]к|прошл)|иначе)`,
       "giu",
     ),
   },
@@ -324,7 +370,8 @@ const canonicalBrandForms = new Set<string>([
   "Ии-Тони",
 ]);
 
-const formatNoise = /[\u00AD\u200B-\u200D\u2060\uFEFF]/gu;
+const formatNoise =
+  /[\u00AD\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu;
 const nbsp = /[\u00A0\u202F\u2007]/gu;
 
 const normalizeClientCopy = (text: string): string =>
@@ -365,7 +412,10 @@ const stripToken = (token: string): string =>
   token.replace(/^[«"'(]+|[»"').]+$/gu, "");
 
 const tokensIn = (text: string): string[] =>
-  text.split(/\s+/u).map(stripToken).filter((token) => token.length > 0);
+  text
+    .split(/\s+/u)
+    .map(stripToken)
+    .filter((token) => token.length > 0);
 
 const negationBefore = /^(?:не|без|никак|никогда|нельзя|нет)$/iu;
 const negationAfter = /^(?:не|нет)$/iu;
@@ -375,7 +425,9 @@ const isNegatedClaim = (
   matchStart: number,
   matchEnd: number,
 ): boolean => {
-  const before = tokensIn(text.slice(clauseStart(text, matchStart), matchStart));
+  const before = tokensIn(
+    text.slice(clauseStart(text, matchStart), matchStart),
+  );
   const after = tokensIn(text.slice(matchEnd, clauseEnd(text, matchEnd)));
   if (before.slice(-2).some((token) => negationBefore.test(token))) return true;
   return after.slice(0, 4).some((token) => negationAfter.test(token));

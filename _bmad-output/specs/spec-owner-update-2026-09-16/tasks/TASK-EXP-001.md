@@ -18,11 +18,12 @@
 - Решения: нет.
 - Вопросы: нет.
 - Статус live: guard активен в коде и в тестах; активацию внешних каналов и production эта задача не включает и не подтверждает.
-- Живой статус ветки для любого агента: [AGENT-STATUS.md](../../../../../AGENT-STATUS.md). HEAD реализации `b6215e8`. Независимый re-review после него: 0 Critical; чекбокс review ниже ещё открыт.
+- Живой статус ветки для любого агента: [AGENT-STATUS.md](../../../../../AGENT-STATUS.md). HEAD реализации `b6215e8` (squash в `main` как `92993646`). Независимый re-review после него: 0 Critical. Follow-up `f7a899c` (`codex/copy-guard-warnings-2026-09-16`) закрыл безопасные Warning'и (словоформы, bidi-маркеры, imperative «оформи сегодня»); чекбокс review ниже закрыт. Два Warning'а осознанно оставлены (наивная правка ломает одобренную копию): тайминг-отрицание «поставлю диагноз … не сразу» и «перебью».
 
 ## Что уже есть
 
-Guard, бренд в DOM и provider-ingress закрыты в `5eab17e` / `0bae85a` / `b6215e8`. Карточка ждёт формального закрытия review.
+Guard, бренд в DOM и provider-ingress закрыты в `5eab17e` / `0bae85a` / `b6215e8`. Независимый
+review пройден; безопасные Warning'и закрыты в follow-up `f7a899c`.
 
 ## Файлы
 
@@ -103,7 +104,7 @@ pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-saf
 
 - [x] Сохранить результаты проверок и связь с пунктами исходника.
 - [x] Закрыть связанные DEC/Q или явно оставить задачу blocked. — Связанных DEC/Q нет (`decision_ids: []`, `open_question_ids: []`).
-- [ ] Пройти независимый review; не объявлять live-активацию по результату локального теста.
+- [x] Пройти независимый review; не объявлять live-активацию по результату локального теста. — Re-review `b6215e8` дал 0 Critical; follow-up `f7a899c` прошёл независимый review (найдены и откачены три false-positive правки), полный набор тестов и pre-push gate зелёные. Live-активация не объявлена: `SELARTI_ENABLED=false`, nothing deployed.
 
 ### Что реализовано
 
@@ -139,3 +140,17 @@ pnpm vitest run apps/web/src/content.test.ts packages/application/src/prompt-saf
 | `git diff --check` | exit 0 |
 
 Независимый review нашёл два Critical (бренд в рендере без дефиса; provider ingress без guard) и ряд Warning. Закрыты оба Critical и Warning: окно отрицания, регистр «Ии-Тоня», суффиксы/латиница имени вне URL/email, soft hyphen/ZWSP, экспорт без `RegExp`, словоформы «успеем/успеть», «топовейший», «скидочками», «запишется/записывайтесь сейчас», «забронируйте … сегодня», «осталось N мест», «лечим», «лекарство». Не трогались омографы («лyчшие») и «диагностика» как сервисный термин лендинга.
+
+### Прогон follow-up `f7a899c` (2026-09-16; триаж оставшихся Warning'ов)
+
+Безопасно закрыты: словоформы «наилучший/скидочный/выгоднейший/сэкономите/успевайте/порекомендуем»,
+bidi-маркеры (LRM/RLM, embedding/override/isolate), imperative «оформи сегодня» через целое слово
+`оформ(?:ите|и)`. Откачены после независимого review (ломали одобренную копию): расширение
+`перебива*` до `переб[иь]*` (задевает «перебираю варианты») и сужение окна «не» до 2 токенов
+(ломает «Диагноз по переписке не ставлю»). Эти два пункта + омографы остаются осознанными Warning'ами.
+
+| Проверка | Результат |
+|---|---|
+| `vitest run tests/repo/client-copy-guard.test.ts` | 42 passed (RED→GREEN на словоформы, bidi, imperative + 10 ACCEPTED регрессов на false-positive) |
+| `vitest run packages/application/src/prompt-safety.test.ts .../selarti-response-service.test.ts .../conversation-service.test.ts packages/domain apps/web` | 285 passed, 0 регрессий |
+| `pre-push-gate.sh --full` (bash -n, prettier, git diff --check, claw evidence, eslint, tests/repo, tsc tests) | gate green |
