@@ -11,7 +11,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `7777ae5` = squash of PR [#94](https://github.com/Dimkox/ii-tonya-platform/pull/94) (TASK-PLT-008 consents substrate + data matrix), on top of #93 (`3333466`, DEC-PLT-004 RF-store explicit), #92 (#91/#90/#89) |
+| `main` SHA | `584dd10` (docs: DEC-FIN-017 accepted) ; last feature merge = `7777ae5` PR #94 (TASK-PLT-008 substrate). Accepted decisions: DEC-PLT-004 (#92/#93), DEC-FIN-017. On top of #91/#90/#89. |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -19,7 +19,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `7777ae5`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `584dd10`**, not from the old feature-branch SHAs.
 
 **DEC-PLT-004 accepted 2026-09-17** (PR #92; §4/#3 made explicit via PR #93): owner chose variant A and ruled every §8 red-line; the
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
@@ -35,7 +35,7 @@ Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-
 reactive ban; T0-B re-consent campaign 60 days; already-paid/active **grandfathered**. Next target:
 keystone **PLT-008** (its legal Q-001/117/139/143/144 are answered by the rule; Q-031 technical).
 Public-text propagation is **TASK-PLT-012**, left open on purpose. SPEC.md re-derive = bmad-spec/Claw
-step (no derive script in this checkout; do not hand-edit SPEC). 38 owner decisions still open;
+step (no derive script in this checkout; do not hand-edit SPEC). 37 owner decisions still open (DEC-PLT-004 + DEC-FIN-017 accepted 2026-09-17);
 accepting DEC-PLT-004 unblocked 0 tasks straight to `ready`.
 
 Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —
