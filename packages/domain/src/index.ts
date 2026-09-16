@@ -17,12 +17,18 @@ export type {
   ReservationViewInput,
 } from "./consent.js";
 export {
+  CLIENT_ASSISTANT_NAME,
+  CLIENT_COPY_PROHIBITED_RULES,
   evaluateSafety,
+  guardClientCopy,
   isActionableSafetyContact,
   transitionHandoff,
 } from "./safety.js";
 export type {
   AgeBand,
+  ClientCopyGuardResult,
+  ClientCopyRejectionReason,
+  ClientCopyRule,
   DeterministicSafetyGuard,
   HandoffAction,
   HandoffState,

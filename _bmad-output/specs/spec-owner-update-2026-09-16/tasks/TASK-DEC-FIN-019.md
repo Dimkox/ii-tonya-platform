@@ -1,0 +1,70 @@
+# TASK-DEC-FIN-019: Решить: Клиентский referral anti-fraud
+
+> For agentic workers: исполнять по superpowers:subagent-driven-development или superpowers:executing-plans после закрытия зависимостей.
+
+**Goal:** Запись решения DEC-FIN-019: выбранное правило, основание, дата, ответственный, судьба существующих данных.
+
+**Architecture:** Следовать существующим границам пакетов на SHA `18af66fef61c33d21216c3b24f935cb1fe3d7b2d` и [контракту исполнения](../execution-contract.md).
+
+**Tech Stack:** TypeScript, Node 24, pnpm 11.9.0, PostgreSQL; для design/content — форматы из критериев задачи.
+
+**Spec:** [SPEC.md](../SPEC.md), [requirements.md](../requirements.md).
+
+## Статус и область
+
+- State: `planned`; readiness: `ready`.
+- Тип: decision; исполнитель: product-owner; приоритет: P0.
+- Depends on: нет.
+- Решения: нет.
+- Вопросы: нет.
+
+## Что уже есть
+
+Открытое противоречие/решение; ни один вариант не утверждён этим разбором.
+
+## Файлы
+
+**Прочитать:**
+
+- [_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md](../../../../_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md)
+
+**Получить от зависимых задач (файлы ещё предстоит создать):**
+
+Нет.
+
+**Изменить:**
+
+- [_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md](../../../../_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md)
+
+**Создать:**
+
+Нет.
+
+**Проверки:**
+
+Нет.
+
+## Пункты задачи
+
+## Шаги
+
+- [ ] Как нормализуются promo_XXXX, предотвращаются self-referral/дубли и защищаются регистрация, оплата, возврат?
+- [ ] Сопоставить варианты: Case-insensitive code + verified unique identity + idempotent events.; Case-sensitive code + explicit duplicate policy.; Иная documented anti-fraud policy.
+- [ ] Зафиксировать решение в _bmad-output/specs/spec-owner-update-2026-09-16/.memlog.md через _bmad/scripts/memlog.py и повторно вывести затронутые SPEC/companions/backlog; не менять SPEC вручную.
+- [ ] Обновить связанные задачи: TASK-FIN-021.
+
+## Критерии приёмки
+
+- [ ] Выбран один непротиворечивый вариант либо дано точное новое правило с числами, границами и применимостью.
+- [ ] Определено, сохраняются ли условия уже оплаченных заказов/действующих участников.
+- [ ] Связанные тестовые примеры и публичный текст используют то же решение.
+
+## Команды проверки
+
+Проверка решений/контента по критериям выше; запуск приложения не является доказательством принятого решения.
+
+## Evidence и завершение
+
+- [ ] Сохранить результаты проверок и связь с пунктами исходника.
+- [ ] Закрыть связанные DEC/Q или явно оставить задачу blocked.
+- [ ] Пройти независимый review; не объявлять live-активацию по результату локального теста.

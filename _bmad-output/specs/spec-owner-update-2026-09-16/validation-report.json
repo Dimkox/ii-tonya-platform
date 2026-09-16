@@ -1,0 +1,26 @@
+{
+  "checked_at_utc": "2026-09-15T21:50:19.666480+00:00",
+  "base_sha": "18af66fef61c33d21216c3b24f935cb1fe3d7b2d",
+  "counts": {
+    "requirements": 49,
+    "atomic_items": 194,
+    "catalog_details": 186,
+    "tasks": 84,
+    "implementation_tasks": 50,
+    "decision_tasks": 34,
+    "decisions": 39,
+    "source_claims": 319,
+    "open_questions": 208,
+    "classified_nonempty_source_lines": 4791
+  },
+  "checks": {
+    "remote_backlog_validator": "pass; zero errors",
+    "staged_whitespace": "pass",
+    "change_scope": "documentation only; no application edits",
+    "local_links": "2281 checked, zero missing except explicitly planned outputs",
+    "source_credentials": "8 source lines redacted; repeated credential audit passed",
+    "independent_review": "FIN/EXP/PLT findings corrected; owner business decisions remain open"
+  },
+  "application_tests": "not run: documentation and task planning only",
+  "external_activation": "not performed"
+}

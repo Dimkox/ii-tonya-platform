@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { guardClientCopy } from "@ii-tonya/domain";
+
 import { validateIntentProposal } from "./conversation-service.js";
 import { validateExpertIntentProposal } from "./expert-prompt-context.js";
 
@@ -235,6 +237,172 @@ describe("LLM capability boundary", () => {
         ),
       ).toBe(true);
       expect(source).not.toMatch(/@ii-tonya\/(?:db|integrations)|node:/u);
+    }
+  });
+});
+
+describe("client copy guard", () => {
+  const clientAuthorization = {
+    allowedExpertIds: ["b7ab91db-4988-4ec6-bf23-42d2ea3333a1"],
+    allowedServiceCodes: ["consultation"],
+  };
+
+  const gateClientAnswer = (text: string) =>
+    validateIntentProposal({ kind: "answer", text }, clientAuthorization);
+
+  const prohibitedMarketing: readonly (readonly [string, string])[] = [
+    ["лучший", "Мы подобрали лучшие варианты для вашего запроса."],
+    ["лучший", "Это лучший эксперт в базе."],
+    ["топ", "Это топ предложений недели."],
+    ["топ", "У нас топовые специалисты."],
+    ["хит", "Этот формат — хит сезона."],
+    ["хит", "Хиты базы уже ждут вас."],
+    ["скидка", "Вам доступна скидка на пакет."],
+    ["скидка", "Скидки действуют до конца месяца."],
+    ["выгода", "Ваша выгода очевидна."],
+    ["выгода", "Это выгодно и удобно."],
+    ["экономия", "Реальная экономия бюджета."],
+    ["экономия", "Экономьте на пакете сообщений."],
+    ["успей", "Успей записаться на этой неделе."],
+    ["успей", "Успейте до конца недели."],
+    ["специально для вас", "Мы подготовили это специально для вас."],
+    ["специально для вас", "Курс подобран специально для тебя."],
+    ["рекомендуем", "Рекомендуем начать с базового пакета."],
+    ["рекомендуем", "Эксперт рекомендовал вам встречи раз в неделю."],
+    ["запишитесь сейчас", "Запишитесь сейчас, слоты закрываются."],
+    ["успей", "Успеем записаться до пятницы."],
+    ["успей", "Успеть записаться стоит заранее."],
+    ["топ", "Это самый топовейший эксперт в базе."],
+    ["скидка", "Делюсь скидочками на пакет."],
+    ["запишитесь сейчас", "Он запишется сейчас без очереди."],
+    ["запишитесь сейчас", "Записывайтесь сейчас, слоты закрываются."],
+  ];
+
+  it.each(prohibitedMarketing)("rejects the prohibited term «%s»", (_term, text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_marketing_term",
+    });
+  });
+
+  it.each([
+    "Поставлю тебе диагноз по переписке.",
+    "Анкета выявит твой диагноз за пять минут.",
+    "Мы назначаем лечение по результатам чата.",
+    "Я помогу вылечить бессонницу.",
+    "Это излечимо за две недели.",
+    "Симптомы уйдут после первого пакета.",
+    "Я не врач и поставлю диагноз по переписке.",
+    "Работаем без лечения и вылечиваем за месяц.",
+    "Мы лечим тревогу по переписке.",
+    "Выпишу лекарство после анкеты.",
+  ])("rejects the diagnosis or treatment claim: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_medical_claim",
+    });
+  });
+
+  it.each([
+    "Купите пакет сейчас, иначе цена вырастет.",
+    "Осталось последнее место, решайте быстрее.",
+    "Запишитесь, пока цены не выросли.",
+    "Только сегодня действует это предложение.",
+    "Забронируйте слот сегодня.",
+    "Осталось 2 места.",
+    "Мест почти нет.",
+  ])("rejects the pressure claim: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_pressure",
+    });
+  });
+
+  it.each([
+    "Пишу вам первой, чтобы напомнить о покупке.",
+    "Без вашего запроса пришлю напоминание о визите.",
+    "Мы сделаем массовую рассылку по всей базе.",
+    "Ты меня не слышишь, но я перебиваю и продолжаю.",
+  ])("rejects the interruption or spam claim: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: false,
+      reasonCode: "prohibited_copy_interruption_or_spam",
+    });
+  });
+
+  it.each([
+    "Привет, я ИИ Тоня.",
+    "Напиши ии тоня для записи.",
+    "ИИ-Тоня всегда на связи.",
+    "Тоня подберёт эксперта.",
+    "ии-тоня напоминает о визите.",
+  ])("rejects the non-canonical assistant name: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: false,
+      reasonCode: "client_copy_brand_name_variant",
+    });
+  });
+
+  it.each([
+    "Привет, я ии-Тоня. Помогу сориентироваться в сервисе: расскажу, как работают пакеты, купоны и запись к экспертам.",
+    "Напиши ии-Тоне в мессенджере, и мы подберём формат.",
+    "Вместе с ии-Тоней вы получите историю обращений.",
+    "ии-Тоня записывает к экспертам через Planerka.",
+    "Ии-Тоня отвечает быстро.",
+  ])("accepts the canonical name and its case forms: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: true,
+      proposal: { kind: "answer", text },
+    });
+  });
+
+  it.each([
+    "Стоимость базового тарифа — от 12 000 рублей в месяц.",
+    "В базе появился новый эксперт, доступны слоты.",
+    "Начисление и использование купонов в V2 отключены.",
+    "Пакет «Знакомство» содержит 100 сообщений без срока.",
+    "Я не психолог и не врач. Я — навигатор.",
+    "Обратную связь собираем только по вашему желанию.",
+    "Отменить запись можно за 24 часа до визита.",
+    "Фототерапия, кинезиология и астрология есть в каталоге.",
+    "Архитектор и защитник данных ведут группы.",
+    "Топливо для генератора привозим по запросу.",
+    "Затопить подвал — не наш профиль, но архив соберём.",
+    "Рекомендации по расписанию присылаем только по запросу клиента.",
+    "Не назначает лечение и не заменяет врача или психолога.",
+    "Без спама, без перегруза, без лишних вкладок.",
+    "Я не ставлю диагнозы и не обещаю результат.",
+    "Экономический эффект не входит в нашу задачу.",
+  ])("accepts neutral client copy: %s", (text) => {
+    expect(gateClientAnswer(text)).toEqual({
+      accepted: true,
+      proposal: { kind: "answer", text },
+    });
+  });
+
+  it("keeps non-answer intents outside the copy guard", () => {
+    expect(
+      validateIntentProposal(
+        { kind: "show_catalog", serviceCode: "consultation" },
+        clientAuthorization,
+      ),
+    ).toEqual({
+      accepted: true,
+      proposal: { kind: "show_catalog", serviceCode: "consultation" },
+    });
+  });
+
+  it.each([
+    "Успей купить пакет по новой цене.",
+    "ии-Тоня подберёт формат.",
+    "Мы поставим диагноз по переписке.",
+    "Не назначает лечение.",
+  ])("keeps the gate and the domain guard in step for: %s", (text) => {
+    const guarded = guardClientCopy(text);
+    const gated = gateClientAnswer(text);
+    expect(gated.accepted).toBe(guarded.accepted);
+    if (!guarded.accepted && !gated.accepted) {
+      expect(gated.reasonCode).toBe(guarded.reasonCode);
     }
   });
 });

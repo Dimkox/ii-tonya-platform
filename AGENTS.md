@@ -3,6 +3,11 @@
 This file is the portable operating contract for human and AI contributors. It applies
 to the entire repository and must be read before making changes.
 
+**This worktree (`codex/owner-spec-2026-09-16`):** before any other work, read
+[`AGENT-STATUS.md`](AGENT-STATUS.md). That file is the live agent continuation
+status (copy-guard, Selarti env, remaining work). This AGENTS.md stays the standing
+operating contract and does not replace it.
+
 ## Establish identity first
 
 Never assume a checkout path, branch, remote, or inherited machine configuration. Run:

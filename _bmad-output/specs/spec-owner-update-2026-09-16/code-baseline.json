@@ -1,0 +1,596 @@
+{
+  "base_sha": "18af66fef61c33d21216c3b24f935cb1fe3d7b2d",
+  "scope": "Read-only static inspection; no application/runtime tests or live-provider activation performed.",
+  "entries": [
+    {
+      "topic": "Клиентская коммерческая модель",
+      "files": [
+        "packages/application/src/client-commercial-policy.ts",
+        "packages/application/src/conversation-service.ts",
+        "packages/db/migrations/0032_commercial_core_v2_a1.sql"
+      ],
+      "observation": "В коде сосуществуют legacy_package_v1 и free_client_v2; conversation-service выбирает free для V2. Файлы владельца снова описывают платные абонементы. Нельзя заменить назначенную политику всем существующим клиентам без решения и миграционного контракта.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/client-commercial-policy.test.ts",
+        "packages/application/src/conversation-service.test.ts"
+      ],
+      "gaps": [
+        "Нужен выбор целевой модели и когорт; готовность live не проверялась."
+      ]
+    },
+    {
+      "topic": "Классификация и выбор пакета сообщений",
+      "files": [
+        "packages/domain/src/billing.ts",
+        "packages/db/src/schema/billing.ts"
+      ],
+      "observation": "chargeDelta списывает ordinary_inbound/outbound; system/safety/error бесплатны. choosePackage выбирает неистёкшие пакеты, intro после платных, затем срок окончания, grantedAt и ID. Intro в схеме 100 бессрочных сообщений.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/domain/src/billing.test.ts",
+        "packages/domain/src/billing.property.test.ts"
+      ],
+      "gaps": [
+        "Источник требует тарифицировать все сообщения, 80–100 intro и другой FIFO; конфликт требует решения."
+      ]
+    },
+    {
+      "topic": "Экспертские тарифы V2",
+      "files": [
+        "packages/db/migrations/0032_commercial_core_v2_a1.sql",
+        "packages/application/src/expert-residency-service.ts",
+        "packages/application/src/expert-referral-admin-service.ts"
+      ],
+      "observation": "SQL ограничивает V2 тарифами START 3900, BASE 5900, PRO 9990 рублей, длительностью 2592000 секунд, cap 3000 bps и квотами групп 0/1/3. Новый персональный тариф не помещается в действующие CHECK constraints; нужна новая версия политики и ручная миграция, не правка исторического SQL.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/expert-residency-service.test.ts",
+        "packages/application/src/expert-referral-admin-service.test.ts"
+      ],
+      "gaps": [
+        "Нет проверенной реализации новой персональной формулы/акции/пола цены."
+      ]
+    },
+    {
+      "topic": "Реферальная арифметика",
+      "files": [
+        "packages/domain/src/expert-referral.ts",
+        "packages/db/src/repositories/expert-referral-repository.ts",
+        "packages/db/migrations/0033_expert_referral_maturity_a2.sql"
+      ],
+      "observation": "quoteResidency принимает cap; значение по умолчанию 5000 bps относится к общему/legacy пути. V2 SQL отдельно фиксирует 3000 bps. Есть FIFO, 365-дневный срок, reversals/debt и зрелость A2. Новое 3-месячное удержание акции и cap 10% для SPACE не подтверждены.",
+      "status": "partial",
+      "test_files": [
+        "packages/domain/src/expert-referral.test.ts",
+        "packages/domain/src/expert-referral.property.test.ts",
+        "packages/db/src/repositories/expert-referral-repository.test.ts"
+      ],
+      "gaps": [
+        "Не переобъявлять уже существующие 30% V2 новой реализацией; проверить расширение на категории/акции."
+      ]
+    },
+    {
+      "topic": "Тарифы центра и организатора",
+      "files": [
+        "packages/domain/src/partner-pricing.ts",
+        "packages/db/src/schema/partner-commerce.ts",
+        "packages/db/migrations/0037_partner_commerce_a.sql"
+      ],
+      "observation": "calculatePartnerShadowQuote использует >=6 и >=10, +3000 online-only, +5000 million-city, квоты CENTER 10×30 и ORGANIZER 5×50/3×100/1×500, комиссии 10%/15% и 4500 за карточку. Калькулятор shadow; наличие функции не доказывает активную продажу.",
+      "status": "partial",
+      "test_files": [
+        "packages/domain/src/partner-pricing.test.ts",
+        "packages/db/src/repositories/partner-commerce-repository.test.ts"
+      ],
+      "gaps": [
+        "Ровно 5 экспертов и состав квалификации требуют решения; акционные цены и SPACE не представлены в типе."
+      ]
+    },
+    {
+      "topic": "Проверка пробного экспертского доступа",
+      "files": [
+        "packages/db/src/repositories/test-expert-trial-repository.ts",
+        "packages/application/src/test-expert-warmup.ts",
+        "packages/application/src/test-expert-segmentation.ts",
+        "packages/application/src/test-expert-telegram-service.ts"
+      ],
+      "observation": "Пробный доступ резервирует по 2 units с лимитом 100; warmup потребляет 0. Сегментация содержит EXPERT/CENTER/ORGANIZER, SPACE отсутствует. Текст source-main смешивает коммерческую демонстрацию с платной клиентской тарификацией.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "packages/db/src/repositories/test-expert-trial-repository.test.ts"
+      ],
+      "gaps": [
+        "Нужна изоляция виртуальных демо-цен/купонного баланса и реальных booking/payments."
+      ]
+    },
+    {
+      "topic": "Точка входа «тест эксперт» и детерминированная анкета",
+      "files": [
+        "packages/application/src/test-expert-telegram-service.ts",
+        "apps/api/src/routes/telegram-webhook.ts"
+      ],
+      "observation": "Найдены распознавание «тест эксперт»/`/test_expert`, версия сессии, сбор имени, специализации и сегмента, а также маршрутизация через Telegram webhook. Текст — намеренно неактивный placeholder, не полный продажный сценарий строк 3051–4271.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "apps/api/src/routes/telegram-webhook.test.ts"
+      ],
+      "gaps": [
+        "Нет найденной реализации этапов демо-экспертов, FAQ эксперта по источнику, возражений, менеджерской встречи и передачи анкеты менеджеру."
+      ]
+    },
+    {
+      "topic": "История диалога, одноразовая детерминированная доставка и fail-closed режим",
+      "files": [
+        "packages/application/src/test-expert-telegram-service.ts",
+        "packages/db/src/repositories/test-expert-telegram-repository.ts"
+      ],
+      "observation": "Сессия хранит version/state, а детерминированные ответы передаются через транзакционную доставку; двусмысленная идентичность и отсутствие согласия дают unavailable. Это покрывает техническую основу части B021/B022/B039, но не проверяет маркетинговые правила ответов.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "tests/repo/test-expert-telegram-repository-guards.test.ts"
+      ],
+      "gaps": [
+        "Нет найденной проверки орфографии/грамматики исходящих сообщений и правила «каждый ответ заканчивается вопросом или действием». "
+      ]
+    },
+    {
+      "topic": "Купоны клиента и демонстрация фиксированных 3000/1000/2000",
+      "files": [
+        "packages/application/src/test-expert-telegram-service.ts",
+        "packages/db/src/schema/test-expert-trial.ts"
+      ],
+      "observation": "В inspected paths тестовый экспертский диалог и trial schema не содержат клиентской купонной модели или демо-значений 3 000, 1 000, 2 000.",
+      "status": "not_found_in_inspected_paths",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "tests/integration/test-expert-trial-postgres.test.ts"
+      ],
+      "gaps": [
+        "Поиск ограничен путями тестового экспертского сценария и схемы trial; наличие иной клиентской coupon-подсистемы этой записью не исключается."
+      ]
+    },
+    {
+      "topic": "Клиентское бронирование и резерв",
+      "files": [
+        "packages/application/src/client-booking-service.ts",
+        "apps/api/src/routes/client-booking.ts",
+        "packages/db/src/repositories/booking-repository.ts"
+      ],
+      "observation": "Найдены отдельные application/API/repository границы клиентского бронирования. Они требуют отдельного сопоставления с источником, включая окно 24 часа, резерв 72 часа, лист ожидания и три напоминания.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/application/src/client-booking-service.test.ts",
+        "tests/integration/client-booking-repository.test.ts",
+        "tests/e2e/client-booking-boundary.test.ts"
+      ],
+      "gaps": [
+        "Эта сверка не подтверждает соответствие всех временных чисел и купонных последствий отмены."
+      ]
+    },
+    {
+      "topic": "Персональная цена тестового эксперта",
+      "files": [
+        "packages/db/src/repositories/test-expert-pricing-policy.ts",
+        "packages/application/src/test-expert-telegram-service.ts"
+      ],
+      "observation": "Найдена выдача предварительной авторитетной цены после сегментации, но inspected code не подтверждает формулу 12 000/20 000, 16 городов, −1 000, +5 000, +3 000 и шкалу 8/9/10/12 тыс. из B024–B029.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "tests/integration/test-expert-trial-postgres.test.ts"
+      ],
+      "gaps": [
+        "Нет подтверждения полного набора полей расчёта и конфликтующих лимитов бонусов 20%/30%."
+      ]
+    },
+    {
+      "topic": "Экспертское резидентство и тарифные версии",
+      "files": [
+        "packages/application/src/expert-residency-service.ts",
+        "packages/db/src/schema/expert-residency.ts",
+        "packages/db/src/repositories/expert-residency-repository.ts"
+      ],
+      "observation": "Найдены версии тарифов, заказы резидентства и поля individualServicesEnabled/groupEventLimit. Значения и коммерческая политика в коде относятся к действующей V2-модели, поэтому они не подтверждают оферту B009/B069 автоматически.",
+      "status": "partial",
+      "test_files": [
+        "packages/application/src/expert-residency-service.test.ts",
+        "tests/integration/expert-residency-tariff-discovery.test.ts",
+        "tests/integration/expert-residency-checkout.test.ts"
+      ],
+      "gaps": [
+        "Нет подтверждения исходных публичных тарифов 12 000 и 20 000, setup fee 3 000 и полного правила перерыва 3 месяца."
+      ]
+    },
+    {
+      "topic": "Групповые мероприятия и их процентная модель",
+      "files": [
+        "packages/db/src/schema/expert-residency.ts",
+        "packages/db/src/repositories/expert-residency-repository.ts",
+        "apps/web/src/content.ts"
+      ],
+      "observation": "В schema/repository имеются groupEventLimit, а в web content присутствует маркетинговый блок оплаты групп. Не найдена в inspected runtime реализация расчётной выручки, брони, остатка, отчёта и срока оплаты 5 рабочих дней.",
+      "status": "partial",
+      "test_files": [
+        "tests/integration/expert-residency-tariff-discovery.test.ts",
+        "apps/web/src/content.test.ts"
+      ],
+      "gaps": [
+        "Нет найденной исполнимой модели 10%/15%+4 500 и разрешения конфликта 30% услуги против 30% выручки."
+      ]
+    },
+    {
+      "topic": "Лендинг: контент, CTA и тарифные секции",
+      "files": [
+        "apps/web/src/content.ts",
+        "apps/web/src/landing-view.ts",
+        "apps/web/src/config.ts"
+      ],
+      "observation": "Найдены централизованный контент и HTML-представление лендинга с CTA «тест клиент»/«тест эксперт», пакетами, тарифами, FAQ, контактами и порядком оплаты мероприятий. Это предметно близко к B042–B050, но часть чисел и формулировок должна проверяться построчно против extract-b.",
+      "status": "partial",
+      "test_files": [
+        "apps/web/src/content.test.ts",
+        "apps/web/src/landing-view.test.ts",
+        "apps/web/src/config.test.ts"
+      ],
+      "gaps": [
+        "Не подтверждены все 20 FAQ, полные реквизиты блоков, выбранная палитра, SEO и все поля контактной формы."
+      ]
+    },
+    {
+      "topic": "Лендинг: реализация визуального HTML/CSS/адаптивности",
+      "files": [
+        "apps/web/src/landing-view.ts",
+        "apps/web/src/styles.css"
+      ],
+      "observation": "Найдены view и stylesheet в web-приложении; их существование подтверждает отдельный presentation layer. Эта быстрая сверка не доказывает точное соблюдение трёх палитр, размеров dialog-компонента, Intersection Observer, mobile breakpoint 768px и SEO B051–B055.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "apps/web/src/landing-view.test.ts"
+      ],
+      "gaps": [
+        "Нужна визуальная и DOM-проверка против точных дизайнерских значений исходника."
+      ]
+    },
+    {
+      "topic": "Оферта и политика на web-слое",
+      "files": [
+        "apps/web/src/legal-content.ts",
+        "apps/web/src/legal/oferta.txt",
+        "apps/web/src/legal/policy.txt"
+      ],
+      "observation": "Найдены опубликованные текстовые legal assets и их сборка в web content. Они являются материалом для публикации; совпадение каждого юридического правила B056–B089 требует отдельной юридической и построчной проверки.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "apps/web/src/legal-content.test.ts"
+      ],
+      "gaps": [
+        "Не подтверждаются правовая действительность, юридическая применимость и отсутствие конфликтов 20%/30%, напоминаний и реферального момента начисления."
+      ]
+    },
+    {
+      "topic": "Остаточный AI-триал, лимиты и reconciliation",
+      "files": [
+        "packages/application/src/test-expert-telegram-service.ts",
+        "packages/db/src/repositories/test-expert-trial-repository.ts",
+        "packages/worker/src/test-expert-trial-reconciliation.ts"
+      ],
+      "observation": "Найдены нулевые единицы для детерминированного warmup, резерв 2 единиц на residual turn, авторитетные исходы и bounded reconciliation. Это относится к текущему безопасному «тест эксперт» фундаменту, но не реализует продажный скрипт или клиентскую/экспертскую купонную механику этого диапазона.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "tests/integration/test-expert-trial-postgres.test.ts",
+        "packages/worker/src/test-expert-trial-reconciliation.test.ts"
+      ],
+      "gaps": [
+        "Нужна проверка включения флагов и внешней provider-capability; они не следуют только из наличия исходных файлов."
+      ]
+    },
+    {
+      "topic": "Экспертские Telegram-команды /schedule, /client и /stats",
+      "files": [
+        "packages/integrations/src/telegram/expert-command-processor.ts",
+        "apps/api/src/routes/telegram-webhook.ts",
+        "packages/db/src/repositories/expert-telegram-query-repository.ts"
+      ],
+      "observation": "Найдена отдельная реализованная ветка private expert query commands. Она относится к Story 24.1 и не является реализацией демонстрации, менеджерского хэнд-оффа или ценовых правил диапазона B.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/integrations/src/telegram/expert-command-processor.test.ts",
+        "apps/api/src/routes/telegram-webhook.test.ts"
+      ],
+      "gaps": [
+        "Требуется отдельное сопоставление с Story 24.1; связь с B-claims не предполагается."
+      ]
+    },
+    {
+      "topic": "Planerka contract boundary",
+      "files": [
+        "packages/integrations/src/planerka/planerka-port.ts",
+        "packages/integrations/src/planerka/disabled-planerka-adapter.ts",
+        "packages/domain/src/reservation.ts"
+      ],
+      "observation": "Есть типизированный порт Planerka, disabled-адаптер и доменная модель резерва; живой адаптер не подтверждён просмотром.",
+      "status": "partial",
+      "test_files": [
+        "tests/contract/planerka-port.test.ts",
+        "packages/domain/src/reservation.test.ts",
+        "tests/integration/booking-concurrency.test.ts"
+      ],
+      "gaps": [
+        "Требование source Reserved на 72 часа → Booked/Cancelled требует сверки маппинга статусов и API после решения владельца."
+      ]
+    },
+    {
+      "topic": "Client booking API and persistence",
+      "files": [
+        "apps/api/src/routes/client-booking.ts",
+        "packages/application/src/client-booking-service.ts",
+        "packages/db/src/repositories/booking-repository.ts",
+        "packages/db/src/schema/booking.ts"
+      ],
+      "observation": "Существуют API, application service, PostgreSQL repository и schema для клиентского бронирования.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "apps/api/src/routes/client-booking.test.ts",
+        "packages/application/src/client-booking-service.test.ts",
+        "tests/integration/client-booking-repository.test.ts"
+      ],
+      "gaps": [
+        "Новые правила space slots и Planerka должны быть отдельной оценкой, не выведены из наличия booking-кода."
+      ]
+    },
+    {
+      "topic": "Reservation expiry",
+      "files": [
+        "packages/worker/src/reservation-expiry.ts",
+        "packages/domain/src/reservation.ts",
+        "packages/db/src/repositories/booking-repository.ts"
+      ],
+      "observation": "Есть worker-задача истечения резервов и тестируемая доменная модель.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/worker/src/reservation-expiry.test.ts",
+        "tests/integration/booking-concurrency.test.ts"
+      ],
+      "gaps": [
+        "Нужно проверить точное соответствие 72-часовому требованию source."
+      ]
+    },
+    {
+      "topic": "Telegram ingress and deterministic delivery",
+      "files": [
+        "apps/api/src/routes/telegram-webhook.ts",
+        "packages/integrations/src/telegram/telegram-adapter.ts",
+        "packages/worker/src/telegram-send-text-dispatcher.ts"
+      ],
+      "observation": "Есть webhook route, Telegram adapter и typed dispatcher outbox-доставки.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "apps/api/src/routes/telegram-webhook.test.ts",
+        "packages/integrations/src/telegram/telegram-adapter.test.ts",
+        "packages/worker/src/telegram-send-text-dispatcher.test.ts"
+      ],
+      "gaps": [
+        "Рекламный promo_bot и source=promo_bot не подтверждены в просмотренных путях."
+      ]
+    },
+    {
+      "topic": "Selarti boundary and fail-closed composition",
+      "files": [
+        "packages/integrations/src/selarti/selarti-port.ts",
+        "packages/integrations/src/selarti/selarti-contract-adapter.ts",
+        "packages/integrations/src/selarti/disabled-selarti-adapter.ts",
+        "apps/api/src/routes/selarti-response.ts"
+      ],
+      "observation": "Имеются порт, контрактный и disabled Selarti adapters, плюс response route.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "tests/contract/selarti-port.test.ts",
+        "packages/application/src/selarti-response-service.test.ts",
+        "tests/integration/hybrid-message-gateway-b2.test.ts"
+      ],
+      "gaps": [
+        "Сценарий из source с ценой/ручной верификацией не является доказанным активным Selarti-потоком."
+      ]
+    },
+    {
+      "topic": "Consent and privacy authority",
+      "files": [
+        "packages/domain/src/consent.ts",
+        "packages/application/src/privacy-service.ts",
+        "packages/db/src/repositories/privacy-repository.ts",
+        "packages/worker/src/privacy-erasure.ts"
+      ],
+      "observation": "Есть domain consent, privacy service, repository и worker удаления.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/domain/src/consent.test.ts",
+        "packages/application/src/privacy-service.test.ts",
+        "tests/integration/privacy-workflow.test.ts"
+      ],
+      "gaps": [
+        "Политика source о 30-дневном ответе и полном перечне прав требует юридической/продуктовой сверки."
+      ]
+    },
+    {
+      "topic": "Data retention",
+      "files": [
+        "packages/worker/src/data-retention.ts",
+        "packages/worker/src/b2-sensitive-retention.ts",
+        "docs/operations/data-retention.md"
+      ],
+      "observation": "В коде и документации есть retention-процессы, включая B2-sensitive ветку.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/worker/src/data-retention.test.ts",
+        "packages/worker/src/b2-sensitive-retention.test.ts",
+        "tests/integration/client-session-privacy.test.ts"
+      ],
+      "gaps": [
+        "Сроки source для клиентов, резидентов, сайта и cookies не сопоставлены с существующей политикой."
+      ]
+    },
+    {
+      "topic": "Outbox and idempotency",
+      "files": [
+        "packages/db/src/repositories/outbox-repository.ts",
+        "packages/worker/src/outbox-runner.ts",
+        "packages/contracts/src/worker-outbox.ts",
+        "packages/db/migrations/0004_durable_outbox.sql"
+      ],
+      "observation": "Есть durable outbox repository, runner, контракт и миграция.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/db/src/repositories/outbox-repository.test.ts",
+        "packages/worker/src/outbox-runner.test.ts",
+        "tests/integration/outbox-runner.test.ts"
+      ],
+      "gaps": [
+        "Новые source-сценарии должны использовать эти гарантии, но не могут обходить их прямыми внешними вызовами."
+      ]
+    },
+    {
+      "topic": "Audit data",
+      "files": [
+        "packages/db/src/schema/audit.ts",
+        "packages/db/migrations/0014_admin_feedback_controls.sql",
+        "packages/db/src/repositories/expert-referral-admin-repository.ts"
+      ],
+      "observation": "Есть audit schema и административный repository для экспертских рефералов.",
+      "status": "partial",
+      "test_files": [
+        "packages/db/src/repositories/expert-referral-admin-repository.test.ts",
+        "tests/repo/admin-ledger-prepared-sql-guard.test.ts"
+      ],
+      "gaps": [
+        "Аудит ручного approval/отклонения и payment-link из source требует отдельного контракта."
+      ]
+    },
+    {
+      "topic": "Expert referrals",
+      "files": [
+        "packages/application/src/expert-referral-service.ts",
+        "packages/db/src/repositories/expert-referral-repository.ts",
+        "packages/domain/src/expert-referral.ts",
+        "packages/db/migrations/0018_expert_residency_referrals.sql"
+      ],
+      "observation": "Существует отдельный экспертский реферальный bounded context с доменом, сервисом, repository и миграцией.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/application/src/expert-referral-service.test.ts",
+        "packages/domain/src/expert-referral.test.ts",
+        "tests/integration/expert-referral-redemption.test.ts"
+      ],
+      "gaps": [
+        "Source 1000-бонусы и партнёрская атрибуция не следует отождествлять с текущим экспертским referral credit без решения владельца."
+      ]
+    },
+    {
+      "topic": "Partner commerce",
+      "files": [
+        "packages/db/migrations/0037_partner_commerce_a.sql",
+        "tests/integration/partner-commerce-a-migration.test.ts",
+        "docs/superpowers/specs/2026-08-30-partner-commerce-and-acquisition-economics-design.md"
+      ],
+      "observation": "Есть миграция и integration test Partner Commerce A, а также утверждённый design-документ.",
+      "status": "partial",
+      "test_files": [
+        "tests/integration/partner-commerce-a-migration.test.ts"
+      ],
+      "gaps": [
+        "Новые source-тарифы/пороги центров и организаторов конфликтуют с уже утверждёнными правилами и требуют reconciliation spec."
+      ]
+    },
+    {
+      "topic": "Test-expert trial",
+      "files": [
+        "packages/application/src/test-expert-telegram-service.ts",
+        "packages/db/src/repositories/test-expert-telegram-repository.ts",
+        "packages/db/migrations/0038_test_expert_trial.sql"
+      ],
+      "observation": "Есть сервис, repository и миграция для отдельного trial «тест эксперт».",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/application/src/test-expert-telegram-service.test.ts",
+        "tests/repo/test-expert-trial-traceability.test.ts"
+      ],
+      "gaps": [
+        "Source-подход 1000 бонусов/ручная квалификация не должен неявно менять лимитированный trial без отдельного решения."
+      ]
+    },
+    {
+      "topic": "Runtime configuration and secret policy",
+      "files": [
+        "packages/config/src/env.ts",
+        "packages/config/src/env.test.ts",
+        "scripts/validate-runtime-env.sh",
+        ".env.example"
+      ],
+      "observation": "Конфигурация и env-policy существуют; исходные секреты не должны попадать в tracked config.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "packages/config/src/env.test.ts",
+        "tests/repo/env-policy.test.ts"
+      ],
+      "gaps": [
+        "Требуется redaction raw snapshot и безопасная ротация реальных учетных данных вне репозитория, если они действительны."
+      ]
+    },
+    {
+      "topic": "Rate limiting and adult-only gate",
+      "files": [
+        "apps/api/src/rate-limit.ts",
+        "apps/api/src/rate-limit.test.ts",
+        "packages/config/src/env.ts"
+      ],
+      "observation": "Есть API rate-limit, но флаги MINOR_ONBOARDING_ENABLED/ALLOW_MINOR_DATA не подтверждены в просмотренных путях.",
+      "status": "partial",
+      "test_files": [
+        "apps/api/src/rate-limit.test.ts",
+        "tests/repo/env-policy.test.ts"
+      ],
+      "gaps": [
+        "Нужно отдельно определить compliant adult-only gate; source-инструкция удалить CI-проверки не подтверждает безопасную реализацию."
+      ]
+    },
+    {
+      "topic": "Legal web content",
+      "files": [
+        "apps/web/src/legal-content.ts",
+        "apps/web/src/legal-view.ts",
+        "apps/web/src/legal/oferta.txt",
+        "apps/web/src/legal/policy.txt"
+      ],
+      "observation": "В web-app есть legal content/view и текстовые оферта/политика.",
+      "status": "existing_needs_verification",
+      "test_files": [
+        "apps/web/src/legal-content.test.ts",
+        "apps/web/src/legal-view.test.ts"
+      ],
+      "gaps": [
+        "Новая оферта и privacy policy source требуют юридической проверки, redaction и отдельного diff against текущего текста."
+      ]
+    },
+    {
+      "topic": "Observability and source attribution",
+      "files": [
+        "packages/observability/src/logger.ts",
+        "packages/observability/src/selarti-budget-metrics.test.ts",
+        "apps/api/src/rate-limit.ts"
+      ],
+      "observation": "Есть logger и метрики Selarti budget; promo_bot source attribution не найден в inspected paths.",
+      "status": "not_found_in_inspected_paths",
+      "test_files": [
+        "packages/observability/src/logger.test.ts",
+        "packages/observability/src/selarti-budget-metrics.test.ts"
+      ],
+      "gaps": [
+        "Нужен явный безопасный контур source=promo_bot с политикой retention и без влияния на финансовые права."
+      ]
+    }
+  ]
+}
