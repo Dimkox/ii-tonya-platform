@@ -11,7 +11,7 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `main` |
-| `main` SHA | `9437e727` = squash of PR [#91](https://github.com/Dimkox/ii-tonya-platform/pull/91), on top of `6ec3f505` (#90), `b2b7af9c` (#89), `92993646` (#88) |
+| `main` SHA | `26b626d` (= #91 tip `9437e727` → status `950e2d8` → backlog reconcile `26b626d`) |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -19,7 +19,14 @@ not treat older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
-Continue new work from **`main` at `9437e727`**, not from the old feature-branch SHAs.
+Continue new work from **`main` at `26b626d`**, not from the old feature-branch SHAs.
+
+Housekeeping (2026-09-16, no owner decision required): `backlog.json` per-task `state` reconciled —
+EXP-001/PLT-013 now `merged` (`backlog.state` stays `planning_only`; delivery truth is AGENT-STATUS +
+git). Pruned 5 provably-ancestry-merged local `codex/*` branches (62 → 57). The remaining 57 are
+worktree-locked (10) or hold unique commits (likely squash-merged) — **not** force-deleted; a clean
+pass needs a per-PR check. There is no unblocked engineering task left (verified: every remaining
+card needs ≥1 of the 39 open `DEC` decisions or an open owner question).
 
 ## What is done
 
