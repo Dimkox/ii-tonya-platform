@@ -28,7 +28,7 @@
         ],
         "tests": []
       },
-      "current_state": "Код различает legacy_package_v1 и free_client_v2; conversation-service выбирает free для V2.",
+      "current_state": "DEC-FIN-001 variant B recorded. Cohort/rollback contract is docs/superpowers/implementation-artifacts/fin-client-access-policy.md. New free_client_v2 admission is closed; existing assignments immutable. Q-016 closed here; Q-169 remains on TASK-FIN-002. No live activation.",
       "deliverables": [
         "Утверждённая когортная матрица и migration/rollback contract."
       ],
@@ -47,10 +47,9 @@
       "resolves_decisions": [
         "DEC-FIN-001"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
-        "Q-016",
         "Q-169"
       ],
       "source_claim_ids": [
