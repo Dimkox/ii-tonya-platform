@@ -31,7 +31,7 @@ release_status: "NO-GO"
 
 | Gate | Почему агент не закрывает |
 |---|---|
-| Подпись native bundle | нет права на production signing key |
+| Подпись native bundle | **PASS** 2026-09-17 для `origin/main` `cb07bd18`: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`. Не задеплоен |
 | Migration preflight / restore drill на проде | нет делегированного destructive DB |
 | YooKassa test-shop / fiscal / registry | BLOCKED; пустые креды должны остаться пустыми |
 | Provider staging (Planerka/Selarti) | default-off, нет RF-доказательства региона |

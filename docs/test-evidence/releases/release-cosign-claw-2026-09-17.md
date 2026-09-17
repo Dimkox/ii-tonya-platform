@@ -20,6 +20,6 @@ Private key material is not in Git, not on the production host, and not printed
 here. `deploy-native-remote.sh` verifies with `--key "$SIGNING_PUBLIC_KEY_FILE"`
 and `--bundle` against `native-release.sha256`.
 
-This does not deploy a release. The Claw `release` gate for `origin/main`
-`cb07bd1821d8106b0b0088b17bcf305662a1b792` was still running when the key was
-created; the new key is what will sign that bundle.
+Signed `origin/main` `cb07bd1821d8106b0b0088b17bcf305662a1b792` with this key
+(`docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`).
+Not deployed.
