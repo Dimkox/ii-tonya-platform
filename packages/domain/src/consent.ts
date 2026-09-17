@@ -27,9 +27,9 @@ export interface ReservationViewInput {
   expertNote?: string;
   expertNoteConsent: boolean;
   // DEC-PLT-004 §3: the transfer to the expert is its own grant, separate from `expert_note`.
-  // When explicitly false the expert sees the minimal handoff (pseudonym, no request note).
-  // Left undefined by callers that have not yet wired the `expert_handoff` lateral.
-  expertHandoffConsent?: boolean;
+  // Required + fail-closed: only an explicit `true` reveals the name/note; anything else collapses
+  // to the minimal handoff (pseudonym, no request note).
+  expertHandoffConsent: boolean;
 }
 
 export interface ExpertView {
@@ -72,7 +72,7 @@ export function buildProfilePatch(
 }
 
 export function buildExpertView(input: ReservationViewInput): ExpertView {
-  if (input.expertHandoffConsent === false) {
+  if (input.expertHandoffConsent !== true) {
     return {
       reservationId: input.reservationId,
       startsAt: input.startsAt,

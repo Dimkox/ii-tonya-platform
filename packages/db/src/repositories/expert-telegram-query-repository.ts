@@ -324,10 +324,16 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
           n.id as notification_id,
           r.id as reservation_id,
           e.user_id as actor_user_id,
-          coalesce(nullif(cp.display_name, ''), 'Клиент') as client_display_name,
+          case
+            when handoff_consent.granted then coalesce(nullif(cp.display_name, ''), 'Клиент')
+            else 'Клиент'
+          end as client_display_name,
           s.starts_at,
           es.name as service_name,
-          case when note_consent.granted then cp.expert_note else null end as preparation_note
+          case
+            when note_consent.granted and handoff_consent.granted then cp.expert_note
+            else null
+          end as preparation_note
         from notifications n
         join reservations r on n.reservation_id = r.id
         join experts e on e.id = r.expert_id
@@ -352,6 +358,18 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
                 and candidate.consent_type = 'expert_note'
             )
         ) note_consent on true
+        left join lateral (
+          select coalesce(bool_and(latest.decision = 'granted'), false) as granted
+          from consents latest
+          where latest.user_id = r.user_id
+            and latest.consent_type = 'expert_handoff'
+            and latest.created_at = (
+              select max(candidate.created_at)
+              from consents candidate
+              where candidate.user_id = r.user_id
+                and candidate.consent_type = 'expert_handoff'
+            )
+        ) handoff_consent on true
         where n.callback_token_hash = ${command.tokenHash}
           and n.callback_action = 'view_client'
           and n.callback_consumed_at is null

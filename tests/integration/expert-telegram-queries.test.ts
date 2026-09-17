@@ -65,6 +65,11 @@ const seed = async (options: { consent?: boolean } = {}) => {
       select user_id, 'expert_note', 'granted', 'v1', ${now}
       from reservations where id = ${reservationId}::uuid
     `);
+    await testDb.db.execute(sql`
+      insert into consents (user_id, consent_type, decision, policy_version, created_at)
+      select user_id, 'expert_handoff', 'granted', 'handoff-v1', ${now}
+      from reservations where id = ${reservationId}::uuid
+    `);
   }
   return { expertId: fixture.expertId, reservationId, telegramUserId };
 };
@@ -457,18 +462,33 @@ describe("PostgreSQL expert Telegram queries", () => {
     ).rejects.toThrow("expert_query_unavailable");
   });
 
-  it("omits absent and latest-revoked preparation consent", async () => {
-    for (const decision of ["absent", "revoked"] as const) {
+  it("withholds the name and note unless expert_handoff (and note) consent is granted", async () => {
+    for (const decision of [
+      "absent",
+      "note-revoked",
+      "handoff-revoked",
+    ] as const) {
       const fixture = await seed({ consent: decision !== "absent" });
-      if (decision === "revoked") {
+      if (decision === "note-revoked") {
         await testDb.db.execute(sql`
           insert into consents (user_id, consent_type, decision, policy_version, created_at)
           select user_id, 'expert_note', 'revoked', 'v2', ${new Date(now.getTime() + 1)}
           from reservations where id = ${fixture.reservationId}::uuid
         `);
       }
+      if (decision === "handoff-revoked") {
+        await testDb.db.execute(sql`
+          insert into consents (user_id, consent_type, decision, policy_version, created_at)
+          select user_id, 'expert_handoff', 'revoked', 'handoff-v2', ${new Date(now.getTime() + 1)}
+          from reservations where id = ${fixture.reservationId}::uuid
+        `);
+      }
       const repo = new PostgresExpertTelegramQueryRepository(testDb.db);
-      const tokenHash = (decision === "absent" ? "f" : "9").repeat(64);
+      const tokenHash = {
+        absent: "f",
+        "note-revoked": "9",
+        "handoff-revoked": "3",
+      }[decision].repeat(64);
       const claims = {
         reservationId: fixture.reservationId,
         expertId: fixture.expertId,
@@ -477,17 +497,24 @@ describe("PostgreSQL expert Telegram queries", () => {
         expiresAtEpochSeconds: Math.floor(now.getTime() / 1_000) + 600,
       };
       await repo.put(tokenHash, claims);
-      await expect(
-        repo.consumeClientView({
-          tokenHash,
-          reservationId: fixture.reservationId,
-          expertId: fixture.expertId,
-          telegramUserId: fixture.telegramUserId,
-          version: 3,
-          now,
-          correlationId: `client-view-consent-${decision}`,
-        }),
-      ).resolves.not.toHaveProperty("preparationNote");
+      const result = await repo.consumeClientView({
+        tokenHash,
+        reservationId: fixture.reservationId,
+        expertId: fixture.expertId,
+        telegramUserId: fixture.telegramUserId,
+        version: 3,
+        now,
+        correlationId: `client-view-consent-${decision}`,
+      });
+      // No consented preparation note in any of these states.
+      expect(result).not.toHaveProperty("preparationNote");
+      // Name is withheld whenever the transfer grant is absent or revoked.
+      if (decision === "absent" || decision === "handoff-revoked") {
+        expect(result).toMatchObject({ clientDisplayName: "Клиент" });
+      } else {
+        // note revoked but handoff still granted -> identity visible, note gone.
+        expect(result).toMatchObject({ clientDisplayName: "Client" });
+      }
     }
   });
 

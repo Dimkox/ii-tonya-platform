@@ -68,21 +68,21 @@ describe("booking workflows", () => {
 
   it("returns a consented note and meeting URL only for a booked owner appointment", async () => {
     const deps = bookingFixture();
-    vi.spyOn(
-      deps.repository,
-      "listAuthorizedExpertSchedule",
-    ).mockResolvedValue([
-      {
-        reservationId: deps.reservationId,
-        expertId: deps.expertId,
-        status: "booked",
-        startsAt: new Date("2026-07-30T10:00:00.000Z"),
-        clientDisplayName: "Клиент",
-        expertNote: "Предпочитает утро",
-        expertNoteConsent: true,
-        meetingUrl: "https://meeting.invalid/private",
-      },
-    ]);
+    vi.spyOn(deps.repository, "listAuthorizedExpertSchedule").mockResolvedValue(
+      [
+        {
+          reservationId: deps.reservationId,
+          expertId: deps.expertId,
+          status: "booked",
+          startsAt: new Date("2026-07-30T10:00:00.000Z"),
+          clientDisplayName: "Клиент",
+          expertNote: "Предпочитает утро",
+          expertNoteConsent: true,
+          expertHandoffConsent: true,
+          meetingUrl: "https://meeting.invalid/private",
+        },
+      ],
+    );
 
     const view = await createBookingService(deps).getExpertSchedule({
       expertId: deps.expertId,
