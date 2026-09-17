@@ -169,7 +169,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 ## Next actions (pick one, do not mix)
 
 - **This branch:** remaining DEC pack closed conservatively; partner/expert/client
-  policy artifacts written. See `docs/runbooks/production-cutover-status.md`.
+  policy artifacts written. RF legal-agent gate: `docs/legal/owner-update-legal-review.md`
+  (CONDITIONAL PASS). `/privacy` and `/oferta` no longer treat use/accept as 152-FZ
+  consent (156-FZ). See `docs/runbooks/production-cutover-status.md`.
   Production remains **NO-GO** (no payments, no prod switch, no invented prices).
 - **Owner price:** four paid client SKU `price_minor` values. Until then FIN-021
   and `PAYMENTS_ENABLED` stay off.

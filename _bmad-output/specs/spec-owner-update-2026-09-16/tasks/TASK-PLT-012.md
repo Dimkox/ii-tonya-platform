@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `implemented_pending_review`; readiness: `pending_dependencies`.
 - Тип: content; исполнитель: legal; приоритет: P1.
 - Depends on: [TASK-FIN-025](TASK-FIN-025.md), [TASK-PLT-008](TASK-PLT-008.md), [TASK-PLT-009](TASK-PLT-009.md), [TASK-EXP-011](TASK-EXP-011.md), [TASK-DEC-PLT-007](TASK-DEC-PLT-007.md), [TASK-DEC-PLT-004](TASK-DEC-PLT-004.md), [TASK-DEC-PLT-005](TASK-DEC-PLT-005.md).
 - Решения: DEC-PLT-007, DEC-PLT-004, DEC-PLT-005.
