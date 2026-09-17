@@ -86,7 +86,7 @@
         ],
         "tests": []
       },
-      "current_state": "billing schema хранит intro ровно 100 сообщений без expiresAt; источники требуют 80/100 и 30/60 дней.",
+      "current_state": "Partial catalog written (60d, intro 100, x2-only). Absolute SKU prices TBD owner; Q-169 open. Artifact: docs/superpowers/implementation-artifacts/fin-client-package-policy.md.",
       "deliverables": [
         "Таблица SKU с price, units, coupon grant, duration, timezone и migration mapping."
       ],
@@ -111,16 +111,9 @@
       "state": "planned",
       "readiness": "pending_dependencies",
       "open_question_ids": [
-        "Q-003",
-        "Q-016",
-        "Q-018",
-        "Q-019",
-        "Q-024",
-        "Q-053",
-        "Q-054",
+        "Q-169",
         "Q-118",
         "Q-163",
-        "Q-169",
         "Q-178",
         "Q-179"
       ],
@@ -473,7 +466,7 @@
         ],
         "tests": []
       },
-      "current_state": "V2 CHECK constraints фиксируют START/BASE/PRO=3900/5900/9990 и cap 30%; новые личные диапазоны не помещаются в V2.",
+      "current_state": "DEC-FIN-007 keep V2 3900/5900/9990; DEC-FIN-009 Exclusive is marketing-only. Contract: docs/superpowers/implementation-artifacts/fin-expert-pricing-policy.md. No live activation.",
       "deliverables": [
         "Выбранная versioned pricing policy и eligibility Exclusive."
       ],
@@ -494,7 +487,7 @@
         "DEC-FIN-007",
         "DEC-FIN-009"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-086",
@@ -829,7 +822,7 @@
         ],
         "tests": []
       },
-      "current_state": "Shadow quote применяет >=6/>=10; source даёт 5–9 и >5 варианты.",
+      "current_state": "DEC-FIN-012 >=6/>=10 recorded in docs/superpowers/implementation-artifacts/fin-center-policy.md. Matches partner-pricing.ts. No live activation.",
       "deliverables": [
         "Centre tier table and qualified-referral definition."
       ],
@@ -849,7 +842,7 @@
       "resolves_decisions": [
         "DEC-FIN-012"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-150",
@@ -888,7 +881,7 @@
         ],
         "tests": []
       },
-      "current_state": "Current entitlements are fixed 5×50/3×100/1×500, but cross-band consumption is not stated.",
+      "current_state": "Organizer bands and strict matching consumption in docs/superpowers/implementation-artifacts/fin-organizer-policy.md.",
       "deliverables": [
         "Organizer tier table, qualifying referral and band-consumption rules."
       ],
@@ -905,7 +898,7 @@
         "REQ-FIN-012.01",
         "REQ-FIN-012.02"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-151",
@@ -946,7 +939,7 @@
         ],
         "tests": []
       },
-      "current_state": "Current partner quote knows 10%/15%+4500 but source conflicts on deposit base.",
+      "current_state": "Group settlement: 30% of project service price + 70% remainder. docs/superpowers/implementation-artifacts/fin-group-event-settlement.md.",
       "deliverables": [
         "Deposit, final settlement, registered-attendee report and invoice deadline contract."
       ],
@@ -967,7 +960,7 @@
         "DEC-FIN-013",
         "DEC-FIN-020"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-075",
@@ -1008,7 +1001,7 @@
         ],
         "tests": []
       },
-      "current_state": "Baseline подтверждает expert referral repository, но источник спорит о создании/показе кода.",
+      "current_state": "Code created at registration, visible after first payment. docs/superpowers/implementation-artifacts/fin-expert-code-lifecycle.md.",
       "deliverables": [
         "Code namespace, created/visible/revoked lifecycle and content gate."
       ],
@@ -1030,7 +1023,7 @@
         "DEC-FIN-014",
         "DEC-FIN-022"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-053",
@@ -5668,7 +5661,7 @@
         "create": [],
         "tests": []
       },
-      "current_state": "Открытое противоречие/решение; ни один вариант не утверждён этим разбором.",
+      "current_state": "DEC-EXP-005 accepted: current landing :root palette is the one live palette.",
       "deliverables": [
         "Запись решения DEC-EXP-005: выбранное правило, основание, дата, ответственный, судьба существующих данных."
       ],
@@ -5685,7 +5678,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
@@ -5715,7 +5708,7 @@
         "create": [],
         "tests": []
       },
-      "current_state": "Открытое противоречие/решение; ни один вариант не утверждён этим разбором.",
+      "current_state": "DEC-EXP-006 accepted no-change: no post-visit quiet/D+1 review/daily checkups in runtime; EXP-003 must not add them.",
       "deliverables": [
         "Запись решения DEC-EXP-006: выбранное правило, основание, дата, ответственный, судьба существующих данных."
       ],
@@ -5732,7 +5725,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
@@ -6457,7 +6450,8 @@
         "TASK-FIN-022"
       ],
       "reason": "Источник не определяет строгость условия.",
-      "decision_task_id": "TASK-FIN-007"
+      "decision_task_id": "TASK-FIN-007",
+      "status": "accepted"
     },
     {
       "id": "DEC-FIN-010",
@@ -6877,7 +6871,8 @@
         "TASK-EXP-020"
       ],
       "reason": "Финальный вариант не выбран.",
-      "decision_task_id": "TASK-DEC-EXP-005"
+      "decision_task_id": "TASK-DEC-EXP-005",
+      "status": "accepted"
     },
     {
       "id": "DEC-EXP-006",
@@ -6896,7 +6891,8 @@
         "TASK-EXP-003"
       ],
       "reason": "Исходник содержит одновременно эти правила, приоритет не определён.",
-      "decision_task_id": "TASK-DEC-EXP-006"
+      "decision_task_id": "TASK-DEC-EXP-006",
+      "status": "accepted"
     },
     {
       "id": "DEC-PLT-001",

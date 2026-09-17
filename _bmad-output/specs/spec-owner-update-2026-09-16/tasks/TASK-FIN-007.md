@@ -12,10 +12,10 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `ready`.
+- State: `implemented_pending_review`; readiness: `ready`.
 - Тип: decision; исполнитель: product-owner; приоритет: P0.
 - Depends on: нет.
-- Решения: DEC-FIN-007, DEC-FIN-009.
+- Решения: DEC-FIN-007 (accepted ① V2), DEC-FIN-009 (accepted ② recommendation).
 - Вопросы: Q-086, Q-088, Q-089, Q-090, Q-126, Q-148, Q-164, Q-185.
 
 ## Что уже есть

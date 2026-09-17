@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `ready`.
+- State: `implemented_pending_review`; readiness: `ready`.
 - Тип: decision; исполнитель: product-owner; приоритет: P1.
 - Depends on: нет.
 - Решения: DEC-FIN-013, DEC-FIN-020.

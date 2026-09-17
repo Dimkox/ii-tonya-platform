@@ -159,31 +159,24 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 2. Bind `ии-Тоня` AI to a task if that is wanted (currently `test expert` → `41nano`).
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
 4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
-5. Owner DEC pack: 36/39 accepted. Remaining owner-gated: DEC-FIN-009, DEC-EXP-005,
-   DEC-EXP-006, plus package prices (FIN-003). FIN-001 contract is on this branch
-   (`implemented_pending_review`). Code implementation of paid admission is
-   TASK-FIN-021 and still waits SKU/prices. EXP-007 still has Q-055/056/057;
-   EXP-013 still has six copy questions. Implementers must not invent these.
+5. Owner DEC pack: **39/39 accepted** (last three conservative 2026-09-17). Hard
+   remaining owner input is **package prices**, not another DEC. FIN-021 and live
+   payments wait on those numbers. EXP-007 still has Q-055/056/057; EXP-013 still
+   has six copy questions. Production cutover: NO-GO
+   (`docs/runbooks/production-cutover-status.md`).
 6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. YooKassa key exists; `PAYMENTS_ENABLED=false`.
 
 ## Next actions (pick one, do not mix)
 
-- **FIN-001 review:** independent read of
-  `docs/superpowers/implementation-artifacts/fin-client-access-policy.md` against
-  DEC-FIN-001 B and CHECK `0032`; then merge this branch. Do not invent a paid
-  SQL policy token here.
-- **FIN-002:** catalog/term spec after FIN-001 merge. DEC-FIN-002 (60 days, intro
-  100) and DEC-FIN-003 (x2 only) are accepted; **absolute package prices are still
-  missing** — do not fabricate them. Q-169 lives there.
-- **PLT-008 close:** independent review of #97; reservation-binding migration
-  remains deferred.
-- **Still owner-gated:** DEC-FIN-009 (Эксклюзив threshold), DEC-EXP-005 (palette),
-  DEC-EXP-006 (clinical rhythm). EXP-007 still has Q-055/056/057.
-- **Selarti wiring:** only if the owner asks; do not flip `SELARTI_ENABLED`.
-- **EXP-019 design final:** designer sketches + owner pick + `DEC-EXP-005`.
-- **Factory tooling PR:** `codex/install-adaptive-factory-2.0.18` is a separate
-  stack install (AGBP 2.0.18 + Superpowers 6.3.0 + Spec Kit 1.0.7); push/review
-  independently of FIN-001.
+- **This branch:** remaining DEC pack closed conservatively; partner/expert/client
+  policy artifacts written. See `docs/runbooks/production-cutover-status.md`.
+  Production remains **NO-GO** (no payments, no prod switch, no invented prices).
+- **Owner price:** four paid client SKU `price_minor` values. Until then FIN-021
+  and `PAYMENTS_ENABLED` stay off.
+- **FIN-001/007/012–015 review** then merge this branch.
+- **PLT-008 close:** independent review of #97.
+- **Selarti / YooKassa / Planerka:** do not flip `*_ENABLED`.
+- **Factory tooling PR:** `codex/install-adaptive-factory-2.0.18` separately.
 
 ## Standing rules for this branch
 
