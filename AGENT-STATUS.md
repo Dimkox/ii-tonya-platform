@@ -164,7 +164,7 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
    payments wait on those numbers. EXP-007 still has Q-055/056/057; EXP-013 still
    has six copy questions. Production cutover: NO-GO
    (`docs/runbooks/production-cutover-status.md`).
-6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. YooKassa key exists; `PAYMENTS_ENABLED=false`.
+6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged. SKU prices still missing.
 
 ## Next actions (pick one, do not mix)
 
