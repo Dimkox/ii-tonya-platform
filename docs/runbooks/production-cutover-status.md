@@ -35,7 +35,7 @@ release_status: "NO-GO"
 | YooKassa test-shop / fiscal / registry | BLOCKED; пустые креды должны остаться пустыми |
 | Provider staging (Planerka/Selarti) | default-off, нет RF-доказательства региона |
 | Clinical safety directory + outage drill | DEC-EXP-006 = не выдумывать клинический ритм |
-| Retention/legal approval | **CONDITIONAL PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; уведомление РКН всё ещё человек |
+| Retention/legal approval | **PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; владелец подтвердил уведомление РКН (ст. 22 152-ФЗ); номер реестра не передавался |
 | Manual production environment approval | человек |
 | Смена `/opt/ii-tonya-platform/current` | интерактивный root SSH, не unattended |
 
