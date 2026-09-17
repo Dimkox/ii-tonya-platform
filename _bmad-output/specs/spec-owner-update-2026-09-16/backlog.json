@@ -86,7 +86,7 @@
         ],
         "tests": []
       },
-      "current_state": "Partial catalog written (60d, intro 100, x2-only). Absolute SKU prices TBD owner; Q-169 open. Artifact: docs/superpowers/implementation-artifacts/fin-client-package-policy.md.",
+      "current_state": "Owner prices 4999/5999/7999/10990 RUB. Coupon grant x2. Catalog docs/superpowers/implementation-artifacts/fin-client-package-policy.md. Q-169 TZ still open. Coupons default-off until FIN-021.",
       "deliverables": [
         "Таблица SKU с price, units, coupon grant, duration, timezone и migration mapping."
       ],
@@ -108,14 +108,10 @@
         "DEC-FIN-002",
         "DEC-FIN-003"
       ],
-      "state": "planned",
-      "readiness": "pending_dependencies",
+      "state": "implemented_pending_review",
+      "readiness": "ready",
       "open_question_ids": [
-        "Q-169",
-        "Q-118",
-        "Q-163",
-        "Q-178",
-        "Q-179"
+        "Q-169"
       ],
       "source_claim_ids": [
         "A010",

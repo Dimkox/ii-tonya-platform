@@ -48,7 +48,7 @@ Telegram stays a channel; Sheets/Make off; micro-check-ins in-session; 18+ self-
 reactive ban; T0-B re-consent campaign 60 days; already-paid/active **grandfathered**. Next target:
 keystone **PLT-008** (its legal Q-001/117/139/143/144 are answered by the rule; Q-031 technical).
 Public-text propagation is **TASK-PLT-012**, left open on purpose. SPEC.md re-derive = bmad-spec/Claw
-step (no derive script in this checkout; do not hand-edit SPEC). DEC pack: 36/39 accepted (11 individually ruled + 25 по консервативному/без-ретро/keep-current варианту через делегацию «а дальше делай» 2026-09-17, суть в decision-register.md). OPEN: DEC-FIN-009 (Эксклюзив threshold), DEC-EXP-005 (палитра), DEC-EXP-006 (клинический ритм отзыв/пауза/чекап). Pending price data (DEC-FIN-003): absolute package prices not in source, carried as TASK-FIN-003 open questions.
+step (no derive script in this checkout; do not hand-edit SPEC). DEC pack: 36/39 accepted (11 individually ruled + 25 по консервативному/без-ретро/keep-current варианту через делегацию «а дальше делай» 2026-09-17, суть в decision-register.md). OPEN: DEC-FIN-009 (Эксклюзив threshold), DEC-EXP-005 (палитра), DEC-EXP-006 (клинический ритм отзыв/пауза/чекап). Package prices owner-set 2026-09-17: 4999/5999/7999/10990 ₽.
 accepting DEC-PLT-004 unblocked 0 tasks straight to `ready`.
 
 Housekeeping (2026-09-16/17, no owner decision required): `backlog.json` per-task `state` reconciled —
@@ -160,8 +160,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
 3. Selarti live path: webhook URL + `SELARTI_WEBHOOK_SECRET`, channel mapping, `SELARTI_RESPONSE_INGRESS_*` (absent from the working `.env`; only in `.env.example`), cost admission, `selarti_ai_processing` consent. Keep `SELARTI_ENABLED=false` until that is asked.
 4. ~~Push of the local commits.~~ Done: PR #88 squash-merged to `main` as `92993646`.
 5. Owner DEC pack: **39/39 accepted** (last three conservative 2026-09-17). Hard
-   remaining owner input is **package prices**, not another DEC. FIN-021 and live
-   payments wait on those numbers. EXP-007 still has Q-055/056/057; EXP-013 still
+   remaining owner input for SKU **prices is closed** (4999/5999/7999/10990 ₽).
+   FIN-021 still needs the versioned paid policy in code. Live production
+   runtime.env is unchanged. EXP-007 still has Q-055/056/057; EXP-013 still
    has six copy questions. Production cutover: NO-GO
    (`docs/runbooks/production-cutover-status.md`).
 6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged. SKU prices still missing.
@@ -176,8 +177,9 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
   Production remains **NO-GO** (no payments, no prod switch, no invented prices).
   Rollback drill: Claw rehearsal PASS
   (`docs/test-evidence/rollback-drill-2026-09-17.md`); live host still unconfigured.
-- **Owner price:** four paid client SKU `price_minor` values. Until then FIN-021
-  and `PAYMENTS_ENABLED` stay off.
+- **SKU prices:** 4999 / 5999 / 7999 / 10990 ₽ recorded. Next code: TASK-FIN-021
+  versioned paid policy. Local payments flags already on; production runtime.env
+  is not.
 - **FIN-001/007/012–015 review** then merge this branch.
 - **PLT-008 close:** independent review of #97.
 - **Selarti / YooKassa / Planerka:** do not flip `*_ENABLED`.

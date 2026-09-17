@@ -68,7 +68,7 @@ describe("landing content", () => {
       .update(JSON.stringify(landingContent.faq))
       .digest("hex");
     expect(digest).toBe(
-      "905e710c596a95446b1dd6866e1be3719add17f1f5f58a41e462838d53a7a38e",
+      "87529ea3ba9e16ff39b1ddb4e4bbaf206f6bbb4b707c6dc6989d35805166597c",
     );
   });
 

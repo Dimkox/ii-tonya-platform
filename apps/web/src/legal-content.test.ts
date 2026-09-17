@@ -69,6 +69,10 @@ describe("public legal documents", () => {
   it("states package and coupon terms without claiming default-off coupon issuance is active", () => {
     const oferta = legalDocuments.oferta.text;
     expect(oferta).toContain("60 календарных дней");
+    expect(oferta).toContain("4 999 ₽");
+    expect(oferta).toContain("5 999 ₽");
+    expect(oferta).toContain("7 999 ₽");
+    expect(oferta).toContain("10 990 ₽");
     expect(oferta).toContain("100 сообщений и не имеет срока действия");
     expect(oferta).toContain("новые Купоны действуют 45 календарных дней");
     expect(oferta).not.toContain(
@@ -81,7 +85,9 @@ describe("public legal documents", () => {
     const { landingContent } = await import("./content.js");
     const faq = landingContent.faq.map((entry) => entry.join(" ")).join(" ");
     expect(faq).not.toContain("новые платные пакеты в V2 не продаются");
-    expect(faq).toContain("30 дней");
+    expect(faq).toContain("60 дней");
+    expect(faq).toContain("4 999");
+    expect(faq).toContain("10 990");
     expect(faq).toContain("100 сообщений без срока");
     expect(faq).toContain("Купоны");
     expect(faq).toContain("отключены");
