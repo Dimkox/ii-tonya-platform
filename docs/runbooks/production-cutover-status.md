@@ -22,7 +22,8 @@ release_status: "NO-GO"
   `fin-group-event-settlement.md`,
   `fin-expert-code-lifecycle.md`.
 - PLT-008 substrate + expert_handoff read-path уже на `main` (#97).
-- Все `*_ENABLED` остаются `false`. Платежи не включаются.
+- Все `*_ENABLED` на **продакшене** остаются `false` (`PAYMENTS_ENABLED=false`).
+  Локальный `.env` на Claw не копировался в `/etc/ii-tonya/runtime.env`.
 
 ## Не исполняется автоматически (go-live)
 
@@ -37,11 +38,13 @@ release_status: "NO-GO"
 | Clinical safety directory + outage drill | DEC-EXP-006 = не выдумывать клинический ритм |
 | Retention/legal approval | **PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; владелец подтвердил уведомление РКН (ст. 22 152-ФЗ); номер реестра не передавался |
 | Manual production environment approval | человек |
-| Смена `/opt/ii-tonya-platform/current` | интерактивный root SSH, не unattended |
-| Rollback drill | **PASS rehearsal** 2026-09-17: `docs/test-evidence/rollback-drill-2026-09-17.md`. Production SSH (`DEPLOY_HOST`) не задан |
+| Смена `/opt/ii-tonya-platform/current` | адаптер SSH есть; новый SHA не выкладывается этим прогоном |
+| Rollback drill | **PASS rehearsal** 2026-09-17: `docs/test-evidence/rollback-drill-2026-09-17.md`. Host SSH **PASS** 2026-09-17: `docs/test-evidence/production/host-identity-2026-09-17.md`. Live `deploy-native-remote.sh rollback` **not executed** |
 
-Текущий native runtime `233f3cf7…` — operational, но не воспроизводимый релиз
-текущего SHA. Новый SHA на прод **не выкладывается** этим прогоном.
+Текущий native runtime на хосте: `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`
+(`current`), предыдущий каталог `233f3cf72e45e47117948ad5615b603252801e40`.
+Это не релиз текущего `main` (53 коммита позади `origin/main`). Новый SHA на
+прод **не выкладывается** этим прогоном. Production `PAYMENTS_ENABLED=false`.
 
 ## Цены клиентских пакетов
 

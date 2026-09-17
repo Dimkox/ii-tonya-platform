@@ -25,4 +25,6 @@ Claw rehearsal of the exact remote rollback body (two immutable `releases/<sha>`
 directories, unit restore, symlink switch, readiness):
 [`docs/test-evidence/rollback-drill-2026-09-17.md`](../test-evidence/rollback-drill-2026-09-17.md).
 That rehearsal is not a substitute for `deploy-native-remote.sh rollback` against
-the dedicated host once `DEPLOY_HOST` is configured.
+the dedicated host. Host SSH is configured as of 2026-09-17
+(`docs/test-evidence/production/host-identity-2026-09-17.md`); live rollback was
+not executed.

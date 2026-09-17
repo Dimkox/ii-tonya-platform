@@ -164,8 +164,11 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
    FIN-021 still needs the versioned paid policy in code. Live production
    runtime.env is unchanged. EXP-007 still has Q-055/056/057; EXP-013 still
    has six copy questions. Production cutover: NO-GO
-   (`docs/runbooks/production-cutover-status.md`).
-6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged. SKU prices still missing.
+   (`docs/runbooks/production-cutover-status.md`). Host identity and
+   BatchMode `ii_tonya` SSH: PASS 2026-09-17
+   (`docs/test-evidence/production/host-identity-2026-09-17.md`). Live SHA
+   `7498ce65`; no new deploy, no live rollback, no runtime.env copy.
+6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged (`PAYMENTS_ENABLED=false`). SKU prices recorded 4999/5999/7999/10990.
 
 ## Next actions (pick one, do not mix)
 
@@ -174,9 +177,11 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
   (legal PASS after owner attested RKN art.22 notice). `/privacy` and `/oferta`
   no longer treat use/accept as 152-FZ consent (156-FZ). See
   `docs/runbooks/production-cutover-status.md`.
-  Production remains **NO-GO** (no payments, no prod switch, no invented prices).
+  Production remains **NO-GO** (no payments on prod, no new SHA switch).
   Rollback drill: Claw rehearsal PASS
-  (`docs/test-evidence/rollback-drill-2026-09-17.md`); live host still unconfigured.
+  (`docs/test-evidence/rollback-drill-2026-09-17.md`); host SSH PASS
+  (`docs/test-evidence/production/host-identity-2026-09-17.md`); live rollback
+  not executed.
 - **SKU prices:** 4999 / 5999 / 7999 / 10990 ₽ recorded. Next code: TASK-FIN-021
   versioned paid policy. Local payments flags already on; production runtime.env
   is not.

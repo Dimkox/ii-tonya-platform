@@ -1,6 +1,6 @@
 # Go-live evidence
 
-Owner: Release owner. Independent reviewer: unassigned. Production deployment adapter: implemented but target unconfigured.
+Owner: Release owner. Independent reviewer: unassigned. Production deployment adapter: implemented; host SSH configured 2026-09-17 (live deploy/rollback not run).
 
 | Gate                                                               | Evidence URI/checksum                                                          | Date         | Owner            | Reviewer           | Status               |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------ | ---------------- | ------------------ | -------------------- |
@@ -15,7 +15,8 @@ Owner: Release owner. Independent reviewer: unassigned. Production deployment ad
 | Clinical safety directory and outage drill                         | unavailable                                                                    | not executed | Clinical safety  | unassigned         | blocked              |
 | Provider-connected staging record                                  | `docs/runbooks/provider-staging-evidence.md`                                   | not executed | Integrations     | unassigned         | blocked              |
 | YooKassa test-shop, legal/fiscal, registry and activation approval | `docs/runbooks/yookassa-provider.md`                                           | not executed | Payments/Legal   | unassigned         | blocked              |
-| Rollback drill using prior immutable release directory             | `docs/test-evidence/rollback-drill-2026-09-17.md`                              | 2026-09-17   | Incident command | unassigned         | PASS rehearsal (exact adapter body; production SSH host not configured) |
+| Production host identity and BatchMode deploy SSH                  | `docs/test-evidence/production/host-identity-2026-09-17.md`                    | 2026-09-17   | Platform         | unassigned         | PASS (ED25519 pin; `ii_tonya` key; live rollback not run) |
+| Rollback drill using prior immutable release directory             | `docs/test-evidence/rollback-drill-2026-09-17.md`                              | 2026-09-17   | Incident command | unassigned         | PASS rehearsal (exact adapter body). Host SSH now configured; live rollback not executed |
 | Manual production environment approval                             | unavailable                                                                    | not executed | Release          | unassigned         | blocked              |
 | Sandbox payment container lifecycle (`SBX-TST-009`)                | `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`    | not executed | Platform         | independent review | blocked: no image    |
 | Sandbox/native-production closure inventory and security scan      | same record                                                                    | not executed | Security/Release | unassigned         | blocked              |

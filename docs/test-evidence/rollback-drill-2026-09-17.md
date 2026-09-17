@@ -6,9 +6,11 @@ Reviewer: unassigned (independent review still open).
 
 ## Scope
 
-Production SSH (`DEPLOY_HOST` / `SSH_KEY_FILE`) is **not configured** on this
-checkout. This drill is a **Claw rehearsal of the exact remote rollback body**
-inside `scripts/deploy-native-remote.sh`, against two immutable
+Production SSH (`DEPLOY_HOST` / `SSH_KEY_FILE`) was **not configured** when this
+rehearsal ran. Host identity and BatchMode SSH were added later the same day
+(`docs/test-evidence/production/host-identity-2026-09-17.md`); live rollback was
+still not executed. This drill remains a **Claw rehearsal of the exact remote
+rollback body** inside `scripts/deploy-native-remote.sh`, against two immutable
 `releases/<40-hex>` directories. It is not a live switch of
 `/opt/ii-tonya-platform/current` on the dedicated server.
 

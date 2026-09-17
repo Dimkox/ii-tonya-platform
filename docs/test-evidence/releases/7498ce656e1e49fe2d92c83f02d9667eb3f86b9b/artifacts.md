@@ -4,10 +4,13 @@
 - signed_at_utc: 2026-09-11T11:39:50Z (Rekor `integratedTime` 1789126790)
 - source_sha: `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`
 - format: `ii-tonya-native-v1`
-- status: **not deployed.** Production still serves `233f3cf72e45e47117948ad5615b603252801e40`
-  (2026-08-14), tracked in [#48](https://github.com/Dimkox/ii-tonya-platform/issues/48). The
-  only GitHub release remains `prod-233f3cf`
-  ([#58](https://github.com/Dimkox/ii-tonya-platform/issues/58)).
+- status: **built and signed 2026-09-11.** A later host inventory (2026-09-17) found
+  production `current` pointing at this SHA; previous directory
+  `233f3cf72e45e47117948ad5615b603252801e40` remains on disk. See
+  [`docs/test-evidence/production/host-identity-2026-09-17.md`](../../production/host-identity-2026-09-17.md).
+  The only GitHub release tag remains `prod-233f3cf`
+  ([#58](https://github.com/Dimkox/ii-tonya-platform/issues/58)). This file is still the
+  2026-09-11 build/sign record, not a deploy adapter log.
 
 ## How it was produced
 
