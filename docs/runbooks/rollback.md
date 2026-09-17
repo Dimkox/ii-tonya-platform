@@ -18,3 +18,11 @@ Decision owner: Incident commander. Executor: Platform owner. Reviewer: Release 
    decision owner, executor, reviewer, and recovery outcome.
 
 Production rollback never uses Docker, Compose, mutable tags, or GitHub Actions.
+
+## Rehearsal evidence
+
+Claw rehearsal of the exact remote rollback body (two immutable `releases/<sha>`
+directories, unit restore, symlink switch, readiness):
+[`docs/test-evidence/rollback-drill-2026-09-17.md`](../test-evidence/rollback-drill-2026-09-17.md).
+That rehearsal is not a substitute for `deploy-native-remote.sh rollback` against
+the dedicated host once `DEPLOY_HOST` is configured.

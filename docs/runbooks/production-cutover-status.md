@@ -38,6 +38,7 @@ release_status: "NO-GO"
 | Retention/legal approval | **PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; владелец подтвердил уведомление РКН (ст. 22 152-ФЗ); номер реестра не передавался |
 | Manual production environment approval | человек |
 | Смена `/opt/ii-tonya-platform/current` | интерактивный root SSH, не unattended |
+| Rollback drill | **PASS rehearsal** 2026-09-17: `docs/test-evidence/rollback-drill-2026-09-17.md`. Production SSH (`DEPLOY_HOST`) не задан |
 
 Текущий native runtime `233f3cf7…` — operational, но не воспроизводимый релиз
 текущего SHA. Новый SHA на прод **не выкладывается** этим прогоном.

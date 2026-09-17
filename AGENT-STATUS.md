@@ -174,6 +174,8 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
   no longer treat use/accept as 152-FZ consent (156-FZ). See
   `docs/runbooks/production-cutover-status.md`.
   Production remains **NO-GO** (no payments, no prod switch, no invented prices).
+  Rollback drill: Claw rehearsal PASS
+  (`docs/test-evidence/rollback-drill-2026-09-17.md`); live host still unconfigured.
 - **Owner price:** four paid client SKU `price_minor` values. Until then FIN-021
   and `PAYMENTS_ENABLED` stay off.
 - **FIN-001/007/012–015 review** then merge this branch.
