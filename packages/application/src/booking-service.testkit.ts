@@ -21,9 +21,10 @@ export interface BookingFixture extends BookingDependencies {
   };
 }
 
-export const bookingFixture = (
-  initial?: { readonly status: ReservationStatus; readonly version: number },
-): BookingFixture => {
+export const bookingFixture = (initial?: {
+  readonly status: ReservationStatus;
+  readonly version: number;
+}): BookingFixture => {
   const reservationId = "00000000-0000-4000-8000-000000000101";
   const expertId = "00000000-0000-4000-8000-000000000102";
   const userId = "00000000-0000-4000-8000-000000000103";
@@ -32,9 +33,8 @@ export const bookingFixture = (
   const topics: string[] = [];
   const charges: number[] = [];
   const actions: string[] = [];
-  let reservation:
-    | { status: ReservationStatus; version: number }
-    | undefined = initial === undefined ? undefined : { ...initial };
+  let reservation: { status: ReservationStatus; version: number } | undefined =
+    initial === undefined ? undefined : { ...initial };
 
   const publish = (topic: string): void => {
     topics.push(topic);
@@ -87,10 +87,7 @@ export const bookingFixture = (
         if (command.expectedVersion !== reservation.version) {
           throw new Error("Stale reservation version");
         }
-        if (
-          command.actor.type === "expert" &&
-          command.actor.id !== expertId
-        ) {
+        if (command.actor.type === "expert" && command.actor.id !== expertId) {
           throw new Error("Reservation expert ownership mismatch");
         }
         if (command.actor.type === "client" && command.actor.id !== userId) {
@@ -119,18 +116,19 @@ export const bookingFixture = (
         }
         return { reservationId, ...reservation };
       },
-      async transitionFromTelegramCallback(command): Promise<BookingResult | null> {
+      async transitionFromTelegramCallback(
+        command,
+      ): Promise<BookingResult | null> {
         if (
           command.tokenHash !== callbackTokenHash ||
           command.reservationId !== reservationId
-        ) return null;
+        )
+          return null;
         return this.transitionAndPublish({
           reservationId,
           expectedVersion: command.version,
           action:
-            command.action === "confirm"
-              ? "expert_confirm"
-              : "expert_cancel",
+            command.action === "confirm" ? "expert_confirm" : "expert_cancel",
           actor: { type: "expert", id: command.expertId },
           now: command.now,
           correlationId: command.correlationId,
@@ -140,7 +138,8 @@ export const bookingFixture = (
         if (
           command.telegramUserId !== telegramUserId ||
           command.expertId !== expertId
-        ) return null;
+        )
+          return null;
         return [
           {
             reservationId,
@@ -150,6 +149,7 @@ export const bookingFixture = (
             clientDisplayName: "Клиент",
             expertNote: "Не показывать без согласия",
             expertNoteConsent: false,
+            expertHandoffConsent: false,
             meetingUrl: "https://meeting.invalid/private",
             rawConversation: "never expose",
             unconsentedProfile: "never expose",
