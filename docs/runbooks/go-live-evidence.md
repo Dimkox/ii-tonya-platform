@@ -1,6 +1,6 @@
 # Go-live evidence
 
-Owner: Release owner. Independent reviewer: unassigned. Production deployment adapter: implemented; host SSH configured 2026-09-17 (live deploy/rollback not run).
+Owner: Release owner. Independent reviewer: unassigned. Production deployment adapter: implemented; `cb07bd18` live 2026-09-18 (`docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md`). Payments still fail-closed.
 
 | Gate                                                               | Evidence URI/checksum                                                          | Date         | Owner            | Reviewer           | Status               |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------ | ---------------- | ------------------ | -------------------- |
@@ -17,16 +17,16 @@ Owner: Release owner. Independent reviewer: unassigned. Production deployment ad
 | YooKassa test-shop, legal/fiscal, registry and activation approval | `docs/runbooks/yookassa-provider.md`                                           | not executed | Payments/Legal   | unassigned         | blocked              |
 | Production host identity and BatchMode deploy SSH                  | `docs/test-evidence/production/host-identity-2026-09-17.md`                    | 2026-09-17   | Platform         | unassigned         | PASS (ED25519 pin; `ii_tonya` key; live rollback not run) |
 | Rollback drill using prior immutable release directory             | `docs/test-evidence/rollback-drill-2026-09-17.md`                              | 2026-09-17   | Incident command | unassigned         | PASS rehearsal (exact adapter body). Host SSH now configured; live rollback not executed |
-| Manual production environment approval                             | unavailable                                                                    | not executed | Release          | unassigned         | blocked              |
+| Manual production environment approval                             | `docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md`                  | 2026-09-18   | Release          | owner («делай сам») | PASS for this SHA only; payments/providers still off |
 | Sandbox payment container lifecycle (`SBX-TST-009`)                | `docs/test-evidence/claw/sandbox-payment-provider-20260813/verification.md`    | not executed | Platform         | independent review | blocked: no image    |
 | Sandbox/native-production closure inventory and security scan      | same record                                                                    | not executed | Security/Release | unassigned         | blocked              |
 
 Live payments: disabled
 
 YooKassa status: BLOCKED. Direct Claw checks are repository gates, not provider evidence;
-GitHub Actions are not used. Hoster maintenance defers production deployment, and empty
-credential placeholders must remain empty until the separate activation approval.
+GitHub Actions are not used. Native SHA `cb07bd18` is live; empty credential placeholders
+must remain empty until the separate payment activation approval.
 
-Release status: NO-GO
+Release status: NO-GO for live payments/providers. Native runtime SHA is deployed.
 
 The sandbox payment implementation does not change this decision. Its code review is not provider-connected staging evidence and its packaged-runtime gates remain incomplete. Production has no application image: its release candidate is the signed native API/worker bundle described in `docs/runbooks/native-production-deployment.md`.

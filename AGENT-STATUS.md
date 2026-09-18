@@ -167,17 +167,10 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
    (`docs/runbooks/production-cutover-status.md`). Host identity and
    BatchMode `ii_tonya` SSH: PASS 2026-09-17
    (`docs/test-evidence/production/host-identity-2026-09-17.md`). Live SHA
-   `7498ce65`; no new deploy, no live rollback, no runtime.env copy.
-   New cosign signing key 2026-09-17:
-   `docs/test-evidence/releases/release-cosign-claw-2026-09-17.md`. Signed
-   `origin/main` `cb07bd18` (not deployed):
-   `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`.
-   Claw 2026-09-18: Database Gate PASS; CI FAIL gitleaks only
-   (`docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/`).
-   Native smoke PASS (`native-smoke.md`). Prod transfer+preflight PASS
-   (`docs/test-evidence/production/cb07bd18-preflight-2026-09-18.md`);
-   no pending SQL; `current` not switched.
-6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged (`PAYMENTS_ENABLED=false`). SKU prices recorded 4999/5999/7999/10990.
+   `cb07bd18` deployed 2026-09-18
+   (`docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md`); previous
+   `7498ce65`. Local payments flags were not copied to runtime.env.
+6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` still has `PAYMENTS_ENABLED=false`; only the migration approval SHA and file mode were changed for this deploy. SKU prices recorded 4999/5999/7999/10990.
 
 ## Next actions (pick one, do not mix)
 
@@ -186,7 +179,7 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
   (legal PASS after owner attested RKN art.22 notice). `/privacy` and `/oferta`
   no longer treat use/accept as 152-FZ consent (156-FZ). See
   `docs/runbooks/production-cutover-status.md`.
-  Production remains **NO-GO** (no payments on prod, no new SHA switch).
+  Production native SHA is live (`cb07bd18`); payments/providers remain **NO-GO**.
   Rollback drill: Claw rehearsal PASS
   (`docs/test-evidence/rollback-drill-2026-09-17.md`); host SSH PASS
   (`docs/test-evidence/production/host-identity-2026-09-17.md`); live rollback

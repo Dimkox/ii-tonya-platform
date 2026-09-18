@@ -13,16 +13,13 @@ authoritative ии-Тоня source document.
 ## Status
 
 Native production runtime deployed; live-provider activation remains closed. As of
-2026-09-17 the dedicated Ubuntu server serves
-`7498ce656e1e49fe2d92c83f02d9667eb3f86b9b` as systemd-managed API and worker
+2026-09-18 the dedicated Ubuntu server serves
+`cb07bd1821d8106b0b0088b17bcf305662a1b792` as systemd-managed API and worker
 services with system PostgreSQL, nginx, and HTTPS for `ii-tonya.ru` and
 `www.ii-tonya.ru`. The prior immutable directory
-`233f3cf72e45e47117948ad5615b603252801e40` remains on disk as `.previous-release`
-([first-release evidence](docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md);
+`7498ce656e1e49fe2d92c83f02d9667eb3f86b9b` is `.previous-release`
+([deploy evidence](docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md);
 [host identity](docs/test-evidence/production/host-identity-2026-09-17.md)).
-That first native release required host-only recovery settings and is not accepted as a
-reproducible cold-deploy artifact; a corrected exact-SHA replacement of current `main`
-is still the active release task.
 The client platform foundation is implemented, while live-provider gates remain closed.
 Release B2 now contains the default-off single-dialogue response convergence slice:
 deterministic and accepted Selarti replies receive one monotonic dialogue sequence and

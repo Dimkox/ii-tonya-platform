@@ -45,15 +45,12 @@ Wiki-репозиторий GitHub для приватных репозитор�
 
 ## Что крутится прямо сейчас
 
-Текущий production `current`: `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`
-(инвентарь 2026-09-17). Предыдущий каталог на диске:
-`233f3cf72e45e47117948ad5615b603252801e40` (релиз
-[`prod-233f3cf`](https://github.com/Dimkox/ii-tonya-platform/releases/tag/prod-233f3cf)).
-Loopback `/health/ready` 2026-09-17: `postgres/migrations/workerLease/adapters` —
-все `true`. Хост и BatchMode SSH:
-[`host-identity-2026-09-17.md`](../test-evidence/production/host-identity-2026-09-17.md).
-
-`origin/main` на 53 коммита впереди живого SHA — см. [issue #48](https://github.com/Dimkox/ii-tonya-platform/issues/48).
+Текущий production `current`: `cb07bd1821d8106b0b0088b17bcf305662a1b792`
+(выкладка 2026-09-18). Previous:
+`7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`. `233f3cf7` ещё на диске.
+Loopback `/health/ready` 2026-09-18: `postgres/migrations/workerLease/adapters` —
+все `true`. Evidence:
+[`cb07bd18-deploy-2026-09-18.md`](../test-evidence/production/cb07bd18-deploy-2026-09-18.md).
 
 ## Правила связности
 
