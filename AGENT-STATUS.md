@@ -172,6 +172,8 @@ The task `test expert` still points at the older agent `41nano` (`gpt-4.1-nano`)
    `docs/test-evidence/releases/release-cosign-claw-2026-09-17.md`. Signed
    `origin/main` `cb07bd18` (not deployed):
    `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`.
+   Claw 2026-09-18: Database Gate PASS; CI FAIL gitleaks only
+   (`docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/`).
 6. Planerka / Make / Sheets still placeholders. Telegram bot tokens exist; webhook/HMAC/admin chat ids do not. Local `.env` (gitignored): owner supplied YooKassa `shopId`; `PAYMENTS_ENABLED=true`, `YOOKASSA_ENABLED=true`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_MODE=live`. `loadEnv` accepts. Production `/etc/ii-tonya/runtime.env` is unchanged (`PAYMENTS_ENABLED=false`). SKU prices recorded 4999/5999/7999/10990.
 
 ## Next actions (pick one, do not mix)

@@ -32,6 +32,8 @@ release_status: "NO-GO"
 | Gate | Почему агент не закрывает |
 |---|---|
 | Подпись native bundle | **PASS** 2026-09-17 для `origin/main` `cb07bd18`: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`. Не задеплоен |
+| Claw CI `cb07bd18` | **FAIL gitleaks**; build/lint/typecheck/coverage PASS. Allowlist committed on this branch; cannot green the signed SHA without a new commit |
+| Claw Database Gate `cb07bd18` | **PASS** 2026-09-18: `docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/database.md` |
 | Migration preflight / restore drill на проде | нет делегированного destructive DB |
 | YooKassa test-shop / fiscal / registry | BLOCKED; пустые креды должны остаться пустыми |
 | Provider staging (Planerka/Selarti) | default-off, нет RF-доказательства региона |
