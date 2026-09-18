@@ -35,7 +35,7 @@ release_status: "NO-GO"
 | Claw CI `cb07bd18` | **FAIL gitleaks**; build/lint/typecheck/coverage PASS. Allowlist committed on this branch; cannot green the signed SHA without a new commit |
 | Claw Database Gate `cb07bd18` | **PASS** 2026-09-18: `docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/database.md` |
 | Native smoke `cb07bd18` | **PASS** 2026-09-18: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/native-smoke.md` (Claw `ii_tonya_native_smoke` only) |
-| Migration preflight / restore drill на проде | нет делегированного destructive DB |
+| Transfer + runtime.env + migration preflight `cb07bd18` | **PASS** read-only 2026-09-18: `docs/test-evidence/production/cb07bd18-preflight-2026-09-18.md`. Incoming на хосте; `current` не переключён. Approve SHA still `7498ce65`. Restore drill не делался |
 | YooKassa test-shop / fiscal / registry | BLOCKED; пустые креды должны остаться пустыми |
 | Provider staging (Planerka/Selarti) | default-off, нет RF-доказательства региона |
 | Clinical safety directory + outage drill | DEC-EXP-006 = не выдумывать клинический ритм |
