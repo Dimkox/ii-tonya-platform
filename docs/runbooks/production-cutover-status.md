@@ -29,20 +29,20 @@ release_status: "NO-GO"
 
 Из `docs/runbooks/go-live-evidence.md`, статус **NO-GO**:
 
-| Gate | Почему агент не закрывает |
-|---|---|
-| Подпись native bundle | **PASS** 2026-09-17 для `origin/main` `cb07bd18`: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`. Не задеплоен |
-| Claw CI `cb07bd18` | **FAIL gitleaks**; build/lint/typecheck/coverage PASS. Allowlist committed on this branch; cannot green the signed SHA without a new commit |
-| Claw Database Gate `cb07bd18` | **PASS** 2026-09-18: `docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/database.md` |
-| Native smoke `cb07bd18` | **PASS** 2026-09-18: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/native-smoke.md` (Claw `ii_tonya_native_smoke` only) |
-| Transfer + runtime.env + migration preflight `cb07bd18` | **PASS** read-only 2026-09-18: `docs/test-evidence/production/cb07bd18-preflight-2026-09-18.md`. Incoming на хосте; `current` не переключён. Approve SHA still `7498ce65`. Restore drill не делался |
-| YooKassa test-shop / fiscal / registry | BLOCKED; пустые креды должны остаться пустыми |
-| Provider staging (Planerka/Selarti) | default-off, нет RF-доказательства региона |
-| Clinical safety directory + outage drill | DEC-EXP-006 = не выдумывать клинический ритм |
-| Retention/legal approval | **PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; владелец подтвердил уведомление РКН (ст. 22 152-ФЗ); номер реестра не передавался |
-| Manual production environment approval | человек |
-| Смена `/opt/ii-tonya-platform/current` | **DONE** 2026-09-18: `current` → `cb07bd18`; previous `7498ce65`. Evidence `docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md` |
-| Rollback drill | **PASS rehearsal** 2026-09-17: `docs/test-evidence/rollback-drill-2026-09-17.md`. Host SSH **PASS** 2026-09-17: `docs/test-evidence/production/host-identity-2026-09-17.md`. Live `deploy-native-remote.sh rollback` **not executed** |
+| Gate                                                    | Почему агент не закрывает                                                                                                                                                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Подпись native bundle                                   | **PASS** 2026-09-17 для `origin/main` `cb07bd18`: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/artifacts.md`. Не задеплоен                                                                                   |
+| Claw CI `cb07bd18`                                      | **FAIL gitleaks**; build/lint/typecheck/coverage PASS. Allowlist committed on this branch; cannot green the signed SHA without a new commit                                                                                           |
+| Claw Database Gate `cb07bd18`                           | **PASS** 2026-09-18: `docs/test-evidence/claw/cb07bd1821d8106b0b0088b17bcf305662a1b792/database.md`                                                                                                                                   |
+| Native smoke `cb07bd18`                                 | **PASS** 2026-09-18: `docs/test-evidence/releases/cb07bd1821d8106b0b0088b17bcf305662a1b792/native-smoke.md` (Claw `ii_tonya_native_smoke` only)                                                                                       |
+| Transfer + runtime.env + migration preflight `cb07bd18` | **PASS** read-only 2026-09-18: `docs/test-evidence/production/cb07bd18-preflight-2026-09-18.md`. Incoming на хосте; `current` не переключён. Approve SHA still `7498ce65`. Restore drill не делался                                   |
+| YooKassa test-shop / fiscal / registry                  | BLOCKED; пустые креды должны остаться пустыми                                                                                                                                                                                         |
+| Provider staging (Planerka/Selarti)                     | default-off, нет RF-доказательства региона                                                                                                                                                                                            |
+| Clinical safety directory + outage drill                | DEC-EXP-006 = не выдумывать клинический ритм                                                                                                                                                                                          |
+| Retention/legal approval                                | **PASS** 2026-09-17: `docs/legal/owner-update-legal-review.md`; владелец подтвердил уведомление РКН (ст. 22 152-ФЗ); номер реестра не передавался                                                                                     |
+| Manual production environment approval                  | человек                                                                                                                                                                                                                               |
+| Смена `/opt/ii-tonya-platform/current`                  | **DONE** 2026-09-18: `current` → `cb07bd18`; previous `7498ce65`. Evidence `docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md`                                                                                              |
+| Rollback drill                                          | **PASS rehearsal** 2026-09-17: `docs/test-evidence/rollback-drill-2026-09-17.md`. Host SSH **PASS** 2026-09-17: `docs/test-evidence/production/host-identity-2026-09-17.md`. Live `deploy-native-remote.sh rollback` **not executed** |
 
 Текущий native runtime на хосте: `cb07bd1821d8106b0b0088b17bcf305662a1b792`
 (`current` = `origin/main` at sign time). Previous:

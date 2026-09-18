@@ -349,8 +349,10 @@ const approvedAutomationArtifactHashes = new Map([
     "39f638068394485aa621da9f7ed609d1c15ee9bd7574b27d8c29b494481b1470",
   ],
   [
+    // 5596c3b also DROP SCHEMA drizzle so a leftover migrator ledger cannot skip
+    // 0018 after public was emptied.
     "scripts/smoke-native-release.sh",
-    "9fd54833375be65f13fadc9203d1bf2d0eccb60439862f3c296e289abb9a9553",
+    "8948a5ee1292657b69294c726e3bf608ba050f2914e8db4f9e6c19d9afa91de1",
   ],
   [
     "scripts/migrate-native.mjs",
