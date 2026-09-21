@@ -6,6 +6,7 @@ import {
   validateClientCatalogCards,
   type ClientCatalogCard,
 } from "./client-catalog-repository.js";
+import { currentConsentGrantedSql } from "./consent-current.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 export interface WithdrawConsentCommand {
@@ -171,13 +172,13 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         values (
           ${command.targetUserId}::uuid,
           ${command.purpose},
-          (case when (
-               select prior.decision from consents prior
-               where prior.user_id = ${command.targetUserId}::uuid
-                 and prior.consent_type = ${command.purpose}
-               order by prior.created_at desc, prior."sequence" desc
-               limit 1
-             ) = 'granted' then 'revoked' else 'denied' end),
+          (case
+             when ${currentConsentGrantedSql({
+               userExpression: sql`${command.targetUserId}::uuid`,
+               purpose: command.purpose,
+             })}
+             then 'revoked' else 'denied'
+           end),
           ${command.policyVersion},
           'consent'
         )
@@ -239,13 +240,13 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           values (
             ${command.targetUserId}::uuid,
             'expert_handoff',
-            (case when (
-                 select prior.decision from consents prior
-                 where prior.user_id = ${command.targetUserId}::uuid
-                   and prior.consent_type = 'expert_handoff'
-                 order by prior.created_at desc, prior."sequence" desc
-                 limit 1
-               ) = 'granted' then 'revoked' else 'denied' end),
+            (case
+               when ${currentConsentGrantedSql({
+                 userExpression: sql`${command.targetUserId}::uuid`,
+                 purpose: "expert_handoff",
+               })}
+               then 'revoked' else 'denied'
+             end),
             'handoff-v1',
             'consent'
           )
