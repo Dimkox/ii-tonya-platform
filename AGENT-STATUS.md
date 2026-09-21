@@ -13,7 +13,7 @@ older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `codex/fin-001-client-access-policy` (from `origin/main` @ `cb07bd1`) |
-| `main` SHA | `cb07bd18` — live in production since 2026-09-18 (contains PR #97 `f6b0c296` expert_handoff read-path). This branch `codex/fin-001-client-access-policy` @ `e195029b` is 16 commits ahead of `origin/main` and has **no PR yet** |
+| `main` SHA | `cb07bd18` — live in production since 2026-09-18 (contains PR #97 `f6b0c296` expert_handoff read-path). This branch `codex/fin-001-client-access-policy` is 19 commits ahead of `origin/main` (head `ecadb43a`) and is open as **PR #98** — not merged: `TASK-FIN-002/012/013/015` still need owner rulings (`Q-169`, `DEC-FIN-029`, `DEC-FIN-030`) and `TASK-PLT-008` waits on `TASK-PLT-017` |
 | Decision register (2026-09-21) | 43 DEC cards: 39 `accepted` + 4 `open` (`DEC-PLT-011…014`, opened by verdict Б). `backlog.json`: 93 tasks — readiness `ready` 34 / `pending_dependencies` 51 / `blocked_by_decision` 8; state merged 25 / implemented_pending_review 8 / planned 60. `validate_backlog.py --repo-root .` → `ok: true` |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
