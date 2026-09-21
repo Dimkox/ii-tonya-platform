@@ -220,6 +220,8 @@ const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
 const MINIMUM_LEAD_MS = 24 * 60 * 60 * 1_000;
+// DEC-PLT-004 §4 (строка Telegram): meeting_url уходит наружу не ранее 30 минут до встречи.
+const MEETING_URL_DISCLOSURE_LEAD_MS = 30 * 60 * 1_000;
 const MAXIMUM_HOLD_MS = 72 * 60 * 60 * 1_000;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -587,7 +589,9 @@ export class PostgresBookingRepository {
         note_consent.granted as "expertNoteConsent",
         handoff_consent.granted as "expertHandoffConsent",
         case
-          when r.status = 'booked' then r.meeting_url
+          when r.status = 'booked'
+            and s.starts_at - ${MEETING_URL_DISCLOSURE_LEAD_MS} * interval '1 millisecond' <= clock_timestamp()
+          then r.meeting_url
           else null
         end as "meetingUrl"
       from experts e

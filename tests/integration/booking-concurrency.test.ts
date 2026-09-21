@@ -804,6 +804,45 @@ describe("booking transaction", () => {
       meetingUrl: "https://meeting.invalid/private",
     });
     expect(handoffDeniedSchedule?.[0]).not.toHaveProperty("expertNote");
+
+    // DEC-PLT-004 §4 (строка Telegram): meeting_url наружу «не ранее 30 мин» до встречи.
+    const originalSlotRow = await testDb.db.execute<{ startsAt: Date }>(sql`
+      select starts_at as "startsAt" from slots where id = ${fixture.command.slotId}::uuid
+    `);
+    const originalStartsAt = originalSlotRow.rows[0]?.startsAt;
+    await testDb.db.execute(sql`
+      update slots set starts_at = now() + interval '2 hours'
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    const tooEarlySchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2027-12-31T00:00:00.000Z"),
+    });
+    expect(tooEarlySchedule?.[0]).toMatchObject({
+      status: "booked",
+      clientDisplayName: "Клиент",
+    });
+    expect(tooEarlySchedule?.[0]).not.toHaveProperty("meetingUrl");
+    await testDb.db.execute(sql`
+      update slots set starts_at = now() + interval '10 minutes'
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    const insideLeadSchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2027-12-31T00:00:00.000Z"),
+    });
+    expect(insideLeadSchedule?.[0]).toMatchObject({
+      status: "booked",
+      meetingUrl: "https://meeting.invalid/private",
+    });
+    await testDb.db.execute(sql`
+      update slots set starts_at = ${originalStartsAt}
+      where id = ${fixture.command.slotId}::uuid
+    `);
     await testDb.db.execute(sql`
       update experts set active = false where id = ${fixture.expertId}::uuid
     `);

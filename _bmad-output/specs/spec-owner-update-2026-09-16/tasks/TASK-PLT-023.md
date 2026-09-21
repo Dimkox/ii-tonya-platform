@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `ready`.
+- State: `implemented_pending_review`; readiness: `ready`.
 - Тип: implementation; исполнитель: backend; приоритет: P1.
 - Depends on: .
 - Решения: `DEC-PLT-004`.
@@ -65,6 +65,19 @@
 - [ ] Ссылка не попадает в expert schedule message и в schedule-запись ранее порога (тест).
 - [ ] При `starts_at` в прошлом или неопределённом — отказ по умолчанию (fail-closed).
 
+
+## Исполнено (2026-09-21, ветка codex/fin-001)
+
+- [x] SQL-гейт в `booking-repository.ts`: `s.starts_at - ${MEETING_URL_DISCLOSURE_LEAD_MS} * interval '1 millisecond' <= clock_timestamp()`
+  при `status='booked'`; константа `30 * 60 * 1_000` рядом с `MINIMUM_LEAD_MS`.
+- [x] Адаптер Telegram не изменён: печать `Встреча:` уже условна на присутствие поля
+  (`telegram-adapter.ts:473-476`), а маппинг репозитория опускает `null` (`booking-repository.ts:681-682`) — проверено чтением кода.
+- [x] Таблица истинности выражения на `postgres:16-alpine`: `+2h → false`, `+30min → true`,
+  `+10min → true`, `-1h → true`.
+- [x] Интеграционный кейс в обе стороны: встреча через 2 часа — свойства `meetingUrl` нет;
+  через 10 минут — ссылка есть; затем `starts_at` возвращается к исходному.
+  Контроль: при удалении условия тест падает с «to not have property "meetingUrl"» (замерено).
+- [ ] Независимый review этого гейта.
 
 ## Команды проверки
 

@@ -66,6 +66,20 @@ describe("booking SQL mutation guards", () => {
     );
   });
 
+  it("withholds the expert meeting URL until 30 minutes before the start (DEC-PLT-004 §4)", () => {
+    const source = readFileSync(
+      "packages/db/src/repositories/booking-repository.ts",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      "const MEETING_URL_DISCLOSURE_LEAD_MS = 30 * 60 * 1_000;",
+    );
+    expect(source).toContain(
+      "and s.starts_at - ${MEETING_URL_DISCLOSURE_LEAD_MS} * interval '1 millisecond' <= clock_timestamp()",
+    );
+  });
+
   it("does not expose split Telegram authorization and schedule reads", () => {
     const source = readFileSync(
       "packages/db/src/repositories/booking-repository.ts",

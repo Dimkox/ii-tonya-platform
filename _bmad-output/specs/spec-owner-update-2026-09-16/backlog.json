@@ -7131,7 +7131,7 @@
           "tests/repo/meeting-url-timing-gate.test.ts"
         ]
       },
-      "current_state": "§4 действующего правила требует отдавать ссылку не ранее 30 минут до встречи. Read-path гейтит только статус: `booking-repository.ts:588-590` `when r.status = 'booked' then r.meeting_url`, `telegram-adapter.ts:471-477` рендерит `Встреча: <url>` в сообщение расписания. Замер review PR #97 (случай без согласий, встреча через ~24 часа): `meetingUrl` возвращается (проверено 2026-09-21).",
+      "current_state": "Исполнено на ветке codex/fin-001 (2026-09-21): `booking-repository.ts` гейтит `meetingUrl` условием `s.starts_at - MEETING_URL_DISCLOSURE_LEAD_MS (30 мин) * interval '1 millisecond' <= clock_timestamp()`; адаптер Telegram менять не потребовалось — он печатает `Встреча:` только когда поле присутствует в записи (telegram-adapter.ts:473-476), а маппинг репозитория опускает null (booking-repository.ts:681-682). Замер таблицы истинности выражения на postgres:16-alpine: +2h → false, +30min/+10min/прошлое → true. Интеграционный кейс проверяет обе стороны (+2h ссылки нет, +10min есть) и обязан краснеть при удалении гейта — проверено removal-экспериментом.",
       "deliverables": [
         "Временной гейт на обоих путях показа ссылки (SQL и рендер сообщения): до порога ссылка не раскрывается.",
         "Порог — число из схемы env с fail-closed default: отсутствие конфигурации = не показывать."
@@ -7142,7 +7142,8 @@
       ],
       "acceptance": [
         "Ссылка не попадает в expert schedule message и в schedule-запись ранее порога (тест).",
-        "При `starts_at` в прошлом или неопределённом — отказ по умолчанию (fail-closed)."
+        "При `starts_at` в прошлом или неопределённом — отказ по умолчанию (fail-closed).",
+        "Гарунт в tests/repo/booking-repository-guards.test.ts пиннит константу 30 минут и условие в SQL."
       ],
       "verification_commands": [
         "pnpm exec vitest run tests/repo/meeting-url-timing-gate.test.ts"
@@ -7153,7 +7154,7 @@
         "A005"
       ],
       "detail_ids": [],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready"
     },
     {
