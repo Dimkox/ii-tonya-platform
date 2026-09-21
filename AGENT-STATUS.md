@@ -1,7 +1,8 @@
 # Agent status — owner-spec 2026-09-16
 
-Updated: 2026-09-17 — TASK-FIN-001 cohort contract on
-`codex/fin-001-client-access-policy`. This is the live continuation file. Read
+Updated: 2026-09-21 — owner verdict **Б** on the consent ТЗ review: DEC-PLT-004
+partially reopened, gate cards DEC-PLT-011…014 and TASK-PLT-017…021 created (see
+the 2026-09-21 section below). This is the live continuation file. Read
 it before `AGENTS.md` extras, the spec README, or any TASK card. Do not treat
 older handoffs (`docs/handoffs/2026-08-*`) as current.
 
@@ -12,7 +13,8 @@ older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Item | Value |
 |---|---|
 | Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `codex/fin-001-client-access-policy` (from `origin/main` @ `cb07bd1`) |
-| `main` SHA | `5b407ff` = DEC-pack (25 conservative acceptances) on top of `632184d` (DEC-FIN-020) → … → `7777ae5` #94 (PLT-008 substrate). 36/39 decisions accepted |
+| `main` SHA | `cb07bd18` — live in production since 2026-09-18 (contains PR #97 `f6b0c296` expert_handoff read-path). This branch `codex/fin-001-client-access-policy` @ `e195029b` is 16 commits ahead of `origin/main` and has **no PR yet** |
+| Decision register (2026-09-21) | 43 DEC cards: 39 `accepted` + 4 `open` (`DEC-PLT-011…014`, opened by verdict Б). `backlog.json`: 93 tasks — readiness `ready` 34 / `pending_dependencies` 51 / `blocked_by_decision` 8; state merged 25 / implemented_pending_review 8 / planned 60. `validate_backlog.py --repo-root .` → `ok: true` |
 | Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
 | Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
 | PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
@@ -21,6 +23,54 @@ older handoffs (`docs/handoffs/2026-08-*`) as current.
 | Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
 
 Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). Factory/Superpowers/Spec Kit install is a **separate** branch `codex/install-adaptive-factory-2.0.18` — do not mix it into this FIN-001 change.
+
+## 2026-09-21 — вердикт владельца Б: reopen DEC-PLT-004 под «подробный режим»
+
+Владелец по §8 рецензии на ТЗ «понятное согласие на данные в клиентской ветке»
+(архив `ii-tonya-base/outputs/tz-client-consent-2026-09-21.md`, рецензия
+`…-review.md`) выбрал **вариант Б**, а не рекомендованный А. Записано в
+`.memlog.md` (запись 699, `--type decision --by user`).
+
+Что это значит для исполнителя:
+
+- Инвариант `DEC-PLT-004` §2 («специальные категории 152-ФЗ и ПД третьих лиц не
+  хранятся никогда») **пересматривается**: целевая модель — добровольный
+  подробный режим со спецданными по отдельному письменному согласию (ст. 9/10
+  № 152-ФЗ) с надлежащей ЭП (CAP-3 ТЗ).
+- **Interim-режим до закрытия `DEC-PLT-011…014` = действующее правило §1–§9 без
+  изменений.** Подробный режим закрыт, спецданные не персистятся и не
+  передаются, подбор остаётся договорным основанием (п.5 ч.1 ст.6) **без
+  consent-записи**, одно согласие = одна цель, согласие выдаёт только клиент
+  через верифицированный UI, публикация текстов по-прежнему под `DEC-PLT-007`
+  до `TASK-PLT-012`. Reopen **не** разрешает хранить спецданные — он открывает
+  работу по их допустимому хранению.
+- Новые открытые карточки гейтов: `DEC-PLT-011` (способ ЭП, идентификация,
+  доказательства), `DEC-PLT-012` (класс УЗ и доказательство РФ-региона для
+  персиста спецданных), `DEC-PLT-013` (канал подписи и участие Telegram),
+  `DEC-PLT-014` (правовая основа входного потока при незапрошенных спецданных и
+  ПД третьих лиц). Вопросы `Q-001`, `Q-117`, `Q-144` возвращены в `open` — их
+  единственный носитель `TASK-PLT-008`.
+- Новые задачи: `TASK-PLT-017` **grant-механизм согласий** (readiness `ready`,
+  независима от reopen — без неё CAP-5/6/7 неработоспособны: в проде `insert
+  into consents` только с `decision='denied'` в `privacy-repository.ts:169,220`,
+  роута выдачи нет, `privacyService = disabledService` — `apps/api/src/server.ts:337`);
+  `TASK-PLT-018` карантин входящего текста (CAP-4 сегодня **нарушается**:
+  `dialogue_inbound.text` хранит сырой текст 30 дней —
+  `hybrid-message-repository.ts:105-107`); `TASK-PLT-019…021` — подпись/УЗ/канал,
+  все `blocked_by_decision`.
+- Незакрытый дефект реестра: 4 задачи висели `blocked_by_decision` при всех
+  принятых DEC (`TASK-FIN-022`, `TASK-EXP-003`, `TASK-EXP-014`, `TASK-EXP-020`) —
+  переведены в `pending_dependencies`. Поле `readiness` в этом пакете **кураторское**:
+  единого дериватора нет, `open_question_ids` на него не влияет (замеры 21.09 —
+  12 расхождений при деривации «DEC accepted + deps merged + oq empty», 8 при
+  «DEC + deps»). Менять массово не стали.
+- `validate_backlog.py` **не** сломан — вызывается из корня репозитория:
+  `python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root .`
+  (прогон 2026-09-21: `ok: true`, 93 задачи / 43 решения).
+- Приложения 1–4 к ТЗ на машину не переносились: `CAP-9` остаётся
+  непроверяемым, юридические ссылки ТЗ документами в пакете не подтверждены.
+
+**Сдвиг релиза клиентского контура принят владельцем вместе с Б.**
 
 **TASK-FIN-001 (this branch):** DEC-FIN-001 variant B already accepted. Wrote
 `docs/superpowers/implementation-artifacts/fin-client-access-policy.md` — cohort

@@ -1717,7 +1717,7 @@
         "REQ-FIN-007.04"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-075",
         "Q-079",
@@ -2321,7 +2321,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-005",
         "Q-008",
@@ -3115,7 +3115,7 @@
       ],
       "priority": "P2",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-103",
         "Q-110",
@@ -3612,7 +3612,7 @@
       "verification_commands": [],
       "priority": "P2",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-165"
       ],
@@ -4360,7 +4360,8 @@
         "Зафиксировать цели/категории/основания/получателей/сроки в матрице поDEC004.",
         "Собирать только разрешённые поля по1–2 за диалог; добровольный отказ не заполняется догадкой.",
         "Отдельное согласие передачи эксперту связывать с бронью, версией текста и подтверждённым principal.",
-        "Отделить разговорный возраст/предположения пола от проверки18+; ограничить чтение полей каждой ролью."
+        "Отделить разговорный возраст/предположения пола от проверки18+; ограничить чтение полей каждой ролью.",
+        "Связь 2026-09-21 (вердикт Б): CAP-4-дефект персиста входящего текста вынесен в отдельную задачу TASK-PLT-018 (носителем решётки DEC-PLT-014); grant-механизм — TASK-PLT-017; вопросы Q-001/Q-117/Q-144 возвращены в open этим reopen."
       ],
       "acceptance": [
         "При отсутствии/отзыве согласия передача запроса/контактов эксперту прекращается.",
@@ -6203,6 +6204,517 @@
       "open_question_ids": [],
       "source_claim_ids": [],
       "detail_ids": []
+    },
+    {
+      "id": "TASK-DEC-PLT-011",
+      "title": "Решить: Способ ЭП, идентификация и доказательства письменного согласия",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-011"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-011-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-011: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Какой способ ЭП, уровень подтверждения личности и комплект доказательств утверждаются для письменного согласия на спецданные в подробном режиме?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-011-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "C006",
+        "C074"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-PLT-012",
+      "title": "Решить: Класс защищённости УЗ и доказательство РФ-региона для персиста спецданных",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-012"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-012-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-012: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Какой класс УЗ и комплект мер по приказу ФСТЭК № 21 применяются к контуру хранения спецкатегорий и как документируется РФ-регион хостинга?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-012-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B088",
+        "C009"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-PLT-013",
+      "title": "Решить: Канал подписи и участие Telegram в обработке спецданных",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [
+        "TASK-DEC-PLT-011"
+      ],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-013"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-013-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-013: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Где подписывается письменное согласие и допускается ли подробный режим в Telegram, с какой ревизией §4 правила DEC-PLT-004?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-013-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C005",
+        "C006"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-PLT-014",
+      "title": "Решить: Правовая основа входного потока при незапрошенных спецданных и ПД третьих лиц",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-014"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-014-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-014: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Каково основание и технический режим обработки входящего свободного текста до получения согласия: карантин без персиста, минимальная обработка с отдельным основанием, или отказ от приёма?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-014-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C009"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-017",
+      "title": "Реализовать выдачу, просмотр и отзыв согласий (grant-механизм)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "docs/operations/owner-update-data-matrix.md",
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "modify": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0039_consent_grant_audit.sql",
+          "tests/repo/consent-grant.test.ts"
+        ],
+        "tests": [
+          "tests/repo/consent-grant.test.ts"
+        ]
+      },
+      "current_state": "Цикл согласий замкнут наполовину (проверено 2026-09-21 на e195029b): insert into consents только в withdrawConsentAtomically и только с decision='denied' (privacy-repository.ts:169,220); HTTP-роута выдачи нет; privacyService=disabledService (apps/api/src/server.ts:337); audit-полей §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) нет до ручной миграции 0039.",
+      "deliverables": [
+        "Миграция packages/db/migrations/0039_consent_grant_audit.sql: audit-колонки §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) и словарь целей включая отсутствующие.",
+        "Сервисный путь grant: append-only запись decision='granted' с policy_version только по действию клиента; перенос privacyService из disabledService в реальный ингресс.",
+        "API и экран клиента: просмотр действующих согласий, выдача цели, отзыв цели с остановкой отложенных заданий и поздних ответов.",
+        "Регресс-тесты tests/repo/consent-grant.test.ts (grant→read-gate открывается, withdraw→закрывается, повторное нажатие идемпотентно)."
+      ],
+      "steps": [
+        "Спроектировать одну транзакцию grant по образцу withdrawConsentAtomically (serializable + advisory lock) и зафиксировать, что внешняя модель/промпт не имеют пути записи.",
+        "Поднять privacy-ингресс (apps/api/src/server.ts:337) за default-off флагом клиентского контура; включить его без релиза нельзя.",
+        "Согласие на подбор НЕ создавать: основание подбора — договор (DEC-PLT-004 §1), UI показывает acknowledgement без consent-записи.",
+        "Миграцию выполнить вручную (drizzle-kit generate запрещён AGENTS.md) и проверить совпадение SQL с живой БД до применения."
+      ],
+      "acceptance": [
+        "Ни одна спецкатегория не персистится: interim-правило DEC-PLT-004 §2 соблюдено, запрещённых колонок 0.",
+        "grant возможен только через верифицированный UI клиента; тест-контроль: путь записи недоступен сервису внешней модели.",
+        "CAP-5/6/7 ТЗ становятся исполнимыми: разрешение связано с экспертом/встречей/версией состава (аудит-колонки заполнены).",
+        "Публичные тексты не изменены (DEC-PLT-007); live-активация не объявлена."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/consent-grant.test.ts"
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-018",
+      "title": "Карантин входящего текста до правового основания (CAP-4 дефект)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-014"
+      ],
+      "decision_ids": [
+        "DEC-PLT-014"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/safety.ts",
+          "packages/config/src/env.ts",
+          "packages/db/src/repositories/b2-sensitive-retention-repository.ts"
+        ],
+        "modify": [
+          "packages/db/src/repositories/hybrid-message-repository.ts",
+          "packages/config/src/env.ts"
+        ],
+        "create": [
+          "tests/repo/inbound-text-quarantine.test.ts"
+        ],
+        "tests": [
+          "tests/repo/inbound-text-quarantine.test.ts"
+        ]
+      },
+      "current_state": "CAP-4 не выполнен сегодня: путь B1 персистит сырой текст входящего сообщения в dialogue_inbound.text с TTL 30 дней без скрининга (hybrid-message-repository.ts:105-107); детерминированный safety-конвейер в проде отключён (apps/api/src/server.ts:332-333); guardClientCopy гейтит только исходящие.",
+      "deliverables": [
+        "Режим обработки входа по DEC-PLT-014: скрининг/карантин до персиста сырого текста (hybrid-message-repository.ts:105-107) с документированным TTL.",
+        "Обновление docs/operations/owner-update-data-matrix.md: фактический состав и срок персиста входа.",
+        "Регресс-тест tests/repo/inbound-text-quarantine.test.ts: контрольный текст не попадает в постоянные хранилища и во внешние вызовы."
+      ],
+      "steps": [
+        "До принятия DEC-PLT-014 не имплементировать: задача открыта как носитель дефекта, interim-правило уже запрещает персист спецданных.",
+        "Замерить текущий фактический персист (30 дней) и зафиксировать в матрице как дефект, а не как основание.",
+        "Выбранный вариант реализовать с тест-контролем «последующее согласие не легализует задним числом»."
+      ],
+      "acceptance": [
+        "Контрольный текст не обнаруживается в dialogue_inbound и в исходящих payload после реализации.",
+        "TTL и состав персиста входа в матрице и в коде совпадают (проверяются тестом).",
+        "Better-than-nothing: ни один внешний ИИ-вызов не получает неэкранированный вход до granted основания."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/inbound-text-quarantine.test.ts"
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-019",
+      "title": "Письменное согласие с ЭП: подписание, идентификация, хранилище доказательств",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-011",
+        "TASK-PLT-017"
+      ],
+      "decision_ids": [
+        "DEC-PLT-011"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts",
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "modify": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0040_consent_evidence.sql",
+          "docs/security/detailed-mode-signature.md",
+          "tests/repo/consent-evidence.test.ts"
+        ],
+        "tests": [
+          "tests/repo/consent-evidence.test.ts"
+        ]
+      },
+      "current_state": "Компонентов нет ни в коде, ни в backlog (проверено 2026-09-21): нет подписания, identity-proofing, evidence-хранилища и портов с реализацией; режим закрыт флагами.",
+      "deliverables": [
+        "Миграция packages/db/migrations/0040_consent_evidence.sql: хранилище доказательств подписания (версия документа, штамп времени, результат проверки).",
+        "docs/security/detailed-mode-signature.md: способ подписи и идентификации по DEC-PLT-011 с границами и отказными случаями.",
+        "Тесты tests/repo/consent-evidence.test.ts на отрицательные сценарии."
+      ],
+      "steps": [
+        "Начинать только после принятия DEC-PLT-011 и закрытия TASK-PLT-017 (grant — общий путь записи).",
+        "Подробный режим держать закрытым default-off флагом до приёмки всех условий CAP-3.",
+        "Не персистить спецданные до TASK-PLT-020 (класс УЗ и РФ-регион)."
+      ],
+      "acceptance": [
+        "Отрицательные сценарии (сбой подписи, повторные нажатия, отзыв, просроченная версия документа) оставляют режим закрытым.",
+        "Одной кнопки недостаточно в коде, а не только в тексте: гейт проверяет подпись, личность, объём и действительность.",
+        "interim-правило DEC-PLT-004 не нарушается ни в одном тестовом прогоне."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/consent-evidence.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-020",
+      "title": "Контур УЗ и доказательство РФ-региона для персиста спецданных",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "integration",
+      "owner": "ops",
+      "depends_on": [
+        "TASK-DEC-PLT-012",
+        "TASK-PLT-019"
+      ],
+      "decision_ids": [
+        "DEC-PLT-012"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "docs/runbooks/go-live-evidence.md",
+          "docs/security/threat-model-and-go-live-gates.md"
+        ],
+        "modify": [
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "create": [
+          "docs/security/uz-detailed-mode-measures.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Класс УЗ-2 выбирался под «спецданные не храним»; персист спецкатегорий меняет класс. Доказательство РФ-региона хостинга в go-live-evidence отсутствует (зафиксировано как незакрытый гейт в DEC-PLT-004 §9).",
+      "deliverables": [
+        "docs/security/uz-detailed-mode-measures.md: комплект мер по выбранному классу УЗ (DEC-PLT-012) с владельцем каждой меры.",
+        "Записи доказательств РФ-региона хостинга в docs/runbooks/go-live-evidence.md с точным коммитом и датой.",
+        "Свидетельства под docs/test-evidence/ на каждую меру."
+      ],
+      "steps": [
+        "Не начинать до принятия DEC-PLT-012.",
+        "Согласовать меры с текущим threat-model (docs/security/threat-model-and-go-live-gates.md) и не ослаблять существующие гейты.",
+        "Реестр гейтов включения подробного режима: физическая невозможность включить без доказанного региона."
+      ],
+      "acceptance": [
+        "Каждая мера DEC-PLT-012 имеет свидетельство с точным коммитом.",
+        "Без доказательства РФ-региона подробный режим не включается конструкцией, а не договорённостью.",
+        "Действующие гейты прода (default-off, redaction) не ослаблены."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-021",
+      "title": "Канал подписи и исключающий спецданные режим Telegram",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-013",
+        "TASK-PLT-019"
+      ],
+      "decision_ids": [
+        "DEC-PLT-013"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/config/src/env.ts",
+          "docs/operations/owner-update-data-matrix.md"
+        ],
+        "modify": [
+          "packages/config/src/env.ts"
+        ],
+        "create": [
+          "docs/operations/detailed-mode-channel-boundary.md"
+        ],
+        "tests": []
+      },
+      "current_state": "ТЗ предпочитает защищённую веб-страницу каналом подписи и отдаёт участие Telegram на аудит; правило DEC-PLT-004 §4 запрещает тексты о здоровье даже в служебных чатах; Telegram сейчас транспорт, webhook/HMAC/admin chat id отсутствуют.",
+      "deliverables": [
+        "docs/operations/detailed-mode-channel-boundary.md: границы канала по DEC-PLT-013 (что допустимо в Telegram, что только в веб-контуре).",
+        "Конфигурационный гейт в packages/config/src/env.ts, запрещающий спецданные в Telegram-пути до решения DEC-PLT-013.",
+        "Ревизия §4 правила и матрицы обработителей при допуске Telegram (отдельная запись владельца)."
+      ],
+      "steps": [
+        "Не начинать до принятия DEC-PLT-013.",
+        "Паспортные реквизиты и содержимое подробного разговора в чат не отправляются — проверить текстами интерфейса и кодом.",
+        "Отказ от подробного режима не закрывает каталог: проверить UX-путь."
+      ],
+      "acceptance": [
+        "Матрица обработителей и код канала не противоречат друг другу (проверяемый тест/скрипт).",
+        "Ни один путь Telegram не может донести спецданные до персиста или внешнего ИИ при закрытом DEC-PLT-013.",
+        "Копия не давит на клиента и не обещает несуществующего (проверка copy-guard)."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
     }
   ],
   "decisions": [
@@ -6984,7 +7496,8 @@
         "TASK-PLT-008",
         "TASK-PLT-010",
         "TASK-PLT-012",
-        "TASK-PLT-016"
+        "TASK-PLT-016",
+        "TASK-PLT-017"
       ],
       "reason": "Начало диалога, cookies и акцепт перечислены как согласие; правовую достаточность и юрисдикции эта спецификация не подтверждает.",
       "decision_task_id": "TASK-DEC-PLT-004"
@@ -7121,6 +7634,88 @@
       ],
       "reason": "14–19часов и дизайнерские3–5/5–7дней — оценки старого задания, не подтверждённый срок всего обновления.",
       "decision_task_id": "TASK-DEC-PLT-010"
+    },
+    {
+      "id": "DEC-PLT-011",
+      "title": "Способ ЭП, идентификация и доказательства письменного согласия",
+      "question": "Какой способ электронной подписи, какой уровень подтверждения личности и какой комплект доказательств утверждаются для письменного согласия клиента на обработку специальных категорий в подробном режиме?",
+      "options": [
+        "Внешний оператор квалифицированной ЭП (УКЭП / Госуслуги) с хранением подписанного документа, штампа времени и результата проверочной сессии.",
+        "Простая ЭП по подтверждённому каналу при письменном юридическом заключении о достаточности для ч. 4 ст. 9.",
+        "Подробный режим не открывать, пока доступная клиенту подпись не утверждена."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "C006",
+        "C074"
+      ],
+      "blocks": [
+        "TASK-PLT-019",
+        "TASK-PLT-020"
+      ],
+      "reason": "Вердикт Б 2026-09-21 сделал подробный режим целевым; ТЗ отвергает достаточность Telegram ID/SMS/callback; задач подписи в backlog не было.",
+      "decision_task_id": "TASK-DEC-PLT-011"
+    },
+    {
+      "id": "DEC-PLT-012",
+      "title": "Класс защищённости УЗ и доказательство РФ-региона для персиста спецданных",
+      "question": "Какой класс защищённости ИС и какой комплект мер по приказу ФСТЭК № 21 применяются к контуру, где начинают храниться специальные категории, и как документируется РФ-регион хостинга?",
+      "options": [
+        "Общий контур как УЗ-1 с полным комплектом мер и подтверждением региона до включения режима.",
+        "Выделенная изолированная подсистема подробного режима класса УЗ-1.",
+        "Не открывать режим до готовности мер УЗ-1."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B088",
+        "C009"
+      ],
+      "blocks": [
+        "TASK-PLT-020"
+      ],
+      "reason": "Класс УЗ-2 выбирался под инвариант «спецданные не храним»; reopen снимает это основание, доказательство РФ-региона не внесено.",
+      "decision_task_id": "TASK-DEC-PLT-012"
+    },
+    {
+      "id": "DEC-PLT-013",
+      "title": "Канал подписи и участие Telegram в обработке спецданных",
+      "question": "Где подписывается письменное согласие и допускается ли подробный режим в Telegram-канале, с какой ревизией §4 действующего правила?",
+      "options": [
+        "Только защищённая веб-страница оператора, Telegram вне контура спецданных.",
+        "Допустить Telegram после документированного аудита его участия и ревизии §4.",
+        "Не выбирать канал до DEC-PLT-011."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C005",
+        "C006"
+      ],
+      "blocks": [
+        "TASK-PLT-021"
+      ],
+      "reason": "ТЗ предпочитает веб-подпись и отдаёт Telegram на аудит; правило §4 запрещает тексты о здоровье в переписке.",
+      "decision_task_id": "TASK-DEC-PLT-013"
+    },
+    {
+      "id": "DEC-PLT-014",
+      "title": "Правовая основа входного потока при незапрошенных спецданных и ПД третьих лиц",
+      "question": "Каково правовое основание и технический режим обработки входящего свободного текста до получения требуемого согласия: карантин без персиста, минимальная техническая обработка с отдельным основанием, или отказ от приёма?",
+      "options": [
+        "Карантин: сырой текст не персистится, детерминированный скрининг отбрасывает спецданные/ПД третьих лиц, согласие не легализует задним числом.",
+        "Ограниченный персист с укороченным TTL и отдельным основанием для минимальной технической обработки.",
+        "Приём текстов со спецданными запрещён гейтом, ручной перевод на защищённый канал."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C009"
+      ],
+      "blocks": [
+        "TASK-PLT-018"
+      ],
+      "reason": "CAP-4 нарушается сейчас: dialogue_inbound.text хранит сырой текст 30 дней без скрининга (hybrid-message-repository.ts:105-107).",
+      "decision_task_id": "TASK-DEC-PLT-014"
     }
   ]
 }
