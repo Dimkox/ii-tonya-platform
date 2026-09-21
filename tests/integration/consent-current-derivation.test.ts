@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { hasCurrentTestExpertConsent } from "../../packages/db/src/repositories/test-expert-consent-authority.js";
+import { PostgresPrivacyRepository } from "../../packages/db/src/repositories/privacy-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -112,5 +113,71 @@ describe("single current-consent derivation", () => {
       )
     ).rows[0]!;
     expect(await ask(user.id)).toBe(false);
+  });
+});
+
+describe("current consent states for the client surface", () => {
+  const repository = () =>
+    new PostgresPrivacyRepository(testDb!.db, {
+      privacyMutationCapability: { enabled: true },
+    });
+
+  const seed = async (
+    rows: readonly [purpose: string, decision: string, at: string][],
+  ) => {
+    const user = (
+      await testDb!.db.execute<{ id: string }>(
+        sql`insert into users (id) values (gen_random_uuid()) returning id`,
+      )
+    ).rows[0]!;
+    for (const [purpose, decision, at] of rows) {
+      await testDb!.db.execute(sql`
+        insert into consents (user_id, consent_type, decision, policy_version, created_at)
+        values (${user.id}::uuid, ${purpose}, ${decision}, 'v1', ${at}::timestamptz)
+      `);
+    }
+    return user.id;
+  };
+
+  it("reports one row per purpose, taking the latest instant of each", async () => {
+    const userId = await seed([
+      ["client_messaging", "granted", "2026-09-01T10:00:00Z"],
+      ["client_messaging", "revoked", "2026-09-05T10:00:00Z"],
+      ["expert_note", "granted", "2026-09-02T10:00:00Z"],
+      ["expert_note", "denied", "2026-09-01T10:00:00Z"],
+    ]);
+    expect(await repository().listCurrentConsents(userId)).toEqual([
+      {
+        purpose: "client_messaging",
+        inForce: false,
+        policyVersion: "v1",
+        decidedAt: "2026-09-05T10:00:00.000Z",
+      },
+      {
+        purpose: "expert_note",
+        inForce: true,
+        policyVersion: "v1",
+        decidedAt: "2026-09-02T10:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("marks a contradicted instant as not in force, like the gate does", async () => {
+    const userId = await seed([
+      ["follow_up", "granted", "2026-09-04T10:00:00Z"],
+      ["follow_up", "denied", "2026-09-04T10:00:00Z"],
+    ]);
+    const rows = await repository().listCurrentConsents(userId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.inForce).toBe(false);
+  });
+
+  it("returns nothing for a subject without decisions", async () => {
+    const user = (
+      await testDb!.db.execute<{ id: string }>(
+        sql`insert into users (id) values (gen_random_uuid()) returning id`,
+      )
+    ).rows[0]!;
+    expect(await repository().listCurrentConsents(user.id)).toEqual([]);
   });
 });

@@ -46,3 +46,29 @@ export function currentConsentGrantedSql(args: {
 }): SQL {
   return sql`(${currentConsentSatisfiedSql(args)})`;
 }
+
+/**
+ * Списочная форма того же правила: по каждой цели — самое позднее мгновение и «действует ли».
+ * Нужна ровно одна строка на цель, поэтому `bool_and` здесь группировочный, а не скалярный;
+ * семантика ничьей не меняется: смешанные решения в одном мгновении = не действует.
+ */
+export function currentConsentStatesSql(userId: SQL): SQL {
+  return sql`
+    select latest.consent_type as purpose,
+      coalesce(bool_and(latest.decision = 'granted'), false) as "inForce",
+      max(latest.policy_version) as "policyVersion",
+      to_char(
+        max(latest.created_at) at time zone 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      ) as "decidedAt"
+    from consents latest
+    where latest.user_id = ${userId}
+      and latest.created_at = (
+        select max(candidate.created_at)
+        from consents candidate
+        where candidate.user_id = ${userId}
+          and candidate.consent_type = latest.consent_type
+      )
+    group by latest.consent_type
+    order by latest.consent_type`;
+}

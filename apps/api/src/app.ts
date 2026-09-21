@@ -56,6 +56,7 @@ import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
+import { clientPrivacyRoutes } from "./routes/client-privacy.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
 
@@ -265,6 +266,15 @@ export async function buildApp(
       principals: deps.clientBookingPrincipal,
       reserveEnabled: deps.config.features.clientBookingReserve === true,
       metrics: { record: recordClientBookingMetric },
+    });
+  }
+  if (
+    deps.config.features.clientPrivacy === true &&
+    deps.clientPrincipal !== undefined
+  ) {
+    await app.register(clientPrivacyRoutes, {
+      privacy: deps.privacyService,
+      principals: deps.clientPrincipal,
     });
   }
   if (deps.yookassaWebhook !== undefined) {

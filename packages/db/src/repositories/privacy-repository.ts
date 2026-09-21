@@ -6,7 +6,10 @@ import {
   validateClientCatalogCards,
   type ClientCatalogCard,
 } from "./client-catalog-repository.js";
-import { currentConsentGrantedSql } from "./consent-current.js";
+import {
+  currentConsentGrantedSql,
+  currentConsentStatesSql,
+} from "./consent-current.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 export interface WithdrawConsentCommand {
@@ -341,6 +344,30 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         and consumed_at is null
         and invalidated_at is null
     `);
+  }
+
+  async listCurrentConsents(userId: string): Promise<
+    Array<{
+      purpose: string;
+      inForce: boolean;
+      policyVersion: string;
+      decidedAt: string;
+    }>
+  > {
+    const rows = (
+      await this.db.execute<{
+        purpose: string;
+        inForce: boolean;
+        policyVersion: string;
+        decidedAt: string;
+      }>(currentConsentStatesSql(sql`${userId}::uuid`))
+    ).rows;
+    return rows.map((row) => ({
+      purpose: row.purpose,
+      inForce: row.inForce === true,
+      policyVersion: row.policyVersion,
+      decidedAt: row.decidedAt,
+    }));
   }
 
   async exportOwnedSubject(userId: string): Promise<SubjectExport> {

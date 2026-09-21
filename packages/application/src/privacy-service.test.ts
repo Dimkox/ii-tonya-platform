@@ -19,6 +19,7 @@ describe("privacy lifecycle", () => {
       }),
       exportOwnedSubject: vi.fn(),
       startErasureAtomically: vi.fn(),
+      listCurrentConsents: vi.fn(async () => []),
     };
     const audit = { append: vi.fn() };
     const service = createPrivacyService({
@@ -51,6 +52,7 @@ describe("privacy lifecycle", () => {
       withdrawConsentAtomically: vi.fn(),
       exportOwnedSubject: vi.fn(),
       startErasureAtomically: vi.fn(),
+      listCurrentConsents: vi.fn(async () => []),
     };
     const service = createPrivacyService({
       repository,
@@ -74,6 +76,7 @@ describe("privacy lifecycle", () => {
       withdrawConsentAtomically: vi.fn(),
       exportOwnedSubject: vi.fn(),
       startErasureAtomically: vi.fn(),
+      listCurrentConsents: vi.fn(async () => []),
     };
     const service = createPrivacyService({
       repository,
@@ -104,6 +107,7 @@ describe("privacy lifecycle", () => {
         }),
         exportOwnedSubject: vi.fn(),
         startErasureAtomically: vi.fn(),
+        listCurrentConsents: vi.fn(async () => []),
       };
       const service = createPrivacyService({
         repository,
@@ -127,6 +131,7 @@ describe("privacy lifecycle", () => {
       withdrawConsentAtomically: vi.fn(),
       exportOwnedSubject: vi.fn(),
       startErasureAtomically: vi.fn(),
+      listCurrentConsents: vi.fn(async () => []),
     };
     const service = createPrivacyService({
       repository,
@@ -166,6 +171,7 @@ describe("privacy lifecycle", () => {
         ledgerFactsPreserved: 2,
         auditFactsPreserved: 5,
       }),
+      listCurrentConsents: vi.fn(async () => []),
     };
     const service = createPrivacyService({
       repository,

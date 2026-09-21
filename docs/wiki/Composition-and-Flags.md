@@ -104,6 +104,7 @@ GOOGLE_SHEETS_PROJECTION_ENABLED, INTENT_MODEL_ENABLED, LLM_PROVIDER, MINOR_ONBO
 | `CLIENT_CATALOG_ENABLED`           | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
 | `CLIENT_BOOKING_ENABLED`           | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
 | `CLIENT_BOOKING_RESERVE_ENABLED`   | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
+| `CLIENT_PRIVACY_ENABLED`           | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
 | `CLIENT_FREE_ACCESS_V2_ENABLED`    | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
 | `CLIENT_TELEGRAM_INGRESS_ENABLED`  | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
 | `CLIENT_HYBRID_ROUTING_ENABLED`    | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |

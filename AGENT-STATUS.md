@@ -157,6 +157,21 @@ fail-closed на ответе БД; контроль «строка есть = g
 `policy_version` и не имеет потребителей вне своего теста (мёртвый код, не гейт), а `D6`/`EGRESS-03`
 по-прежнему ждёт барьера ревизии — `revision` и `revoke_epoch` читаются нулём мест.
 
+**W3 начата (2026-09-21, вечер): согласия впервые достижимы извне.** До этого весь privacy-ingress
+не композировался: `apps/api/src/server.ts` держал `disabledService`, у `createPrivacyService` не было
+ни одного вызывающего места, у `createEnvironmentHmacPseudonymizer` — ноль потребителей. Журнал фактов
+и репозиторий существовали, наружу не торчали ничего. Добавлено: `apps/api/src/routes/client-privacy.ts`
+(`GET /v1/client/privacy/consents`, `POST /v1/client/privacy/consents/withdraw`), композиция реального
+сервиса с `PostgresPrivacyRepository` и `privacyMutationCapability`, флаг `CLIENT_PRIVACY_ENABLED`
+(default-off; схемой требуется `CLIENT_SESSION_ENABLED` — без клиентской сессии маршрутам нечем
+аутентифицироваться, и ждать молча 401 хуже, чем не запустить), списочная форма единого оракула
+`currentConsentStatesSql` (та же семантика ничьей, `bool_and` живёт только в `consent-current.ts` —
+иначе краснеет трипвайр). Формат `decidedAt` закреплён `to_char` в SQL: `max()` из сырого pg приходит
+строкой, а не `Date` (первая версия падала на `toISOString`). Не выставлено осознанно: выдача по
+предъявлению, экспорт и уничтожение (ждут подтверждающего UX по `T32` и ключа псевдонима).
+Тесты: 14 маршрутных, 3 на списочный оракул (живая БД), 3 на флаг; контроль `bool_and → bool_or`
+красит тест ничьей.
+
 **BOT-04 / дефект `D11` карты W1 — закрыт частично (2026-09-21):** экспертная `callback_query`-ветка
 (`apps/api/src/routes/telegram-webhook.ts`) читала только `from.id` и `data`, поэтому нажатие в
 групповом чате (пересланное сообщение с той же клавиатуры) проходило как приватное. `chat.type`

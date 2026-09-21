@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
+  createPrivacyService,
   createAdminService,
   createClientCatalogService,
   createClientBookingService,
@@ -29,6 +30,7 @@ import {
   migrateDb,
   PostgresAdminApprovalRepository,
   PostgresAdminRepository,
+  PostgresPrivacyRepository,
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
   PostgresExpertAiRequestReceiptStore,
@@ -334,7 +336,22 @@ export const createDefaultLifecycle = (
       ),
       bookingService: disabledService<BookingService>("booking ingress"),
       catalogService: disabledService<CatalogService>("catalog ingress"),
-      privacyService: disabledService<PrivacyService>("privacy ingress"),
+      privacyService:
+        config.features.clientPrivacy === true
+          ? createPrivacyService({
+              repository: new PostgresPrivacyRepository(db, {
+                privacyMutationCapability: { enabled: true },
+              }),
+              // Репозиторий дописывает аудит внутри своей сериализуемой транзакции;
+              // этот порт остался в сигнатуре ради совместимости композиции.
+              audit: { append: () => undefined },
+              // Псевдоним нужен только уничтожению, а эта сборка его не выставляет.
+              pseudonymize: () => {
+                throw new Error("privacy erasure is not exposed");
+              },
+              capability: { enabled: true },
+            })
+          : disabledService<PrivacyService>("privacy ingress"),
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
       }),

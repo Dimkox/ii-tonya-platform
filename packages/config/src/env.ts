@@ -79,6 +79,7 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -220,6 +221,17 @@ const schema = z
       }
     }
     if (
+      value.CLIENT_PRIVACY_ENABLED === "true" &&
+      value.CLIENT_SESSION_ENABLED !== "true"
+    ) {
+      // Маршруты согласий аутентифицируются клиентской сессией: без неё они всегда 401.
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_PRIVACY_ENABLED"],
+        message: "client_privacy_requires_client_session",
+      });
+    }
+    if (
       (value.CLIENT_BOOKING_ENABLED === "true" &&
         (value.CLIENT_SESSION_ENABLED !== "true" ||
           value.CLIENT_CATALOG_ENABLED !== "true" ||
@@ -327,6 +339,7 @@ export type RuntimeConfig = {
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientPrivacy?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientHybridRouting?: boolean;
@@ -469,6 +482,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientPrivacy: value.CLIENT_PRIVACY_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
