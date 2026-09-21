@@ -7267,6 +7267,67 @@
       "detail_ids": [],
       "state": "implemented_pending_review",
       "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-025",
+      "title": "Журналы: перестать писать URI и текст ошибки, вернуть безопасную диагностику (TRACK-05, T29)",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/observability/src/logger.ts",
+          "apps/api/src/app.ts",
+          "deploy/nginx/ii-tonya",
+          "apps/worker/src/main.ts",
+          "packages/worker/src/outbox-runner.ts"
+        ],
+        "modify": [
+          "packages/observability/src/logger.ts",
+          "apps/api/src/app.ts",
+          "deploy/nginx/ii-tonya"
+        ],
+        "create": [
+          "tests/repo/log-hygiene.test.ts"
+        ],
+        "tests": [
+          "tests/repo/log-hygiene.test.ts"
+        ]
+      },
+      "current_state": "Замерено 2026-09-21: в `msg` попадает сырой путь с query (404 Fastify: `Route GET:/nope?email=…&code=EXPE-RT-12345 not found`) и текст 5xx-исключения; правила для URI/query в `packages/observability/src/logger.ts` нет (греп по uri|query|referrer пуст). Обратная сторона: в access-строке нет ни method, ни statusCode, ни шаблона маршрута, ни remote address. `botKey` — сегмент пути webhook-а, а `deploy/nginx/ii-tonya` не задаёт `access_log`/`log_format` (grep пуст) ⇒ секрет уходит в журнал nginx. Обработчиков `unhandledRejection`/`uncaughtException` нет; воркер не импортирует логгер.",
+      "deliverables": [
+        "Санитизация URI/query и текста исключения в `msg`; тест, что телефон, почта и `botKey` не проходят в лог.",
+        "Явная allow-list запись завершения запроса (метод, шаблон маршрута, код статуса, длительность, корреляция) — безопасность и диагностика одновременно.",
+        "`log_format`/`access_log` в nginx с шаблоном маршрута вместо сырого URI; `botKey` — из пути в заголовок или в шаблон.",
+        "Перехват unhandled-исключений через санитизатор и структурированные reason-code строки в воркере."
+      ],
+      "steps": [
+        "Собрать пакет observability перед проверкой (dist устарел — D20), иначе тесты врут.",
+        "Не ослаблять существующие sensitiveKey-якоря ради «меньше шуметь» (риск перестать резать реальные message/url/body).",
+        "Не подменять продуктовое решение: `botKey` в пути убирается только вместе с совместимым контрактом webhook (нужен прогон на синтетике)."
+      ],
+      "acceptance": [
+        "T29: тест с заведомо «грязным» URL/телом даёт [REDACTED] и при этом сохраняет метод, шаблон маршрута и статус.",
+        "В тестовом выводе нет ни одного совпадения с телефон/почта/botKey-формой.",
+        "Контроль переворота: при отключении правила тест краснеет."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/log-hygiene.test.ts packages/observability",
+        "pnpm --filter @ii-tonya/observability build",
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
     }
   ],
   "decisions": [

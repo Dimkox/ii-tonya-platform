@@ -25,3 +25,5 @@ _bmad/*.bak
 .worktrees/
 work/
 /.native-release/
+*.bundle
+*.tar.gz
