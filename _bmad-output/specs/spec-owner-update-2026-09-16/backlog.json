@@ -7210,6 +7210,63 @@
       "detail_ids": [],
       "state": "planned",
       "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-024",
+      "title": "Убрать предсогласиевую аналитику из публичной оболочки (TRACK-01/02/03)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "frontend",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "apps/web/index.html",
+          "apps/web/src/index-shell.test.ts",
+          "apps/web/src/main.ts",
+          "deploy/nginx/ii-tonya",
+          "apps/web/src/legal/policy.txt"
+        ],
+        "modify": [
+          "apps/web/index.html",
+          "apps/web/src/index-shell.test.ts",
+          "tests/repo/test-expert-trial-traceability.test.ts"
+        ],
+        "create": [],
+        "tests": [
+          "apps/web/src/index-shell.test.ts"
+        ]
+      },
+      "current_state": "TRACK-01 исполнен на ветке 2026-09-21: из `apps/web/index.html` удалён inline-блок Я.Метрики (wc счётчик 111827123, webvisor:true, clickmap:true, ecommerce, trackLinks) и `noscript`-пиксель `mc.yandex.ru/watch/...`; текст-подсказка про JavaScript сохранена. Тесты ранее **закрепляли** нарушение (`index-shell.test.ts` исполнял inline-скрипт в vm и сверял опции; `test-expert-trial-traceability.test.ts` требовал наличия счётчика) — переписаны в негативные (5 и 1 проверок). Контроль переворота: с возвращённой Метрикой падают 6 тестов, без неё — 8 зелёные. Замер прода: `curl --noproxy '*' https://ii-tonya.ru/` отдаёт статический HTML 1604 байта (Last-Modified 27.08.2026) **без** счётчика, то есть задеплоенная копия нарушения не содержала; дефект жил в исходниках лендинга и в локальной сборке `apps/web/dist` (артефакт, не в git).",
+      "deliverables": [
+        "Публичная оболочка не создаёт сторонних запросов до выбора пользователя (TRACK-01, T27).",
+        "Негативные CI-проверки оболочки: ни inline-скриптов, ни сторонних хостов, ни запроса в noscript-ветке.",
+        "Остаток объёма: TRACK-02 (запрет Webvisor на экранах с ПД — требуется экран согласия), TRACK-03 (чистый bootstrap приватной части — требует решения владельца о наличии web-кабинета), CSP в nginx (защетный барьер), файл подтверждения владения `apps/web/public/yandex_bece38d2993630d3.html` (нужно слово владельца: оставлять ли верификацию аккаунта Яндекса)."
+      ],
+      "steps": [
+        "Держать аналитику полностью выключенной, пока нет утверждённого выбора `cookies_analytics` и записи в реестре обработчиков.",
+        "Любое будущее включение — только динамически загружаемым модулем после серверного `granted`, никогда inline в оболочке.",
+        "Не объявлять TRACK-02/T28 выполненными, пока в web нет приватного экрана: проверять нечего (замер: в `apps/web/src/main.ts` только `/`, `/oferta`, `/privacy`; роутера и кабинета нет)."
+      ],
+      "acceptance": [
+        "`index.html` не содержит ни одного стороннего URL и ни одного inline-<script> (тест).",
+        "noscript-ветка не содержит <img|<script|url( (тест).",
+        "Возврат счётчика или любого тег-менеджера делает CI красным (проверено переворотом)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run apps/web/src/index-shell.test.ts tests/repo/test-expert-trial-traceability.test.ts",
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [],
+      "detail_ids": [],
+      "state": "implemented_pending_review",
+      "readiness": "ready"
     }
   ],
   "decisions": [
