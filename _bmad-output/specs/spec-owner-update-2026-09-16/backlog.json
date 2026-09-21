@@ -6442,7 +6442,7 @@
           "tests/repo/consent-grant.test.ts"
         ]
       },
-      "current_state": "Цикл согласий замкнут наполовину (проверено 2026-09-21 на e195029b): insert into consents только в withdrawConsentAtomically и только с decision='denied' (privacy-repository.ts:169,220); HTTP-роута выдачи нет; privacyService=disabledService (apps/api/src/server.ts:337); audit-полей §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) нет до ручной миграции 0039.",
+      "current_state": "Исполнено на ветке 2026-09-21: миграция 0039 (аддитивно: `sequence identity` как детерминированный тай-брейкер вместо двух несовместимых дериваций, канал, scope_fields, ссылки на версию документа и предъявления, prior_decision_id, recipient_id/reservation_id, text_sha256, basis; CHECK-словарь decision='granted|denied|revoked' как NOT VALID) + три связи consent_document_versions / consent_presentations / consent_states с монотонной revision + репозиторий PostgresConsentEvidenceRepository (approveDocumentVersion, issuePresentation, recordDecision с одноразовым погашением токена, invalidatePresentations, currentState) + 12 интеграционных тестов на postgres:16-alpine, включая контроль переворотом (убрал проверку consumed_at -> тест повтора красный). НЕ исполнено: withdrawal ещё не пишет в новую модель (privacy-repository.ts остаётся на 'denied' без предъявления/ревизии), HTTP-роуты и web/bot UI, единая деривация для read-гейтов (D2), барьер ревизии в диспетчере (EGRESS-03).",
       "deliverables": [
         "Миграция packages/db/migrations/0039_consent_grant_audit.sql: audit-колонки §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) и словарь целей включая отсутствующие.",
         "Сервисный путь grant: append-only запись decision='granted' с policy_version только по действию клиента; перенос privacyService из disabledService в реальный ингресс.",
@@ -6459,7 +6459,8 @@
         "Ни одна спецкатегория не персистится: interim-правило DEC-PLT-004 §2 соблюдено, запрещённых колонок 0.",
         "grant возможен только через верифицированный UI клиента; тест-контроль: путь записи недоступен сервису внешней модели.",
         "CAP-5/6/7 ТЗ становятся исполнимыми: разрешение связано с экспертом/встречей/версией состава (аудит-колонки заполнены).",
-        "Публичные тексты не изменены (DEC-PLT-007); live-активация не объявлена."
+        "Публичные тексты не изменены (DEC-PLT-007); live-активация не объявлена.",
+        "Отдельно: отзыв должен писать 'revoked' через ту же модель с bump revision (сейчас остаётся 'denied' без предъявления) — не объявлять TASK-PLT-017 закрытой."
       ],
       "verification_commands": [
         "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/consent-grant.test.ts"
@@ -6470,7 +6471,7 @@
         "A005"
       ],
       "detail_ids": [],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready"
     },
     {

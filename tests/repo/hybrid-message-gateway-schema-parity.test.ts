@@ -38,10 +38,10 @@ describe("B1 schema/migration parity", () => {
       ),
     ).toHaveLength(1);
     expect(journal.entries.at(-1)).toEqual({
-      idx: 38,
+      idx: 39,
       version: "7",
-      when: 1788393600000,
-      tag: "0038_test_expert_trial",
+      when: 1788480000000,
+      tag: "0039_consent_evidence_grant",
       breakpoints: true,
     });
   });

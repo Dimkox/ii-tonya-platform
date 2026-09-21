@@ -656,12 +656,17 @@ describe("booking transaction", () => {
       clientDisplayName: "Клиент",
     });
     expect(noConsentSchedule?.[0]).not.toHaveProperty("expertNote");
+    // 2026-09-21: словарь `decision` закрыт проверкой `consents_decision_known` (миграция 0039,
+    // EVID-01), поэтому не-грантовое значение здесь — легальное `revoked`. Свойство
+    // «нераспознанный токен не открывает гейт» теперь защищается на уровне БД и проверяется
+    // тестом миграции (tests/integration/consent-evidence-schema.test.ts), а на уровне домена —
+    // packages/domain/src/consent.test.ts.
     await testDb.db.execute(sql`
       insert into consents (
         user_id, consent_type, decision, policy_version, created_at
       )
       select
-        user_id, 'expert_note', 'unknown', 'expert-note-v1',
+        user_id, 'expert_note', 'revoked', 'expert-note-v1',
         '2026-07-29T09:59:00.000Z'::timestamptz
       from reservations
       where id = ${reserved.reservationId}::uuid

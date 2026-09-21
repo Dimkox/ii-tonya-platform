@@ -120,6 +120,17 @@ export {
   type WithdrawConsentCommand,
   type WithdrawalReceipt,
 } from "./repositories/privacy-repository.js";
+
+export {
+  CONSENT_PURPOSES,
+  ConsentGrantInvariantError,
+  PostgresConsentEvidenceRepository,
+  type ApprovedDocument,
+  type ConsentChannel,
+  type ConsentDecisionReceipt,
+  type ConsentPurpose,
+  type IssuedPresentation,
+} from "./repositories/consent-evidence-repository.js";
 export {
   AdminInvalidStateTransitionError,
   AdminTargetNotFoundError,

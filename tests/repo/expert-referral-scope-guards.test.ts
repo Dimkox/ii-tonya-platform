@@ -37,6 +37,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
       "packages/db/migrations/0037_partner_commerce_a.sql",
       "packages/db/migrations/0038_test_expert_trial.sql",
+      "packages/db/migrations/0039_consent_evidence_grant.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",

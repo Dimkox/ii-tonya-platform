@@ -22,13 +22,13 @@ describe("public HTML shell loads nothing third-party", () => {
       ),
     ];
 
-    expect(inline.map(([, body]) => body.trim())).toEqual([]);
+    expect(inline.map(([, body]) => (body ?? "").trim())).toEqual([]);
   });
 
   it("references no host but our own", () => {
-    const urls = [...indexHtml.matchAll(/https?:\/\/([^"' />\s]+)/gu)].map(
-      (m) => m[1],
-    );
+    const urls = [...indexHtml.matchAll(/https?:\/\/([^"' />\s]+)/gu)]
+      .map((match) => match[1])
+      .filter((value): value is string => value !== undefined);
 
     for (const url of urls) {
       expect(

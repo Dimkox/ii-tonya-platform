@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `ready`.
+- State: `implemented_pending_review`; readiness: `ready`.
 - Тип: implementation; исполнитель: backend; приоритет: P0.
 - Depends on: нет.
 - Решения: `DEC-PLT-004`.
@@ -79,6 +79,36 @@
 - [ ] CAP-5/6/7 ТЗ становятся исполнимыми: разрешение связано с экспертом/встречей/версией состава (аудит-колонки заполнены).
 - [ ] Публичные тексты не изменены (DEC-PLT-007); live-активация не объявлена.
 
+
+## Исполнено (2026-09-21)
+
+- [x] Миграция `0039_consent_evidence_grant.sql` — аддитивно к существующим сущностям (дубликатов и
+  второй базы согласий нет, SCOPE-01): `sequence` (identity) как детерминированный тай-брейкер,
+  `channel`, `scope_fields`, `document_version_id`, `presentation_id`, `prior_decision_id`,
+  `recipient_id`, `reservation_id`, `text_sha256`, `basis`; словарь решений закрыт проверкой
+  `consents_decision_known` (NOT VALID — история не валит деплой).
+- [x] `consent_document_versions` (тело неизменяемо, соответствие тела хешу проверяет сама БД),
+  `consent_presentations` (одноразовый токен, срок, привязка к субъекту и цели), `consent_states`
+  (PK subject+purpose, монотонная `revision`) — EVID-01…04.
+- [x] `PostgresConsentEvidenceRepository`: approveDocumentVersion / issuePresentation /
+  recordDecision (сериализуемая транзакция + advisory lock + погашение предъявления + факт +
+  ревизия + аудит) / invalidatePresentations / currentState.
+- [x] 12 интеграционных тестов на `postgres:16-alpine`: выдача с доказательством, повтор, чужой
+  субъект, чужая цель, истёкшее и отозванное предъявление, закрытый словарь решений, «подбор» и
+  «реклама» как цели невозможны, откат транзакции не оставляет погашенного токена, capability off
+  блокирует любую запись. Контроль переворотом: снятие проверки `consumed_at` делает тест повтора
+  красным; возврат — зелёный.
+- [x] Прогон: `tests/repo` 52 файла / 428, `packages/db` + `packages/domain` 33 файла / 265,
+  интеграционные согласия 47/47, `tsc -p tsconfig.tests.json` и eslint — exit 0.
+
+## Не исполнено (остаток объёма)
+
+- [ ] Отзыв (`withdrawConsentAtomically`) ещё не переведён в новую модель: пишет `denied` без
+  предъявления и без bump `revision`. До этого шага задача не закрывается.
+- [ ] Единая деривация «текущего решения» для read-гейтов (дефект D2) вместо двух разных SQL.
+- [ ] HTTP-роуты web/bot и экран согласия (WEB-01…05, BOT-01…07) — упирается в тексты документов
+  и в решение о web-кабинете.
+- [ ] Барьер ревизии перед внешней отправкой (EGRESS-03, `TASK-PLT-022`).
 
 ## Команды проверки
 

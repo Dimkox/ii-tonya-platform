@@ -21,7 +21,7 @@ const snapshotPath = (idx: number): string =>
 // baseline - a NEW gap fails the guard, closing one only requires shrinking it.
 const MISSING_SNAPSHOT_BASELINE = [
   14, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-  38,
+  38, 39,
 ];
 
 // drizzle-kit 0.31.x aborts JSON.stringify on a BigInt schema default, so
@@ -70,6 +70,7 @@ const HAND_SQL_TRIGGERS = [
   "client_booking_privacy_completion_guard",
   "client_commercial_policy_assignments_no_delete",
   "client_commercial_policy_assignments_no_update",
+  "consent_document_versions_append_only",
   "consents_append_only",
   "delivery_attempts_append_only",
   "expert_referral_admin_approval_global_unique",
@@ -248,6 +249,6 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    expect(declared.size).toBe(96);
+    expect(declared.size).toBe(99);
   });
 });
