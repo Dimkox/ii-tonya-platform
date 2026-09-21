@@ -57,7 +57,7 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
     expect(await handoffRevokeCount("handoff-direct")).toBe(1);
   });
 
-  it("withdrawing expert_note cascades expert_handoff to denied and enqueues one revoke event", async () => {
+  it("withdrawing expert_note cascades a granted expert_handoff to revoked (never a fabricated first refusal) and enqueues one revoke event", async () => {
     const userId = await testDb!.createUser();
     await testDb!.db.execute(sql`
       insert into consents (user_id, consent_type, decision, policy_version)
@@ -70,10 +70,20 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
       correlationId: "handoff-cascade",
     });
     const state = await decisions(userId);
+    // RIGHTS-08: отзыв ранее выданного согласия отличается от первоначального отказа.
+    // Заметка никому не выдавалась -> denied; передача была выдана -> revoked.
     expect(state).toMatchObject({
       expert_note: "denied",
-      expert_handoff: "denied",
+      expert_handoff: "revoked",
     });
+    const handoffState = (
+      await testDb!.db.execute<{ decision: string; revision: string }>(sql`
+        select decision, revision::text from consent_states
+        where user_id = ${userId}::uuid and purpose = 'expert_handoff'
+      `)
+    ).rows[0];
+    expect(handoffState?.decision).toBe("revoked");
+    expect(Number(handoffState?.revision)).toBeGreaterThan(0);
     expect(await handoffRevokeCount("handoff-cascade")).toBe(1);
     // The cascaded fact records the handoff's own consent version, never the note's
     // (append-only provenance — DEC-PLT-004 §3).
@@ -81,7 +91,7 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
       await testDb!.db.execute<{ decision: string; policyVersion: string }>(sql`
         select decision, policy_version as "policyVersion" from consents
         where user_id = ${userId}::uuid and consent_type = 'expert_handoff'
-          and decision = 'denied'
+          and decision in ('denied', 'revoked')
       `)
     ).rows;
     expect(handoffRows.length).toBeGreaterThan(0);

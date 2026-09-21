@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import { currentConsentGrantedSql } from "./consent-current.js";
 
 type Executor = Pick<DrizzleDb, "execute">;
 
@@ -11,31 +12,30 @@ export async function hasCurrentTestExpertConsent(
     selartiPolicyVersion?: string;
   },
 ): Promise<boolean> {
-  const rows = await executor.execute<{
-    purpose: string;
-    decision: string;
-    policyVersion: string;
-  }>(sql`
-    select distinct on (consent_type)
-      consent_type as purpose,decision,policy_version as "policyVersion"
-    from consents
-    where user_id=${input.userId}::uuid
-      and consent_type in ('client_messaging','selarti_ai_processing')
-    order by consent_type,created_at desc,id desc`);
-  const latest = new Map(rows.rows.map((row) => [row.purpose, row]));
-  const messaging = latest.get("client_messaging");
+  // D2 карты W1: раньше здесь был `distinct on (consent_type) … order by created_at desc,
+  // id desc`, где `id` — случайный uuid: при равных created_at выбор «последнего» ряда был
+  // произвольным и расходился с read-гейтами эксперта. Теперь одна формула на весь репозиторий:
+  // самое позднее мгновение, и любая не-granted запись в нём означает «не действует».
+  const granted = async (
+    purpose: string,
+    policyVersion: string,
+  ): Promise<boolean> => {
+    const result = await executor.execute<{ granted: boolean }>(sql`
+      select ${currentConsentGrantedSql({
+        userExpression: sql`${input.userId}::uuid`,
+        purpose,
+        policyVersion: sql`${policyVersion}`,
+      })} as granted
+    `);
+    return result.rows[0]?.granted === true;
+  };
+
+  if (!(await granted("client_messaging", input.messagingPolicyVersion)))
+    return false;
   if (
-    messaging?.decision !== "granted" ||
-    messaging.policyVersion !== input.messagingPolicyVersion
+    input.selartiPolicyVersion !== undefined &&
+    !(await granted("selarti_ai_processing", input.selartiPolicyVersion))
   )
     return false;
-  if (input.selartiPolicyVersion !== undefined) {
-    const ai = latest.get("selarti_ai_processing");
-    if (
-      ai?.decision !== "granted" ||
-      ai.policyVersion !== input.selartiPolicyVersion
-    )
-      return false;
-  }
   return true;
 }

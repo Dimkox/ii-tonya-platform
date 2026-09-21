@@ -10,17 +10,17 @@ older handoffs (`docs/handoffs/2026-08-*`) as current.
 
 ## Where you are
 
-| Item | Value |
-|---|---|
-| Canonical checkout | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `codex/fin-001-client-access-policy` (from `origin/main` @ `cb07bd1`) |
-| `main` SHA | `cb07bd18` — live in production since 2026-09-18 (contains PR #97 `f6b0c296` expert_handoff read-path). This branch `codex/fin-001-client-access-policy` is ahead of `origin/main` (счётчик и head не пинним — устаревают на каждом коммите) and is open as **PR #98** — not merged: `TASK-FIN-002/012/013/015` still need owner rulings (`Q-169`, `DEC-FIN-029`, `DEC-FIN-030`) and `TASK-PLT-008` waits on `TASK-PLT-017` |
-| Decision register (2026-09-21) | 43 DEC cards: 39 `accepted` + 4 `open` (`DEC-PLT-011…014`, opened by verdict Б). `backlog.json`: 93 tasks — readiness `ready` 34 / `pending_dependencies` 51 / `blocked_by_decision` 8; state merged 25 / implemented_pending_review 8 / planned 60. `validate_backlog.py --repo-root .` → `ok: true` |
-| Feature branch | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree) |
-| Copy-guard follow-up | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote) |
-| PLT-013 follow-up | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote) |
-| Copy-guard pre-squash tip | `b6215e8` (history rewritten by squash; use `92993646` on main) |
-| Spec package | `_bmad-output/specs/spec-owner-update-2026-09-16/` |
-| Local secrets | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored |
+| Item                           | Value                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical checkout             | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform` on `codex/fin-001-client-access-policy` (from `origin/main` @ `cb07bd1`)                                                                                                                                                                                                                                                                                         |
+| `main` SHA                     | `cb07bd18` — live in production since 2026-09-18 (contains PR #97 `f6b0c296` expert_handoff read-path). This branch `codex/fin-001-client-access-policy` is ahead of `origin/main` (счётчик и head не пинним — устаревают на каждом коммите) and is open as **PR #98** — not merged: `TASK-FIN-002/012/013/015` still need owner rulings (`Q-169`, `DEC-FIN-029`, `DEC-FIN-030`) and `TASK-PLT-008` waits on `TASK-PLT-017` |
+| Decision register (2026-09-21) | 43 DEC cards: 39 `accepted` + 4 `open` (`DEC-PLT-011…014`, opened by verdict Б). `backlog.json`: 93 tasks — readiness `ready` 34 / `pending_dependencies` 51 / `blocked_by_decision` 8; state merged 25 / implemented_pending_review 8 / planned 60. `validate_backlog.py --repo-root .` → `ok: true`                                                                                                                       |
+| Feature branch                 | `codex/owner-spec-2026-09-16` still exists locally in `.worktrees/owner-spec-2026-09-16` (not deleted; `main` was already checked out in the primary worktree)                                                                                                                                                                                                                                                              |
+| Copy-guard follow-up           | PR [#89](https://github.com/Dimkox/ii-tonya-platform/pull/89) squash-merged to `main` as `b2b7af9c`; branch `codex/copy-guard-warnings-2026-09-16` deleted (local and remote)                                                                                                                                                                                                                                               |
+| PLT-013 follow-up              | PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90) squash-merged to `main` as `6ec3f505` (`botKey` log redaction + review close); branch `codex/plt-013-botkey-redaction` deleted (local and remote)                                                                                                                                                                                                             |
+| Copy-guard pre-squash tip      | `b6215e8` (history rewritten by squash; use `92993646` on main)                                                                                                                                                                                                                                                                                                                                                             |
+| Spec package                   | `_bmad-output/specs/spec-owner-update-2026-09-16/`                                                                                                                                                                                                                                                                                                                                                                          |
+| Local secrets                  | `/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.env`, mode `0600`, gitignored                                                                                                                                                                                                                                                                                                                                    |
 
 Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). Factory/Superpowers/Spec Kit install is a **separate** branch `codex/install-adaptive-factory-2.0.18` — do not mix it into this FIN-001 change.
 
@@ -52,7 +52,7 @@ Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). 
   единственный носитель `TASK-PLT-008`.
 - Новые задачи: `TASK-PLT-017` **grant-механизм согласий** (readiness `ready`,
   независима от reopen — без неё CAP-5/6/7 неработоспособны: в проде `insert
-  into consents` только с `decision='denied'` в `privacy-repository.ts:169,220`,
+into consents` только с `decision='denied'` в `privacy-repository.ts:169,220`,
   роута выдачи нет, `privacyService = disabledService` — `apps/api/src/server.ts:337`);
   `TASK-PLT-018` карантин входящего текста (CAP-4 сегодня **нарушается**:
   `dialogue_inbound.text` хранит сырой текст 30 дней —
@@ -127,8 +127,21 @@ expert→expert рефералами отказался: это было бы и
 выдача/погашение/отзыв предъявления/состояние — всё в одной сериализуемой транзакции с advisory
 lock, под capability-флагом и по закрытому списку целей («подбор» и «реклама» отклоняются).
 12 новых интеграционных тестов зелёные; контроль переворотом сделан (снятие проверки `consumed_at`
-красит тест повтора). `TASK-PLT-017` → `implemented_pending_review`: **отзыв ещё не переведён в
-новую модель**, единая деривация для read-гейтов, HTTP-роуты и UI — остаток объёма.
+красит тест повтора). **Остаток того же дня:** отзыв переведён в новую модель (`privacy-repository`
+пишет `revoked` при отзыве ранее выданного, `denied` остаётся первоначальным отказом; в той же
+сериализуемой транзакции — проекция в `consent_states` с монотонной `revision` и гашение ранее
+выданных предъявлений) и закрыт дефект **D2**: единая формула «текущее решение» —
+`packages/db/src/repositories/consent-current.ts`, три читателя (`booking-repository`,
+`expert-telegram-query-repository`, авторизация тестового эксперта) переведены на неё, прежний
+`distinct on … order by created_at desc, id desc` с тай-брейкером-uuid удалён, ничья в одном
+мгновении стала fail-closed. Тесты: `tests/integration/consent-current-derivation.test.ts` (5; ничья
+проверена в обоих порядках вставки) и переписанный `test-expert-consent-authority.test.ts` (7 —
+сама деривация теперь живёт в SQL и проверяется интеграционно, поэтому юнит держит контракт
+оркестрации: цели, порядок, short-circuit,
+fail-closed на ответе БД; контроль «строка есть = granted» красит 5). Пин списка таблиц
+`tests/integration/schema.test.ts` дополнен тремя таблицами 0039 — `b5a6daf0` его пропустил.
+`TASK-PLT-017` → `implemented_pending_review`: остаток объёма — HTTP-роуты и web/bot UI (`D13`/`D14`)
+и барьер ревизии в диспетчере исходящих (`EGRESS-03`, `D6`).
 
 **W1 закрыта (2026-09-21):** карта «пункт ТЗ ↔ код» — `docs/spec/consent-pd-w1-map-2026-09-21.md`.
 Собрана по требованию `BASE-01` шестью независимыми read-only обследованиями; нагружающие факты
@@ -162,7 +175,6 @@ lock, под capability-флагом и по закрытому списку ц�
 **Правило на время этой работы:** `RELEASE-02` и `SCOPE-03` — сначала карта, тексты и синтетические
 данные; внешние сервисы и спецкатегории не включаются на основании одной кнопки; отсутствует
 подтверждение — значит не «готово», а «подтверждение не получено» (Приложение А).
-
 
 ### Вердикт владельца по Q-169 (2026-09-21) — только часовая часть
 
@@ -242,7 +254,6 @@ Q-169 (часовой пояс/опорный timestamp) и сверка 30 vs 6
 - Карточки `tasks/*.md` синхронизированы с `backlog.json` по заголовкам State/readiness
   (59 карточек отставали; JSON — авторитет, валидатор их не проверяет).
 
-
 **TASK-FIN-001 (this branch):** DEC-FIN-001 variant B already accepted. Wrote
 `docs/superpowers/implementation-artifacts/fin-client-access-policy.md` — cohort
 matrix + rollback without silent reassignment. Card
@@ -259,7 +270,7 @@ and Q-031 principal model (PLT-016/PLT-013).
 профильная проверка was executed by a compliance agent → `evidence/DEC-PLT-004-rule.md`. Register
 status `accepted`; `TASK-DEC-PLT-004` merged; `backlog.json` readiness re-derived
 (EXP-006/PLT-008/PLT-010/PLT-016 → `pending_dependencies`). Key consequences: **owner-explicit rule
-(§9, 2026-09-17): the operator's only PII store is PostgreSQL on RF servers** — Sheets/Make are *not* a
+(§9, 2026-09-17): the operator's only PII store is PostgreSQL on RF servers** — Sheets/Make are _not_ a
 PII store (de-identified projections or off; an RF "table with a mandate" as a second store was NOT
 chosen), Telegram is transport only, object_store/backups RF; region proof in `go-live-evidence.md`
 still required before any enablement. A005
@@ -322,7 +333,7 @@ State on the card: `verified_pending_review`. An independent adversarial review 
 security surface closed the review checkbox; merged as PR [#90](https://github.com/Dimkox/ii-tonya-platform/pull/90)
 (`6ec3f505`). It found no reachable credential→log leak in current paths. Live activation is not in scope.
 
-- Redaction (`packages/observability/src/logger.ts`): the review then found one gap *in scope* —
+- Redaction (`packages/observability/src/logger.ts`): the review then found one gap _in scope_ —
   `botKey` / `CLIENT_TELEGRAM_BOT_KEY` was classified as a "bot identifier" and pinned visible by
   a test, but the client webhook authenticates it with `secureEqual` and it is the request path
   capability, i.e. a bearer secret. Fixed: `sensitiveKey` now matches `bot[-_]?key`; the test's
@@ -359,14 +370,14 @@ Auth against `POST https://selarti.com/api/1.1/wf/auth` with `{"key":"<SELARTI_A
 
 Set in the **main-checkout** `.env` (not this worktree):
 
-| Variable | State |
-|---|---|
-| `SELARTI_API_KEY` | set (50 chars, not a Bubble id) |
-| `SELARTI_COMPANY_ID` | set |
-| `SELARTI_TASK_ID` | set — task name `test expert`, type Telegram, status in progress |
-| `SELARTI_AI_ID` | set — **new** agent created via `POST /api/1.1/wf/create_ai`, name `ии-Тоня`, version `gpt-4o`, work option `incoming and outgoing communication` |
-| `SELARTI_ENABLED` | **false** |
-| `SELARTI_WEBHOOK_SECRET` | placeholder |
+| Variable                 | State                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SELARTI_API_KEY`        | set (50 chars, not a Bubble id)                                                                                                                   |
+| `SELARTI_COMPANY_ID`     | set                                                                                                                                               |
+| `SELARTI_TASK_ID`        | set — task name `test expert`, type Telegram, status in progress                                                                                  |
+| `SELARTI_AI_ID`          | set — **new** agent created via `POST /api/1.1/wf/create_ai`, name `ии-Тоня`, version `gpt-4o`, work option `incoming and outgoing communication` |
+| `SELARTI_ENABLED`        | **false**                                                                                                                                         |
+| `SELARTI_WEBHOOK_SECRET` | placeholder                                                                                                                                       |
 
 `create_ai` docs: [Selarti public API](https://docs.selarti.com/), body fields `company_id`, `name`, `start_message`, `version`, `work_option`, `instruction`. Meta: `GET https://selarti.com/api/1.1/meta`.
 

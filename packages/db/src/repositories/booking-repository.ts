@@ -7,6 +7,7 @@ import {
   type ReservationStatus,
 } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
+import { currentConsentSatisfiedSql } from "./consent-current.js";
 
 export interface ReserveSlotCommand {
   idempotencyKey: string;
@@ -604,34 +605,16 @@ export class PostgresBookingRepository {
       join slots s on s.id = r.slot_id
       left join client_profiles cp on cp.user_id = r.user_id
       left join lateral (
-        select coalesce(
-          bool_and(latest.decision = 'granted'),
-          false
-        ) as granted
-        from consents latest
-        where latest.user_id = r.user_id
-          and latest.consent_type = 'expert_note'
-          and latest.created_at = (
-            select max(candidate.created_at)
-            from consents candidate
-            where candidate.user_id = r.user_id
-              and candidate.consent_type = 'expert_note'
-          )
+        ${currentConsentSatisfiedSql({
+          userExpression: sql`r.user_id`,
+          purpose: "expert_note",
+        })}
       ) note_consent on true
       left join lateral (
-        select coalesce(
-          bool_and(latest.decision = 'granted'),
-          false
-        ) as granted
-        from consents latest
-        where latest.user_id = r.user_id
-          and latest.consent_type = 'expert_handoff'
-          and latest.created_at = (
-            select max(candidate.created_at)
-            from consents candidate
-            where candidate.user_id = r.user_id
-              and candidate.consent_type = 'expert_handoff'
-          )
+        ${currentConsentSatisfiedSql({
+          userExpression: sql`r.user_id`,
+          purpose: "expert_handoff",
+        })}
       ) handoff_consent on true
       where e.id = ${command.expertId}::uuid
         and e.active
