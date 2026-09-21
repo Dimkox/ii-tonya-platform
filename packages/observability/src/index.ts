@@ -5,6 +5,10 @@ export {
   type Logger,
 } from "./logger.js";
 export {
+  installFatalProcessLogging,
+  type FatalHandlerDeps,
+} from "./fatal-logging.js";
+export {
   operationalMetrics,
   clientCatalogMetricLabels,
   clientBookingMetricLabels,

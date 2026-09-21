@@ -18,6 +18,8 @@ import {
   PostgresTestExpertTelegramRepository,
 } from "@ii-tonya/db";
 import {
+  createLogger,
+  installFatalProcessLogging,
   recordClientCatalogMetric,
   recordClientSessionMetric,
   recordExpertReferralMaturityMetric,
@@ -542,7 +544,13 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
       process.exit(status);
     });
   let hardExitTimer: NodeJS.Timeout | undefined;
+  // Без этого воркер молчал: неперехваченное исключение писалось в stderr (или не писалось
+  // вовсе), а журнал инфраструктуры его не видел.
+  const removeFatalLogging = installFatalProcessLogging({
+    logger: createLogger(),
+  });
   const stop = () => {
+    removeFatalLogging();
     controller.abort();
     if (hardExitTimer === undefined) {
       hardExitTimer = setTimeout(() => {
