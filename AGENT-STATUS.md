@@ -157,6 +157,21 @@ fail-closed на ответе БД; контроль «строка есть = g
 `policy_version` и не имеет потребителей вне своего теста (мёртвый код, не гейт), а `D6`/`EGRESS-03`
 по-прежнему ждёт барьера ревизии — `revision` и `revoke_epoch` читаются нулём мест.
 
+**Барьер отзыва в исходящих начат (2026-09-21, `EGRESS-01/03`, дефекты `D5`/`D6`).** Сверка
+согласия стоит в выдаче строк очереди (`PostgresOutboxRepository.claim` → защищённый хук
+`egressGatePredicate`, реализация в `PostgresOrderedTelegramOutboxRepository`; предикат
+`dialogueConsentEgressPredicate` живёт в `consent-current.ts`, иначе краснеет трипвайр), а не в
+диспетчере: подменой диспетчера барьер обойти нельзя. Миграция не понадобилась — привязка к
+субъекту уже была в схеме (`integration_outbox.dialogue_id` → `dialogues.user_id`, NOT NULL с
+`0034`). Fail-closed во всех неизвестных случаях, включая ничью в одном мгновении. `consentGate`
+сделан **обязательным** параметром (`composeB2TelegramDelivery` тоже) — молча собрать отправку
+«как раньше» теперь невозможно, `tsc` нашёл оба места. Флаг `TELEGRAM_EGRESS_CONSENT_GATE_ENABLED`
+default-off, схемно требует `B2_TELEGRAM_DISPATCH_ENABLED`. **Найдено попутно:**
+`composeB2TelegramDelivery` не вызывается ни из одного производственного места (только свой тест) —
+тот же класс дефекта, что `D1`; включение канала всё равно обязано пройти через гейт.
+**Не закрыто:** сверка непосредственно перед сетевым вызовом (окно лизинга), потребитель
+`booking.handoff_revoked` (`TASK-PLT-022`), `revision`/`revoke_epoch` по-прежнему не читаются.
+
 **W3 начата (2026-09-21, вечер): согласия впервые достижимы извне.** До этого весь privacy-ingress
 не композировался: `apps/api/src/server.ts` держал `disabledService`, у `createPrivacyService` не было
 ни одного вызывающего места, у `createEnvironmentHmacPseudonymizer` — ноль потребителей. Журнал фактов

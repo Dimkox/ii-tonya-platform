@@ -72,3 +72,25 @@ export function currentConsentStatesSql(userId: SQL): SQL {
     group by latest.consent_type
     order by latest.consent_type`;
 }
+
+/**
+ * EGRESS-01/03 (приёмка T18/T25): барьер исходящих. Строка очереди считается разрешённой к
+ * выдаче только если согласие субъекта диалога действует по тому же правилу, что и read-гейты.
+ * Отсутствие диалога или субъекта = не разрешено (fail-closed): молча отправить «неизвестно
+ * чьё» сообщение хуже, чем оставить его в очереди.
+ */
+export function dialogueConsentEgressPredicate(
+  dialogueId: SQL,
+  purpose: string,
+): SQL {
+  return sql`
+    exists (
+      select 1
+      from dialogues gated
+      where gated.id = ${dialogueId}
+        and ${currentConsentGrantedSql({
+          userExpression: sql`gated.user_id`,
+          purpose,
+        })}
+    )`;
+}

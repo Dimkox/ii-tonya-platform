@@ -80,6 +80,9 @@ const schema = z
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
+    TELEGRAM_EGRESS_CONSENT_GATE_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -221,6 +224,18 @@ const schema = z
       }
     }
     if (
+      value.TELEGRAM_EGRESS_CONSENT_GATE_ENABLED === "true" &&
+      value.B2_TELEGRAM_DISPATCH_ENABLED !== "true"
+    ) {
+      // Гейт проверяет выдачу клиентских telegram-сообщений; без самого канала это
+      // включённый флаг, который ничего не защищает.
+      context.addIssue({
+        code: "custom",
+        path: ["TELEGRAM_EGRESS_CONSENT_GATE_ENABLED"],
+        message: "telegram_egress_consent_gate_requires_dispatch",
+      });
+    }
+    if (
       value.CLIENT_PRIVACY_ENABLED === "true" &&
       value.CLIENT_SESSION_ENABLED !== "true"
     ) {
@@ -345,6 +360,7 @@ export type RuntimeConfig = {
     clientHybridRouting?: boolean;
     selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
+    telegramEgressConsentGate?: boolean;
     b2TelegramDispatch?: boolean;
     b2SensitiveRetention?: boolean;
     testExpertPromo?: boolean;
@@ -488,6 +504,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
       selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
       selartiResponseIngress: false,
+      telegramEgressConsentGate:
+        value.TELEGRAM_EGRESS_CONSENT_GATE_ENABLED === "true",
       b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
       b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",
       testExpertPromo: value.TEST_EXPERT_PROMO_ENABLED === "true",

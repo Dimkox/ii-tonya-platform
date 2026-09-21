@@ -267,13 +267,18 @@ export function composeWorkerOutboxDelivery(
 export function composeB2TelegramDelivery(
   db: DrizzleDb,
   enabled: boolean,
+  /** Явное решение: отправлять клиентские сообщения можно только сверяя согласие субъекта. */
+  consentGate: { readonly enabled: boolean },
   capability?: OutboxDispatcher & OutboxReconciler,
 ) {
   if (!enabled) return undefined;
   if (capability === undefined) {
     throw new Error("b2_telegram_delivery_capability_unavailable");
   }
-  const repository = new PostgresOrderedTelegramOutboxRepository(db);
+  const repository = new PostgresOrderedTelegramOutboxRepository(
+    db,
+    consentGate,
+  );
   return {
     repository,
     run: () =>

@@ -356,7 +356,9 @@ describe("hybrid gateway B2 ordered local delivery", () => {
   });
 
   it("holds later dialogue sequence behind retry and unknown outcome until reconciliation", async () => {
-    const ordered = new PostgresOrderedTelegramOutboxRepository(database.db);
+    const ordered = new PostgresOrderedTelegramOutboxRepository(database.db, {
+      enabled: false,
+    });
     const first = await ordered.claim(10, "b2-worker", 60_000, 5);
     expect(
       first.map(
