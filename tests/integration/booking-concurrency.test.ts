@@ -764,6 +764,46 @@ describe("booking transaction", () => {
       meetingUrl: "https://meeting.invalid/private",
     });
     expect(revokedSchedule?.[0]).not.toHaveProperty("expertNote");
+
+    // Зазор, найденный независимым review: note granted + handoff denied.
+    // До ужесточения CASE SQL отдавал plaintext заметки в слой приложения,
+    // и ни один тест этого состояния не покрывал.
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'granted', 'expert-note-v1',
+        '2026-07-29T10:02:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_handoff', 'denied', 'handoff-v1',
+        '2026-07-29T10:03:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const handoffDeniedSchedule = await repository.listAuthorizedExpertSchedule(
+      {
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      },
+    );
+    expect(handoffDeniedSchedule?.[0]).toMatchObject({
+      status: "booked",
+      expertNoteConsent: true,
+      expertHandoffConsent: false,
+      clientDisplayName: "Клиент",
+      meetingUrl: "https://meeting.invalid/private",
+    });
+    expect(handoffDeniedSchedule?.[0]).not.toHaveProperty("expertNote");
     await testDb.db.execute(sql`
       update experts set active = false where id = ${fixture.expertId}::uuid
     `);

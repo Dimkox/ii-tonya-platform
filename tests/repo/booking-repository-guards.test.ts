@@ -35,12 +35,35 @@ describe("booking SQL mutation guards", () => {
   });
 
   it("implements the production booking workflow port structurally", () => {
-    const repository: BookingWorkflowRepository =
-      new PostgresBookingRepository(
-        {} as ConstructorParameters<typeof PostgresBookingRepository>[0],
-      );
+    const repository: BookingWorkflowRepository = new PostgresBookingRepository(
+      {} as ConstructorParameters<typeof PostgresBookingRepository>[0],
+    );
 
     expect(repository).toBeInstanceOf(PostgresBookingRepository);
+  });
+
+  it("gates the expert preparation note on note AND handoff consent in both read paths", () => {
+    const booking = readFileSync(
+      "packages/db/src/repositories/booking-repository.ts",
+      "utf8",
+    );
+    const telegramQueries = readFileSync(
+      "packages/db/src/repositories/expert-telegram-query-repository.ts",
+      "utf8",
+    );
+    const predicate =
+      "when note_consent.granted and handoff_consent.granted then cp.expert_note";
+
+    expect(booking).toContain(predicate);
+    expect(telegramQueries).toContain(predicate);
+    // Контроль, который обязан перевернуться: асимметрия «note_consent alone»
+    // возвращает plaintext заметки в слой приложения при denied handoff.
+    expect(booking).not.toMatch(
+      /when note_consent\.granted then cp\.expert_note/,
+    );
+    expect(telegramQueries).not.toMatch(
+      /when note_consent\.granted then cp\.expert_note/,
+    );
   });
 
   it("does not expose split Telegram authorization and schedule reads", () => {

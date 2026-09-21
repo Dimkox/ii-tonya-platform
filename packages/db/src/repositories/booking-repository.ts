@@ -581,7 +581,7 @@ export class PostgresBookingRepository {
           else 'Клиент'
         end as "clientDisplayName",
         case
-          when note_consent.granted then cp.expert_note
+          when note_consent.granted and handoff_consent.granted then cp.expert_note
           else null
         end as "expertNote",
         note_consent.granted as "expertNoteConsent",

@@ -7039,6 +7039,118 @@
       "detail_ids": [],
       "state": "planned",
       "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-022",
+      "title": "Подключить потребитель события booking.handoff_revoked",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/contracts/src/worker-outbox.ts",
+          "packages/db/src/repositories/outbox-repository.ts",
+          "packages/db/src/repositories/privacy-repository.ts"
+        ],
+        "modify": [
+          "packages/contracts/src/worker-outbox.ts",
+          "packages/db/src/repositories/outbox-repository.ts"
+        ],
+        "create": [
+          "tests/repo/handoff-revoke-consumer.test.ts"
+        ],
+        "tests": [
+          "tests/repo/handoff-revoke-consumer.test.ts"
+        ]
+      },
+      "current_state": "Событие `booking.handoff_revoked` порождается (`privacy-repository.ts:235-243`), но темы нет ни в allowlist воркера, ни в списке claim'ов Telegram: `grep -rn handoff_revoked packages/contracts/src/worker-outbox.ts packages/db/src/repositories/outbox-repository.ts` пусто (проверено 2026-09-21), а `outbox-repository.ts:31-37` бросает `worker_outbox_topic_allowlist_invalid` на неперечисленные темы. Нога §3 «получатели удаляют свои копии» не подключена.",
+      "deliverables": [
+        "Тема `booking.handoff_revoked` в allowlist и диспетчер, который исполняет аннулирование переданного состава у получателя.",
+        "Идемпотентность: повторная доставка не порождает повторного исполнения и не возвращает данные эксперту."
+      ],
+      "steps": [
+        "Определить поведение при выключенном внешнем канале (все флаги default-off): фиксировать локальное исполнение, не изобретать внешний вызов.",
+        "Сохранить трипвайр: неизвестная тема по-прежнему должна ронять воркера."
+      ],
+      "acceptance": [
+        "Событие, поставленное отзывом, прочитано потребителем и помечено исполненным (DB-free тест по allowlist + интеграционный прогон).",
+        "Ни один путь не возвращает эксперту данные после отзыва (тот же кейс, что в read-гейте)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/handoff-revoke-consumer.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-023",
+      "title": "Гейт времени показа meeting_url эксперту (§4 «не ранее 30 минут»)",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/repositories/booking-repository.ts",
+          "packages/integrations/src/telegram/telegram-adapter.ts",
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "modify": [
+          "packages/db/src/repositories/booking-repository.ts",
+          "packages/integrations/src/telegram/telegram-adapter.ts"
+        ],
+        "create": [
+          "tests/repo/meeting-url-timing-gate.test.ts"
+        ],
+        "tests": [
+          "tests/repo/meeting-url-timing-gate.test.ts"
+        ]
+      },
+      "current_state": "§4 действующего правила требует отдавать ссылку не ранее 30 минут до встречи. Read-path гейтит только статус: `booking-repository.ts:588-590` `when r.status = 'booked' then r.meeting_url`, `telegram-adapter.ts:471-477` рендерит `Встреча: <url>` в сообщение расписания. Замер review PR #97 (случай без согласий, встреча через ~24 часа): `meetingUrl` возвращается (проверено 2026-09-21).",
+      "deliverables": [
+        "Временной гейт на обоих путях показа ссылки (SQL и рендер сообщения): до порога ссылка не раскрывается.",
+        "Порог — число из схемы env с fail-closed default: отсутствие конфигурации = не показывать."
+      ],
+      "steps": [
+        "Не менять состав §3 (минимальный handoff включает meeting_url) — ужесточение только по времени.",
+        "Контроль обязан перевернуться: за 40 минут ссылки нет, за 10 минут — есть."
+      ],
+      "acceptance": [
+        "Ссылка не попадает в expert schedule message и в schedule-запись ранее порога (тест).",
+        "При `starts_at` в прошлом или неопределённом — отказ по умолчанию (fail-closed)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/meeting-url-timing-gate.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
     }
   ],
   "decisions": [
@@ -7821,7 +7933,9 @@
         "TASK-PLT-010",
         "TASK-PLT-012",
         "TASK-PLT-016",
-        "TASK-PLT-017"
+        "TASK-PLT-017",
+        "TASK-PLT-022",
+        "TASK-PLT-023"
       ],
       "reason": "Начало диалога, cookies и акцепт перечислены как согласие; правовую достаточность и юрисдикции эта спецификация не подтверждает.",
       "decision_task_id": "TASK-DEC-PLT-004"

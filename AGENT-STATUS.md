@@ -72,6 +72,24 @@ Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). 
 
 **Сдвиг релиза клиентского контура принят владельцем вместе с Б.**
 
+### Независимый review read-path PLT-008 (2026-09-21, PR #97)
+
+Вердикт **PASS-with-findings**: обе экспертские read-цепочки fail-closed, обходов не найдено,
+контроль переворота (безгейтовая реплика того же SQL) сработал. Чекбокс независимого review в
+`tasks/TASK-PLT-008.md` закрыт с полным текстом вердикта. Изменения этого прогона — **код на этой
+ветке, не в `main`**: `packages/db/src/repositories/booking-repository.ts` (заметка эксперту теперь
+требует `note_consent` **и** `handoff_consent`, как в соседнем пути
+`expert-telegram-query-repository.ts:333`), интеграционный кейс `note granted + handoff denied`
+(красный на старом предикате — проверено) и DB-free трипвайр в
+`tests/repo/booking-repository-guards.test.ts`. Прогон: `tests/repo` 51 файл / 424 теста,
+интеграционное трио 32/32 на `postgres:16-alpine`, `tsc -p tsconfig.tests.json` / eslint /
+prettier — exit 0.
+
+Review НЕ сертифицирует §3 `DEC-PLT-004` целиком: согласие user-scoped (нет
+`recipient_id`/`reservation_id`/`text_hash`) и grant-пути в проде нет → носитель `TASK-PLT-017`.
+Заведены `TASK-PLT-022` (потребителя `booking.handoff_revoked` нет в allowlist воркера) и
+`TASK-PLT-023` (показ `meeting_url` не ограничен §4-порогом 30 минут).
+
 ### Независимый review FIN-артефактов (2026-09-21)
 
 Review 7 артефактов `docs/superpowers/implementation-artifacts/fin-*.md` против принятых DEC и
