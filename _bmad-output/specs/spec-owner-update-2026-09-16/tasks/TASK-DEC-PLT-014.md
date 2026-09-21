@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `merged`; readiness: `ready`.
 - Тип: decision; исполнитель: product-owner; приоритет: P0.
 - Depends on: нет.
 - Решает: `DEC-PLT-014` — Правовая основа входного потока при незапрошенных спецданных и ПД третьих лиц (открыто вердиктом владельца Б от 2026-09-21, reopen инварианта §2 `DEC-PLT-004`).
