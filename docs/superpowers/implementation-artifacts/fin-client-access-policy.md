@@ -2,7 +2,7 @@
 title: "Client commercial-policy cohorts (DEC-FIN-001)"
 type: "policy"
 created: "2026-09-17"
-status: "approved"
+status: "pending_review"
 decision: "DEC-FIN-001"
 variant: "B"
 task: "TASK-FIN-001"

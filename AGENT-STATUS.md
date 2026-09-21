@@ -72,6 +72,39 @@ Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). 
 
 **Сдвиг релиза клиентского контура принят владельцем вместе с Б.**
 
+### Независимый review FIN-артефактов (2026-09-21)
+
+Review 7 артефактов `docs/superpowers/implementation-artifacts/fin-*.md` против принятых DEC и
+против кода. Итог: **подпись ревьювера закрывает только TASK-FIN-001**; FIN-007 и FIN-014 —
+после документабельных правок (исполнены этим прогоном); FIN-002 — нужен вердикт владельца по
+Q-169 (часовой пояс/опорный timestamp) и сверка 30 vs 60 дней; FIN-012/013/015 упираются в код,
+которого нет. Что исправлено и заведено:
+
+- Исправлены ложные утверждения о текущем коде: `fin-expert-code-lifecycle.md` (колонок `visibleAt`
+  нет, «один резидент — один активный код» схемой не обеспечено, клиентских coupon-таблиц нет,
+  коды чеканятся батчем, а не при регистрации резидента), `fin-center-policy.md` и
+  `fin-organizer-policy.md` (цены полос взяты из тест-фикстуры `partner-commerce-repository.test.ts:24`,
+  действующих `approved` строк `partner_tariff_policy_versions` в дереве нет; production-путь
+  котировки жёстко передаёт `qualifiedExpertCount: 0` — `partner-commerce-repository.ts:101`),
+  `fin-expert-pricing-policy.md` (PRO `group_event_limit=3` вместо «per V2 row» + порядок скидок
+  DEC-FIN-011), `fin-client-package-policy.md` (30 дней в `admin-repository.ts:369` против принятых
+  60; убрана ссылка на значения локального `.env` под заголовком «Продакшен»),
+  `fin-group-event-settlement.md` (вместимость 20 человек из REQ-FIN-013.01 + пример 30/70).
+- Убрано преждевременное `status: "approved"` во всех 7 артефактах → `pending_review`
+  (ревью ещё не подписано).
+- `DEC-FIN-012` получил эрратум: скобка «5 ⇒ 12000; 15000 — с 6» была взаимоисключающей;
+  операционное правило `>=6`/`>=10` и код (`partner-pricing.ts:77`) не менялись.
+- `DEC-FIN-003` дополнен записью ранее данного вердикта владельца о ценах (`.memlog.md` 694,
+  коммит `de0656f`) — гейт «до прайса владельца» закрыт.
+- Новые открытые решения: `DEC-FIN-029` (многоразовость эксперского кода) и `DEC-FIN-030`
+  (абсолютные цены партнёрских полос). Новые задачи: `TASK-FIN-029` (подключить qualified count к
+  полосе + boundary-тесты, `ready`), `TASK-FIN-030` (движок расхода полос и посещаемости),
+  `TASK-FIN-031` (видимость кода и один активный код), `TASK-FIN-032` (сид approved политик),
+  плюс `TASK-DEC-FIN-029/030`.
+- Карточки `tasks/*.md` синхронизированы с `backlog.json` по заголовкам State/readiness
+  (59 карточек отставали; JSON — авторитет, валидатор их не проверяет).
+
+
 **TASK-FIN-001 (this branch):** DEC-FIN-001 variant B already accepted. Wrote
 `docs/superpowers/implementation-artifacts/fin-client-access-policy.md` — cohort
 matrix + rollback without silent reassignment. Card

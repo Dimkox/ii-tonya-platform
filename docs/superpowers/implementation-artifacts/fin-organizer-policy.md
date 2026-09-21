@@ -2,7 +2,7 @@
 title: "Organizer partner policy (DEC-FIN-012)"
 type: "policy"
 created: "2026-09-17"
-status: "approved"
+status: "pending_review"
 task: "TASK-FIN-013"
 live_activation: false
 ---
@@ -13,7 +13,7 @@ live_activation: false
 
 ## Тариф
 
-| Квалифицированных экспертов | Tier | База (из snapshot ORGANIZER) |
+| Квалифицированных экспертов | Tier | База (из **тест-фикстуры** `ORGANIZER`; прод-сида `partner_tariff_policy_versions` в дереве нет — проверено 2026-09-21 — см. `TASK-FIN-029`) |
 |---:|---|---|
 | 0–5 | STANDARD | `standardPriceMinor` (источник 20000 ₽) |
 | 6–9 | REFERRED_6_9 | `referredSixPriceMinor` (15000 ₽) |

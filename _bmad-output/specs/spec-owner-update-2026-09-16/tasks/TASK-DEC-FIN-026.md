@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `ready`.
+- State: `merged`; readiness: `ready`.
 - Тип: decision; исполнитель: product-owner; приоритет: P0.
 - Depends on: нет.
 - Решения: нет.

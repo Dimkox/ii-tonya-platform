@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `planned`; readiness: `pending_dependencies`.
 - Тип: content; исполнитель: product-owner; приоритет: P2.
 - Depends on: [TASK-EXP-015](TASK-EXP-015.md), [TASK-FIN-022](TASK-FIN-022.md), [TASK-FIN-023](TASK-FIN-023.md), [TASK-FIN-010](TASK-FIN-010.md), [TASK-FIN-019](TASK-FIN-019.md), [TASK-DEC-FIN-017](TASK-DEC-FIN-017.md).
 - Решения: DEC-FIN-010, DEC-FIN-011, DEC-FIN-016, DEC-FIN-017.

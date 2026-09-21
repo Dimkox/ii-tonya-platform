@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `planned`; readiness: `pending_dependencies`.
 - Тип: design; исполнитель: backend; приоритет: P0.
 - Depends on: [TASK-FIN-007](TASK-FIN-007.md), [TASK-DEC-FIN-021](TASK-DEC-FIN-021.md), [TASK-DEC-FIN-024](TASK-DEC-FIN-024.md), [TASK-FIN-009](TASK-FIN-009.md).
 - Решения: DEC-FIN-007, DEC-FIN-021, DEC-FIN-024, DEC-FIN-028.

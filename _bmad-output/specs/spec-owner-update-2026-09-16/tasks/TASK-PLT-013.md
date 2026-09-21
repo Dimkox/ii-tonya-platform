@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `verified_pending_review`; readiness: `ready`.
+- State: `merged`; readiness: `ready`.
 - Тип: verification; исполнитель: ops; приоритет: P0.
 - Depends on: нет.
 - Решения: нет.

@@ -2,7 +2,7 @@
 title: "Client package catalog (DEC-FIN-002 / DEC-FIN-003)"
 type: "policy"
 created: "2026-09-17"
-status: "approved"
+status: "pending_review"
 task: "TASK-FIN-002"
 live_activation: false
 ---
@@ -29,8 +29,8 @@ live_activation: false
 
 Купонный грант = `2 × price` (DEC-FIN-003 ②). Фиксированные 1000/2000/3000/4000 не хранятся. Оплата пакета: `cash + credit = price`. Начисление купонов в runtime V2 по-прежнему default-off до TASK-FIN-021.
 
-`expiresAt` платного SKU = `paid_at + 60 calendar days`. Q-169 (TZ) кандидат `DISPLAY_TIMEZONE=Europe/Moscow`, **не закрыт этим документом**.
+`expiresAt` платного SKU = `paid_at + 60 calendar days` (срок принят DEC-FIN-002, где явно сказано, что 30-дневное истечение ЭТИМ решением не задано). **Не закрыто этим документом:** Q-169 (часовой пояс и опорный timestamp) — кандидат `DISPLAY_TIMEZONE=Europe/Moscow` (`packages/config/src/env.ts:186`); отсчёт от `paid_at` вместо `granted_at` историческую совместимость не описывает; наконец уже отлитый путь `admin`-грантов истекает по другому правилу — `packages/db/src/repositories/admin-repository.ts:369` `case when kind='admin' then db_now + interval '30 days'` — проверено 2026-09-21, то есть 30 и 60 дней живут в коде одновременно и требуют сверки в `TASK-FIN-021`.
 
 ## Продакшен
 
-Цены заданы. Продажа на выделенном сервере всё ещё ждёт `runtime.env`, кассу 54-ФЗ и webhook. Локальный `.env` уже с `PAYMENTS_ENABLED=true`.
+Цены заданы и записаны в реестр (DEC-FIN-003, дополнение 2026-09-21; `.memlog.md` запись 694, коммит `de0656f`). Продажа на выделенном сервере всё ещё ждёт `runtime.env`, кассу 54-ФЗ и webhook: production `PAYMENTS_ENABLED=false` по `docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md`. Значения локального `.env` здесь не приводятся (AGENT-STATUS: имена переменных, не значения).

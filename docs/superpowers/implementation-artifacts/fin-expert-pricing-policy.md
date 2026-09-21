@@ -2,7 +2,7 @@
 title: "Expert personal pricing policy (DEC-FIN-007 / DEC-FIN-009)"
 type: "policy"
 created: "2026-09-17"
-status: "approved"
+status: "pending_review"
 task: "TASK-FIN-007"
 live_activation: false
 ---
@@ -17,7 +17,7 @@ DEC-FIN-007 **①**: активная policy = **`expert_residency_v2`**. Нов
 |---|---|---:|---|---:|---|
 | START | Старт | 390000 (3900 ₽) | 30×24ч | 3000 | 0 |
 | BASE | База | 590000 (5900 ₽) | 30×24ч | 3000 | 1 |
-| PRO | Про | 999000 (9990 ₽) | 30×24ч | 3000 | per V2 row |
+| PRO | Про | 999000 (9990 ₽) | 30×24ч | 3000 | 3 (`group_event_limit`, CHECK `expert_tariff_v2_combination` — `packages/db/src/schema/expert-residency.ts:385`: START 0, BASE 1, PRO 3 — проверено 2026-09-21) |
 
 Исторические `legacy_residency_v1` snapshots не переписываются.
 
@@ -28,3 +28,11 @@ DEC-FIN-007 **①**: активная policy = **`expert_residency_v2`**. Нов
 ## Rollback
 
 Не создавать новые `expert_residency_v2` tariff_key вне START/BASE/PRO. Retire только через audited `tariff_retire`. Live residency billing остаётся default-off.
+
+### Порядок скидок (кросс-ссылка, 2026-09-21)
+
+Этот документ фиксирует только базовую формулу тарифа V2 (no-change по DEC-FIN-007 ①). Активные
+механики начисления приняты отдельно и применяются **поверх** базы в порядке DEC-FIN-011 ①:
+floor 5000 → Start-проценты (Energy Start + 3-месячный Start 15%/10%) → акций нет. Читая только
+таблицу выше, нельзя считать итоговую цену: для базы 12000 ₽ порядок даёт иной результат, чем голая
+строка START/BASE/PRO.

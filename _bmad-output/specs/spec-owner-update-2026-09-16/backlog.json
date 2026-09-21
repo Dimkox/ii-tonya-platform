@@ -6715,6 +6715,330 @@
       "detail_ids": [],
       "state": "planned",
       "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-FIN-029",
+      "title": "Решить: Многоразовость эксперского referral-кода",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-029"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто независимым review FIN-артефактов 2026-09-21; ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-FIN-029: выбранный вариант, основание, дата, ответственный."
+      ],
+      "steps": [
+        "Один код расходуется однократно или резидент приводит нескольких коллег одним кодом?"
+      ],
+      "acceptance": [
+        "Правило зафиксировано в decision-register.md со статусом accepted; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "D037"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-FIN-030",
+      "title": "Решить: Абсолютные цены партнёрских полос center и organizer",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-030"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто независимым review FIN-артефактов 2026-09-21; ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-FIN-030: выбранный вариант, основание, дата, ответственный."
+      ],
+      "steps": [
+        "Какие цены полос публикуются как действующий approved тариф центра и организатора?"
+      ],
+      "acceptance": [
+        "Правило зафиксировано в decision-register.md со статусом accepted; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D039"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-FIN-029",
+      "title": "Подключить qualified referral count к расчёту партнёрской полосы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-FIN-012"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/partner-pricing.ts",
+          "packages/domain/src/partner-pricing.test.ts",
+          "packages/db/src/repositories/partner-commerce-repository.ts",
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "modify": [
+          "packages/db/src/repositories/partner-commerce-repository.ts"
+        ],
+        "create": [
+          "tests/repo/partner-tier-wiring.test.ts"
+        ],
+        "tests": [
+          "tests/repo/partner-tier-wiring.test.ts"
+        ]
+      },
+      "current_state": "Порог не исполняется: единственная production-цепочка котировки жёстко передаёт qualifiedExpertCount: 0 (partner-commerce-repository.ts:101, проверено 2026-09-21), поэтому все shadow-котировки попадают в STANDARD. Тесты полос покрывают только 0/6/10, границ 4/5/9 нет.",
+      "deliverables": [
+        "Котировка получает фактическое число подтверждённых квалифицированных рефералов, а не литерал 0.",
+        "Boundary-тесты на 4/5/6/9/10 подтверждают: 5 ⇒ STANDARD, 6 ⇒ REFERRED_6_9, 10 ⇒ REFERRED_10_PLUS без ретро-смены."
+      ],
+      "steps": [
+        "Взять источник qualified count из действующего движка квалификации (оплаченное/подтверждённое участие), не из числа регистраций.",
+        "Не менять пороги DEC-FIN-012 (>=6 и >=10) и не трогать conservation-тесты полос."
+      ],
+      "acceptance": [
+        "Ни одна новая котировка не сохраняется в STANDARD при >=6 подтверждённых рефералах (тест).",
+        "Поведение существующих строк не меняется задним числом: пересчёт только для новых котировок."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/partner-tier-wiring.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-FIN-030",
+      "title": "Движок расхода партнёрских полос и записи посещаемости группы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-012",
+        "DEC-FIN-013"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/partner-pricing.ts",
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "modify": [
+          "packages/domain/src/partner-pricing.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0039_partner_band_consumption.sql",
+          "tests/repo/partner-band-consumption.test.ts"
+        ],
+        "tests": [
+          "tests/repo/partner-band-consumption.test.ts"
+        ]
+      },
+      "current_state": "Strict-band consumption описан в артефактах, но не реализован: eventEntitlements участвует только в валидации формы и в выводе котировки (partner-pricing.ts:73-74, :84), таблиц расхода/entitlement-лимита нет (проверено 2026-09-21), полей вместимости и посещаемости в expert-residency.ts нет.",
+      "deliverables": [
+        "Учёт расхода полос: одно событие не может расходовать корзину большей полосы и не может быть засчитано дважды.",
+        "Запись посещаемости включённой группы (до 20 человек по REQ-FIN-013.01) как основание распределения 30/70."
+      ],
+      "steps": [
+        "Реализовать ledger расхода поверх существующей versioned policy, без дублирования полос в коде.",
+        "Держать миграцию ручной (drizzle-kit generate запрещён) и проверить SQL-совпадение с живой БД до применения."
+      ],
+      "acceptance": [
+        "Тест: второе событие сверх лимита полосы отклоняется или тарифицируется как дополнительная группа (10%/15%).",
+        "Тест: сумма deposit+remainder conservation 30/70 сохраняется при любом числе участников до 20."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/partner-band-consumption.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "pending_dependencies"
+    },
+    {
+      "id": "TASK-FIN-031",
+      "title": "Lifecycle эксперского кода: отметка видимости и ограничение одного активного кода",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-014",
+        "DEC-FIN-029"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/schema/expert-residency.ts",
+          "packages/db/src/repositories/expert-referral-admin-repository.ts"
+        ],
+        "modify": [
+          "packages/db/src/schema/expert-residency.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0040_expert_referral_visibility.sql",
+          "tests/repo/expert-referral-code-lifecycle.test.ts"
+        ],
+        "tests": [
+          "tests/repo/expert-referral-code-lifecycle.test.ts"
+        ]
+      },
+      "current_state": "Артефакт fin-expert-code-lifecycle.md описывал несуществующее: колонки visibleAt нет (0 совпадений по packages/ и apps/), «один резидент — один активный код» не обеспечено (unique только code_hash и тривиальный (id, inviter_expert_id), expert-residency.ts:244-247), коды чеканятся батчем (expert_referral.batch_generate), а не при регистрации резидента. Многоразовость — открытый DEC-FIN-029.",
+      "deliverables": [
+        "Отметка видимости кода по первой успешной оплате резидентуры (DEC-FIN-014 ①) реализована колонкой и гейтом display/API.",
+        "Ограничение «не более одного кода в статусе issued на резидента» обеспечено схемой (partial unique) после решения DEC-FIN-029 о многоразовости."
+      ],
+      "steps": [
+        "Миграцию выполнять вручную; проверять, что выдача батча не может создать второй активный код тому же резиденту.",
+        "Не менять деривацию code_hash/key_version (это ключ идемпотентности)."
+      ],
+      "acceptance": [
+        "Тест: до первой успешной оплаты код не отдаётся в display/API, после — отдаётся.",
+        "Тест: второй issued-код тому же inviter_expert_id отклоняется (при однократной семантике)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/expert-referral-code-lifecycle.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-FIN-032",
+      "title": "Опубликовать approved партнёрские тарифные строки (seed policy rows)",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-FIN-030",
+        "TASK-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-030"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/schema/partner-commerce.ts",
+          "packages/db/migrations/0037_partner_commerce_a.sql"
+        ],
+        "modify": [
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0041_partner_tariff_policy_seed.sql"
+        ],
+        "tests": []
+      },
+      "current_state": "Действующего тарифа нет: строк partner_tariff_policy_versions со статусом approved в дереве нет, а числа 15000/12000/8000 (центр) и 20000/15000/10000 (организатор) существуют только в тест-фикстуре partner-commerce-repository.test.ts:24 (проверено 2026-09-21). CHECK в 0037 закрепляет валюту, пороги полос и комиссии, но не абсолютные цены.",
+      "deliverables": [
+        "Versioned approved строки политик для CENTER и ORGANIZER с числами из DEC-FIN-030 и effective_from.",
+        "Синхронизация артефактов fin-center-policy.md и fin-organizer-policy.md: ссылаться на опубликованную политику, а не на фикстуру."
+      ],
+      "steps": [
+        "Сид — отдельная ручная миграция; в одном прогоне с ней не менять пороги полос.",
+        "Тест-фикстура остаётся фикстурой и не должна использоваться как источник продуктового тарифа."
+      ],
+      "acceptance": [
+        "После сида котировка читает approved-строку и считает полосу по DEC-FIN-012 (тест с реальной политикой).",
+        "Ни одно публичное число тарифа не берётся из теста (проверяется grep-тестом по дереву)."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
     }
   ],
   "decisions": [
@@ -7716,6 +8040,47 @@
       ],
       "reason": "CAP-4 нарушается сейчас: dialogue_inbound.text хранит сырой текст 30 дней без скрининга (hybrid-message-repository.ts:105-107).",
       "decision_task_id": "TASK-DEC-PLT-014"
+    },
+    {
+      "id": "DEC-FIN-029",
+      "title": "Многоразовость эксперского referral-кода",
+      "question": "Один код расходуется однократно или резидент может приводить нескольких коллег одним кодом?",
+      "options": [
+        "Код однократный: после redeem выпускается новый батч.",
+        "Код многоразовый в пределах периода с капитоном по политике.",
+        "Многоразовость только для резидента с первой успешной оплатой."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "D037"
+      ],
+      "blocks": [
+        "TASK-FIN-031"
+      ],
+      "reason": "REQ-FIN-014.02 требует lifecycle многоразового кода, схема реализует однократный расход; DEC-FIN-014 закрывало только момент создания/видимости.",
+      "decision_task_id": "TASK-DEC-FIN-029"
+    },
+    {
+      "id": "DEC-FIN-030",
+      "title": "Абсолютные цены партнёрских полос center и organizer",
+      "question": "Какие абсолютные цены полос публикуются как действующий approved тариф центра и организатора?",
+      "options": [
+        "Утвердить числа из фикстуры (15000/12000/8000 и 20000/15000/10000) отдельным решением и завести сид.",
+        "Утвердить иные абсолютные цены versioned policy row.",
+        "Не публиковать партнёрские тарифы, цены не фиксировать."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D039"
+      ],
+      "blocks": [
+        "TASK-FIN-032"
+      ],
+      "reason": "DEC-FIN-012 зафиксировало пороги, а не цены; approved-строк политик в дереве нет, есть только тест-фикстура.",
+      "decision_task_id": "TASK-DEC-FIN-030"
     }
   ]
 }
