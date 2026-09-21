@@ -7,13 +7,10 @@ export type {
   MessageClass,
   PackageKind,
 } from "./billing.js";
-export { buildExpertView, buildProfilePatch } from "./consent.js";
+export { buildExpertView } from "./consent.js";
 export type {
-  ConsentGrant,
   ConsentPurpose,
   ExpertView,
-  ProfileInput,
-  ProfilePatch,
   ReservationViewInput,
 } from "./consent.js";
 export {
