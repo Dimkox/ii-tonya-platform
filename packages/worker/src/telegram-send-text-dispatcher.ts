@@ -9,6 +9,14 @@ import type {
   OutboxReconciler,
 } from "./outbox-runner.js";
 
+/**
+ * EGRESS-01 (приёмка T18): согласие сверяется непосредственно перед сетевым вызовом, а не
+ * только при выдаче строки из очереди — иначе отзыв в окне лизинга уходит клиенту.
+ */
+export type TelegramConsentGate = Readonly<{
+  allowsSend(dialogueId: string): Promise<boolean>;
+}>;
+
 export type TelegramSendTextPayload = Readonly<{
   deliveryId: string;
   dialogueId: string;
@@ -62,6 +70,8 @@ export function createTelegramSendTextDispatcher(deps: {
   readonly botKey: string;
   readonly sendMessageUrl: URL;
   readonly transport: TelegramTransport;
+  /** Обязателен: собрать отправку без сверки согласия нельзя даже по незнанию. */
+  readonly consentGate: TelegramConsentGate;
 }): OutboxDispatcher & OutboxReconciler {
   return {
     async dispatch(message: OutboxMessage): Promise<DispatchOutcome> {
@@ -79,6 +89,16 @@ export function createTelegramSendTextDispatcher(deps: {
       } catch {
         return { kind: "terminal", reasonCode: "invalid_payload" };
       }
+      let allowed: boolean;
+      try {
+        allowed = await deps.consentGate.allowsSend(payload.dialogueId);
+      } catch {
+        // Неизвестный результат проверки = не отправляем (fail-closed).
+        allowed = false;
+      }
+      if (!allowed)
+        return { kind: "terminal", reasonCode: "local_source_invalid" };
+
       try {
         const response = await deps.transport.request({
           method: "POST",

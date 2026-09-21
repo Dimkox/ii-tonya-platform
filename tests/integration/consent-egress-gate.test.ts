@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PostgresOrderedTelegramOutboxRepository } from "../../packages/db/src/repositories/outbox-repository.js";
+import { createConsentEgressGate } from "../../packages/db/src/repositories/consent-egress-gate.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -107,5 +108,54 @@ describe("egress consent barrier on the outbound queue", () => {
       `);
     }
     expect(await claim({ enabled: true })).toHaveLength(0);
+  });
+});
+
+describe("pre-send consent gate against the journal", () => {
+  const gate = () => createConsentEgressGate(testDb!.db);
+
+  const dialogueOf = async (userId: string) => {
+    sequence += 1;
+    return (
+      await testDb!.db.execute<{ id: string }>(sql`
+        insert into dialogues (tenant_key, user_id, provider, bot_key, external_chat_id)
+        values ('tenant-2', ${userId}::uuid, 'telegram', 'bot-2', ${`gate-${sequence}`})
+        returning id
+      `)
+    ).rows[0]!.id;
+  };
+
+  it("follows the journal: nothing, granted, then revoked", async () => {
+    const user = (
+      await testDb!.db.execute<{ id: string }>(
+        sql`insert into users (id) values (gen_random_uuid()) returning id`,
+      )
+    ).rows[0]!;
+    const dialogue = await dialogueOf(user.id);
+    expect(await gate().allowsSend(dialogue)).toBe(false);
+    await decide(user.id, "granted");
+    expect(await gate().allowsSend(dialogue)).toBe(true);
+    await decide(user.id, "revoked");
+    expect(await gate().allowsSend(dialogue)).toBe(false);
+  });
+
+  it("denies a dialogue that does not exist and a contradicted instant", async () => {
+    expect(
+      await gate().allowsSend("00000000-0000-4000-8000-000000000fff"),
+    ).toBe(false);
+    const user = (
+      await testDb!.db.execute<{ id: string }>(
+        sql`insert into users (id) values (gen_random_uuid()) returning id`,
+      )
+    ).rows[0]!;
+    const dialogue = await dialogueOf(user.id);
+    for (const decision of ["denied", "granted"]) {
+      await testDb!.db.execute(sql`
+        insert into consents (user_id, consent_type, decision, policy_version, created_at)
+        values (${user.id}::uuid, 'client_messaging', ${decision}, 'messaging-v1',
+                '2026-09-21T14:00:00Z'::timestamptz)
+      `);
+    }
+    expect(await gate().allowsSend(dialogue)).toBe(false);
   });
 });

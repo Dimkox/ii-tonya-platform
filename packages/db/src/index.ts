@@ -100,6 +100,7 @@ export {
   PostgresOrderedTelegramOutboxRepository,
   type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
+export { createConsentEgressGate } from "./repositories/consent-egress-gate.js";
 export {
   PostgresB2SensitiveRetentionRepository,
   type B2SensitiveRetentionResult,
