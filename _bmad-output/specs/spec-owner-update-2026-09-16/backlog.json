@@ -6822,9 +6822,12 @@
       "item_ids": [],
       "kind": "implementation",
       "owner": "backend",
-      "depends_on": [],
+      "depends_on": [
+        "TASK-DEC-FIN-031"
+      ],
       "decision_ids": [
-        "DEC-FIN-012"
+        "DEC-FIN-012",
+        "DEC-FIN-031"
       ],
       "resolves_decisions": [],
       "files": {
@@ -6844,10 +6847,11 @@
           "tests/repo/partner-tier-wiring.test.ts"
         ]
       },
-      "current_state": "Порог не исполняется: единственная production-цепочка котировки жёстко передаёт qualifiedExpertCount: 0 (partner-commerce-repository.ts:101, проверено 2026-09-21), поэтому все shadow-котировки попадают в STANDARD. Тесты полос покрывают только 0/6/10, границ 4/5/9 нет.",
+      "current_state": "Разделено 2026-09-21. Исполнено: границы полосы закреплены тестами 0..99 на оба kind (packages/domain/src/partner-pricing.test.ts, 52 теста; контроль: при пороге 5 вместо 6 краснеют ровно кейсы «5 -> STANDARD»), плюс DB-free гарант tests/repo/partner-quote-source.test.ts, пиннящий отсутствие источника числа (проверен переворотом: добавление колонки expert_id делает его красным). Не исполнимо сейчас: сам подсчёт qualified count — связи commercial_participants с экспертами в схеме нет (замер 2026-09-21), production-путь передаёт литерал 0 (partner-commerce-repository.ts:101) → блокируется DEC-FIN-031.",
       "deliverables": [
         "Котировка получает фактическое число подтверждённых квалифицированных рефералов, а не литерал 0.",
-        "Boundary-тесты на 4/5/6/9/10 подтверждают: 5 ⇒ STANDARD, 6 ⇒ REFERRED_6_9, 10 ⇒ REFERRED_10_PLUS без ретро-смены."
+        "Boundary-тесты на 4/5/6/9/10 подтверждают: 5 ⇒ STANDARD, 6 ⇒ REFERRED_6_9, 10 ⇒ REFERRED_10_PLUS без ретро-смены.",
+        "Гарунт tests/repo/partner-quote-source.test.ts: отсутствие аффилиации и литерал 0 в writer зафиксированы тестом и обязаны перевернуться при добавлении связи."
       ],
       "steps": [
         "Взять источник qualified count из действующего движка квалификации (оплаченное/подтверждённое участие), не из числа регистраций.",
@@ -6867,7 +6871,7 @@
       ],
       "detail_ids": [],
       "state": "planned",
-      "readiness": "ready"
+      "readiness": "blocked_by_decision"
     },
     {
       "id": "TASK-FIN-030",
@@ -7151,6 +7155,59 @@
       "detail_ids": [],
       "state": "planned",
       "readiness": "ready"
+    },
+    {
+      "id": "TASK-DEC-FIN-031",
+      "title": "Решить: Модель аффилиации партнёра с экспертами для расчёта полосы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-031"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md",
+          "packages/db/src/schema/partner-commerce.ts",
+          "packages/db/src/schema/expert-residency.ts"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто 2026-09-21 при попытке исполнить TASK-FIN-029: связи commercial_participants (CENTER/ORGANIZER) с экспертами в схеме нет, production-котировка передаёт qualifiedExpertCount: 0 (partner-commerce-repository.ts:101).",
+      "deliverables": [
+        "Запись решения DEC-FIN-031: что считается приведёнными экспертами для партнёра, из какой таблицы и с каким статусом подтверждения."
+      ],
+      "steps": [
+        "Выбрать модель аффилиации (новая таблица связи / расширенный referral graph / признать правило неактивным) и зафиксировать её с числами и границами."
+      ],
+      "acceptance": [
+        "Правило исполнимо без изобретения источника: после решения TASK-FIN-029 получает конкретный запрос подсчёта.",
+        "Статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D037",
+        "D039"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
     }
   ],
   "decisions": [
@@ -7475,7 +7532,8 @@
         "TASK-EXP-015",
         "TASK-EXP-016",
         "TASK-FIN-013",
-        "TASK-FIN-023"
+        "TASK-FIN-023",
+        "TASK-FIN-029"
       ],
       "reason": "Источники дают >5 и 5–9, код использует >=6; rule bands отсутствует.",
       "decision_task_id": "TASK-FIN-012"
@@ -8195,6 +8253,28 @@
       ],
       "reason": "DEC-FIN-012 зафиксировало пороги, а не цены; approved-строк политик в дереве нет, есть только тест-фикстура.",
       "decision_task_id": "TASK-DEC-FIN-030"
+    },
+    {
+      "id": "DEC-FIN-031",
+      "title": "Модель аффилиации партнёра с экспертами для расчёта полосы",
+      "question": "Что именно и из какой таблицы считается приведёнными экспертами для CENTER и ORGANIZER?",
+      "options": [
+        "Новая таблица аффилиации participant↔expert с датой подтверждения.",
+        "Переиспользовать expert→expert referral graph через новый внешний ключ к organization_profiles.",
+        "Признать правило неактивным: shadow-котировки остаются STANDARD, перенос на будущий виток."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D037",
+        "D039"
+      ],
+      "blocks": [
+        "TASK-FIN-029"
+      ],
+      "reason": "Схема не содержит связи партнёра с экспертами, поэтому production-котировка передаёт 0 и порог DEC-FIN-012 не исполняется.",
+      "decision_task_id": "TASK-DEC-FIN-031"
     }
   ]
 }

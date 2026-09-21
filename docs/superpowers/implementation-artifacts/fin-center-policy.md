@@ -13,7 +13,7 @@ DEC-FIN-012 **①**: пороги **`>=6` и `>=10`**, consumption = **strict ma
 
 ## Тариф (minor = копейки)
 
-Арифметика полос совпадает с `packages/domain/src/partner-pricing.ts`. Сами цены полос взяты из **тест-фикстуры** `packages/db/src/repositories/partner-commerce-repository.test.ts:24` (`1500000/1200000/800000` minor = 15000/12000/8000 ₽): строки `partner_tariff_policy_versions` со статусом `approved` в миграциях и скриптах нет — проверено 2026-09-21, то есть таблица ниже описывает формулу, а не действующий тариф → `TASK-FIN-029`:
+Арифметика полос совпадает с `packages/domain/src/partner-pricing.ts`. Сами цены полос взяты из **тест-фикстуры** `packages/db/src/repositories/partner-commerce-repository.test.ts:24` (`1500000/1200000/800000` minor = 15000/12000/8000 ₽): строки `partner_tariff_policy_versions` со статусом `approved` в миграциях и скриптах нет — проверено 2026-09-21, то есть таблица ниже описывает формулу, а не действующий тариф → `DEC-FIN-030` (утвердить абсолютные цены) и `TASK-FIN-032` (опубликовать approved-строки):
 
 | Квалифицированных экспертов | Tier | База |
 |---:|---|---:|
@@ -27,7 +27,7 @@ DEC-FIN-012 **①**: пороги **`>=6` и `>=10`**, consumption = **strict ma
 
 ## Квалификация эксперта
 
-Считается только qualified referral, уже принятый действующим движком рефералки (оплаченное/подтверждённое участие, не «просто регистрация»). Точный event grant — DEC-FIN-015 / FIN-016; здесь порог считает уже qualified count. **Порог не исполняется в production-пути:** единственная цепочка котировки жёстко передаёт `qualifiedExpertCount: 0` (`packages/db/src/repositories/partner-commerce-repository.ts:101` — проверено 2026-09-21), поэтому каждая сохраняемая shadow-котировка попадает в `STANDARD` независимо от числа рефералов; boundary-тестов на 4/5/9 нет (`partner-pricing.test.ts` покрывает 0/6/10) → `TASK-FIN-029`.
+Считается только qualified referral, уже принятый действующим движком рефералки (оплаченное/подтверждённое участие, не «просто регистрация»). Точный event grant — DEC-FIN-015 / FIN-016; здесь порог считает уже qualified count. **Порог не исполняется в production-пути:** единственная цепочка котировки жёстко передаёт `qualifiedExpertCount: 0` (`packages/db/src/repositories/partner-commerce-repository.ts:101` — проверено 2026-09-21), поэтому каждая сохраняемая shadow-котировка попадает в `STANDARD` независимо от числа рефералов; Границы полосы закреплены тестами 2026-09-21 (`partner-pricing.test.ts` покрывает 0..11 и 99 на CENTER и ORGANIZER), но проводки нет: источника `qualifiedExpertCount` в схеме не существует — у `commercial_participants` только `id, user_id, participant_kind, onboarding_state, created_at`, а `expert_referrals` связывает эксперта с экспертом (`expert-residency.ts:285`) → см. открытый `DEC-FIN-031` (модель аффилиации) и `TASK-FIN-029` (проводка после него).
 
 ## Consumption
 

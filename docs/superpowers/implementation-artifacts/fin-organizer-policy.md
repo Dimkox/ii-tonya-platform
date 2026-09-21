@@ -13,7 +13,7 @@ live_activation: false
 
 ## Тариф
 
-| Квалифицированных экспертов | Tier | База (из **тест-фикстуры** `ORGANIZER`; прод-сида `partner_tariff_policy_versions` в дереве нет — проверено 2026-09-21 — см. `TASK-FIN-029`) |
+| Квалифицированных экспертов | Tier | База (из **тест-фикстуры** `ORGANIZER`; прод-сида `partner_tariff_policy_versions` в дереве нет — проверено 2026-09-21 — см. `DEC-FIN-030` и `TASK-FIN-032`) |
 |---:|---|---|
 | 0–5 | STANDARD | `standardPriceMinor` (источник 20000 ₽) |
 | 6–9 | REFERRED_6_9 | `referredSixPriceMinor` (15000 ₽) |

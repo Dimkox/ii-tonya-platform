@@ -164,4 +164,91 @@ describe("calculatePartnerShadowQuote", () => {
       calculatePartnerShadowQuote(quoteInput(overrides) as never),
     ).toThrow(new Error("partner_pricing_invalid")),
   );
+
+  // Границы полосы по DEC-FIN-012 (пороги `>=6` и `>=10`) и его эрратуму 2026-09-21:
+  // ровно 5 приведённых экспертов — это STANDARD (базовая цена), скидка начинается с 6.
+  describe("tier boundaries per DEC-FIN-012", () => {
+    const boundary = [
+      [0, "STANDARD"],
+      [1, "STANDARD"],
+      [2, "STANDARD"],
+      [3, "STANDARD"],
+      [4, "STANDARD"],
+      [5, "STANDARD"],
+      [6, "REFERRED_6_9"],
+      [7, "REFERRED_6_9"],
+      [8, "REFERRED_6_9"],
+      [9, "REFERRED_6_9"],
+      [10, "REFERRED_10_PLUS"],
+      [11, "REFERRED_10_PLUS"],
+      [99, "REFERRED_10_PLUS"],
+    ] as const;
+
+    it.each(boundary)("counts %i -> %s (CENTER)", (count, tier) => {
+      const quote = calculatePartnerShadowQuote(
+        quoteInput({ qualifiedExpertCount: count }),
+      );
+      expect(quote.tier).toBe(tier);
+      expect(quote.basePriceMinor).toBe(
+        tier === "STANDARD"
+          ? 1_500_000
+          : tier === "REFERRED_6_9"
+            ? 1_200_000
+            : 800_000,
+      );
+    });
+
+    it.each(boundary)("counts %i -> %s (ORGANIZER)", (count, tier) => {
+      const quote = calculatePartnerShadowQuote(
+        quoteInput({
+          kind: "ORGANIZER",
+          qualifiedExpertCount: count,
+          policy: policy("ORGANIZER"),
+        }),
+      );
+      expect(quote.tier).toBe(tier);
+      expect(quote.basePriceMinor).toBe(
+        tier === "STANDARD"
+          ? 2_000_000
+          : tier === "REFERRED_6_9"
+            ? 1_500_000
+            : 1_000_000,
+      );
+    });
+
+    it("keeps the 5/6 step a discount step, never a surcharge", () => {
+      const five = calculatePartnerShadowQuote(
+        quoteInput({ qualifiedExpertCount: 5 }),
+      );
+      const six = calculatePartnerShadowQuote(
+        quoteInput({ qualifiedExpertCount: 6 }),
+      );
+      const nine = calculatePartnerShadowQuote(
+        quoteInput({ qualifiedExpertCount: 9 }),
+      );
+      const ten = calculatePartnerShadowQuote(
+        quoteInput({ qualifiedExpertCount: 10 }),
+      );
+      expect(six.basePriceMinor).toBeLessThan(five.basePriceMinor);
+      expect(ten.basePriceMinor).toBeLessThan(nine.basePriceMinor);
+      expect(five.finalPriceMinor - six.finalPriceMinor).toBe(300_000);
+    });
+
+    it("keeps tier selection independent of the surcharges", () => {
+      for (const count of [5, 6, 10]) {
+        const plain = calculatePartnerShadowQuote(
+          quoteInput({ qualifiedExpertCount: count }),
+        );
+        const both = calculatePartnerShadowQuote(
+          quoteInput({
+            qualifiedExpertCount: count,
+            onlineOnly: true,
+            cityMillionPlus: true,
+          }),
+        );
+        expect(both.tier).toBe(plain.tier);
+        expect(both.finalPriceMinor - plain.finalPriceMinor).toBe(800_000);
+      }
+    });
+  });
 });
