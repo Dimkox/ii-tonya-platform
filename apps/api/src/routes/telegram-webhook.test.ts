@@ -569,6 +569,56 @@ describe("Telegram webhook callback boundary", () => {
     }
   });
 
+  it("rejects a callback whose originating chat is a group (BOT-04)", async () => {
+    const state = await build({ checkoutEnabled: true });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 911,
+          callback_query: {
+            id: "xr1-group",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            message: { chat: { id: -1001234567890, type: "group" } },
+          },
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "unauthorized_expert" });
+      expect(state.claim).not.toHaveBeenCalled();
+      expect(state.verifyCallback).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("accepts the same callback when the originating chat is private", async () => {
+    const state = await build({ checkoutEnabled: true });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: {
+          update_id: 912,
+          callback_query: {
+            id: "xr1-private",
+            from: { id: 123456789 },
+            data: "xr1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            message: { chat: { id: 123456789, type: "private" } },
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.claim).toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
   it("fresh-resolves an xr1 principal, processes checkout, and delivers only the stored URL", async () => {
     const state = await build({ checkoutEnabled: true });
     try {

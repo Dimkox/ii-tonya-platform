@@ -373,6 +373,22 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         ) {
           return reply.code(403).send({ error: "invalid_callback" });
         }
+        // BOT-04: клавиатура попадает в групповой чат (пересланное сообщение), и нажатие в нём
+        // приходит с тем же id пользователя. Экспертный callback принимается только из приватной
+        // сессии. `message` в апдейте бывает отсутствует, поэтому требование предъявляется лишь
+        // когда чат в апдейте есть.
+        const callbackMessage = callbackRecord.message;
+        const callbackChat =
+          callbackMessage && typeof callbackMessage === "object"
+            ? (callbackMessage as Record<string, unknown>).chat
+            : undefined;
+        if (
+          callbackChat &&
+          typeof callbackChat === "object" &&
+          (callbackChat as Record<string, unknown>).type !== "private"
+        ) {
+          return reply.code(403).send({ error: "unauthorized_expert" });
+        }
         if (data.startsWith("xr1.")) {
           if (
             deps.expertCheckoutEnabled !== true ||
