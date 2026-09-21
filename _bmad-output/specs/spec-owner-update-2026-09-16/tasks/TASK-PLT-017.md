@@ -21,7 +21,7 @@
 
 ## Что уже есть
 
-Цикл согласий замкнут наполовину (проверено 2026-09-21 на e195029b): insert into consents только в withdrawConsentAtomically и только с decision='denied' (privacy-repository.ts:169,220); HTTP-роута выдачи нет; privacyService=disabledService (apps/api/src/server.ts:337); audit-полей §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) нет до ручной миграции 0039.
+Цикл согласий замкнут наполовину (проверено 2026-09-21 на e195029b): insert into consents только в withdrawConsentAtomically и только с decision='denied' (privacy-repository.ts:169,220); HTTP-роута выдачи нет; privacyService=disabledService (apps/api/src/server.ts:337). Снято 2026-09-21 вечером: privacyService компонуется реально по CLIENT_PRIVACY_ENABLED, есть GET /v1/client/privacy/consents и POST /v1/client/privacy/consents/withdraw; роута выдачи по предъявлению нет; audit-полей §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) нет до ручной миграции 0039.
 
 ## Файлы
 
@@ -59,7 +59,7 @@
 ## Пункты задачи
 
 - [ ] Миграция packages/db/migrations/0039_consent_grant_audit.sql: audit-колонки §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) и словарь целей включая отсутствующие.
-- [ ] Сервисный путь grant: append-only запись decision='granted' с policy_version только по действию клиента; перенос privacyService из disabledService в реальный ингресс.
+- [x] Перенос privacyService из disabledService в реальный ингресс (2026-09-21): сервис компонуется с PostgresPrivacyRepository по CLIENT_PRIVACY_ENABLED, просмотр и отзыв доступны по HTTP. Append-only запись decision='granted' по действию клиента — выдача по предъявлению остаётся не выставленной.
 - [ ] API и экран клиента: просмотр действующих согласий, выдача цели, отзыв цели с остановкой отложенных заданий и поздних ответов.
 - [ ] Регресс-тесты tests/repo/consent-grant.test.ts (grant→read-gate открывается, withdraw→закрывается, повторное нажатие идемпотентно).
 

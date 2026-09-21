@@ -53,7 +53,7 @@ Continue product work from **`main` at `cb07bd1`** (AGENT-STATUS after PR #97). 
 - Новые задачи: `TASK-PLT-017` **grant-механизм согласий** (readiness `ready`,
   независима от reopen — без неё CAP-5/6/7 неработоспособны: в проде `insert
 into consents` только с `decision='denied'` в `privacy-repository.ts:169,220`,
-  роута выдачи нет, `privacyService = disabledService` — `apps/api/src/server.ts:337`);
+  роута выдачи нет, `privacyService = disabledService` — `apps/api/src/server.ts:337`); _(эти два факта сняты вечером 2026-09-21: просмотр и отзыв цели — реальные маршруты, сервис компонуется по `CLIENT_PRIVACY_ENABLED`; роута выдачи по предъявлению по-прежнему нет)_
   `TASK-PLT-018` карантин входящего текста (CAP-4 сегодня **нарушается**:
   `dialogue_inbound.text` хранит сырой текст 30 дней —
   `hybrid-message-repository.ts:105-107`); `TASK-PLT-019…021` — подпись/УЗ/канал,
