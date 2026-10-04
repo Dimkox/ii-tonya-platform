@@ -182,6 +182,24 @@ describe("client privacy consent routes", () => {
     await app.close();
   });
 
+  it("rejects a presentation document from another purpose before persistence", async () => {
+    const { app, issuePresentation } = await build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/client/privacy/presentations",
+      headers: { authorization, "content-type": "application/json" },
+      payload: JSON.stringify({
+        purpose: "client_messaging",
+        channel: "web",
+        documentKey: "consent.expert_note",
+      }),
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "invalid_request" });
+    expect(issuePresentation).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("exports only the authenticated subject without caching", async () => {
     const { app, exportSubject } = await build();
     const response = await app.inject({
