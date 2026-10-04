@@ -10,6 +10,10 @@ const build = async (input?: {
   readonly resolution?: "resolved" | "denied" | "unavailable";
   readonly list?: () => Promise<unknown>;
   readonly withdraw?: () => Promise<unknown>;
+  readonly exportSubject?: () => Promise<unknown>;
+  readonly issuePresentation?: (input: unknown) => Promise<unknown>;
+  readonly recordDecision?: (input: unknown) => Promise<unknown>;
+  readonly eraseSubject?: (input: unknown) => Promise<unknown>;
 }) => {
   const listConsents = vi.fn(
     input?.list ??
@@ -23,6 +27,41 @@ const build = async (input?: {
       ]),
   );
   const withdrawConsent = vi.fn(input?.withdraw ?? (async () => undefined));
+  const exportSubject = vi.fn(
+    input?.exportSubject ??
+      (async () => ({
+        userId,
+        consents: [],
+      })),
+  );
+  const issuePresentation = vi.fn(
+    input?.issuePresentation ??
+      (async () => ({
+        presentationId: "presentation-1",
+        token: "opaque-token-12345678901234567890",
+        expiresAt: "2026-10-05T00:00:00.000Z",
+      })),
+  );
+  const recordDecision = vi.fn(
+    input?.recordDecision ??
+      (async () => ({
+        decisionId: "decision-1",
+        revision: 1,
+        documentVersionId: "document-1",
+        textSha256: "a".repeat(64),
+      })),
+  );
+  const eraseSubject = vi.fn(
+    input?.eraseSubject ??
+      (async () => ({
+        jobId: "job-1",
+        status: "pending",
+        contentRefsDeleted: 0,
+        profileFieldsDeleted: 0,
+        ledgerFactsPreserved: 0,
+        auditFactsPreserved: 0,
+      })),
+  );
   const app = Fastify();
   await app.register(clientPrivacyRoutes, {
     principals: {
@@ -40,9 +79,19 @@ const build = async (input?: {
               kind: (input?.resolution ?? "denied") as "denied" | "unavailable",
             },
     },
-    privacy: { listConsents, withdrawConsent } as never,
+    privacy: { listConsents, withdrawConsent, exportSubject } as never,
+    consentEvidence: { issuePresentation, recordDecision } as never,
+    eraseSubject,
   });
-  return { app, listConsents, withdrawConsent };
+  return {
+    app,
+    listConsents,
+    withdrawConsent,
+    exportSubject,
+    issuePresentation,
+    recordDecision,
+    eraseSubject,
+  };
 };
 
 const withdrawBody = JSON.stringify({
@@ -51,6 +100,106 @@ const withdrawBody = JSON.stringify({
 });
 
 describe("client privacy consent routes", () => {
+  it("starts erasure only for the authenticated subject", async () => {
+    const { app, eraseSubject } = await build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/client/privacy/erase",
+      headers: { authorization },
+    });
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      jobId: "job-1",
+      status: "pending",
+      contentRefsDeleted: 0,
+      profileFieldsDeleted: 0,
+      ledgerFactsPreserved: 0,
+      auditFactsPreserved: 0,
+    });
+    expect(eraseSubject).toHaveBeenCalledWith({
+      principalUserId: userId,
+      targetUserId: userId,
+      correlationId: expect.any(String),
+    });
+    await app.close();
+  });
+
+  it("records one decision against the authenticated subject and presentation", async () => {
+    const { app, recordDecision } = await build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/client/privacy/decisions",
+      headers: { authorization, "content-type": "application/json" },
+      payload: JSON.stringify({
+        token: "opaque-token-12345678901234567890",
+        purpose: "client_messaging",
+        decision: "granted",
+        policyVersion: "messaging-v1",
+      }),
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      decisionId: "decision-1",
+      revision: 1,
+      documentVersionId: "document-1",
+      textSha256: "a".repeat(64),
+    });
+    expect(recordDecision).toHaveBeenCalledWith({
+      token: "opaque-token-12345678901234567890",
+      userId,
+      purpose: "client_messaging",
+      decision: "granted",
+      policyVersion: "messaging-v1",
+      correlationId: expect.any(String),
+    });
+    await app.close();
+  });
+
+  it("issues a presentation only for the authenticated subject", async () => {
+    const { app, issuePresentation } = await build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/client/privacy/presentations",
+      headers: { authorization, "content-type": "application/json" },
+      payload: JSON.stringify({
+        purpose: "client_messaging",
+        channel: "web",
+        documentKey: "consent.client_messaging",
+      }),
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      presentationId: "presentation-1",
+      token: "opaque-token-12345678901234567890",
+      expiresAt: "2026-10-05T00:00:00.000Z",
+    });
+    expect(issuePresentation).toHaveBeenCalledWith({
+      userId,
+      purpose: "client_messaging",
+      channel: "web",
+      documentKey: "consent.client_messaging",
+    });
+    await app.close();
+  });
+
+  it("exports only the authenticated subject without caching", async () => {
+    const { app, exportSubject } = await build();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/client/privacy/export",
+      headers: { authorization },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ userId, consents: [] });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(exportSubject).toHaveBeenCalledWith({
+      principalUserId: userId,
+      targetUserId: userId,
+      correlationId: expect.any(String),
+    });
+    await app.close();
+  });
+
   it("lists the caller's own consent states and never another subject's", async () => {
     const { app, listConsents } = await build();
     const response = await app.inject({

@@ -23,6 +23,7 @@ export interface HybridMessageGatewayDeps {
   clock?: () => Date;
   messagingConsentPolicyVersion?: string;
   selartiConsentPolicyVersion?: string;
+  hasMessagingConsent?: (userId: string) => Promise<boolean>;
   budgetMetric?: (
     outcome: "admitted" | "warning" | "soft_stop" | "hard_stop",
   ) => void;
@@ -112,6 +113,18 @@ export class HybridMessageGateway {
     if (route === "complex_dialogue" && this.deps.routingEnabled !== true)
       return { status: "unavailable" };
     if (!this.deps.messagingConsentPolicyVersion) return { status: "rejected" };
+    if (route === "complex_dialogue") {
+      if (this.deps.hasMessagingConsent === undefined)
+        return { status: "rejected" };
+      try {
+        if (
+          !(await this.deps.hasMessagingConsent(String(update.message.from.id)))
+        )
+          return { status: "rejected" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    }
     const occurredAt = (this.deps.clock ?? (() => new Date()))();
     const result = await this.deps.persist({
       updateId: update.update_id,

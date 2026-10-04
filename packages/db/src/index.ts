@@ -102,6 +102,10 @@ export {
 } from "./repositories/outbox-repository.js";
 export { createConsentEgressGate } from "./repositories/consent-egress-gate.js";
 export {
+  currentConsentGrantedSql,
+  currentConsentSatisfiedSql,
+} from "./repositories/consent-current.js";
+export {
   PostgresB2SensitiveRetentionRepository,
   type B2SensitiveRetentionResult,
 } from "./repositories/b2-sensitive-retention-repository.js";

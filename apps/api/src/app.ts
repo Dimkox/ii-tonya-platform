@@ -75,6 +75,24 @@ export interface AppDependencies {
   bookingService: BookingService;
   catalogService: CatalogService;
   privacyService: PrivacyService;
+  consentEvidence?:
+    | {
+        issuePresentation(command: {
+          userId: string;
+          purpose: string;
+          channel: "web" | "telegram";
+          documentKey: string;
+        }): Promise<unknown>;
+        recordDecision(command: {
+          token: string;
+          userId: string;
+          purpose: string;
+          decision: "granted" | "denied";
+          policyVersion: string;
+          correlationId: string;
+        }): Promise<unknown>;
+      }
+    | undefined;
   adminService: AdminService;
   selarti: SelartiPort;
   telegramCallbacks: TelegramCallbackService;
@@ -275,6 +293,10 @@ export async function buildApp(
     await app.register(clientPrivacyRoutes, {
       privacy: deps.privacyService,
       principals: deps.clientPrincipal,
+      eraseSubject: deps.privacyService.eraseSubject,
+      ...(deps.consentEvidence === undefined
+        ? {}
+        : { consentEvidence: deps.consentEvidence }),
     });
   }
   if (deps.yookassaWebhook !== undefined) {

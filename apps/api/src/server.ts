@@ -31,6 +31,9 @@ import {
   PostgresAdminApprovalRepository,
   PostgresAdminRepository,
   PostgresPrivacyRepository,
+  PostgresConsentEvidenceRepository,
+  currentConsentGrantedSql,
+  sql,
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
   PostgresExpertAiRequestReceiptStore,
@@ -274,6 +277,27 @@ export const createDefaultLifecycle = (
             budgetMetric: (outcome) => recordSelartiBudgetMetric({ outcome }),
             messagingConsentPolicyVersion:
               config.clientMessagingConsentPolicyVersion!,
+            hasMessagingConsent: async (telegramUserId) => {
+              if (config.features.clientPrivacy !== true) return false;
+              const row = (
+                await db.execute<{ granted: boolean }>(sql`
+                  select exists (
+                    select 1
+                    from channel_identities ci
+                    where ci.provider = 'telegram'
+                      and ci.bot_key = ${config.clientTelegramBotKey}
+                      and ci.external_id = ${telegramUserId}
+                      and ci.status = 'active'
+                      and ${currentConsentGrantedSql({
+                        userExpression: sql`ci.user_id`,
+                        purpose: "client_messaging",
+                        policyVersion: sql`${config.clientMessagingConsentPolicyVersion!}`,
+                      })}
+                  ) as granted
+                `)
+              ).rows[0];
+              return row?.granted === true;
+            },
             ...(config.selartiAiConsentPolicyVersion === undefined
               ? {}
               : {
@@ -353,6 +377,12 @@ export const createDefaultLifecycle = (
               capability: { enabled: true },
             })
           : disabledService<PrivacyService>("privacy ingress"),
+      consentEvidence:
+        config.features.clientPrivacy === true
+          ? new PostgresConsentEvidenceRepository(db, {
+              consentMutationCapability: { enabled: true },
+            })
+          : undefined,
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
       }),

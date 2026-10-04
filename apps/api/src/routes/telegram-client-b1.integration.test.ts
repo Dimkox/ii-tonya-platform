@@ -222,6 +222,7 @@ describe("B1 dedicated Telegram HTTP to PostgreSQL path", () => {
         costAdmissionEnabled: true,
         messagingConsentPolicyVersion: "client-msg-v1",
         selartiConsentPolicyVersion: "selarti-v1",
+        hasMessagingConsent: async () => true,
         clock: () => new Date("2026-08-29T00:00:00.000Z"),
         persist: (input) => repository.persist(input),
       });

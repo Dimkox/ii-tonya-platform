@@ -6,6 +6,46 @@ const update = (text: string, id: number | string = 7) => ({
   message: { chat: { id: 22, type: "private" }, from: { id: 22 }, text },
 });
 describe("HybridMessageGateway", () => {
+  it("rejects complex content before persistence without current messaging consent", async () => {
+    let persisted = false;
+    const gateway = new HybridMessageGateway({
+      enabled: true,
+      botKey: "bot-a",
+      routingEnabled: true,
+      messagingConsentPolicyVersion: "client-msg-v1",
+      hasMessagingConsent: async () => false,
+      persist: async () => {
+        persisted = true;
+        return "claimed";
+      },
+    });
+    expect(await gateway.handle(update("личный свободный текст"))).toEqual({
+      status: "rejected",
+    });
+    expect(persisted).toBe(false);
+  });
+
+  it("returns unavailable when the consent oracle fails closed", async () => {
+    let persisted = false;
+    const gateway = new HybridMessageGateway({
+      enabled: true,
+      botKey: "bot-a",
+      routingEnabled: true,
+      messagingConsentPolicyVersion: "client-msg-v1",
+      hasMessagingConsent: async () => {
+        throw new Error("database unavailable");
+      },
+      persist: async () => {
+        persisted = true;
+        return "claimed";
+      },
+    });
+    expect(await gateway.handle(update("личный свободный текст"))).toEqual({
+      status: "unavailable",
+    });
+    expect(persisted).toBe(false);
+  });
+
   it.each(["claimed", "warning", "soft_stop", "hard_stop"] as const)(
     "emits one bounded budget metric for %s",
     async (result) => {
@@ -17,6 +57,7 @@ describe("HybridMessageGateway", () => {
         costAdmissionEnabled: true,
         messagingConsentPolicyVersion: "client-msg-v1",
         selartiConsentPolicyVersion: "selarti-v1",
+        hasMessagingConsent: async () => true,
         budgetMetric: (outcome) => outcomes.push(outcome),
         persist: async () => result,
       });
@@ -51,6 +92,7 @@ describe("HybridMessageGateway", () => {
       routingEnabled: true,
       messagingConsentPolicyVersion: "client-msg-v1",
       selartiConsentPolicyVersion: "selarti-v1",
+      hasMessagingConsent: async () => true,
       clock: () => new Date("2026-08-29T00:00:00Z"),
       persist: async (input) => {
         calls.push(input);
@@ -83,6 +125,7 @@ describe("HybridMessageGateway", () => {
       routingEnabled: true,
       messagingConsentPolicyVersion: "client-msg-v1",
       selartiConsentPolicyVersion: "selarti-v1",
+      hasMessagingConsent: async () => true,
       persist,
     });
     expect(await gateway.handle(update("x"))).toEqual({ status: "duplicate" });
