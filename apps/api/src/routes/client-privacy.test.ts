@@ -155,6 +155,28 @@ describe("client privacy consent routes", () => {
     await app.close();
   });
 
+  it("does not misreport infrastructure failures as client conflicts", async () => {
+    const { app } = await build({
+      recordDecision: async () => {
+        throw new Error("database unavailable");
+      },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/client/privacy/decisions",
+      headers: { authorization, "content-type": "application/json" },
+      payload: JSON.stringify({
+        token: "opaque-token-12345678901234567890",
+        purpose: "client_messaging",
+        decision: "granted",
+        policyVersion: "messaging-v1",
+      }),
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "internal_error" });
+    await app.close();
+  });
+
   it("issues a presentation only for the authenticated subject", async () => {
     const { app, issuePresentation } = await build();
     const response = await app.inject({

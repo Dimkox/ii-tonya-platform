@@ -121,6 +121,24 @@ const DECISION_KEYS = {
   policyVersion: true,
 } as const;
 
+const decisionFailure = (
+  error: unknown,
+): { statusCode: 400 | 409 | 500 | 503; error: string } => {
+  const code =
+    error !== null && typeof error === "object" && "code" in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+  if (code === "consent_mutations_disabled")
+    return { statusCode: 503, error: "consent_unavailable" };
+  if (code === "consent_purpose_unknown")
+    return { statusCode: 400, error: "unknown_purpose" };
+  if (code === "consent_command_incomplete")
+    return { statusCode: 400, error: "invalid_request" };
+  if (code === "consent_presentation_invalid")
+    return { statusCode: 409, error: "consent_not_recorded" };
+  return { statusCode: 500, error: "internal_error" };
+};
+
 const parsePresentationBody = (
   body: unknown,
   headers: readonly string[],
@@ -352,8 +370,9 @@ export const clientPrivacyRoutes: FastifyPluginAsync<RouteOptions> = async (
           correlationId: randomUUID(),
         });
         return reply.code(201).send(receipt);
-      } catch {
-        return reply.code(409).send({ error: "consent_not_recorded" });
+      } catch (error) {
+        const failure = decisionFailure(error);
+        return reply.code(failure.statusCode).send({ error: failure.error });
       }
     },
   );
