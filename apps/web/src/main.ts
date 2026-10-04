@@ -3,6 +3,11 @@ import { readPublicConfig } from "./config.js";
 import type { LegalDocumentCode } from "./legal-content.js";
 import { renderLegalPage } from "./legal-view.js";
 import { renderLanding } from "./landing-view.js";
+import {
+  bindPrivacyActions,
+  renderConsentPage,
+  renderMyDataPage,
+} from "./consent-view.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("web_root_missing");
@@ -11,7 +16,13 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (legalRoute !== undefined) {
+if (route === "/consent" || route === "/my-data") {
+  app.innerHTML =
+    route === "/consent" ? renderConsentPage() : renderMyDataPage();
+  bindPrivacyActions(app);
+  document.title =
+    route === "/consent" ? "Согласия — ии-Тоня" : "Мои данные — ии-Тоня";
+} else if (legalRoute !== undefined) {
   app.innerHTML = renderLegalPage(legalRoute);
   document.title =
     legalRoute === "oferta"
