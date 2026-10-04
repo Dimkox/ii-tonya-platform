@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { renderConsentPage, renderMyDataPage } from "./consent-view.js";
+import {
+  consentPolicyVersions,
+  renderConsentPage,
+  renderMyDataPage,
+} from "./consent-view.js";
 
 describe("client privacy views", () => {
   it("renders separate, explicit consent purposes", () => {
@@ -9,6 +13,13 @@ describe("client privacy views", () => {
     expect(html).toContain('data-consent-purpose="client_profile"');
     expect(html).toContain("Каждая цель управляется отдельно");
     expect(html).not.toMatch(/token|localStorage|analytics|telegram/iu);
+  });
+
+  it("keeps policy versions owned by the server consent contract", () => {
+    expect(consentPolicyVersions).toEqual({
+      client_messaging: "messaging-v1",
+      client_profile: "profile-v1",
+    });
   });
 
   it("renders export and erasure controls without embedding identity data", () => {

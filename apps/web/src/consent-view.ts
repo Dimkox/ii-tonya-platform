@@ -8,6 +8,11 @@ const escapeHtml = (value: string): string =>
 
 export type ConsentPurpose = "client_messaging" | "client_profile";
 
+export const consentPolicyVersions: Record<ConsentPurpose, string> = {
+  client_messaging: "messaging-v1",
+  client_profile: "profile-v1",
+};
+
 const labels: Record<ConsentPurpose, { title: string; description: string }> = {
   client_messaging: {
     title: "Сообщения в клиентском диалоге",
@@ -88,7 +93,7 @@ export function bindPrivacyActions(root: ParentNode): void {
             token,
             purpose,
             decision: choice.checked ? "granted" : "denied",
-            policyVersion: "client-consent-v1",
+            policyVersion: consentPolicyVersions[purpose],
           }),
         });
         if (!decision.ok) throw new Error("decision_failed");
