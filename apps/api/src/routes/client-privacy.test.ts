@@ -81,7 +81,7 @@ const build = async (input?: {
     },
     privacy: { listConsents, withdrawConsent, exportSubject } as never,
     consentEvidence: { issuePresentation, recordDecision } as never,
-    eraseSubject,
+    eraseSubject: eraseSubject as never,
   });
   return {
     app,
