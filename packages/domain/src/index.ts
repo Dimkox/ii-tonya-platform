@@ -14,6 +14,15 @@ export type {
   ReservationViewInput,
 } from "./consent.js";
 export {
+  consentPurposeSchema,
+  deriveDialogueReadiness,
+  isConsentScopeAllowed,
+} from "./consent-contracts.js";
+export type {
+  ConsentScopeRequest,
+  DialogueConsentState,
+} from "./consent-contracts.js";
+export {
   CLIENT_ASSISTANT_NAME,
   CLIENT_COPY_PROHIBITED_RULES,
   evaluateSafety,
