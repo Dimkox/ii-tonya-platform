@@ -52,6 +52,7 @@ export function renderMyDataPage(): string {
 const jsonRequest = (url: string, init: RequestInit = {}): Promise<Response> =>
   fetch(url, {
     ...init,
+    cache: "no-store",
     credentials: "same-origin",
     headers: { "content-type": "application/json", ...init.headers },
   });
@@ -63,6 +64,37 @@ export function bindPrivacyActions(root: ParentNode): void {
   const consentStatus = root.querySelector<HTMLElement>(
     "[data-consent-status]",
   );
+  if (consentForm !== null) {
+    void jsonRequest("/v1/client/privacy/consents")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("consents_unavailable");
+        const payload = (await response.json()) as {
+          consents?: Array<{ purpose?: unknown; inForce?: unknown }>;
+        };
+        const active = new Set(
+          (payload.consents ?? [])
+            .filter(
+              (consent): consent is { purpose: string; inForce: true } =>
+                typeof consent.purpose === "string" && consent.inForce === true,
+            )
+            .map((consent) => consent.purpose),
+        );
+        for (const choice of root.querySelectorAll<HTMLInputElement>(
+          "[data-consent-purpose]",
+        )) {
+          choice.checked = active.has(choice.dataset.consentPurpose ?? "");
+        }
+      })
+      .catch(() => {
+        if (consentStatus)
+          consentStatus.textContent =
+            "Не удалось загрузить текущий выбор. Сохранение отключено.";
+        const submit = consentForm.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        if (submit) submit.disabled = true;
+      });
+  }
   consentForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (consentStatus) consentStatus.textContent = "Сохраняем выбор…";

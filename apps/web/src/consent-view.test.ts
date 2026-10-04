@@ -12,6 +12,7 @@ describe("client privacy views", () => {
     expect(html).toContain('data-consent-purpose="client_messaging"');
     expect(html).toContain('data-consent-purpose="client_profile"');
     expect(html).toContain("Каждая цель управляется отдельно");
+    expect(html).toContain("data-consent-form");
     expect(html).not.toMatch(/token|localStorage|analytics|telegram/iu);
   });
 
