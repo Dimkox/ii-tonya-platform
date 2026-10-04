@@ -1,11 +1,3 @@
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
 export type ConsentPurpose = "client_messaging" | "client_profile";
 
 export const consentPolicyVersions: Record<ConsentPurpose, string> = {
