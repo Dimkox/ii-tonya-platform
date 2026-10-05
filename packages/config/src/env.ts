@@ -104,6 +104,9 @@ const schema = z
       .default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_TELEGRAM_NAVIGATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_COST_ADMISSION_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_RESPONSE_INGRESS_ENABLED: z
@@ -349,6 +352,7 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  clientNavigation?: { origin: string };
   clientTelegramBotToken?: string;
   clientWeb?: { origin: string; botUsername: string; widgetEnabled: boolean };
   databaseUrl: string;
@@ -378,6 +382,7 @@ export type RuntimeConfig = {
     clientPrivacy?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
+    clientTelegramNavigation?: boolean;
     clientHybridRouting?: boolean;
     selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
@@ -427,10 +432,67 @@ export type RuntimeConfig = {
       };
 };
 
+export function clientTelegramBotId(
+  token: string | undefined,
+): string | undefined {
+  if (
+    !token ||
+    !/^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u.test(token) ||
+    /placeholder/iu.test(token)
+  )
+    return undefined;
+  const id = token.split(":")[0]!;
+  return Number.isSafeInteger(Number(id)) ? id : undefined;
+}
+
+// Also called on manually supplied runtime configs, before composing an app.
+export function assertClientNavigationConfig(config: RuntimeConfig): void {
+  if (config.features.clientTelegramNavigation !== true) return;
+  const f = config.features;
+  if (
+    [
+      f.clientTelegramIngress,
+      f.clientHybridRouting,
+      f.testExpertPromo,
+      f.testExpertDeterministicFlow,
+      f.testExpertSelarti,
+      f.testExpertReconciliation,
+      f.workerOutboxDelivery,
+      f.b2TelegramDispatch,
+      f.selartiCostAdmission,
+      f.selartiResponseIngress,
+    ].some((enabled) => enabled === true)
+  )
+    throw new Error("client_navigation_exclusive_mode_required");
+  let originValid = false;
+  try {
+    const url = new URL(config.clientNavigation?.origin ?? "");
+    originValid =
+      url.protocol === "https:" &&
+      url.origin === config.clientNavigation?.origin;
+  } catch {
+    /* fixed error below */
+  }
+  if (
+    !originValid ||
+    clientTelegramBotId(config.clientTelegramBotToken) === undefined ||
+    !/^[A-Za-z0-9_-]{32,256}$/u.test(config.telegramWebhookSecret ?? "") ||
+    /placeholder/iu.test(config.telegramWebhookSecret ?? "") ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u.test(
+      config.clientTelegramBotKey ?? "",
+    ) ||
+    /placeholder/iu.test(config.clientTelegramBotKey ?? "")
+  )
+    throw new Error("client_navigation_configuration_incomplete");
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
   if (
-    (value.CLIENT_WEB_ORIGIN !== undefined ||
+    ((value.CLIENT_WEB_ORIGIN !== undefined &&
+      (value.CLIENT_TELEGRAM_NAVIGATION_ENABLED !== "true" ||
+        value.CLIENT_SESSION_ENABLED === "true" ||
+        value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME !== undefined)) ||
       value.CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true") &&
     (!value.CLIENT_WEB_ORIGIN ||
       !value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME ||
@@ -486,12 +548,17 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     throw new Error("Raw conversation logging is prohibited");
   }
 
-  return {
+  const config: RuntimeConfig = {
     databaseUrl: value.DATABASE_URL,
+    ...(value.CLIENT_TELEGRAM_NAVIGATION_ENABLED !== "true" ||
+    value.CLIENT_WEB_ORIGIN === undefined
+      ? {}
+      : { clientNavigation: { origin: value.CLIENT_WEB_ORIGIN } }),
     ...(value.TELEGRAM_BOT_TOKEN === undefined
       ? {}
       : { clientTelegramBotToken: value.TELEGRAM_BOT_TOKEN }),
-    ...(value.CLIENT_WEB_ORIGIN === undefined
+    ...(value.CLIENT_WEB_ORIGIN === undefined ||
+    value.CLIENT_SESSION_ENABLED !== "true"
       ? {}
       : {
           clientWeb: {
@@ -543,6 +610,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientPrivacy: value.CLIENT_PRIVACY_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
+      clientTelegramNavigation:
+        value.CLIENT_TELEGRAM_NAVIGATION_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
       selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
       selartiResponseIngress: false,
@@ -612,4 +681,6 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         }
       : {}),
   };
+  assertClientNavigationConfig(config);
+  return config;
 }

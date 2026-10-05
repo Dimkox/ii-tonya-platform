@@ -172,8 +172,9 @@ pass each array as one fixture, rather than spreading its entries as arguments.
 
 Main completed all three independent review layers and authorized one PATCH batch.
 The existing `in-review` state and checked implementation tasks are preserved.
-Review-remediation closure is **pending main's receipt/acceptance of the final
-frozen-source report**. No new approval round or wholesale re-derivation occurred.
+Review-remediation closure was independently accepted on commit
+`2429b306024618266586e4d8063add52ac9f25b1`. No new approval round or wholesale
+re-derivation occurred.
 
 Accepted fixes implemented:
 
@@ -250,6 +251,20 @@ No production-data, external-CI, aggregate-run or release claim follows from the
 local results. Main retains aggregate/release ownership after the source freeze.
 
 ## Suggested Review Order
+
+Independent PATCH review returned PASS with no blocking findings for the frozen
+code fingerprint `939b02bb8f60b4ae114c89a7ce0bb0236e6d75b84588d52f2cb466271abf9ec7`.
+The reviewer reported 106 passing tests across four separate single-file commands
+and a passing real-browser harness; PostgreSQL was not rerun. Main also ran the
+tests typecheck successfully. A raw CONNECT transport probe is closed before
+routing (ECONNRESET), not returned as a JSON method error. Other unsupported
+methods do not reach the repository.
+
+The owner explicitly requested publication. The normal pre-push gate passed all
+six branch checks (shell syntax, formatting, whitespace, local Claw evidence
+integrity, changed-file lint and tests/repo). Remote readback confirms the exact
+commit on `rc/client-consent-factory`. This is RC publication, not a production
+deployment or an external Trust CI receipt. The parent remains in progress.
 
 **Anonymous entry and fail-closed HTTP boundary**
 

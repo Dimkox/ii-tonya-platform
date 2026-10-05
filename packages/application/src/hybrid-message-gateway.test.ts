@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HybridMessageGateway } from "./hybrid-message-gateway.js";
 
 const update = (text: string, id: number | string = 7) => ({
@@ -6,6 +6,102 @@ const update = (text: string, id: number | string = 7) => ({
   message: { chat: { id: 22, type: "private" }, from: { id: 22 }, text },
 });
 describe("HybridMessageGateway", () => {
+  it.each([
+    ["/help", "deterministic"],
+    ["synthetic ordinary request", "complex_dialogue"],
+  ] as const)(
+    "continues fresh %s after replay false with original consent and persistence semantics",
+    async (text, route) => {
+      const order: string[] = [];
+      const persist = vi.fn(async () => {
+        order.push("persist");
+        return "claimed" as const;
+      });
+      const hasReceipt = vi.fn(async () => {
+        order.push("replay");
+        return false;
+      });
+      const hasMessagingConsent = vi.fn(async () => {
+        order.push("consent");
+        return true;
+      });
+      const gateway = new HybridMessageGateway({
+        enabled: true,
+        botKey: "rotated-key",
+        botId: "123456",
+        ingressReplay: { hasReceipt },
+        routingEnabled: true,
+        messagingConsentPolicyVersion: "client-msg-v1",
+        hasMessagingConsent,
+        persist,
+      });
+      expect(await gateway.handle(update(text))).toEqual({
+        status: "accepted",
+        route,
+      });
+      expect(hasReceipt).toHaveBeenCalledExactlyOnceWith({
+        botId: "123456",
+        updateId: 7,
+      });
+      expect(order).toEqual(
+        route === "deterministic"
+          ? ["replay", "persist"]
+          : ["replay", "consent", "persist"],
+      );
+      expect(persist).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          botKey: "rotated-key",
+          updateId: 7n,
+          text,
+          route,
+          externalUserId: "22",
+          externalChatId: "22",
+          messagingConsentPolicyVersion: "client-msg-v1",
+        }),
+      );
+    },
+  );
+  it.each([true, "failure", undefined])(
+    "fences navigation receipts before reading content, outcome=%s",
+    async (outcome) => {
+      const persist = vi.fn(async () => "claimed" as const);
+      const hasReceipt = vi.fn(async () => {
+        if (outcome === "failure") throw new Error("SYNTHETIC_PRIVATE_CANARY");
+        return outcome as boolean;
+      });
+      const gateway = new HybridMessageGateway({
+        enabled: true,
+        botKey: "rotated-key",
+        botId: "123456",
+        ingressReplay: { hasReceipt },
+        persist,
+      });
+      const result = await gateway.handle({
+        update_id: 7,
+        get message() {
+          throw new Error("must not read personal content");
+        },
+      });
+      expect(result).toEqual({
+        status: outcome === true ? "duplicate" : "unavailable",
+      });
+      expect(hasReceipt).toHaveBeenCalledWith({ botId: "123456", updateId: 7 });
+      expect(persist).not.toHaveBeenCalled();
+    },
+  );
+  it("fails closed with known bot identity and absent replay reader", async () => {
+    const persist = vi.fn(async () => "claimed" as const);
+    const gateway = new HybridMessageGateway({
+      enabled: true,
+      botKey: "rotated-key",
+      botId: "123456",
+      persist,
+    });
+    expect(await gateway.handle(update("/start"))).toEqual({
+      status: "unavailable",
+    });
+    expect(persist).not.toHaveBeenCalled();
+  });
   it("rejects complex content before persistence without current messaging consent", async () => {
     let persisted = false;
     const gateway = new HybridMessageGateway({

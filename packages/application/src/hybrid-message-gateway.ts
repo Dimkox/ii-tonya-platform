@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  clientIngressUpdateId,
+  type ClientIngressReplayRead,
+} from "./client-navigation-gateway.js";
 
 export type HybridRoute = "deterministic" | "complex_dialogue";
 export type HybridResult =
@@ -18,6 +22,8 @@ type Update = {
 export interface HybridMessageGatewayDeps {
   enabled?: boolean;
   botKey?: string;
+  botId?: string;
+  ingressReplay?: ClientIngressReplayRead;
   routingEnabled?: boolean | undefined;
   costAdmissionEnabled?: boolean | undefined;
   clock?: () => Date;
@@ -98,6 +104,20 @@ export class HybridMessageGateway {
   constructor(private readonly deps: HybridMessageGatewayDeps) {}
   async handle(raw: unknown): Promise<HybridResult> {
     if (this.deps.enabled !== true) return { status: "disabled" };
+    if (this.deps.botId !== undefined) {
+      const updateId = clientIngressUpdateId(raw);
+      if (updateId === undefined) return { status: "rejected" };
+      try {
+        const terminal = await this.deps.ingressReplay?.hasReceipt({
+          botId: this.deps.botId,
+          updateId,
+        });
+        if (terminal === true) return { status: "duplicate" };
+        if (terminal !== false) return { status: "unavailable" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    }
     const update = parse(raw);
     if (!update || !this.deps.botKey) return { status: "rejected" };
     const canonical = JSON.stringify({

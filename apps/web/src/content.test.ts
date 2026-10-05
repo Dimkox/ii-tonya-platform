@@ -19,19 +19,26 @@ describe("landing content", () => {
 
   it("contains the approved client and expert offer", () => {
     const copy = JSON.stringify(landingContent);
-    expect(copy).toContain("тест клиент");
+    expect(landingContent.clientCta).toContain("каталог");
+    expect(landingContent.clientCta).toContain("личный кабинет");
     expect(copy).toContain("тест эксперт");
     expect(copy).toContain("500 сообщений");
     expect(copy).toContain("начисление и использование купонов в V2 отключены");
     expect(copy).toContain("45 дней");
     expect(copy).toContain("24/7");
-    expect(landingContent.about).toEqual([
-      "Привет! Я ии-Тоня — твой персональный помощник в мире саморазвития.",
-      "Я не психолог и не врач. Я — навигатор. Я помогаю тебе найти того специалиста или мероприятие, которые подходят именно тебе: по запросу, по бюджету, по локации, по душе.",
-      "Ты просто пишешь мне в мессенджере — я задаю вопросы, разбираюсь в твоей ситуации и подбираю подходящие варианты из моей базы. А ещё я записываю к экспертам, напоминаю о визитах и собираю обратную связь.",
-      "Моя миссия — чтобы ты не тонул в рекламном шуме, а получал только то, что тебе действительно нужно. Без спама, без перегруза, без лишних вкладок.",
-      "Я работаю 24/7 и всегда на связи. Ты можешь написать мне ночью — я отвечу.",
+    const clientCopy = JSON.stringify([
+      landingContent.about,
+      landingContent.aboutProposition,
+      landingContent.principles,
+      landingContent.clientCta,
+      ...landingContent.faq.slice(0, 8),
+      ...landingContent.faq.slice(17),
     ]);
+    expect(clientCopy).not.toMatch(
+      /Ты просто пишешь|рассказываешь мне о себе|бесплатный доступ к диагностике|Я проведу с тобой мини-диагностику|Я подберу удобное время|Я сразу покажу его свободные слоты|Я веду историю|проводим еженедельные|Напиши мне, что именно/iu,
+    );
+    expect(clientCopy).toContain("Персональный диалог пока недоступен");
+    expect(clientCopy).toContain("Покупка пакетов пока недоступна");
     expect(landingContent.expertPromise).toHaveLength(4);
     expect(landingContent.expertSteps[2]?.[1]).toContain("бронирует слот");
     expect(landingContent.tariffFactors).toEqual([
@@ -65,15 +72,39 @@ describe("landing content", () => {
       "Что, если мне не понравился эксперт?",
     ]);
     const digest = createHash("sha256")
-      .update(JSON.stringify(landingContent.faq))
+      .update(JSON.stringify(landingContent.faq.slice(8, 17)))
       .digest("hex");
     expect(digest).toBe(
-      "87529ea3ba9e16ff39b1ddb4e4bbaf206f6bbb4b707c6dc6989d35805166597c",
+      "048fcc00d37d55e1e5ce0b743b810c4333e92b4105fa4a848766a3bfc77b5348",
+    );
+  });
+
+  it("preserves every client package amount and term while purchase is unavailable", () => {
+    expect(landingContent.messagePackages).toEqual([
+      ["Знакомство", "100 сообщений, без срока"],
+      ["Старт", "500 сообщений, 60 дней, 4 999 ₽"],
+      ["Базовый", "1000 сообщений, 60 дней, 5 999 ₽"],
+      ["Глубокий", "1500 сообщений, 60 дней, 7 999 ₽"],
+      ["Максимальный", "2000 сообщений, 60 дней, 10 990 ₽"],
+    ]);
+    expect(landingContent.faq[2][1]).toContain(
+      "Покупка пакетов пока недоступна",
     );
   });
 
   it("keeps a truthful fail-closed contact boundary", () => {
     expect(landingContent.contact.formNotice).toContain("не отправляет данные");
+    expect(landingContent.contact.formNotice).not.toMatch(/чат/iu);
+    expect(landingContent.contact.formNotice).toContain("телефон или e-mail");
+    expect(landingContent.contact.formNotice).toContain(
+      "Не отправляйте личную историю",
+    );
+  });
+
+  it("qualifies private account capabilities on enabled login", () => {
+    expect(landingContent.faq[0][1]).toContain("если вход включён");
+    expect(landingContent.faq[18][1]).toContain("если вход включён");
+    expect(landingContent.faq[18][1]).toContain("После входа");
   });
 
   it("publishes the supplied expert tariff model", () => {

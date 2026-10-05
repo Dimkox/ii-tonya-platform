@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { reserveSelartiCost } from "./selarti-budget-repository.js";
 import { hasCurrentTestExpertConsent } from "./test-expert-consent-authority.js";
+import { PostgresClientIngressReplayRepository } from "./client-ingress-replay-repository.js";
 
 export type HybridPersistInput = {
   updateId: bigint;
@@ -37,8 +38,23 @@ export class PostgresHybridMessageRepository {
     private readonly testHooks: {
       afterConsentRead?: (userId: string) => Promise<void> | void;
     } = {},
+    private readonly botId?: string,
   ) {}
   async persist(input: HybridPersistInput): Promise<HybridPersistResult> {
+    if (this.botId !== undefined) {
+      if (
+        input.updateId < 0n ||
+        input.updateId > BigInt(Number.MAX_SAFE_INTEGER)
+      )
+        return "rejected";
+      if (
+        await new PostgresClientIngressReplayRepository(this.db).hasReceipt({
+          botId: this.botId,
+          updateId: Number(input.updateId),
+        })
+      )
+        return "duplicate";
+    }
     if (!/^[0-9a-f]{64}$/u.test(input.payloadHash))
       throw new Error("hybrid_payload_hash_invalid");
     return this.db.transaction(async (tx) => {

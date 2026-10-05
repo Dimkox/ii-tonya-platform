@@ -6,6 +6,8 @@ import type {
   ClientBookingService,
   ClientPrincipalResolver,
   ClientSessionService,
+  ClientNavigationGateway,
+  ClientIngressReplayRead,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
@@ -14,7 +16,11 @@ import type {
   PrivacyService,
   SelartiProposalAcceptResult,
 } from "@ii-tonya/application";
-import type { RuntimeConfig } from "@ii-tonya/config";
+import {
+  assertClientNavigationConfig,
+  clientTelegramBotId,
+  type RuntimeConfig,
+} from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
 import {
@@ -107,6 +113,9 @@ export interface AppDependencies {
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
   clientIngressEnabled?: boolean | undefined;
+  clientNavigationGateway?: Pick<ClientNavigationGateway, "handle">;
+  clientBotId?: string;
+  clientIngressReplay?: ClientIngressReplayRead;
   clientHybridRoutingEnabled?: boolean | undefined;
   clientBotKey?: string | undefined;
   clientGateway?:
@@ -159,6 +168,28 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertClientNavigationConfig(deps.config);
+  if (
+    deps.config.features.clientTelegramNavigation === true &&
+    (typeof deps.clientNavigationGateway?.handle !== "function" ||
+      typeof deps.clientIngressReplay?.hasReceipt !== "function" ||
+      deps.clientBotId !==
+        clientTelegramBotId(deps.config.clientTelegramBotToken) ||
+      deps.clientBotKey !== deps.config.clientTelegramBotKey ||
+      deps.telegramWebhookSecret !== deps.config.telegramWebhookSecret ||
+      deps.clientIngressEnabled === true ||
+      deps.clientHybridRoutingEnabled === true)
+  )
+    throw new Error("client_navigation_capability_unavailable");
+  const clientBotId = clientTelegramBotId(deps.config.clientTelegramBotToken);
+  if (
+    (deps.config.features.clientTelegramIngress === true ||
+      deps.clientIngressEnabled === true) &&
+    (clientBotId === undefined ||
+      deps.clientBotId !== clientBotId ||
+      typeof deps.clientIngressReplay?.hasReceipt !== "function")
+  )
+    throw new Error("client_ingress_replay_capability_unavailable");
   const sessionCapability =
     deps.clientSessionService !== undefined &&
     deps.clientSessionRepository !== undefined &&
@@ -364,6 +395,10 @@ export async function buildApp(
   await app.register(telegramWebhookRoutes, {
     secret: deps.telegramWebhookSecret,
     clientIngressEnabled: deps.clientIngressEnabled,
+    clientNavigationEnabled: deps.config.features.clientTelegramNavigation,
+    clientNavigationGateway: deps.clientNavigationGateway,
+    clientBotId: deps.clientBotId,
+    clientIngressReplay: deps.clientIngressReplay,
     clientHybridRoutingEnabled: deps.clientHybridRoutingEnabled,
     clientBotKey: deps.clientBotKey,
     clientGateway: deps.clientGateway,

@@ -18,10 +18,15 @@ import {
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
   HybridMessageGateway,
+  ClientNavigationGateway,
   createSelartiResponseService,
   TestExpertTelegramService,
 } from "@ii-tonya/application";
-import { loadEnv } from "@ii-tonya/config";
+import {
+  loadEnv,
+  assertClientNavigationConfig,
+  clientTelegramBotId,
+} from "@ii-tonya/config";
 import {
   checkDbReadiness,
   closeDb,
@@ -44,6 +49,7 @@ import {
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
+  PostgresClientIngressReplayRepository,
   PostgresSelartiProposalRepository,
   PostgresTestExpertTelegramRepository,
   PostgresExpertTrialPricingPolicy,
@@ -138,6 +144,12 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertClientNavigationConfig(config);
+    if (
+      config.features.clientTelegramIngress === true &&
+      clientTelegramBotId(config.clientTelegramBotToken) === undefined
+    )
+      throw new Error("client_ingress_bot_identity_required");
     if (
       config.features.clientFreeAccessV2 === true &&
       options.clientCommercialPolicyRepository === undefined
@@ -170,6 +182,22 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    assertClientNavigationConfig(config);
+    const clientBotId = clientTelegramBotId(config.clientTelegramBotToken);
+    if (
+      config.features.clientTelegramIngress === true &&
+      clientBotId === undefined
+    )
+      throw new Error("client_ingress_bot_identity_required");
+    const clientIngressReplay = new PostgresClientIngressReplayRepository(db);
+    const clientNavigationGateway =
+      config.features.clientTelegramNavigation === true
+        ? new ClientNavigationGateway({
+            botId: clientBotId!,
+            origin: config.clientNavigation!.origin,
+            replay: clientIngressReplay,
+          })
+        : undefined;
     if (
       config.features.testExpertPromo === true &&
       config.features.testExpertDeterministicFlow === true &&
@@ -287,6 +315,9 @@ export const createDefaultLifecycle = (
         ? new HybridMessageGateway({
             enabled: true,
             botKey: config.clientTelegramBotKey,
+            ...(clientBotId === undefined
+              ? {}
+              : { botId: clientBotId, ingressReplay: clientIngressReplay }),
             routingEnabled: config.features.clientHybridRouting === true,
             costAdmissionEnabled: config.features.selartiCostAdmission === true,
             budgetMetric: (outcome) => recordSelartiBudgetMetric({ outcome }),
@@ -320,7 +351,9 @@ export const createDefaultLifecycle = (
                     config.selartiAiConsentPolicyVersion,
                 }),
             persist: async (input) =>
-              new PostgresHybridMessageRepository(db).persist(input),
+              new PostgresHybridMessageRepository(db, {}, clientBotId).persist(
+                input,
+              ),
           })
         : undefined;
     const selartiResponses =
@@ -457,6 +490,11 @@ export const createDefaultLifecycle = (
       inbox: new PostgresWebhookInboxRepository(db),
       rateLimiter: createWindowedRateLimiter(),
       clientIngressEnabled: config.features.clientTelegramIngress,
+      clientIngressReplay,
+      ...(clientBotId === undefined ? {} : { clientBotId }),
+      ...(clientNavigationGateway === undefined
+        ? {}
+        : { clientNavigationGateway }),
       clientHybridRoutingEnabled: config.features.clientHybridRouting,
       ...(config.clientTelegramBotKey === undefined
         ? {}

@@ -63,6 +63,7 @@ describe("server composition", () => {
           displayTimezone: "Europe/Moscow",
           yookassaRecovery: { enabled: false },
           clientTelegramBotKey: "bot-client",
+          clientTelegramBotToken: `123456:${"a".repeat(35)}`,
           features: {
             workerOutboxDelivery: false,
             clientCatalog: false,
