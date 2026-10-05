@@ -126,6 +126,26 @@ erasure remain unavailable. The RC is published on `rc/client-consent-factory`;
 the factory Trust CI limitation is unchanged. See the
 [production evidence](../../test-evidence/production/426ee3b-client-account-2026-10-05.md).
 
+### 2026-10-05: public catalog and navigation RC deployed
+
+The current native/web source is now
+`cab25eef3d7abd8591c2a49c3605a14acdc76585`, published on the RC branch and deployed
+to the separate ii-tonya.ru host. The public catalog API/UI is implemented and
+passed direct external-browser checks; its live eligible service list is empty.
+Navigation-only Telegram ingress now records content-free terminal receipts,
+rejects replay across later mode changes, and provides the account Mini App link.
+Webhook/commands/menu configuration is confirmed, but Telegram recorded a fresh
+connection timeout; real command delivery and real-user login remain unobserved.
+The owner was asked for a real Telegram launch. See the
+[RC evidence](../../test-evidence/production/cab25eef-client-navigation-2026-10-05.md).
+
+These facts supersede only the earlier public-projection and navigation-watermark
+gaps. They do not complete personal-content admission, signed special-category
+consent, scoped expert transfer, authority-stamped async work, erasure proof,
+approved document publication, payment/provider activation or Trust CI. The
+controller continues independent implementable increments; CT-015 content-free
+telemetry is next. The full factory remains `in-progress`.
+
 ## Design Notes
 
 The candidate is intentionally broad because the user approved the complete factory slice. Production readiness means the implementation and evidence are complete; it does not silently manufacture legal/provider approvals. The release artifact must remain disabled by default and carry explicit recovery steps.
