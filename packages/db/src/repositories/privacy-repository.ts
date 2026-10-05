@@ -1,4 +1,11 @@
 import { createHash } from "node:crypto";
+import {
+  backupScheduleSchema,
+  backupVerificationEvidenceSchema,
+  requireBackupVerificationEvidence,
+  type BackupVerificationEvidence,
+  type BackupSchedule,
+} from "@ii-tonya/contracts";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import {
@@ -101,18 +108,162 @@ function one<T>(rows: T[], description: string): T {
   return row;
 }
 
+type BackupJobRow = {
+  jobId: string;
+  status: "pending" | "processor_complete" | "backup_verified" | "dead_letter";
+  policyVersion: string | null;
+  expiresAt: Date | string | null;
+  verificationState: "scheduled" | "verified" | null;
+  receipt: unknown;
+};
+
+async function loadBackupJob(
+  db: DrizzleDb | Transaction,
+  jobId: string,
+  lock = false,
+): Promise<BackupJobRow> {
+  return one(
+    (
+      await db.execute<BackupJobRow>(sql`
+    select id as "jobId", status, backup_policy_version as "policyVersion",
+      backup_expires_at as "expiresAt", backup_verification_state as "verificationState",
+      erasure_receipt as receipt
+    from privacy_deletion_jobs where id=${jobId}::uuid ${lock ? sql`for update` : sql``}
+  `)
+    ).rows,
+    "privacy deletion job",
+  );
+}
+
+function receiptObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function backupBinding(row: BackupJobRow) {
+  const timestamp =
+    row.expiresAt === null ? NaN : new Date(row.expiresAt).getTime();
+  return {
+    jobId: row.jobId,
+    policyVersion: row.policyVersion ?? "",
+    expiresNoLaterThan: Number.isFinite(timestamp)
+      ? new Date(timestamp).toISOString()
+      : "",
+  };
+}
+
+function backupJobState(row: BackupJobRow) {
+  return {
+    jobId: row.jobId,
+    status: row.status,
+    ...(row.policyVersion === null ||
+    row.expiresAt === null ||
+    row.verificationState === null
+      ? {}
+      : {
+          backupEvidence: {
+            policyVersion: row.policyVersion,
+            expiresNoLaterThan: backupBinding(row).expiresNoLaterThan,
+            verificationState: row.verificationState,
+          },
+        }),
+    ...(receiptObject(row.receipt) &&
+    Object.hasOwn(row.receipt, "backupVerification")
+      ? {
+          backupVerification: row.receipt.backupVerification,
+        }
+      : {}),
+  };
+}
+
+async function databaseNow(db: DrizzleDb | Transaction): Promise<Date> {
+  const row = one(
+    (
+      await db.execute<{ now: Date | string }>(
+        sql`select clock_timestamp() as now`,
+      )
+    ).rows,
+    "database clock",
+  );
+  return new Date(row.now);
+}
+
+async function requirePersistedBackupProof(
+  db: DrizzleDb | Transaction,
+  row: BackupJobRow,
+): Promise<BackupVerificationEvidence> {
+  if (
+    row.status !== "backup_verified" ||
+    row.verificationState !== "verified" ||
+    !receiptObject(row.receipt)
+  ) {
+    throw new Error("Backup verification evidence is incomplete or invalid");
+  }
+  const proof = requireBackupVerificationEvidence(
+    row.receipt.backupVerification,
+    backupBinding(row),
+    await databaseNow(db),
+  );
+  // Compare original PostgreSQL precision, not just JS's millisecond projection.
+  const match =
+    (
+      await db.execute(sql`
+    select id from privacy_deletion_jobs where id=${row.jobId}::uuid
+      and backup_expires_at=${proof.expiresNoLaterThan}::timestamptz
+      and backup_verified_at=${proof.verifiedAt}::timestamptz
+  `)
+    ).rows.length === 1;
+  if (!match)
+    throw new Error("Backup verification evidence is incomplete or invalid");
+  return proof;
+}
+
+/** Parent/child locks serialize work only until commit; they are not a durable
+ * invariant against later inserts or writes from old binaries/arbitrary SQL.
+ */
+async function requireCompletedErasureWork(
+  tx: Transaction,
+  jobId: string,
+): Promise<void> {
+  const attempts = (
+    await tx.execute<{ processor: string; status: string }>(sql`
+    select processor, status from privacy_processor_attempts
+    where deletion_job_id=${jobId}::uuid order by processor for update
+  `)
+  ).rows;
+  const bookings = (
+    await tx.execute<{ phase: string }>(sql`
+    select phase from client_booking_erasure_work where deletion_job_id=${jobId}::uuid for update
+  `)
+  ).rows;
+  if (
+    attempts.length !== PROCESSORS.length ||
+    PROCESSORS.some(
+      (name) =>
+        !attempts.some(
+          (attempt) =>
+            attempt.processor === name && attempt.status === "acknowledged",
+        ),
+    ) ||
+    bookings.some((booking) => booking.phase !== "complete")
+  ) {
+    throw new Error(
+      "All four named processor acknowledgements and booking erasure completion are required",
+    );
+  }
+}
+
 /** Static contract kept executable to prevent a downgrade from PostgreSQL-safe privacy controls. */
 export function assertPrivacyWorkflowContract(): {
   postgresAuthoritative: true;
   immutableFactsRewritten: false;
   retentionClaim: "for_update_skip_locked";
-  backupDeletionClaim: "expiry_evidence_only";
+  backupDeletionClaim: "verified_bound_evidence";
 } {
   return {
     postgresAuthoritative: true,
     immutableFactsRewritten: false,
     retentionClaim: "for_update_skip_locked",
-    backupDeletionClaim: "expiry_evidence_only",
+    backupDeletionClaim: "verified_bound_evidence",
   };
 }
 
@@ -123,6 +274,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       beforeWithdrawalAudit?: () => Promise<void> | void;
       privacyMutationCapability?: {
         enabled: boolean;
+        /** Trusted server configuration, shared with the worker's active policy.
+         * Absence denies terminal certification; it never selects a default.
+         */
+        activeBackupPolicyVersion?: string;
         captureManifests?: (userId: string) => Promise<
           readonly {
             processor: (typeof PROCESSORS)[number];
@@ -772,11 +927,19 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     jobId: string,
     status: ErasureJob["status"],
   ): Promise<ErasureJob> {
-    const stored = (
-      await tx.execute<{ receipt: unknown }>(sql`
-      select erasure_receipt as receipt from privacy_deletion_jobs where id = ${jobId}::uuid
-    `)
-    ).rows[0]?.receipt;
+    const job = await loadBackupJob(tx, jobId, true);
+    if (status === "backup_verified") {
+      const activePolicy =
+        this.options.privacyMutationCapability?.activeBackupPolicyVersion;
+      if (activePolicy === undefined || activePolicy !== job.policyVersion) {
+        throw new Error(
+          "Backup verification evidence is incomplete or invalid",
+        );
+      }
+      await requireCompletedErasureWork(tx, jobId);
+      await requirePersistedBackupProof(tx, job);
+    }
+    const stored = job.receipt;
     if (
       typeof stored === "object" &&
       stored !== null &&
@@ -840,40 +1003,14 @@ export class PostgresPrivacyWorkflowRepository {
   }
 
   async getJob(jobId: string) {
-    const row = one(
-      (
-        await this.db.execute<{
-          jobId: string;
-          status:
-            | "pending"
-            | "processor_complete"
-            | "backup_verified"
-            | "dead_letter";
-          policyVersion: string | null;
-          expiresAt: Date | string | null;
-          verificationState: "scheduled" | "verified" | null;
-        }>(sql`
-      select id as "jobId", status, backup_policy_version as "policyVersion", backup_expires_at as "expiresAt", backup_verification_state as "verificationState"
-      from privacy_deletion_jobs where id = ${jobId}::uuid
-    `)
-      ).rows,
-      "privacy deletion job",
-    );
-    return {
-      jobId: row.jobId,
-      status: row.status,
-      ...(row.policyVersion === null ||
-      row.expiresAt === null ||
-      row.verificationState === null
-        ? {}
-        : {
-            backupEvidence: {
-              policyVersion: row.policyVersion,
-              expiresNoLaterThan: new Date(row.expiresAt).toISOString(),
-              verificationState: row.verificationState,
-            },
-          }),
-    };
+    return this.db.transaction(async (tx) => {
+      const row = await loadBackupJob(tx, jobId, true);
+      if (row.status === "backup_verified") {
+        await requireCompletedErasureWork(tx, jobId);
+        await requirePersistedBackupProof(tx, row);
+      }
+      return backupJobState(row);
+    });
   }
 
   async getAttempt(jobId: string, processor: string) {
@@ -957,6 +1094,11 @@ export class PostgresPrivacyWorkflowRepository {
   ): Promise<void> {
     this.assertMutationEnabled();
     await this.db.transaction(async (tx) => {
+      // Same parent-before-child order as completion and terminal replay.
+      const row = await loadBackupJob(tx, jobId, true);
+      if (row.status !== "pending" && row.status !== "dead_letter") {
+        throw new Error("Privacy erasure job is already complete");
+      }
       await tx.execute(sql`
         update privacy_processor_attempts set status = 'dead_letter', receipt_ref = ${hash({ reason })}, updated_at = now()
         where deletion_job_id = ${jobId}::uuid and processor = ${processor} and status <> 'acknowledged'
@@ -969,33 +1111,75 @@ export class PostgresPrivacyWorkflowRepository {
 
   async completeProcessors(
     jobId: string,
-    evidence: {
-      policyVersion: string;
-      expiresNoLaterThan: string;
-      verificationState: "scheduled" | "verified";
-    },
+    evidence: BackupSchedule,
   ): Promise<void> {
     this.assertMutationEnabled();
-    const updated = await this.db.execute(sql`
-      update privacy_deletion_jobs set status = 'processor_complete', backup_policy_version = ${evidence.policyVersion},
-        backup_expires_at = ${new Date(evidence.expiresNoLaterThan)}, backup_verification_state = ${evidence.verificationState}, updated_at = now()
-      where id = ${jobId}::uuid and status = 'pending'
-        and (select count(*) from privacy_processor_attempts where deletion_job_id = ${jobId}::uuid and status = 'acknowledged') = 4
-      returning id
-    `);
-    if (updated.rows.length !== 1)
-      throw new Error("All four processor acknowledgements are required");
+    const schedule = backupScheduleSchema.safeParse(evidence);
+    if (!schedule.success) throw new Error("Backup schedule is invalid");
+    await this.db.transaction(async (tx) => {
+      const row = await loadBackupJob(tx, jobId, true);
+      if (row.status !== "pending")
+        throw new Error("Processor completion CAS lost");
+      await requireCompletedErasureWork(tx, jobId);
+      const updated = await tx.execute(sql`
+        update privacy_deletion_jobs set status='processor_complete', backup_policy_version=${schedule.data.policyVersion},
+          backup_expires_at=${schedule.data.expiresNoLaterThan}::timestamptz, backup_verification_state='scheduled', updated_at=clock_timestamp()
+        where id=${jobId}::uuid and status='pending' returning id
+      `);
+      if (updated.rows.length !== 1)
+        throw new Error("Processor completion CAS lost");
+    });
   }
 
-  async verifyBackup(jobId: string, verifiedAt: Date): Promise<void> {
+  async verifyBackup(jobId: string, evidence: BackupVerificationEvidence) {
     this.assertMutationEnabled();
-    const updated = await this.db.execute(sql`
-      update privacy_deletion_jobs set status = 'backup_verified', backup_verification_state = 'verified', backup_verified_at = ${verifiedAt}, updated_at = now()
-      where id = ${jobId}::uuid and status = 'processor_complete' and backup_expires_at <= ${verifiedAt}
-      returning id
-    `);
-    if (updated.rows.length !== 1)
-      throw new Error("Backup verification CAS lost or expiry has not elapsed");
+    // Take a strict copy before any I/O; neither caller mutation nor unknown fields enter JSONB.
+    const parsed = backupVerificationEvidenceSchema.safeParse(evidence);
+    if (!parsed.success || parsed.data.jobId !== jobId)
+      throw new Error("Backup verification evidence is incomplete or invalid");
+    return this.db.transaction(async (tx) => {
+      const row = await loadBackupJob(tx, jobId, true);
+      await requireCompletedErasureWork(tx, jobId);
+      const proof = requireBackupVerificationEvidence(
+        parsed.data,
+        backupBinding(row),
+        await databaseNow(tx),
+      );
+      if (row.status === "backup_verified") {
+        const persisted = await requirePersistedBackupProof(tx, row);
+        if (JSON.stringify(persisted) !== JSON.stringify(proof))
+          throw new Error(
+            "Backup verification evidence conflicts with persisted proof",
+          );
+        return backupJobState(row);
+      }
+      if (
+        row.status !== "processor_complete" ||
+        row.verificationState !== "scheduled" ||
+        !receiptObject(row.receipt) ||
+        Object.hasOwn(row.receipt, "backupVerification")
+      ) {
+        throw new Error(
+          "Backup verification evidence is incomplete or invalid",
+        );
+      }
+      const updated = await tx.execute(sql`
+        update privacy_deletion_jobs set status='backup_verified', backup_verification_state='verified',
+          backup_verified_at=${proof.verifiedAt}::timestamptz,
+          erasure_receipt=jsonb_set(erasure_receipt, '{backupVerification}', ${JSON.stringify(proof)}::jsonb),
+          updated_at=clock_timestamp()
+        where id=${jobId}::uuid and status='processor_complete' and backup_verification_state='scheduled'
+          and backup_policy_version=${proof.policyVersion}
+          and backup_expires_at=${proof.expiresNoLaterThan}::timestamptz
+          and backup_expires_at <= clock_timestamp() and ${proof.verifiedAt}::timestamptz <= clock_timestamp()
+        returning id
+      `);
+      if (updated.rows.length !== 1)
+        throw new Error(
+          "Backup verification CAS lost or expiry has not elapsed",
+        );
+      return backupJobState(await loadBackupJob(tx, jobId));
+    });
   }
 
   async claimExpiredContent(now: Date, batchSize: number) {

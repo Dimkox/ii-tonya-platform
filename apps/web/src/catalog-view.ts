@@ -15,7 +15,7 @@ const escape = (text: string) =>
 export const renderCatalogPage =
   (): string => `<a class="skip-link" href="#catalog-content">Перейти к содержанию</a>
   <header class="site-header legal-header"><a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a><a class="header-action" href="/account">Личный кабинет</a></header>
-  <section id="catalog-content" class="legal-page catalog-page" aria-labelledby="catalog-heading" tabindex="-1"><p class="eyebrow">Опубликованные услуги</p><h1 id="catalog-heading">Каталог услуг</h1>
+  <main id="catalog-content" class="legal-page catalog-page" aria-labelledby="catalog-heading" tabindex="-1"><p class="eyebrow">Опубликованные услуги</p><h1 id="catalog-heading">Каталог услуг</h1>
     <p>Каталог можно смотреть без входа. Личный запрос здесь вводить не нужно.</p>
     <p>Показаны первые 20 опубликованных услуг или меньше. Фильтры работают только с загруженными услугами.</p>
     <p role="status" aria-live="polite" tabindex="-1" data-catalog-status>Загружаем каталог…</p>
@@ -26,7 +26,7 @@ export const renderCatalogPage =
       <button class="button ghost" type="button" data-catalog-clear>Сбросить фильтры</button>
     </div>
     <div data-catalog-results aria-busy="true"></div>
-  </section><footer class="legal-footer"><nav aria-label="Навигация"><a href="/account">Личный кабинет</a><a href="/privacy">Политика конфиденциальности</a><a href="/">На главную</a></nav></footer>`;
+  </main><footer class="legal-footer"><nav aria-label="Навигация"><a href="/account">Личный кабинет</a><a href="/privacy">Политика конфиденциальности</a><a href="/">На главную</a></nav></footer>`;
 
 const matchingItems = (
   items: readonly PublicCatalogItem[],

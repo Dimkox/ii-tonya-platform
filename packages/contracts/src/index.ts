@@ -1,4 +1,13 @@
 export { brandId } from "./ids.js";
+export {
+  backupVerificationBindingSchema,
+  backupVerificationEvidenceSchema,
+  backupScheduleSchema,
+  requireBackupVerificationEvidence,
+  type BackupVerificationBinding,
+  type BackupVerificationEvidence,
+  type BackupSchedule,
+} from "./backup-erasure.js";
 export type { EventId, ReservationId, UserId } from "./ids.js";
 export { eventEnvelopeSchema } from "./events.js";
 export type { EventEnvelope } from "./events.js";

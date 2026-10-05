@@ -39,7 +39,7 @@ export function renderLanding(config: PublicConfig): string {
       <a class="header-action" href="/account">Личный кабинет</a>
       <a class="header-action" href="/catalog">Открыть каталог</a>
     </header>
-    <main id="main-content">
+    <main id="main-content" tabindex="-1">
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal><p class="section-index">01 / Первый экран</p><h1>${content.hero.title}</h1><p class="hero-lead">${content.hero.description}</p><p class="hero-subtitle">${content.hero.subtitle}</p>
           <div class="hero-actions"><a class="button primary" href="/account">Открыть личный кабинет <span aria-hidden="true">↗</span></a><a class="button ghost" data-messenger-action href="${href(config, "expert")}">Попробовать как эксперт</a><a class="button ghost" href="/catalog">Каталог услуг</a></div>

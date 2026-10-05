@@ -26,7 +26,7 @@ it("offers two labelled selects, loading status, and no personal input or login 
   expect(html).toContain(
     "Показаны первые 20 опубликованных услуг или меньше. Фильтры работают только с загруженными услугами.",
   );
-  expect(html).not.toContain("<main");
+  expect(html.match(/<main\b/gu)).toHaveLength(1);
   expect(html).toContain('aria-labelledby="catalog-heading"');
   expect(html).not.toMatch(/<input|<textarea|<script|data-login/iu);
 });

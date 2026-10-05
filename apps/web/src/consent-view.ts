@@ -24,7 +24,7 @@ const escape = (text: string) =>
 function page(title: string): string {
   return `<a class="skip-link" href="#account-content">Перейти к содержанию</a>
     <header class="site-header legal-header"><a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a><a class="header-action" href="/account">Личный кабинет</a></header>
-    <main id="account-content" class="legal-page consent-page"><p class="eyebrow">Приватность</p><h1>${title}</h1>
+    <main id="account-content" class="legal-page consent-page" tabindex="-1"><p class="eyebrow">Приватность</p><h1>${title}</h1>
     <p>Каждая цель управляется отдельно. Вход подтверждает твой аккаунт и сам по себе не даёт согласия на обработку сообщений, передачу эксперту или ИИ.</p>
     <section data-account-login><button class="button primary" type="button" data-login disabled>Войти через Telegram</button><div data-login-help></div></section>
     <p role="status" aria-live="polite" tabindex="-1" data-account-status>Проверяем доступность входа…</p>
