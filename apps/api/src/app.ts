@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type {
   AdminService,
   BookingService,
@@ -25,11 +26,18 @@ import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
 import {
   createLogger,
+  classifyFailure,
+  httpErrorStatus,
+  httpRetryAfter,
   recordClientSessionMetric,
   recordClientBookingMetric,
   type Logger,
 } from "@ii-tonya/observability";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  LogController,
+  type FastifyInstance,
+  type FastifyReply,
+} from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { operatorCaseRoutes } from "./routes/operator-cases.js";
@@ -71,6 +79,12 @@ import { clientPrivacyRoutes } from "./routes/client-privacy.js";
 import { browserAccountRoutes } from "./routes/browser-account.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
+
+// Fastify exposes no public distinction between implicit and explicit 200.
+// Use its installed status-set marker, guarded by the differential tests.
+const { kReplyHasStatusCode } = createRequire(import.meta.url)(
+  "fastify/lib/symbols.js",
+) as { kReplyHasStatusCode: symbol };
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -164,6 +178,66 @@ const assertDisabled = (config: RuntimeConfig): void => {
   )
     throw new Error("Live provider activation is prohibited");
 };
+
+const diagnostic = (write: () => void): void => {
+  try {
+    write();
+  } catch {
+    /* A broken logger cannot alter the HTTP outcome. */
+  }
+};
+
+function terminalErrorReply(
+  reply: FastifyReply,
+  statusCode: number,
+): FastifyReply {
+  const payload = JSON.stringify({
+    error:
+      statusCode >= 500
+        ? "internal_error"
+        : statusCode === 413
+          ? "body_too_large"
+          : "invalid_request",
+  });
+  // The root error boundary is terminal: re-entering serialization/onSend lets
+  // a second failure reach Fastify's prose-bearing parent fallback. onError has
+  // already run; raw.end still triggers onResponse. Route-local handlers remain.
+  reply.hijack();
+  if (reply.raw.headersSent) {
+    reply.raw.destroy();
+    return reply;
+  }
+  const fixedHeaders = {
+    "content-type": "application/json; charset=utf-8",
+    "content-length": String(Buffer.byteLength(payload)),
+  };
+  const body = reply.request.method === "HEAD" ? undefined : payload;
+  try {
+    // Preserve headers deliberately set by trusted routes (auth/cookies/CORS),
+    // not error.headers. Replace framing left over from the failed response.
+    reply.removeHeader("content-encoding");
+    reply.removeHeader("transfer-encoding");
+    reply.raw.removeHeader("content-encoding");
+    reply.raw.removeHeader("transfer-encoding");
+    const headers: Record<string, string | number | string[] | undefined> =
+      reply.getHeaders();
+    reply.raw.writeHead(statusCode, { ...headers, ...fixedHeaders });
+    reply.raw.end(body);
+  } catch {
+    // Invalid preselected headers must not send us back into error serialization.
+    if (!reply.raw.headersSent) {
+      for (const key of reply.raw.getHeaderNames()) reply.raw.removeHeader(key);
+      try {
+        reply.raw.writeHead(statusCode, fixedHeaders);
+        reply.raw.end(body);
+      } catch {
+        reply.raw.destroy();
+      }
+    } else reply.raw.destroy();
+  }
+  return reply;
+}
+
 export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
@@ -279,8 +353,69 @@ export async function buildApp(
   }
   const app = Fastify({
     loggerInstance: deps.logger,
+    logController: new LogController({ disableRequestLogging: true }),
+    frameworkErrors(error, request, reply: FastifyReply) {
+      // Router decoding errors precede normal error handlers and otherwise echo paths.
+      const statusCode = httpErrorStatus(
+        error,
+        reply.statusCode,
+        Object.getOwnPropertyDescriptor(reply, kReplyHasStatusCode)?.value ===
+          true,
+      );
+      diagnostic(() =>
+        request.log.error({
+          event: "http_request_failed",
+          method: request.method,
+          statusCode,
+          failureClass:
+            statusCode >= 500 ? "internal_error" : "invalid_request",
+        }),
+      );
+      return terminalErrorReply(reply, statusCode);
+    },
     bodyLimit: 64_000,
     ajv: { customOptions: { removeAdditional: false } },
+  });
+  // Register at the root so plugins inherit this boundary and can retain their
+  // stricter local status contracts (notably session/booking oversized 400s).
+  app.setNotFoundHandler((request, reply) => {
+    diagnostic(() =>
+      request.log.info({
+        event: "http_not_found",
+        method: request.method,
+        statusCode: 404,
+      }),
+    );
+    return reply.code(404).send({ error: "not_found" });
+  });
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode = httpErrorStatus(
+      error,
+      reply.statusCode,
+      Object.getOwnPropertyDescriptor(reply, kReplyHasStatusCode)?.value ===
+        true,
+    );
+    const retryAfter = httpRetryAfter(error);
+    if (retryAfter !== undefined) reply.header("retry-after", retryAfter);
+    diagnostic(() =>
+      request.log.error({
+        event: "http_request_failed",
+        method: request.method,
+        statusCode,
+        failureClass: classifyFailure(error),
+      }),
+    );
+    return terminalErrorReply(reply, statusCode);
+  });
+  app.addHook("onResponse", async (request, reply) => {
+    diagnostic(() =>
+      request.log.info({
+        event: "http_request_completed",
+        method: request.method,
+        statusCode: reply.statusCode,
+        durationMs: reply.elapsedTime,
+      }),
+    );
   });
   if (deps.expertCodeKeyring !== undefined) {
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);

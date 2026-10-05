@@ -135,3 +135,9 @@ backups remain for recovery; no live rollback was exercised or claimed.
 Any subsequent release must use its own exact previous-SHA anchor. Do not blindly
 run the archived helpers against a different deployment, purge terminal bot
 receipts, or enable legacy/personal ingress as a rollback technique.
+
+### Additional production data readback, 03:46 UTC
+
+A read-only PostgreSQL transaction on the same production host confirmed **zero experts, zero services and zero future slots**, not merely a filtering or frontend issue. There are also zero navigation receipts for the token-verified client bot. Telegram's webhook URL/IP still match this host, its pending queue is zero, and the last reported timeout remains 03:20:01 UTC. These facts do not establish successful Telegram delivery. The owner was asked for the approved real expert/service/schedule source; no demonstration data was seeded.
+
+A later journal read under the deployment account returned zero visible rows. That is not evidence that application logs are content-free; no runtime sink-coverage claim is made from it.

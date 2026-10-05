@@ -1,4 +1,9 @@
 export {
+  classifyFailure,
+  httpErrorStatus,
+  httpRetryAfter,
+} from "./telemetry-schema.js";
+export {
   createLogger,
   redactProviderUrl,
   sanitizeTelemetry,

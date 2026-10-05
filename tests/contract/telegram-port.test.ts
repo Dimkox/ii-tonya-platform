@@ -589,7 +589,20 @@ describe("Telegram expert callback", () => {
         "__PLACEHOLDER_TELEGRAM_BOT_TOKEN__",
       );
       if (name.includes("timeout") || name === "invalid-schema") {
-        expect(serializedLogs).toContain("/bot[REDACTED]/sendMessage");
+        expect(logged).toEqual([
+          {
+            event: "transport_failure",
+            provider: "telegram",
+            operation: "sendMessage",
+            outcome:
+              name === "timeout-before-send"
+                ? "before_write"
+                : name === "timeout-after-send"
+                  ? "after_write"
+                  : "unknown",
+          },
+        ]);
+        expect(serializedLogs).not.toContain("url");
       }
     },
   );
@@ -617,7 +630,9 @@ describe("Telegram expert callback", () => {
         chat_id: "123456789",
         text: "Your authorized schedule",
       },
-      context: { idempotencyKey: "__PLACEHOLDER_TELEGRAM_RECONCILIATION_KEY__" },
+      context: {
+        idempotencyKey: "__PLACEHOLDER_TELEGRAM_RECONCILIATION_KEY__",
+      },
     });
   });
 

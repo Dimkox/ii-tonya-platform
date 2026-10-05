@@ -1,6 +1,120 @@
-import { metrics } from "@opentelemetry/api";
+import { types } from "node:util";
+import {
+  metrics,
+  type Attributes,
+  type Counter,
+  type Histogram,
+  type UpDownCounter,
+} from "@opentelemetry/api";
+import { ownData } from "./telemetry-schema.js";
 
-const meter = metrics.getMeter("ii-tonya");
+const rawMeter = metrics.getMeter("ii-tonya");
+
+// Copy primitive own data before validation. Even a toJSON property or accessor
+// on an otherwise valid label object must never reach an instrument/exporter.
+function metricData(value: unknown): Record<string, string> | undefined {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    types.isProxy(value) ||
+    Array.isArray(value)
+  )
+    return undefined;
+  const result: Record<string, string> = Object.create(null) as Record<
+    string,
+    string
+  >;
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string") return undefined;
+    const item = ownData(value, key);
+    if (typeof item !== "string") return undefined;
+    result[key] = item;
+  }
+  return result;
+}
+
+const reconciliationNames = new Set([
+  "reconciliation_age",
+  "units_consumed",
+  "units_released",
+  "unknown_outcome",
+]);
+function singleLabel(
+  value: Record<string, string>,
+  key: string,
+  allowed: ReadonlySet<string>,
+): Attributes {
+  if (Object.keys(value).length !== 1 || !allowed.has(value[key]!))
+    throw new Error("invalid_operational_metric_labels");
+  return value;
+}
+function instrumentLabels(name: string, attributes: unknown): Attributes {
+  if (attributes === undefined) return {};
+  const labels = metricData(attributes);
+  if (!labels) throw new Error("invalid_operational_metric_labels");
+  switch (name) {
+    case "ii_tonya_inbox_duplicates":
+      return singleLabel(
+        labels,
+        "provider",
+        new Set(["telegram", "selarti", "yookassa"]),
+      );
+    case "ii_tonya_client_catalog":
+      return clientCatalogMetricLabels(labels);
+    case "ii_tonya_client_session":
+      return clientSessionMetricLabels(labels);
+    case "ii_tonya_client_booking":
+      return clientBookingMetricLabels(labels);
+    case "ii_tonya_worker_outbox_delivery":
+      return workerOutboxMetricLabels(labels);
+    case "ii_tonya_selarti_budget_outcomes":
+      return selartiBudgetMetricLabels(labels);
+    case "ii_tonya_test_expert_reconciliation":
+      return singleLabel(labels, "outcome", reconciliationNames);
+    case "ii_tonya_expert_referral_maturity":
+      return singleLabel(labels, "outcome", expertReferralMaturityOutcomes);
+    default:
+      if (name.startsWith("ii_tonya_expert_"))
+        return referralMetricLabels(labels);
+      if (Object.keys(labels).length !== 0)
+        throw new Error("invalid_operational_metric_labels");
+      return labels;
+  }
+}
+function checkValue(value: number, signed = false): void {
+  if (!Number.isFinite(value) || (!signed && value < 0))
+    throw new Error("invalid_operational_metric_value");
+}
+// Only these guarded facades are exported; raw instruments stay module-private.
+const meter = {
+  createCounter(name: string): Counter {
+    const instrument = rawMeter.createCounter(name);
+    return {
+      add(value, attributes) {
+        checkValue(value);
+        instrument.add(value, instrumentLabels(name, attributes));
+      },
+    };
+  },
+  createUpDownCounter(name: string): UpDownCounter {
+    const instrument = rawMeter.createUpDownCounter(name);
+    return {
+      add(value, attributes) {
+        checkValue(value, true);
+        instrument.add(value, instrumentLabels(name, attributes));
+      },
+    };
+  },
+  createHistogram(name: string): Histogram {
+    const instrument = rawMeter.createHistogram(name);
+    return {
+      record(value, attributes) {
+        checkValue(value);
+        instrument.record(value, instrumentLabels(name, attributes));
+      },
+    };
+  },
+};
 
 export const operationalMetrics = {
   inboxDuplicates: meter.createCounter("ii_tonya_inbox_duplicates"),
@@ -72,10 +186,18 @@ export function recordTestExpertReconciliationMetric(event: {
     | "unknown_outcome";
   value: number;
 }): void {
-  if (!Number.isFinite(event.value) || event.value < 0)
+  const name = ownData(event, "name");
+  const value = ownData(event, "value");
+  if (
+    typeof name !== "string" ||
+    !reconciliationNames.has(name) ||
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 0
+  )
     throw new Error("invalid_test_expert_reconciliation_metric");
-  operationalMetrics.testExpertReconciliation.add(event.value, {
-    outcome: event.name,
+  operationalMetrics.testExpertReconciliation.add(value, {
+    outcome: name,
   });
 }
 
@@ -103,6 +225,7 @@ export type SelartiBudgetMetricLabels = Readonly<{
 export function selartiBudgetMetricLabels(
   value: unknown,
 ): SelartiBudgetMetricLabels {
+  value = metricData(value);
   if (
     !isRecord(value) ||
     Object.keys(value).length !== 1 ||
@@ -167,6 +290,7 @@ export type ClientSessionMetricLabels = Readonly<{
 export function clientSessionMetricLabels(
   value: unknown,
 ): ClientSessionMetricLabels {
+  value = metricData(value);
   if (!isRecord(value)) {
     throw new Error("invalid_client_session_metric_labels");
   }
@@ -225,6 +349,7 @@ export type ClientBookingMetricLabels = Readonly<{
 export function clientBookingMetricLabels(
   value: unknown,
 ): ClientBookingMetricLabels {
+  value = metricData(value);
   if (!isRecord(value)) {
     throw new Error("invalid_client_booking_metric_labels");
   }
@@ -345,6 +470,7 @@ export type ClientCatalogMetricLabels = Readonly<{
 export function clientCatalogMetricLabels(
   value: unknown,
 ): ClientCatalogMetricLabels {
+  value = metricData(value);
   if (!isRecord(value)) {
     throw new Error("invalid_client_catalog_metric_labels");
   }
@@ -456,6 +582,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export function workerOutboxMetricLabels(
   value: unknown,
 ): WorkerOutboxMetricLabels {
+  value = metricData(value);
   if (!isRecord(value)) {
     throw new Error("invalid_worker_outbox_metric_labels");
   }
@@ -508,6 +635,7 @@ export function recordWorkerOutboxMetric(
 export function referralMetricLabels(
   value: unknown,
 ): ExpertReferralMetricLabels {
+  value = metricData(value);
   if (!isRecord(value)) throw new Error("invalid_referral_metric_labels");
   const keys = Object.keys(value);
   if (

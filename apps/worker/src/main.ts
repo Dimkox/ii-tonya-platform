@@ -19,6 +19,7 @@ import {
 } from "@ii-tonya/db";
 import {
   createLogger,
+  classifyFailure,
   installFatalProcessLogging,
   recordClientCatalogMetric,
   recordClientSessionMetric,
@@ -588,8 +589,12 @@ export function isDirectExecution(
 }
 
 if (isDirectExecution(import.meta.url, process.argv[1])) {
-  void main().catch(() => {
-    process.stderr.write("Worker startup or polling failed\n");
+  void main().catch((error: unknown) => {
+    createLogger().fatal({
+      event: "startup_failure",
+      module: "worker",
+      failureClass: classifyFailure(error),
+    });
     process.exitCode = 1;
   });
 }

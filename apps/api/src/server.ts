@@ -64,6 +64,7 @@ import {
 } from "@ii-tonya/integrations";
 import {
   createLogger,
+  classifyFailure,
   installFatalProcessLogging,
   recordClientSessionMetric,
   recordSelartiBudgetMetric,
@@ -617,7 +618,11 @@ if (
   import.meta.url === pathToFileURL(invokedPath).href
 ) {
   void main().catch((error: unknown) => {
-    createLogger().fatal({ err: error }, "api startup failed");
+    createLogger().fatal({
+      event: "startup_failure",
+      module: "api",
+      failureClass: classifyFailure(error),
+    });
     process.exitCode = 1;
   });
 }

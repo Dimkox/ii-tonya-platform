@@ -1,4 +1,5 @@
 import type { Logger } from "./logger.js";
+import { classifyFailure } from "./telemetry-schema.js";
 
 /**
  * Node пишет неперехваченное исключение в stderr мимо санитизатора: вместе со стеком в
@@ -15,9 +16,6 @@ export type FatalHandlerDeps = {
   ) => void;
 };
 
-const asError = (value: unknown): Error =>
-  value instanceof Error ? value : new Error(String(value));
-
 export function installFatalProcessLogging(
   deps: FatalHandlerDeps,
   target: {
@@ -27,23 +25,31 @@ export function installFatalProcessLogging(
 ): () => void {
   const exit = deps.exit ?? ((code: number) => process.exit(code));
 
-  const onException = (error: unknown) => {
-    deps.onFatal?.(error, "uncaughtException");
-    deps.logger.error(
-      { err: asError(error), fatal: "uncaughtException" },
-      "uncaught exception, stopping the process",
-    );
-    exit(1);
+  const fatal = (
+    error: unknown,
+    kind: "uncaughtException" | "unhandledRejection",
+  ) => {
+    try {
+      try {
+        deps.onFatal?.(error, kind);
+      } catch {
+        /* Cleanup cannot prevent exit. */
+      }
+      try {
+        deps.logger.error({
+          event: "process_fatal",
+          fatal: kind,
+          failureClass: classifyFailure(error),
+        });
+      } catch {
+        /* A broken sink cannot prevent exit or print the raw exception. */
+      }
+    } finally {
+      exit(1);
+    }
   };
-
-  const onRejection = (reason: unknown) => {
-    deps.onFatal?.(reason, "unhandledRejection");
-    deps.logger.error(
-      { err: asError(reason), fatal: "unhandledRejection" },
-      "unhandled promise rejection, stopping the process",
-    );
-    exit(1);
-  };
+  const onException = (error: unknown) => fatal(error, "uncaughtException");
+  const onRejection = (reason: unknown) => fatal(reason, "unhandledRejection");
 
   target.on("uncaughtException", onException);
   target.on("unhandledRejection", onRejection);
