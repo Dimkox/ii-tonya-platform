@@ -35,14 +35,14 @@ export function renderLanding(config: PublicConfig): string {
   return `<a class="skip-link" href="#main-content">Перейти к содержанию</a>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="ии-Тоня — наверх"><span>ии-</span>Тоня</a>
-      <nav aria-label="Основная навигация"><a href="#about">О проекте</a><a href="#clients">Клиентам</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav>
+      <nav aria-label="Основная навигация"><a href="#about">О проекте</a><a href="#clients">Клиентам</a><a href="/catalog">Каталог услуг</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav>
       <a class="header-action" href="/account">Личный кабинет</a>
       <a class="header-action" data-messenger-action href="${href(config, "client")}">Открыть диалог</a>
     </header>
     <main id="main-content">
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal><p class="section-index">01 / Первый экран</p><h1>${content.hero.title}</h1><p class="hero-lead">${content.hero.description}</p><p class="hero-subtitle">${content.hero.subtitle}</p>
-          <div class="hero-actions"><a class="button primary" data-messenger-action href="${href(config, "client")}">Попробовать бесплатно <span aria-hidden="true">↗</span></a><a class="button ghost" data-messenger-action href="${href(config, "expert")}">Попробовать как эксперт</a></div>
+          <div class="hero-actions"><a class="button primary" data-messenger-action href="${href(config, "client")}">Попробовать бесплатно <span aria-hidden="true">↗</span></a><a class="button ghost" data-messenger-action href="${href(config, "expert")}">Попробовать как эксперт</a><a class="button ghost" href="/catalog">Каталог услуг</a></div>
         </div>
         <figure class="hero-portrait" data-reveal><div class="portrait-frame"><picture><source type="image/avif" srcset="/tonya-hero-512.avif 512w, /tonya-hero-1024.avif 1024w" sizes="(max-width: 900px) 86vw, 50vw"><source type="image/webp" srcset="/tonya-hero-512.webp 512w, /tonya-hero-1024.webp 1024w" sizes="(max-width: 900px) 86vw, 50vw"><img src="/tonya-hero.png" width="1024" height="1536" alt="Иллюстрация ии-Тони — внимательной женщины-навигатора" fetchpriority="high"></picture></div><figcaption>Тамбов и онлайн</figcaption></figure>
         <div class="principles">${content.principles.map(([icon, item], index) => `<p><span>${String(index + 1).padStart(2, "0")}</span><i aria-hidden="true">${icon}</i>${item}</p>`).join("")}</div>

@@ -54,6 +54,11 @@ import {
 } from "./routes/yookassa-webhook.js";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { clientCatalogRoutes } from "./routes/client-catalog.js";
+import {
+  publicClientCatalogRoutes,
+  type PublicCatalogRead,
+  type PublicCatalogLoadState,
+} from "./routes/public-client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { clientPrivacyRoutes } from "./routes/client-privacy.js";
@@ -130,6 +135,8 @@ export interface AppDependencies {
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
   clientCatalogService?: ClientCatalogService;
+  publicCatalog?: PublicCatalogRead;
+  publicCatalogLoadState?: PublicCatalogLoadState;
   clientSessionService?: ClientSessionService;
   clientSessionRepository?: ClientSessionRevocation;
   clientPrincipal?: ClientPrincipalResolver;
@@ -248,6 +255,14 @@ export async function buildApp(
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  await app.register(publicClientCatalogRoutes, {
+    ...(deps.publicCatalog === undefined
+      ? {}
+      : { catalog: deps.publicCatalog }),
+    ...(deps.publicCatalogLoadState === undefined
+      ? {}
+      : { loadState: deps.publicCatalogLoadState }),
+  });
   if (
     deps.config.features.clientSession === true &&
     deps.clientSessionService !== undefined &&
@@ -518,6 +533,8 @@ export async function buildTestApp(
     >;
     yookassaWebhook?: YooKassaWebhookDependencies;
     clientCatalogService?: ClientCatalogService;
+    publicCatalog?: PublicCatalogRead;
+    publicCatalogLoadState?: PublicCatalogLoadState;
     clientSessionService?: ClientSessionService;
     clientSessionRepository?: ClientSessionRevocation;
     clientPrincipal?: ClientPrincipalResolver;
@@ -663,6 +680,13 @@ export async function buildTestApp(
     ...(options.clientCatalogService === undefined
       ? {}
       : { clientCatalogService: options.clientCatalogService }),
+    ...(options.publicCatalog === undefined
+      ? {}
+      : { publicCatalog: options.publicCatalog }),
+    publicCatalogLoadState: options.publicCatalogLoadState ?? {
+      limiter: createWindowedRateLimiter(),
+      inFlight: 0,
+    },
     ...(options.clientSessionService === undefined
       ? {}
       : { clientSessionService: options.clientSessionService }),

@@ -51,7 +51,7 @@ const finiteDate = (value: Date): boolean =>
   value instanceof Date && Number.isFinite(value.getTime());
 
 export class PostgresCatalogRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(private readonly db: Pick<DrizzleDb, "execute">) {}
 
   async listPublicServices(input: {
     serviceCode?: string;

@@ -39,6 +39,7 @@ import {
   PostgresExpertAiRequestReceiptStore,
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
+  PostgresCatalogRepository,
   PostgresBookingRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
@@ -375,6 +376,14 @@ export const createDefaultLifecycle = (
       ),
       bookingService: disabledService<BookingService>("booking ingress"),
       catalogService: disabledService<CatalogService>("catalog ingress"),
+      publicCatalog: {
+        listPublicServices: (input) =>
+          db.transaction(async (tx) => {
+            await tx.execute(sql`SET LOCAL lock_timeout = '1s'`);
+            await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
+            return new PostgresCatalogRepository(tx).listPublicServices(input);
+          }),
+      },
       privacyService:
         config.features.clientPrivacy === true
           ? createPrivacyService({

@@ -1528,15 +1528,49 @@ summary:focus-visible {
   }
 }
 
-.consent-list {
+.consent-list,
+.catalog-list {
   display: grid;
   gap: 1.25rem;
   margin: 1.5rem 0;
 }
-.consent-card {
+.consent-card,
+.catalog-card {
   border: 1px solid #bdb6a8;
   border-radius: 1rem;
   padding: 1.25rem;
+}
+.catalog-list {
+  padding: 0;
+  list-style: none;
+}
+.catalog-card {
+  overflow-wrap: anywhere;
+}
+.catalog-card h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+}
+.catalog-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  align-items: end;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.catalog-filters label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.catalog-filters select {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.65rem;
+  font: inherit;
+  color: inherit;
+  background: var(--paper-light);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
 }
 .consent-card .button {
   margin: 0.4rem 0.4rem 0.4rem 0;

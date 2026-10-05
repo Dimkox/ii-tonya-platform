@@ -15,6 +15,8 @@ import {
   createClientCatalogOutboxRegistry,
   createClientCatalogSourceReader,
 } from "../../apps/worker/src/client-catalog-outbox.js";
+import { createDefaultLifecycle } from "../../apps/api/src/server.js";
+import { loadEnv } from "../../packages/config/src/env.js";
 
 let testDb: TestDatabase;
 
@@ -52,6 +54,45 @@ const seedService = async (input: {
 };
 
 describe("PostgreSQL client catalog worker", () => {
+  it("default public read expires a blocked table lock and resets transaction-local settings", async () => {
+    const config = loadEnv({
+      DATABASE_URL: "postgresql://localhost/test",
+      ALLOW_INSECURE_LOCAL_DATABASE: "true",
+    });
+    const deps = await createDefaultLifecycle().dependencies(config, testDb.db);
+    const acquired = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const holder = testDb.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`lock table expert_services in access exclusive mode`,
+      );
+      acquired.resolve();
+      await release.promise;
+    });
+    await acquired.promise;
+    const fallback = setTimeout(() => release.resolve(), 1_600);
+    try {
+      await expect(
+        deps.publicCatalog!.listPublicServices({ limit: 20 }),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: "55P03" }),
+      });
+    } finally {
+      clearTimeout(fallback);
+      release.resolve();
+      await holder;
+    }
+    expect(await deps.publicCatalog!.listPublicServices({ limit: 20 })).toEqual(
+      [],
+    );
+    const settings = await testDb.db.execute<{
+      lock: string;
+      statement: string;
+    }>(
+      sql`select current_setting('lock_timeout') as lock, current_setting('statement_timeout') as statement`,
+    );
+    expect(settings.rows).toEqual([{ lock: "0", statement: "0" }]);
+  });
   it("materializes only active verified public services with no source identifiers", async () => {
     await seedService({ name: "Visible" });
     await seedService({ name: "Inactive", active: false });
@@ -123,8 +164,9 @@ describe("PostgreSQL client catalog worker", () => {
     });
     expect(services).toHaveLength(20);
     expect(services.map(({ displayName }) => displayName)).toEqual(
-      Array.from({ length: 20 }, (_, index) =>
-        `Expert ${String(index).padStart(2, "0")}`,
+      Array.from(
+        { length: 20 },
+        (_, index) => `Expert ${String(index).padStart(2, "0")}`,
       ),
     );
   });

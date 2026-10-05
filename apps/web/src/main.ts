@@ -3,6 +3,7 @@ import { readPublicConfig } from "./config.js";
 import type { LegalDocumentCode } from "./legal-content.js";
 import { renderLegalPage } from "./legal-view.js";
 import { renderLanding } from "./landing-view.js";
+import { bindCatalogActions, renderCatalogPage } from "./catalog-view.js";
 import {
   bindPrivacyActions,
   renderConsentPage,
@@ -17,7 +18,15 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/consent" || route === "/my-data" || route === "/account") {
+if (route === "/catalog") {
+  app.innerHTML = renderCatalogPage();
+  bindCatalogActions(app);
+  document.title = "Каталог услуг — ии-Тоня";
+} else if (
+  route === "/consent" ||
+  route === "/my-data" ||
+  route === "/account"
+) {
   app.innerHTML =
     route === "/consent"
       ? renderConsentPage()

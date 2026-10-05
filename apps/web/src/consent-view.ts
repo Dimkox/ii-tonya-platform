@@ -29,7 +29,7 @@ function page(title: string): string {
     <section data-account-login><button class="button primary" type="button" data-login disabled>Войти через Telegram</button><div data-login-help></div></section>
     <p role="status" aria-live="polite" tabindex="-1" data-account-status>Проверяем доступность входа…</p>
     <button type="button" class="button ghost" data-retry>Обновить</button><div data-account-private></div>
-    </main><footer class="legal-footer"><nav aria-label="Навигация"><a href="/consent">Согласия</a><a href="/my-data">Мои данные</a><a href="/privacy">Политика конфиденциальности</a><a href="/">На главную</a></nav></footer>`;
+    </main><footer class="legal-footer"><nav aria-label="Навигация"><a href="/catalog">Каталог услуг</a><a href="/consent">Согласия</a><a href="/my-data">Мои данные</a><a href="/privacy">Политика конфиденциальности</a><a href="/">На главную</a></nav></footer>`;
 }
 export const renderConsentPage = () => page("Твои согласия");
 export const renderMyDataPage = () => page("Мои данные");
