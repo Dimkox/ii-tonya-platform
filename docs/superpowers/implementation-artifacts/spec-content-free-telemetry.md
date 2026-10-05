@@ -52,7 +52,10 @@ bounded closure review passed, including source/compiled Fastify symbol resoluti
 Main freshly observed logger20, tracing12, HTTP leakage27, real bootstrap2 and
 API36 passing in separate commands, plus four package typechecks and tests tsc.
 Status remains in-review because local evidence is not exact-SHA Trust CI or the
-external release gates. Production publication remains a separately authorized RC.
+external release gates. The owner-authorized RC was published at approximately
+05:00 UTC; [production evidence](../../test-evidence/production/2db008f7-content-free-telemetry-2026-10-05.md)
+binds source, signatures, host readback and direct browser/HTTP checks. This is not
+completion of the full parent factory or a real-user Telegram login claim.
 
 Initial implementation: **291 passing tests across 22 separately invoked focused files**.
 Observability, integrations, API and app-worker builds and typechecks passed; tests

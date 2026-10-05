@@ -160,3 +160,21 @@ The candidate is intentionally broad because the user approved the complete fact
 - `pnpm exec eslint .` -- expected: no errors.
 - `git diff --check` -- expected: no whitespace errors.
 - `pwsh -File scripts/check-development-environment.ps1 -RequireDocker` -- expected: no failures before PostgreSQL evidence.
+
+## Latest production RC — 2026-10-05, 05:00 UTC
+
+Native and web now run `2db008f7d25cfcaef134afbd9d8de4d6e975c8b7`, pushed normally
+to `rc/client-consent-factory`. This supersedes the cab25ee live-source observation,
+not its navigation implementation. CT-015 operational telemetry now uses closed
+schemas, safe HTTP failures, sanitized trace context and guarded metric labels.
+Independent review findings were closed before publication. See
+[exact release evidence](../../test-evidence/production/2db008f7-content-free-telemetry-2026-10-05.md)
+and [telemetry contract](spec-content-free-telemetry.md).
+
+Direct browser and HTTP checks passed; API/worker/Nginx are active. SQL history
+was unchanged. Real commercial catalog data remains absent (zero experts, services
+and slots); real Telegram delivery/login remains unobserved and its stored timeout
+persists. Payments, personal ingress/provider processing and erasure activation
+remain off. Factory Trust CI enrollment, signature/provider/legal evidence and
+the other parent gaps are not satisfied by this RC. Next independent code slices
+are verified backup evidence and original-consent asynchronous fencing.
