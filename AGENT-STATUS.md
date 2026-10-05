@@ -1,5 +1,33 @@
 # Agent status — owner-spec 2026-09-16
 
+## 2026-10-05 production continuation — read before historical entries
+
+The canonical working branch is `codex/fin-001-client-access-policy`; always
+recheck identity live. The historical September branch/main instructions below
+are not the current deployment source. RC branch `rc/client-consent-factory`
+and native/web production at `ii-tonya.ru` were verified at
+`4354818c0187d41057b9660deb847e15a002a574` around05:50 UTC. Separate host/root:
+`157.22.187.237`, `/opt/ii-tonya-platform`. Previous2db008f is retained for recovery.
+
+Current durable parent: [client-sensitive consent](docs/superpowers/implementation-artifacts/spec-client-sensitive-consent.md).
+Latest [production evidence](docs/test-evidence/production/4354818c-backup-proof-web-landmarks-2026-10-05.md)
+records what is live and what is not. This RC does not certify the full commercial
+product: catalogue counts are zero, real-user Telegram delivery/login is
+unobserved, personal ingress/provider processing and erasure remain off, and
+exact-SHA external Trust CI/provider/legal evidence is unavailable.
+
+Next approved implementation: original-consent asynchronous fencing, using
+existing JSONB and no new migration or activation. Backup-proof and web-landmark
+patches have independent closure; their statuses stay in-review for external
+gates. PostgreSQL focused-file budgets already exhausted: navigation replay,
+catalogue worker and `client-backup-erasure-evidence.test.ts` each3/3. Existing
+`privacy-workflow.test.ts` used2/3. The one aggregate was interrupted, not green;
+do not rerun it or disguise a repeated suite as new evidence.
+
+Preserve the unrelated untracked `.qwen`, factory files and old claw evidence.
+No secrets or environment values may enter output or commits. All instructions
+and dates below remain historical context unless verified against current state.
+
 Updated: 2026-09-21 — owner verdict **Б** on the consent ТЗ review: DEC-PLT-004
 partially reopened, gate cards DEC-PLT-011…014 and TASK-PLT-017…021 created (see
 the 2026-09-21 section below). This is the live continuation file. Read

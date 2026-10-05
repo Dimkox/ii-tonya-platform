@@ -161,7 +161,7 @@ The candidate is intentionally broad because the user approved the complete fact
 - `git diff --check` -- expected: no whitespace errors.
 - `pwsh -File scripts/check-development-environment.ps1 -RequireDocker` -- expected: no failures before PostgreSQL evidence.
 
-## Latest production RC — 2026-10-05, 05:00 UTC
+## Previous telemetry RC — 2026-10-05, 05:00 UTC
 
 Native and web now run `2db008f7d25cfcaef134afbd9d8de4d6e975c8b7`, pushed normally
 to `rc/client-consent-factory`. This supersedes the cab25ee live-source observation,
@@ -178,3 +178,18 @@ persists. Payments, personal ingress/provider processing and erasure activation
 remain off. Factory Trust CI enrollment, signature/provider/legal evidence and
 the other parent gaps are not satisfied by this RC. Next independent code slices
 are verified backup evidence and original-consent asynchronous fencing.
+
+## Latest production RC — 2026-10-05, 05:50 UTC
+
+Native and web now run `4354818c0187d41057b9660deb847e15a002a574`, pushed normally
+to `rc/client-consent-factory`. The backup-proof boundary now requires verified
+bound evidence and database-valid terminal replay; elapsed time cannot certify
+erasure. The public web has one main landmark, keyboard skip focus and an
+accessible no-JavaScript fallback. Independent patch review, signed artifact
+verification and live browser/API readback passed for this bounded RC.
+
+See [exact production evidence](../../test-evidence/production/4354818c-backup-proof-web-landmarks-2026-10-05.md).
+No migration or provider/erasure activation occurred. Real commercial catalogue
+data and real-user Telegram login/delivery remain absent/unobserved; external
+Trust CI and the other signature/provider/legal/retention gates remain open.
+The next implementable increment is original-consent asynchronous fencing.
