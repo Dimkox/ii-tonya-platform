@@ -34,6 +34,8 @@ describe("direct Claw verification semantics", () => {
     expect(runner).toContain('docker compose "${compose_args[@]}"');
     expect(runner).toContain(
       'compose_root="${CLAW_COMPOSE_ROOT:-/home/pall/app-stack}"',
+    );
+    expect(runner).toContain(
       "claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store",
     );
     expect(runner).toContain(

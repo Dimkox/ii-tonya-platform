@@ -57,6 +57,7 @@ import { clientCatalogRoutes } from "./routes/client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { clientPrivacyRoutes } from "./routes/client-privacy.js";
+import { browserAccountRoutes } from "./routes/browser-account.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
 
@@ -293,12 +294,36 @@ export async function buildApp(
     await app.register(clientPrivacyRoutes, {
       privacy: deps.privacyService,
       principals: deps.clientPrincipal,
-      eraseSubject: deps.privacyService.eraseSubject,
+      // Erasure remains uncomposed until content, processor and backup coverage is verified.
       ...(deps.consentEvidence === undefined
         ? {}
         : { consentEvidence: deps.consentEvidence }),
     });
   }
+  await app.register(browserAccountRoutes, {
+    logLevel: "silent",
+    ...(deps.config.clientWeb === undefined
+      ? {}
+      : {
+          origin: deps.config.clientWeb.origin,
+          botUsername: deps.config.clientWeb.botUsername,
+        }),
+    widgetEnabled: deps.config.clientWeb?.widgetEnabled === true,
+    privacyEnabled: deps.config.features.clientPrivacy === true,
+    ...(deps.config.features.clientSession !== true ||
+    !deps.clientSessionService ||
+    !deps.clientSessionRepository ||
+    !deps.clientPrincipal
+      ? {}
+      : {
+          sessions: {
+            issue: (proof, signal) =>
+              deps.clientSessionService!.issue(proof, signal),
+            revoke: (digest) => deps.clientSessionRepository!.revoke(digest),
+          },
+          principals: deps.clientPrincipal,
+        }),
+  });
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }

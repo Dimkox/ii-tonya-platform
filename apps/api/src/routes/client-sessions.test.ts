@@ -56,27 +56,33 @@ describe("client session HTTP contract", () => {
   it.each([
     [{ kind: "unauthorized" }, 401, "unauthorized"],
     [{ kind: "unavailable" }, 503, "temporarily_unavailable"],
-  ] as const)("maps issuance outcome without detail", async (outcome, status, error) => {
-    const state = await build({ sessions: { issue: async () => outcome, revoke: vi.fn() } });
-    const response = await state.app.inject({
-      method: "POST",
-      url: "/v1/client/sessions",
-      headers: { "content-type": "application/json" },
-      payload: JSON.stringify({ identityProof: proof }),
-    });
-    expect(response.statusCode).toBe(status);
-    expect(response.json()).toEqual({ error });
-  });
+  ] as const)(
+    "maps issuance outcome without detail",
+    async (outcome, status, error) => {
+      const state = await build({
+        sessions: { issue: async () => outcome, revoke: vi.fn() },
+      });
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/client/sessions",
+        headers: { "content-type": "application/json" },
+        payload: JSON.stringify({ identityProof: proof }),
+      });
+      expect(response.statusCode).toBe(status);
+      expect(response.json()).toEqual({ error });
+    },
+  );
 
-  it("revokes exactly one currently resolved session", async () => {
-    const state = await build();
+  it("revokes exactly the supplied session even when the owner is no longer active", async () => {
+    const resolve = vi.fn(async () => ({ kind: "denied" as const }));
+    const state = await build({ principals: { resolve } });
     const response = await state.app.inject({
       method: "DELETE",
       url: "/v1/client/sessions/current",
       headers: { authorization: `Bearer ${token}` },
     });
     expect(response.statusCode).toBe(204);
-    expect(state.resolve).toHaveBeenCalledWith(`Bearer ${token}`);
+    expect(resolve).not.toHaveBeenCalled();
     expect(state.revoke).toHaveBeenCalledOnce();
   });
 });

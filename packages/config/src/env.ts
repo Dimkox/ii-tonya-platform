@@ -80,6 +80,25 @@ const schema = z
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_WEB_ORIGIN: z
+      .string()
+      .refine((value) => {
+        try {
+          const url = new URL(value);
+          return url.protocol === "https:" && url.origin === value;
+        } catch {
+          return false;
+        }
+      }, "client_web_origin_must_be_exact_https_origin")
+      .optional(),
+    CLIENT_TELEGRAM_LOGIN_BOT_USERNAME: z
+      .string()
+      .regex(/^[A-Za-z0-9_]{2,29}bot$/iu)
+      .optional(),
+    CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    TELEGRAM_BOT_TOKEN: optionalNonEmptyString,
     TELEGRAM_EGRESS_CONSENT_GATE_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
@@ -330,6 +349,8 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  clientTelegramBotToken?: string;
+  clientWeb?: { origin: string; botUsername: string; widgetEnabled: boolean };
   databaseUrl: string;
   integrations: {
     selarti: false;
@@ -409,6 +430,14 @@ export type RuntimeConfig = {
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
   if (
+    (value.CLIENT_WEB_ORIGIN !== undefined ||
+      value.CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true") &&
+    (!value.CLIENT_WEB_ORIGIN ||
+      !value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME ||
+      value.CLIENT_SESSION_ENABLED !== "true")
+  )
+    throw new Error("client_web_configuration_incomplete");
+  if (
     value.TEST_EXPERT_PROMO_ENABLED === "true" &&
     value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true" &&
     value.CLIENT_TELEGRAM_INGRESS_ENABLED !== "true"
@@ -459,6 +488,19 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
 
   return {
     databaseUrl: value.DATABASE_URL,
+    ...(value.TELEGRAM_BOT_TOKEN === undefined
+      ? {}
+      : { clientTelegramBotToken: value.TELEGRAM_BOT_TOKEN }),
+    ...(value.CLIENT_WEB_ORIGIN === undefined
+      ? {}
+      : {
+          clientWeb: {
+            origin: value.CLIENT_WEB_ORIGIN,
+            botUsername: value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME!,
+            widgetEnabled:
+              value.CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true",
+          },
+        }),
     integrations: {
       selarti: false,
       planerka: false,

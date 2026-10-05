@@ -246,13 +246,15 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
+  // Security patch only: Fastify >=5.12.5 closes the reviewed September 2026
+  // advisories. Dependency names and payment integration boundaries are unchanged.
   [
     "apps/sandbox-api/package.json",
-    "10d849ade54b15694f30f477c4911acbb2e0a2750fb7cec617339cb23f26f1f2",
+    "449a71ee2e260137f66e409824c7b940503a5227ddb2838b793ae2959eca555d",
   ],
   [
     "apps/api/package.json",
-    "82e0499817addb7236e92216b60592618b4e03cc0c60acc1c24c0dedbdb42b3e",
+    "612edab1de19229840f06fe1cead61134e8ba5bba085bfb5a41a43540c68a51b",
   ],
   [
     "apps/web/package.json",
@@ -574,7 +576,7 @@ const approvedDependencySpecifiers = new Map([
   ["drizzle-orm", "^0.45.2"],
   ["eslint", "^9.31.0"],
   ["fast-check", "^4.2.0"],
-  ["fastify", "^5.5.0"],
+  ["fastify", "^5.12.5"],
   ["globals", "^14.0.0"],
   ["pg", "^8.16.3"],
   ["pino", "^9.7.0"],

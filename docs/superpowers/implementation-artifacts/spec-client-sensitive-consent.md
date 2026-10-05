@@ -75,6 +75,45 @@ context:
 
 ## Spec Change Log
 
+### 2026-10-04: live inventory and implementation gap audit
+
+The owner authorized implementation, RC publication, production deployment, and
+selection of the client bot identified by the configured token. This is execution
+authority, not fabricated signature-provider evidence, final legal document bodies,
+participant research, or a successful Trust CI receipt. The parent stays
+`in-progress`; the narrower browser increment is tracked in
+`spec-client-web-account.md`.
+
+The read-only production inventory found zero users, channel identities, approved
+consent documents, consent decisions, and publishable expert services. Do not seed
+demo records into live to disguise those absences. Before the account cutover, API
+and worker pointed to `88c34f3f6b53fc099c14cc750cc71225fa0bbbe3`, while web pointed
+to `0f49618e3e3b6d064e830f3b8ba77db794555bd0`.
+
+| Factory boundary                    | Remaining acceptance gap                                                                                                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Written special-category permission | No selected real signing provider, complete signature evidence, or admission model enforcing that evidence. Ordinary Telegram authentication is not a signature or content consent.            |
+| Pre-consent ingress                 | Keep content ingress off. A durable rejected-delivery watermark and strictly bounded structured input are still missing; old events must not become new after a grant.                         |
+| Public catalog                      | No public unauthenticated projection/UI yet. Published live inventory is empty.                                                                                                                |
+| Late provider responses             | Responses lack the original consent-authority stamp; they must be checked under the withdrawal lock before persisting any response body.                                                       |
+| Outbound delivery                   | Last-moment checks still have a check-to-send race; a later grant must not revive work authorized by a revoked decision.                                                                       |
+| Expert transfer                     | Existing grants do not bind the exact recipient, reservation, and approved snapshot hash. Keep disclosure disabled.                                                                            |
+| Erasure and retention               | Coverage of dialogue/proposal/outbox/authority data and real processor/backup proof is incomplete. Elapsed retention time is not verified deletion. The browser must not claim completion.     |
+| Documents and activation            | Six final purpose-specific documents are not present in the live document registry. Legal/operator/provider inputs must contain actual values and evidence, not merely boolean approval flags. |
+| Factory CI                          | Deployed Trust CI does not enroll this repository. The legacy consumer runner also references an absent pinned image. Local tests are not an exact-SHA factory receipt.                        |
+
+The factory/consumer infrastructure defect was filed as
+[Adaptive Grok Build Pro issue 243](https://github.com/Dimkox/adaptive-grok-build-pro/issues/243).
+No factory trust policy, holdout, signing authority, or image identity was changed
+to manufacture a passing gate.
+
+The cabinet candidate passed a local full run (307 files, 2374 tests, no skips)
+before the independent review patches and dependency upgrade. Post-review focused
+results must be recorded separately; that earlier result is not a full-suite claim
+for a later SHA. The browser sequence used an isolated PostgreSQL 17.5 database
+and synthetic documents. It is not evidence that real legal documents exist in
+production or that a user completed a real Telegram login there.
+
 ## Design Notes
 
 The candidate is intentionally broad because the user approved the complete factory slice. Production readiness means the implementation and evidence are complete; it does not silently manufacture legal/provider approvals. The release artifact must remain disabled by default and carry explicit recovery steps.

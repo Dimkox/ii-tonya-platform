@@ -63,6 +63,7 @@ import {
   shutdownTelemetry,
 } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
+import { createTelegramClientProofVerifier } from "./telegram-client-proof.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
@@ -150,7 +151,11 @@ export const createDefaultLifecycle = (
       throw new Error("test_expert_metric_sink_unavailable");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
-        options.clientSessionComposition?.verifier !== undefined,
+        options.clientSessionComposition?.verifier !== undefined ||
+        (config.clientTelegramBotToken !== undefined &&
+          /^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u.test(
+            config.clientTelegramBotToken,
+          )),
       bookingRuntime: true,
     });
     if (
@@ -174,7 +179,11 @@ export const createDefaultLifecycle = (
       throw new Error("client_telegram_bot_key_required");
     assertClientCapabilityPreflight(config.features, {
       identityProofVerifier:
-        options.clientSessionComposition?.verifier !== undefined,
+        options.clientSessionComposition?.verifier !== undefined ||
+        (config.clientTelegramBotToken !== undefined &&
+          /^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u.test(
+            config.clientTelegramBotToken,
+          )),
       bookingRuntime: true,
     });
     let expertCodeKeyring: ExpertCodeKeyring | undefined;
@@ -229,12 +238,17 @@ export const createDefaultLifecycle = (
         ? new PostgresClientSessionRepository(db)
         : undefined;
     const clientSessionService =
-      clientSessionRepository === undefined ||
-      options.clientSessionComposition === undefined
+      clientSessionRepository === undefined
         ? undefined
         : createClientSessionService({
             verifier: createClientProofVerifierGate(
-              options.clientSessionComposition.verifier,
+              options.clientSessionComposition?.verifier ??
+                createTelegramClientProofVerifier({
+                  botToken: config.clientTelegramBotToken!,
+                  resolveIdentity: (externalId) =>
+                    clientSessionRepository.resolveTelegramIdentity(externalId),
+                  widgetEnabled: config.clientWeb?.widgetEnabled === true,
+                }),
             ),
             sessions: clientSessionRepository,
             generateToken: createClientSessionToken,
@@ -381,6 +395,20 @@ export const createDefaultLifecycle = (
         config.features.clientPrivacy === true
           ? new PostgresConsentEvidenceRepository(db, {
               consentMutationCapability: { enabled: true },
+              requiredPolicyVersions: {
+                ...(config.clientMessagingConsentPolicyVersion === undefined
+                  ? {}
+                  : {
+                      client_messaging:
+                        config.clientMessagingConsentPolicyVersion,
+                    }),
+                ...(config.selartiAiConsentPolicyVersion === undefined
+                  ? {}
+                  : {
+                      selarti_ai_processing:
+                        config.selartiAiConsentPolicyVersion,
+                    }),
+              },
             })
           : undefined,
       adminService: createAdminService({

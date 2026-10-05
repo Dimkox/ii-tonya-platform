@@ -62,6 +62,50 @@ const validInstant = (value: Date): boolean =>
 export class PostgresClientSessionRepository {
   constructor(private readonly db: DrizzleDb) {}
 
+  async resolveTelegramIdentity(externalId: string): Promise<string | null> {
+    if (
+      !/^[1-9][0-9]{0,15}$/u.test(externalId) ||
+      !Number.isSafeInteger(Number(externalId))
+    )
+      return null;
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='1500ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
+      // Other channel writers do not share an advisory-lock namespace. This
+      // short table lock prevents a concurrent mapping phantom during creation.
+      await tx.execute(
+        sql`lock table channel_identities in share row exclusive mode`,
+      );
+      const mappings = (
+        await tx.execute<{
+          userId: string;
+          status: string;
+          active: boolean;
+        }>(sql`
+        select c.user_id as "userId", c.status, u.active from channel_identities c
+        join users u on u.id=c.user_id
+        where c.provider='telegram' and c.external_id=${externalId}
+        for update of c, u
+      `)
+      ).rows;
+      if (mappings.length > 0) {
+        const only = mappings[0]!;
+        return mappings.length === 1 && only.status === "active" && only.active
+          ? only.userId
+          : null;
+      }
+      const user = (
+        await tx.execute<{ id: string }>(
+          sql`insert into users default values returning id`,
+        )
+      ).rows[0];
+      if (!user) throw new Error("client_identity_unavailable");
+      await tx.execute(sql`insert into channel_identities(user_id,provider,external_id,status)
+        values (${user.id}::uuid,'telegram',${externalId},'active')`);
+      return user.id;
+    });
+  }
+
   async issue(
     input: ClientSessionIssueInput,
   ): Promise<ClientSessionIssueOutcome> {
@@ -77,6 +121,8 @@ export class PostgresClientSessionRepository {
     }
     try {
       return await this.db.transaction(async (tx: Transaction) => {
+        await tx.execute(sql`set local statement_timeout='2000ms'`);
+        await tx.execute(sql`set local lock_timeout='1000ms'`);
         const authority = (
           await tx.execute<{ userId: string }>(sql`
             select id as "userId"
@@ -200,20 +246,21 @@ export class PostgresClientSessionRepository {
     tokenDigest: `sha256:${string}`,
   ): Promise<ClientSessionRevocation> {
     if (!tokenDigestPattern.test(tokenDigest)) return { kind: "denied" };
-    const row = (
-      await this.db.execute<{ tokenDigest: string }>(sql`
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
+      const row = (
+        await tx.execute<{ tokenDigest: string }>(sql`
         update client_sessions s
         set revoked_at=clock_timestamp()
-        from users u
         where s.token_digest=${tokenDigest}
-          and u.id=s.user_id and u.active=true
           and s.scope='client_catalog:read'
           and s.revoked_at is null
-          and s.expires_at > clock_timestamp()
         returning s.token_digest as "tokenDigest"
       `)
-    ).rows[0];
-    return row === undefined ? { kind: "denied" } : { kind: "revoked" };
+      ).rows[0];
+      return row === undefined ? { kind: "denied" } : { kind: "revoked" };
+    });
   }
 
   async cleanupExpired(limit: number): Promise<{
@@ -225,6 +272,8 @@ export class PostgresClientSessionRepository {
     }
     try {
       return await this.db.transaction(async (tx: Transaction) => {
+        await tx.execute(sql`set local statement_timeout='2000ms'`);
+        await tx.execute(sql`set local lock_timeout='1000ms'`);
         const receipts = await tx.execute(sql`
         delete from client_identity_proof_receipts
         where replay_digest in (

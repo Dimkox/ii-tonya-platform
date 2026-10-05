@@ -36,6 +36,7 @@ export function renderLanding(config: PublicConfig): string {
     <header class="site-header">
       <a class="brand" href="#top" aria-label="ии-Тоня — наверх"><span>ии-</span>Тоня</a>
       <nav aria-label="Основная навигация"><a href="#about">О проекте</a><a href="#clients">Клиентам</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav>
+      <a class="header-action" href="/account">Личный кабинет</a>
       <a class="header-action" data-messenger-action href="${href(config, "client")}">Открыть диалог</a>
     </header>
     <main id="main-content">

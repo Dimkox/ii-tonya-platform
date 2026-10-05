@@ -136,6 +136,10 @@ const decisionFailure = (
     return { statusCode: 400, error: "invalid_request" };
   if (code === "consent_presentation_invalid")
     return { statusCode: 409, error: "consent_not_recorded" };
+  if (code === "consent_withdrawal_required")
+    return { statusCode: 409, error: "withdrawal_required" };
+  if (code === "consent_document_version_missing")
+    return { statusCode: 503, error: "document_unavailable" };
   return { statusCode: 500, error: "internal_error" };
 };
 
@@ -333,8 +337,9 @@ export const clientPrivacyRoutes: FastifyPluginAsync<RouteOptions> = async (
           ...body,
         });
         return reply.code(201).send(presentation);
-      } catch {
-        return reply.code(500).send({ error: "internal_error" });
+      } catch (error) {
+        const failure = decisionFailure(error);
+        return reply.code(failure.statusCode).send({ error: failure.error });
       }
     },
   );

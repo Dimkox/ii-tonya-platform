@@ -1528,6 +1528,43 @@ summary:focus-visible {
   }
 }
 
+.consent-list {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+.consent-card {
+  border: 1px solid #bdb6a8;
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+.consent-card .button {
+  margin: 0.4rem 0.4rem 0.4rem 0;
+}
+.consent-document {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  padding: 1rem;
+  background: #f5f2eb;
+  max-height: 28rem;
+  overflow: auto;
+}
+.document-metadata {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.consent-page [data-account-status] {
+  margin: 1.5rem 0;
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+[hidden] {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

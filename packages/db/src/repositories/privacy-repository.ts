@@ -164,6 +164,8 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`set local statement_timeout='2000ms'`);
+        await tx.execute(sql`set local lock_timeout='1000ms'`);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`,
         );

@@ -7,6 +7,7 @@ import {
   bindPrivacyActions,
   renderConsentPage,
   renderMyDataPage,
+  renderAccountPage,
 } from "./consent-view.js";
 
 const app = document.querySelector<HTMLElement>("#app");
@@ -16,12 +17,20 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/consent" || route === "/my-data") {
+if (route === "/consent" || route === "/my-data" || route === "/account") {
   app.innerHTML =
-    route === "/consent" ? renderConsentPage() : renderMyDataPage();
+    route === "/consent"
+      ? renderConsentPage()
+      : route === "/my-data"
+        ? renderMyDataPage()
+        : renderAccountPage();
   bindPrivacyActions(app);
   document.title =
-    route === "/consent" ? "Согласия — ии-Тоня" : "Мои данные — ии-Тоня";
+    route === "/consent"
+      ? "Согласия — ии-Тоня"
+      : route === "/my-data"
+        ? "Мои данные — ии-Тоня"
+        : "Личный кабинет — ии-Тоня";
 } else if (legalRoute !== undefined) {
   app.innerHTML = renderLegalPage(legalRoute);
   document.title =
