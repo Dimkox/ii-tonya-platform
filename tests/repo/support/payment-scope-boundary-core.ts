@@ -266,9 +266,9 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    // Re-registered: verify:deploy now syntax-checks each script separately (a multi-file
-    // `bash -n` validated only the first operand), and the pre-push gate scripts are wired in.
-    "a876cdc0275f096e74209dbf94da4d689d1d28cb7d5fb82bbd4b6f22a0530665",
+    // Reviewed navigation increment: add the native Nginx proof entrypoint and
+    // invoke it from verify:deploy. Existing scripts and dependency graph remain.
+    "db3bc1f5f1d61883a1dfde9374f1411694c4746c5a0ed7f6dc28a153f80fcc02",
   ],
   [
     "packages/application/package.json",

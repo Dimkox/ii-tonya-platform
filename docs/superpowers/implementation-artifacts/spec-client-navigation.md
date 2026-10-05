@@ -378,6 +378,14 @@ fresh tests TypeScript check and whitespace check also passed. This closes only
 the bounded implementation review: external exact-SHA CI/Database Gate and live
 release evidence remain separate, and the full factory is not complete.
 
+The first RC push of `5f13be90b738703c99dc26af7f44db54d6408e5d` was refused by
+the pre-push scope gate: the newly reviewed root package scripts had not been
+registered in the exact manifest-hash map. A focused reproduction produced
+122 passing assertions and one hash-mismatch failure, not a payment-scope change.
+The follow-up updates only that package manifest's reviewed hash and comment;
+the classifier, other pins, mutation assertions, dependencies and lockfile are
+unchanged. No hook bypass or history rewrite was used.
+
 ## Suggested Review Order
 
 **Admission and replay**
