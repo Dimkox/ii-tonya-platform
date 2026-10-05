@@ -311,6 +311,19 @@ This is an RC source freeze, not an assertion that the entire consent factory is
 implemented or that external exact-SHA CI passed. Final deployment, live user
 authentication and approved-document publication are separate evidence items.
 
+### Production RC checkpoint — 2026-10-05
+
+API and web source `426ee3b571de9b77aaae2e9294cb79e7cd0a596c` are deployed to
+ii-tonya.ru and published on `rc/client-consent-factory`. The selected token's
+client bot has a verified Mini App menu pointing to `/account`. Desktop and mobile
+public UI, readiness, anonymous denial, forged-proof denial and body-size rejection
+passed live checks. Real-user Telegram login has not been observed; six approved
+consent documents are absent, erasure and unsafe integrations remain unavailable,
+and factory exact-SHA CI is still blocked. This does not mark the story complete.
+
+See [deployment evidence](../../test-evidence/production/426ee3b-client-account-2026-10-05.md)
+for artifact digests, rollback targets, checks and explicit limits.
+
 ## Suggested Review Order
 
 **Authentication and authority**

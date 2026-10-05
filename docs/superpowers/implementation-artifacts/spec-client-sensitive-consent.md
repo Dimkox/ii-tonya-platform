@@ -114,6 +114,18 @@ for a later SHA. The browser sequence used an isolated PostgreSQL 17.5 database
 and synthetic documents. It is not evidence that real legal documents exist in
 production or that a user completed a real Telegram login there.
 
+### 2026-10-05: cabinet RC deployed, full factory remains incomplete
+
+Native API and web now run the same source
+`426ee3b571de9b77aaae2e9294cb79e7cd0a596c` on ii-tonya.ru. The token-selected
+client bot's verified Mini App menu opens `/account`. Live public desktop/mobile
+checks and negative authentication checks passed; no real user login was claimed.
+The live document registry is still empty and the acceptance gaps above remain.
+Session/privacy routes are enabled, while unsafe ingress, external delivery and
+erasure remain unavailable. The RC is published on `rc/client-consent-factory`;
+the factory Trust CI limitation is unchanged. See the
+[production evidence](../../test-evidence/production/426ee3b-client-account-2026-10-05.md).
+
 ## Design Notes
 
 The candidate is intentionally broad because the user approved the complete factory slice. Production readiness means the implementation and evidence are complete; it does not silently manufacture legal/provider approvals. The release artifact must remain disabled by default and carry explicit recovery steps.
