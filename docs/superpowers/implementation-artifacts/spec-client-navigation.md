@@ -378,6 +378,13 @@ fresh tests TypeScript check and whitespace check also passed. This closes only
 the bounded implementation review: external exact-SHA CI/Database Gate and live
 release evidence remain separate, and the full factory is not complete.
 
+The bounded RC was subsequently deployed as
+`cab25eef3d7abd8591c2a49c3605a14acdc76585`. See the
+[production evidence](../../test-evidence/production/cab25eef-client-navigation-2026-10-05.md)
+for direct-browser checks, Telegram configuration, its unresolved connection
+timeout, the empty catalog and the incomplete full-suite/Trust CI gates. This
+does not change the parent factory's incomplete status.
+
 The first RC push of `5f13be90b738703c99dc26af7f44db54d6408e5d` was refused by
 the pre-push scope gate: the newly reviewed root package scripts had not been
 registered in the exact manifest-hash map. A focused reproduction produced
