@@ -57,6 +57,12 @@ The first normal pre-push refused publication: one older schema parity test stil
 pinned journal0039. The exact baseline was advanced to the already-approved0040
 entry, preserving all assertions; focused regression went RED1/GREEN3. This is a
 test-inventory correction, not a migration edit or check bypass.
+The subsequent normal gate passed all checks and published remote
+`rc/client-consent-factory` at `8835f9e1a26287f145c19f231a31e59396a5fc10`.
+Remote readback matched; exact-SHA GitHub check-runs returned0. Public production
+`SOURCE_SHA` still returned `425e647a6e8a577095df2d9a89f28660d5a781ef`.
+Factory consumer issue243 and PR247 remain open (PR head9352f1e). No external receipt
+or completed production release is inferred from the successful local gate/push.
 Exact-SHA external Trust CI and Database Gate, real inventory and real-user Telegram
 login remain unproven. The synthetic journey is not live identity/provider evidence.
 Follow the [current activation section](../runbooks/client-booking-activation.md)

@@ -2,7 +2,7 @@
 title: Browser booking authority and account journey
 type: feature
 created: 2026-10-06
-status: in-progress
+status: in-review
 baseline_commit: 5388baeb61b6593b98119fc66eaff632095d85d0
 review_loop_iteration: 0
 context: []
@@ -76,3 +76,16 @@ Use the approved plan's focused commands and limits; evidence is retained in
 documentation alone. The migration prerequisite has independent test files; its
 PostgreSQL runs currently use two of three allowed invocations (first rejected the
 shared PG16 default, second passed on explicitly isolated PG17.5).
+
+## 2026-10-06 current continuation
+
+Implementation code through Task5 and bounded Task6 journey is in remote RC
+`8835f9e1a26287f145c19f231a31e59396a5fc10`. Independent list/bridge/UI reviews and
+Chrome corrections are recorded in [journey evidence](../../test-evidence/2026-10-06-browser-booking-journey.md).
+The normal pre-push gate passed after exact journal-baseline correction. The earlier
+paragraph's baseline test count is historical: migration-state and session-grant PG
+budgets are3/3 exhausted. New list/journey PG budgets2/3 each; Chrome account3/3.
+
+Status stays in-review, not done: external exact-SHA CI/Database Gate, real-user login
+and approved real inventory are missing. Production remains425e647. Outstanding
+nonblocking coverage/UX minors are listed in evidence; no hidden activation occurred.

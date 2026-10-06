@@ -5,8 +5,11 @@
 Local code HEAD2c0c7c92e2f1cc40ab102bb0fe321cb375ba8d5b on canonical
 codex/fin-001-client-access-policy. Task3 owner list731f189 and Task4 bridgef5020a8;
 Task5 account UI/shared-session fixes and Task6 focused journey in2c0c7c9.
-Production remains last verified425e647. No live mutation or flag activation here.
-RC push/pre-push gate still pending at this entry; do not infer remote publication.
+Production SOURCE_SHA freshly verified425e647. No live mutation or flag activation here.
+Remote rc/client-consent-factory now8835f9e1a26287f145c19f231a31e59396a5fc10;
+normal pre-push gate passed after correcting a stale journal0039 expectation to0040.
+No hook bypass/force push. Exact-SHA GitHub check-runs0; external CI is not certified.
+This status-only follow-up may be ahead of the remote RC; do not confuse it with code.
 
 Focused evidence: list application8/API9/PG3, bridge14, existing booking service6/
 routes6/browser-account6/privacy-client9, booking-client6/view3, real Chrome account
@@ -14,7 +17,8 @@ regressions2 and synthetic-boundary PostgreSQL journey2 passed. Relevant applica
 DB/API/web/tests types, builds, lint and whitespace passed. No full suite rerun.
 Task3 independent Kepler review no Critical/Important. Hooke found two Important UI
 defects: old consent controls after account switch and competing button locks;
-both reproduced in Chrome and fixed RED2→GREEN2. Task6 evidence-only review pending.
+both reproduced in Chrome and fixed RED2→GREEN2. Hooke accepted bounded Task6 API
+journey/runbook evidence, not live browser login/reload, providers or release gates.
 
 New bounded budgets: client-booking-list PG2/3; browser-booking-journey2/3 (first
 collection failure); booking-account browser concurrency3/3 exhausted (first fixture
@@ -27,6 +31,9 @@ trailing-slash account booking initialization. Do not mark full product complete
 Real inventory/login and external exact-SHA Trust CI/Database Gate remain release
 gaps. Do not invent provider facts, enable free-text or reinstate written-signing
 prerequisites. Preserve unrelated untracked factory/.qwen/claw files.
+Owned Compose fixture container/volume/network and Chrome profiles removed. Factory
+issue243 and PR247 remain OPEN, PR head9352f1e. Plan ledger retained for remaining
+release gates; no additional exhausted-suite invocation is authorized implicitly.
 
 ## 2026-10-06 browser booking foundation — current local continuation
 
