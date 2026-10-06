@@ -22,6 +22,10 @@ export interface BrowserAccountOptions {
     ): Promise<{ kind: "revoked" } | { kind: "denied" }>;
   };
   principals?: ClientPrincipalResolver;
+  bookingPrincipals?: ClientPrincipalResolver;
+  bookingEnabled?: boolean;
+  bookingReserveEnabled?: boolean;
+  catalogEnabled?: boolean;
 }
 const SESSION = "__Host-client-session";
 const NONCE = "__Host-client-csrf";
@@ -87,7 +91,13 @@ export const browserAccountRoutes: FastifyPluginAsync<
       .header("pragma", "no-cache")
       .header("referrer-policy", "no-referrer");
     if (
-      request.url.includes("?") ||
+      (request.url.includes("?") &&
+        !(
+          request.method === "GET" &&
+          /^\/v1\/browser\/bookings\?after=bk1\.[A-Za-z0-9_-]{43}$/u.test(
+            request.url,
+          )
+        )) ||
       cookieValues(request) === null ||
       request.headers.authorization !== undefined
     )
@@ -148,6 +158,17 @@ export const browserAccountRoutes: FastifyPluginAsync<
     if (resolved.kind !== "resolved" && cookieValues(request)?.has(SESSION))
       setCookies.push(cookie(SESSION, "", 0));
     if (setCookies.length) reply.header("set-cookie", setCookies);
+    const booking =
+      resolved.kind === "resolved" &&
+      deps.bookingEnabled === true &&
+      deps.bookingPrincipals
+        ? await resolveClientPrincipal(
+            deps.bookingPrincipals,
+            `Bearer ${token}`,
+          )
+        : { kind: "denied" };
+    if (booking.kind === "unavailable")
+      return reply.code(503).send({ error: "session_unavailable" });
     return {
       available: true,
       authenticated: resolved.kind === "resolved",
@@ -156,6 +177,9 @@ export const browserAccountRoutes: FastifyPluginAsync<
       widgetEnabled: deps.widgetEnabled,
       privacyAvailable: deps.privacyEnabled,
       erasureAvailable: false,
+      bookingAvailable: booking.kind === "resolved",
+      bookingReserveAvailable:
+        booking.kind === "resolved" && deps.bookingReserveEnabled === true,
     };
   });
   app.post(
@@ -217,6 +241,121 @@ export const browserAccountRoutes: FastifyPluginAsync<
     reply.header("set-cookie", [cookie(SESSION, "", 0), cookie(NONCE, "", 0)]);
     return reply.code(204).send();
   });
+  const uuid =
+    "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+  for (const [method, suffix, pattern, booking] of [
+    ["POST", "catalog-requests", /^\/v1\/browser\/catalog-requests$/u, false],
+    [
+      "GET",
+      "catalog-requests/:id",
+      new RegExp(`^/v1/browser/catalog-requests/${uuid}$`, "u"),
+      false,
+    ],
+    [
+      "GET",
+      "bookings",
+      /^\/v1\/browser\/bookings(?:\?after=bk1\.[A-Za-z0-9_-]{43})?$/u,
+      true,
+    ],
+    ["POST", "bookings", /^\/v1\/browser\/bookings$/u, true],
+    [
+      "DELETE",
+      "bookings/:handle",
+      /^\/v1\/browser\/bookings\/bk1\.[A-Za-z0-9_-]{43}$/u,
+      true,
+    ],
+  ] as const) {
+    app.route({
+      method,
+      url: `/v1/browser/${suffix}`,
+      bodyLimit: 1024,
+      async handler(request, reply) {
+        if (!pattern.test(request.raw.url ?? ""))
+          return reply.code(400).send({ error: "invalid_request" });
+        const token = await authenticated(request, reply);
+        if (!token) return;
+        if (!matchesSessionBinding(request, token))
+          return reply.code(403).send({ error: "forbidden" });
+        const framing = [
+          "content-type",
+          "content-length",
+          "content-encoding",
+          "transfer-encoding",
+        ];
+        if (
+          framing.some((name) => headerCount(request, name) > 1) ||
+          request.headers["content-encoding"] !== undefined ||
+          request.headers["transfer-encoding"] !== undefined
+        ) {
+          return reply.code(400).send({ error: "invalid_request" });
+        }
+        const body = request.body;
+        const length = request.headers["content-length"];
+        if (method === "POST") {
+          if (
+            !/^application\/json(?:;\s*charset=utf-8)?$/iu.test(
+              request.headers["content-type"] ?? "",
+            ) ||
+            !Buffer.isBuffer(body) ||
+            body.length < 1 ||
+            body.length > 1024 ||
+            (length !== undefined && length !== String(body.length))
+          )
+            return reply.code(400).send({ error: "invalid_request" });
+        } else if (
+          request.headers["content-type"] !== undefined ||
+          (length !== undefined && length !== "0") ||
+          (Buffer.isBuffer(body) && body.length !== 0)
+        )
+          return reply.code(400).send({ error: "invalid_request" });
+        if (booking) {
+          if (deps.bookingEnabled !== true || !deps.bookingPrincipals)
+            return reply.code(503).send({ error: "booking_unavailable" });
+          const authority = await resolveClientPrincipal(
+            deps.bookingPrincipals,
+            `Bearer ${token}`,
+          );
+          if (authority.kind !== "resolved")
+            return reply
+              .code(authority.kind === "unavailable" ? 503 : 403)
+              .send({ error: "booking_unavailable" });
+          if (method === "POST" && deps.bookingReserveEnabled !== true)
+            return reply.code(503).send({ error: "reserve_unavailable" });
+        } else if (deps.catalogEnabled !== true)
+          return reply.code(503).send({ error: "catalog_unavailable" });
+        const response = await app.inject({
+          method,
+          url: request.raw.url!.replace("/v1/browser/", "/v1/client/"),
+          headers: {
+            authorization: `Bearer ${token}`,
+            ...(method === "POST"
+              ? { "content-type": "application/json" }
+              : {}),
+          },
+          ...(method === "POST" ? { payload: body as Buffer } : {}),
+        });
+        if (response.statusCode >= 500)
+          return reply.code(503).send({ error: "temporarily_unavailable" });
+        if (response.statusCode >= 400) {
+          const errors: Record<number, string> = {
+            400: "invalid_request",
+            401: "unauthorized",
+            403: "forbidden",
+            404: "not_found",
+            409: "conflict",
+            429: "rate_limited",
+          };
+          return reply
+            .code(response.statusCode)
+            .send({ error: errors[response.statusCode] ?? "request_failed" });
+        }
+        return reply
+          .code(response.statusCode)
+          .type("application/json")
+          .send(response.rawPayload);
+      },
+    });
+  }
   for (const [method, suffix] of [
     ["GET", "consents"],
     ["GET", "export"],

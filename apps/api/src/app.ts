@@ -491,6 +491,16 @@ export async function buildApp(
         }),
     widgetEnabled: deps.config.clientWeb?.widgetEnabled === true,
     privacyEnabled: deps.config.features.clientPrivacy === true,
+    bookingEnabled:
+      deps.config.features.clientBooking === true &&
+      deps.clientBookingService !== undefined,
+    bookingReserveEnabled: deps.config.features.clientBookingReserve === true,
+    catalogEnabled:
+      deps.config.features.clientCatalog === true &&
+      deps.clientCatalogService !== undefined,
+    ...(deps.clientBookingPrincipal === undefined
+      ? {}
+      : { bookingPrincipals: deps.clientBookingPrincipal }),
     ...(deps.config.features.clientSession !== true ||
     !deps.clientSessionService ||
     !deps.clientSessionRepository ||
