@@ -1,5 +1,40 @@
 # Agent status — owner-spec 2026-09-16
 
+## Original consent export correction — local, not deployed
+
+AC016 patch adds original immutable document id/key/version/title/body/hash to each
+owner consent export, joined by the decision's document_version_id, never latest
+publication. Legacy/unbound decisions export document:null. Application and DB
+interfaces match; existing browser JSON download consumes the additive field.
+
+New tests/integration/consent-original-export.test.ts on isolated ComposePG17.5:
+run1 RED2 (missing documents); run2 1/2 (document checks passed, test mistakenly
+expected withdrawn rather than existing revoked enum); corrected literal;
+run3 GREEN2 with explicit owner-only two-decision/null-revocation assertions.
+This focused PG file is now3/3 EXHAUSTED. Existing exhausted files untouched.
+Application privacy-service9/9, application/DB builds, tests typecheck and scoped
+lint/format/diff passed. Parfit static review no Critical/Important; Minor coverage
+suggestion addressed by final assertion strengthening. No release claim yet.
+
+Disposable ii-tonya-consent-export-20261006 Compose container/volume/network removed;
+never confuse it with production. Live remains d0a3437 with local booking composition
+on/reserve off. Ordinary document inputs, erasure and authentic login still open.
+
+## Privacy continuation — next implementation target
+
+Read-only live privacy inventory at2026-10-06T23:31:32Z on d0a3437:
+approved documents0, deletion jobs/manifests/retention items0, booking grants0.
+No mutation, test or new login. Existing public legal review does not approve six
+separate consent texts. Asked owner asynchronously where final texts/retention
+matrix reside or whether to prepare drafts; no answer yet. Signing remains excluded.
+
+Confirmed code gap AC-016: owner export returns consent metadata only, not the
+original immutable document body/hash; UI download fetches current presentation.
+Next safe implementation is owner-bound historical document/evidence export, with
+legacy absence preserved and foreign-user access denied. See updated human-review
+gap audit for exact files and evidence. This can progress while document inputs and
+authentic login are pending. Erasure remains a separate unfinished requirement.
+
 ## Live ordinary booking composition — latest state
 
 Native/web/remote RC now d0a34370b72e57bf56bf0a9806d31432d5931fa0.

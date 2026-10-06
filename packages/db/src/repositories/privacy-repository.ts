@@ -38,6 +38,14 @@ export interface SubjectExport {
     decision: string;
     policyVersion: string;
     createdAt: string;
+    document: {
+      id: string;
+      documentKey: string;
+      version: number;
+      title: string;
+      body: string;
+      textSha256: string;
+    } | null;
   }[];
   readonly profile: { displayName?: string; timezone?: string } | null;
   readonly reservations: readonly {
@@ -541,9 +549,16 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         decision: string;
         policyVersion: string;
         createdAt: Date | string;
+        document: SubjectExport["consents"][number]["document"];
       }>(sql`
-      select consent_type as purpose, decision, policy_version as "policyVersion", created_at as "createdAt"
-      from consents where user_id = ${userId}::uuid order by created_at, id
+      select c.consent_type as purpose, c.decision, c.policy_version as "policyVersion", c.created_at as "createdAt",
+        case when d.id is null then null else jsonb_build_object(
+          'id',d.id,'documentKey',d.document_key,'version',d.version,
+          'title',d.title,'body',d.body,'textSha256',d.text_sha256
+        ) end as document
+      from consents c
+      left join consent_document_versions d on d.id=c.document_version_id
+      where c.user_id = ${userId}::uuid order by c.created_at, c.id
     `)
     ).rows.map((row) => ({
       ...row,

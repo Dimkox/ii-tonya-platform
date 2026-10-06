@@ -44,6 +44,14 @@ export interface SubjectExport {
     decision: string;
     policyVersion: string;
     createdAt: string;
+    document: {
+      id: string;
+      documentKey: string;
+      version: number;
+      title: string;
+      body: string;
+      textSha256: string;
+    } | null;
   }[];
   readonly profile: { displayName?: string; timezone?: string } | null;
   readonly reservations: readonly {

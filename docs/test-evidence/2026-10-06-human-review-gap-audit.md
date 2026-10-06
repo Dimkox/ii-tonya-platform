@@ -103,3 +103,53 @@ subject in its transaction. Therefore completing AC-015 needs a designed durable
 request/status path and verified deletion composition, including access to status
 after session revocation; forwarding the existing browser route alone is unsafe
 and insufficient. Preserve current denial until that path is implemented.
+
+## Post-activation privacy audit — 2026-10-06 23:31 UTC
+
+Pinned SSH/read-only transaction on live
+`d0a34370b72e57bf56bf0a9806d31432d5931fa0` returned approved_documents0,
+deletion_jobs0, deletion_manifests0, retention_items0 and booking_grants0.
+These are point-in-time aggregate observations, not deletion proof or a claim that
+the whole database contains no personal data. No mutation or synthetic login ran.
+Reproduction helper: `/tmp/ii-tonya-booking-activation.BmIJgf/privacy-inventory.mjs`.
+
+Existing `docs/legal/owner-update-legal-review.md` concerns public policy/offer,
+not approval of six separate purpose documents. The source bundle is a requirements
+draft, not a ready approved document registry. Owner was asked asynchronously for
+the location of final documents/retention matrix or permission to prepare drafts.
+No signing prerequisite is being reinstated.
+
+AC-016 has a confirmed implementation gap independent of legal approval:
+`PostgresPrivacyRepository.exportOwnedSubject` selects purpose, decision,
+policyVersion and createdAt from consents only. It does not return the linked
+immutable document body/title/version/hash or evidence binding, despite0039
+storing document_version_id and text_sha256. The browser's document-download action
+uses a new current presentation, not necessarily the version originally accepted.
+Therefore later document publication can leave the subject without their original
+copy through the existing export/download flow.
+
+Next independently implementable correction: extend the owner-scoped export with
+the original linked immutable document/evidence (including revoked/older versions),
+preserve legacy decisions without inventing documents, and exclude foreign-user
+decisions/documents. Cover original-vs-current version, cross-owner denial and legacy
+absence with focused tests. This is not permission to publish unapproved texts or
+claim AC-015 complete. Existing test budgets remain unchanged.
+
+### AC-016 original-copy implementation evidence
+
+The original-document export correction is now implemented locally in the DB
+repository and application interface. Each owner's decision includes its linked
+immutable document (id/key/version/title/body/SHA256), or explicit null for a legacy
+or otherwise unbound decision. The query uses the original document ID, not latest
+version/status, so replacement and withdrawal retain the original accepted copy.
+The existing browser JSON download carries the new field without HTML rendering.
+
+Focused new PostgreSQL17.5 file `consent-original-export.test.ts`: run1 RED2;
+run2 1/2 because the test used nonexistent withdrawn instead of revoked; run3
+GREEN2 after correction and stronger isolation assertions. Budget3/3 consumed.
+Version170005 is asserted in the fixture. Tests cover original copy after newer
+publication and withdrawal, exclusion of foreign decisions, and legacy null.
+Application service9/9 and relevant builds/typechecks/lint/format/diff passed.
+Parfit found no Critical/Important issue; the Minor exact-isolation assertion was
+added before the final successful run. This is not live document publication,
+legal approval, complete audit-evidence export, or full AC-016 acceptance proof.
