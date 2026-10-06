@@ -1,5 +1,21 @@
 # Agent status — owner-spec 2026-09-16
 
+## Published original-document export — latest live state
+
+Native/web/RC48009f9ce4de9f8258eede8d59b950899eafd0a8. Signed build/import checks,
+rollout and pinned host readback passed. Catalogue/booking/grants/local outbox stay
+on; reserve/external content/payments remain off. Worker heartbeat fresh, individual
+services active, owned staging and nginx-check unit absent. Prior compatibled0a3437
+and runtime/nginx backups retained. No migration delta or exhausted test rerun.
+Evidence docs/test-evidence/production/2026-10-07-original-consent-export.md;
+reviewer guide docs/test-evidence/production/human-review-guide.md.
+Current helper directory /tmp/ii-tonya-consent-export-release.TTqxgZ/ pins priord0a3437.
+
+Authenticated original-document export has local PG evidence, not actual live-user
+evidence. Final document/retention inputs and authentic login requests remain
+unanswered. Erasure still unavailable; full goal not achieved. Continue unresolved
+privacy functions/acceptance, do not repeat this finished rollout.
+
 ## Original consent export correction — local, not deployed
 
 AC016 patch adds original immutable document id/key/version/title/body/hash to each
