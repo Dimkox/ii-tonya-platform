@@ -592,6 +592,34 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0040_client_session_booking_grants.sql",
+    "abd7de7b230598e2f63309c660c98de4d1812e87737dcefbfe0e8a15f2f32979",
+  ],
+  [
+    "packages/db/migrations/meta/0039_snapshot.json",
+    "b7dbbb1318fa677e2f43e0975a6f858dae9fab00ff3863899cfd5e7baca8cdc1",
+  ],
+  [
+    "packages/db/migrations/meta/0040_snapshot.json",
+    "7f6d547793b02b9da77a5daa584a70bb10e0239e2bbef1169d1e9a7c7d1ca411",
+  ],
+  [
+    "packages/db/migrations/state/0039_manifest.json",
+    "db670f20b5f7c44e5a2c2590945f24f133456c5e11415a9b9451a3abc8bac9de",
+  ],
+  [
+    "packages/db/migrations/state/0039_sql_objects.json",
+    "1723fa6d795402eca56b42708a2ecc69f280574a273b9056f42fa901d1a2ef49",
+  ],
+  [
+    "packages/db/migrations/state/0040_manifest.json",
+    "0286858c8df2db68231d611be308f3fba7599a1820637476ce0c3e3351c6d730",
+  ],
+  [
+    "packages/db/migrations/state/0040_sql_objects.json",
+    "013d69c02997e3bf2fc097c9050b52603c9b62e54d293191c3dd44757ad03ebf",
+  ],
+  [
     "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
     "495e8b352021c1fb6d0fc027e1621df6137d0d15c4a54cff5ce975cb2c318e0a",
   ],
@@ -757,7 +785,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "823e327301655b77b12fa3bd7cfec9cff7f08a8603fc18565af91e39d96eca81",
+    "db04e9ea2bcf4c1a83962716b6a16373432895d1417b01b858f86a96259d28b1",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -837,7 +865,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "823e327301655b77b12fa3bd7cfec9cff7f08a8603fc18565af91e39d96eca81",
+    "db04e9ea2bcf4c1a83962716b6a16373432895d1417b01b858f86a96259d28b1",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -858,6 +886,7 @@ const approvedDatabaseRelations = new Set([
   "client_identity_proof_receipts",
   "expert_telegram_residency_callbacks",
   "client_profiles",
+  "client_session_booking_grants",
   "client_sessions",
   "consent_document_versions",
   "consent_presentations",

@@ -64,14 +64,15 @@ its SQL-only supplement and input hashes are under `packages/db/migrations/state
   `bigint("next_delivery_sequence", { mode: "bigint" }).notNull().default(0n)` in
   `packages/db/src/schema/integration.ts`, with
   `TypeError: Do not know how to serialize a BigInt`.
-- The history also carries 27 hand-authored functions, 33 triggers,
-  1 view (`package_balances`) and 2 extensions
+- The reconstructed database also carries 27 hand-authored functions, 48 non-internal triggers,
+  2 views (`package_balances`, `expert_referral_balances`) and 2 extensions
   (`btree_gist`, `pgcrypto`) that no Drizzle schema declaration represents. A schema-derived
   snapshot cannot contain them, so rebuilding the chain from `packages/db/src/schema` is not
   available: a full `generate` already fails with
   `ERROR: function expert_jsonb_has_exact_keys(jsonb, text[]) does not exist`, because the CHECK
   constraints that call these functions are emitted while the functions are not.
-  `tests/repo/migration-history-integrity.test.ts` pins that exact set.
+  `tests/repo/migration-history-integrity.test.ts` pins the historical unquoted SQL
+  subset; the database-derived state supplement and integration test cover the full set.
 
 - Do not read `drizzle-kit check` or `drizzle-kit up` as a safety net here: both report
   `Everything's fine`, and neither restores the missing snapshots. The Database Gate step

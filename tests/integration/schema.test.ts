@@ -207,6 +207,7 @@ describe("MVP schema", () => {
       "client_commercial_policy_controls",
       "client_identity_proof_receipts",
       "client_profiles",
+      "client_session_booking_grants",
       "client_sessions",
       "commercial_participants",
       "consent_document_versions",

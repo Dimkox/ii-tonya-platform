@@ -1,5 +1,35 @@
 # Agent status — owner-spec 2026-09-16
 
+## 2026-10-06 browser booking foundation — current local continuation
+
+Owner approved design, plan, migration-state prerequisite and native execution with
+independent review. Canonical branch remains `codex/fin-001-client-access-policy`.
+Local grant code HEAD: `a2c751b3cde6ca62fd4c17a2fe79204ec2c0f317`; not pushed/deployed.
+Production/remote RC remains425e647; do not confuse local metadata/code with live.
+
+Durable contract: `docs/superpowers/implementation-artifacts/spec-browser-booking-authority.md`.
+Approved plan: `docs/superpowers/plans/2026-10-06-browser-booking-authority.md`.
+Evidence: `docs/test-evidence/2026-10-06-booking-grant-foundation.md`.
+Plan ledger/logs: `.superpowers/sdd/2026-10-06-browser-booking-authority/`.
+
+Migration0039 state restored from real SQL replay; raw Drizzle introspection had
+three independently identified semantic defects, corrected from pg_catalog in6965239.
+SQL-only supplement now includes full constraint/index semantics. Migration0040 and
+truthful state add explicit session-bound booking grants. Atomic issuance and fresh
+resolution implemented; flag remains false by default, no old-session promotion.
+Grant backend independent review found two guard regressions; exact artifact/relation
+registration and schema inventory were corrected with RED→GREEN (scope123/123,
+schema7/7 onPG17.5). Tasks3–6 (list, browser bridge, UI, complete
+journey/release) are NOT implemented. Do not report a working browser booking flow.
+
+New focused PG budgets: migration-state-baseline3/3, client-session-booking-grants3/3
+consumed. Final results2/2 and8/8 respectively. Preserve all older exhausted budgets.
+Schema inventory used2/3 runs in this slice. Deferred review minors: explicit snapshot
+ID-linkage assertions; grant-survival-after-issuance-disable integration scenario.
+No full/multipath suite or live mutation. Real experts/services/slots remain absent
+at the latest production inventory readback. User source request remains unanswered.
+Preserve unrelated untracked factory/.qwen/claw files and earlier release evidence.
+
 ## 2026-10-06 published async RC — current continuation
 
 Owner explicitly commanded deployment. Native and web on ii-tonya.ru and remote
