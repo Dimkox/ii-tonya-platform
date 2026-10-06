@@ -1,5 +1,42 @@
 # Agent status — owner-spec 2026-09-16
 
+## 2026-10-06 human-review publication — current owner scope
+
+The active goal is the complete ordinary product route published on ii-tonya.ru
+for human review, not a local-only demonstration. Factory completion and Trust CI
+integration are explicitly excluded by the owner; report missing external
+acceptance as a limitation, not a task to restart. An empty real catalogue is
+accepted for now. Written consent/signing is not an onboarding prerequisite;
+special-category free-text processing stays closed. These decisions supersede
+conflicting scope statements in historical entries below.
+
+Fresh readback in this continuation: local HEAD
+62b31d9b260b7f4fcedb55434c26556c0e92521f; public SOURCE_SHA
+425e647a6e8a577095df2d9a89f28660d5a781ef. Environment check passed with Node24.21.0
+and pnpm11.9.0. No deployment or runtime activation has occurred in this turn.
+
+Code inspection confirms that browser erasure is unconditionally unavailable,
+not merely a disabled environment flag: browser-account.ts returns503 for erase,
+and consent-view.ts explicitly says no request was sent. The two known navigation
+defects also remain: exact /account matching excludes /account/, and pagehide
+disposes booking with no pageshow recovery. These remain implementation work;
+do not claim the whole cabinet or AC-015 is complete.
+
+Current acceptance audit: docs/test-evidence/2026-10-06-human-review-gap-audit.md.
+All previously recorded focused-test budgets remain unchanged. This continuation
+ran no test suite and started no background verification process.
+
+Subsequent navigation implementation: the two defects described above now have
+an uncommitted local correction in consent-view.ts and a new focused real-Chrome
+account-navigation.test.ts. RED2 then GREEN2; web typecheck/build, scoped lint and
+diff check passed. New file budget2/3, old exhausted files not rerun. Synthetic
+lifecycle/HTTP boundary, not real Telegram or live evidence. Independent reviewer
+Curie found no Critical/Important issues; Minor: fixture does not prove changed
+authority or write non-replay. See audit for evidence limits. No deployment or
+erasure implementation yet. Erasure is also deliberately uncomposed in server/app,
+requires verified processor manifests, and invalidates sessions; a safe status path
+after revocation is required, not merely removing the browser503 guard.
+
 ## 2026-10-06 browser booking code continuation, after foundation
 
 Local code HEAD2c0c7c92e2f1cc40ab102bb0fe321cb375ba8d5b on canonical

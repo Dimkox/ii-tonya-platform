@@ -51,6 +51,11 @@ interface TelegramWindow extends Window {
   onClientTelegramAuth?: (user: Record<string, unknown>) => void;
 }
 export function bindPrivacyActions(root: ParentNode): void {
+  // A cached document may retain an obsolete session and in-flight callbacks.
+  // Reload via GET rather than reviving controllers or replaying mutations.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) window.location.reload();
+  });
   const launchData = readMiniAppLaunchData(window.location.hash);
   if (window.location.hash.includes("tgWebAppData"))
     window.history.replaceState(
@@ -124,7 +129,7 @@ export function bindPrivacyActions(root: ParentNode): void {
     }
     privateArea.innerHTML =
       '<button class="button ghost" type="button" data-logout disabled>Выйти</button>';
-    if (window.location.pathname === "/account") {
+    if (window.location.pathname.replace(/\/+$/u, "") === "/account") {
       const bookingArea = document.createElement("section");
       bookingArea.dataset.bookingArea = "";
       bookingArea.setAttribute("aria-label", "Запись к эксперту");
