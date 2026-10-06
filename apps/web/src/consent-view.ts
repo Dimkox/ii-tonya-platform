@@ -4,6 +4,7 @@ import {
   type BrowserSession,
 } from "./privacy-client.js";
 import { readMiniAppLaunchData } from "./telegram-launch.js";
+import { bindBookingActions } from "./booking-view.js";
 
 const labels: Record<string, string> = {
   client_profile: "Профиль клиента",
@@ -67,6 +68,15 @@ export function bindPrivacyActions(root: ParentNode): void {
   const help = root.querySelector<HTMLElement>("[data-login-help]")!;
   let session: BrowserSession | undefined;
   let busy = false;
+  let disposeBooking: (() => void) | undefined;
+  client.onAuthorityChange(() => {
+    disposeBooking?.();
+    disposeBooking = undefined;
+    privateArea.replaceChildren();
+    session = undefined;
+    status.textContent =
+      "Сессия изменилась. Нажми «Обновить», чтобы проверить текущий аккаунт. Старые действия недоступны.";
+  });
   const message = (text: string) => {
     status.textContent = text;
   };
@@ -81,6 +91,8 @@ export function bindPrivacyActions(root: ParentNode): void {
     }
   }
   async function refresh() {
+    disposeBooking?.();
+    disposeBooking = undefined;
     privateArea.replaceChildren();
     login.disabled = true;
     session = await client.probe();
@@ -112,6 +124,13 @@ export function bindPrivacyActions(root: ParentNode): void {
     }
     privateArea.innerHTML =
       '<button class="button ghost" type="button" data-logout disabled>Выйти</button>';
+    if (window.location.pathname === "/account") {
+      const bookingArea = document.createElement("section");
+      bookingArea.dataset.bookingArea = "";
+      bookingArea.setAttribute("aria-label", "Запись к эксперту");
+      privateArea.append(bookingArea);
+      disposeBooking = bindBookingActions(bookingArea, client, session);
+    }
     if (!session.privacyAvailable) {
       message("Вход выполнен. Управление данными сейчас недоступно.");
       return;
@@ -266,6 +285,9 @@ export function bindPrivacyActions(root: ParentNode): void {
       button.closest<HTMLElement>("[data-purpose]")?.dataset.purpose;
     const disabled = new Map<HTMLButtonElement, boolean>();
     root.querySelectorAll<HTMLButtonElement>("button").forEach((control) => {
+      // Booking owns its own async locks; restoring privacy's snapshot must
+      // never overwrite a newer booking controller state.
+      if (control.closest("[data-booking-area]")) return;
       disabled.set(control, control.disabled);
       control.disabled = true;
     });
@@ -329,6 +351,8 @@ export function bindPrivacyActions(root: ParentNode): void {
     );
     if (button)
       void act(button, async () => {
+        disposeBooking?.();
+        disposeBooking = undefined;
         await client.logout();
         await confirmed("Ты вышел из кабинета.");
       });

@@ -6,6 +6,8 @@ export interface BrowserSession {
   widgetEnabled?: boolean;
   privacyAvailable?: boolean;
   erasureAvailable: false;
+  bookingAvailable?: boolean;
+  bookingReserveAvailable?: boolean;
 }
 export interface ConsentState {
   purpose: string;
@@ -36,6 +38,43 @@ export class PrivacyClient {
   private states: ConsentState[] = [];
   private epoch = 0;
   private recovering = false;
+  private readonly authorityListeners = new Set<() => void>();
+  onAuthorityChange(listener: () => void): () => void {
+    this.authorityListeners.add(listener);
+    return () => {
+      this.authorityListeners.delete(listener);
+    };
+  }
+  private advanceEpoch(): void {
+    ++this.epoch;
+    for (const listener of this.authorityListeners) listener();
+  }
+  private bookingAvailable = false;
+  private bookingReserveAvailable = false;
+  get sessionEpoch(): number {
+    return this.epoch;
+  }
+  async bookingRequest<T>(
+    path: string,
+    method = "GET",
+    body?: unknown,
+    timeoutMs?: number,
+  ): Promise<T> {
+    this.requireSession();
+    if (
+      !/^(?:bookings(?:\?after=bk1\.[A-Za-z0-9_-]{43}|\/bk1\.[A-Za-z0-9_-]{43})?|catalog-requests(?:\/[0-9a-f-]{36})?)$/u.test(
+        path,
+      )
+    )
+      throw new Error("invalid_booking_path");
+    if (
+      path.startsWith("bookings") &&
+      (!this.bookingAvailable ||
+        (method === "POST" && !this.bookingReserveAvailable))
+    )
+      throw new PrivacyApiError(503);
+    return this.call<T>(path, method, body, timeoutMs);
+  }
   private readonly presentations = new Map<string, ConsentPresentation>();
   constructor(
     private readonly request: typeof fetch = (...args) => fetch(...args),
@@ -45,15 +84,19 @@ export class PrivacyClient {
     path: string,
     method = "GET",
     body?: unknown,
+    timeoutMs?: number,
   ): Promise<T> {
     const epoch = this.epoch;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new Error("privacy_request_timeout"));
-      }, this.options.timeoutMs ?? 10000);
+      timer = setTimeout(
+        () => {
+          controller.abort();
+          reject(new Error("privacy_request_timeout"));
+        },
+        Math.min(timeoutMs ?? 10000, this.options.timeoutMs ?? 10000),
+      );
     });
     let response: Response;
     let value: T;
@@ -90,7 +133,7 @@ export class PrivacyClient {
     if (epoch !== this.epoch) throw new Error("stale_response");
     if (!response.ok) {
       if (response.status === 401) {
-        ++this.epoch;
+        this.advanceEpoch();
         this.authenticated = false;
         this.csrf = "";
         this.presentations.clear();
@@ -127,12 +170,15 @@ export class PrivacyClient {
     // CSRF is bound to the cookie session. A changed probe invalidates operations
     // started under the previous authority, even if both accounts are authenticated.
     if (authenticated !== this.authenticated || csrf !== this.csrf) {
-      ++this.epoch;
+      this.advanceEpoch();
       this.states = [];
       this.presentations.clear();
     }
     this.authenticated = authenticated;
     this.csrf = csrf;
+    this.bookingAvailable = authenticated && session.bookingAvailable === true;
+    this.bookingReserveAvailable =
+      this.bookingAvailable && session.bookingReserveAvailable === true;
     if (!this.authenticated) {
       this.states = [];
       this.presentations.clear();
@@ -143,7 +189,7 @@ export class PrivacyClient {
     const result = await this.call<{ csrfToken: string }>("session", "POST", {
       identityProof,
     });
-    ++this.epoch;
+    this.advanceEpoch();
     this.authenticated = true;
     this.csrf = result.csrfToken;
   }
@@ -279,9 +325,9 @@ export class PrivacyClient {
     return this.call("privacy/export");
   }
   async logout(): Promise<void> {
-    ++this.epoch;
+    this.advanceEpoch();
     await this.call("session", "DELETE");
-    ++this.epoch;
+    this.advanceEpoch();
     this.authenticated = false;
     this.csrf = "";
     this.states = [];

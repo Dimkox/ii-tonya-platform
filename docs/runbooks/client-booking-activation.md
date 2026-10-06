@@ -1,5 +1,40 @@
 # Client Booking Activation Gate
 
+## 2026-10-06 browser booking continuation (supersedes historical status below)
+
+The owner approved the browser journey and explicit session grant design. Local
+implementation now includes migration0040, atomic grant issuance, owner-only keyset
+pages, a finite cookie/CSRF browser bridge and account booking controls. This does
+not imply production activation. The historical section below describes the earlier
+booking slice and must not be used as today's command sequence or database version.
+
+- Defaults remain off: `CLIENT_SESSION_BOOKING_GRANTS_ENABLED`,
+  `CLIENT_BOOKING_ENABLED`, `CLIENT_BOOKING_RESERVE_ENABLED`.
+- Existing read sessions are not promoted. After deployment, a fresh verified login
+  is required to receive a server-enabled grant. Grant issuance requires session and
+  booking capabilities but does not require reserve creation to be enabled.
+- Apply additive0040 before starting dependent code; retain0039/0040 state manifests
+  and SQL-object supplements. Never generate/rewrite migration history.
+- Verify actual production identity, exact SHA, reviewed flags, signed artifacts and
+  rollback binaries. The release must retain owner GET/cancel and expiry processing.
+- Require approved real experts/services/slots and real-user login evidence before
+  enabling reservation creation. Synthetic test proofs and worker materialization
+  fixtures are not live Telegram or provider evidence.
+- Current focused PostgreSQL evidence uses isolated Compose PostgreSQL17.5, not the
+  historical16.0.15 gate below. External exact-SHA Trust CI/Database Gate acceptance
+  remains separate; local tests never replace an unavailable external receipt.
+- No written-consent or signing prerequisite is added to this structured flow.
+  Free-text intake, payments, external processing and notification activation remain
+  outside this increment.
+
+Recovery order: disable reserve creation and new grant issuance first. Keep booking
+reads/cancellation, existing parent-session resolution and expiry processing running.
+Do not drop grants/receipts or roll back to a binary that strands active owners.
+If a write response is lost, reconcile all active owner pages before an explicit new
+action. Never automatically replay a reserve/cancel after session recovery.
+
+## Historical gate
+
 Status: **BLOCKED**. This note is evidence metadata, not activation or deployment approval.
 
 ## Current safe posture

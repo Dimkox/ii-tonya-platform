@@ -146,7 +146,12 @@ describe("finite browser booking bridge", () => {
     try {
       const response = await app.inject({
         url: "/v1/browser/bookings",
-        headers: { ...headers, ...extra },
+        headers: Object.fromEntries(
+          Object.entries({ ...headers, ...extra }).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? [...value] : value,
+          ]),
+        ),
       });
       expect(response.statusCode).toBe(code);
       expect(calls).toEqual([]);
