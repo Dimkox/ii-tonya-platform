@@ -747,6 +747,88 @@ export class PostgresBookingRepository {
     });
   }
 
+  async listOwnedActive(command: {
+    userId: string;
+    after?: `bk1.${string}`;
+  }): Promise<
+    | { kind: "not_found" }
+    | {
+        kind: "found";
+        bookings: {
+          bookingHandle: `bk1.${string}`;
+          state: "reserved" | "booked";
+          startsAt: Date;
+          reservedUntil: Date;
+        }[];
+      }
+  > {
+    if (
+      !UUID_PATTERN.test(command.userId) ||
+      (command.after !== undefined &&
+        !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.after))
+    ) {
+      return { kind: "not_found" };
+    }
+    // Resolve the anchor and the page in one snapshot. Keep microsecond cursor
+    // comparisons in PostgreSQL; cancelled receipts remain valid anchors.
+    const rows = (
+      await this.db.execute<{
+        anchorFound: boolean;
+        bookingHandle: `bk1.${string}` | null;
+        state: "reserved" | "booked";
+        startsAt: Date | string;
+        reservedUntil: Date | string;
+      }>(sql`
+      with anchor as (
+        select b.created_at,b.booking_handle
+        from client_booking_receipts b
+        join users u on u.id=b.user_id and u.active
+        where b.user_id=${command.userId}::uuid and b.booking_handle=${command.after ?? null}
+      ), authority as (
+        select (${command.after === undefined} or exists(select 1 from anchor)) as valid
+      )
+      select authority.valid as "anchorFound", page.booking_handle as "bookingHandle",
+        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil"
+      from authority
+      left join lateral (
+        select b.booking_handle,b.created_at,r.status,s.starts_at,r.reserved_until
+        from client_booking_receipts b
+        join reservations r on r.id=b.reservation_id and r.user_id=b.user_id
+        join slots s on s.id=r.slot_id
+        join users u on u.id=b.user_id and u.active
+        where authority.valid and b.user_id=${command.userId}::uuid
+          and r.status in ('reserved','booked')
+          and (${command.after === undefined} or (b.created_at,b.booking_handle) > (select created_at,booking_handle from anchor))
+        order by b.created_at,b.booking_handle
+        limit 21
+      ) page on true
+      order by page.created_at,page.booking_handle
+    `)
+    ).rows;
+    if (rows[0]?.anchorFound !== true) return { kind: "not_found" };
+    return {
+      kind: "found",
+      bookings: rows.flatMap((row) =>
+        row.bookingHandle === null
+          ? []
+          : [
+              {
+                bookingHandle: row.bookingHandle,
+                state: row.state,
+                startsAt: normalizeBookingTimestamp(
+                  row.startsAt,
+                  "slots.starts_at",
+                ),
+                reservedUntil: normalizeBookingTimestamp(
+                  row.reservedUntil,
+                  "reservations.reserved_until",
+                ),
+              },
+            ],
+      ),
+    };
+  }
+
   async reserveProtectedChoice(
     command: ReserveProtectedChoiceCommand,
   ): Promise<ProtectedClientBookingReserveResult> {

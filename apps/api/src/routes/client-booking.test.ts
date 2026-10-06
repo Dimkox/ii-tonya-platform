@@ -31,7 +31,11 @@ const appFor = async (input?: { reserveEnabled?: boolean }) => {
         },
       }),
     },
-    bookings: { reserve, cancel },
+    bookings: {
+      reserve,
+      cancel,
+      list: async () => ({ bookings: [], nextCursor: null }),
+    },
     reserveEnabled: input?.reserveEnabled ?? true,
   });
   return { app, reserve, cancel };

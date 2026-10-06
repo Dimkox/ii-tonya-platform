@@ -49,7 +49,11 @@ async function fixture(
     request: vi.fn(),
     choices: vi.fn(),
   } as unknown as NonNullable<typeof deps.clientCatalogService>;
-  deps.clientBookingService = { reserve: vi.fn(), cancel: vi.fn() };
+  deps.clientBookingService = {
+    reserve: vi.fn(),
+    cancel: vi.fn(),
+    list: vi.fn(),
+  };
   const handleInbound = vi.fn<typeof deps.conversationService.handleInbound>(
     async () => {
       if (options.serviceFailure)

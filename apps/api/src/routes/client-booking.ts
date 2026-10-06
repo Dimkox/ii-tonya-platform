@@ -79,6 +79,47 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
     return reply.code(500).send({ error: "internal_error" });
   });
 
+  app.get("/v1/client/bookings", async (request, reply) => {
+    noStore(reply);
+    const path =
+      /^\/v1\/client\/bookings(?:\?after=(bk1\.[A-Za-z0-9_-]{43}))?$/u.exec(
+        request.raw.url ?? "",
+      );
+    const framed = [
+      "content-type",
+      "content-encoding",
+      "transfer-encoding",
+    ].some((name) => {
+      const header = rawHeader(request.raw.rawHeaders, name);
+      return !header.valid || header.value !== undefined;
+    });
+    const length = rawHeader(request.raw.rawHeaders, "content-length");
+    if (
+      path === null ||
+      framed ||
+      !length.valid ||
+      (length.value !== undefined && length.value !== "0")
+    ) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    const resolution = await authorize(request.raw.rawHeaders, deps.principals);
+    if (resolution.kind === "denied")
+      return reply.code(401).send({ error: "unauthorized" });
+    if (resolution.kind === "unavailable")
+      return reply.code(503).send({ error: "temporarily_unavailable" });
+    try {
+      return reply.send(
+        await deps.bookings.list(resolution.principal, path[1]),
+      );
+    } catch (error) {
+      if (error instanceof ClientBookingNotFoundError)
+        return reply.code(404).send({ error: "not_found" });
+      if (error instanceof ClientBookingInvalidRequestError)
+        return reply.code(400).send({ error: "invalid_request" });
+      return reply.code(500).send({ error: "internal_error" });
+    }
+  });
+
   app.post<{ Body: Buffer }>(
     "/v1/client/bookings",
     { bodyLimit: 1_024 },
