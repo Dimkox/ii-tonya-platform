@@ -76,6 +76,9 @@ const schema = z
       .default("false"),
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_SESSION_BOOKING_GRANTS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -285,6 +288,17 @@ const schema = z
         message: "client_booking_configuration_incomplete",
       });
     }
+    if (
+      value.CLIENT_SESSION_BOOKING_GRANTS_ENABLED === "true" &&
+      (value.CLIENT_SESSION_ENABLED !== "true" ||
+        value.CLIENT_BOOKING_ENABLED !== "true")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_SESSION_BOOKING_GRANTS_ENABLED"],
+        message: "client_booking_grants_require_session_and_booking",
+      });
+    }
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||
@@ -376,6 +390,7 @@ export type RuntimeConfig = {
   features: {
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
+    clientSessionBookingGrants?: boolean;
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
@@ -604,6 +619,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     features: {
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
+      clientSessionBookingGrants:
+        value.CLIENT_SESSION_BOOKING_GRANTS_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",

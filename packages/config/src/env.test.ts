@@ -27,6 +27,7 @@ describe("loadEnv", () => {
       workerOutboxDelivery: false,
       clientCatalog: false,
       clientSession: false,
+      clientSessionBookingGrants: false,
       clientBooking: false,
       clientBookingReserve: false,
       clientFreeAccessV2: false,

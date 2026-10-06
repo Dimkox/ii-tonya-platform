@@ -281,6 +281,8 @@ export const createDefaultLifecycle = (
                 }),
             ),
             sessions: clientSessionRepository,
+            bookingGrantsEnabled:
+              config.features.clientSessionBookingGrants === true,
             generateToken: createClientSessionToken,
             digestToken: clientSessionTokenHash,
           });

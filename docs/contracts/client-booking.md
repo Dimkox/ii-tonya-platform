@@ -24,7 +24,9 @@ export interface ClientBookingPrincipalResolver {
 The resolver follows the exact raw-header and `^Bearer (cs1\.[A-Za-z0-9_-]{43})$` grammar frozen in
 `client-booking-principal-prerequisite.md`, performs a fresh PostgreSQL lookup, and constructs the
 minimal principal only after proving `client_booking:write`.
-`client_catalog:read` does not satisfy this interface. Scope, token hash, expiry, revocation, and
+`client_catalog:read` alone does not satisfy this interface. The 2026-10-06 amendment
+in `client-booking-principal-prerequisite.md` permits a separately persisted,
+server-issued booking grant bound to that session. Scope, token hash, expiry, revocation, and
 session ID stay inside resolution. No body, query, path, alternate header, Selarti identity, or
 cached claim supplies ownership.
 
@@ -33,7 +35,7 @@ cached claim supplies ownership.
 `POST /v1/client/bookings`, exact JSON body, maximum 1 KiB:
 
 ```json
-{"choiceHandle":"ch1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+{ "choiceHandle": "ch1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }
 ```
 
 The handle is exactly `^ch1\.[A-Za-z0-9_-]{43}$`. No other key is accepted. The server hashes it
@@ -75,7 +77,10 @@ literal `client_cancel`, and executes the existing transition. First cancellatio
 return:
 
 ```json
-{"bookingHandle":"bk1.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","state":"cancelled"}
+{
+  "bookingHandle": "bk1.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+  "state": "cancelled"
+}
 ```
 
 Internal `cancelled_by_client` and `cancelled_by_expert` both project to `cancelled`. Other public
@@ -85,15 +90,15 @@ contact, correlation ID, outbox ID, or audit ID.
 
 ## Errors and feature gates
 
-| Condition | Response |
-| --- | --- |
-| malformed body/path/media/framing | `400 {"error":"invalid_request"}` |
-| denied authority | `401 {"error":"unauthorized"}` |
-| syntactically valid absent, erased, or foreign choice; foreign or missing booking handle | `404 {"error":"not_found"}` |
-| owned expired/stale/ineligible/full choice or non-cancellable non-cancelled owner state | `409 {"error":"conflict"}` |
-| reserve kill switch false while booking route capability remains enabled | `503 {"error":"feature_disabled"}` |
-| resolver or PostgreSQL unavailable | `503 {"error":"temporarily_unavailable"}` |
-| unexpected internal failure | `500 {"error":"internal_error"}` |
+| Condition                                                                                | Response                                  |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------- |
+| malformed body/path/media/framing                                                        | `400 {"error":"invalid_request"}`         |
+| denied authority                                                                         | `401 {"error":"unauthorized"}`            |
+| syntactically valid absent, erased, or foreign choice; foreign or missing booking handle | `404 {"error":"not_found"}`               |
+| owned expired/stale/ineligible/full choice or non-cancellable non-cancelled owner state  | `409 {"error":"conflict"}`                |
+| reserve kill switch false while booking route capability remains enabled                 | `503 {"error":"feature_disabled"}`        |
+| resolver or PostgreSQL unavailable                                                       | `503 {"error":"temporarily_unavailable"}` |
+| unexpected internal failure                                                              | `500 {"error":"internal_error"}`          |
 
 `CLIENT_BOOKING_ENABLED=false` removes both routes. With it true,
 `CLIENT_BOOKING_RESERVE_ENABLED=false` disables POST only and leaves authenticated owner DELETE

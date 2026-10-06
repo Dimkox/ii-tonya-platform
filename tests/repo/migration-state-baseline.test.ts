@@ -64,29 +64,33 @@ describe("database-derived migration state baseline", () => {
     ).toEqual(["btree_gist", "pgcrypto"]);
   });
 
-  it("binds state evidence to every SQL input and the exact snapshot bytes", () => {
-    const manifest = read(`${folder}/state/0039_manifest.json`);
-    expect(manifest, "missing migration-state provenance").not.toBeNull();
-    const journal = read(`${folder}/meta/_journal.json`);
-    expect(manifest.migrations).toHaveLength(40);
-    const digest = (path: string) =>
-      createHash("sha256").update(readFileSync(path)).digest("hex");
-    for (const entry of journal.entries.filter(
-      (entry: { idx: number }) => entry.idx <= 39,
-    )) {
-      expect(manifest.migrations[entry.idx]).toEqual({
-        idx: entry.idx,
-        tag: entry.tag,
-        sha256: digest(`${folder}/${entry.tag}.sql`),
-      });
-    }
-    expect(manifest.snapshotSha256).toBe(
-      digest(`${folder}/meta/0039_snapshot.json`),
-    );
-    expect(manifest.sqlObjectsSha256).toBe(
-      digest(`${folder}/state/0039_sql_objects.json`),
-    );
-    expect(manifest.databaseVersion).toBe("170005");
-    expect(manifest.generatePermitted).toBe(false);
-  });
+  it.each([39, 40])(
+    "binds state %i evidence to every SQL input and exact snapshot bytes",
+    (last) => {
+      const tag = String(last).padStart(4, "0");
+      const manifest = read(`${folder}/state/${tag}_manifest.json`);
+      expect(manifest, "missing migration-state provenance").not.toBeNull();
+      const journal = read(`${folder}/meta/_journal.json`);
+      expect(manifest.migrations).toHaveLength(last + 1);
+      const digest = (path: string) =>
+        createHash("sha256").update(readFileSync(path)).digest("hex");
+      for (const entry of journal.entries.filter(
+        (entry: { idx: number }) => entry.idx <= last,
+      )) {
+        expect(manifest.migrations[entry.idx]).toEqual({
+          idx: entry.idx,
+          tag: entry.tag,
+          sha256: digest(`${folder}/${entry.tag}.sql`),
+        });
+      }
+      expect(manifest.snapshotSha256).toBe(
+        digest(`${folder}/meta/${tag}_snapshot.json`),
+      );
+      expect(manifest.sqlObjectsSha256).toBe(
+        digest(`${folder}/state/${tag}_sql_objects.json`),
+      );
+      expect(manifest.databaseVersion).toBe("170005");
+      expect(manifest.generatePermitted).toBe(false);
+    },
+  );
 });

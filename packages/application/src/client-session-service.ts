@@ -23,6 +23,7 @@ export interface ClientSessionRepository {
     readonly tokenDigest: `sha256:${string}`;
     readonly scope: "client_catalog:read";
     readonly maximumTtlMs: 3_600_000;
+    readonly bookingGrant?: true;
   }): Promise<
     | { readonly kind: "issued"; readonly expiresAt: Date }
     | { readonly kind: "denied" }
@@ -48,6 +49,7 @@ export interface ClientSessionService {
 }
 
 interface ClientSessionServiceDependencies {
+  readonly bookingGrantsEnabled?: boolean;
   readonly verifier: IdentityProofVerifier;
   readonly sessions: ClientSessionRepository;
   readonly generateToken: () => `cs1.${string}`;
@@ -72,7 +74,10 @@ const validVerifiedProof = (
     return false;
   }
   const keys = Object.keys(value);
-  if (keys.length !== verifiedKeys.size || keys.some((key) => !verifiedKeys.has(key))) {
+  if (
+    keys.length !== verifiedKeys.size ||
+    keys.some((key) => !verifiedKeys.has(key))
+  ) {
     return false;
   }
   const proof = value as Partial<VerifiedClientIdentityProof>;
@@ -128,6 +133,9 @@ export const createClientSessionService = (
           tokenDigest,
           scope: "client_catalog:read",
           maximumTtlMs: 3_600_000,
+          ...(dependencies.bookingGrantsEnabled === true
+            ? { bookingGrant: true as const }
+            : {}),
         });
         if (result.kind !== "issued") return { kind: "unauthorized" };
         return {

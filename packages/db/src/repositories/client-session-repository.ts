@@ -9,6 +9,7 @@ interface ClientSessionIssueInput {
   readonly tokenDigest: `sha256:${string}`;
   readonly scope: "client_catalog:read";
   readonly maximumTtlMs: 3_600_000;
+  readonly bookingGrant?: true;
 }
 
 type ClientSessionIssueOutcome =
@@ -115,7 +116,8 @@ export class PostgresClientSessionRepository {
       !replayDigestPattern.test(input.replayDigest) ||
       !validInstant(input.proofExpiresAt) ||
       input.scope !== "client_catalog:read" ||
-      input.maximumTtlMs !== 3_600_000
+      input.maximumTtlMs !== 3_600_000 ||
+      (input.bookingGrant !== undefined && input.bookingGrant !== true)
     ) {
       return { kind: "denied" };
     }
@@ -169,6 +171,10 @@ export class PostgresClientSessionRepository {
             ${input.proofExpiresAt},${databaseNow}
           )
         `);
+        if (input.bookingGrant === true) {
+          await tx.execute(sql`insert into client_session_booking_grants(session_token_digest)
+            values (${input.tokenDigest})`);
+        }
         const expiresAt =
           session.expiresAt instanceof Date
             ? session.expiresAt
@@ -224,7 +230,11 @@ export class PostgresClientSessionRepository {
         from client_sessions s
         join users u on u.id=s.user_id
         where s.token_digest=${tokenDigest}
-          and s.scope='client_booking:write'
+          and (s.scope='client_booking:write' or
+            (s.scope='client_catalog:read' and exists (
+              select 1 from client_session_booking_grants g
+              where g.session_token_digest=s.token_digest
+            )))
           and s.revoked_at is null
           and s.expires_at > clock_timestamp()
           and u.active=true
