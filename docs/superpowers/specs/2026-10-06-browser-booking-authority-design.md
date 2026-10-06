@@ -1,6 +1,6 @@
 # Browser booking authority and account journey
 
-Status: proposed; owner approved the two-layer scope, written design pending review.
+Status: owner-approved design (2026-10-06, "Go"); implementation plan pending review.
 Date: 2026-10-06.
 Inspected base: `f4f05e38ad337b9b8dbfd2ce84d7fa7bb6f11956`.
 

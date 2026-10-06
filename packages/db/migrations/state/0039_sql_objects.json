@@ -1,0 +1,446 @@
+{
+  "functions": [
+    {
+      "name": "audit_test_expert_lifecycle_transition",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.audit_test_expert_lifecycle_transition()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin insert into test_expert_lifecycle_audit_events(entity_type,entity_id,from_status,to_status)\nvalues(case when tg_table_name='test_expert_prompt_assets' then 'prompt' else 'campaign' end,new.id,old.status,new.status); return new; end $function$\n"
+    },
+    {
+      "name": "client_booking_guard_privacy_completion",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.client_booking_guard_privacy_completion()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF NEW.status IN ('processor_complete','backup_verified')\n     AND EXISTS (\n       SELECT 1 FROM client_booking_erasure_work w\n       WHERE w.deletion_job_id=NEW.id AND w.phase <> 'complete'\n     ) THEN\n    RAISE EXCEPTION 'client_booking_erasure_incomplete' USING ERRCODE='23514';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "client_commercial_policy_assignment_immutable",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.client_commercial_policy_assignment_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN RAISE EXCEPTION 'client_commercial_policy_assignments_append_only' USING ERRCODE='23514'; END; $function$\n"
+    },
+    {
+      "name": "enforce_admin_ledger_provenance",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_admin_ledger_provenance()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  package_row \"message_packages\"%ROWTYPE;\n  original_grant \"message_ledger_entries\"%ROWTYPE;\nBEGIN\n  IF NEW.legacy_admin_fact THEN\n    RAISE EXCEPTION 'legacy admin ledger marker is migration-only' USING ERRCODE = '23514';\n  END IF;\n  SELECT * INTO package_row\n  FROM \"message_packages\"\n  WHERE \"id\" = NEW.\"package_id\";\n  IF NOT FOUND THEN\n    RETURN NEW;\n  END IF;\n  IF package_row.\"kind\" = 'paid' THEN\n    IF NEW.\"admin_approval_id\" IS NOT NULL OR NEW.\"admin_requester_session_id_hash\" IS NOT NULL THEN\n      RAISE EXCEPTION 'paid ledger facts cannot carry admin approval provenance' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\n  END IF;\n  IF package_row.\"legacy_admin_grant\" THEN\n    IF NEW.\"entry_kind\" IN ('grant', 'revocation') THEN\n      RAISE EXCEPTION 'legacy admin entitlements cannot receive new admin grant or revocation facts' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\n  END IF;\n  IF NEW.\"entry_kind\" = 'grant' AND (\n    NEW.\"admin_approval_id\" IS DISTINCT FROM package_row.\"admin_approval_id\"\n    OR NEW.\"admin_requester_session_id_hash\" IS DISTINCT FROM package_row.\"admin_requester_session_id_hash\"\n  ) THEN\n    RAISE EXCEPTION 'admin grant provenance must match package provenance' USING ERRCODE = '23514';\n  END IF;\n  IF NEW.\"entry_kind\" = 'revocation' THEN\n    IF NEW.\"admin_approval_id\" IS NULL OR NEW.\"admin_requester_session_id_hash\" IS NULL THEN\n      RAISE EXCEPTION 'admin revocation provenance is required' USING ERRCODE = '23514';\n    END IF;\n    SELECT * INTO original_grant\n    FROM \"message_ledger_entries\"\n    WHERE \"id\" = NEW.\"original_entry_id\"\n      AND \"package_id\" = NEW.\"package_id\"\n      AND \"entry_kind\" = 'grant';\n    IF NOT FOUND\n      OR original_grant.\"admin_approval_id\" IS DISTINCT FROM package_row.\"admin_approval_id\"\n      OR original_grant.\"admin_requester_session_id_hash\" IS DISTINCT FROM package_row.\"admin_requester_session_id_hash\"\n    THEN\n      RAISE EXCEPTION 'admin revocation original grant provenance is invalid' USING ERRCODE = '23514';\n    END IF;\n    IF NOT EXISTS (\n      SELECT 1\n      FROM \"admin_approvals\" a\n      WHERE a.\"id\" = NEW.\"admin_approval_id\"\n        AND a.\"requester_session_id_hash\" = NEW.\"admin_requester_session_id_hash\"\n        AND a.\"action\" = 'package.revoke'\n        AND a.\"object_type\" = 'user'\n        AND a.\"object_id\" = package_row.\"user_id\"\n        AND a.\"required_role\" = 'entitlement_admin'\n        AND a.\"payload_hash\" = 'sha256:' || encode(digest(convert_to(\n          '{\"idempotencyKey\":' || to_json(NEW.\"idempotency_key\")::text ||\n          ',\"packageId\":' || to_json(NEW.\"package_id\"::text)::text ||\n          ',\"userId\":' || to_json(package_row.\"user_id\"::text)::text || '}',\n          'UTF8'\n        ), 'sha256'), 'hex')\n        AND a.\"consumed_at\" IS NOT NULL\n    ) THEN\n      RAISE EXCEPTION 'admin revocation approval provenance is invalid' USING ERRCODE = '23514';\n    END IF;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "enforce_admin_package_provenance",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_admin_package_provenance()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  expected_action text;\n  expected_payload_hash text;\nBEGIN\n  IF NEW.legacy_admin_grant THEN\n    RAISE EXCEPTION 'legacy admin package marker is migration-only' USING ERRCODE = '23514';\n  END IF;\n  IF NEW.kind = 'paid' THEN\n    RETURN NEW;\n  END IF;\n  expected_action := CASE WHEN NEW.kind = 'admin' THEN 'package.grant' ELSE 'package.intro_grant' END;\n  expected_payload_hash := 'sha256:' || encode(digest(convert_to(\n    '{\"idempotencyKey\":' || to_json(NEW.grant_idempotency_key)::text ||\n    ',\"units\":' || NEW.granted_messages::text ||\n    ',\"userId\":' || to_json(NEW.user_id::text)::text || '}',\n    'UTF8'\n  ), 'sha256'), 'hex');\n  IF NOT EXISTS (\n    SELECT 1\n    FROM \"admin_approvals\" a\n    WHERE a.\"id\" = NEW.\"admin_approval_id\"\n      AND a.\"requester_session_id_hash\" = NEW.\"admin_requester_session_id_hash\"\n      AND a.\"action\" = expected_action\n      AND a.\"object_type\" = 'user'\n      AND a.\"object_id\" = NEW.\"user_id\"\n      AND a.\"required_role\" = 'entitlement_admin'\n      AND a.\"payload_hash\" = expected_payload_hash\n      AND a.\"consumed_at\" IS NOT NULL\n  ) THEN\n    RAISE EXCEPTION 'admin package approval provenance is invalid' USING ERRCODE = '23514';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "enforce_expert_referral_admin_approval_global_unique",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_expert_referral_admin_approval_global_unique()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE lock_key bigint;\nBEGIN\n  FOR lock_key IN SELECT DISTINCT hashtextextended(value::text, 928451) AS advisory_key FROM unnest(array[NEW.approval_id,NEW.second_approval_id]) AS approvals(value) WHERE value is not null ORDER BY advisory_key LOOP\n    PERFORM pg_advisory_xact_lock(lock_key);\n  END LOOP;\n  IF EXISTS (SELECT 1 FROM expert_referral_admin_execution_results existing WHERE existing.approval_id in (NEW.approval_id,NEW.second_approval_id) OR existing.second_approval_id in (NEW.approval_id,NEW.second_approval_id)) THEN\n    RAISE EXCEPTION USING ERRCODE='23505', MESSAGE='expert_referral_admin_approval_global_unique';\n  END IF;\n  RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "enforce_human_escalation_transition",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_human_escalation_transition()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  transition_now timestamptz := clock_timestamp();\nBEGIN\n  IF TG_OP = 'DELETE' THEN\n    RAISE EXCEPTION 'human escalation deletion is forbidden' USING ERRCODE = '55000';\n  END IF;\n\n  IF NEW.id IS DISTINCT FROM OLD.id\n    OR NEW.incident_id IS DISTINCT FROM OLD.incident_id\n    OR NEW.opened_at IS DISTINCT FROM OLD.opened_at\n    OR NEW.acknowledgement_deadline IS DISTINCT FROM OLD.acknowledgement_deadline\n    OR NEW.escalation_reason IS DISTINCT FROM OLD.escalation_reason\n    OR NEW.created_at IS DISTINCT FROM OLD.created_at\n  THEN\n    RAISE EXCEPTION 'human escalation immutable fields cannot change' USING ERRCODE = '55000';\n  END IF;\n\n  IF NEW.version <> OLD.version + 1 THEN\n    RAISE EXCEPTION 'human escalation version must increment by one' USING ERRCODE = '40001';\n  END IF;\n  IF NEW.updated_at < OLD.updated_at THEN\n    RAISE EXCEPTION 'human escalation updated_at cannot move backward' USING ERRCODE = '22007';\n  END IF;\n  IF NEW.updated_at > transition_now\n    OR NEW.acknowledged_at > transition_now\n    OR NEW.resolved_at > transition_now\n  THEN\n    RAISE EXCEPTION 'human escalation transition timestamp is in the future' USING ERRCODE = '22007';\n  END IF;\n\n  IF OLD.status = 'opened' AND NEW.status = 'assigned' THEN\n    IF NEW.owner_id IS NULL\n      OR (OLD.owner_id IS NOT NULL AND NEW.owner_id IS DISTINCT FROM OLD.owner_id)\n      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at\n      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at\n    THEN\n      RAISE EXCEPTION 'invalid opened to assigned human escalation transition' USING ERRCODE = '23514';\n    END IF;\n  ELSIF OLD.status = 'assigned' AND NEW.status = 'acknowledged' THEN\n    IF NEW.owner_id IS NULL\n      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id\n      OR OLD.acknowledged_at IS NOT NULL\n      OR NEW.acknowledged_at IS NULL\n      OR NEW.acknowledged_at < OLD.updated_at\n      OR NEW.updated_at < NEW.acknowledged_at\n      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at\n    THEN\n      RAISE EXCEPTION 'invalid assigned to acknowledged human escalation transition' USING ERRCODE = '23514';\n    END IF;\n  ELSIF OLD.status = 'assigned' AND NEW.status = 'escalated' THEN\n    IF NEW.owner_id IS NULL\n      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id\n      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at\n      OR NEW.resolved_at IS DISTINCT FROM OLD.resolved_at\n      OR transition_now < OLD.acknowledgement_deadline\n      OR NEW.updated_at < OLD.acknowledgement_deadline\n    THEN\n      RAISE EXCEPTION 'invalid assigned to escalated human escalation transition' USING ERRCODE = '23514';\n    END IF;\n  ELSIF OLD.status IN ('acknowledged', 'escalated') AND NEW.status = 'resolved' THEN\n    IF NEW.owner_id IS NULL\n      OR NEW.owner_id IS DISTINCT FROM OLD.owner_id\n      OR NEW.acknowledged_at IS DISTINCT FROM OLD.acknowledged_at\n      OR OLD.resolved_at IS NOT NULL\n      OR NEW.resolved_at IS NULL\n      OR NEW.resolved_at < COALESCE(OLD.acknowledged_at, OLD.updated_at)\n      OR NEW.updated_at < NEW.resolved_at\n    THEN\n      RAISE EXCEPTION 'invalid resolved human escalation transition' USING ERRCODE = '23514';\n    END IF;\n  ELSE\n    RAISE EXCEPTION 'human escalation status transition is not allowed' USING ERRCODE = '23514';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "expert_first_settlement_guard_change",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_first_settlement_guard_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP = 'DELETE' THEN\n    RAISE EXCEPTION USING ERRCODE='55000', CONSTRAINT='expert_first_settlement_transition', MESSAGE='expert_first_settlement_guard';\n  END IF;\n  IF NOT (\n      (OLD.eligibility = 'pending_feature_hold' AND NEW.eligibility IN ('eligible','permanently_ineligible','cancelled_by_refund'))\n      OR (OLD.eligibility = 'eligible' AND NEW.eligibility = 'cancelled_by_refund')\n    )\n    OR ROW(NEW.id,NEW.expert_id,NEW.settlement_sequence,NEW.qualifying_order_id,NEW.qualifying_payment_attempt_id,NEW.referral_id,NEW.settlement_expert_active,NEW.settlement_expert_verified,NEW.settlement_abuse_cleared,NEW.settlement_control_version,NEW.settlement_invitee_user_id,NEW.settlement_invitee_channel_identity_id,NEW.settlement_inviter_expert_id,NEW.settlement_inviter_user_id,NEW.settlement_inviter_channel_identity_id,NEW.settled_at,NEW.created_at)\n       IS DISTINCT FROM\n       ROW(OLD.id,OLD.expert_id,OLD.settlement_sequence,OLD.qualifying_order_id,OLD.qualifying_payment_attempt_id,OLD.referral_id,OLD.settlement_expert_active,OLD.settlement_expert_verified,OLD.settlement_abuse_cleared,OLD.settlement_control_version,OLD.settlement_invitee_user_id,OLD.settlement_invitee_channel_identity_id,OLD.settlement_inviter_expert_id,OLD.settlement_inviter_user_id,OLD.settlement_inviter_channel_identity_id,OLD.settled_at,OLD.created_at)\n  THEN\n    RAISE EXCEPTION USING ERRCODE='55000', CONSTRAINT='expert_first_settlement_transition', MESSAGE='expert_first_settlement_guard';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "expert_jsonb_has_exact_keys",
+      "arguments": "value jsonb, expected text[]",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_jsonb_has_exact_keys(value jsonb, expected text[])\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE STRICT\nAS $function$\n  SELECT jsonb_typeof(value)='object'\n    AND (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(value) AS keys(k))\n      = (SELECT array_agg(k ORDER BY k) FROM unnest(expected) AS keys(k));\n$function$\n"
+    },
+    {
+      "name": "expert_provider_reversal_result_guard",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_provider_reversal_result_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP='INSERT' AND NEW.result_legacy_exempt THEN\n    RAISE EXCEPTION USING ERRCODE='23514', CONSTRAINT='expert_provider_reversal_legacy_exempt_forbidden', MESSAGE='expert_provider_reversal_legacy_exempt_forbidden';\n  END IF;\n  IF TG_OP='UPDATE' AND NEW.result_legacy_exempt AND NOT OLD.result_legacy_exempt THEN\n    RAISE EXCEPTION USING ERRCODE='23514', CONSTRAINT='expert_provider_reversal_legacy_exempt_forbidden', MESSAGE='expert_provider_reversal_legacy_exempt_forbidden';\n  END IF;\n  IF TG_OP='INSERT' THEN\n    RETURN NEW;\n  END IF;\n  IF OLD.status='processed' AND OLD.event_kind IN ('refunded','charged_back')\n     AND (NEW.result_payload IS DISTINCT FROM OLD.result_payload OR NEW.result_schema_version IS DISTINCT FROM OLD.result_schema_version OR NEW.result_legacy_exempt IS DISTINCT FROM OLD.result_legacy_exempt)\n  THEN\n    RAISE EXCEPTION USING ERRCODE='55000', CONSTRAINT='expert_provider_reversal_result_immutable', MESSAGE='expert_provider_reversal_result_immutable';\n  END IF;\n  IF NEW.status='processed' AND NEW.event_kind IN ('refunded','charged_back')\n     AND OLD.status IS DISTINCT FROM 'processed' AND (NEW.result_schema_version IS DISTINCT FROM 1 OR NEW.result_legacy_exempt)\n  THEN\n    RAISE EXCEPTION USING ERRCODE='23514', CONSTRAINT='expert_provider_reversal_result_required', MESSAGE='expert_provider_reversal_result_required';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "expert_referral_maturities_append_only_terminal",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_referral_maturities_append_only_terminal()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF OLD.status IN ('granted', 'cancelled') THEN RAISE EXCEPTION 'expert_referral_maturities_terminal_immutable' USING ERRCODE = '23514'; END IF;\n  IF NEW.status IN ('granted', 'cancelled') AND (NEW.settled_at <> OLD.settled_at OR NEW.matures_at <> OLD.matures_at OR NEW.first_settlement_id <> OLD.first_settlement_id OR NEW.referral_id <> OLD.referral_id OR NEW.qualifying_order_id <> OLD.qualifying_order_id OR NEW.qualifying_payment_attempt_id <> OLD.qualifying_payment_attempt_id OR NEW.inviter_expert_id <> OLD.inviter_expert_id) THEN\n    RAISE EXCEPTION 'expert_referral_maturities_financial_facts_immutable' USING ERRCODE = '23514';\n  END IF;\n  RETURN NEW;\nEND; $function$\n"
+    },
+    {
+      "name": "expert_referral_maturities_no_delete",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_referral_maturities_no_delete()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN RAISE EXCEPTION 'expert_referral_maturities_append_only' USING ERRCODE = '23514'; END; $function$\n"
+    },
+    {
+      "name": "expert_referral_validate_ledger_allocation_total",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_referral_validate_ledger_allocation_total()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  target_entry_id uuid;\n  expected_total bigint;\n  allocated_total bigint;\nBEGIN\n  IF TG_TABLE_NAME = 'expert_referral_ledger_entries' THEN\n    target_entry_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END;\n  ELSE\n    target_entry_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.ledger_entry_id ELSE NEW.ledger_entry_id END;\n  END IF;\n\n  SELECT amount_minor\n    INTO expected_total\n    FROM expert_referral_ledger_entries\n    WHERE id = target_entry_id;\n\n  IF NOT FOUND THEN\n    RETURN NULL;\n  END IF;\n\n  SELECT coalesce(sum(amount_minor), 0)::bigint\n    INTO allocated_total\n    FROM expert_referral_ledger_allocations\n    WHERE ledger_entry_id = target_entry_id;\n\n  IF allocated_total <> expected_total THEN\n    RAISE EXCEPTION USING\n      ERRCODE = '23514',\n      CONSTRAINT = 'expert_ledger_allocations_exact_total',\n      MESSAGE = 'expert_ledger_allocations_exact_total';\n  END IF;\n\n  RETURN NULL;\nEND;\n$function$\n"
+    },
+    {
+      "name": "expert_residency_default_provider_deadline",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_residency_default_provider_deadline()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF NEW.provider_deadline IS NULL THEN\n    NEW.provider_deadline := NEW.payment_deadline;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "expert_reward_grant_require_eligible_settlement",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_reward_grant_require_eligible_settlement()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  marker_eligibility expert_first_settlement_eligibility;\nBEGIN\n  SELECT eligibility\n    INTO marker_eligibility\n    FROM expert_first_residency_settlements\n    WHERE id = NEW.first_settlement_id\n      AND referral_id = NEW.referral_id\n      AND qualifying_order_id = NEW.qualifying_order_id\n      AND qualifying_payment_attempt_id = NEW.qualifying_payment_attempt_id\n    FOR UPDATE;\n\n  IF NOT FOUND OR marker_eligibility <> 'eligible' THEN\n    RAISE EXCEPTION USING\n      ERRCODE = '23514',\n      CONSTRAINT = 'expert_reward_grants_eligible_settlement',\n      MESSAGE = 'expert_reward_grants_eligible_settlement';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "name": "lock_and_reject_selarti_budget_policy_overlap",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.lock_and_reject_selarti_budget_policy_overlap()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  PERFORM pg_advisory_xact_lock(739184, 42036);\n  IF EXISTS (\n    SELECT 1 FROM selarti_budget_policies p\n    WHERE p.status='approved' AND tstzrange(p.effective_from, p.effective_to, '[)') &&\n      tstzrange(NEW.effective_from, NEW.effective_to, '[)')\n  ) THEN RAISE EXCEPTION 'selarti budget policy window overlaps approved policy'; END IF;\n  RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "lock_partner_policy_window",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.lock_partner_policy_window()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF NEW.status='approved' THEN\n    PERFORM pg_advisory_xact_lock(739184, 42037);\n    IF EXISTS (SELECT 1 FROM partner_tariff_policy_versions p WHERE p.status='approved' AND p.partner_kind=NEW.partner_kind AND p.id<>NEW.id AND tstzrange(p.effective_from,p.effective_to,'[)') && tstzrange(NEW.effective_from,NEW.effective_to,'[)')) THEN\n      RAISE EXCEPTION 'partner tariff policy window overlaps approved policy' USING ERRCODE='23514';\n    END IF;\n  END IF;\n  RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "reject_append_only_change",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.reject_append_only_change()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin\n  raise exception 'append-only facts cannot be changed' using errcode = '55000';\nend;\n$function$\n"
+    },
+    {
+      "name": "reject_expert_referral_admin_result_mutation",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.reject_expert_referral_admin_result_mutation()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='expert_referral_admin_result_immutable'; END $function$\n"
+    },
+    {
+      "name": "reject_partner_commerce_mutation",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.reject_partner_commerce_mutation()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN RAISE EXCEPTION 'partner commerce rows are immutable' USING ERRCODE='23514'; END $function$\n"
+    },
+    {
+      "name": "reject_selarti_budget_policy_mutation",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.reject_selarti_budget_policy_mutation()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN RAISE EXCEPTION 'selarti budget policies are immutable'; END $function$\n"
+    },
+    {
+      "name": "reject_test_expert_immutable_mutation",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.reject_test_expert_immutable_mutation()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ begin raise exception 'test expert immutable fact'; end $function$\n"
+    },
+    {
+      "name": "validate_and_consume_selarti_budget_approval",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_and_consume_selarti_budget_approval()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE approval admin_approvals%ROWTYPE; expected_hash text;\nBEGIN\n  PERFORM pg_advisory_xact_lock(739184, 42036);\n  expected_hash := 'sha256:' || encode(digest(convert_to(to_json(concat_ws('|','selarti-budget-policy-v1',NEW.version,NEW.status,to_char(NEW.effective_from at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'),coalesce(to_char(NEW.effective_to at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'),'-'),NEW.global_cap_rub_minor,NEW.global_warning_rub_minor,NEW.global_soft_rub_minor,NEW.per_user_warning_rub_minor,NEW.per_user_soft_rub_minor,NEW.per_user_hard_rub_minor,NEW.official_usd_rub_quote_micros,NEW.selarti_uplift_bps,NEW.usd_micros_per_request,NEW.usd_micros_per_unit,NEW.worst_case_billable_units,NEW.rate_version,NEW.model_version,NEW.stress_inflation_bps))::text,'UTF8'),'sha256'),'hex');\n  SELECT * INTO approval FROM admin_approvals WHERE id=NEW.approval_id FOR UPDATE;\n  IF approval.id IS NULL OR approval.action<>'selarti_budget.policy_approve' OR approval.object_type<>'selarti_budget_policy' OR approval.object_id<>NEW.id OR approval.required_role<>'security_admin' OR approval.requester_id=approval.approver_id OR approval.approver_id IS NULL OR approval.requester_session_id_hash IS NULL OR approval.requester_mfa_verified_at IS NULL OR approval.approver_session_id_hash IS NULL OR approval.approver_mfa_verified_at IS NULL OR approval.approved_at IS NULL OR approval.approved_at>NEW.created_at OR approval.consumed_at IS NOT NULL OR approval.expires_at<=NEW.created_at OR approval.payload_hash<>expected_hash OR approval.requester_mfa_verified_at < NEW.created_at - interval '15 minutes' OR approval.requester_mfa_verified_at > NEW.created_at OR approval.approver_mfa_verified_at < NEW.created_at - interval '15 minutes' OR approval.approver_mfa_verified_at > NEW.created_at OR NOT EXISTS (SELECT 1 FROM admin_sessions s JOIN admin_role_assignments r ON r.admin_id=s.admin_id AND r.role='security_admin' WHERE s.session_id_hash=approval.requester_session_id_hash AND s.admin_id=approval.requester_id AND s.mfa_verified_at=approval.requester_mfa_verified_at AND s.revoked_at IS NULL AND s.expires_at>NEW.created_at) OR NOT EXISTS (SELECT 1 FROM admin_sessions s JOIN admin_role_assignments r ON r.admin_id=s.admin_id AND r.role='security_admin' WHERE s.session_id_hash=approval.approver_session_id_hash AND s.admin_id=approval.approver_id AND s.mfa_verified_at=approval.approver_mfa_verified_at AND s.revoked_at IS NULL AND s.expires_at>NEW.created_at) THEN RAISE EXCEPTION 'selarti budget approval invalid'; END IF;\n  UPDATE admin_approvals SET consumed_at=NEW.created_at WHERE id=NEW.approval_id;\n  RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "validate_test_expert_campaign_prompt",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_test_expert_campaign_prompt()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin\n  if new.status='active' and not exists (\n    select 1 from test_expert_prompt_assets p where p.id=new.prompt_asset_id and p.version=new.prompt_asset_version\n      and p.status='approved' and p.official_contract_evidence is not null\n  ) then raise exception 'test expert campaign prompt is not approved'; end if;\n  return new;\nend $function$\n"
+    },
+    {
+      "name": "validate_test_expert_campaign_transition",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_test_expert_campaign_transition()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin\n  if tg_op='DELETE' then raise exception 'test expert immutable fact'; end if;\n  if (old.id,old.code,old.version,old.cap_units,old.provider_calls_per_message,old.prompt_asset_id,old.prompt_asset_version,old.effective_from,old.effective_to,old.created_at)\n     is distinct from (new.id,new.code,new.version,new.cap_units,new.provider_calls_per_message,new.prompt_asset_id,new.prompt_asset_version,new.effective_from,new.effective_to,new.created_at)\n     or not ((old.status='inactive' and new.status='active') or (old.status='active' and new.status='retired'))\n  then raise exception 'invalid test expert campaign transition'; end if;\n  return new;\nend $function$\n"
+    },
+    {
+      "name": "validate_test_expert_initial_status",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_test_expert_initial_status()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin if new.status<>'inactive' then raise exception 'test expert lifecycle must start inactive'; end if; return new; end $function$\n"
+    },
+    {
+      "name": "validate_test_expert_prompt_transition",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_test_expert_prompt_transition()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nbegin\n  if tg_op='DELETE' then raise exception 'test expert immutable fact'; end if;\n  if (old.id,old.asset_key,old.version,old.sha256,old.source_path,old.official_contract_evidence,old.created_at)\n     is distinct from (new.id,new.asset_key,new.version,new.sha256,new.source_path,new.official_contract_evidence,new.created_at)\n     or not ((old.status='inactive' and new.status='approved') or (old.status='approved' and new.status='retired'))\n  then raise exception 'invalid test expert prompt transition'; end if;\n  return new;\nend $function$\n"
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "admin_case_actions",
+      "name": "admin_case_actions_append_only",
+      "definition": "CREATE TRIGGER admin_case_actions_append_only BEFORE DELETE OR UPDATE ON admin_case_actions FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "audit_events",
+      "name": "audit_events_append_only",
+      "definition": "CREATE TRIGGER audit_events_append_only BEFORE DELETE OR UPDATE ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "client_commercial_policy_assignments",
+      "name": "client_commercial_policy_assignments_no_delete",
+      "definition": "CREATE TRIGGER client_commercial_policy_assignments_no_delete BEFORE DELETE ON client_commercial_policy_assignments FOR EACH ROW EXECUTE FUNCTION client_commercial_policy_assignment_immutable()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "client_commercial_policy_assignments",
+      "name": "client_commercial_policy_assignments_no_update",
+      "definition": "CREATE TRIGGER client_commercial_policy_assignments_no_update BEFORE UPDATE ON client_commercial_policy_assignments FOR EACH ROW EXECUTE FUNCTION client_commercial_policy_assignment_immutable()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "consent_document_versions",
+      "name": "consent_document_versions_append_only",
+      "definition": "CREATE TRIGGER consent_document_versions_append_only BEFORE DELETE OR UPDATE ON consent_document_versions FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "consents",
+      "name": "consents_append_only",
+      "definition": "CREATE TRIGGER consents_append_only BEFORE DELETE OR UPDATE ON consents FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "delivery_attempts",
+      "name": "delivery_attempts_append_only",
+      "definition": "CREATE TRIGGER delivery_attempts_append_only BEFORE DELETE OR UPDATE ON delivery_attempts FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_first_residency_settlements",
+      "name": "expert_first_settlement_guard",
+      "definition": "CREATE TRIGGER expert_first_settlement_guard BEFORE DELETE OR UPDATE ON expert_first_residency_settlements FOR EACH ROW EXECUTE FUNCTION expert_first_settlement_guard_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_admin_execution_results",
+      "name": "expert_referral_admin_approval_global_unique",
+      "definition": "CREATE TRIGGER expert_referral_admin_approval_global_unique BEFORE INSERT ON expert_referral_admin_execution_results FOR EACH ROW EXECUTE FUNCTION enforce_expert_referral_admin_approval_global_unique()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_admin_execution_results",
+      "name": "expert_referral_admin_results_immutable",
+      "definition": "CREATE TRIGGER expert_referral_admin_results_immutable BEFORE DELETE OR UPDATE ON expert_referral_admin_execution_results FOR EACH ROW EXECUTE FUNCTION reject_expert_referral_admin_result_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_admin_execution_results",
+      "name": "expert_referral_admin_results_truncate_immutable",
+      "definition": "CREATE TRIGGER expert_referral_admin_results_truncate_immutable BEFORE TRUNCATE ON expert_referral_admin_execution_results FOR EACH STATEMENT EXECUTE FUNCTION reject_expert_referral_admin_result_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_ledger_allocations",
+      "name": "expert_ledger_allocations_exact_total",
+      "definition": "CREATE CONSTRAINT TRIGGER expert_ledger_allocations_exact_total AFTER INSERT OR DELETE OR UPDATE ON expert_referral_ledger_allocations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION expert_referral_validate_ledger_allocation_total()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_ledger_allocations",
+      "name": "expert_referral_append_only",
+      "definition": "CREATE TRIGGER expert_referral_append_only BEFORE DELETE OR UPDATE ON expert_referral_ledger_allocations FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_ledger_entries",
+      "name": "expert_ledger_allocations_exact_total",
+      "definition": "CREATE CONSTRAINT TRIGGER expert_ledger_allocations_exact_total AFTER INSERT OR UPDATE ON expert_referral_ledger_entries DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION expert_referral_validate_ledger_allocation_total()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_ledger_entries",
+      "name": "expert_referral_append_only",
+      "definition": "CREATE TRIGGER expert_referral_append_only BEFORE DELETE OR UPDATE ON expert_referral_ledger_entries FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_reward_grants",
+      "name": "expert_referral_append_only",
+      "definition": "CREATE TRIGGER expert_referral_append_only BEFORE DELETE OR UPDATE ON expert_referral_reward_grants FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_reward_grants",
+      "name": "expert_reward_grants_eligible_settlement",
+      "definition": "CREATE TRIGGER expert_reward_grants_eligible_settlement BEFORE INSERT ON expert_referral_reward_grants FOR EACH ROW EXECUTE FUNCTION expert_reward_grant_require_eligible_settlement()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_reward_maturities",
+      "name": "expert_referral_maturities_delete_guard",
+      "definition": "CREATE TRIGGER expert_referral_maturities_delete_guard BEFORE DELETE ON expert_referral_reward_maturities FOR EACH ROW EXECUTE FUNCTION expert_referral_maturities_no_delete()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referral_reward_maturities",
+      "name": "expert_referral_maturities_terminal_guard",
+      "definition": "CREATE TRIGGER expert_referral_maturities_terminal_guard BEFORE UPDATE ON expert_referral_reward_maturities FOR EACH ROW EXECUTE FUNCTION expert_referral_maturities_append_only_terminal()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_referrals",
+      "name": "expert_referral_append_only",
+      "definition": "CREATE TRIGGER expert_referral_append_only BEFORE DELETE OR UPDATE ON expert_referrals FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_residency_orders",
+      "name": "expert_orders_provider_deadline_default",
+      "definition": "CREATE TRIGGER expert_orders_provider_deadline_default BEFORE INSERT ON expert_residency_orders FOR EACH ROW EXECUTE FUNCTION expert_residency_default_provider_deadline()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_residency_provider_event_inbox",
+      "name": "expert_provider_reversal_result_guard",
+      "definition": "CREATE TRIGGER expert_provider_reversal_result_guard BEFORE INSERT OR UPDATE ON expert_residency_provider_event_inbox FOR EACH ROW EXECUTE FUNCTION expert_provider_reversal_result_guard()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_residency_receipt_contacts",
+      "name": "expert_receipt_contacts_append_only",
+      "definition": "CREATE TRIGGER expert_receipt_contacts_append_only BEFORE DELETE OR UPDATE ON expert_residency_receipt_contacts FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "human_escalations",
+      "name": "human_escalations_transition_integrity",
+      "definition": "CREATE TRIGGER human_escalations_transition_integrity BEFORE DELETE OR UPDATE ON human_escalations FOR EACH ROW EXECUTE FUNCTION enforce_human_escalation_transition()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "message_ledger_entries",
+      "name": "message_ledger_admin_provenance",
+      "definition": "CREATE TRIGGER message_ledger_admin_provenance BEFORE INSERT ON message_ledger_entries FOR EACH ROW EXECUTE FUNCTION enforce_admin_ledger_provenance()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "message_ledger_entries",
+      "name": "message_ledger_entries_append_only",
+      "definition": "CREATE TRIGGER message_ledger_entries_append_only BEFORE DELETE OR UPDATE ON message_ledger_entries FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "message_packages",
+      "name": "message_packages_append_only",
+      "definition": "CREATE TRIGGER message_packages_append_only BEFORE DELETE OR UPDATE ON message_packages FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "message_packages",
+      "name": "message_packages_legacy_marker_migration_only",
+      "definition": "CREATE TRIGGER message_packages_legacy_marker_migration_only BEFORE INSERT ON message_packages FOR EACH ROW EXECUTE FUNCTION enforce_admin_package_provenance()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "partner_shadow_quotes",
+      "name": "partner_shadow_quotes_immutable",
+      "definition": "CREATE TRIGGER partner_shadow_quotes_immutable BEFORE DELETE OR UPDATE ON partner_shadow_quotes FOR EACH ROW EXECUTE FUNCTION reject_partner_commerce_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "partner_tariff_policy_versions",
+      "name": "partner_tariff_policy_versions_immutable",
+      "definition": "CREATE TRIGGER partner_tariff_policy_versions_immutable BEFORE DELETE OR UPDATE ON partner_tariff_policy_versions FOR EACH ROW EXECUTE FUNCTION reject_partner_commerce_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "partner_tariff_policy_versions",
+      "name": "partner_tariff_policy_versions_no_overlap",
+      "definition": "CREATE TRIGGER partner_tariff_policy_versions_no_overlap BEFORE INSERT OR UPDATE ON partner_tariff_policy_versions FOR EACH ROW EXECUTE FUNCTION lock_partner_policy_window()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "privacy_deletion_jobs",
+      "name": "client_booking_privacy_completion_guard",
+      "definition": "CREATE TRIGGER client_booking_privacy_completion_guard BEFORE UPDATE OF status ON privacy_deletion_jobs FOR EACH ROW EXECUTE FUNCTION client_booking_guard_privacy_completion()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "prompt_versions",
+      "name": "prompt_versions_append_only",
+      "definition": "CREATE TRIGGER prompt_versions_append_only BEFORE DELETE OR UPDATE ON prompt_versions FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "reconciliation_mismatches",
+      "name": "reconciliation_mismatches_append_only",
+      "definition": "CREATE TRIGGER reconciliation_mismatches_append_only BEFORE DELETE OR UPDATE ON reconciliation_mismatches FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "safety_incidents",
+      "name": "safety_incidents_append_only",
+      "definition": "CREATE TRIGGER safety_incidents_append_only BEFORE DELETE OR UPDATE ON safety_incidents FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "selarti_budget_policies",
+      "name": "selarti_budget_policy_approval",
+      "definition": "CREATE TRIGGER selarti_budget_policy_approval BEFORE INSERT ON selarti_budget_policies FOR EACH ROW EXECUTE FUNCTION validate_and_consume_selarti_budget_approval()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "selarti_budget_policies",
+      "name": "selarti_budget_policy_immutable",
+      "definition": "CREATE TRIGGER selarti_budget_policy_immutable BEFORE DELETE OR UPDATE ON selarti_budget_policies FOR EACH ROW EXECUTE FUNCTION reject_selarti_budget_policy_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "selarti_budget_policies",
+      "name": "selarti_budget_policy_no_overlap",
+      "definition": "CREATE TRIGGER selarti_budget_policy_no_overlap BEFORE INSERT ON selarti_budget_policies FOR EACH ROW EXECUTE FUNCTION lock_and_reject_selarti_budget_policy_overlap()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_audit_events",
+      "name": "test_expert_audit_immutable",
+      "definition": "CREATE TRIGGER test_expert_audit_immutable BEFORE DELETE OR UPDATE ON test_expert_audit_events FOR EACH ROW EXECUTE FUNCTION reject_test_expert_immutable_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_campaign_versions",
+      "name": "test_expert_campaign_initial_status",
+      "definition": "CREATE TRIGGER test_expert_campaign_initial_status BEFORE INSERT ON test_expert_campaign_versions FOR EACH ROW EXECUTE FUNCTION validate_test_expert_initial_status()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_campaign_versions",
+      "name": "test_expert_campaign_prompt_authority",
+      "definition": "CREATE TRIGGER test_expert_campaign_prompt_authority BEFORE INSERT OR UPDATE ON test_expert_campaign_versions FOR EACH ROW EXECUTE FUNCTION validate_test_expert_campaign_prompt()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_campaign_versions",
+      "name": "test_expert_campaign_transition",
+      "definition": "CREATE TRIGGER test_expert_campaign_transition BEFORE DELETE OR UPDATE ON test_expert_campaign_versions FOR EACH ROW EXECUTE FUNCTION validate_test_expert_campaign_transition()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_campaign_versions",
+      "name": "test_expert_campaign_transition_audit",
+      "definition": "CREATE TRIGGER test_expert_campaign_transition_audit AFTER UPDATE ON test_expert_campaign_versions FOR EACH ROW EXECUTE FUNCTION audit_test_expert_lifecycle_transition()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_deterministic_requests",
+      "name": "test_expert_deterministic_immutable",
+      "definition": "CREATE TRIGGER test_expert_deterministic_immutable BEFORE DELETE OR UPDATE ON test_expert_deterministic_requests FOR EACH ROW EXECUTE FUNCTION reject_test_expert_immutable_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_lifecycle_audit_events",
+      "name": "test_expert_lifecycle_audit_immutable",
+      "definition": "CREATE TRIGGER test_expert_lifecycle_audit_immutable BEFORE DELETE OR UPDATE ON test_expert_lifecycle_audit_events FOR EACH ROW EXECUTE FUNCTION reject_test_expert_immutable_mutation()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_prompt_assets",
+      "name": "test_expert_prompt_initial_status",
+      "definition": "CREATE TRIGGER test_expert_prompt_initial_status BEFORE INSERT ON test_expert_prompt_assets FOR EACH ROW EXECUTE FUNCTION validate_test_expert_initial_status()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_prompt_assets",
+      "name": "test_expert_prompt_transition",
+      "definition": "CREATE TRIGGER test_expert_prompt_transition BEFORE DELETE OR UPDATE ON test_expert_prompt_assets FOR EACH ROW EXECUTE FUNCTION validate_test_expert_prompt_transition()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "test_expert_prompt_assets",
+      "name": "test_expert_prompt_transition_audit",
+      "definition": "CREATE TRIGGER test_expert_prompt_transition_audit AFTER UPDATE ON test_expert_prompt_assets FOR EACH ROW EXECUTE FUNCTION audit_test_expert_lifecycle_transition()",
+      "enabled": "O"
+    }
+  ],
+  "exclusionConstraints": [
+    {
+      "table_name": "expert_residency_tariff_versions",
+      "name": "expert_tariff_active_interval_exclusion",
+      "definition": "EXCLUDE USING gist (tariff_key WITH =, tstzrange(active_from, active_to, '[)'::text) WITH &&)"
+    }
+  ],
+  "extensions": [
+    {
+      "name": "btree_gist",
+      "version": "1.7"
+    },
+    {
+      "name": "pgcrypto",
+      "version": "1.3"
+    }
+  ]
+}

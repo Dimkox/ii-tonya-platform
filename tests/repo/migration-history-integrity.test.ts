@@ -16,12 +16,12 @@ const snapshotPath = (idx: number): string =>
   `${META}/${String(idx).padStart(4, "0")}_snapshot.json`;
 
 // Migration history is hand-authored: these entries have SQL but no Drizzle
-// snapshot, so `drizzle-kit generate` diffs against the newest stored snapshot
-// (0021) and re-emits every object added after it. The list is a frozen
+// snapshot. The database-derived 0039 baseline closes only the latest gap;
+// schema-derived generate remains prohibited. The list is a frozen
 // baseline - a NEW gap fails the guard, closing one only requires shrinking it.
 const MISSING_SNAPSHOT_BASELINE = [
   14, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-  38, 39,
+  38,
 ];
 
 // drizzle-kit 0.31.x aborts JSON.stringify on a BigInt schema default, so
@@ -157,8 +157,8 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(21);
-    expect(newest).toBeLessThan(
+    expect(newest).toBe(39);
+    expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
   });

@@ -54,11 +54,12 @@ constraints, lockfiles, tests, feature flags, or CI to fit the machine.
 ## Migration history is hand-authored
 
 Migrations in `packages/db/migrations` are authored, reviewed, and applied as SQL. The Drizzle
-snapshot chain stops at `0021`: journal entries `0014`, `0019`, `0020`, and `0022`-`0038` have SQL
-but no `meta/NNNN_snapshot.json`.
+historical snapshot chain has gaps at `0014`, `0019`, `0020`, and `0022`-`0038`.
+The state baseline at `0039` was reconstructed from the SQL journal on PostgreSQL 17.5;
+its SQL-only supplement and input hashes are under `packages/db/migrations/state`.
 
-- Do not run `drizzle-kit generate`. It diffs against the newest stored snapshot (`0021`) and
-  therefore re-emits every object added afterwards - a 2026-09-10 probe produced a 215-statement
+- Do not run `drizzle-kit generate`. Before the state baseline repair its newest stored
+  snapshot was `0021`, so it re-emitted every object added afterwards - a 2026-09-10 probe produced a 215-statement
   `0039_*.sql` recreating existing tables. It also aborts before that on the BigInt default
   `bigint("next_delivery_sequence", { mode: "bigint" }).notNull().default(0n)` in
   `packages/db/src/schema/integration.ts`, with
@@ -81,9 +82,14 @@ but no `meta/NNNN_snapshot.json`.
   bigint-default list. Closing a real gap is welcome - shrink that baseline in the same change; a new
   gap fails the guard.
 
-Rebuilding the snapshot chain (the only way to make `generate` usable again) needs a state-based
-snapshot for the newest migration; `drizzle-kit introspect` emits a Drizzle schema, not snapshot JSON,
-so there is no tool-supported path. Track that in the migration-integrity issue before attempting it.
+State reconstruction must replay the hand-authored SQL on an isolated PostgreSQL 17.5 database.
+`drizzle-kit introspect` 0.31.10 writes snapshot JSON **only when the output directory has no
+snapshots**; use a fresh temporary directory, never the committed migration directory.
+The generated SQL is not an executable replacement for this repository's migrations.
+Introspection omits functions, triggers, exclusion constraints and extensions: retain and verify
+their exact PostgreSQL definitions separately. The `0039` baseline does not repair old gaps or
+make schema-derived generation safe; `generate` remains forbidden. See issue #60 and
+`docs/operations/migration-state-baseline.md` for evidence and the reproduction procedure.
 
 ## Test execution rules
 
