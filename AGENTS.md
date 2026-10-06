@@ -86,8 +86,10 @@ State reconstruction must replay the hand-authored SQL on an isolated PostgreSQL
 `drizzle-kit introspect` 0.31.10 writes snapshot JSON **only when the output directory has no
 snapshots**; use a fresh temporary directory, never the committed migration directory.
 The generated SQL is not an executable replacement for this repository's migrations.
-Introspection omits functions, triggers, exclusion constraints and extensions: retain and verify
-their exact PostgreSQL definitions separately. The `0039` baseline does not repair old gaps or
+Introspection omits functions, triggers, exclusion constraints and extensions and misrepresents
+some composite FKs, index operator classes and NOT VALID checks. Correct supported fields using
+`packages/db/src/testkit/migration-state.ts`; retain and verify exact PostgreSQL definitions and
+validation flags separately. The `0039` baseline does not repair old gaps or
 make schema-derived generation safe; `generate` remains forbidden. See issue #60 and
 `docs/operations/migration-state-baseline.md` for evidence and the reproduction procedure.
 

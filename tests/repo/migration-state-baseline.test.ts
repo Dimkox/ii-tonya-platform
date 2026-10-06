@@ -7,6 +7,34 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
+  it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
+    const snapshot = read(`${folder}/meta/0039_snapshot.json`);
+    expect(
+      snapshot.tables["public.partner_shadow_quotes"].foreignKeys
+        .partner_shadow_quotes_policy_kind_fk.columnsTo,
+    ).toEqual(["policy_version_id", "partner_kind"]);
+    expect(
+      snapshot.tables[
+        "public.consents"
+      ].indexes.consents_subject_purpose_order_idx.columns.map(
+        (column: { opclass: string }) => column.opclass,
+      ),
+    ).toEqual(["uuid_ops", "text_ops", "timestamptz_ops", "int8_ops"]);
+    expect(
+      snapshot.tables["public.consents"].checkConstraints
+        .consents_no_self_reference.value,
+    ).toBe("prior_decision_id IS NULL OR prior_decision_id <> id");
+    const supplement = read(`${folder}/state/0039_sql_objects.json`);
+    for (const name of [
+      "consents_evidence_document_fk",
+      "consents_evidence_presentation_fk",
+      "consents_no_self_reference",
+    ]) {
+      expect(
+        supplement.constraints.find((c: { name: string }) => c.name === name),
+      ).toMatchObject({ validated: false });
+    }
+  });
   it("records the actual tables, constraints and SQL-only objects at migration 0039", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
     expect(snapshot, "missing actual database state baseline").not.toBeNull();

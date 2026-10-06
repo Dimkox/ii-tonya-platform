@@ -10,6 +10,13 @@ import {
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
 import { createDb, type DrizzleDb } from "../../packages/db/src/client.js";
+import {
+  constraintStateSql,
+  indexStateSql,
+  normalizeMigrationSnapshot,
+  type ConstraintState,
+  type IndexState,
+} from "../../packages/db/src/testkit/migration-state.js";
 
 const dbRequire = createRequire(
   new URL("../../packages/db/package.json", import.meta.url),
@@ -88,12 +95,19 @@ it("reproduces the committed snapshot from SQL, including all supported database
         : reject(new Error("disposable_introspection_failed")),
     );
   });
-  const actual = read(join(output, "meta/0000_snapshot.json"));
+  const constraints = await database!.db.execute<
+    ConstraintState & Record<string, unknown>
+  >(sql.raw(constraintStateSql));
+  const indexes = await database!.db.execute<
+    IndexState & Record<string, unknown>
+  >(sql.raw(indexStateSql));
+  const actual = normalizeMigrationSnapshot(
+    read(join(output, "meta/0000_snapshot.json")),
+    { constraints: constraints.rows, indexes: indexes.rows },
+  );
   const expected = read(`${folder}/meta/0039_snapshot.json`);
-  delete actual.id;
-  delete actual.prevId;
-  delete expected.id;
-  delete expected.prevId;
+  actual.id = expected.id;
+  actual.prevId = expected.prevId;
   expect(actual).toEqual(expected);
 }, 90_000);
 
@@ -118,10 +132,14 @@ it("preserves exact functions, triggers, exclusion constraints and extensions om
     where n.nspname='public' and c.contype='x' order by table_name,name`);
   const extensions = await database!.db.execute(sql`
     select extname name,extversion version from pg_extension where extname<>'plpgsql' order by name`);
+  const constraints = await database!.db.execute(sql.raw(constraintStateSql));
+  const indexes = await database!.db.execute(sql.raw(indexStateSql));
   expect({
     functions: functions.rows,
     triggers: triggers.rows,
     exclusionConstraints: exclusions.rows,
     extensions: extensions.rows,
+    constraints: constraints.rows,
+    indexes: indexes.rows,
   }).toEqual(expected);
 });

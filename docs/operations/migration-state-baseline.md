@@ -16,10 +16,13 @@ The observed database contains 99 tables, 963 columns, 164 foreign keys, 93 uniq
 constraints, 278 check constraints and two views. The introspection progress counter
 for foreign keys includes intermediate processing and is not the final object count.
 
-Drizzle does not represent every database object. The accompanying
+Drizzle does not represent every database object and its raw introspection has
+known semantic defects. The accompanying
 `state/0039_sql_objects.json` preserves actual definitions of 27 user functions,
 48 non-internal triggers, one exclusion constraint and two extensions with versions.
-The old SQL-text scanner undercounted quoted trigger/view declarations; it is not
+It additionally records all 637 table constraints (including validation,
+deferrability and positional foreign-key columns) and all 280 indexes with exact
+definitions and positional operator classes. The old SQL-text scanner undercounted quoted trigger/view declarations; it is not
 substituted for the live catalogue readback. Snapshot JSON alone is not a complete
 database backup or a safe basis for regenerating SQL.
 
@@ -35,10 +38,17 @@ unchanged. The historical missing-snapshot baseline shrinks by 0039 only.
 3. Run the pinned local `drizzle-kit introspect` against that disposable database,
    with a fresh empty temporary output directory. Do not use the committed migration
    folder as output. Do not execute the introspected SQL file.
-4. Compare the generated `meta/0000_snapshot.json` with the committed 0039 snapshot,
-   ignoring only `id` and `prevId`, which are assigned for repository linkage.
+4. Read positional constraints and indexes using
+   `packages/db/src/testkit/migration-state.ts`. Normalize the raw introspection
+   through `normalizeMigrationSnapshot`: it corrects composite FK pairing, per-column
+   index operator classes and CHECK expressions directly from PostgreSQL, not schema
+   guesses. Keep NOT VALID/deferrability in the authoritative companion catalogue,
+   since Drizzle cannot express them. Compare this corrected projection with the
+   committed snapshot, ignoring only repository linkage `id` and `prevId`.
 5. Compare function definitions, non-internal trigger definitions/enabled state,
-   exclusion constraints and extension versions from `pg_catalog` with the supplement.
+   every constraint and index, exclusion constraints and extension versions from
+   `pg_catalog` with the supplement. Comparing raw introspection to itself is not
+   sufficient; literal regression assertions pin the known bad representations.
 6. Remove only the owned temporary directory/database after comparison.
 
 `tests/integration/migration-state-baseline.test.ts` automates these comparisons on

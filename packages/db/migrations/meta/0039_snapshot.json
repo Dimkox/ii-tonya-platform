@@ -224,7 +224,7 @@
       "checkConstraints": {
         "client_profiles_expert_note_bounded": {
           "name": "client_profiles_expert_note_bounded",
-          "value": "(expert_note IS NULL) OR ((char_length(expert_note) >= 1) AND (char_length(expert_note) <= 2000))"
+          "value": "expert_note IS NULL OR char_length(expert_note) >= 1 AND char_length(expert_note) <= 2000"
         }
       },
       "policies": {},
@@ -543,21 +543,21 @@
               "expression": "user_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "int8_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "consent_type",
               "asc": true,
               "nulls": "last",
-              "opclass": "int8_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
               "expression": "created_at",
               "asc": false,
               "nulls": "first",
-              "opclass": "int8_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -611,19 +611,19 @@
       "checkConstraints": {
         "consents_no_self_reference": {
           "name": "consents_no_self_reference",
-          "value": "(prior_decision_id IS NULL) OR (prior_decision_id <> id))) NOT VALID"
+          "value": "prior_decision_id IS NULL OR prior_decision_id <> id"
         },
         "consents_decision_known": {
           "name": "consents_decision_known",
-          "value": "decision = ANY (ARRAY['granted'::text, 'denied'::text, 'revoked'::text]))) NOT VALID"
+          "value": "decision = ANY (ARRAY['granted'::text, 'denied'::text, 'revoked'::text])"
         },
         "consents_channel_known": {
           "name": "consents_channel_known",
-          "value": "(channel IS NULL) OR (channel = ANY (ARRAY['web'::text, 'telegram'::text])))) NOT VALID"
+          "value": "channel IS NULL OR (channel = ANY (ARRAY['web'::text, 'telegram'::text]))"
         },
         "consents_text_sha256_shape": {
           "name": "consents_text_sha256_shape",
-          "value": "(text_sha256 IS NULL) OR (text_sha256 ~ '^[0-9a-f]{64}$'::text))) NOT VALID"
+          "value": "text_sha256 IS NULL OR text_sha256 ~ '^[0-9a-f]{64}$'::text"
         }
       },
       "policies": {},
@@ -1356,14 +1356,14 @@
               "expression": "requester_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "nonce",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "text_ops",
               "isExpression": false
             }
           ],
@@ -1405,11 +1405,11 @@
         },
         "admin_approvals_binding_complete": {
           "name": "admin_approvals_binding_complete",
-          "value": "(requester_session_id_hash = 'legacy-unbound'::text) OR ((requester_mfa_verified_at IS NOT NULL) AND (((approver_id IS NULL) AND (approver_session_id_hash IS NULL) AND (approver_mfa_verified_at IS NULL) AND (approved_at IS NULL)) OR ((approver_id IS NOT NULL) AND (approver_session_id_hash IS NOT NULL) AND (approver_mfa_verified_at IS NOT NULL) AND (approved_at IS NOT NULL))))"
+          "value": "requester_session_id_hash = 'legacy-unbound'::text OR requester_mfa_verified_at IS NOT NULL AND (approver_id IS NULL AND approver_session_id_hash IS NULL AND approver_mfa_verified_at IS NULL AND approved_at IS NULL OR approver_id IS NOT NULL AND approver_session_id_hash IS NOT NULL AND approver_mfa_verified_at IS NOT NULL AND approved_at IS NOT NULL)"
         },
         "admin_approvals_lifecycle_order": {
           "name": "admin_approvals_lifecycle_order",
-          "value": "(requester_session_id_hash = 'legacy-unbound'::text) OR ((expires_at > created_at) AND (requester_mfa_verified_at <= created_at) AND ((approved_at IS NULL) OR ((approved_at >= created_at) AND (approver_mfa_verified_at <= approved_at))) AND ((consumed_at IS NULL) OR ((approved_at IS NOT NULL) AND (consumed_at >= approved_at))))"
+          "value": "requester_session_id_hash = 'legacy-unbound'::text OR expires_at > created_at AND requester_mfa_verified_at <= created_at AND (approved_at IS NULL OR approved_at >= created_at AND approver_mfa_verified_at <= approved_at) AND (consumed_at IS NULL OR approved_at IS NOT NULL AND consumed_at >= approved_at)"
         }
       },
       "policies": {},
@@ -2324,21 +2324,21 @@
               "expression": "dialogue_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "int8_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "dialogue_sequence",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "int8_ops",
               "isExpression": false
             },
             {
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "int8_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             }
           ],
@@ -2379,7 +2379,7 @@
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             },
             {
@@ -2403,7 +2403,7 @@
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             },
             {
@@ -2448,7 +2448,7 @@
         },
         "integration_outbox_attempts_nonnegative": {
           "name": "integration_outbox_attempts_nonnegative",
-          "value": "(attempt >= 0) AND (reconciliation_attempt >= 0)"
+          "value": "attempt >= 0 AND reconciliation_attempt >= 0"
         },
         "integration_outbox_dialogue_order_pair": {
           "name": "integration_outbox_dialogue_order_pair",
@@ -2456,7 +2456,7 @@
         },
         "integration_outbox_dialogue_sequence_positive": {
           "name": "integration_outbox_dialogue_sequence_positive",
-          "value": "(dialogue_sequence IS NULL) OR (dialogue_sequence > 0)"
+          "value": "dialogue_sequence IS NULL OR dialogue_sequence > 0"
         }
       },
       "policies": {},
@@ -2560,7 +2560,7 @@
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             }
           ],
@@ -2654,7 +2654,7 @@
         },
         "reservations_meeting_url_https": {
           "name": "reservations_meeting_url_https",
-          "value": "(meeting_url IS NULL) OR ((meeting_url ~ '^https://[^[:space:]]+$'::text) AND (char_length(meeting_url) <= 2048))"
+          "value": "meeting_url IS NULL OR meeting_url ~ '^https://[^[:space:]]+$'::text AND char_length(meeting_url) <= 2048"
         }
       },
       "policies": {},
@@ -2784,14 +2784,14 @@
               "expression": "message_event_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "direction",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "text_ops",
               "isExpression": false
             }
           ],
@@ -2889,11 +2889,11 @@
       "checkConstraints": {
         "message_ledger_delta_matches_kind": {
           "name": "message_ledger_delta_matches_kind",
-          "value": "((entry_kind = 'grant'::ledger_entry_kind) AND (package_id IS NOT NULL) AND (delta > 0) AND (message_event_id IS NULL) AND (original_entry_id IS NULL)) OR ((entry_kind = 'debit'::ledger_entry_kind) AND (package_id IS NOT NULL) AND (delta = '-1'::integer) AND (message_event_id IS NOT NULL) AND (original_entry_id IS NULL)) OR ((entry_kind = 'free'::ledger_entry_kind) AND (delta = 0) AND (message_event_id IS NOT NULL) AND (original_entry_id IS NULL)) OR ((entry_kind = 'compensation'::ledger_entry_kind) AND (package_id IS NOT NULL) AND (delta = 1) AND (message_event_id IS NULL) AND (original_entry_id IS NOT NULL)) OR ((entry_kind = 'revocation'::ledger_entry_kind) AND (package_id IS NOT NULL) AND (delta <= 0) AND (message_event_id IS NULL) AND (original_entry_id IS NOT NULL))"
+          "value": "entry_kind = 'grant'::ledger_entry_kind AND package_id IS NOT NULL AND delta > 0 AND message_event_id IS NULL AND original_entry_id IS NULL OR entry_kind = 'debit'::ledger_entry_kind AND package_id IS NOT NULL AND delta = '-1'::integer AND message_event_id IS NOT NULL AND original_entry_id IS NULL OR entry_kind = 'free'::ledger_entry_kind AND delta = 0 AND message_event_id IS NOT NULL AND original_entry_id IS NULL OR entry_kind = 'compensation'::ledger_entry_kind AND package_id IS NOT NULL AND delta = 1 AND message_event_id IS NULL AND original_entry_id IS NOT NULL OR entry_kind = 'revocation'::ledger_entry_kind AND package_id IS NOT NULL AND delta <= 0 AND message_event_id IS NULL AND original_entry_id IS NOT NULL"
         },
         "message_ledger_admin_binding_complete": {
           "name": "message_ledger_admin_binding_complete",
-          "value": "((admin_approval_id IS NULL) AND (admin_requester_session_id_hash IS NULL)) OR ((admin_approval_id IS NOT NULL) AND (admin_requester_session_id_hash IS NOT NULL))"
+          "value": "admin_approval_id IS NULL AND admin_requester_session_id_hash IS NULL OR admin_approval_id IS NOT NULL AND admin_requester_session_id_hash IS NOT NULL"
         }
       },
       "policies": {},
@@ -3396,7 +3396,7 @@
       "checkConstraints": {
         "admin_sessions_lifecycle_order": {
           "name": "admin_sessions_lifecycle_order",
-          "value": "(mfa_verified_at <= expires_at) AND ((revoked_at IS NULL) OR (revoked_at >= created_at))"
+          "value": "mfa_verified_at <= expires_at AND (revoked_at IS NULL OR revoked_at >= created_at)"
         }
       },
       "policies": {},
@@ -3654,28 +3654,28 @@
               "expression": "user_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "kind",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
               "expression": "expires_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
               "expression": "granted_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -3743,11 +3743,11 @@
         },
         "message_packages_admin_binding_complete": {
           "name": "message_packages_admin_binding_complete",
-          "value": "((admin_approval_id IS NULL) AND (admin_requester_session_id_hash IS NULL)) OR ((admin_approval_id IS NOT NULL) AND (admin_requester_session_id_hash IS NOT NULL))"
+          "value": "admin_approval_id IS NULL AND admin_requester_session_id_hash IS NULL OR admin_approval_id IS NOT NULL AND admin_requester_session_id_hash IS NOT NULL"
         },
         "message_packages_admin_contract": {
           "name": "message_packages_admin_contract",
-          "value": "((kind = 'paid'::text) AND (legacy_admin_grant = false) AND (admin_approval_id IS NULL) AND (admin_requester_session_id_hash IS NULL)) OR ((kind = ANY (ARRAY['admin'::text, 'intro'::text])) AND (legacy_admin_grant = true) AND (admin_approval_id IS NULL) AND (admin_requester_session_id_hash IS NULL)) OR ((kind = 'admin'::text) AND (legacy_admin_grant = false) AND (admin_approval_id IS NOT NULL) AND (admin_requester_session_id_hash IS NOT NULL) AND (granted_messages = ANY (ARRAY[500, 1000, 1500, 2000])) AND (expires_at IS NOT NULL)) OR ((kind = 'intro'::text) AND (legacy_admin_grant = false) AND (admin_approval_id IS NOT NULL) AND (admin_requester_session_id_hash IS NOT NULL) AND (granted_messages = 100) AND (expires_at IS NULL))"
+          "value": "kind = 'paid'::text AND legacy_admin_grant = false AND admin_approval_id IS NULL AND admin_requester_session_id_hash IS NULL OR (kind = ANY (ARRAY['admin'::text, 'intro'::text])) AND legacy_admin_grant = true AND admin_approval_id IS NULL AND admin_requester_session_id_hash IS NULL OR kind = 'admin'::text AND legacy_admin_grant = false AND admin_approval_id IS NOT NULL AND admin_requester_session_id_hash IS NOT NULL AND (granted_messages = ANY (ARRAY[500, 1000, 1500, 2000])) AND expires_at IS NOT NULL OR kind = 'intro'::text AND legacy_admin_grant = false AND admin_approval_id IS NOT NULL AND admin_requester_session_id_hash IS NOT NULL AND granted_messages = 100 AND expires_at IS NULL"
         }
       },
       "policies": {},
@@ -4004,7 +4004,7 @@
               "expression": "order_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -4054,7 +4054,7 @@
       "checkConstraints": {
         "expert_payment_attempt_amount_bounds": {
           "name": "expert_payment_attempt_amount_bounds",
-          "value": "(expected_amount_minor >= 0) AND (expected_amount_minor <= '999999999999'::bigint)"
+          "value": "expected_amount_minor >= 0 AND expected_amount_minor <= '999999999999'::bigint"
         },
         "expert_payment_attempt_currency_rub": {
           "name": "expert_payment_attempt_currency_rub",
@@ -4062,7 +4062,7 @@
         },
         "expert_payment_attempt_resolution": {
           "name": "expert_payment_attempt_resolution",
-          "value": "((status = ANY (ARRAY['created'::expert_residency_payment_attempt_status, 'pending'::expert_residency_payment_attempt_status, 'unknown_outcome'::expert_residency_payment_attempt_status])) AND (resolved_at IS NULL)) OR ((status = ANY (ARRAY['settled'::expert_residency_payment_attempt_status, 'failed'::expert_residency_payment_attempt_status, 'refunded'::expert_residency_payment_attempt_status, 'charged_back'::expert_residency_payment_attempt_status])) AND (resolved_at IS NOT NULL))"
+          "value": "(status = ANY (ARRAY['created'::expert_residency_payment_attempt_status, 'pending'::expert_residency_payment_attempt_status, 'unknown_outcome'::expert_residency_payment_attempt_status])) AND resolved_at IS NULL OR (status = ANY (ARRAY['settled'::expert_residency_payment_attempt_status, 'failed'::expert_residency_payment_attempt_status, 'refunded'::expert_residency_payment_attempt_status, 'charged_back'::expert_residency_payment_attempt_status])) AND resolved_at IS NOT NULL"
         }
       },
       "policies": {},
@@ -4368,11 +4368,11 @@
       "checkConstraints": {
         "expert_abuse_holds_reason_bounded": {
           "name": "expert_abuse_holds_reason_bounded",
-          "value": "((char_length(reason_code) >= 1) AND (char_length(reason_code) <= 128)) AND ((closed_reason_code IS NULL) OR ((char_length(closed_reason_code) >= 1) AND (char_length(closed_reason_code) <= 128)))"
+          "value": "char_length(reason_code) >= 1 AND char_length(reason_code) <= 128 AND (closed_reason_code IS NULL OR char_length(closed_reason_code) >= 1 AND char_length(closed_reason_code) <= 128)"
         },
         "expert_abuse_holds_lifecycle": {
           "name": "expert_abuse_holds_lifecycle",
-          "value": "((status = 'open'::expert_referral_abuse_hold_status) AND (closed_approval_id IS NULL) AND (closed_admin_session_id_hash IS NULL) AND (closed_reason_code IS NULL) AND (closed_at IS NULL)) OR ((status = 'closed'::expert_referral_abuse_hold_status) AND (closed_approval_id IS NOT NULL) AND (closed_admin_session_id_hash IS NOT NULL) AND (closed_reason_code IS NOT NULL) AND (closed_at >= opened_at))"
+          "value": "status = 'open'::expert_referral_abuse_hold_status AND closed_approval_id IS NULL AND closed_admin_session_id_hash IS NULL AND closed_reason_code IS NULL AND closed_at IS NULL OR status = 'closed'::expert_referral_abuse_hold_status AND closed_approval_id IS NOT NULL AND closed_admin_session_id_hash IS NOT NULL AND closed_reason_code IS NOT NULL AND closed_at >= opened_at"
         }
       },
       "policies": {},
@@ -4450,7 +4450,7 @@
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -4518,7 +4518,7 @@
       "checkConstraints": {
         "expert_referral_batches_requested_count_bounded": {
           "name": "expert_referral_batches_requested_count_bounded",
-          "value": "(requested_count >= 1) AND (requested_count <= 1000)"
+          "value": "requested_count >= 1 AND requested_count <= 1000"
         }
       },
       "policies": {},
@@ -4620,21 +4620,21 @@
               "expression": "inviter_expert_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             },
             {
               "expression": "issued_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -4710,11 +4710,11 @@
         },
         "expert_referral_codes_masked_suffix_bounded": {
           "name": "expert_referral_codes_masked_suffix_bounded",
-          "value": "(char_length(masked_suffix) >= 4) AND (char_length(masked_suffix) <= 12)"
+          "value": "char_length(masked_suffix) >= 4 AND char_length(masked_suffix) <= 12"
         },
         "expert_referral_codes_lifecycle": {
           "name": "expert_referral_codes_lifecycle",
-          "value": "((status = 'issued'::expert_referral_code_status) AND (redeemed_at IS NULL) AND (revoked_at IS NULL) AND (revoked_approval_id IS NULL) AND (revoked_admin_session_id_hash IS NULL)) OR ((status = 'redeemed'::expert_referral_code_status) AND (redeemed_at IS NOT NULL) AND (revoked_at IS NULL) AND (revoked_approval_id IS NULL) AND (revoked_admin_session_id_hash IS NULL)) OR ((status = 'revoked'::expert_referral_code_status) AND (redeemed_at IS NULL) AND (revoked_at IS NOT NULL) AND (revoked_approval_id IS NOT NULL) AND (revoked_admin_session_id_hash IS NOT NULL))"
+          "value": "status = 'issued'::expert_referral_code_status AND redeemed_at IS NULL AND revoked_at IS NULL AND revoked_approval_id IS NULL AND revoked_admin_session_id_hash IS NULL OR status = 'redeemed'::expert_referral_code_status AND redeemed_at IS NOT NULL AND revoked_at IS NULL AND revoked_approval_id IS NULL AND revoked_admin_session_id_hash IS NULL OR status = 'revoked'::expert_referral_code_status AND redeemed_at IS NULL AND revoked_at IS NOT NULL AND revoked_approval_id IS NOT NULL AND revoked_admin_session_id_hash IS NOT NULL"
         }
       },
       "policies": {},
@@ -4915,14 +4915,14 @@
               "expression": "inviter_expert_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "valid_until",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -5020,11 +5020,11 @@
       "checkConstraints": {
         "expert_issuance_override_quota_bounded": {
           "name": "expert_issuance_override_quota_bounded",
-          "value": "((additional_quota >= 1) AND (additional_quota <= 1000)) AND ((consumed_count >= 0) AND (consumed_count <= additional_quota))"
+          "value": "additional_quota >= 1 AND additional_quota <= 1000 AND consumed_count >= 0 AND consumed_count <= additional_quota"
         },
         "expert_issuance_override_reason_bounded": {
           "name": "expert_issuance_override_reason_bounded",
-          "value": "(char_length(reason_code) >= 1) AND (char_length(reason_code) <= 128)"
+          "value": "char_length(reason_code) >= 1 AND char_length(reason_code) <= 128"
         },
         "expert_issuance_override_validity": {
           "name": "expert_issuance_override_validity",
@@ -5032,7 +5032,7 @@
         },
         "expert_issuance_override_distinct_approvers": {
           "name": "expert_issuance_override_distinct_approvers",
-          "value": "(approver_one_id <> approver_two_id) AND (requester_id <> approver_one_id) AND (requester_id <> approver_two_id) AND (approval_one_id <> approval_two_id)"
+          "value": "approver_one_id <> approver_two_id AND requester_id <> approver_one_id AND requester_id <> approver_two_id AND approval_one_id <> approval_two_id"
         }
       },
       "policies": {},
@@ -5126,14 +5126,14 @@
               "expression": "expert_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -5211,15 +5211,15 @@
       "checkConstraints": {
         "expert_ledger_amount_bounds": {
           "name": "expert_ledger_amount_bounds",
-          "value": "(amount_minor <> 0) AND (abs(amount_minor) <= '999999999999'::bigint)"
+          "value": "amount_minor <> 0 AND abs(amount_minor) <= '999999999999'::bigint"
         },
         "expert_ledger_kind_contract": {
           "name": "expert_ledger_kind_contract",
-          "value": "((entry_kind = 'reward_grant'::expert_referral_ledger_entry_kind) AND (amount_minor > 0) AND (order_id IS NULL) AND (original_entry_id IS NULL)) OR ((entry_kind = 'reservation'::expert_referral_ledger_entry_kind) AND (amount_minor < 0) AND (order_id IS NOT NULL) AND (original_entry_id IS NULL)) OR ((entry_kind = ANY (ARRAY['release'::expert_referral_ledger_entry_kind, 'debt_repayment'::expert_referral_ledger_entry_kind])) AND (amount_minor > 0) AND (original_entry_id IS NOT NULL)) OR ((entry_kind = ANY (ARRAY['spend'::expert_referral_ledger_entry_kind, 'expiry'::expert_referral_ledger_entry_kind, 'reversal'::expert_referral_ledger_entry_kind])) AND (amount_minor < 0) AND (original_entry_id IS NOT NULL)) OR ((entry_kind = 'administrative_correction'::expert_referral_ledger_entry_kind) AND (admin_approval_id IS NOT NULL) AND (admin_session_id_hash IS NOT NULL))"
+          "value": "entry_kind = 'reward_grant'::expert_referral_ledger_entry_kind AND amount_minor > 0 AND order_id IS NULL AND original_entry_id IS NULL OR entry_kind = 'reservation'::expert_referral_ledger_entry_kind AND amount_minor < 0 AND order_id IS NOT NULL AND original_entry_id IS NULL OR (entry_kind = ANY (ARRAY['release'::expert_referral_ledger_entry_kind, 'debt_repayment'::expert_referral_ledger_entry_kind])) AND amount_minor > 0 AND original_entry_id IS NOT NULL OR (entry_kind = ANY (ARRAY['spend'::expert_referral_ledger_entry_kind, 'expiry'::expert_referral_ledger_entry_kind, 'reversal'::expert_referral_ledger_entry_kind])) AND amount_minor < 0 AND original_entry_id IS NOT NULL OR entry_kind = 'administrative_correction'::expert_referral_ledger_entry_kind AND admin_approval_id IS NOT NULL AND admin_session_id_hash IS NOT NULL"
         },
         "expert_ledger_admin_binding_complete": {
           "name": "expert_ledger_admin_binding_complete",
-          "value": "((admin_approval_id IS NULL) AND (admin_session_id_hash IS NULL)) OR ((admin_approval_id IS NOT NULL) AND (admin_session_id_hash IS NOT NULL))"
+          "value": "admin_approval_id IS NULL AND admin_session_id_hash IS NULL OR admin_approval_id IS NOT NULL AND admin_session_id_hash IS NOT NULL"
         }
       },
       "policies": {},
@@ -5314,7 +5314,7 @@
               "expression": "expert_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -5364,7 +5364,7 @@
           "tableFrom": "expert_referral_reward_grants",
           "tableTo": "expert_referrals",
           "schemaTo": "public",
-          "columnsFrom": ["expert_id", "referral_id"],
+          "columnsFrom": ["referral_id", "expert_id"],
           "columnsTo": ["id", "inviter_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -5375,16 +5375,16 @@
           "tableTo": "expert_first_residency_settlements",
           "schemaTo": "public",
           "columnsFrom": [
-            "referral_id",
             "first_settlement_id",
+            "referral_id",
             "qualifying_order_id",
             "qualifying_payment_attempt_id"
           ],
           "columnsTo": [
             "id",
+            "referral_id",
             "qualifying_order_id",
-            "qualifying_payment_attempt_id",
-            "referral_id"
+            "qualifying_payment_attempt_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -5586,8 +5586,8 @@
           "tableFrom": "expert_first_residency_settlements",
           "tableTo": "expert_residency_orders",
           "schemaTo": "public",
-          "columnsFrom": ["expert_id", "qualifying_order_id"],
-          "columnsTo": ["expert_id", "id"],
+          "columnsFrom": ["qualifying_order_id", "expert_id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5597,8 +5597,8 @@
           "tableTo": "expert_residency_payment_attempts",
           "schemaTo": "public",
           "columnsFrom": [
-            "qualifying_order_id",
-            "qualifying_payment_attempt_id"
+            "qualifying_payment_attempt_id",
+            "qualifying_order_id"
           ],
           "columnsTo": ["id", "order_id"],
           "onDelete": "no action",
@@ -5609,7 +5609,7 @@
           "tableFrom": "expert_first_residency_settlements",
           "tableTo": "expert_referrals",
           "schemaTo": "public",
-          "columnsFrom": ["expert_id", "referral_id"],
+          "columnsFrom": ["referral_id", "expert_id"],
           "columnsTo": ["id", "invitee_expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -5696,11 +5696,11 @@
       "checkConstraints": {
         "expert_first_settlement_eligibility_evidence": {
           "name": "expert_first_settlement_eligibility_evidence",
-          "value": "((eligibility = ANY (ARRAY['eligible'::expert_first_settlement_eligibility, 'pending_feature_hold'::expert_first_settlement_eligibility])) AND (referral_id IS NOT NULL) AND settlement_expert_active AND settlement_expert_verified AND settlement_abuse_cleared) OR (eligibility = ANY (ARRAY['permanently_ineligible'::expert_first_settlement_eligibility, 'cancelled_by_refund'::expert_first_settlement_eligibility]))"
+          "value": "(eligibility = ANY (ARRAY['eligible'::expert_first_settlement_eligibility, 'pending_feature_hold'::expert_first_settlement_eligibility])) AND referral_id IS NOT NULL AND settlement_expert_active AND settlement_expert_verified AND settlement_abuse_cleared OR (eligibility = ANY (ARRAY['permanently_ineligible'::expert_first_settlement_eligibility, 'cancelled_by_refund'::expert_first_settlement_eligibility]))"
         },
         "expert_first_settlement_pending_snapshot_complete": {
           "name": "expert_first_settlement_pending_snapshot_complete",
-          "value": "(eligibility <> 'pending_feature_hold'::expert_first_settlement_eligibility) OR ((settlement_invitee_user_id IS NOT NULL) AND (settlement_invitee_channel_identity_id IS NOT NULL) AND (settlement_inviter_expert_id IS NOT NULL) AND (settlement_inviter_user_id IS NOT NULL) AND (settlement_inviter_channel_identity_id IS NOT NULL))"
+          "value": "eligibility <> 'pending_feature_hold'::expert_first_settlement_eligibility OR settlement_invitee_user_id IS NOT NULL AND settlement_invitee_channel_identity_id IS NOT NULL AND settlement_inviter_expert_id IS NOT NULL AND settlement_inviter_user_id IS NOT NULL AND settlement_inviter_channel_identity_id IS NOT NULL"
         }
       },
       "policies": {},
@@ -5871,14 +5871,14 @@
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             },
             {
               "expression": "received_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -5915,19 +5915,19 @@
         },
         "expert_provider_event_processing_state": {
           "name": "expert_provider_event_processing_state",
-          "value": "((status = ANY (ARRAY['received'::expert_residency_provider_event_status, 'processing'::expert_residency_provider_event_status, 'reconciliation_required'::expert_residency_provider_event_status])) AND (processed_at IS NULL)) OR ((status = ANY (ARRAY['processed'::expert_residency_provider_event_status, 'rejected'::expert_residency_provider_event_status])) AND (processed_at IS NOT NULL))"
+          "value": "(status = ANY (ARRAY['received'::expert_residency_provider_event_status, 'processing'::expert_residency_provider_event_status, 'reconciliation_required'::expert_residency_provider_event_status])) AND processed_at IS NULL OR (status = ANY (ARRAY['processed'::expert_residency_provider_event_status, 'rejected'::expert_residency_provider_event_status])) AND processed_at IS NOT NULL"
         },
         "expert_provider_verification_id_bounded": {
           "name": "expert_provider_verification_id_bounded",
-          "value": "(char_length(verification_id) >= 1) AND (char_length(verification_id) <= 200)"
+          "value": "char_length(verification_id) >= 1 AND char_length(verification_id) <= 200"
         },
         "expert_provider_verifier_key_bounded": {
           "name": "expert_provider_verifier_key_bounded",
-          "value": "(char_length(verifier_key_version) >= 1) AND (char_length(verifier_key_version) <= 100)"
+          "value": "char_length(verifier_key_version) >= 1 AND char_length(verifier_key_version) <= 100"
         },
         "expert_provider_event_amount_bounded": {
           "name": "expert_provider_event_amount_bounded",
-          "value": "(amount_minor >= 0) AND (amount_minor <= '999999999999'::bigint)"
+          "value": "amount_minor >= 0 AND amount_minor <= '999999999999'::bigint"
         },
         "expert_provider_event_currency_rub": {
           "name": "expert_provider_event_currency_rub",
@@ -5935,11 +5935,11 @@
         },
         "expert_provider_event_identity_complete": {
           "name": "expert_provider_event_identity_complete",
-          "value": "((identity_version = 0) AND (payment_id IS NULL) AND (order_id IS NULL) AND (amount_minor IS NULL) AND (currency IS NULL) AND (occurred_at IS NULL) AND (verification_id IS NULL) AND (verifier_key_version IS NULL) AND (verified_at IS NULL)) OR ((identity_version = 1) AND (payment_id IS NOT NULL) AND (order_id IS NOT NULL) AND (amount_minor IS NOT NULL) AND (currency IS NOT NULL) AND (occurred_at IS NOT NULL) AND (verification_id IS NOT NULL) AND (verifier_key_version IS NOT NULL) AND (verified_at IS NOT NULL))"
+          "value": "identity_version = 0 AND payment_id IS NULL AND order_id IS NULL AND amount_minor IS NULL AND currency IS NULL AND occurred_at IS NULL AND verification_id IS NULL AND verifier_key_version IS NULL AND verified_at IS NULL OR identity_version = 1 AND payment_id IS NOT NULL AND order_id IS NOT NULL AND amount_minor IS NOT NULL AND currency IS NOT NULL AND occurred_at IS NOT NULL AND verification_id IS NOT NULL AND verifier_key_version IS NOT NULL AND verified_at IS NOT NULL"
         },
         "expert_provider_reversal_result_shape": {
           "name": "expert_provider_reversal_result_shape",
-          "value": "(event_kind <> ALL (ARRAY['refunded'::text, 'charged_back'::text])) OR (status <> 'processed'::expert_residency_provider_event_status) OR (result_legacy_exempt AND (result_schema_version IS NULL) AND (result_payload IS NULL)) OR COALESCE(((NOT (result_schema_version IS DISTINCT FROM 1)) AND (result_payload IS NOT NULL) AND (jsonb_typeof(result_payload) = 'object'::text) AND expert_jsonb_has_exact_keys(result_payload, ARRAY['kind'::text, 'eventId'::text, 'paymentId'::text, 'orderId'::text, 'cashRefundedMinor'::text, 'restoredCreditMinor'::text, 'rewardReversed'::text, 'debtMinor'::text, 'terminated'::text]) AND ((result_payload ->> 'kind'::text) = event_kind) AND ((result_payload ->> 'eventId'::text) = external_event_id) AND ((result_payload ->> 'paymentId'::text) = payment_id) AND ((result_payload ->> 'orderId'::text) = (order_id)::text) AND ((result_payload ->> 'cashRefundedMinor'::text) ~ '^(0|[1-9][0-9]{0,11})$'::text) AND ((result_payload ->> 'restoredCreditMinor'::text) = '0'::text) AND (jsonb_typeof((result_payload -> 'rewardReversed'::text)) = 'boolean'::text) AND ((result_payload ->> 'debtMinor'::text) ~ '^(0|[1-9][0-9]{0,11})$'::text) AND (jsonb_typeof((result_payload -> 'terminated'::text)) = 'boolean'::text)), false)"
+          "value": "(event_kind <> ALL (ARRAY['refunded'::text, 'charged_back'::text])) OR status <> 'processed'::expert_residency_provider_event_status OR result_legacy_exempt AND result_schema_version IS NULL AND result_payload IS NULL OR COALESCE(NOT result_schema_version IS DISTINCT FROM 1 AND result_payload IS NOT NULL AND jsonb_typeof(result_payload) = 'object'::text AND expert_jsonb_has_exact_keys(result_payload, ARRAY['kind'::text, 'eventId'::text, 'paymentId'::text, 'orderId'::text, 'cashRefundedMinor'::text, 'restoredCreditMinor'::text, 'rewardReversed'::text, 'debtMinor'::text, 'terminated'::text]) AND (result_payload ->> 'kind'::text) = event_kind AND (result_payload ->> 'eventId'::text) = external_event_id AND (result_payload ->> 'paymentId'::text) = payment_id AND (result_payload ->> 'orderId'::text) = order_id::text AND (result_payload ->> 'cashRefundedMinor'::text) ~ '^(0|[1-9][0-9]{0,11})$'::text AND (result_payload ->> 'restoredCreditMinor'::text) = '0'::text AND jsonb_typeof(result_payload -> 'rewardReversed'::text) = 'boolean'::text AND (result_payload ->> 'debtMinor'::text) ~ '^(0|[1-9][0-9]{0,11})$'::text AND jsonb_typeof(result_payload -> 'terminated'::text) = 'boolean'::text, false)"
         }
       },
       "policies": {},
@@ -6032,21 +6032,21 @@
               "expression": "user_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "consent_purpose",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
               "expression": "policy_version",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
@@ -6101,7 +6101,7 @@
         },
         "expert_receipt_contacts_ciphertext": {
           "name": "expert_receipt_contacts_ciphertext",
-          "value": "(length(ciphertext) >= 1) AND (length(ciphertext) <= 8192)"
+          "value": "length(ciphertext) >= 1 AND length(ciphertext) <= 8192"
         },
         "expert_receipt_contacts_key_reference": {
           "name": "expert_receipt_contacts_key_reference",
@@ -6113,11 +6113,11 @@
         },
         "expert_receipt_contacts_verification": {
           "name": "expert_receipt_contacts_verification",
-          "value": "((consent_decision = 'granted'::text) AND (verified_at IS NOT NULL)) OR ((consent_decision = 'denied'::text) AND (verified_at IS NULL))"
+          "value": "consent_decision = 'granted'::text AND verified_at IS NOT NULL OR consent_decision = 'denied'::text AND verified_at IS NULL"
         },
         "expert_receipt_contacts_revocation": {
           "name": "expert_receipt_contacts_revocation",
-          "value": "(revoked_at IS NULL) OR ((verified_at IS NOT NULL) AND (revoked_at >= verified_at))"
+          "value": "revoked_at IS NULL OR verified_at IS NOT NULL AND revoked_at >= verified_at"
         }
       },
       "policies": {},
@@ -6246,7 +6246,7 @@
       "checkConstraints": {
         "expert_ai_request_receipts_hashes_check": {
           "name": "expert_ai_request_receipts_hashes_check",
-          "value": "(request_key_hash ~ '^[0-9a-f]{64}$'::text) AND (request_digest ~ '^[0-9a-f]{64}$'::text)"
+          "value": "request_key_hash ~ '^[0-9a-f]{64}$'::text AND request_digest ~ '^[0-9a-f]{64}$'::text"
         },
         "expert_ai_request_receipts_status_check": {
           "name": "expert_ai_request_receipts_status_check",
@@ -6258,7 +6258,7 @@
         },
         "expert_ai_request_receipts_state_check": {
           "name": "expert_ai_request_receipts_state_check",
-          "value": "((status = 'processing'::text) AND (lease_until IS NOT NULL) AND (outcome_status IS NULL) AND (outcome_code IS NULL) AND (outcome_detail IS NULL)) OR ((status = 'failed'::text) AND (lease_until IS NULL) AND (outcome_status IS NULL) AND (outcome_code IS NULL) AND (outcome_detail IS NULL)) OR ((status = 'complete'::text) AND (lease_until IS NULL) AND (((outcome_status = 200) AND (outcome_code = 'completed'::text) AND (outcome_detail = ANY (ARRAY['redeem_expert_referral'::text, 'view_referral_summary'::text, 'quote_residency'::text, 'start_residency_checkout'::text]))) OR ((outcome_status = 422) AND (outcome_code = 'proposal_rejected'::text) AND (outcome_detail = ANY (ARRAY['invalid_shape'::text, 'unsupported_intent'::text, 'unauthorized_scope'::text]))) OR ((outcome_status = 403) AND (outcome_code = 'forbidden'::text) AND (outcome_detail IS NULL)) OR ((outcome_status = 503) AND (outcome_code = 'feature_disabled'::text) AND (outcome_detail IS NULL))))"
+          "value": "status = 'processing'::text AND lease_until IS NOT NULL AND outcome_status IS NULL AND outcome_code IS NULL AND outcome_detail IS NULL OR status = 'failed'::text AND lease_until IS NULL AND outcome_status IS NULL AND outcome_code IS NULL AND outcome_detail IS NULL OR status = 'complete'::text AND lease_until IS NULL AND (outcome_status = 200 AND outcome_code = 'completed'::text AND (outcome_detail = ANY (ARRAY['redeem_expert_referral'::text, 'view_referral_summary'::text, 'quote_residency'::text, 'start_residency_checkout'::text])) OR outcome_status = 422 AND outcome_code = 'proposal_rejected'::text AND (outcome_detail = ANY (ARRAY['invalid_shape'::text, 'unsupported_intent'::text, 'unauthorized_scope'::text])) OR outcome_status = 403 AND outcome_code = 'forbidden'::text AND outcome_detail IS NULL OR outcome_status = 503 AND outcome_code = 'feature_disabled'::text AND outcome_detail IS NULL)"
         }
       },
       "policies": {},
@@ -6453,14 +6453,14 @@
               "expression": "provider",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
               "expression": "command_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -6516,7 +6516,7 @@
               "expression": "order_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -6530,7 +6530,7 @@
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -6553,7 +6553,7 @@
               "expression": "reconciliation_claimed_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -6567,7 +6567,7 @@
               "expression": "id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -6624,7 +6624,7 @@
           "tableFrom": "expert_residency_provider_operations",
           "tableTo": "expert_residency_payment_attempts",
           "schemaTo": "public",
-          "columnsFrom": ["order_id", "payment_attempt_id"],
+          "columnsFrom": ["payment_attempt_id", "order_id"],
           "columnsTo": ["id", "order_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
@@ -6647,7 +6647,7 @@
         },
         "expert_provider_operations_amount": {
           "name": "expert_provider_operations_amount",
-          "value": "(amount_minor > 0) AND (amount_minor <= '999999999999'::bigint)"
+          "value": "amount_minor > 0 AND amount_minor <= '999999999999'::bigint"
         },
         "expert_provider_operations_currency": {
           "name": "expert_provider_operations_currency",
@@ -6663,11 +6663,11 @@
         },
         "expert_provider_operations_provider_id": {
           "name": "expert_provider_operations_provider_id",
-          "value": "(provider_object_id IS NULL) OR (provider_object_id ~ '^[A-Za-z0-9_-]{1,64}$'::text)"
+          "value": "provider_object_id IS NULL OR provider_object_id ~ '^[A-Za-z0-9_-]{1,64}$'::text"
         },
         "expert_provider_operations_parent": {
           "name": "expert_provider_operations_parent",
-          "value": "((operation_kind = 'create_payment'::text) AND (parent_payment_id IS NULL)) OR ((operation_kind = 'create_refund'::text) AND (parent_payment_id ~ '^[A-Za-z0-9_-]{1,64}$'::text))"
+          "value": "operation_kind = 'create_payment'::text AND parent_payment_id IS NULL OR operation_kind = 'create_refund'::text AND parent_payment_id ~ '^[A-Za-z0-9_-]{1,64}$'::text"
         },
         "expert_provider_operations_status": {
           "name": "expert_provider_operations_status",
@@ -6675,15 +6675,15 @@
         },
         "expert_provider_operations_resolution": {
           "name": "expert_provider_operations_resolution",
-          "value": "((status = ANY (ARRAY['claimed'::text, 'pending'::text, 'unknown_outcome'::text])) AND (resolved_at IS NULL)) OR ((status = ANY (ARRAY['succeeded'::text, 'canceled'::text, 'failed'::text])) AND (resolved_at IS NOT NULL))"
+          "value": "(status = ANY (ARRAY['claimed'::text, 'pending'::text, 'unknown_outcome'::text])) AND resolved_at IS NULL OR (status = ANY (ARRAY['succeeded'::text, 'canceled'::text, 'failed'::text])) AND resolved_at IS NOT NULL"
         },
         "expert_provider_operations_replay_bundle": {
           "name": "expert_provider_operations_replay_bundle",
-          "value": "((replay_ciphertext IS NULL) AND (replay_key_reference IS NULL) AND (replay_body_version IS NULL) AND (recovery_expires_at IS NULL)) OR (((length(replay_ciphertext) >= 1) AND (length(replay_ciphertext) <= 32768)) AND (replay_key_reference ~ '^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$'::text) AND ((replay_body_version >= 1) AND (replay_body_version <= 2147483647)) AND (recovery_expires_at IS NOT NULL))"
+          "value": "replay_ciphertext IS NULL AND replay_key_reference IS NULL AND replay_body_version IS NULL AND recovery_expires_at IS NULL OR length(replay_ciphertext) >= 1 AND length(replay_ciphertext) <= 32768 AND replay_key_reference ~ '^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9._/-]{1,192}$'::text AND replay_body_version >= 1 AND replay_body_version <= 2147483647 AND recovery_expires_at IS NOT NULL"
         },
         "expert_provider_operations_recovery_attempt": {
           "name": "expert_provider_operations_recovery_attempt",
-          "value": "(recovery_attempt >= 0) AND (recovery_attempt <= 100)"
+          "value": "recovery_attempt >= 0 AND recovery_attempt <= 100"
         },
         "expert_provider_operations_recovery_lease": {
           "name": "expert_provider_operations_recovery_lease",
@@ -6691,7 +6691,7 @@
         },
         "expert_provider_operations_manual_review": {
           "name": "expert_provider_operations_manual_review",
-          "value": "(manual_review_at IS NULL) OR ((provider_object_id IS NULL) AND (status = 'unknown_outcome'::text))"
+          "value": "manual_review_at IS NULL OR provider_object_id IS NULL AND status = 'unknown_outcome'::text"
         }
       },
       "policies": {},
@@ -6818,11 +6818,11 @@
         },
         "client_catalog_requests_filters_check": {
           "name": "client_catalog_requests_filters_check",
-          "value": "((service_code IS NULL) OR (((char_length(service_code) >= 1) AND (char_length(service_code) <= 64)) AND (service_code !~ '[[:cntrl:]]'::text))) AND ((language IS NULL) OR (((char_length(language) >= 1) AND (char_length(language) <= 32)) AND (language !~ '[[:cntrl:]]'::text)))"
+          "value": "(service_code IS NULL OR char_length(service_code) >= 1 AND char_length(service_code) <= 64 AND service_code !~ '[[:cntrl:]]'::text) AND (language IS NULL OR char_length(language) >= 1 AND char_length(language) <= 32 AND language !~ '[[:cntrl:]]'::text)"
         },
         "client_catalog_requests_time_check": {
           "name": "client_catalog_requests_time_check",
-          "value": "(expires_at >= created_at) AND (updated_at >= created_at)"
+          "value": "expires_at >= created_at AND updated_at >= created_at"
         }
       },
       "policies": {},
@@ -6939,14 +6939,14 @@
               "expression": "created_at",
               "asc": false,
               "nulls": "first",
-              "opclass": "text_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
               "expression": "id",
               "asc": false,
               "nulls": "first",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -6992,11 +6992,11 @@
         },
         "outbox_operator_alerts_payload_check": {
           "name": "outbox_operator_alerts_payload_check",
-          "value": "((case_type = 'safety'::text) AND (case_reason_code = 'safety_operator_escalation'::text) AND (rating IS NULL) AND (content_hash IS NULL) AND (policy_version IS NULL)) OR ((case_type = 'negative_feedback'::text) AND (case_reason_code = 'negative_feedback_policy'::text) AND ((rating >= 1) AND (rating <= 5)) AND (content_hash ~ '^[0-9a-f]{64}$'::text) AND (policy_version ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'::text)) OR ((case_type = 'delivery_failure'::text) AND (case_reason_code = ANY (ARRAY['delivery_failure'::text, 'negative_feedback_source_invalid'::text])) AND (rating IS NULL) AND (content_hash IS NULL) AND (policy_version IS NULL))"
+          "value": "case_type = 'safety'::text AND case_reason_code = 'safety_operator_escalation'::text AND rating IS NULL AND content_hash IS NULL AND policy_version IS NULL OR case_type = 'negative_feedback'::text AND case_reason_code = 'negative_feedback_policy'::text AND rating >= 1 AND rating <= 5 AND content_hash ~ '^[0-9a-f]{64}$'::text AND policy_version ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'::text OR case_type = 'delivery_failure'::text AND (case_reason_code = ANY (ARRAY['delivery_failure'::text, 'negative_feedback_source_invalid'::text])) AND rating IS NULL AND content_hash IS NULL AND policy_version IS NULL"
         },
         "outbox_operator_alerts_lifecycle_check": {
           "name": "outbox_operator_alerts_lifecycle_check",
-          "value": "(((status = 'open'::text) AND (acknowledged_at IS NULL) AND (resolved_at IS NULL)) OR ((status = 'acknowledged'::text) AND (acknowledged_at IS NOT NULL) AND (resolved_at IS NULL)) OR ((status = 'resolved'::text) AND (resolved_at IS NOT NULL))) AND (updated_at >= created_at) AND ((acknowledged_at IS NULL) OR (acknowledged_at >= created_at)) AND ((resolved_at IS NULL) OR (resolved_at >= created_at))"
+          "value": "(status = 'open'::text AND acknowledged_at IS NULL AND resolved_at IS NULL OR status = 'acknowledged'::text AND acknowledged_at IS NOT NULL AND resolved_at IS NULL OR status = 'resolved'::text AND resolved_at IS NOT NULL) AND updated_at >= created_at AND (acknowledged_at IS NULL OR acknowledged_at >= created_at) AND (resolved_at IS NULL OR resolved_at >= created_at)"
         }
       },
       "policies": {},
@@ -7188,7 +7188,7 @@
         },
         "expert_telegram_residency_callbacks_telegram_id_check": {
           "name": "expert_telegram_residency_callbacks_telegram_id_check",
-          "value": "(telegram_user_id)::text ~ '^[1-9][0-9]{0,19}$'::text"
+          "value": "telegram_user_id::text ~ '^[1-9][0-9]{0,19}$'::text"
         },
         "expert_telegram_residency_callbacks_expiry_check": {
           "name": "expert_telegram_residency_callbacks_expiry_check",
@@ -7196,15 +7196,15 @@
         },
         "expert_telegram_residency_callbacks_checkout_state_check": {
           "name": "expert_telegram_residency_callbacks_checkout_state_check",
-          "value": "((checkout_status = 'issued'::text) AND (consumed_at IS NULL)) OR ((checkout_status <> 'issued'::text) AND (consumed_at IS NOT NULL))"
+          "value": "checkout_status = 'issued'::text AND consumed_at IS NULL OR checkout_status <> 'issued'::text AND consumed_at IS NOT NULL"
         },
         "expert_telegram_residency_callbacks_processing_lease_check": {
           "name": "expert_telegram_residency_callbacks_processing_lease_check",
-          "value": "((checkout_status = 'processing'::text) AND (processing_fence IS NOT NULL) AND (processing_lease_until IS NOT NULL)) OR ((checkout_status <> 'processing'::text) AND (processing_fence IS NULL) AND (processing_lease_until IS NULL))"
+          "value": "checkout_status = 'processing'::text AND processing_fence IS NOT NULL AND processing_lease_until IS NOT NULL OR checkout_status <> 'processing'::text AND processing_fence IS NULL AND processing_lease_until IS NULL"
         },
         "expert_telegram_residency_callbacks_checkout_outcome_check": {
           "name": "expert_telegram_residency_callbacks_checkout_outcome_check",
-          "value": "((checkout_status = ANY (ARRAY['issued'::text, 'processing'::text])) AND (outcome_recorded_at IS NULL) AND (checkout_url IS NULL)) OR ((checkout_status = ANY (ARRAY['unavailable'::text, 'unknown'::text])) AND (outcome_recorded_at IS NOT NULL) AND (checkout_url IS NULL)) OR ((checkout_status = 'ready'::text) AND (outcome_recorded_at IS NOT NULL) AND (checkout_url IS NOT NULL) AND ((char_length((checkout_url)::text) >= 1) AND (char_length((checkout_url)::text) <= 2048)) AND ((checkout_url)::text ~* '^https://[^[:space:]]+$'::text))"
+          "value": "(checkout_status = ANY (ARRAY['issued'::text, 'processing'::text])) AND outcome_recorded_at IS NULL AND checkout_url IS NULL OR (checkout_status = ANY (ARRAY['unavailable'::text, 'unknown'::text])) AND outcome_recorded_at IS NOT NULL AND checkout_url IS NULL OR checkout_status = 'ready'::text AND outcome_recorded_at IS NOT NULL AND checkout_url IS NOT NULL AND char_length(checkout_url::text) >= 1 AND char_length(checkout_url::text) <= 2048 AND checkout_url::text ~* '^https://[^[:space:]]+$'::text"
         }
       },
       "policies": {},
@@ -7258,7 +7258,7 @@
       "checkConstraints": {
         "client_catalog_snapshots_cards_check": {
           "name": "client_catalog_snapshots_cards_check",
-          "value": "(jsonb_typeof(cards) = 'array'::text) AND (jsonb_array_length(cards) <= 20)"
+          "value": "jsonb_typeof(cards) = 'array'::text AND jsonb_array_length(cards) <= 20"
         },
         "client_catalog_snapshots_expiry_check": {
           "name": "client_catalog_snapshots_expiry_check",
@@ -7343,7 +7343,7 @@
               "expression": "request_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "bpchar_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -7440,7 +7440,7 @@
         },
         "client_identity_proof_receipts_session_digest_check": {
           "name": "client_identity_proof_receipts_session_digest_check",
-          "value": "(session_token_digest IS NULL) OR (session_token_digest ~ '^sha256:[0-9a-f]{64}$'::text)"
+          "value": "session_token_digest IS NULL OR session_token_digest ~ '^sha256:[0-9a-f]{64}$'::text"
         },
         "client_identity_proof_receipts_expiry_check": {
           "name": "client_identity_proof_receipts_expiry_check",
@@ -7531,7 +7531,7 @@
         },
         "client_sessions_lifecycle_check": {
           "name": "client_sessions_lifecycle_check",
-          "value": "(expires_at > created_at) AND ((revoked_at IS NULL) OR (revoked_at >= created_at))"
+          "value": "expires_at > created_at AND (revoked_at IS NULL OR revoked_at >= created_at)"
         },
         "client_sessions_scope_check": {
           "name": "client_sessions_scope_check",
@@ -7592,7 +7592,7 @@
               "expression": "request_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -7606,7 +7606,7 @@
               "expression": "id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -7717,7 +7717,7 @@
               "expression": "booking_handle",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "bpchar_ops",
               "isExpression": false
             }
           ],
@@ -7832,14 +7832,14 @@
               "expression": "phase",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
               "expression": "lease_until",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -7878,7 +7878,7 @@
         },
         "client_booking_erasure_work_attempt_count_check": {
           "name": "client_booking_erasure_work_attempt_count_check",
-          "value": "(attempt_count >= 0) AND (attempt_count <= 5)"
+          "value": "attempt_count >= 0 AND attempt_count <= 5"
         },
         "client_booking_erasure_work_lease_check": {
           "name": "client_booking_erasure_work_lease_check",
@@ -8160,7 +8160,7 @@
               "expression": "tariff_key",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
@@ -8210,7 +8210,7 @@
       "checkConstraints": {
         "expert_tariff_price_bounds": {
           "name": "expert_tariff_price_bounds",
-          "value": "(price_minor > 0) AND (price_minor <= '999999999999'::bigint)"
+          "value": "price_minor > 0 AND price_minor <= '999999999999'::bigint"
         },
         "expert_tariff_currency_rub": {
           "name": "expert_tariff_currency_rub",
@@ -8230,15 +8230,15 @@
         },
         "expert_tariff_credit_cap": {
           "name": "expert_tariff_credit_cap",
-          "value": "(credit_cap_bps >= 0) AND (credit_cap_bps <= 10000)"
+          "value": "credit_cap_bps >= 0 AND credit_cap_bps <= 10000"
         },
         "expert_tariff_v2_combination": {
           "name": "expert_tariff_v2_combination",
-          "value": "(commercial_policy_version <> 'expert_residency_v2'::text) OR ((tariff_key = 'START'::text) AND (display_name = 'Старт'::text) AND (price_minor = 390000) AND (duration_seconds = 2592000) AND (credit_cap_bps = 3000) AND (individual_services_enabled = true) AND (group_event_limit = 0) AND (statistics_level = 'basic'::text) AND (support_priority = 'standard'::text)) OR ((tariff_key = 'BASE'::text) AND (display_name = 'База'::text) AND (price_minor = 590000) AND (duration_seconds = 2592000) AND (credit_cap_bps = 3000) AND (individual_services_enabled = true) AND (group_event_limit = 1) AND (statistics_level = 'expanded'::text) AND (support_priority = 'standard'::text)) OR ((tariff_key = 'PRO'::text) AND (display_name = 'Про'::text) AND (price_minor = 999000) AND (duration_seconds = 2592000) AND (credit_cap_bps = 3000) AND (individual_services_enabled = true) AND (group_event_limit = 3) AND (statistics_level = 'expanded'::text) AND (support_priority = 'priority'::text))"
+          "value": "commercial_policy_version <> 'expert_residency_v2'::text OR tariff_key = 'START'::text AND display_name = 'Старт'::text AND price_minor = 390000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 0 AND statistics_level = 'basic'::text AND support_priority = 'standard'::text OR tariff_key = 'BASE'::text AND display_name = 'База'::text AND price_minor = 590000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 1 AND statistics_level = 'expanded'::text AND support_priority = 'standard'::text OR tariff_key = 'PRO'::text AND display_name = 'Про'::text AND price_minor = 999000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 3 AND statistics_level = 'expanded'::text AND support_priority = 'priority'::text"
         },
         "expert_tariff_group_event_limit": {
           "name": "expert_tariff_group_event_limit",
-          "value": "(group_event_limit >= 0) AND (group_event_limit <= 3)"
+          "value": "group_event_limit >= 0 AND group_event_limit <= 3"
         },
         "expert_tariff_statistics_level": {
           "name": "expert_tariff_statistics_level",
@@ -8535,14 +8535,14 @@
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "enum_ops",
               "isExpression": false
             },
             {
               "expression": "payment_deadline",
               "asc": true,
               "nulls": "last",
-              "opclass": "enum_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -8590,7 +8590,7 @@
       "checkConstraints": {
         "expert_order_money_bounds": {
           "name": "expert_order_money_bounds",
-          "value": "(price_minor > 0) AND (price_minor <= '999999999999'::bigint) AND (credit_minor >= 0) AND (credit_minor <= '999999999999'::bigint) AND (cash_minor >= 0) AND (cash_minor <= '999999999999'::bigint)"
+          "value": "price_minor > 0 AND price_minor <= '999999999999'::bigint AND credit_minor >= 0 AND credit_minor <= '999999999999'::bigint AND cash_minor >= 0 AND cash_minor <= '999999999999'::bigint"
         },
         "expert_order_cash_remainder": {
           "name": "expert_order_cash_remainder",
@@ -8610,7 +8610,7 @@
         },
         "expert_order_settlement_interval": {
           "name": "expert_order_settlement_interval",
-          "value": "((settled_at IS NULL) AND (residency_starts_at IS NULL) AND (residency_ends_at IS NULL)) OR ((settled_at IS NOT NULL) AND (residency_starts_at IS NOT NULL) AND (residency_ends_at IS NOT NULL) AND (residency_starts_at >= settled_at) AND (residency_ends_at = (residency_starts_at + make_interval(secs => (duration_seconds)::double precision))))"
+          "value": "settled_at IS NULL AND residency_starts_at IS NULL AND residency_ends_at IS NULL OR settled_at IS NOT NULL AND residency_starts_at IS NOT NULL AND residency_ends_at IS NOT NULL AND residency_starts_at >= settled_at AND residency_ends_at = (residency_starts_at + make_interval(secs => duration_seconds::double precision))"
         },
         "expert_order_deadline_not_after_provider": {
           "name": "expert_order_deadline_not_after_provider",
@@ -8622,23 +8622,23 @@
         },
         "expert_order_credit_cap": {
           "name": "expert_order_credit_cap",
-          "value": "((credit_cap_bps >= 0) AND (credit_cap_bps <= 10000)) AND ((credit_minor * 10000) <= (price_minor * credit_cap_bps))"
+          "value": "credit_cap_bps >= 0 AND credit_cap_bps <= 10000 AND (credit_minor * 10000) <= (price_minor * credit_cap_bps)"
         },
         "expert_order_v2_cap": {
           "name": "expert_order_v2_cap",
-          "value": "(commercial_policy_version <> 'expert_residency_v2'::text) OR (credit_cap_bps = 3000)"
+          "value": "commercial_policy_version <> 'expert_residency_v2'::text OR credit_cap_bps = 3000"
         },
         "expert_order_v2_price": {
           "name": "expert_order_v2_price",
-          "value": "(commercial_policy_version <> 'expert_residency_v2'::text) OR (price_minor = ANY (ARRAY[(390000)::bigint, (590000)::bigint, (999000)::bigint]))"
+          "value": "commercial_policy_version <> 'expert_residency_v2'::text OR (price_minor = ANY (ARRAY[390000::bigint, 590000::bigint, 999000::bigint]))"
         },
         "expert_order_v2_duration": {
           "name": "expert_order_v2_duration",
-          "value": "(commercial_policy_version <> 'expert_residency_v2'::text) OR (duration_seconds = 2592000)"
+          "value": "commercial_policy_version <> 'expert_residency_v2'::text OR duration_seconds = 2592000"
         },
         "expert_order_group_event_limit": {
           "name": "expert_order_group_event_limit",
-          "value": "(group_event_limit >= 0) AND (group_event_limit <= 3)"
+          "value": "group_event_limit >= 0 AND group_event_limit <= 3"
         },
         "expert_order_statistics_level": {
           "name": "expert_order_statistics_level",
@@ -8724,14 +8724,14 @@
               "expression": "dialogue_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -8747,7 +8747,7 @@
               "expression": "expires_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -8787,7 +8787,7 @@
       "checkConstraints": {
         "dialogue_inbound_text_check": {
           "name": "dialogue_inbound_text_check",
-          "value": "((char_length(text) >= 1) AND (char_length(text) <= 4096)) AND (text !~ '[[:cntrl:]]'::text)"
+          "value": "char_length(text) >= 1 AND char_length(text) <= 4096 AND text !~ '[[:cntrl:]]'::text"
         },
         "dialogue_inbound_expiry_check": {
           "name": "dialogue_inbound_expiry_check",
@@ -8933,7 +8933,7 @@
         },
         "expert_referral_admin_result_second_binding": {
           "name": "expert_referral_admin_result_second_binding",
-          "value": "CHECK (COALESCE((((action <> 'expert_referral.issuance_override'::text) AND (second_approval_id IS NULL) AND (second_nonce_hash IS NULL)) OR ((action = 'expert_referral.issuance_override'::text) AND (second_approval_id IS NOT NULL) AND (second_nonce_hash IS NOT NULL) AND (second_nonce_hash ~ '^sha256:[0-9a-f]{64}$'::text) AND (second_approval_id <> approval_id))), false"
+          "value": "COALESCE(action <> 'expert_referral.issuance_override'::text AND second_approval_id IS NULL AND second_nonce_hash IS NULL OR action = 'expert_referral.issuance_override'::text AND second_approval_id IS NOT NULL AND second_nonce_hash IS NOT NULL AND second_nonce_hash ~ '^sha256:[0-9a-f]{64}$'::text AND second_approval_id <> approval_id, false)"
         },
         "expert_referral_admin_result_object_only": {
           "name": "expert_referral_admin_result_object_only",
@@ -8941,15 +8941,15 @@
         },
         "expert_referral_admin_result_no_secrets": {
           "name": "expert_referral_admin_result_no_secrets",
-          "value": "(NOT (safe_result ?| ARRAY['codes'::text, 'plaintext'::text, 'digest'::text, 'hash'::text, 'nonce'::text])) AND ((safe_result)::text !~ '\"(codes|plaintext|digest|hash|nonce)\"[[:space:]]*:'::text)"
+          "value": "NOT safe_result ?| ARRAY['codes'::text, 'plaintext'::text, 'digest'::text, 'hash'::text, 'nonce'::text] AND safe_result::text !~ '\"(codes|plaintext|digest|hash|nonce)\"[[:space:]]*:'::text"
         },
         "expert_referral_admin_result_expected_version": {
           "name": "expert_referral_admin_result_expected_version",
-          "value": "CHECK (COALESCE((((action = ANY (ARRAY['expert_referral.feature_switch'::text, 'client_commercial_policy.control_v2'::text])) AND (expected_version IS NOT NULL) AND ((expected_version >= 0) AND (expected_version <= 2147483646))) OR ((action <> ALL (ARRAY['expert_referral.feature_switch'::text, 'client_commercial_policy.control_v2'::text])) AND (expected_version IS NULL))), false"
+          "value": "COALESCE((action = ANY (ARRAY['expert_referral.feature_switch'::text, 'client_commercial_policy.control_v2'::text])) AND expected_version IS NOT NULL AND expected_version >= 0 AND expected_version <= 2147483646 OR (action <> ALL (ARRAY['expert_referral.feature_switch'::text, 'client_commercial_policy.control_v2'::text])) AND expected_version IS NULL, false)"
         },
         "expert_referral_admin_result_exact_schema": {
           "name": "expert_referral_admin_result_exact_schema",
-          "value": "((action = 'expert_referral.code_revoke'::text) AND (safe_result ?& ARRAY['id'::text, 'status'::text]) AND ((safe_result - ARRAY['id'::text, 'status'::text]) = '{}'::jsonb) AND ((safe_result ->> 'id'::text) = (object_id)::text) AND ((safe_result ->> 'status'::text) = 'revoked'::text)) OR ((action = 'expert_referral.issuance_override'::text) AND (safe_result ? 'overrideId'::text) AND ((safe_result - 'overrideId'::text) = '{}'::jsonb) AND ((safe_result ->> 'overrideId'::text) = (object_id)::text)) OR ((action = 'expert_referral.feature_switch'::text) AND (safe_result ? 'version'::text) AND ((safe_result - 'version'::text) = '{}'::jsonb) AND (jsonb_typeof((safe_result -> 'version'::text)) = 'number'::text) AND (((safe_result ->> 'version'::text))::numeric = ((expected_version + 1))::numeric)) OR ((action = 'expert_referral.batch_generate'::text) AND (safe_result ?& ARRAY['batchId'::text, 'count'::text]) AND ((safe_result - ARRAY['batchId'::text, 'count'::text]) = '{}'::jsonb) AND (jsonb_typeof((safe_result -> 'batchId'::text)) = 'string'::text) AND (jsonb_typeof((safe_result -> 'count'::text)) = 'number'::text)) OR ((action = 'expert_residency.tariff_create_v2'::text) AND (safe_result ? 'tariffVersionId'::text) AND ((safe_result - 'tariffVersionId'::text) = '{}'::jsonb)) OR ((action = 'client_commercial_policy.control_v2'::text) AND (object_id = '00000000-0000-0000-0000-000000000041'::uuid) AND (safe_result ?& ARRAY['version'::text, 'admissionPolicy'::text]) AND ((safe_result - ARRAY['version'::text, 'admissionPolicy'::text]) = '{}'::jsonb) AND (jsonb_typeof((safe_result -> 'version'::text)) = 'number'::text) AND (((safe_result ->> 'version'::text))::numeric > (0)::numeric) AND ((((safe_result ->> 'version'::text))::numeric % (1)::numeric) = (0)::numeric) AND (jsonb_typeof((safe_result -> 'admissionPolicy'::text)) = 'string'::text) AND ((safe_result ->> 'admissionPolicy'::text) = ANY (ARRAY['legacy_package_v1'::text, 'free_client_v2'::text])))"
+          "value": "action = 'expert_referral.code_revoke'::text AND safe_result ?& ARRAY['id'::text, 'status'::text] AND (safe_result - ARRAY['id'::text, 'status'::text]) = '{}'::jsonb AND (safe_result ->> 'id'::text) = object_id::text AND (safe_result ->> 'status'::text) = 'revoked'::text OR action = 'expert_referral.issuance_override'::text AND safe_result ? 'overrideId'::text AND (safe_result - 'overrideId'::text) = '{}'::jsonb AND (safe_result ->> 'overrideId'::text) = object_id::text OR action = 'expert_referral.feature_switch'::text AND safe_result ? 'version'::text AND (safe_result - 'version'::text) = '{}'::jsonb AND jsonb_typeof(safe_result -> 'version'::text) = 'number'::text AND ((safe_result ->> 'version'::text)::numeric) = (expected_version + 1)::numeric OR action = 'expert_referral.batch_generate'::text AND safe_result ?& ARRAY['batchId'::text, 'count'::text] AND (safe_result - ARRAY['batchId'::text, 'count'::text]) = '{}'::jsonb AND jsonb_typeof(safe_result -> 'batchId'::text) = 'string'::text AND jsonb_typeof(safe_result -> 'count'::text) = 'number'::text OR action = 'expert_residency.tariff_create_v2'::text AND safe_result ? 'tariffVersionId'::text AND (safe_result - 'tariffVersionId'::text) = '{}'::jsonb OR action = 'client_commercial_policy.control_v2'::text AND object_id = '00000000-0000-0000-0000-000000000041'::uuid AND safe_result ?& ARRAY['version'::text, 'admissionPolicy'::text] AND (safe_result - ARRAY['version'::text, 'admissionPolicy'::text]) = '{}'::jsonb AND jsonb_typeof(safe_result -> 'version'::text) = 'number'::text AND ((safe_result ->> 'version'::text)::numeric) > 0::numeric AND (((safe_result ->> 'version'::text)::numeric) % 1::numeric) = 0::numeric AND jsonb_typeof(safe_result -> 'admissionPolicy'::text) = 'string'::text AND ((safe_result ->> 'admissionPolicy'::text) = ANY (ARRAY['legacy_package_v1'::text, 'free_client_v2'::text]))"
         },
         "expert_referral_admin_result_action_allowed": {
           "name": "expert_referral_admin_result_action_allowed",
@@ -9250,9 +9250,9 @@
           ],
           "columnsTo": [
             "id",
+            "referral_id",
             "qualifying_order_id",
-            "qualifying_payment_attempt_id",
-            "referral_id"
+            "qualifying_payment_attempt_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -9263,7 +9263,7 @@
       "checkConstraints": {
         "expert_referral_maturity_policy": {
           "name": "expert_referral_maturity_policy",
-          "value": "(policy_version = 'expert_referral_v2_30d'::text) AND (amount_minor = 100000)"
+          "value": "policy_version = 'expert_referral_v2_30d'::text AND amount_minor = 100000"
         },
         "expert_referral_maturity_settled_clock": {
           "name": "expert_referral_maturity_settled_clock",
@@ -9271,15 +9271,15 @@
         },
         "expert_referral_maturity_terminal_state": {
           "name": "expert_referral_maturity_terminal_state",
-          "value": "((status = 'pending'::expert_referral_maturity_status) AND (granted_at IS NULL) AND (cancelled_at IS NULL) AND (terminal_reason IS NULL)) OR ((status = 'granted'::expert_referral_maturity_status) AND (granted_at IS NOT NULL) AND (cancelled_at IS NULL) AND (terminal_reason IS NULL) AND (lease_token IS NULL) AND (lease_until IS NULL)) OR ((status = 'cancelled'::expert_referral_maturity_status) AND (granted_at IS NULL) AND (cancelled_at IS NOT NULL) AND (terminal_reason IS NOT NULL) AND (terminal_reason = ANY (ARRAY['terminating_provider_reversal'::text, 'eligibility_lost'::text, 'feature_disabled'::text])) AND (lease_token IS NULL) AND (lease_until IS NULL))"
+          "value": "status = 'pending'::expert_referral_maturity_status AND granted_at IS NULL AND cancelled_at IS NULL AND terminal_reason IS NULL OR status = 'granted'::expert_referral_maturity_status AND granted_at IS NOT NULL AND cancelled_at IS NULL AND terminal_reason IS NULL AND lease_token IS NULL AND lease_until IS NULL OR status = 'cancelled'::expert_referral_maturity_status AND granted_at IS NULL AND cancelled_at IS NOT NULL AND terminal_reason IS NOT NULL AND (terminal_reason = ANY (ARRAY['terminating_provider_reversal'::text, 'eligibility_lost'::text, 'feature_disabled'::text])) AND lease_token IS NULL AND lease_until IS NULL"
         },
         "expert_referral_maturity_idempotency_nonempty": {
           "name": "expert_referral_maturity_idempotency_nonempty",
-          "value": "idempotency_key = ('expert-referral-maturity:v1:'::text || (first_settlement_id)::text)"
+          "value": "idempotency_key = ('expert-referral-maturity:v1:'::text || first_settlement_id::text)"
         },
         "expert_referral_maturity_attempt_bounded": {
           "name": "expert_referral_maturity_attempt_bounded",
-          "value": "(attempt_count >= 0) AND (attempt_count <= 2147483647)"
+          "value": "attempt_count >= 0 AND attempt_count <= 2147483647"
         }
       },
       "policies": {},
@@ -9438,7 +9438,7 @@
               "expression": "id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -9472,11 +9472,11 @@
       "checkConstraints": {
         "selarti_response_proposals_hash_check": {
           "name": "selarti_response_proposals_hash_check",
-          "value": "(request_payload_hash ~ '^[0-9a-f]{64}$'::text) AND (response_payload_hash ~ '^[0-9a-f]{64}$'::text)"
+          "value": "request_payload_hash ~ '^[0-9a-f]{64}$'::text AND response_payload_hash ~ '^[0-9a-f]{64}$'::text"
         },
         "selarti_response_proposals_text_check": {
           "name": "selarti_response_proposals_text_check",
-          "value": "(text IS NULL) OR (((char_length(text) >= 1) AND (char_length(text) <= 4096)) AND (text !~ '[[:cntrl:]]'::text))"
+          "value": "text IS NULL OR char_length(text) >= 1 AND char_length(text) <= 4096 AND text !~ '[[:cntrl:]]'::text"
         },
         "selarti_response_proposals_expiry_check": {
           "name": "selarti_response_proposals_expiry_check",
@@ -9553,14 +9553,14 @@
               "expression": "dialogue_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "int8_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "dialogue_sequence",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "int8_ops",
               "isExpression": false
             }
           ],
@@ -9913,15 +9913,15 @@
         },
         "selarti_budget_policy_window_check": {
           "name": "selarti_budget_policy_window_check",
-          "value": "(effective_to IS NULL) OR (effective_to > effective_from)"
+          "value": "effective_to IS NULL OR effective_to > effective_from"
         },
         "selarti_budget_policy_threshold_check": {
           "name": "selarti_budget_policy_threshold_check",
-          "value": "(global_cap_rub_minor > 0) AND (global_cap_rub_minor <= '999999999999'::bigint) AND (global_warning_rub_minor >= 0) AND (global_warning_rub_minor <= '999999999999'::bigint) AND (global_warning_rub_minor <= global_soft_rub_minor) AND (global_soft_rub_minor <= '999999999999'::bigint) AND (global_soft_rub_minor <= global_cap_rub_minor) AND (per_user_warning_rub_minor >= 0) AND (per_user_warning_rub_minor <= '999999999999'::bigint) AND (per_user_warning_rub_minor <= per_user_soft_rub_minor) AND (per_user_soft_rub_minor <= '999999999999'::bigint) AND (per_user_soft_rub_minor <= per_user_hard_rub_minor) AND (per_user_hard_rub_minor <= '999999999999'::bigint) AND (per_user_hard_rub_minor <= global_cap_rub_minor)"
+          "value": "global_cap_rub_minor > 0 AND global_cap_rub_minor <= '999999999999'::bigint AND global_warning_rub_minor >= 0 AND global_warning_rub_minor <= '999999999999'::bigint AND global_warning_rub_minor <= global_soft_rub_minor AND global_soft_rub_minor <= '999999999999'::bigint AND global_soft_rub_minor <= global_cap_rub_minor AND per_user_warning_rub_minor >= 0 AND per_user_warning_rub_minor <= '999999999999'::bigint AND per_user_warning_rub_minor <= per_user_soft_rub_minor AND per_user_soft_rub_minor <= '999999999999'::bigint AND per_user_soft_rub_minor <= per_user_hard_rub_minor AND per_user_hard_rub_minor <= '999999999999'::bigint AND per_user_hard_rub_minor <= global_cap_rub_minor"
         },
         "selarti_budget_policy_cost_check": {
           "name": "selarti_budget_policy_cost_check",
-          "value": "(official_usd_rub_quote_micros > 0) AND (official_usd_rub_quote_micros <= '999999999999'::bigint) AND (selarti_uplift_bps = 1000) AND (usd_micros_per_request >= 0) AND (usd_micros_per_request <= '999999999999'::bigint) AND (usd_micros_per_unit >= 0) AND (usd_micros_per_unit <= '999999999999'::bigint) AND (worst_case_billable_units > 0) AND (worst_case_billable_units <= 1000000) AND (stress_inflation_bps = 6000) AND (ceil((((((usd_micros_per_request)::numeric + ((usd_micros_per_unit)::numeric * (worst_case_billable_units)::numeric)) * ceil((((official_usd_rub_quote_micros)::numeric * ((10000 + selarti_uplift_bps))::numeric) / (10000)::numeric))) * (100)::numeric) / ('1000000000000'::bigint)::numeric)) > (0)::numeric) AND (ceil((((((usd_micros_per_request)::numeric + ((usd_micros_per_unit)::numeric * (worst_case_billable_units)::numeric)) * ceil((((official_usd_rub_quote_micros)::numeric * ((10000 + selarti_uplift_bps))::numeric) / (10000)::numeric))) * (100)::numeric) / ('1000000000000'::bigint)::numeric)) <= ('999999999999'::bigint)::numeric)"
+          "value": "official_usd_rub_quote_micros > 0 AND official_usd_rub_quote_micros <= '999999999999'::bigint AND selarti_uplift_bps = 1000 AND usd_micros_per_request >= 0 AND usd_micros_per_request <= '999999999999'::bigint AND usd_micros_per_unit >= 0 AND usd_micros_per_unit <= '999999999999'::bigint AND worst_case_billable_units > 0 AND worst_case_billable_units <= 1000000 AND stress_inflation_bps = 6000 AND ceil((usd_micros_per_request::numeric + usd_micros_per_unit::numeric * worst_case_billable_units::numeric) * ceil(official_usd_rub_quote_micros::numeric * (10000 + selarti_uplift_bps)::numeric / 10000::numeric) * 100::numeric / '1000000000000'::bigint::numeric) > 0::numeric AND ceil((usd_micros_per_request::numeric + usd_micros_per_unit::numeric * worst_case_billable_units::numeric) * ceil(official_usd_rub_quote_micros::numeric * (10000 + selarti_uplift_bps)::numeric / 10000::numeric) * 100::numeric / '1000000000000'::bigint::numeric) <= '999999999999'::bigint::numeric"
         }
       },
       "policies": {},
@@ -10056,7 +10056,7 @@
               "expression": "user_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "date_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -10117,7 +10117,7 @@
         },
         "selarti_cost_reservation_amount_check": {
           "name": "selarti_cost_reservation_amount_check",
-          "value": "(reserved_rub_minor > 0) AND (worst_case_usd_micros > 0)"
+          "value": "reserved_rub_minor > 0 AND worst_case_usd_micros > 0"
         }
       },
       "policies": {},
@@ -10200,7 +10200,7 @@
               "expression": "id",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             }
           ],
@@ -10275,7 +10275,7 @@
         },
         "selarti_actual_usage_amount_check": {
           "name": "selarti_actual_usage_amount_check",
-          "value": "((outcome = 'applied'::text) AND (actual_usd_micros IS NOT NULL) AND (actual_usd_micros >= 0) AND (actual_rub_minor IS NOT NULL) AND (actual_rub_minor >= 0)) OR ((outcome <> 'applied'::text) AND (actual_usd_micros IS NULL) AND (actual_rub_minor IS NULL))"
+          "value": "outcome = 'applied'::text AND actual_usd_micros IS NOT NULL AND actual_usd_micros >= 0 AND actual_rub_minor IS NOT NULL AND actual_rub_minor >= 0 OR outcome <> 'applied'::text AND actual_usd_micros IS NULL AND actual_rub_minor IS NULL"
         }
       },
       "policies": {},
@@ -10518,7 +10518,7 @@
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -10571,7 +10571,7 @@
         },
         "commercial_participants_state_kind_coherence_check": {
           "name": "commercial_participants_state_kind_coherence_check",
-          "value": "((onboarding_state = 'started'::text) AND (participant_kind IS NULL)) OR ((onboarding_state <> 'started'::text) AND (participant_kind IS NOT NULL))"
+          "value": "onboarding_state = 'started'::text AND participant_kind IS NULL OR onboarding_state <> 'started'::text AND participant_kind IS NOT NULL"
         }
       },
       "policies": {},
@@ -10660,11 +10660,11 @@
         },
         "organization_profiles_legal_name_check": {
           "name": "organization_profiles_legal_name_check",
-          "value": "(char_length(legal_name) >= 1) AND (char_length(legal_name) <= 300)"
+          "value": "char_length(legal_name) >= 1 AND char_length(legal_name) <= 300"
         },
         "organization_profiles_city_check": {
           "name": "organization_profiles_city_check",
-          "value": "(char_length(city) >= 1) AND (char_length(city) <= 200)"
+          "value": "char_length(city) >= 1 AND char_length(city) <= 200"
         }
       },
       "policies": {},
@@ -10817,7 +10817,7 @@
               "expression": "partner_kind",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
@@ -10858,7 +10858,7 @@
       "checkConstraints": {
         "partner_tariff_policy_versions_money_check": {
           "name": "partner_tariff_policy_versions_money_check",
-          "value": "(standard_price_minor > 0) AND (referred_six_price_minor > 0) AND (referred_ten_price_minor > 0) AND (referred_ten_price_minor <= referred_six_price_minor) AND (referred_six_price_minor <= standard_price_minor) AND (online_only_surcharge_minor = 300000) AND (city_million_plus_surcharge_minor = 500000) AND (duration_seconds = 2592000) AND (resident_commission_bps = 1000) AND (nonresident_commission_bps = 1500) AND (nonresident_card_fee_minor = 450000)"
+          "value": "standard_price_minor > 0 AND referred_six_price_minor > 0 AND referred_ten_price_minor > 0 AND referred_ten_price_minor <= referred_six_price_minor AND referred_six_price_minor <= standard_price_minor AND online_only_surcharge_minor = 300000 AND city_million_plus_surcharge_minor = 500000 AND duration_seconds = 2592000 AND resident_commission_bps = 1000 AND nonresident_commission_bps = 1500 AND nonresident_card_fee_minor = 450000"
         },
         "partner_tariff_policy_versions_kind_check": {
           "name": "partner_tariff_policy_versions_kind_check",
@@ -10866,7 +10866,7 @@
         },
         "partner_tariff_policy_versions_id_check": {
           "name": "partner_tariff_policy_versions_id_check",
-          "value": "(char_length(policy_version_id) >= 1) AND (char_length(policy_version_id) <= 128)"
+          "value": "char_length(policy_version_id) >= 1 AND char_length(policy_version_id) <= 128"
         },
         "partner_tariff_policy_versions_currency_check": {
           "name": "partner_tariff_policy_versions_currency_check",
@@ -10882,11 +10882,11 @@
         },
         "partner_tariff_policy_versions_window_check": {
           "name": "partner_tariff_policy_versions_window_check",
-          "value": "(effective_to IS NULL) OR (effective_to > effective_from)"
+          "value": "effective_to IS NULL OR effective_to > effective_from"
         },
         "partner_tariff_policy_versions_entitlements_check": {
           "name": "partner_tariff_policy_versions_entitlements_check",
-          "value": "((partner_kind = 'CENTER'::text) AND (event_entitlements = '{\"bands\": [{\"count\": 10, \"capacity\": 30}]}'::jsonb)) OR ((partner_kind = 'ORGANIZER'::text) AND (event_entitlements = '{\"bands\": [{\"count\": 5, \"capacity\": 50}, {\"count\": 3, \"capacity\": 100}, {\"count\": 1, \"capacity\": 500}]}'::jsonb))"
+          "value": "partner_kind = 'CENTER'::text AND event_entitlements = '{\"bands\": [{\"count\": 10, \"capacity\": 30}]}'::jsonb OR partner_kind = 'ORGANIZER'::text AND event_entitlements = '{\"bands\": [{\"count\": 5, \"capacity\": 50}, {\"count\": 3, \"capacity\": 100}, {\"count\": 1, \"capacity\": 500}]}'::jsonb"
         }
       },
       "policies": {},
@@ -11082,7 +11082,7 @@
           "tableTo": "partner_tariff_policy_versions",
           "schemaTo": "public",
           "columnsFrom": ["policy_version_id", "partner_kind"],
-          "columnsTo": ["partner_kind", "policy_version_id"],
+          "columnsTo": ["policy_version_id", "partner_kind"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -11092,7 +11092,7 @@
       "checkConstraints": {
         "partner_shadow_quotes_money_check": {
           "name": "partner_shadow_quotes_money_check",
-          "value": "(base_price_minor > 0) AND (online_only_surcharge_minor >= 0) AND (city_million_plus_surcharge_minor >= 0) AND (final_price_minor > 0) AND (resident_commission_bps = 1000) AND (nonresident_commission_bps = 1500) AND (nonresident_card_fee_minor = 450000)"
+          "value": "base_price_minor > 0 AND online_only_surcharge_minor >= 0 AND city_million_plus_surcharge_minor >= 0 AND final_price_minor > 0 AND resident_commission_bps = 1000 AND nonresident_commission_bps = 1500 AND nonresident_card_fee_minor = 450000"
         },
         "partner_shadow_quotes_kind_check": {
           "name": "partner_shadow_quotes_kind_check",
@@ -11104,7 +11104,7 @@
         },
         "partner_shadow_quotes_currency_check": {
           "name": "partner_shadow_quotes_currency_check",
-          "value": "(currency = 'RUB'::text) AND (duration_seconds = 2592000)"
+          "value": "currency = 'RUB'::text AND duration_seconds = 2592000"
         },
         "partner_shadow_quotes_count_check": {
           "name": "partner_shadow_quotes_count_check",
@@ -11112,11 +11112,11 @@
         },
         "partner_shadow_quotes_arithmetic_check": {
           "name": "partner_shadow_quotes_arithmetic_check",
-          "value": "((base_price_minor + online_only_surcharge_minor) + city_million_plus_surcharge_minor) = final_price_minor"
+          "value": "(base_price_minor + online_only_surcharge_minor + city_million_plus_surcharge_minor) = final_price_minor"
         },
         "partner_shadow_quotes_entitlements_check": {
           "name": "partner_shadow_quotes_entitlements_check",
-          "value": "((partner_kind = 'CENTER'::text) AND (event_entitlements = '{\"bands\": [{\"count\": 10, \"capacity\": 30}]}'::jsonb)) OR ((partner_kind = 'ORGANIZER'::text) AND (event_entitlements = '{\"bands\": [{\"count\": 5, \"capacity\": 50}, {\"count\": 3, \"capacity\": 100}, {\"count\": 1, \"capacity\": 500}]}'::jsonb))"
+          "value": "partner_kind = 'CENTER'::text AND event_entitlements = '{\"bands\": [{\"count\": 10, \"capacity\": 30}]}'::jsonb OR partner_kind = 'ORGANIZER'::text AND event_entitlements = '{\"bands\": [{\"count\": 5, \"capacity\": 50}, {\"count\": 3, \"capacity\": 100}, {\"count\": 1, \"capacity\": 500}]}'::jsonb"
         }
       },
       "policies": {},
@@ -11279,7 +11279,7 @@
       "checkConstraints": {
         "test_expert_prompt_key_bounded": {
           "name": "test_expert_prompt_key_bounded",
-          "value": "(char_length(asset_key) >= 1) AND (char_length(asset_key) <= 128)"
+          "value": "char_length(asset_key) >= 1 AND char_length(asset_key) <= 128"
         },
         "test_expert_prompt_version_positive": {
           "name": "test_expert_prompt_version_positive",
@@ -11291,7 +11291,7 @@
         },
         "test_expert_prompt_source_bounded": {
           "name": "test_expert_prompt_source_bounded",
-          "value": "((char_length(source_path) >= 1) AND (char_length(source_path) <= 512)) AND (source_path !~ '[[:cntrl:]]'::text)"
+          "value": "char_length(source_path) >= 1 AND char_length(source_path) <= 512 AND source_path !~ '[[:cntrl:]]'::text"
         },
         "test_expert_prompt_status_check": {
           "name": "test_expert_prompt_status_check",
@@ -11299,7 +11299,7 @@
         },
         "test_expert_prompt_activation_check": {
           "name": "test_expert_prompt_activation_check",
-          "value": "(status <> 'approved'::text) OR ((official_contract_evidence IS NOT NULL) AND ((char_length(official_contract_evidence) >= 1) AND (char_length(official_contract_evidence) <= 512)))"
+          "value": "status <> 'approved'::text OR official_contract_evidence IS NOT NULL AND char_length(official_contract_evidence) >= 1 AND char_length(official_contract_evidence) <= 512"
         }
       },
       "policies": {},
@@ -11423,11 +11423,11 @@
       "checkConstraints": {
         "test_expert_campaign_period_check": {
           "name": "test_expert_campaign_period_check",
-          "value": "(effective_to IS NULL) OR (effective_from IS NULL) OR (effective_to > effective_from)"
+          "value": "effective_to IS NULL OR effective_from IS NULL OR effective_to > effective_from"
         },
         "test_expert_campaign_code_bounded": {
           "name": "test_expert_campaign_code_bounded",
-          "value": "(char_length(code) >= 1) AND (char_length(code) <= 128)"
+          "value": "char_length(code) >= 1 AND char_length(code) <= 128"
         },
         "test_expert_campaign_version_positive": {
           "name": "test_expert_campaign_version_positive",
@@ -11447,7 +11447,7 @@
         },
         "test_expert_campaign_prompt_activation_check": {
           "name": "test_expert_campaign_prompt_activation_check",
-          "value": "(status <> 'active'::text) OR ((prompt_asset_id IS NOT NULL) AND (prompt_asset_version IS NOT NULL) AND (effective_from IS NOT NULL))"
+          "value": "status <> 'active'::text OR prompt_asset_id IS NOT NULL AND prompt_asset_version IS NOT NULL AND effective_from IS NOT NULL"
         }
       },
       "policies": {},
@@ -11658,7 +11658,7 @@
               "expression": "user_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -11682,12 +11682,12 @@
           "tableTo": "dialogues",
           "schemaTo": "public",
           "columnsFrom": [
-            "user_id",
             "dialogue_id",
+            "user_id",
             "bot_key",
             "external_chat_id"
           ],
-          "columnsTo": ["bot_key", "external_chat_id", "id", "user_id"],
+          "columnsTo": ["id", "user_id", "bot_key", "external_chat_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -11726,8 +11726,8 @@
           "tableFrom": "test_expert_sessions",
           "tableTo": "test_expert_redemptions",
           "schemaTo": "public",
-          "columnsFrom": ["campaign_version_id", "user_id", "redemption_id"],
-          "columnsTo": ["campaign_version_id", "id", "user_id"],
+          "columnsFrom": ["redemption_id", "campaign_version_id", "user_id"],
+          "columnsTo": ["id", "campaign_version_id", "user_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -11745,19 +11745,19 @@
         },
         "test_expert_session_segment_check": {
           "name": "test_expert_session_segment_check",
-          "value": "(segment IS NULL) OR (segment = ANY (ARRAY['EXPERT'::text, 'CENTER'::text, 'ORGANIZER'::text]))"
+          "value": "segment IS NULL OR (segment = ANY (ARRAY['EXPERT'::text, 'CENTER'::text, 'ORGANIZER'::text]))"
         },
         "test_expert_session_digest_check": {
           "name": "test_expert_session_digest_check",
-          "value": "((name_digest IS NULL) OR (name_digest ~ '^[0-9a-f]{64}$'::text)) AND ((specialization_digest IS NULL) OR (specialization_digest ~ '^[0-9a-f]{64}$'::text))"
+          "value": "(name_digest IS NULL OR name_digest ~ '^[0-9a-f]{64}$'::text) AND (specialization_digest IS NULL OR specialization_digest ~ '^[0-9a-f]{64}$'::text)"
         },
         "test_expert_session_scope_bounded": {
           "name": "test_expert_session_scope_bounded",
-          "value": "((char_length(bot_key) >= 1) AND (char_length(bot_key) <= 128)) AND ((char_length(external_chat_id) >= 1) AND (char_length(external_chat_id) <= 64))"
+          "value": "char_length(bot_key) >= 1 AND char_length(bot_key) <= 128 AND char_length(external_chat_id) >= 1 AND char_length(external_chat_id) <= 64"
         },
         "test_expert_session_copy_bounded": {
           "name": "test_expert_session_copy_bounded",
-          "value": "(char_length(copy_version) >= 1) AND (char_length(copy_version) <= 128)"
+          "value": "char_length(copy_version) >= 1 AND char_length(copy_version) <= 128"
         },
         "test_expert_session_selling_inactive": {
           "name": "test_expert_session_selling_inactive",
@@ -11773,11 +11773,11 @@
         },
         "test_expert_session_progress_check": {
           "name": "test_expert_session_progress_check",
-          "value": "((state = 'awaiting_name'::text) AND (name_digest IS NULL) AND (specialization_digest IS NULL) AND (segment IS NULL)) OR ((state = 'awaiting_specialization'::text) AND (name_digest IS NOT NULL) AND (specialization_digest IS NULL) AND (segment IS NULL)) OR ((state = 'awaiting_segment'::text) AND (name_digest IS NOT NULL) AND (specialization_digest IS NOT NULL) AND (segment IS NULL)) OR ((state = ANY (ARRAY['ready'::text, 'qualified'::text, 'closed'::text])) AND (name_digest IS NOT NULL) AND (specialization_digest IS NOT NULL) AND (segment IS NOT NULL))"
+          "value": "state = 'awaiting_name'::text AND name_digest IS NULL AND specialization_digest IS NULL AND segment IS NULL OR state = 'awaiting_specialization'::text AND name_digest IS NOT NULL AND specialization_digest IS NULL AND segment IS NULL OR state = 'awaiting_segment'::text AND name_digest IS NOT NULL AND specialization_digest IS NOT NULL AND segment IS NULL OR (state = ANY (ARRAY['ready'::text, 'qualified'::text, 'closed'::text])) AND name_digest IS NOT NULL AND specialization_digest IS NOT NULL AND segment IS NOT NULL"
         },
         "test_expert_session_qualified_authority_check": {
           "name": "test_expert_session_qualified_authority_check",
-          "value": "(state <> 'qualified'::text) OR ((campaign_version_id IS NOT NULL) AND (redemption_id IS NOT NULL))"
+          "value": "state <> 'qualified'::text OR campaign_version_id IS NOT NULL AND redemption_id IS NOT NULL"
         }
       },
       "policies": {},
@@ -11866,11 +11866,11 @@
       "checkConstraints": {
         "test_expert_deterministic_bot_bounded": {
           "name": "test_expert_deterministic_bot_bounded",
-          "value": "(char_length(bot_key) >= 1) AND (char_length(bot_key) <= 128)"
+          "value": "char_length(bot_key) >= 1 AND char_length(bot_key) <= 128"
         },
         "test_expert_deterministic_key_bounded": {
           "name": "test_expert_deterministic_key_bounded",
-          "value": "(char_length(request_key) >= 1) AND (char_length(request_key) <= 128)"
+          "value": "char_length(request_key) >= 1 AND char_length(request_key) <= 128"
         },
         "test_expert_deterministic_digest_check": {
           "name": "test_expert_deterministic_digest_check",
@@ -12001,7 +12001,7 @@
       "checkConstraints": {
         "test_expert_redemption_key_bounded": {
           "name": "test_expert_redemption_key_bounded",
-          "value": "(char_length(redemption_idempotency_key) >= 1) AND (char_length(redemption_idempotency_key) <= 128)"
+          "value": "char_length(redemption_idempotency_key) >= 1 AND char_length(redemption_idempotency_key) <= 128"
         },
         "test_expert_redemption_granted_check": {
           "name": "test_expert_redemption_granted_check",
@@ -12009,7 +12009,7 @@
         },
         "test_expert_redemption_nonnegative_check": {
           "name": "test_expert_redemption_nonnegative_check",
-          "value": "(consumed_units >= 0) AND (reserved_units >= 0)"
+          "value": "consumed_units >= 0 AND reserved_units >= 0"
         },
         "test_expert_redemption_capacity_check": {
           "name": "test_expert_redemption_capacity_check",
@@ -12017,7 +12017,7 @@
         },
         "test_expert_redemption_units_even_check": {
           "name": "test_expert_redemption_units_even_check",
-          "value": "((consumed_units % 2) = 0) AND ((reserved_units % 2) = 0)"
+          "value": "(consumed_units % 2) = 0 AND (reserved_units % 2) = 0"
         }
       },
       "policies": {},
@@ -12105,14 +12105,14 @@
               "expression": "redemption_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
               "expression": "status",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "text_ops",
               "isExpression": false
             },
             {
@@ -12135,7 +12135,7 @@
               "expression": "created_at",
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             },
             {
@@ -12176,7 +12176,7 @@
       "checkConstraints": {
         "test_expert_reservation_key_bounded": {
           "name": "test_expert_reservation_key_bounded",
-          "value": "(char_length(request_key) >= 1) AND (char_length(request_key) <= 128)"
+          "value": "char_length(request_key) >= 1 AND char_length(request_key) <= 128"
         },
         "test_expert_reservation_digest_check": {
           "name": "test_expert_reservation_digest_check",
@@ -12192,7 +12192,7 @@
         },
         "test_expert_reservation_provider_request_check": {
           "name": "test_expert_reservation_provider_request_check",
-          "value": "((status = ANY (ARRAY['unknown'::text, 'applied'::text])) AND (provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)) OR ((status = ANY (ARRAY['reserved'::text, 'not_applied'::text])) AND ((provider_request_id IS NULL) OR (provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)))"
+          "value": "(status = ANY (ARRAY['unknown'::text, 'applied'::text])) AND provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text OR (status = ANY (ARRAY['reserved'::text, 'not_applied'::text])) AND (provider_request_id IS NULL OR provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)"
         }
       },
       "policies": {},
@@ -12243,7 +12243,7 @@
               "expression": "reservation_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -12321,7 +12321,7 @@
         },
         "test_expert_outcome_provider_request_check": {
           "name": "test_expert_outcome_provider_request_check",
-          "value": "((outcome = ANY (ARRAY['unknown'::text, 'applied'::text])) AND (provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)) OR ((outcome = 'not_applied'::text) AND ((provider_request_id IS NULL) OR (provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)))"
+          "value": "(outcome = ANY (ARRAY['unknown'::text, 'applied'::text])) AND provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text OR outcome = 'not_applied'::text AND (provider_request_id IS NULL OR provider_request_id ~ '^sha256:[0-9a-f]{64}$'::text)"
         }
       },
       "policies": {},
@@ -12378,7 +12378,7 @@
               "expression": "redemption_id",
               "asc": true,
               "nulls": "last",
-              "opclass": "timestamptz_ops",
+              "opclass": "uuid_ops",
               "isExpression": false
             },
             {
@@ -12422,11 +12422,11 @@
       "checkConstraints": {
         "test_expert_audit_type_bounded": {
           "name": "test_expert_audit_type_bounded",
-          "value": "(char_length(event_type) >= 1) AND (char_length(event_type) <= 64)"
+          "value": "char_length(event_type) >= 1 AND char_length(event_type) <= 64"
         },
         "test_expert_audit_digest_check": {
           "name": "test_expert_audit_digest_check",
-          "value": "(event_digest IS NULL) OR (event_digest ~ '^[0-9a-f]{64}$'::text)"
+          "value": "event_digest IS NULL OR event_digest ~ '^[0-9a-f]{64}$'::text"
         }
       },
       "policies": {},
@@ -12519,7 +12519,7 @@
       "checkConstraints": {
         "consent_document_key_bounded": {
           "name": "consent_document_key_bounded",
-          "value": "(char_length(document_key) >= 1) AND (char_length(document_key) <= 128)"
+          "value": "char_length(document_key) >= 1 AND char_length(document_key) <= 128"
         },
         "consent_document_version_positive": {
           "name": "consent_document_version_positive",
@@ -12527,11 +12527,11 @@
         },
         "consent_document_title_bounded": {
           "name": "consent_document_title_bounded",
-          "value": "(char_length(title) >= 1) AND (char_length(title) <= 256)"
+          "value": "char_length(title) >= 1 AND char_length(title) <= 256"
         },
         "consent_document_body_bounded": {
           "name": "consent_document_body_bounded",
-          "value": "(char_length(body) >= 1) AND (char_length(body) <= 65536)"
+          "value": "char_length(body) >= 1 AND char_length(body) <= 65536"
         },
         "consent_document_digest_check": {
           "name": "consent_document_digest_check",
@@ -12539,7 +12539,7 @@
         },
         "consent_document_body_matches_digest": {
           "name": "consent_document_body_matches_digest",
-          "value": "(text_sha256)::text = encode(digest(body, 'sha256'::text), 'hex'::text)"
+          "value": "text_sha256::text = encode(digest(body, 'sha256'::text), 'hex'::text)"
         },
         "consent_document_status_check": {
           "name": "consent_document_status_check",
@@ -12547,11 +12547,11 @@
         },
         "consent_document_approval_check": {
           "name": "consent_document_approval_check",
-          "value": "(status <> 'approved'::text) OR ((approved_at IS NOT NULL) AND ((char_length(approved_by) >= 1) AND (char_length(approved_by) <= 128)))"
+          "value": "status <> 'approved'::text OR approved_at IS NOT NULL AND char_length(approved_by) >= 1 AND char_length(approved_by) <= 128"
         },
         "consent_document_transition_audit_required": {
           "name": "consent_document_transition_audit_required",
-          "value": "(status <> 'retired'::text) OR (approved_at IS NOT NULL)"
+          "value": "status <> 'retired'::text OR approved_at IS NOT NULL"
         }
       },
       "policies": {},
@@ -12659,7 +12659,7 @@
               "expression": "created_at",
               "asc": false,
               "nulls": "first",
-              "opclass": "uuid_ops",
+              "opclass": "timestamptz_ops",
               "isExpression": false
             }
           ],
@@ -12716,11 +12716,11 @@
         },
         "consent_presentations_session_bounded": {
           "name": "consent_presentations_session_bounded",
-          "value": "(session_key IS NULL) OR ((char_length(session_key) >= 8) AND (char_length(session_key) <= 128))"
+          "value": "session_key IS NULL OR char_length(session_key) >= 8 AND char_length(session_key) <= 128"
         },
         "consent_presentations_purpose_bounded": {
           "name": "consent_presentations_purpose_bounded",
-          "value": "(char_length(purpose) >= 1) AND (char_length(purpose) <= 64)"
+          "value": "char_length(purpose) >= 1 AND char_length(purpose) <= 64"
         },
         "consent_presentations_token_digest_check": {
           "name": "consent_presentations_token_digest_check",
@@ -12803,7 +12803,7 @@
           "tableTo": "expert_referral_ledger_entries",
           "schemaTo": "public",
           "columnsFrom": ["ledger_entry_id", "expert_id"],
-          "columnsTo": ["expert_id", "id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -12813,7 +12813,7 @@
           "tableTo": "expert_referral_reward_grants",
           "schemaTo": "public",
           "columnsFrom": ["reward_grant_id", "expert_id"],
-          "columnsTo": ["expert_id", "id"],
+          "columnsTo": ["id", "expert_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -12828,7 +12828,7 @@
       "checkConstraints": {
         "expert_ledger_allocation_nonzero": {
           "name": "expert_ledger_allocation_nonzero",
-          "value": "(amount_minor <> 0) AND (abs(amount_minor) <= '999999999999'::bigint)"
+          "value": "amount_minor <> 0 AND abs(amount_minor) <= '999999999999'::bigint"
         }
       },
       "policies": {},
@@ -12935,7 +12935,7 @@
       "checkConstraints": {
         "consent_states_purpose_bounded": {
           "name": "consent_states_purpose_bounded",
-          "value": "(char_length(purpose) >= 1) AND (char_length(purpose) <= 64)"
+          "value": "char_length(purpose) >= 1 AND char_length(purpose) <= 64"
         },
         "consent_states_decision_check": {
           "name": "consent_states_decision_check",
@@ -13154,26 +13154,14 @@
       "materialized": false
     }
   },
-  "_meta": {
-    "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
+  "_meta": { "schemas": {}, "tables": {}, "columns": {} },
   "internal": {
     "tables": {
       "expert_ai_request_receipts": {
-        "columns": {
-          "expires_at": {
-            "isDefaultAnExpression": true
-          }
-        }
+        "columns": { "expires_at": { "isDefaultAnExpression": true } }
       },
       "client_catalog_requests": {
-        "columns": {
-          "expires_at": {
-            "isDefaultAnExpression": true
-          }
-        }
+        "columns": { "expires_at": { "isDefaultAnExpression": true } }
       }
     }
   }

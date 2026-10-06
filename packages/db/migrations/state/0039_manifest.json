@@ -2,7 +2,7 @@
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
   "sourceRevision": "5388baeb61b6593b98119fc66eaff632095d85d0",
-  "method": "SQL journal replay to isolated PostgreSQL; drizzle-kit introspect to empty directory; SQL-only catalog supplement",
+  "method": "SQL journal replay; introspection corrected against positional PostgreSQL catalog data; full constraint/index and SQL-only supplement",
   "generatePermitted": false,
   "migrations": [
     {
@@ -206,6 +206,6 @@
       "sha256": "1da4691ba27f4e22bc84346cc367b820d4f12280fcb1f04077f75111bc5b2e0f"
     }
   ],
-  "snapshotSha256": "42a536de6cc3b9d7f3fea4a1382c196a94fc6db6c00de4d87b3ef788ab7aed81",
-  "sqlObjectsSha256": "98cdc8c513268609f517d865a247c876b767540dc917cd00154537d4f25a2a50"
+  "snapshotSha256": "b7dbbb1318fa677e2f43e0975a6f858dae9fab00ff3863899cfd5e7baca8cdc1",
+  "sqlObjectsSha256": "1723fa6d795402eca56b42708a2ecc69f280574a273b9056f42fa901d1a2ef49"
 }
