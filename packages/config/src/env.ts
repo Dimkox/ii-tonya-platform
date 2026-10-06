@@ -464,7 +464,14 @@ export function clientTelegramBotId(
 export function assertClientNavigationConfig(config: RuntimeConfig): void {
   if (config.features.clientTelegramNavigation !== true) return;
   const f = config.features;
+  // The production booking registry processes only local operator cases and
+  // catalogue materialization. It does not own Telegram/provider delivery.
+  const localBookingWorker =
+    f.clientSession === true &&
+    f.clientCatalog === true &&
+    f.clientBooking === true;
   if (
+    (f.workerOutboxDelivery === true && !localBookingWorker) ||
     [
       f.clientTelegramIngress,
       f.clientHybridRouting,
@@ -472,7 +479,6 @@ export function assertClientNavigationConfig(config: RuntimeConfig): void {
       f.testExpertDeterministicFlow,
       f.testExpertSelarti,
       f.testExpertReconciliation,
-      f.workerOutboxDelivery,
       f.b2TelegramDispatch,
       f.selartiCostAdmission,
       f.selartiResponseIngress,

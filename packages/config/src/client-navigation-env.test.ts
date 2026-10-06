@@ -13,6 +13,33 @@ const navigation = {
   CLIENT_TELEGRAM_BOT_KEY: "synthetic-route-key",
   CLIENT_WEB_ORIGIN: "https://client.example",
 };
+const bookingNavigation = {
+  ...navigation,
+  CLIENT_SESSION_ENABLED: "true",
+  CLIENT_TELEGRAM_LOGIN_BOT_USERNAME: "fixture_bot",
+  CLIENT_CATALOG_ENABLED: "true",
+  CLIENT_BOOKING_ENABLED: "true",
+  CLIENT_SESSION_BOOKING_GRANTS_ENABLED: "true",
+  WORKER_OUTBOX_DELIVERY_ENABLED: "true",
+};
+it("permits navigation alongside the complete local catalogue booking chain", () => {
+  expect(loadEnv(bookingNavigation).features).toMatchObject({
+    clientTelegramNavigation: true,
+    clientBooking: true,
+    workerOutboxDelivery: true,
+    clientBookingReserve: false,
+    b2TelegramDispatch: false,
+    clientTelegramIngress: false,
+  });
+});
+it.each([
+  "CLIENT_TELEGRAM_INGRESS_ENABLED",
+  "CLIENT_HYBRID_ROUTING_ENABLED",
+  "B2_TELEGRAM_DISPATCH_ENABLED",
+  "TEST_EXPERT_SELARTI_ENABLED",
+])("still rejects external/content processing with booking: %s", (flag) => {
+  expect(() => loadEnv({ ...bookingNavigation, [flag]: "true" })).toThrow();
+});
 it("defaults navigation off", () => {
   expect(loadEnv(base).features.clientTelegramNavigation).toBe(false);
 });

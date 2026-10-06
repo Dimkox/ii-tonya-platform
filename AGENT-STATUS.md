@@ -1,5 +1,35 @@
 # Agent status — owner-spec 2026-09-16
 
+## Booking activation conflict correction — local continuation
+
+Live remains b4bac0637548a7abe3e1178f442a3304423d667b, booking not activated.
+Read-only activation preflight failed before mutation: navigation exclusivity in
+assertClientNavigationConfig rejected WORKER_OUTBOX_DELIVERY_ENABLED, which booking
+requires. Linnaeus independent review confirmed this Important defect and identified
+insufficient worker health evidence in the operational helper. No flag bypass.
+
+Local env.ts correction permits the worker only with the complete session/catalog/
+booking chain; every external/content processor prohibition remains. Existing
+navigation tests were extended: RED1/32 on the exact exclusivity error, GREEN32/32.
+Config build/types, scoped lint/format, tests typecheck and diff check passed.
+Linnaeus accepted the config patch with no Critical/Important findings; Minor:
+individual missing-prerequisite test cases remain uncovered. No PG or exhausted
+browser test ran. Do not mark the feature live based on this local correction.
+
+Activation helper /tmp/ii-tonya-booking-release.ckaIXB/activate-booking.mjs has
+default read-only validation and explicit --apply mode, under host flock/pinned SSH.
+It still pins deployed b4bac06, so MUST be updated after the new code release.
+Candidate config and zero grants/services/active reservations checked before writes.
+Reserve remains false; only local catalogue/operator outbox topics are composed.
+New worker proof requires active services and fresh completed-cycle heartbeat via
+/proc/MainPID/root/tmp/ii-tonya-worker-heartbeat, with stable PID. That read path was
+verified accessible on the host. Apply has NOT run. A failed apply requires explicit
+state reconciliation, not blind rollback after grants may have been issued.
+
+Real Telegram login was requested asynchronously from the owner; no result yet.
+Continue new RC verification/publication and guarded activation, then outstanding
+ordinary documents/erasure/full acceptance. Factory and Trust CI remain excluded.
+
 ## Published booking code RC — latest live state
 
 Native/web and remote RC match b4bac0637548a7abe3e1178f442a3304423d667b.
