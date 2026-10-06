@@ -1,5 +1,39 @@
 # Agent status — owner-spec 2026-09-16
 
+## Published booking code RC — latest live state
+
+Native/web and remote RC match b4bac0637548a7abe3e1178f442a3304423d667b.
+Deployment exited0; pinned host readback and real Chrome checks passed. Readiness
+alltrue, API/worker/nginx active. Previous425e647 and configuration backups retained.
+Full evidence: docs/test-evidence/production/2026-10-07-booking-rc-preflight.md.
+Current helpers: /tmp/ii-tonya-booking-release.ckaIXB (pinned previous425e647).
+Do not reuse them for another rollout without refreshing identity/previous pins.
+
+IMPORTANT: this deployed the code and additive0040, NOT booking activation.
+Booking/reserve/grant issuance remain off; session/privacy/navigation stay on.
+Catalogue empty by owner decision; real Telegram login unobserved; erasure and
+ordinary document availability remain unresolved. Next work is reviewed runtime
+activation plus remaining product acceptance, not another source-only release.
+No full/exhausted tests rerun. All deployment/browser sessions terminal, owned
+incoming directories and nginx check unit absent. Exact temporary docs stash
+0abcb27d553f27dd8ed816b4ffdc51bb9f40d48d was applied and retained as recovery copy.
+
+## Booking RC publication preflight — latest continuation
+
+Navigation patch is committed in b4bac0637548a7abe3e1178f442a3304423d667b and
+normally pushed to rc/client-consent-factory; remote readback matches. Pre-push
+gate passed. Native/web artifacts are built and signed in the ignored matching
+.native-release/client-web directory; both signatures and packaged imports passed.
+See docs/test-evidence/production/2026-10-07-booking-rc-preflight.md for exact hashes,
+the failed legacy signing option and corrected readiness path, and remaining gates.
+
+Pinned production readback still425e647; API/worker/nginx active and health/ready
+alltrue. No live mutation. Old /tmp/ii-tonya-async-rc.f8bLcK rollout/recovery helpers
+still pin4354818 and MUST be refreshed before use. Booking activation requires
+catalog/local outbox flags together; production registry is topic-allowlisted, not
+a license to activate external providers. All build/push/import/signing sessions
+completed; no background operation remains. Existing test budgets unchanged.
+
 ## 2026-10-06 human-review publication — current owner scope
 
 The active goal is the complete ordinary product route published on ii-tonya.ru
