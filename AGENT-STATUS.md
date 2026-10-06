@@ -1,5 +1,33 @@
 # Agent status — owner-spec 2026-09-16
 
+## 2026-10-06 browser booking code continuation, after foundation
+
+Local code HEAD2c0c7c92e2f1cc40ab102bb0fe321cb375ba8d5b on canonical
+codex/fin-001-client-access-policy. Task3 owner list731f189 and Task4 bridgef5020a8;
+Task5 account UI/shared-session fixes and Task6 focused journey in2c0c7c9.
+Production remains last verified425e647. No live mutation or flag activation here.
+RC push/pre-push gate still pending at this entry; do not infer remote publication.
+
+Focused evidence: list application8/API9/PG3, bridge14, existing booking service6/
+routes6/browser-account6/privacy-client9, booking-client6/view3, real Chrome account
+regressions2 and synthetic-boundary PostgreSQL journey2 passed. Relevant application/
+DB/API/web/tests types, builds, lint and whitespace passed. No full suite rerun.
+Task3 independent Kepler review no Critical/Important. Hooke found two Important UI
+defects: old consent controls after account switch and competing button locks;
+both reproduced in Chrome and fixed RED2→GREEN2. Task6 evidence-only review pending.
+
+New bounded budgets: client-booking-list PG2/3; browser-booking-journey2/3 (first
+collection failure); booking-account browser concurrency3/3 exhausted (first fixture
+routing failure). Booking-client3 invocations including initial missing-module
+failure; this was not behavioral RED. All older exhausted budgets remain unchanged.
+Keep ledger .superpowers/sdd/2026-10-06-browser-booking-authority until release gates
+close. Deferred review minors: extra list error/order coverage, bfcache recovery and
+trailing-slash account booking initialization. Do not mark full product complete.
+
+Real inventory/login and external exact-SHA Trust CI/Database Gate remain release
+gaps. Do not invent provider facts, enable free-text or reinstate written-signing
+prerequisites. Preserve unrelated untracked factory/.qwen/claw files.
+
 ## 2026-10-06 browser booking foundation — current local continuation
 
 Owner approved design, plan, migration-state prerequisite and native execution with
