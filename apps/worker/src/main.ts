@@ -3,6 +3,12 @@ import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
+import { CLIENT_ASYNC_OUTBOX_TOPICS } from "@ii-tonya/worker";
+import {
+  createClientAsyncOutboxRegistry,
+  type ClientAsyncCapabilities,
+  type ClientAsyncRegistry,
+} from "./client-async-outbox.js";
 import {
   createDb,
   PostgresCatalogRepository,
@@ -93,6 +99,7 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly workerOutboxRegistryFactory?: (
     db: DrizzleDb,
@@ -118,7 +125,9 @@ const DEFAULT_SHUTDOWN_GRACE_MS = 30_000;
 export { disabledExpertResidencyProviderReader };
 
 type WorkerOutboxRegistry =
-  LocalOperatorCaseOutboxRegistry | ClientCatalogOutboxRegistry;
+  | LocalOperatorCaseOutboxRegistry
+  | ClientCatalogOutboxRegistry
+  | ClientAsyncRegistry;
 
 export function selectWorkerOutboxRegistry(
   config: RuntimeConfig,
@@ -200,7 +209,12 @@ function requireWorkerOutboxRegistry(
   const topics = registry.topics;
   const acceptedTopics =
     topics !== undefined &&
-    [LOCAL_OPERATOR_CASE_OUTBOX_TOPICS, CLIENT_CATALOG_OUTBOX_TOPICS].some(
+    [
+      LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
+      CLIENT_CATALOG_OUTBOX_TOPICS,
+      CLIENT_ASYNC_OUTBOX_TOPICS,
+      ["telegram.send_text.v1"],
+    ].some(
       (candidate) =>
         topics.length === candidate.length &&
         topics.every((topic, index) => topic === candidate[index]),
@@ -248,6 +262,7 @@ export function composeWorkerOutboxDelivery(
         reconciler: {
           async reconcile(message) {
             const result = await registry.reconcile(message);
+            if (typeof result === "string") return result;
             if (result.kind === "applied") return "applied";
             if (result.kind === "not_applied") return "not_applied";
             if (result.kind === "still_unknown") return "still_unknown";
@@ -272,16 +287,24 @@ export function composeB2TelegramDelivery(
   enabled: boolean,
   /** Явное решение: отправлять клиентские сообщения можно только сверяя согласие субъекта. */
   consentGate: { readonly enabled: boolean },
-  capability?: OutboxDispatcher & OutboxReconciler,
+  capability?: OutboxDispatcher &
+    OutboxReconciler & { topics?: readonly string[]; botKey?: string },
 ) {
   if (!enabled) return undefined;
-  if (capability === undefined) {
+  if (capability === undefined || consentGate.enabled !== true) {
     throw new Error("b2_telegram_delivery_capability_unavailable");
   }
-  const repository = new PostgresOrderedTelegramOutboxRepository(
-    db,
-    consentGate,
-  );
+  const repository = capability.topics?.includes("selarti.request.v1")
+    ? new PostgresOutboxRepository(
+        db,
+        CLIENT_ASYNC_OUTBOX_TOPICS,
+        capability.botKey,
+      )
+    : new PostgresOrderedTelegramOutboxRepository(
+        db,
+        consentGate,
+        capability.botKey,
+      );
   return {
     repository,
     run: () =>
@@ -323,6 +346,30 @@ export function createProductionWorkerRuntimeFactory(
 ): WorkerRuntimeFactory {
   return {
     async create(config) {
+      const clientEnabled = config.features.b2TelegramDispatch === true;
+      const selartiEnabled =
+        config.features.clientHybridRouting === true ||
+        config.features.testExpertSelarti === true;
+      if (
+        clientEnabled &&
+        (config.features.telegramEgressConsentGate !== true ||
+          !config.clientTelegramBotKey ||
+          !deps.clientAsyncCapabilities?.telegram ||
+          typeof deps.clientAsyncCapabilities.telegram.transport?.request !==
+            "function" ||
+          !(
+            deps.clientAsyncCapabilities.telegram.sendMessageUrl instanceof URL
+          ))
+      )
+        throw new Error("b2_telegram_delivery_capability_unavailable");
+      if (
+        selartiEnabled &&
+        (!clientEnabled ||
+          config.features.selartiCostAdmission !== true ||
+          !config.selartiAiConsentPolicyVersion ||
+          typeof deps.clientAsyncCapabilities?.selarti?.request !== "function")
+      )
+        throw new Error("selarti_delivery_capability_unavailable");
       if (
         config.features.workerOutboxDelivery === true &&
         deps.workerOutboxRegistryFactory === undefined
@@ -334,6 +381,20 @@ export function createProductionWorkerRuntimeFactory(
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
+      const clientRegistry = clientEnabled
+        ? createClientAsyncOutboxRegistry(
+            db,
+            config.clientTelegramBotKey!,
+            deps.clientAsyncCapabilities!,
+            selartiEnabled,
+          )
+        : undefined;
+      const clientDelivery = composeB2TelegramDelivery(
+        db,
+        clientEnabled,
+        { enabled: config.features.telegramEgressConsentGate === true },
+        clientRegistry,
+      );
       const workerOutboxRegistry = selectWorkerOutboxRegistry(
         config,
         deps.workerOutboxRegistryFactory === undefined
@@ -393,7 +454,9 @@ export function createProductionWorkerRuntimeFactory(
         },
       );
       const outboxRepository =
-        workerOutbox?.repository ?? new PostgresOutboxRepository(db);
+        workerOutbox?.repository ??
+        clientDelivery?.repository ??
+        new PostgresOutboxRepository(db);
       return createProductionWorkerRuntime({
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
@@ -407,6 +470,9 @@ export function createProductionWorkerRuntimeFactory(
           new PostgresExpertTelegramResidencyCallbackRepository(db),
         expertResidencyProviderReader,
         outboxRepository,
+        ...(clientDelivery === undefined
+          ? {}
+          : { clientAsyncOutboxRunner: clientDelivery.run }),
         ...(workerOutbox === undefined
           ? {}
           : {

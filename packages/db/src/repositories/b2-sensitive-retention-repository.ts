@@ -1,5 +1,9 @@
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import {
+  clientConsentAuthoritySchema,
+  clientDispatchPayloadDigest,
+} from "@ii-tonya/contracts";
 
 export type B2SensitiveRetentionResult = {
   readonly inboundPurged: number;
@@ -48,9 +52,12 @@ export class PostgresB2SensitiveRetentionRepository {
           where i.id=c.id returning i.id
         ) select count(*)::int count from deleted
       `);
-      const outbox = await tx.execute<{ count: number }>(sql`
-        with candidates as materialized (
-          select id from integration_outbox
+      const outbox = await tx.execute<{
+        id: string;
+        topic: string;
+        payload: Record<string, unknown>;
+      }>(sql`
+          select id,topic,payload from integration_outbox
           where topic in ('selarti.request.v1','telegram.send_text.v1')
             and status in ('succeeded','dead_letter')
             and sensitive_redacted_at is null
@@ -66,12 +73,26 @@ export class PostgresB2SensitiveRetentionRepository {
               )
             )
           order by updated_at,id for update skip locked limit ${limit}
-        ), redacted as (
-          update integration_outbox o set payload='{"redacted":true}'::jsonb,
-            sensitive_redacted_at=${now}::timestamptz,updated_at=now()
-          from candidates c where o.id=c.id returning o.id
-        ) select count(*)::int count from redacted
       `);
+      for (const row of outbox.rows) {
+        const authority = clientConsentAuthoritySchema.safeParse(
+          row.payload.consentAuthority,
+        );
+        const retained =
+          row.topic === "selarti.request.v1" &&
+          authority.success &&
+          authority.data.purposes.selarti_ai_processing
+            ? {
+                redacted: true,
+                consentAuthorityDigest: clientDispatchPayloadDigest(
+                  authority.data,
+                ),
+              }
+            : { redacted: true };
+        await tx.execute(
+          sql`update integration_outbox set payload=${JSON.stringify(retained)}::jsonb,sensitive_redacted_at=${now}::timestamptz,updated_at=now() where id=${row.id}::uuid`,
+        );
+      }
       const proposals = await tx.execute<{ count: number }>(sql`
         with candidates as materialized (
           select id from selarti_response_proposals
@@ -84,7 +105,7 @@ export class PostgresB2SensitiveRetentionRepository {
       `);
       return {
         inboundPurged: Number(inbound.rows[0]?.count ?? 0),
-        outboxRedacted: Number(outbox.rows[0]?.count ?? 0),
+        outboxRedacted: outbox.rows.length,
         proposalsRedacted: Number(proposals.rows[0]?.count ?? 0),
       };
     });

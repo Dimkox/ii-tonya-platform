@@ -1,3 +1,7 @@
+import {
+  seedClientConsent,
+  seedClientRequestStarted,
+} from "../../packages/db/src/testkit/client-consent.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { sql } from "drizzle-orm";
@@ -38,12 +42,8 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status)
       values(${userId}::uuid,'telegram','801','bot-b2','801','active')
     `);
-    await database.db.execute(sql`
-      insert into consents(user_id,consent_type,decision,policy_version,created_at)
-      values
-        (${userId}::uuid,'client_messaging','granted','client-msg-v1','2026-08-29T00:00:00Z'),
-        (${userId}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-29T00:00:01Z')
-    `);
+    await seedClientConsent(database.db, userId, "client_messaging");
+    await seedClientConsent(database.db, userId, "selarti_ai_processing");
     const expertUser = await database.createUser();
     const requester = await database.createUser();
     const approver = await database.createUser();
@@ -163,9 +163,9 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       routingEnabled: false,
       correlationId: "b2-local-2001",
       locale: "ru-RU",
-      deadline: "2026-08-29T00:00:30.000Z",
+      deadline: new Date(Date.now() + 60_000).toISOString(),
       occurredAt: "2026-08-29T00:00:00.000Z",
-      messagingConsentPolicyVersion: "client-msg-v1",
+      messagingConsentPolicyVersion: "client-messaging-v1",
       localReplyText:
         "Я помогу с навигацией по сервису. Опишите ваш запрос одним сообщением.",
     });
@@ -230,10 +230,10 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         costAdmissionEnabled: true,
         correlationId: "b2-selarti-2002",
         locale: "ru-RU",
-        deadline: "2026-08-29T00:00:30.000Z",
+        deadline: new Date(Date.now() + 60_000).toISOString(),
         occurredAt: "2026-08-29T00:00:00.000Z",
-        messagingConsentPolicyVersion: "client-msg-v1",
-        selartiConsentPolicyVersion: "selarti-v1",
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        selartiConsentPolicyVersion: "selarti-ai-v1",
       }),
     ).toBe("claimed");
     const request = (
@@ -258,6 +258,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         .digest("hex"),
       receivedAt: "2026-08-29T00:00:10.000Z",
     };
+    await seedClientRequestStarted(database.db, request.requestId);
     const outcomes = await Promise.all(
       Array.from({ length: 4 }, () => proposals.accept(command)),
     );
@@ -320,10 +321,10 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         costAdmissionEnabled: true,
         correlationId: "b2-selarti-2003",
         locale: "ru-RU",
-        deadline: "2026-08-29T00:00:30.000Z",
+        deadline: new Date(Date.now() + 60_000).toISOString(),
         occurredAt: "2026-08-29T00:00:00.000Z",
-        messagingConsentPolicyVersion: "client-msg-v1",
-        selartiConsentPolicyVersion: "selarti-v1",
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        selartiConsentPolicyVersion: "selarti-ai-v1",
       }),
     ).toBe("claimed");
     const request = (
@@ -343,6 +344,10 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       responsePayloadHash: createHash("sha256").update("reject").digest("hex"),
       receivedAt: "2026-08-29T00:00:31.000Z",
     };
+    await database.db.execute(
+      sql`update integration_outbox set payload=jsonb_set(payload,'{deadline}','"2000-01-01T00:00:00Z"'::jsonb) where idempotency_key=${request.requestId}`,
+    );
+    await seedClientRequestStarted(database.db, request.requestId);
     await expect(proposals.accept(base)).resolves.toBe("rejected");
     await expect(
       proposals.accept({ ...base, dialogueId: request.dialogueId }),
@@ -384,9 +389,9 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       routingEnabled: false,
       correlationId: "b2-local-2004",
       locale: "ru-RU",
-      deadline: "2026-08-29T00:00:30.000Z",
+      deadline: new Date(Date.now() + 60_000).toISOString(),
       occurredAt: "2026-08-29T00:00:00.000Z",
-      messagingConsentPolicyVersion: "client-msg-v1",
+      messagingConsentPolicyVersion: "client-messaging-v1",
       localReplyText: "Локальный ответ",
     });
     await ordered.recordAttemptStarted(
@@ -396,6 +401,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       "attempt-2",
       second[0]!.reconciliationKey,
       new Date(),
+      second[0]!.attempt,
     );
     await ordered.markUnknownOutcome(
       second[0]!.id,
@@ -430,7 +436,7 @@ describe("hybrid gateway B2 ordered local delivery", () => {
     );
     const retention = new PostgresB2SensitiveRetentionRepository(database.db);
     const result = await retention.purgeExpired(
-      new Date("2026-10-01T00:00:00Z"),
+      new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
       100,
     );
     expect(result.inboundPurged).toBeGreaterThanOrEqual(4);
@@ -448,9 +454,9 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       routingEnabled: false,
       correlationId: "b2-local-2001",
       locale: "ru-RU",
-      deadline: "2026-08-29T00:00:30.000Z",
+      deadline: new Date(Date.now() + 60_000).toISOString(),
       occurredAt: "2026-08-29T00:00:00.000Z",
-      messagingConsentPolicyVersion: "client-msg-v1",
+      messagingConsentPolicyVersion: "client-messaging-v1",
     });
     expect(replay).toBe("duplicate");
     const durable = await database.db.execute<{
@@ -458,7 +464,12 @@ describe("hybrid gateway B2 ordered local delivery", () => {
       raw: number;
     }>(sql`
       select (select count(*)::int from dialogue_inbound_tombstones) tombstones,
-        (select count(*)::int from integration_outbox where topic in ('selarti.request.v1','telegram.send_text.v1') and payload <> '{"redacted":true}'::jsonb) raw
+        (select count(*)::int from integration_outbox where topic in ('selarti.request.v1','telegram.send_text.v1') and not (
+          payload = '{"redacted":true}'::jsonb or (topic='selarti.request.v1'
+            and payload-'consentAuthorityDigest'='{"redacted":true}'::jsonb
+            and jsonb_typeof(payload->'consentAuthorityDigest')='string'
+            and payload->>'consentAuthorityDigest' ~ '^[0-9a-f]{64}$')
+        )) raw
     `);
     expect(durable.rows[0]).toEqual({ tombstones: expect.any(Number), raw: 0 });
     expect(durable.rows[0]!.tombstones).toBeGreaterThanOrEqual(4);
@@ -499,12 +510,12 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         costAdmissionEnabled: true,
         correlationId,
         locale: "ru-RU",
-        deadline: "2026-10-01T00:01:00.000Z",
+        deadline: new Date(Date.now() + 60_000).toISOString(),
         occurredAt: "2026-09-20T00:00:00.000Z",
-        messagingConsentPolicyVersion: "client-msg-v1",
-        selartiConsentPolicyVersion: "selarti-v1",
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        selartiConsentPolicyVersion: "selarti-ai-v1",
       });
-      return (
+      const created = (
         await database.db.execute<{
           requestId: string;
           dialogueId: string;
@@ -513,6 +524,8 @@ describe("hybrid gateway B2 ordered local delivery", () => {
         from integration_outbox where correlation_id=${correlationId} and topic='selarti.request.v1'
       `)
       ).rows[0]!;
+      await seedClientRequestStarted(database.db, created.requestId);
+      return created;
     };
     const responses = createSelartiResponseService({
       enabled: true,

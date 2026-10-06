@@ -28,6 +28,244 @@ Preserve the unrelated untracked `.qwen`, factory files and old claw evidence.
 No secrets or environment values may enter output or commits. All instructions
 and dates below remain historical context unless verified against current state.
 
+### Local-only async patch — verification stopped, 2026-10-05 06:57 UTC
+
+Production and the remote RC remain `4354818c0187d41057b9660deb847e15a002a574`;
+fresh public SOURCE_SHA matched and readiness returned200 at approximately06:55 UTC.
+Local HEAD remains `045a2de303b0191c5f345a7d3c2bd3d6ca09eb2d`.
+The async implementation and review patches are UNCOMMITTED and NOT DEPLOYED.
+
+All three independent initial reviews were collected. Thirteen consolidated patch
+items were returned to the implementer; closure is pending. The latest outbox PG
+run exited1:20/23 passed. All three failures occurred in the newly authored
+`reviewBudget` fixture before behavioral assertions, violating
+`expert_order_settlement_interval`. Its timestamp/duration correction is applied
+but UNVERIFIED. Do not weaken the database constraint or financial assertions.
+
+The owner has been asked for ONE explicit additional invocation of only
+`tests/integration/outbox-repository.test.ts`. No answer/exception has been
+received at this continuation point. No fourth run, renamed test, inline-PG
+substitute, push, or deployment is authorized by silence.
+
+Updated exhausted PG budgets: outbox-repository3/3 (latest20/23 FAIL),
+consent-egress-gate3/3 (7/7 PASS), hybrid-message-gateway-b2 3/3 (6/6 PASS),
+client-consent-async-fencing, test-expert-trial-postgres, privacy-workflow,
+navigation replay, catalogue-worker and client-backup-erasure-evidence each3/3.
+B1/B3/API-B1 remain1/3. The inherited aggregate remains interrupted, not green.
+Build/typechecks/lint passed before the final fixture-only correction; none
+certifies the three unexecuted financial/residual scenarios.
+
+Preserve all modified/new source files. Read the current-stop section in
+`docs/superpowers/implementation-artifacts/spec-client-async-authority.md`.
+Initial review reports/diff/findings and next-release helpers are retained in
+`/tmp/ii-tonya-async-rc.f8bLcK`; helpers are pinned to previous production4354818
+and must preserve `CLIENT_NAVIGATION_RELEASE_ENABLED=true`.
+Task logs remain under `.superpowers/sdd/2026-10-05-client-async-authority/`.
+The local PostgreSQL17.5 fixture remains available at127.0.0.1:33110 in
+`ii-tonya-completion-pg-20261005` for the explicitly authorized continuation.
+
+Latest factory PR observed at06:20 UTC is open#247,
+`5886e734b170307c6026f98c026f5e1a0e6ae834`, with merged#245 unchanged.
+It is narrow local-checker compatibility, not deployed public Trust CI or
+ii-tonya enrollment. No external receipt is claimed. Read-only production
+firewall diagnostics were cleaned up; firewall/routes were not changed.
+The full commercial product remains incomplete, independently of this test stop.
+
+### Production recheck and rejected patch closure — 2026-10-05 12:10 UTC
+
+The owner explicitly repeated production publication authorization. No additional
+deployment permission is needed, but the separate exhausted-test exception has
+not been answered. No new commit, push, deployment or capability activation has
+occurred. Local HEAD is still045a2de; native/web and remote RC are still4354818.
+
+Fresh pinned SSH readback: API, worker and Nginx active; readiness reports all four
+checks true. Local server HTTPS and direct external HTTPS both return200. The
+controller's inherited HTTP(S) proxy at127.0.0.1:11080 timed out for this site;
+`curl --noproxy '*'` succeeded with normal TLS verification. This was a controller
+network-path failure, not evidence of a production outage. No proxy, firewall,
+route or production configuration was modified.
+
+Read-only production inventory at12:10:26 UTC: experts0, services0,
+publishable services0, future slots0, approved consent documents0,
+navigation receipts0. Session/privacy/navigation flags are on; browser widget,
+personal ingress, hybrid routing, Selarti response ingress, B2 delivery and
+general outbox delivery remain off. Public catalogue returns an empty items
+array. A combined Telegram readback failed without a stage-specific result, so
+it supplies no fresh Telegram delivery or webhook evidence.
+
+Independent read-only patch closure did NOT approve release. Main traced these
+three remaining consumer-level defects and returned them to the same implementer:
+
+1. Terminal financial `not_applied` maps to the runner's retry result, permitting
+   another dispatch after the reservation was released.
+2. Production fallback recovery is still unscoped when only the filtered client
+   runner is configured, so it can recover another bot's leases.
+3. Bounded cleanup skips a busy subject, but later claim/start can select it and
+   block the sequential dispatcher and unrelated claimed work.
+
+The three previously failed outbox scenarios remain UNVERIFIED, latest20/23,
+3/3 invocations exhausted. Two original financial/residual review items are
+evidence-blocked independently of these three defects. No fourth invocation,
+renamed case or inline-PG substitute is permitted without the requested exception.
+The request was superseded at approximately12:15 UTC: at most TWO additional
+invocations of that same outbox file, to reproduce the newly found dispatch
+convoy and verify its correction. This is not permission for other exhausted
+files, aggregate suites, arbitrary retries or provider calls. No answer has
+arrived. The local PostgreSQL17.5 fixture was rechecked running at the same
+loopback port; no PostgreSQL test or inline substitute was executed.
+The implementer owns only the existing async code/tests/spec/plan/operations
+document patch round; main owns this status. No additional writer or full-suite
+run was authorized. Preserve in-progress status and report bounded unit evidence
+separately from missing PostgreSQL and release evidence.
+
+Allowed non-PG continuation: the final-outcome/runner regression reproduced one
+unsafe retry and redispatch, then passed4/4 after distinguishing the terminal
+accounting outcome. The real runtime-factory regression reproduced unscoped
+recovery with the client-only runner, then passed3/3 after recovery ownership was
+corrected. Synthetic DB boundaries are explicit: neither proves PostgreSQL locking
+or the three earlier fixture-blocked scenarios. The new convoy consumer regression
+is in the same existing outbox PG file and remains unexecuted; its code defect is
+not declared fixed. Independent final closure and publication remain pending.
+The implementer froze and returned control at approximately12:21 UTC. No owned
+verification process remains. Final three-package build/typechecks, tests typecheck,
+scoped lint/format and whitespace checks exited0; the first new test typing failure
+is retained in the ledger. No PG run, commit, push or deploy occurred. Fresh direct
+public HTTPS is200 and SOURCE_SHA is still4354818. Preserve the unchanged test
+budgets and await the explicit bounded exception before the convoy RED/GREEN.
+
+Latest factory PR is still247, now head9352f1ead48d1fbcf07364663073b60e3c945817.
+The new delta freezes exact fixture heads and records the previous external
+root-unittest timeout; it does not deploy public Trust CI or enroll ii-tonya.
+The factory's exact9352f1e Trust CI check completed successfully at07:04:28 UTC;
+that result belongs to the factory repository, not this product. Consumer issue243
+remains open, with no new resolution at this readback.
+GitHub check-runs for the live ii-tonya4354818 SHA still total0. Do not relabel
+local checks or another repository's reviews as this product's Trust CI receipt.
+
+### Goal blocked-audit checkpoint — 2026-10-05 12:22 UTC
+
+The preceding goal turn made concrete progress (two bounded consumer fixes).
+This automatic continuation made no product progress: identity, spec, original
+20/23 failure evidence and whitespace were rechecked; the explicit two-run
+exception still has no answer. All owned implementer/reviewer work is terminal.
+No test, deployment, new feature, alternate PG probe or repeated review was started.
+This is the first no-progress audit turn after those fixes; keep the full goal
+active, and do not treat automatic continuation as the missing authorization.
+
+### Blocked audit passed — 2026-10-05 12:24 UTC
+
+The same explicit-test-authorization blocker was present in the implementation
+handoff turn and both subsequent automatic goal continuations. The handoff turn
+made bounded code progress; the two automatic continuations made no product
+progress. Current identity and the original failing evidence were rechecked; no
+owner answer or new qualifying evidence exists, and no owned job remains live.
+The next required convoy RED/GREEN cannot be executed under the exhausted limit.
+Request goal status `blocked`, not complete or paused. Preserve the full objective,
+all local changes, test budgets and existing deployment authorization. Resume the
+bounded PostgreSQL work only after the owner answers the two-run exception; that
+exception would not by itself close the remaining product/provider/Trust gates.
+
+### Explicit bounded exception — 2026-10-05 14:26 UTC
+
+The owner answered "Да" to the exact two-additional-runs question. This authorizes
+at most TWO further invocations of only `tests/integration/outbox-repository.test.ts`
+for convoy RED and correction GREEN; all other test limits remain unchanged.
+Existing production authorization is unchanged; a green file is not full-product
+or external Trust CI evidence. Identity and the PostgreSQL17.5 loopback fixture
+were revalidated; environment check with RequireDocker passed.
+
+Exception invocation1 is assigned to the coordinator for the current authored
+regression and corrected settlement fixture. The original implementer must not run
+PostgreSQL independently. Reserve invocation2 until all changes and static checks
+are ready. Keep both logs, including failures; never silently reset this allowance.
+
+Exception invocation1 (logical outbox run4),14:28:54 UTC: exit1,23/24.
+The convoy failed meaningfully: no unrelated dispatch occurred while the first
+subject lock was held. All three previously fixture-blocked financial/residual
+scenarios passed after the existing interval correction. Log:
+`.superpowers/sdd/2026-10-05-client-async-authority/owner-exception-1-red.log`.
+Only ONE additional outbox invocation remains, coordinator-operated after the
+implementer's bounded correction and static review. No other PG budget changed.
+
+### Owner removes signing from the launch route — 2026-10-05 14:31 UTC
+
+The owner explicitly reiterated the earlier no-written-consent/no-signature
+launch agreement: "Мы не стартанем так если ещё письменные согласия будем
+требовать .. обсуждали же. Исключая из маршрута". The parent spec now records
+that override. Public catalogue, booking and cabinet must not require electronic
+signing; ordinary per-purpose authorization and privacy protections remain.
+Detailed special-category history processing stays unavailable in that launch
+route. Signature integration is deferred, not falsely completed, and must not be
+reintroduced as a launch blocker. Preserve all unaffected ordinary-route work,
+verification and financial boundaries. The existing async convoy correction and
+the single remaining owner-authorized PostgreSQL invocation continue unchanged.
+
+### Frozen convoy patch review — 2026-10-05 14:49 UTC
+
+The original implementer froze the bounded admission/deferral patch after successful
+package builds/typechecks, tests typecheck, scoped lint/format and whitespace checks.
+The independent reviewer statically closed terminal financial nonapplication and
+client-only recovery ownership. The convoy correction has one remaining static
+finding: with a recovery limit smaller than the expired unstarted backlog, the
+generic second recovery pass can incorrectly create unknown-outcome facts for the
+unstarted overflow. Both recovery APIs need an independent exclusion predicate.
+The same implementer owns that narrow correction plus same-file backlog regressions;
+no additional writer or test invocation is authorized. Final bounded review follows.
+Main has NOT run exception invocation2. Latest PostgreSQL evidence is still23/24;
+exactly ONE owner-authorized outbox invocation remains. No commit, push, deployment,
+provider activation or production data mutation occurred.
+
+### Final owner-authorized run — 2026-10-05 14:53 UTC
+
+Independent rereview accepted the two recovery exclusion predicates for final PG
+verification. Main used exception invocation2 (logical outbox run5) at14:53:08:
+exit1,28/34,13.46s. Log:
+`.superpowers/sdd/2026-10-05-client-async-authority/owner-exception-2-final.log`.
+The original convoy, both small-limit backlog cases, both started-uncertainty cases
+and all earlier financial/residual scenarios passed. Six post-claim contention
+cases failed during fixture setup, before their behavioral assertions: the second
+same-bot client reused updateId1 and correctly received `duplicate` from the real
+producer. The implementer owns a fixture-only unique synthetic update-ID correction;
+production idempotency and all assertions must remain intact. Its behavioral result
+is UNVERIFIED until a new explicitly authorized run.
+
+Both extra invocations are consumed; no PG allowance remains. No renamed test,
+inline substitute, additional suite, push or deployment follows this failed result.
+Main owns current result updates to async spec/plan/operations; the implementer owns
+only the final test-fixture/static-check handoff and its ignored ledger. The owner’s
+no-written-consent launch correction is already recorded in the parent spec; it is
+not a claim that this async patch or the full product has been released.
+
+Fixture-only handoff at14:56 UTC: `reviewClient` now uses `BigInt(chat)` from its
+existing monotonic synthetic sequence. Production code/idempotency and assertions
+were not changed. Tests typecheck and test-file lint exited0; six post-claim
+behaviors remain UNVERIFIED. All owned work is frozen and no process remains.
+No further PostgreSQL invocation is authorized. The next required action is one
+explicitly approved additional invocation of the same outbox file, not a reset of
+the earlier budget. Preserve both owner-exception logs and the full failed result.
+
+### Additional owner exception passed — 2026-10-05 15:00 UTC
+
+The owner answered "Да" to ONE additional invocation of the same outbox file.
+Identity, environment with RequireDocker and the existing loopback PostgreSQL17.5
+fixture were revalidated. Main ran exactly that invocation at15:00:26 UTC:
+**exit0,34/34**, duration23.69s. All six previously fixture-blocked post-claim
+contention cases now passed, alongside the original convoy, lossless limited-batch
+recovery, started uncertainty, bot partition and financial/residual scenarios.
+No production code or assertions changed in this turn. Log:
+`.superpowers/sdd/2026-10-05-client-async-authority/owner-exception-3-final.log`.
+Log SHA256: a5f75060bb3fa96fc4be05bdc176e04eb08c8b07f4ed3458057ee006ad8d9498.
+
+This supersedes the six-scenario local verification blocker, not the other product
+or release gates. Six logical outbox invocations have now been used: original3,
+the earlier two-run exception and this separate one-run exception. No further
+allowance remains; other test budgets and interrupted aggregate are unchanged.
+No commit, push, deploy or activation occurred. The patch is still local against
+HEAD045a2de, and the last observed live/RC source remains4354818. Preserve the
+owner's ordinary launch route without written consent/signing; no special-category
+mode or full-product readiness is claimed. Next work is release-evidence closure,
+not another replay of this passing file.
+
 Updated: 2026-09-21 — owner verdict **Б** on the consent ТЗ review: DEC-PLT-004
 partially reopened, gate cards DEC-PLT-011…014 and TASK-PLT-017…021 created (see
 the 2026-09-21 section below). This is the live continuation file. Read

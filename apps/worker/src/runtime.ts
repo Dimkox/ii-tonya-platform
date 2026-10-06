@@ -59,6 +59,7 @@ export interface WorkerRuntimeDependencies {
 }
 
 export interface ProductionWorkerRuntimeDependencies {
+  readonly clientAsyncOutboxRunner?: BoundedJob;
   readonly workerOutboxRegistry?: Readonly<{
     readonly topics: readonly string[];
   }>;
@@ -267,20 +268,23 @@ export function createProductionWorkerRuntime(
         now: deps.now(),
         batchSize,
       }),
-    recoverExpiredLeases: workerOutboxEnabled
-      ? async () => ({
-          dispatch: 0,
-          reconciliation: 0,
-          reason: "owned_by_filtered_runner",
-        })
-      : async () => ({
-          dispatch:
-            await deps.outboxRepository.recoverExpiredDispatchLeases(batchSize),
-          reconciliation:
-            await deps.outboxRepository.recoverExpiredReconciliationLeases(
-              batchSize,
-            ),
-        }),
+    recoverExpiredLeases:
+      workerOutboxEnabled || deps.clientAsyncOutboxRunner !== undefined
+        ? async () => ({
+            dispatch: 0,
+            reconciliation: 0,
+            reason: "owned_by_filtered_runner",
+          })
+        : async () => ({
+            dispatch:
+              await deps.outboxRepository.recoverExpiredDispatchLeases(
+                batchSize,
+              ),
+            reconciliation:
+              await deps.outboxRepository.recoverExpiredReconciliationLeases(
+                batchSize,
+              ),
+          }),
     reconcileUnknownOutcomes: async () => ({
       reconciled: 0,
       reason: "providers_disabled",
@@ -352,10 +356,14 @@ export function createProductionWorkerRuntime(
           pending: 0,
           reason: "maturity_worker_disabled",
         }),
-    deliverConfirmedOutbox: workerOutboxEnabled
-      ? deps.workerOutboxRunner!
-      : async () =>
-          deps.jobsRepository.materializeOperatorCasesBatch(batchSize),
+    deliverConfirmedOutbox: async () => {
+      const local = workerOutboxEnabled
+        ? await deps.workerOutboxRunner!()
+        : await deps.jobsRepository.materializeOperatorCasesBatch(batchSize);
+      return deps.clientAsyncOutboxRunner
+        ? { local, clientAsync: await deps.clientAsyncOutboxRunner() }
+        : local;
+    },
     processorPrivacy:
       deps.clientCatalogRetention === undefined &&
       deps.clientSessionRetention === undefined &&

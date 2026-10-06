@@ -1,3 +1,4 @@
+import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
@@ -33,8 +34,8 @@ describe("hybrid gateway B3 budget admission", () => {
     locale: "ru-RU",
     deadline: "2026-08-29T12:00:30.000Z",
     occurredAt: at,
-    messagingConsentPolicyVersion: "client-msg-v1",
-    selartiConsentPolicyVersion: "selarti-v1",
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    selartiConsentPolicyVersion: "selarti-ai-v1",
   });
 
   beforeAll(async () => {
@@ -45,9 +46,8 @@ describe("hybrid gateway B3 budget admission", () => {
     await database.db.execute(
       sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram','903',${botKey},'903','active')`,
     );
-    await database.db.execute(
-      sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,'client_messaging','granted','client-msg-v1','2026-08-28T00:00:00Z'),(${userId}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-28T00:00:01Z')`,
-    );
+    await seedClientConsent(database.db, userId, "client_messaging");
+    await seedClientConsent(database.db, userId, "selarti_ai_processing");
   }, 120_000);
   afterAll(async () => database.stop());
 
@@ -261,9 +261,8 @@ describe("hybrid gateway B3 budget admission", () => {
     await database.db.execute(
       sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${secondUser}::uuid,'telegram','904',${botKey},'904','active')`,
     );
-    await database.db.execute(
-      sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${secondUser}::uuid,'client_messaging','granted','client-msg-v1','2026-08-28T00:00:00Z'),(${secondUser}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-28T00:00:01Z')`,
-    );
+    await seedClientConsent(database.db, secondUser, "client_messaging");
+    await seedClientConsent(database.db, secondUser, "selarti_ai_processing");
     const secondInput = (id: bigint) => ({
       ...input(id),
       externalUserId: "904",

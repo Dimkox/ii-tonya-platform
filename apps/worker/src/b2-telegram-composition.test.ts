@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DrizzleDb } from "@ii-tonya/db";
-import { composeB2TelegramDelivery } from "./main.js";
+import {
+  composeB2TelegramDelivery,
+  createProductionWorkerRuntimeFactory,
+} from "./main.js";
 
 describe("B2 Telegram worker composition", () => {
   it("is default-off and fails closed without a provider capability", () => {
@@ -11,5 +14,26 @@ describe("B2 Telegram worker composition", () => {
     expect(() =>
       composeB2TelegramDelivery(db, true, { enabled: false }),
     ).toThrow("b2_telegram_delivery_capability_unavailable");
+  });
+  it("refuses an unfenced capability even when an old flag disables the gate", () => {
+    expect(() =>
+      composeB2TelegramDelivery(
+        {} as DrizzleDb,
+        true,
+        { enabled: false },
+        {
+          dispatch: async () => ({ kind: "applied" }),
+          reconcile: async () => "still_unknown",
+        },
+      ),
+    ).toThrow("b2_telegram_delivery_capability_unavailable");
+  });
+  it("checks production client capability readiness before opening a database", async () => {
+    await expect(
+      createProductionWorkerRuntimeFactory().create({
+        features: { b2TelegramDispatch: true, telegramEgressConsentGate: true },
+        providers: { yookassa: false },
+      } as never),
+    ).rejects.toThrow("b2_telegram_delivery_capability_unavailable");
   });
 });

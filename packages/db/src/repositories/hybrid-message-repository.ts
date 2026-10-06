@@ -2,7 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { reserveSelartiCost } from "./selarti-budget-repository.js";
-import { hasCurrentTestExpertConsent } from "./test-expert-consent-authority.js";
+import {
+  captureClientConsentAuthority,
+  lockClientConsentSubject,
+} from "./client-consent-authority.js";
 import { PostgresClientIngressReplayRepository } from "./client-ingress-replay-repository.js";
 
 export type HybridPersistInput = {
@@ -60,26 +63,27 @@ export class PostgresHybridMessageRepository {
     return this.db.transaction(async (tx) => {
       const identity = (
         await tx.execute<{ userId: string }>(
-          sql`select ci.user_id as "userId" from channel_identities ci join users u on u.id=ci.user_id and u.active=true where ci.provider=${input.provider} and ci.bot_key=${input.botKey} and ci.external_id=${input.externalUserId} and ci.external_chat_id=${input.externalChatId} and ci.status='active' limit 1 for share`,
+          sql`select ci.user_id as "userId" from channel_identities ci join users u on u.id=ci.user_id and u.active=true where ci.provider=${input.provider} and ci.bot_key=${input.botKey} and ci.external_id=${input.externalUserId} and ci.external_chat_id=${input.externalChatId} and ci.status='active' limit 1`,
         )
       ).rows[0];
       if (!identity) return "rejected";
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${identity.userId}, 0))`,
-      );
+      await lockClientConsentSubject(tx, identity.userId);
       if (
-        !(await hasCurrentTestExpertConsent(tx, {
-          userId: identity.userId,
-          messagingPolicyVersion: input.messagingConsentPolicyVersion,
-          ...(input.route === "complex_dialogue" &&
-          input.selartiConsentPolicyVersion !== undefined
-            ? { selartiPolicyVersion: input.selartiConsentPolicyVersion }
-            : {}),
-        })) ||
-        (input.route === "complex_dialogue" &&
-          input.selartiConsentPolicyVersion === undefined)
+        input.route === "complex_dialogue" &&
+        input.selartiConsentPolicyVersion === undefined
       )
         return "rejected";
+      const consentAuthority = await captureClientConsentAuthority(tx, {
+        subjectId: identity.userId,
+        botKey: input.botKey,
+        chatId: input.externalChatId,
+        externalUserId: input.externalUserId,
+        messagingPolicyVersion: input.messagingConsentPolicyVersion,
+        ...(input.route === "complex_dialogue"
+          ? { selartiPolicyVersion: input.selartiConsentPolicyVersion! }
+          : {}),
+      });
+      if (!consentAuthority) return "rejected";
       await this.testHooks.afterConsentRead?.(identity.userId);
       let dialogue = (
         await tx.execute<{ id: string; userId: string }>(
@@ -163,6 +167,7 @@ export class PostgresHybridMessageRepository {
           botKey: input.botKey,
           chatId: input.externalChatId,
           text: reply,
+          consentAuthority,
         };
         const payloadHash = createHash("sha256")
           .update(JSON.stringify(payload))
@@ -206,6 +211,7 @@ export class PostgresHybridMessageRepository {
           locale: input.locale,
           promptVersion: "hybrid-b1",
           deadline: input.deadline,
+          consentAuthority,
         };
         const existing = (
           await tx.execute<{

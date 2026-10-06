@@ -318,17 +318,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     }
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
+        // Re-read authority after the subject barrier, including after a lock wait.
+        await tx.execute(sql`set transaction isolation level read committed`);
         await tx.execute(sql`set local statement_timeout='2000ms'`);
         await tx.execute(sql`set local lock_timeout='1000ms'`);
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
         const consent = one(
           (
             await tx.execute<{ id: string; decision: string }>(sql`
-        insert into consents (user_id, consent_type, decision, policy_version, basis)
+        insert into consents (user_id, consent_type, decision, policy_version, basis, created_at)
         values (
           ${command.targetUserId}::uuid,
           ${command.purpose},
@@ -340,7 +341,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
              then 'revoked' else 'denied'
            end),
           ${command.policyVersion},
-          'consent'
+          'consent', clock_timestamp()
         )
         returning id, decision
       `)
@@ -396,7 +397,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
             ? one(
                 (
                   await tx.execute<{ id: string; decision: string }>(sql`
-          insert into consents (user_id, consent_type, decision, policy_version, basis)
+          insert into consents (user_id, consent_type, decision, policy_version, basis, created_at)
           values (
             ${command.targetUserId}::uuid,
             'expert_handoff',
@@ -408,7 +409,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
                then 'revoked' else 'denied'
              end),
             'handoff-v1',
-            'consent'
+            'consent', clock_timestamp()
           )
           returning id, decision
         `)

@@ -1,4 +1,5 @@
 export { brandId } from "./ids.js";
+export * from "./client-consent-authority.js";
 export {
   backupVerificationBindingSchema,
   backupVerificationEvidenceSchema,

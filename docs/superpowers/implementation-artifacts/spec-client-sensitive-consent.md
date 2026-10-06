@@ -16,7 +16,7 @@ context:
 
 **Problem:** The client consent flow must make each processing purpose explicit and enforce privacy boundaries before content can enter storage, models, queues, experts, or external processors.
 
-**Approach:** Deliver the full disabled-by-default candidate described by `client-consent.factory.json`: authoritative consent evidence, fail-closed ingress, safe catalog, Telegram/web control surfaces, revocation fencing, scoped expert transfer, erasure/retention, content-free observability, runtime composition, and release evidence.
+**Approach:** Deliver the client launch route described by `client-consent.factory.json`, subject to the owner's explicit 2026-10-05 route correction below: authoritative ordinary-consent evidence, fail-closed ingress, safe catalog, Telegram/web control surfaces, revocation fencing, scoped expert transfer, erasure/retention, content-free observability, runtime composition, and release evidence. Written special-category consent and electronic signing are not prerequisites for entering the launch route; the detailed special-category conversation remains unavailable in that route.
 
 ## Boundaries & Constraints
 
@@ -38,6 +38,37 @@ context:
 | TRANSFER  | Changed expert, meeting, note, or snapshot                  | Old authorization rejected; new scoped authorization required  | No enumeration or history leakage    |
 
 </frozen-after-approval>
+
+## Owner route correction — 2026-10-05, 14:31 UTC
+
+The owner explicitly stated that requiring written consent would prevent launch
+and instructed its removal from the route, referring to the earlier no-signature
+release agreement. This supersedes the initial factory bundle's inclusion of
+written special-category consent as a launch prerequisite. The bundle itself is
+retained as the original source, not silently rewritten or declared completed.
+
+- Initial customer path: public catalogue, booking and cabinet without an
+  electronic-signature step. Ordinary processing purposes retain their separate
+  applicable authorization and verified presentation; authentication, payment,
+  `/start` or offer acceptance do not manufacture consent.
+- Do not invite, accept into storage or send for processing a detailed
+  special-category history in this route. Removing signing from onboarding does
+  not enable that capability or turn Telegram authentication into a signature.
+- CAP-3's written-signature integration and its positive signed-conversation
+  scenarios are deferred outside this launch route, not passed or implemented.
+  Negative admission, legacy-denial, unsolicited/third-party input and
+  no-replay protections remain required. Preserve every unaffected acceptance
+  requirement, financial rule and privacy right.
+- Continue ordinary-purpose withdrawal/outbox fencing, scoped expert access,
+  real catalogue/booking/login, ordinary legal documents, erasure/recovery,
+  content-free telemetry and release verification. Do not treat this correction
+  as permission to bypass their tests or invent provider/Trust CI evidence.
+- A future detailed special-category mode is a separate decision and acceptance
+  increment. Its signing work must not reappear as a blocker to this ordinary
+  launch route without a new owner instruction.
+
+This records the owner's route decision; no claim of a live cutover, complete
+ordinary customer journey or passed full acceptance follows from this amendment.
 
 ## Code Map
 
@@ -191,5 +222,7 @@ verification and live browser/API readback passed for this bounded RC.
 See [exact production evidence](../../test-evidence/production/4354818c-backup-proof-web-landmarks-2026-10-05.md).
 No migration or provider/erasure activation occurred. Real commercial catalogue
 data and real-user Telegram login/delivery remain absent/unobserved; external
-Trust CI and the other signature/provider/legal/retention gates remain open.
+Trust CI and applicable ordinary-route provider/legal/retention gates remain open.
+The later owner correction above removes signing from launch prerequisites;
+historical signature gaps describe the deferred detailed mode only.
 The next implementable increment is original-consent asynchronous fencing.

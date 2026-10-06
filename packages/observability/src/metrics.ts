@@ -392,6 +392,7 @@ const workerOutboxTopics = new Set([
   "admin_negative_feedback",
   "catalog_show",
   "telegram_send_text",
+  "selarti_request",
 ]);
 const workerOutboxPhases = new Set([
   "claim",
@@ -408,6 +409,7 @@ const workerOutboxOutcomes = new Set([
   "no_op",
 ]);
 const workerOutboxReasonClasses = new Set([
+  "client_authority_invalid",
   "invalid_payload",
   "local_source_invalid",
   "attempts_exhausted",
@@ -421,11 +423,13 @@ export type WorkerOutboxMetricLabels = Readonly<{
     | "safety_operator_escalation"
     | "admin_negative_feedback"
     | "catalog_show"
-    | "telegram_send_text";
+    | "telegram_send_text"
+    | "selarti_request";
   phase: "claim" | "dispatch" | "reconciliation" | "lease_recovery";
   outcome:
     "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
   reasonClass:
+    | "client_authority_invalid"
     | "invalid_payload"
     | "local_source_invalid"
     | "attempts_exhausted"
