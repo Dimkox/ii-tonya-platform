@@ -11,6 +11,21 @@ context:
   - docs/superpowers/plans/2026-10-05-client-async-authority.md
 ---
 
+## Bounded RC deployed — 2026-10-06, 07:36 UTC
+
+Source425e647a6e8a577095df2d9a89f28660d5a781ef is published on the RC branch and
+installed in native/web production. Normal pre-push gate, full workspace/tests
+typecheck, committed-graph native/web builds, packaged imports, artifact signatures
+and checksums passed. Live browser/API/host readback matched the exact installed SHA.
+Previous4354818 and protected backups remain; temporary rollout staging was cleaned.
+No PostgreSQL or full-suite rerun, migrations or provider activation occurred.
+See [production evidence](../../test-evidence/production/2026-10-06-client-async-authority-rc.md).
+
+Status remains `in-progress` for the separate external release/acceptance gates:
+GitHub check-runs0, no external Trust CI/Database Gate receipt, and the full ordinary
+commercial journey is not complete. This section supersedes earlier local-only
+deployment statements below, not the preserved historical verification results.
+
 ## Latest focused verification — 2026-10-05, 15:00 UTC
 
 The owner explicitly authorized ONE further invocation of the same outbox file.

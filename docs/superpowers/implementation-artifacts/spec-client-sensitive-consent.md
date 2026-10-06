@@ -210,7 +210,7 @@ remain off. Factory Trust CI enrollment, signature/provider/legal evidence and
 the other parent gaps are not satisfied by this RC. Next independent code slices
 are verified backup evidence and original-consent asynchronous fencing.
 
-## Latest production RC — 2026-10-05, 05:50 UTC
+## Previous production RC — 2026-10-05, 05:50 UTC
 
 Native and web now run `4354818c0187d41057b9660deb847e15a002a574`, pushed normally
 to `rc/client-consent-factory`. The backup-proof boundary now requires verified
@@ -226,3 +226,17 @@ Trust CI and applicable ordinary-route provider/legal/retention gates remain ope
 The later owner correction above removes signing from launch prerequisites;
 historical signature gaps describe the deferred detailed mode only.
 The next implementable increment is original-consent asynchronous fencing.
+
+## Latest production RC — 2026-10-06, 07:36 UTC
+
+Native/web and remote RC now match425e647a6e8a577095df2d9a89f28660d5a781ef.
+Original-consent asynchronous fencing and the reviewed lossless queue corrections
+are deployed with existing capability flags unchanged. Live browser/API/host checks
+passed; previous4354818 and configuration backups are retained. See
+[release evidence](../../test-evidence/production/2026-10-06-client-async-authority-rc.md).
+
+The ordinary launch correction remains in force: no written consent or EP prerequisite,
+no detailed special-category mode. Real public services remain absent and real-user
+Telegram login/delivery unobserved. Exact-SHA external Trust CI, ordinary document/data,
+scoped transfer, erasure and full applicable acceptance remain separate requirements.
+This bounded RC does not mark the complete product finished.

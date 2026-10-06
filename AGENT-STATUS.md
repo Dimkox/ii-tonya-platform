@@ -1,5 +1,37 @@
 # Agent status — owner-spec 2026-09-16
 
+## 2026-10-06 published async RC — current continuation
+
+Owner explicitly commanded deployment. Native and web on ii-tonya.ru and remote
+`rc/client-consent-factory` now match425e647a6e8a577095df2d9a89f28660d5a781ef.
+Separate host157.22.187.237, root `/opt/ii-tonya-platform`. API/worker/Nginx active;
+readiness all4true. Live Chrome/HTTP checks passed around07:36 UTC. Previous4354818
+native/web and configuration backups are retained; owned incoming directories and
+temporary Nginx-check unit are absent. Four brief restart connection-refused retries
+preceded readiness. Migration bytes are unchanged; no provider capability activated.
+
+Full workspace/tests typecheck, native/web builds, packaged entrypoint imports,
+normal pre-push gate, Cosign signatures and checksum verification passed. The earlier
+34/34 focused PostgreSQL evidence was hash-rechecked, not rerun; all six logical
+outbox invocations remain consumed and other exhausted budgets are unchanged.
+No full/multipath suite, force push or hook bypass. Exact-SHA GitHub check-runs0;
+external Trust CI/Database Gate evidence is not fabricated. Factory PR247 head9352f1e
+and consumer issue243 remain unchanged/open at this readback.
+
+See [release evidence](docs/test-evidence/production/2026-10-06-client-async-authority-rc.md).
+Ignored artifacts/logs/screenshots are in `.native-release/client-web-425e647a6e8a577095df2d9a89f28660d5a781ef/`.
+Runtime navigation/session/privacy remain on; personal ingress/provider paths,
+general delivery, browser widget and erasure remain off. Public catalogue still0;
+real-user Telegram login/delivery remain unobserved. This is a deployed bounded RC,
+NOT completion of the full ordinary commercial journey or factory acceptance.
+Written consent/EP is excluded from launch prerequisites; special detailed mode
+remains unavailable. Preserve unrelated untracked factory/.qwen/claw files.
+
+Existing `/tmp/ii-tonya-async-rc.f8bLcK` rollout helpers are pinned to previous4354818;
+do not reuse unchanged for a future deployment. Freshly establish identity/target.
+Local post-release documentation may be ahead of deployed425e647; do not mistake
+documentation-only HEAD for the installed source. Older sections below are history.
+
 ## 2026-10-05 production continuation — read before historical entries
 
 The canonical working branch is `codex/fin-001-client-access-policy`; always

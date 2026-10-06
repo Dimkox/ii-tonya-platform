@@ -1,5 +1,10 @@
 # Client asynchronous authority
 
+Deployed bounded RC on 2026-10-06:425e647a6e8a577095df2d9a89f28660d5a781ef,
+native/web and remote RC matching. [Live release evidence](../test-evidence/production/2026-10-06-client-async-authority-rc.md)
+records successful readback and retained rollback. Feature activation is unchanged;
+publication is not completion of the full product or external release gates.
+
 CT-012 candidate, disabled by default. Independent static closure preceded the latest
 focused PG pass; external release gates remain open. The implementation contract and exact verification ledger are in
 [the spec](../superpowers/implementation-artifacts/spec-client-async-authority.md).
@@ -29,9 +34,9 @@ Original convoy, backlog-limit recovery, preservation of started uncertainty and
 financial/residual scenarios passed. All authorized outbox runs are consumed.
 The latest log is `owner-exception-3-final.log` in the existing ignored task directory.
 Independent static closure and this focused pass do not certify the full product,
-external Trust CI or live providers. No commit, push, deployment, signing provider
-or personal free-text activation followed. Signing remains excluded from ordinary
-launch prerequisites.
+external Trust CI or live providers. Publication subsequently occurred as documented
+above, without signing-provider or personal free-text activation. Signing remains
+excluded from ordinary launch prerequisites.
 
 An admitted operation carries `consentAuthority` in existing outbox JSONB: version 1,
 the canonical subject UUID, and original decision UUID / decimal revision pairs.
