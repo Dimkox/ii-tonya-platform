@@ -53,6 +53,10 @@ Reviewer source inspection is not independent execution of every reported comman
 
 This is local implementation evidence, not production acceptance. Production was not
 changed and is last recorded at425e647. RC push/gate status is recorded separately.
+The first normal pre-push refused publication: one older schema parity test still
+pinned journal0039. The exact baseline was advanced to the already-approved0040
+entry, preserving all assertions; focused regression went RED1/GREEN3. This is a
+test-inventory correction, not a migration edit or check bypass.
 Exact-SHA external Trust CI and Database Gate, real inventory and real-user Telegram
 login remain unproven. The synthetic journey is not live identity/provider evidence.
 Follow the [current activation section](../runbooks/client-booking-activation.md)
