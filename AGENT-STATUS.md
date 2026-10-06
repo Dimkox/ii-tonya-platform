@@ -1,5 +1,25 @@
 # Agent status — owner-spec 2026-09-16
 
+## Live ordinary booking composition — latest state
+
+Native/web/remote RC now d0a34370b72e57bf56bf0a9806d31432d5931fa0.
+Signed rollout and activation exited0. Catalog, booking owner read/cancel,
+new-session booking grants and topic-allowlisted local worker are enabled.
+Reserve creation remains false (empty catalogue accepted). External/content/provider
+capabilities remain off. Fresh worker completed-cycle heartbeat/stablePID, API
+readiness and individual services were required for activation success.
+
+Real Chrome public/account/negative-auth checks passed; actual Telegram login is
+still unobserved and was requested from owner. No synthetic live user or inventory.
+Erasure and ordinary document availability remain unresolved; goal is NOT complete.
+Evidence: docs/test-evidence/production/2026-10-07-booking-activation.md.
+Artifacts .native-release/client-web-d0a34370b72e57bf56bf0a9806d31432d5931fa0/;
+helpers /tmp/ii-tonya-booking-activation.BmIJgf/. Runtime backup before activation
+retained. Do not blindly run source-rollout recovery after grant issuance; reconcile
+current grants/bookings and preserve read/cancel. Next work: documents/erasure and
+full acceptance mapping, not another repeated booking deployment. No exhausted
+test files rerun. Operational reviewer Feynman accepted corrected script and closed.
+
 ## Booking activation conflict correction — local continuation
 
 Live remains b4bac0637548a7abe3e1178f442a3304423d667b, booking not activated.
