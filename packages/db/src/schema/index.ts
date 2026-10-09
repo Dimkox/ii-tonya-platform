@@ -9,3 +9,4 @@ export * from "./expert-residency.js";
 export * from "./commercial-policy.js";
 export * from "./partner-commerce.js";
 export * from "./test-expert-trial.js";
+export * from "./privacy-requests.js";

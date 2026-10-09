@@ -8,6 +8,13 @@ Latest recorded publication: `b658b5c15c6992b7596569ab2311ed4a9971d2a6`
 (2026-10-09). See the publication section of the
 [gap audit](../2026-10-06-human-review-gap-audit.md).
 
+Owner's latest instruction requests fictional catalogue data, superseding the
+earlier empty-display choice. Six explicitly labelled, display-only demo cards
+are implemented locally and under review, not yet published. After that release,
+reviewers must see the demo disclosure on every card and no booking/payment
+action. Real inventory and its error/empty states remain separate; the historical
+published-state observations below still describe b658b5c until updated.
+
 ## Reviewer paths
 
 1. Open `/`, `/catalog`, `/privacy` and `/oferta` on desktop and mobile. Public

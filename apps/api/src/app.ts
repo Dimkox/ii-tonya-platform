@@ -15,6 +15,7 @@ import type {
   ExpertReferralAdminService,
   OperatorCaseService,
   PrivacyService,
+  ErasureRequestService,
   SelartiProposalAcceptResult,
 } from "@ii-tonya/application";
 import {
@@ -101,6 +102,7 @@ export interface AppDependencies {
   bookingService: BookingService;
   catalogService: CatalogService;
   privacyService: PrivacyService;
+  erasureRequests?: ErasureRequestService;
   consentEvidence?:
     | {
         issuePresentation(command: {
@@ -491,6 +493,8 @@ export async function buildApp(
         }),
     widgetEnabled: deps.config.clientWeb?.widgetEnabled === true,
     privacyEnabled: deps.config.features.clientPrivacy === true,
+    erasureRequestsEnabled: deps.config.features.clientErasureRequests === true,
+    ...(deps.erasureRequests ? { erasureRequests: deps.erasureRequests } : {}),
     bookingEnabled:
       deps.config.features.clientBooking === true &&
       deps.clientBookingService !== undefined,

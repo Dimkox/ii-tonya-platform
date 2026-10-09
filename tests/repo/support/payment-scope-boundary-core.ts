@@ -592,6 +592,22 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0041_client_erasure_requests.sql",
+    "2e54f405b3a15acccf8c5cafd88dc385ccba5a0b5b287e8e0e5c8cd1c04a18ee",
+  ],
+  [
+    "packages/db/migrations/meta/0041_snapshot.json",
+    "365c054817f116f51c3e8b548a18191e9041700617e117b0222f2a7e98e33941",
+  ],
+  [
+    "packages/db/migrations/state/0041_manifest.json",
+    "34d68756512bf30eefa1fe3a0ad1bbbf0a2ca1150ab59a86cfd2a4bb305ae952",
+  ],
+  [
+    "packages/db/migrations/state/0041_sql_objects.json",
+    "be90ac47a3012b04af76ac275893e303cb48849716f2f47b299047433e9d2d25",
+  ],
+  [
     "packages/db/migrations/0040_client_session_booking_grants.sql",
     "abd7de7b230598e2f63309c660c98de4d1812e87737dcefbfe0e8a15f2f32979",
   ],
@@ -785,7 +801,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "db04e9ea2bcf4c1a83962716b6a16373432895d1417b01b858f86a96259d28b1",
+    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -865,7 +881,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "db04e9ea2bcf4c1a83962716b6a16373432895d1417b01b858f86a96259d28b1",
+    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -884,6 +900,7 @@ const approvedDatabaseRelations = new Set([
   "client_catalog_snapshots",
   "client_catalog_tombstones",
   "client_identity_proof_receipts",
+  "client_erasure_requests",
   "expert_telegram_residency_callbacks",
   "client_profiles",
   "client_session_booking_grants",

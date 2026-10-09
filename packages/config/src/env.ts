@@ -83,6 +83,7 @@ const schema = z
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_ERASURE_REQUESTS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_WEB_ORIGIN: z
       .string()
       .refine((value) => {
@@ -395,6 +396,7 @@ export type RuntimeConfig = {
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
     clientPrivacy?: boolean;
+    clientErasureRequests?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientTelegramNavigation?: boolean;
@@ -631,6 +633,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
       clientPrivacy: value.CLIENT_PRIVACY_ENABLED === "true",
+      clientErasureRequests: value.CLIENT_ERASURE_REQUESTS_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientTelegramNavigation:

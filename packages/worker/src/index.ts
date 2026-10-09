@@ -34,3 +34,4 @@ export * from "./b2-sensitive-retention.js";
 export * from "./telegram-send-text-dispatcher.js";
 export * from "./selarti-request-dispatcher.js";
 export * from "./test-expert-trial-reconciliation.js";
+export * from "./erasure-requests.js";

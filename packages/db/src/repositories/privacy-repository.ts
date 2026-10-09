@@ -90,6 +90,7 @@ export interface SubjectExport {
   }[];
 }
 export interface StartErasureCommand {
+  readonly requestId?: string;
   readonly targetUserId: string;
   readonly correlationId: string;
   readonly idempotencyKey: string;
@@ -804,6 +805,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         ).rows[0];
         if (subject === undefined)
           throw new Error("Privacy subject is unavailable");
+        if (command.requestId !== undefined) {
+          if (command.idempotencyKey !== `erasure-request:${command.requestId}`)
+            throw new Error("Erasure request binding is invalid");
+          const request = (
+            await tx.execute(sql`
+            select id from client_erasure_requests
+            where id=${command.requestId}::uuid and user_id=${command.targetUserId}::uuid
+            for update
+          `)
+          ).rows[0];
+          if (!request) throw new Error("Erasure request binding is invalid");
+        }
         await tx.execute(sql`
         update users set active=false,updated_at=clock_timestamp()
         where id=${command.targetUserId}::uuid
@@ -973,6 +986,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`update privacy_deletion_jobs set erasure_receipt = ${JSON.stringify(receipt)}::jsonb, updated_at = now() where id = ${job.id}::uuid`,
         );
+        if (command.requestId !== undefined) {
+          await tx.execute(sql`update client_erasure_requests set job_id=${job.id}::uuid
+            where id=${command.requestId}::uuid and user_id=${command.targetUserId}::uuid`);
+        }
         return receipt;
       }),
     );
@@ -1058,15 +1075,20 @@ export class PostgresPrivacyWorkflowRepository {
       throw new Error("Privacy processing is disabled");
   }
 
-  async getJob(jobId: string) {
-    return this.db.transaction(async (tx) => {
+  async getJob(jobId: string, transaction?: Transaction) {
+    // Receipt reads supply their transaction so ownership, retained facts and
+    // proof checks share both locks and database-enforced wait bounds.
+    const read = async (tx: Transaction) => {
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
       const row = await loadBackupJob(tx, jobId, true);
       if (row.status === "backup_verified") {
         await requireCompletedErasureWork(tx, jobId);
         await requirePersistedBackupProof(tx, row);
       }
       return backupJobState(row);
-    });
+    };
+    return transaction ? read(transaction) : this.db.transaction(read);
   }
 
   async getAttempt(jobId: string, processor: string) {

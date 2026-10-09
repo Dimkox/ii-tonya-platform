@@ -13,6 +13,21 @@ const items = [
   { displayName: "Beta", serviceCode: "career", language: "en" },
   { displayName: "Gamma", serviceCode: "coaching", language: "en" },
 ];
+it("shows six clearly fictional demo cards without booking or payment authority", () => {
+  const html = renderCatalogPage();
+  const demo = html.match(
+    /<section[^>]*data-demo-catalog[\s\S]*?<\/section>/u,
+  )?.[0];
+  expect(demo).toBeDefined();
+  expect(demo).toContain("Вымышленные данные");
+  expect(demo?.match(/data-demo-card/gu)).toHaveLength(6);
+  expect(demo?.match(/Демо · вымышленный профиль/gu)).toHaveLength(6);
+  expect(demo?.match(/Запись и оплата недоступны/gu)).toHaveLength(6);
+  expect(demo).not.toMatch(
+    /<a\b|<button\b|<form\b|data-catalog-item|https?:|₽/iu,
+  );
+  expect(html).toContain("data-catalog-results");
+});
 it("offers two labelled selects, loading status, and no personal input or login requirement", () => {
   const html = renderCatalogPage();
   expect(html).toContain(

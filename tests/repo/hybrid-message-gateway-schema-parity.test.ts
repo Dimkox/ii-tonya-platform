@@ -38,10 +38,10 @@ describe("B1 schema/migration parity", () => {
       ),
     ).toHaveLength(1);
     expect(journal.entries.at(-1)).toEqual({
-      idx: 40,
+      idx: 41,
       version: "7",
-      when: 1791244800000,
-      tag: "0040_client_session_booking_grants",
+      when: 1791504000000,
+      tag: "0041_client_erasure_requests",
       breakpoints: true,
     });
   });

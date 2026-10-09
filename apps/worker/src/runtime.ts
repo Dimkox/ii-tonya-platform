@@ -67,6 +67,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly clientErasureRequests?: BoundedJob;
   readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
     processDueBatch(command: {
@@ -367,12 +368,16 @@ export function createProductionWorkerRuntime(
     processorPrivacy:
       deps.clientCatalogRetention === undefined &&
       deps.clientSessionRetention === undefined &&
-      deps.clientBookingErasure === undefined
+      deps.clientBookingErasure === undefined &&
+      deps.clientErasureRequests === undefined
         ? async () => ({
             processed: 0,
             reason: "privacy_capability_disabled",
           })
         : async () => ({
+            ...(deps.clientErasureRequests === undefined
+              ? {}
+              : { erasureRequests: await deps.clientErasureRequests() }),
             ...(deps.clientCatalogRetention === undefined
               ? {}
               : { clientCatalog: await deps.clientCatalogRetention() }),

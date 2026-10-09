@@ -198,6 +198,7 @@ export const privacyDeletionJobs = pgTable(
   (table) => [
     unique("privacy_deletion_jobs_subject_idempotency_unique")
       .on(table.userId, table.idempotencyKey),
+    unique("privacy_deletion_jobs_id_subject_unique").on(table.id, table.userId),
   ],
 );
 export const privacyProcessorAttempts = pgTable(

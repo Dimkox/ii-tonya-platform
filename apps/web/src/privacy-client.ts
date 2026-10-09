@@ -5,7 +5,7 @@ export interface BrowserSession {
   botUsername?: string;
   widgetEnabled?: boolean;
   privacyAvailable?: boolean;
-  erasureAvailable: false;
+  erasureAvailable: boolean;
   bookingAvailable?: boolean;
   bookingReserveAvailable?: boolean;
 }
@@ -32,7 +32,23 @@ export class PrivacyApiError extends Error {
     super(status === 401 ? "session_expired" : "privacy_request_failed");
   }
 }
+export interface ErasureProgress {
+  requestId: string;
+  requestedAt: string;
+  stage:
+    | "awaiting_execution"
+    | "deleting"
+    | "awaiting_backup"
+    | "needs_attention"
+    | "completed";
+  retainedFacts: {
+    ledgerFactsPreserved: number;
+    auditFactsPreserved: number;
+  } | null;
+}
 export class PrivacyClient {
+  private erasureReceipt = "";
+  private erasureAvailable = false;
   authenticated = false;
   private csrf = "";
   private states: ConsentState[] = [];
@@ -46,6 +62,8 @@ export class PrivacyClient {
     };
   }
   private advanceEpoch(): void {
+    this.erasureReceipt = "";
+    this.erasureAvailable = false;
     ++this.epoch;
     for (const listener of this.authorityListeners) listener();
   }
@@ -175,6 +193,7 @@ export class PrivacyClient {
       this.presentations.clear();
     }
     this.authenticated = authenticated;
+    this.erasureAvailable = authenticated && session.erasureAvailable === true;
     this.csrf = csrf;
     this.bookingAvailable = authenticated && session.bookingAvailable === true;
     this.bookingReserveAvailable =
@@ -323,6 +342,41 @@ export class PrivacyClient {
   async export(): Promise<unknown> {
     this.requireSession();
     return this.call("privacy/export");
+  }
+  prepareErasureReceipt(): string {
+    this.requireSession();
+    if (!this.erasureAvailable) throw new PrivacyApiError(503);
+    if (!this.erasureReceipt) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      this.erasureReceipt = `er1.${btoa(String.fromCharCode(...bytes))
+        .replace(/\+/gu, "-")
+        .replace(/\//gu, "_")
+        .replace(/=+$/u, "")}`;
+    }
+    return this.erasureReceipt;
+  }
+  async requestErasure(): Promise<ErasureProgress> {
+    return this.call("privacy/erasure-requests", "POST", {
+      receiptToken: this.prepareErasureReceipt(),
+      confirmed: true,
+    });
+  }
+  async readOwnedErasure(): Promise<ErasureProgress> {
+    this.requireSession();
+    return this.call("privacy/erasure-requests");
+  }
+  async readErasureReceipt(receiptToken: string): Promise<ErasureProgress> {
+    const response = await this.request("/v1/browser/privacy/erasure-status", {
+      method: "POST",
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(this.options.timeoutMs ?? 10000),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ receiptToken }),
+    });
+    if (!response.ok) throw new PrivacyApiError(response.status);
+    return response.json() as Promise<ErasureProgress>;
   }
   async logout(): Promise<void> {
     this.advanceEpoch();

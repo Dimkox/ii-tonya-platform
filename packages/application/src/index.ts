@@ -28,3 +28,4 @@ export * from "./test-expert-segmentation.js";
 export * from "./test-expert-trial-metrics.js";
 export * from "./test-expert-telegram-service.js";
 export * from "./client-navigation-gateway.js";
+export * from "./erasure-request-service.js";

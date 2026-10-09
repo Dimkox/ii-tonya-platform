@@ -5,6 +5,7 @@ import {
 } from "./privacy-client.js";
 import { readMiniAppLaunchData } from "./telegram-launch.js";
 import { bindBookingActions } from "./booking-view.js";
+import { bindErasureActions, erasureMarkup } from "./erasure-view.js";
 
 const labels: Record<string, string> = {
   client_profile: "Профиль клиента",
@@ -29,7 +30,7 @@ function page(title: string): string {
     <p>Каждая цель управляется отдельно. Вход подтверждает твой аккаунт и сам по себе не даёт согласия на обработку сообщений, передачу эксперту или ИИ.</p>
     <section data-account-login><button class="button primary" type="button" data-login disabled>Войти через Telegram</button><div data-login-help></div></section>
     <p role="status" aria-live="polite" tabindex="-1" data-account-status>Проверяем доступность входа…</p>
-    <button type="button" class="button ghost" data-retry>Обновить</button><div data-account-private></div>
+    <button type="button" class="button ghost" data-retry>Обновить</button><div data-account-private></div>${erasureMarkup()}
     </main><footer class="legal-footer"><nav aria-label="Навигация"><a href="/catalog">Каталог услуг</a><a href="/consent">Согласия</a><a href="/my-data">Мои данные</a><a href="/privacy">Политика конфиденциальности</a><a href="/">На главную</a></nav></footer>`;
 }
 export const renderConsentPage = () => page("Твои согласия");
@@ -64,6 +65,7 @@ export function bindPrivacyActions(root: ParentNode): void {
       window.location.pathname + window.location.search,
     );
   const client = new PrivacyClient();
+  const updateErasure = bindErasureActions(root, client);
   const status = root.querySelector<HTMLElement>("[data-account-status]")!;
   const privateArea = root.querySelector<HTMLElement>(
     "[data-account-private]",
@@ -101,6 +103,7 @@ export function bindPrivacyActions(root: ParentNode): void {
     privateArea.replaceChildren();
     login.disabled = true;
     session = await client.probe();
+    updateErasure(session.erasureAvailable);
     loginSection.hidden = client.authenticated;
     if (!session.available) {
       message(
@@ -151,7 +154,7 @@ export function bindPrivacyActions(root: ParentNode): void {
         })
         .join("")}</div>
       <div class="hero-actions"><button class="button ghost" type="button" data-withdraw-all ${states.some((s) => s.inForce) ? "" : "disabled"}>Отозвать все действующие согласия</button><button class="button primary" type="button" data-export-data>Скачать мои данные</button></div>
-      <p>Удаление через кабинет пока недоступно: полнота удаления и подтверждения от обработчиков и резервных копий ещё не проверены. Запрос не отправлен. Контакты для обращения указаны в <a href="/privacy">политике конфиденциальности</a>.</p>`,
+      <p>Запрос удаления и проверка его статуса доступны в разделе «Удаление данных» ниже.</p>`,
     );
     privateArea
       .querySelectorAll<HTMLButtonElement>("[data-open-document]")

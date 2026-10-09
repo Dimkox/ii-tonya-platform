@@ -1,5 +1,71 @@
 # Human-review publication gap audit — 2026-10-06
 
+## Pre-installation readback for erasure RC — 2026-10-09
+
+Pinned-key read-only SSH/SQL confirmed native and web still at
+b658b5c15c6992b7596569ab2311ed4a9971d2a6; API, worker and nginx each active.
+Migration journal contains41 applied entries ending timestamp1791244800000
+(local journal0040); client_erasure_requests does not exist; deletion jobs0.
+Queries used read-only mode, statement5s and lock1s limits. No data, settings,
+services or release links changed. Local journal adds only0041; systemd,
+migration entrypoint and dependency lockfile have no changes.
+This is preflight, not a migration execution or release verification.
+
+## Resumed-goal evidence reconciliation — 2026-10-09
+
+The acceptance table below is the original audit, not an up-to-date claim that
+all implementation remains absent. This reconciliation preserves its unresolved
+scope while distinguishing code, recorded tests and genuine live acceptance.
+No test suite was rerun for this reconciliation.
+
+| Cases          | Inspected evidence                                                                                                                                                                                                                                | Remaining acceptance                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| AC-001, AC-005 | `client-navigation-replay.test.ts` asserts one receipt across eight competing changed bodies and zero users, identities, consents, inbound and outbox rows. Navigation release records 4/4 PG tests.                                              | This is navigation storage evidence, not complete logs/APM/backup sink inspection or every consent entry point.        |
+| AC-006         | Navigation replay tests cover restart, arbitrary age, namespace isolation and token rotation.                                                                                                                                                     | Consent grant after rejected content needs its distinct scenario; ordinary replay protection alone does not prove it.  |
+| AC-012         | `client-consent-async-fencing.test.ts` checks withdrawal/regrant leaves old queued reply unclaimable while a fresh reply is claimable, and both lock orders of start/withdrawal. Its implementation ledger records 20/20 on final allowed PG run. | This is local transaction evidence; not real provider delivery acceptance.                                             |
+| AC-013         | Same file tests both lock orders of withdrawal/response persistence, proposal count, derived original authority and duplicate acceptance.                                                                                                         | Full late-response/old-outbound path requires the associated outbox evidence; no real provider result is manufactured. |
+| AC-007, AC-010 | Booking composition was published after the original table; see `production/2026-10-07-booking-activation.md`.                                                                                                                                    | Catalogue intentionally empty; reservation creation off; genuine authenticated journey remains unobserved.             |
+| AC-016         | Current b658b5c release includes original document and bounded owner evidence; PG9/9 plus scope25/25 and date14/14 are recorded above/below.                                                                                                      | Authentic user's historical-document download is still not observed.                                                   |
+| AC-019, AC-020 | b658b5c publication records eight rendered routes, anonymous private401, no JS errors/unexpected requests and mobile overflow false. Compatible rollback files are retained.                                                                      | No live rollback drill; this is not every rights/withdrawal or accessibility scenario.                                 |
+| AC-015         | Request/status implementation is assigned under `spec-ac015-erasure-requests.md`.                                                                                                                                                                 | Not released. Actual processor deletion, backup proof, retained exceptions and safe restore remain required.           |
+
+The two inspected navigation/fencing test files have no diff between published
+async source425e647a6e8a577095df2d9a89f28660d5a781ef and current published
+b658b5c15c6992b7596569ab2311ed4a9971d2a6. That preserves test-source identity;
+it is not a new execution or proof that all transitive dependencies are unchanged.
+Exhausted PG budgets remain exhausted.
+
+Fresh TLS-verified pinned-host reads returned the b658b5c SOURCE_SHA and
+`/health/ready` JSON with all four checks true. Local DNS lookup timed out;
+`--resolve ii-tonya.ru:443:157.22.187.237` bypassed only name resolution, not TLS.
+`/api/ready` returns SPA HTML and is not a valid readiness probe.
+
+`docs/operations/data-retention.md` still records missing genuine backup
+attestation/custody, approved policy binding and post-certification child-work
+invariant. Its proposed 35-day timer is not deletion evidence. The older public
+legal review does not itself approve the new purpose-specific documents or
+establish those infrastructure facts. Owner-delegated technical checkpoints do
+not manufacture them. None of these rows closes the full-product goal.
+
+Read-only SSH inventory during this continuation found twelve scheduled system
+timers, no scheduled application-backup timer, and a disabled
+`pg_basebackup@.timer` template. The deployment user's crontab produced no output.
+The expected `/opt/ii-tonya-platform/backups` directory was absent; `/var/backups`
+exists. The combined inventory command exited2 because one requested path was
+absent, not because the SSH connection failed. No backup files were opened,
+changed or deleted. This observation does not cover root crontab, PostgreSQL WAL
+archives, manual dumps, external storage or hosting-provider snapshots, and
+therefore cannot justify a zero-copy manifest or a completed erasure claim.
+
+Follow-up PostgreSQL queries used the existing runtime connection with
+`default_transaction_read_only=on`, a five-second statement timeout and no
+credential or row-level identity output. Current counts: client sessions0,
+active sessions0, identity-proof receipts0. This supplies no real-login evidence;
+it does not prove that no historical login ever occurred because records may
+have been removed. PostgreSQL reports `archive_mode=off` and `wal_level=replica`.
+Those settings do not exclude filesystem or hosting snapshots and do not close
+the backup-evidence gap.
+
 ## Published evidence export RC — 2026-10-09
 
 Exact source `b658b5c15c6992b7596569ab2311ed4a9971d2a6` is pushed to

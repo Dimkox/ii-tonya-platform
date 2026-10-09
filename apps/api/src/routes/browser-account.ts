@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import type {
   ClientPrincipalResolver,
   ClientSessionService,
+  ErasureRequestService,
 } from "@ii-tonya/application";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
@@ -16,6 +17,8 @@ export interface BrowserAccountOptions {
   botUsername?: string;
   widgetEnabled: boolean;
   privacyEnabled: boolean;
+  erasureRequestsEnabled?: boolean;
+  erasureRequests?: ErasureRequestService;
   sessions?: Pick<ClientSessionService, "issue"> & {
     revoke(
       digest: `sha256:${string}`,
@@ -103,6 +106,21 @@ export const browserAccountRoutes: FastifyPluginAsync<
     )
       return reply.code(400).send({ error: "invalid_request" });
     if (request.method !== "GET" && request.method !== "HEAD") {
+      // The status credential has no mutation/account authority and must survive
+      // session revocation. Only this exact POST skips session-bound CSRF.
+      if (
+        request.method === "POST" &&
+        request.raw.url === "/v1/browser/privacy/erasure-status"
+      ) {
+        if (
+          !deps.origin ||
+          headerCount(request, "origin") !== 1 ||
+          request.headers.origin !== deps.origin ||
+          request.headers["sec-fetch-site"] === "cross-site"
+        )
+          return reply.code(403).send({ error: "forbidden" });
+        return;
+      }
       if (
         !available ||
         headerCount(request, "origin") !== 1 ||
@@ -176,7 +194,10 @@ export const browserAccountRoutes: FastifyPluginAsync<
       botUsername: deps.botUsername,
       widgetEnabled: deps.widgetEnabled,
       privacyAvailable: deps.privacyEnabled,
-      erasureAvailable: false,
+      erasureAvailable:
+        deps.privacyEnabled &&
+        deps.erasureRequestsEnabled === true &&
+        !!deps.erasureRequests,
       bookingAvailable: booking.kind === "resolved",
       bookingReserveAvailable:
         booking.kind === "resolved" && deps.bookingReserveEnabled === true,
@@ -241,6 +262,132 @@ export const browserAccountRoutes: FastifyPluginAsync<
     reply.header("set-cookie", [cookie(SESSION, "", 0), cookie(NONCE, "", 0)]);
     return reply.code(204).send();
   });
+  for (const [method, suffix] of [
+    ["POST", "erasure-requests"],
+    ["GET", "erasure-requests"],
+    ["POST", "erasure-status"],
+  ] as const) {
+    app.route({
+      method,
+      url: `/v1/browser/privacy/${suffix}`,
+      bodyLimit: 1024,
+      logLevel: "silent",
+      async handler(request, reply) {
+        if (request.raw.url !== `/v1/browser/privacy/${suffix}`)
+          return reply.code(400).send({ error: "invalid_request" });
+        if (
+          !limiter.consume(`erasure:${request.ip}`, 30, 60000) ||
+          !limiter.consume("erasure:global", 300, 60000)
+        )
+          return reply.code(429).send({ error: "rate_limited" });
+        let userId: string | undefined;
+        if (suffix !== "erasure-status") {
+          const token = await authenticated(request, reply);
+          if (!token) return;
+          if (!matchesSessionBinding(request, token))
+            return reply.code(403).send({ error: "forbidden" });
+          const principal = await resolveClientPrincipal(
+            deps.principals!,
+            `Bearer ${token}`,
+          );
+          if (principal.kind !== "resolved")
+            return reply
+              .code(principal.kind === "unavailable" ? 503 : 401)
+              .send({ error: "session_unavailable" });
+          userId = principal.principal.userId;
+        }
+        let receiptToken = "";
+        if (
+          [
+            "content-type",
+            "content-length",
+            "content-encoding",
+            "transfer-encoding",
+          ].some((name) => headerCount(request, name) > 1) ||
+          request.headers["content-encoding"] !== undefined ||
+          request.headers["transfer-encoding"] !== undefined
+        )
+          return reply.code(400).send({ error: "invalid_request" });
+        if (method === "POST") {
+          if (
+            !/^application\/json(?:;\s*charset=utf-8)?$/iu.test(
+              request.headers["content-type"] ?? "",
+            ) ||
+            !Buffer.isBuffer(request.body) ||
+            (request.headers["content-length"] !== undefined &&
+              request.headers["content-length"] !== String(request.body.length))
+          )
+            return reply.code(400).send({ error: "invalid_request" });
+          try {
+            const body: unknown = JSON.parse(request.body.toString("utf8"));
+            if (typeof body !== "object" || !body || Array.isArray(body))
+              throw new Error();
+            const value = body as Record<string, unknown>;
+            const keys =
+              suffix === "erasure-status"
+                ? ["receiptToken"]
+                : ["receiptToken", "confirmed"];
+            if (
+              Object.keys(value).length !== keys.length ||
+              Object.keys(value).some((key) => !keys.includes(key)) ||
+              typeof value.receiptToken !== "string" ||
+              (suffix !== "erasure-status" && value.confirmed !== true)
+            )
+              throw new Error();
+            receiptToken = value.receiptToken;
+          } catch {
+            return reply.code(400).send({ error: "invalid_request" });
+          }
+        } else if (
+          request.headers["content-type"] !== undefined ||
+          (request.headers["content-length"] !== undefined &&
+            request.headers["content-length"] !== "0") ||
+          (Buffer.isBuffer(request.body) && request.body.length)
+        )
+          return reply.code(400).send({ error: "invalid_request" });
+        if (
+          !deps.erasureRequests ||
+          (method === "POST" &&
+            suffix === "erasure-requests" &&
+            (!deps.privacyEnabled || deps.erasureRequestsEnabled !== true))
+        )
+          return reply.code(503).send({ error: "erasure_unavailable" });
+        const result =
+          suffix === "erasure-status"
+            ? await deps.erasureRequests.readReceipt(receiptToken)
+            : method === "GET"
+              ? await deps.erasureRequests.readOwned({
+                  principalUserId: userId!,
+                  targetUserId: userId!,
+                })
+              : await deps.erasureRequests.request({
+                  principalUserId: userId!,
+                  targetUserId: userId!,
+                  receiptToken,
+                });
+        if (result.kind === "accepted" || result.kind === "found")
+          return reply
+            .code(result.kind === "accepted" ? 202 : 200)
+            .send(result.request);
+        return reply
+          .code(
+            result.kind === "denied"
+              ? 403
+              : result.kind === "conflict"
+                ? 409
+                : 503,
+          )
+          .send({
+            error:
+              result.kind === "denied"
+                ? "forbidden"
+                : result.kind === "conflict"
+                  ? "conflict"
+                  : "erasure_unavailable",
+          });
+      },
+    });
+  }
   const uuid =
     "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
   for (const [method, suffix, pattern, booking] of [

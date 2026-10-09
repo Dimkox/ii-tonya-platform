@@ -1,5 +1,142 @@
 # Agent status — owner-spec 2026-09-16
 
+## Owner-authorized recovery exception — GREEN
+
+Owner answered "делай" to the explicit request for one extra recovery invocation,
+then asked to continue. Run4 passed1/1 on isolated ComposePostgreSQL170005,
+including authenticated valid-CSRF creation denial and preserved receipts across
+API restart. Log /tmp/ii-tonya-erasure-recovery.mUaKl9/recovery-run4.log.
+This consumes the one authorized exception; no further repeat is authorized.
+Historical blocker entries below are superseded. Preparing RC; no rollout yet.
+
+## Release verification blocker audit
+
+The same request for one extra recovery-test invocation remains unanswered over
+three consecutive goal turns: original failed-final-run handoff, read-only live
+migration preflight, and current revalidation. No implementer, reviewer, test or
+recovery fixture is running. General technical approval remains always_on;
+the explicit three-run repository limit has not been specifically overridden.
+Do not rerun, rename, weaken, delete or claim the corrected recovery test passed.
+Full goal is not achieved; awaiting that exception and genuine hosting evidence.
+All changes and failed logs are preserved; no RC commit/push/deployment occurred.
+
+## Recovery regression final-run correction — verification open
+
+Planck accepted the independent creation switch/composition without defects;
+noted missing authenticated kill-switch evidence. Coordinator augmented the
+recovery integration test to use a valid session and CSRF. Logical run3 failed
+because its new fixture omitted botUsername, making browser session unavailable.
+Fixed fixture botUsername and canonical token encoding, but NOT rerun: recovery
+PG budget3/3 EXHAUSTED. Earlier run2 GREEN is not proof of the augmented test.
+One explicit extra invocation requested asynchronously; no answer yet.
+Failure retained at /tmp/ii-tonya-erasure-recovery.mUaKl9/recovery-run3.log.
+Owned recovery Compose fixture removed again. Do not restart or rename budget.
+
+Popper's P1 fix completed: new contention PG RED0/3 then GREEN3/3, budget2/3;
+DB/API/worker builds, DB/tests types, lint/format/diff passed. Both agents now
+terminal. Pool checkout/network policy is unchanged; SQL lock waits bounded.
+No commit, push or deployment yet. Continue other release preparation while
+awaiting the recovery verification decision; do not claim full goal complete.
+
+## Coordinator recovery gate implementation
+
+Added independent CLIENT_ERASURE_REQUESTS_ENABLED (default false) to config,
+server composition, API creation gate and advertised browser capability.
+Keep CLIENT_PRIVACY_ENABLED=true during recovery so other privacy rights remain
+available. Config focused test RED then GREEN1/1; base config24/24; config build
+passed. Session38521 finished: API2/2, API typecheck, scoped lint and diff check
+passed. No live activation of the new flag yet.
+
+New recovery regression is apps/api/src/routes/erasure-recovery.integration.test.ts.
+Logical PG budget2/3: first collection failed when located under tests/integration
+because Fastify belongs to API dependencies; file moved, budget NOT reset;
+second run GREEN1/1 on isolated ComposePG170005. Covers fresh status-only API
+restart twice, accepted ID/state, revoked denial and unchanged job links/rows.
+Log /tmp/ii-tonya-erasure-recovery.mUaKl9/recovery-run2.log. This is local
+same-binary recovery evidence, not a live deployment/rollback drill. Dedicated
+Compose project ii-tonya-erasure-recovery-20261009 was removed successfully;
+only synthetic data was deleted and fixtures can recreate it. No production
+mutation. Popper still owns DB contention fix.
+
+## Independent review returned — bounded-wait fix assigned
+
+Planck completed read-only review. Demo cards have no blocking finding.
+Erasure P1: unbounded user/job DB lock waits can starve receipt reads. Popper
+was re-engaged on the same agent ID to fix bounded transaction waits and add
+new lock-contention regression coverage. Original erasure PG remains3/3
+exhausted; new regression must cover the newly found lock behavior, not rename
+the old scenarios. Coordinator owns demo/styles and release recovery evidence.
+Second release gate: demonstrate receipt-preserving recovery before enabling
+request creation in production. Prior b658b5c lacks receipt routes and is not a
+compatible post-acceptance rollback. No release/full-erasure completion claim.
+
+## Owner scope change — demo catalogue requested
+
+Latest explicit owner request supersedes the prior empty-catalogue instruction:
+populate the public catalogue with fictional data. Coordinator added six clearly
+labelled demo profiles in a separate display-only section; no synthetic people,
+prices, availability or booking authority are inserted into production tables.
+Real API loading/empty/error states remain separate. Files owned by coordinator:
+apps/web/src/demo-catalog.ts, demo-catalog-browser.test.ts, catalog-view.ts and
+catalog-view.test.ts. Initial catalogue test RED1/6 then GREEN6/6. Browser and
+final checks are in progress; not deployed. Technical human gate always_on was
+reaffirmed by owner; do not ask for ordinary design/push/deploy approval again.
+
+Demo final browser check passed1/1 with actual styles after fixing new heading
+overflow via scoped `.catalog-page h2`. Three browser invocations used: initial
+unstyled pass, styled RED overflow, styled GREEN; do not rerun this logical file.
+Web types, tests types, scoped lint and build passed before that CSS-only fix.
+Final browser log /tmp/ii-tonya-demo-catalog-browser-final.log. Independent
+reviewer Planck `01a11e7e-b984-78c0-a39a-b7f5a9a402cf` is reviewing erasure and
+demo changes read-only, including the CSS correction. Await that exact agent;
+do not spawn a duplicate. No commit/push/deploy yet.
+
+Popper has now returned terminal implementation output for erasure. See
+docs/test-evidence/2026-10-09-erasure-requests-local.md and the plan ledger.
+No parallel implementer is active; independent review is the next code gate.
+Full erasure execution still needs real processor/backup inputs; request
+acceptance alone is not completion. Existing PG3/3 budget remains exhausted.
+
+## Active full-product goal — erasure implementation dispatched
+
+Owner resumed the full goal and delegated technical checkpoints. Do not treat
+the historical unanswered-design entries below as current blockers. AC-015 spec
+and plan are in-progress; BMad implementation is owned by Popper,
+agent `01a11e6e-36e9-7ca3-8a00-d6df698e5b1a`. Do not launch a duplicate or edit
+its implementation files while it runs. Coordinator owns release verification
+and this continuation record. No erasure completion or new release is claimed.
+
+Fresh read-only live checks: ordinary local DNS resolution timed out twice.
+Using curl --resolve ii-tonya.ru:443:157.22.187.237 with TLS verification enabled
+returned source b658b5c15c6992b7596569ab2311ed4a9971d2a6 and /health/ready JSON
+with postgres, migrations, workerLease and adapters all true. /api/ready is NOT
+the health endpoint: it serves SPA HTML and must never count as API readiness.
+This proves pinned-host reachability, not public DNS or authenticated acceptance.
+No production mutation occurred. Remaining full goal includes actual erasure,
+documents/retention, authentic account journeys and release/review evidence.
+
+Implementer remains assigned. Its live ledger is
+`.superpowers/sdd/2026-10-09-erasure-requests/progress.md`: reports service12/12,
+browser API1/1, web client2/2, PG run2 3/3 after initial collection failure.
+New erasure PG budget is now3/3 EXHAUSTED: final pg-final.log passed4/4.
+Never rerun or rename this logical PG task to restart that budget.
+Coordinator read the actual web2/2 log and successful DB build/introspection logs;
+other counts above are implementer-recorded, not independently reproduced.
+Normalized PG17.5 introspection reports101 tables,648 constraints,286 indexes.
+Implementation, metadata and verification are still in progress; do not publish
+or treat this as complete. Coordinator read-only production inventory and updated
+acceptance mapping are in the human-review gap audit. Current sessions/proof
+receipts0; no authentic login evidence. Hosting snapshot access requested
+asynchronously; no response yet, and code work is not blocked on that request.
+
+Coordinator subsequently read actual final PG4/4, browser API2/2,
+worker1/1 and real mobile Chrome1/1 logs. API build succeeded. The single
+tests/repo run failed4/444 across schema parity, migration table count and
+scope hash checks; implementer is correcting those with focused checks.
+Do not repeat the repository-wide run as an inner loop. Early browser failures
+and test type errors are preserved in the plan workspace; final type status
+still requires the implementer's exit-code report. No independent review yet.
+
 ## Published AC-016 evidence RC — 2026-10-09 01:00 UTC
 
 Native/web and remote rc/client-consent-factory now

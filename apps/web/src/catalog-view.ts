@@ -2,6 +2,7 @@ import {
   PublicCatalogClient,
   type PublicCatalogItem,
 } from "./catalog-client.js";
+import { renderDemoCatalog } from "./demo-catalog.js";
 
 const escape = (text: string) =>
   text.replace(
@@ -17,6 +18,8 @@ export const renderCatalogPage =
   <header class="site-header legal-header"><a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a><a class="header-action" href="/account">Личный кабинет</a></header>
   <main id="catalog-content" class="legal-page catalog-page" aria-labelledby="catalog-heading" tabindex="-1"><p class="eyebrow">Опубликованные услуги</p><h1 id="catalog-heading">Каталог услуг</h1>
     <p>Каталог можно смотреть без входа. Личный запрос здесь вводить не нужно.</p>
+    ${renderDemoCatalog()}
+    <h2>Опубликованные услуги</h2>
     <p>Показаны первые 20 опубликованных услуг или меньше. Фильтры работают только с загруженными услугами.</p>
     <p role="status" aria-live="polite" tabindex="-1" data-catalog-status>Загружаем каталог…</p>
     <button class="button ghost" type="button" data-catalog-retry hidden>Повторить загрузку</button>

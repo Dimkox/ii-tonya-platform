@@ -35,6 +35,7 @@ describe("loadEnv", () => {
       clientTelegramNavigation: false,
       clientHybridRouting: false,
       clientPrivacy: false,
+      clientErasureRequests: false,
       telegramEgressConsentGate: false,
       selartiCostAdmission: false,
       selartiResponseIngress: false,

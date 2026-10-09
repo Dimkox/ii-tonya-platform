@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
   createPrivacyService,
+  createErasureRequestService,
   createAdminService,
   createClientCatalogService,
   createClientBookingService,
@@ -36,6 +37,7 @@ import {
   PostgresAdminApprovalRepository,
   PostgresAdminRepository,
   PostgresPrivacyRepository,
+  PostgresErasureRequestRepository,
   PostgresConsentEvidenceRepository,
   currentConsentGrantedSql,
   sql,
@@ -436,6 +438,14 @@ export const createDefaultLifecycle = (
               capability: { enabled: true },
             })
           : disabledService<PrivacyService>("privacy ingress"),
+      // Reads stay composed when request creation is closed. Physical execution
+      // remains gated separately on real capture, custody and backup evidence.
+      erasureRequests: createErasureRequestService({
+        repository: new PostgresErasureRequestRepository(db),
+        requestEnabled:
+          config.features.clientPrivacy === true &&
+          config.features.clientErasureRequests === true,
+      }),
       consentEvidence:
         config.features.clientPrivacy === true
           ? new PostgresConsentEvidenceRepository(db, {

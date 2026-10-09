@@ -296,3 +296,4 @@ export {
 export { PostgresClientCommercialPolicyRepository } from "./repositories/client-commercial-policy-repository.js";
 export * from "./repositories/client-ingress-replay-repository.js";
 export * from "./repositories/client-consent-authority.js";
+export * from "./repositories/erasure-request-repository.js";
