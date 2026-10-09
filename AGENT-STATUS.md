@@ -1,5 +1,34 @@
 # Agent status — owner-spec 2026-09-16
 
+## Published demo catalogue and erasure-status RC — 2026-10-09
+
+Native/web and remote rc/client-consent-factory are now
+aae05c06fdc76e74ccbd77de233d3dd7dc74efcb. Normal push gate passed.
+Exact-commit isolated builds, packaged jitless imports, signed manifests and
+uploaded checksums passed. Migration0041 applied: journal42, composite FK valid.
+API/worker/nginx active, heartbeat fresh, readiness all true. Ordinary public
+DNS/TLS SOURCE_SHA returned the new SHA at09:52UTC.
+CLIENT_ERASURE_REQUESTS_ENABLED=false; CLIENT_PRIVACY_ENABLED=true.
+Creation and physical deletion are NOT activated. Full product goal remains open.
+
+Deployment attempt1 stopped before DB connection: sourcing systemd env through
+bash split an unquoted URL ampersand. Fixed with process.loadEnvFile; read-only
+preflight confirmed journal41/table absent. Hegel reviewed initial and resume
+scripts; attempt2 succeeded. Prior b658b5c and runtime backups retained. No
+database down-migration or snapshot restore was performed. Do not rerun this
+one-shot deploy script against migrated production.
+
+Live Chrome attempt2 reached all six pages, asserted six disclosed non-bookable
+demo cards and no mobile overflow, then failed an incorrect expected receipt
+status (actual403 is contract-correct). Attempt1 cleanup race masked its error;
+attempt3 hit net::ERR_NETWORK_CHANGED. No fully green browser run is claimed;
+all three logs retained. Independent curl confirmed receipt403 and source SHA.
+Operational files/logs: /tmp/ii-tonya-erasure-release.dFzbz1/.
+Signed artifacts: .native-release/client-web-aae05c06fdc76e74ccbd77de233d3dd7dc74efcb/.
+Recovery must retain receipt-capable API after any future acceptance. Authentic
+Telegram login, real-user journeys, processor/backup proof and full erasure remain
+unverified/incomplete. Existing exhausted test budgets are unchanged.
+
 ## Owner-authorized recovery exception — GREEN
 
 Owner answered "делай" to the explicit request for one extra recovery invocation,
