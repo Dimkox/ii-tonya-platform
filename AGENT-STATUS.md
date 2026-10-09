@@ -1,5 +1,26 @@
 # Agent status — owner-spec 2026-09-16
 
+## Published AC-016 evidence RC — 2026-10-09 01:00 UTC
+
+Native/web and remote rc/client-consent-factory now
+b658b5c15c6992b7596569ab2311ed4a9971d2a6. Normal push gate passed. Build used an
+isolated exact-commit clone for native and git archive for web; offline frozen
+install, builds, packaged --jitless API/worker imports and both signatures passed.
+No migration or systemd changes; runtime changed only exact migration approval
+SHA. Previous compatible48009f9 retained. Rollout exited0 after three connection
+refusals during restart. API/worker/nginx active, readiness all true, fresh
+worker heartbeat and expected flags confirmed at2026-10-09T01:00:30.574Z.
+
+Real Chrome checked eight public/account/legal routes including /account/,
+API ready200, anonymous export/consents401, mobile overflow false, no JS errors
+or unexpected external requests. TLS verification enabled. Real Telegram login
+and authenticated live export remain unobserved. Owner staging removed after
+checksum/identity confirmation; signed local artifacts and rollback release kept.
+Artifacts .native-release/client-web-b658b5c15c6992b7596569ab2311ed4a9971d2a6/;
+ops /tmp/ii-tonya-ac016-release.a7aU0p/ pins prior48009f9. Do not reuse deploy
+unchanged against the now-current release. No full-product completion: erasure,
+approved ordinary documents/retention and real-user acceptance remain open.
+
 ## Release preparation after explicit owner deploy command
 
 Date-edge fix implemented and independently accepted by Euler. Coordinator

@@ -4,6 +4,10 @@ Review the published product at https://ii-tonya.ru, not a local development URL
 This guide is not a product-acceptance certificate. Current release identity and
 deployment checks must be read from the latest production evidence and SOURCE_SHA.
 
+Latest recorded publication: `b658b5c15c6992b7596569ab2311ed4a9971d2a6`
+(2026-10-09). See the publication section of the
+[gap audit](../2026-10-06-human-review-gap-audit.md).
+
 ## Reviewer paths
 
 1. Open `/`, `/catalog`, `/privacy` and `/oferta` on desktop and mobile. Public
@@ -19,6 +23,10 @@ deployment checks must be read from the latest production evidence and SOURCE_SH
    should contain its original version/body/hash, not a later replacement.
    Legacy/unbound decisions have null. With no recorded decisions this is an empty
    list, not live proof of historical-document behavior.
+   Decisions also include owner-bound evidence. `scopeStatus` distinguishes
+   absent, complete and redacted scope. Redacted scope is incomplete evidence,
+   not an empty original scope. Invalid linked presentation dates yield null
+   presentation evidence, not invented timestamps or complete-consent proof.
 5. Check `/account/` and back navigation. Restore from browser cache should reload
    and recheck the session; actions must not be automatically repeated.
 6. Log out; private data/actions must no longer be available. Public pages remain

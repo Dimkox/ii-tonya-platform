@@ -1,5 +1,54 @@
 # Human-review publication gap audit — 2026-10-06
 
+## Published evidence export RC — 2026-10-09
+
+Exact source `b658b5c15c6992b7596569ab2311ed4a9971d2a6` is pushed to
+`rc/client-consent-factory` and installed as both native and web on ii-tonya.ru.
+Normal pre-push gate passed syntax, formatting, whitespace, evidence integrity,
+outgoing-file lint and tests/repo. No bypass or force push. Factory/Trust CI
+remains excluded and is not claimed.
+
+Native build used a fresh shared clone pinned to the source commit; web used a
+fresh git archive. Both installed dependencies offline with the frozen lockfile.
+Builds, packaged API/worker imports under --jitless, manifest checksums and Cosign
+signatures passed. Syft warned about deriving directory artifact names; it exited0.
+Manifest SHA256 values:
+
+- Native: `ff24315d2face2c781df9541484778789f4596bb831c49e3201900b502e64cc9`.
+- Web: `892d9bfb8b0e31a75820095127f68e321cfbeb6c6767f8d313d4657d21276771`.
+
+Kuhn reviewed rollout/recovery. Missing curl deadlines, short-circuiting rollback
+and working-tree web build inputs were corrected; second static review closed
+those findings. Deployment holds the release lock, verifies prior source markers,
+checks transferred manifests and identical migrations/systemd definitions, backs
+up runtime, and preserves all flags while updating only the approval SHA.
+No nginx configuration changes or migration execution were needed. Rollout
+exited0. Three connection-refused retries occurred during restart; this was not
+a zero-downtime rollout.
+
+Post-release readback confirms both source markers, individual API/worker/nginx
+services active, readiness checks all true and fresh worker heartbeat. Runtime
+flags preserved at2026-10-09T01:00:30.574Z. Chrome checked `/`, `/catalog`,
+`/account`, `/account/`, `/consent`, `/my-data`, `/privacy`, `/oferta` with real
+TLS verification. All rendered; ready200, anonymous export401 and consents401,
+JS errors0, unexpected external requests0, mobile overflow false. Coordinator
+inspected the mobile-account screenshot. No real-user login or authenticated
+live export was manufactured. This check did not repeat the old no-JavaScript
+suite or prove every complete user journey.
+
+Recovery: compatible previous native/web48009f9 remains installed; restore both
+symlinks under the same lock, restore root-only runtime backup
+`configuration-backups/runtime-before-ac016-b658b5c15c6992b7596569ab2311ed4a9971d2a6.env`
+to `/etc/ii-tonya/runtime.env` with root:ii_tonya0640, restart API/worker, and
+verify readiness, individual services, fresh worker heartbeat and served source
+marker. Database and systemd definitions are unchanged. No live rollback drill
+was performed. Never roll back to older grant-incompatible releases.
+
+Owned incoming directory was removed only after post-release identity/checksum
+verification. Its contents remain recoverable from signed local release
+artifacts. Full product gaps (erasure, approved documents/retention and genuine
+user acceptance) stay open. Reviewer access is the public site, not a local URL.
+
 ## Final code review and date correction — 2026-10-09
 
 Three independent BMad layers completed (Parfit, Kant, Sagan). Coordinator triage:
