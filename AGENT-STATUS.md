@@ -1,5 +1,150 @@
 # Agent status — owner-spec 2026-09-16
 
+## Release preparation after explicit owner deploy command
+
+Date-edge fix implemented and independently accepted by Euler. Coordinator
+focused unit14/14 passed; prior scope25/25 and PG9/9 evidence retained without
+rerunning exhausted PG3/3. Full review triage recorded in human-review gap audit.
+Current SSH preflight confirms native/web48009f9, individual services active and
+all readiness checks true. Prior /tmp release helpers disappeared; new helpers
+in /tmp/ii-tonya-ac016-release.a7aU0p are under Kuhn operational review. No live
+mutation yet. Owner explicitly requested fixing the issue and deploying.
+Do not claim whole-product acceptance; documents/erasure/real login remain open.
+
+## Coordinator review — collected, triage not complete
+
+Three BMad review layers returned: Parfit (blind), Kant (edges), Sagan
+(verification). No reviewer ran tests or changed files. Coordinator read the
+actual /tmp/ac016-pg-final.log:9/9 passed. PG remains3/3 exhausted.
+Kant identified non-finite linked presentation timestamps causing toISOString
+to throw and abort the whole export. Production issuance uses database time;
+the stored columns do not themselves prohibit every non-finite value. Assess
+and handle this edge before acceptance. Sparse-array finding is not reachable
+from PostgreSQL JSONB (holes serialize to null, rejected by current projection).
+Sagan confirmed testkit defaults to PG16 without the explicit admin URL; this
+is pre-existing and documented, while repository policy requires Compose17.5.
+Parfit's remaining findings require triage against the approved historical-fact
+contract; do not turn export into an authority/integrity oracle implicitly.
+No release or completed-story claim. All three reviewer calls are terminal.
+
+## AC-016 approved scope correction — local GREEN, coordinator review pending
+
+Owner-approved frozen scope correction implemented without changing stored JSON.
+Only null, empty object, or the exact approved `fields` array shape is exported;
+all other scope is null with `scopeStatus: redacted`. Owner-bound evidence joins,
+original document projection and strengthened historical metadata assertions stay.
+
+`consent-scope-export.test.ts`: unit RED25/25, then GREEN25/25.
+Existing `consent-evidence-export.test.ts`: final PG invocation GREEN9/9 on
+Compose PostgreSQL17.5 (`170005` asserted). Budget **3/3 exhausted**: previous
+collection failure, RED8/8, final GREEN9/9. Never rerun or rename its scenarios.
+No original-copy integration rerun, new reviewer, push or deployment.
+Coordinator owns review; spec status is `in-review`, not released/done.
+Exact verification and limitations are in the human-review gap audit.
+DB/application/API builds and types, tests types, scoped lint/format and diff
+checks passed. Refreshed coordinator patch: `/tmp/ac016-coordinator.diff`.
+Owned temporary PG container/volume/network removed; no task process remains.
+
+## AC-016 implementation checkpoint after written approval
+
+Owner approved the written spec with "a". Goodall implemented additive evidence
+types/query and tests/integration/consent-evidence-export.test.ts. Agent reports
+two PG invocations: first dependency-build failure, then eight expected RED
+failures before implementation; no GREEN yet, one invocation remains. Agent
+reports builds/types/lint/format/diff pass. Coordinator has inspected the diff,
+not independently reproduced those checks. Temporary fixture was removed.
+No commit, push or deployment. Live identity is not rechecked in this turn.
+
+Review exposed an unresolved safe scope projection: scope_fields is arbitrary
+JSON while the frozen spec requires original scope and no secret disclosure.
+Current patch exports it verbatim. Repository search found no canonical production
+scopeFields object callers; only the new test fixtures pass a nonempty object.
+Do not ship or use the last PG run before resolving the allowed shape. Preserve
+the incomplete patch for correction, not as accepted implementation. Coordinator
+diff is /tmp/ac016-coordinator.diff. Goodall01a11e11-414f-79d0-8054-13f847647e26
+completed and remains available for fixes; no live test process is being waited on.
+
+## AC-016 evidence export checkpoint — 2026-10-09
+
+Current request explicitly authorized implementation of
+`docs/superpowers/implementation-artifacts/spec-ac016-consent-evidence-export.md`.
+Base remains `9c705b475936bb944ebb0035acf2fd1f45980cbb`; uncommitted DB/application
+evidence projection and new `consent-evidence-export.test.ts` are present.
+New file PG budget **2/3 used**: collection failed on missing contracts build;
+after dependency build, expected RED8/8. **No GREEN yet; one invocation remains.**
+Original-copy integration file remains exhausted and was not run.
+
+DB/application/API builds/types, tests types, scoped lint/format/diff passed;
+test source was subsequently strengthened after review and needs final execution.
+One independent read-only review found blocking arbitrary `scope_fields` JSON
+disclosure: spec demands original scope plus secret/third-party-ID exclusion but
+does not define a permitted scope schema or redaction representation. Needs
+coordinator resolution before the last PG run. Minor historical-source assertions
+were strengthened. No further or multilevel BMad review: latest user explicitly
+requires coordinator diff handoff first. Artifacts: `/tmp/ac016-coordinator.diff`,
+`/tmp/ac016-independent-review.txt`; durable details in the human-review gap audit.
+No commit, push, deployment, provider activation or release claim.
+Owned Compose PG container/volume/network were removed after this checkpoint;
+synthetic fixtures can be recreated. No reviewer/test process is left running.
+
+## Explicit continuation — export design accepted
+
+Owner's "доделывай" accepts the presented export design and erasure receipt
+direction. Previous unanswered-design blocker is superseded. Environment check
+passed Node24.21.0/pnpm11.9.0. BMad build rendered successfully; its written
+spec checkpoint is now docs/superpowers/implementation-artifacts/
+spec-ac016-consent-evidence-export.md (draft). No implementation/test/deployment
+yet. Next: written-spec checkpoint then focused TDD, retaining old test budgets.
+
+## Goal resumed — 2026-10-09
+
+Owner resumed the goal. Identity readback remains canonical origin,
+codex/fin-001-client-access-policy at9c705b4; no new source commits since the
+checkpoint. Goal is active; the blocker history below is historical, not current
+goal status. Fresh blocker audit starts with this resumed turn. No explicit
+answer to the presented export/erasure designs has arrived. No new live check,
+implementation, deployment or test run is claimed by the resume inspection.
+
+## Owner-input blocker audit
+
+Erasure design approval has remained unanswered across more than three consecutive
+goal continuations. Independent checks meanwhile resolved the proxy-path timeout
+and identified the residual AC-016 evidence-export gap; these do not approve a
+new implementation. The bounded owner-safe evidence-export design has also now
+been presented for approval. No running process is being waited on. Brainstorming
+requires the relevant design handoff before code; automatic goal continuations
+are not the owner's answer. Final documents/retention and authentic login evidence
+remain missing separately. Goal is blocked on owner input, not complete; preserve
+its full scope and resume from these checkpoints when the owner responds.
+
+## Availability follow-up
+
+Two default curl probes timed out during TLS. HTTPS_PROXY is set locally;
+direct TLS-verified curl with --noproxy '*' returned200 and SOURCE_SHA48009f9,
+HTTP301. Pinned SSH read-only live-state.mjs passed exact native/web SHA,
+services, fresh worker heartbeat, preserved flags and absent staging checks.
+No production mutation or configuration change. This resolves the apparent
+availability blocker to the proxy path, not authenticated-product acceptance.
+Erasure design approval and previously requested owner inputs remain pending.
+
+## Erasure route design checkpoint
+
+Read-only inspection confirms privacy_deletion_jobs/processor-attempt storage exists,
+but no client-owned status route is composed. Existing startErasureAtomically
+deactivates the user and deletes sessions, so simply exposing it would remove the
+user's access to progress. Browser erase remains503. This needs a new lifecycle,
+not an unconditional success button or fabricated processor/backup evidence.
+
+Using brainstorming's architectural path: awaiting owner agreement on the proposed
+request/receipt/progress design before writing its spec and implementation plan.
+Recommended: authenticated request with explicit confirmation; durable idempotent
+receipt; separate narrowly scoped status access surviving session revocation;
+progress per actual local/processor/backup result; retained-facts exceptions; no
+completed status before verified deletion. Alternative manual-only processing is
+not considered completion of the requested product. Source/runtime unchanged.
+Document/retention inputs and authentic login are separately awaiting owner answers.
+This checkpoint does not shrink the goal or mark it complete. No running handles.
+
 ## Published original-document export — latest live state
 
 Native/web/RC48009f9ce4de9f8258eede8d59b950899eafd0a8. Signed build/import checks,

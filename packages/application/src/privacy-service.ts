@@ -44,6 +44,21 @@ export interface SubjectExport {
     decision: string;
     policyVersion: string;
     createdAt: string;
+    evidence: {
+      decisionId: string;
+      sequence: string;
+      channel: string | null;
+      scopeFields: { fields?: ("display_name" | "timezone")[] } | null;
+      scopeStatus: "absent" | "complete" | "redacted";
+      textSha256: string | null;
+      basis: string | null;
+      priorDecisionId: string | null;
+      presentation: {
+        id: string;
+        createdAt: string;
+        consumedAt: string | null;
+      } | null;
+    };
     document: {
       id: string;
       documentKey: string;

@@ -18,6 +18,8 @@ import {
   currentConsentStatesSql,
 } from "./consent-current.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { projectConsentScope } from "./consent-scope-export.js";
+import { projectConsentPresentation } from "./consent-presentation-export.js";
 
 export interface WithdrawConsentCommand {
   readonly targetUserId: string;
@@ -38,6 +40,21 @@ export interface SubjectExport {
     decision: string;
     policyVersion: string;
     createdAt: string;
+    evidence: {
+      decisionId: string;
+      sequence: string;
+      channel: string | null;
+      scopeFields: { fields?: ("display_name" | "timezone")[] } | null;
+      scopeStatus: "absent" | "complete" | "redacted";
+      textSha256: string | null;
+      basis: string | null;
+      priorDecisionId: string | null;
+      presentation: {
+        id: string;
+        createdAt: string;
+        consumedAt: string | null;
+      } | null;
+    };
     document: {
       id: string;
       documentKey: string;
@@ -543,26 +560,49 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       where user_id = ${userId}::uuid order by provider, external_id
     `)
     ).rows;
+    // Historical facts only: do not substitute current authority or latest documents.
+    // Linked evidence is projected only after checking the decision owner's bindings.
     const consents = (
       await this.db.execute<{
         purpose: string;
         decision: string;
         policyVersion: string;
         createdAt: Date | string;
+        evidence: Omit<
+          SubjectExport["consents"][number]["evidence"],
+          "scopeFields" | "scopeStatus"
+        > & { scopeFields: unknown };
         document: SubjectExport["consents"][number]["document"];
       }>(sql`
       select c.consent_type as purpose, c.decision, c.policy_version as "policyVersion", c.created_at as "createdAt",
+        jsonb_build_object(
+          'decisionId',c.id,'sequence',c.sequence::text,'channel',c.channel,
+          'scopeFields',c.scope_fields,'textSha256',c.text_sha256,'basis',c.basis,
+          'priorDecisionId',prior.id,
+          'presentation',case when p.id is null then null else jsonb_build_object(
+            'id',p.id,'createdAt',p.created_at,'consumedAt',p.consumed_at
+          ) end
+        ) as evidence,
         case when d.id is null then null else jsonb_build_object(
           'id',d.id,'documentKey',d.document_key,'version',d.version,
           'title',d.title,'body',d.body,'textSha256',d.text_sha256
         ) end as document
       from consents c
       left join consent_document_versions d on d.id=c.document_version_id
+      left join consents prior on prior.id=c.prior_decision_id and prior.user_id=c.user_id
+      left join consent_presentations p on p.id=c.presentation_id
+        and p.user_id=c.user_id and p.purpose=c.consent_type
+        and p.document_version_id=c.document_version_id
       where c.user_id = ${userId}::uuid order by c.created_at, c.id
     `)
     ).rows.map((row) => ({
       ...row,
       createdAt: new Date(row.createdAt).toISOString(),
+      evidence: {
+        ...row.evidence,
+        ...projectConsentScope(row.evidence.scopeFields),
+        presentation: projectConsentPresentation(row.evidence.presentation),
+      },
     }));
     const profileRow = (
       await this.db.execute<{
