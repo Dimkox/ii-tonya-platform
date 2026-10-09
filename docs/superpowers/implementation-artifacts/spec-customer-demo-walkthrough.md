@@ -2,7 +2,7 @@
 title: "Customer interactive demo walkthrough"
 type: "feature"
 created: "2026-10-09"
-status: "in-review"
+status: "done"
 baseline_commit: "29a01ce7bc386c5d0c052f0ac1a4f24cf0950023"
 review_loop_iteration: 0
 context:

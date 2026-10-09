@@ -1,5 +1,30 @@
 # Agent status — owner-spec 2026-09-16
 
+## Published customer demo — 2026-10-09
+
+Public /demo and /demo/ now serve webbf99509a28c0afaa0ca06fe9e88e4333218a156c;
+native remainsaae05c06fdc76e74ccbd77de233d3dd7dc74efcb. RC branch matches web.
+Normal pre-push gate passed; exact archived-source build, SBOM/provenance,
+Cosign verification and uploaded checksums passed. No API restart, migration,
+runtime flag or real booking/payment/consent change. All services ready.
+
+Local unit15/15, initial full demo Chrome1/1 and narrow review-regression1/1
+passed. Original walkthrough budget3/3 exhausted; new review regression2/3.
+Three independent review layers completed; accepted fixes implemented and
+Epicurus confirmed narrow closure. Live Chrome passed ten demo actions,
+synthetic export, /demo/ and reload, zero application API calls/JS errors,
+no mobile overflow. TLS verified with pinned host DNS; screenshot inspected.
+Signed artifacts .native-release/client-web-bf99509a28c0afaa0ca06fe9e88e4333218a156c/.
+Ops evidence /tmp/ii-tonya-customer-demo-release.fQojmR/. Upload staging removed;
+prior webaae05c0 and native retained. All implementation/review agents terminal.
+
+Demo is public, no login or email provisioning required. Customer email was not
+stored or published, and no email was sent. Full commercial product remains
+incomplete; this only delivers the explicitly requested clickable demonstration.
+Owner raised API spending; no new agents should be launched for cost investigation
+without a concrete need. Recent Gemini usage was not established by read-only logs;
+awaiting which provider's billing shows the reported amount.
+
 ## Active customer demo walkthrough — owner clarification
 
 Owner confirmed catalogue remains demo and explicitly requested clickable review
