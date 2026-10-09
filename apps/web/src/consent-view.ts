@@ -28,6 +28,7 @@ function page(title: string): string {
     <header class="site-header legal-header"><a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a><a class="header-action" href="/account">Личный кабинет</a></header>
     <main id="account-content" class="legal-page consent-page" tabindex="-1"><p class="eyebrow">Приватность</p><h1>${title}</h1>
     <p>Каждая цель управляется отдельно. Вход подтверждает твой аккаунт и сам по себе не даёт согласия на обработку сообщений, передачу эксперту или ИИ.</p>
+    <p><a class="button ghost" href="/demo" data-demo-link>Попробовать интерактивное демо</a> — вымышленный пример без входа и изменения реальных данных.</p>
     <section data-account-login><button class="button primary" type="button" data-login disabled>Войти через Telegram</button><div data-login-help></div></section>
     <p role="status" aria-live="polite" tabindex="-1" data-account-status>Проверяем доступность входа…</p>
     <button type="button" class="button ghost" data-retry>Обновить</button><div data-account-private></div>${erasureMarkup()}

@@ -39,6 +39,9 @@ const examples = [
   ],
 ] as const;
 
+// Shared display labels only; these are not provider service records.
+export { examples as demoExamples };
+
 export function renderDemoCatalog(): string {
   return `<section data-demo-catalog aria-labelledby="demo-catalog-heading">
     <h2 id="demo-catalog-heading">Демонстрационный каталог</h2>

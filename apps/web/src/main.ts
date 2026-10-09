@@ -5,6 +5,10 @@ import { renderLegalPage } from "./legal-view.js";
 import { renderLanding } from "./landing-view.js";
 import { bindCatalogActions, renderCatalogPage } from "./catalog-view.js";
 import {
+  bindDemoWalkthrough,
+  renderDemoWalkthrough,
+} from "./demo-walkthrough.js";
+import {
   bindPrivacyActions,
   renderConsentPage,
   renderMyDataPage,
@@ -18,7 +22,11 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/catalog") {
+if (route === "/demo") {
+  app.innerHTML = renderDemoWalkthrough();
+  bindDemoWalkthrough(app);
+  document.title = "Интерактивное демо — ии-Тоня";
+} else if (route === "/catalog") {
   app.innerHTML = renderCatalogPage();
   bindCatalogActions(app);
   document.title = "Каталог услуг — ии-Тоня";

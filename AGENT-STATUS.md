@@ -1,5 +1,31 @@
 # Agent status — owner-spec 2026-09-16
 
+## Active customer demo walkthrough — owner clarification
+
+Owner confirmed catalogue remains demo and explicitly requested clickable review
+for the customer. Immediate deliverable is isolated public `/demo`, not enabling
+real payments/bookings for fictional services. Customer email is NOT an identity
+proof and must not be copied into source, fixtures, docs or public content.
+Spec: docs/superpowers/implementation-artifacts/spec-customer-demo-walkthrough.md.
+Implementer Godel01a12023-9ad7-7432-a70a-b1dba852916a owns web code/tests;
+coordinator owns this status and release operations. Do not duplicate edits.
+New walkthrough browser budget is separate behavior, maximum3 invocations;
+existing catalogue/account/erasure exhausted tests remain off limits.
+
+Current live native/web remainsaae05c0. Read-only live inventory: experts0,
+expert_services0, slots0, erasure requests0. Live YooKassa settings absent;
+local credential/fiscal fields present, contact purpose/policy absent. Existing
+YooKassa adapter/storage is expert-residency-bound; client checkout is not composed.
+Do not simply enable payment flags: native API/worker reject missing capabilities.
+Owner says hosting credentials are in env. Inspected local main env has SSH/deploy
+access but no named hosting-panel/backup token; secondary tonya-full-update-ci env
+has no matching hosting keys. This is not proof no credential exists elsewhere.
+
+Web-only rollout helper /tmp/ii-tonya-customer-demo-release.fQojmR/deploy-web.sh
+was independently reviewed by Hegel: no blocking finding. Previous/current native
+and web pinnedaae05c0; signed candidate will replace only web symlink. Failed
+attempt retains candidate directory and needs state-aware retry. No rollout yet.
+
 ## Published demo catalogue and erasure-status RC — 2026-10-09
 
 Native/web and remote rc/client-consent-factory are now

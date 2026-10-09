@@ -18,6 +18,7 @@ export const renderCatalogPage =
   <header class="site-header legal-header"><a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a><a class="header-action" href="/account">Личный кабинет</a></header>
   <main id="catalog-content" class="legal-page catalog-page" aria-labelledby="catalog-heading" tabindex="-1"><p class="eyebrow">Опубликованные услуги</p><h1 id="catalog-heading">Каталог услуг</h1>
     <p>Каталог можно смотреть без входа. Личный запрос здесь вводить не нужно.</p>
+    <p><a class="button primary" href="/demo" data-demo-link>Попробовать интерактивное демо</a> — без входа, реальной записи и списаний.</p>
     ${renderDemoCatalog()}
     <h2>Опубликованные услуги</h2>
     <p>Показаны первые 20 опубликованных услуг или меньше. Фильтры работают только с загруженными услугами.</p>

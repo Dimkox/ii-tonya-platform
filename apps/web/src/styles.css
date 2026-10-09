@@ -1600,6 +1600,63 @@ summary:focus-visible {
   opacity: 0.55;
   cursor: wait;
 }
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  padding: 0.75rem var(--page-pad);
+  background: var(--forest-dark);
+  color: var(--white);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.demo-header {
+  position: static;
+}
+.demo-page h2 {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.demo-page .catalog-card {
+  margin-bottom: 1.25rem;
+}
+.demo-page select {
+  min-width: 0;
+}
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.demo-page .button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.demo-page .button:disabled {
+  cursor: not-allowed;
+}
+.demo-page :is(button, select, input):focus-visible,
+.demo-page [data-demo-status]:focus {
+  outline: 3px solid var(--forest);
+  outline-offset: 4px;
+}
+.demo-page :is(button, select, input, [tabindex]) {
+  scroll-margin-top: 12rem;
+}
+.demo-consent {
+  display: flex;
+  align-items: start;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+}
+.demo-consent input {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
 [hidden] {
   display: none !important;
 }
