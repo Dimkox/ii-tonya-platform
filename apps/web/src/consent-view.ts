@@ -382,6 +382,16 @@ export function bindPrivacyActions(root: ParentNode): void {
         return;
       }
       if (!session.widgetEnabled || !session.botUsername) {
+        if (
+          session.botUsername &&
+          /^[A-Za-z0-9_]{2,29}bot$/iu.test(session.botUsername)
+        ) {
+          window.open(
+            `https://t.me/${session.botUsername}`,
+            "_self",
+            "noopener,noreferrer",
+          );
+        }
         message(
           "Для входа открой клиентского бота и выбери «Личный кабинет» в его меню.",
         );

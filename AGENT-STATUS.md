@@ -1,5 +1,28 @@
 # Agent status — owner-spec 2026-09-16
 
+## Client login handoff — 2026-10-10, local candidate
+
+Branch `codex/client-login-handoff-20261010` fixes the ordinary-browser login
+button: when widget login is disabled, an explicit click opens only the validated
+server-selected Telegram bot. Signed Mini App login still takes precedence.
+No session/consent/payment mutation or provider activation was added.
+New Chrome regression `client-login-handoff.test.ts`: RED missing navigation,
+then GREEN1/1; logical browser budget2/3. Web/test typechecks, scoped lint, web
+build and whitespace checks passed. James independently reviewed the narrow diff
+with no blocking findings; actual Telegram navigation/authentication remains
+unverified. No production rollout yet.
+
+Fresh public checks: web SOURCE_SHA bf99509a28c0afaa0ca06fe9e88e4333218a156c,
+readiness all true; browser session available, widget false, booking/reserve false.
+Getzilla source fetched at05f85f12b72b3a897c45c24e172fac8317120b7c and its
+read-only consumer installation plan ran. Getzilla is NOT installed and no Trust
+CI receipt exists for this candidate. Do not report plan execution as integration.
+Owner-authorized cleanup moved five untracked paths (including requirements and
+evidence) to `/home/pall/projects/ii-tonya-cleanup-20261010.OGGXqP`; recoverable,
+not erased. Related Getzilla issues75 and76 record contamination and Gemini costs.
+Next: candidate delivery/release evidence, authentic client login, then real
+catalogue/booking/payment composition. Demo data remains demo; Gemini stays off.
+
 ## Published customer demo — 2026-10-09
 
 Public /demo and /demo/ now serve webbf99509a28c0afaa0ca06fe9e88e4333218a156c;
