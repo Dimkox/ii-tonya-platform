@@ -46,6 +46,7 @@ import {
   PostgresExpertAiRequestReceiptStore,
   PostgresOperatorCaseRepository,
   PostgresClientCatalogRepository,
+  PostgresClientAccountPackagesRepository,
   PostgresCatalogRepository,
   PostgresBookingRepository,
   PostgresClientSessionRepository,
@@ -531,6 +532,9 @@ export const createDefaultLifecycle = (
         ? {}
         : {
             clientSessionService,
+            clientAccountPackages: new PostgresClientAccountPackagesRepository(
+              db,
+            ),
             clientSessionRepository,
             clientPrincipal,
           }),

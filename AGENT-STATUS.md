@@ -1,5 +1,17 @@
 # Agent status — owner-spec 2026-09-16
 
+## Account packages isolated RC — 2026-10-10
+
+Active branch codex/account-packages-rc-20261010 starts from published webe258651.
+Only package readout code/tests copied from78ebbc5; billing calculation/settlement
+and migration0042 excluded. Original work preserved on codex/client-paid-policy-20261010.
+Owner requested publication. Separate API/web missing-CI exception and one run of
+each four exhausted focused tests requested, pending. Do not reuse prior login
+web-only exception or run generic deploy (it starts migrations).
+Read-only live preflight: nativeaae05c0, webe258651, readiness all true.
+Evidence: docs/test-evidence/production/2026-10-10-account-packages-rc.md.
+No production mutation performed. Payments/providers stay off.
+
 ## Client login handoff — 2026-10-10, local candidate
 
 Branch `codex/client-login-handoff-20261010` fixes the ordinary-browser login

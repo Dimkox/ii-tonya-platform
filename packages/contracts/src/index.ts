@@ -38,3 +38,4 @@ export {
   EXPERT_RESIDENCY_V2_TARIFFS,
   type ExpertResidencyV2TariffKey,
 } from "./expert-residency-tariffs.js";
+export * from "./client-account-packages.js";
