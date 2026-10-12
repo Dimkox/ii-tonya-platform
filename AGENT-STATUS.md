@@ -1,5 +1,98 @@
 # Agent status — owner-spec 2026-09-16
 
+## All-tab requirements registry and transport closure — 2026-10-12
+
+Owner supplied Google Doc14AWYM9jbE0OPU3rKY6_PpPl3REDaqQbISdMB4D2mpUc and
+requested every tab in a database, Superpowers/BMad gap audit, then final remote
+production delivery. Retrieved25tabs including later addenda. Private ignored
+registry: .cache/requirements-2026-10-12/requirements.sqlite; source.json retains
+sanitized structured bodies/text/revision. Accounts/API tab is present but its
+credential content is explicitly redacted; raw credentials remain in Google Doc.
+Database integrity_check=ok,25tabs. Audit agents own separate audit-client.json,
+audit-expert.json,audit-web.json files there. Coordinator owns DB/shared files.
+
+Planerka run6 at13:28:57UTC passed58/58 after behavioral RED8/58 on run5.
+Both additional owner-authorized invocations are now consumed. Package/test
+typechecks, scoped lint and diff checks passed; Huygens read-only closure found
+no remaining concrete blockers in the transport scope. No further test run is
+authorized. Full workflow integration and production readiness remain open.
+
+Fresh remote read-only preflight: API/web43a93e2131cde6bb09a6825fc5b83dfbf91fc600;
+API/worker/nginx active, readiness PostgreSQL/migrations/workerLease/adapters true.
+No production change or new release occurred. Earlier unverified-pagination and
+pending-run notes below are historical and superseded by this entry.
+
+## Production completion continuation — 2026-10-12
+
+Owner requests full working production delivery; customer will pay outstanding
+provider subscriptions during acceptance. This does not make unpaid providers
+available or authorize reporting a disabled workflow as complete.
+
+Final three-layer client review found remaining patch defects: requested duration
+not bound to creation response; duration/interval inconsistency; missing range
+endpoints; request pagination limits; record-form guest count bypass. Additional
+coverage is needed for nonzero offsets, schema-valid identity mismatches, outbound
+size limits and uncertain cancellations. Empty participant lists are not rejected
+on reads without a provider requirement. Do not invent page-number semantics.
+Read-only review agents:01a13044-7105-7d53-98de-d827405057f7,
+01a13044-7167-7be0-af02-05d1beac1ec2,01a13044-71bc-7743-8e84-3e6af6bd097d.
+Owner approved two further invocations with "Го". Coordinator ran run5 at
+13:27:05UTC:58tests,8expected behavioral failures and50passes. Implementer
+01a13014-223d-74b1-854f-87cd28a882ca now owns production corrections; no test
+execution delegated. Coordinator reserves the one remaining authorized run6
+after static checks and review. Run4 permission remains separately consumed.
+
+Selarti official public collection was read without provider credentials:
+https://docs.selarti.com/api/collections/38595362/2sAXqwZL69?segregateAuth=true&versionTag=latest.
+It documents auth, send_message, send_message_external, get_thread/get_message.
+Existing worker SelartiRequestTransport and response proposal service still need
+real provider mapping/transport; do not mistake those ports for live integration.
+Payment implementation remains on codex/client-paid-policy-20261010; no merge,
+new migration, deployment or production flag change occurred in this continuation.
+
+## Planerka extra verification — 2026-10-12
+
+Owner explicitly authorized one extra focused invocation after the3/3 limit.
+Run4 at13:16:34UTC passed32/32 in client.test.ts, including the final pagination
+correction. The one-run exception is consumed; no further repeat is authorized.
+Command: pnpm exec vitest run packages/integrations/src/planerka/client.test.ts.
+This supersedes the unverified-pagination note below, not the deferred workflow,
+review/release gates or activation restrictions. No production change occurred.
+
+## Planerka REST transport — 2026-10-12, local candidate
+
+Branch `codex/planerka-api`, baseline
+`a1d8f9353414ff7a1bc1df18a1c113f20b123849`. Sole implementation contract:
+`docs/superpowers/implementation-artifacts/spec-planerka-api-client.md`;
+frontmatter context list is empty. Added provider-native profile/event-types/
+slots/booking-page/UID/create/cancel client, validated schemas, exports and
+`docs/runbooks/planerka-api-client.md`. Legacy disabled adapter, false-only
+Planerka config and all other providers remain unchanged. No live probes,
+credentials, runtime changes, commit, push or deployment.
+
+Environment check passed Node24.21.0/pnpm11.9.0. Focused test budget **3/3
+consumed**: first invocation failed collection because client.ts was not yet
+present (NOT behavioral RED); second passed26/26; final passed32/32 at12:34UTC.
+Do not rerun or rename this logical file to reset its budget. Package and tests
+typechecks, scoped ESLint/Prettier and whitespace checks passed. Initial optional
+property typing mismatch and unused fixture parameters were corrected.
+
+Independent read-only review found four P2 gaps: ready empty stream chunks,
+creation attendee/host binding, contradictory pagination and slot date grouping.
+All four received code/test corrections in the final32/32 run. Independent
+closure accepted three but found a remaining pagination contradiction: a page
+could report no remaining items despite its total. Added request-skip-aware
+remaining-count validation and a regression case AFTER the final run. This last
+patch is behaviorally UNVERIFIED; one additional focused invocation requires an
+explicit owner exception to the consumed3/3 budget. Review sessions:
+`01a13018-bd97-7d43-94b6-f295f76b8181` (initial, terminal),
+`01a1301b-5430-7aa3-aa3e-07914f313533` (closure, terminal).
+
+Worker/database/client workflow wiring, durable operation ownership,
+reconciliation, account-wide rate scheduling, real mappings, working provider
+access and production activation remain deferred. No exact-SHA hosted CI or
+Database Gate evidence exists for this uncommitted transport candidate.
+
 ## Account packages published — 2026-10-10
 
 API/web now43a93e2131cde6bb09a6825fc5b83dfbf91fc600, PR100. Owner “Делай прод”

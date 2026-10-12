@@ -10,6 +10,27 @@ export {
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
 export {
+  createPlanerkaClient,
+  PlanerkaClientError,
+  PlanerkaUnknownOutcomeError,
+  type PlanerkaClient,
+  type PlanerkaClientConfig,
+  type PlanerkaTransport,
+  type PlanerkaErrorCode,
+  type PlanerkaBookingLookup,
+} from "./planerka/client.js";
+export type {
+  PlanerkaProfile,
+  PlanerkaEventType,
+  PlanerkaBooking,
+  PlanerkaBookingPage,
+  PlanerkaBookingsQuery,
+  PlanerkaSlots,
+  PlanerkaSlotsQuery,
+  CreatePlanerkaBooking,
+  CancelPlanerkaBooking,
+} from "./planerka/contracts.js";
+export {
   MAX_PROVIDER_SLOT_CANDIDATES,
   normalizeProviderSlots,
   type PlanerkaMutationOutcome,
