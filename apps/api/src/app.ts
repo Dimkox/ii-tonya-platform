@@ -711,7 +711,16 @@ export async function buildApp(
     });
   }
   await app.register(expertSessionRoutes, expertSession);
-  await app.register(expertBrowserSessionRoutes, expertSession);
+  await app.register(expertBrowserSessionRoutes, {
+    ...expertSession,
+    // The browser facade must not activate billing or fall back to legacy pricing.
+    campaign:
+      deps.config.features.expertSession === true &&
+      deps.config.features.expertResidencyBilling &&
+      deps.expertApi?.residency.kind === "campaign"
+        ? deps.expertApi.residency
+        : undefined,
+  });
   return app as unknown as FastifyInstance;
 }
 

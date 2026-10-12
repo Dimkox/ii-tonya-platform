@@ -3,8 +3,9 @@ import {
   type ExpertBrowserSession,
 } from "./expert-account-client.js";
 import { readMiniAppLaunchData } from "./telegram-launch.js";
+import { bindExpertCampaign } from "./expert-campaign-view.js";
 export function renderExpertAccountPage(): string {
-  return `<main class="section"><a href="/">ии-Тоня</a><h1>Кабинет эксперта</h1><p data-expert-status role="status">Проверяем вход…</p><button class="button primary" data-expert-login disabled>Войти через Telegram</button><button class="button" data-expert-logout hidden>Выйти</button><button class="button" data-expert-retry>Проверить вход</button><div data-expert-help></div><p>Оплата и управление тарифом пока недоступны.</p></main>`;
+  return `<main class="section"><a href="/">ии-Тоня</a><h1>Кабинет эксперта</h1><p data-expert-status role="status">Проверяем вход…</p><button class="button primary" data-expert-login disabled>Войти через Telegram</button><button class="button" data-expert-logout hidden>Выйти</button><button class="button" data-expert-retry>Проверить вход</button><div data-expert-help></div><div data-expert-campaign></div></main>`;
 }
 interface ExpertWindow extends Window {
   Telegram?: { WebApp?: { initData?: string } };
@@ -19,6 +20,17 @@ export function bindExpertAccountActions(
   const logout = root.querySelector<HTMLButtonElement>("[data-expert-logout]")!;
   const retry = root.querySelector<HTMLButtonElement>("[data-expert-retry]")!;
   const help = root.querySelector<HTMLElement>("[data-expert-help]")!;
+  const campaign = root.querySelector<HTMLElement>("[data-expert-campaign]")!;
+  let disposeCampaign: (() => void) | undefined;
+  let campaignEpoch = 0;
+  function clearCampaign() {
+    ++campaignEpoch;
+    disposeCampaign?.();
+    disposeCampaign = undefined;
+    campaign.replaceChildren();
+    campaign.hidden = false;
+    campaign.inert = false;
+  }
   let session: ExpertBrowserSession | undefined,
     epoch = 0;
   let loggingOut = false;
@@ -36,6 +48,7 @@ export function bindExpertAccountActions(
     logout.hidden = session?.authenticated !== true;
   }
   function fail(error: unknown) {
+    clearCampaign();
     session = undefined;
     paint();
     status.textContent =
@@ -46,12 +59,37 @@ export function bindExpertAccountActions(
   async function probe() {
     if (loggingOut) return;
     const current = ++epoch;
+    // Keep a potentially committed checkout's command during revalidation.
+    // Pending responses may finish, but cannot expose UI before this probe.
+    campaign.hidden = true;
+    campaign.inert = true;
     status.textContent = "Проверяем вход…";
     try {
       const result = await client.probe();
       if (current !== epoch) return;
+      const sameSession =
+        disposeCampaign !== undefined &&
+        session?.authenticated === true &&
+        result.authenticated === true &&
+        session.userId === result.userId &&
+        session.expertId === result.expertId &&
+        session.csrfToken === result.csrfToken &&
+        session.expiresAt === result.expiresAt;
+      if (!sameSession) clearCampaign();
       session = result;
       paint();
+      if (result.authenticated && !sameSession) {
+        const bindingEpoch = campaignEpoch;
+        disposeCampaign = bindExpertCampaign(campaign, result, () => {
+          // A same-session probe advances the account epoch, but must not
+          // silence an authorization failure from the retained campaign.
+          if (bindingEpoch !== campaignEpoch) return;
+          ++epoch;
+          fail(new Error("expert_login_denied"));
+        });
+      }
+      campaign.hidden = false;
+      campaign.inert = false;
     } catch (error) {
       if (current === epoch) fail(error);
     }
@@ -59,6 +97,7 @@ export function bindExpertAccountActions(
   async function authenticate(proof: string) {
     if (loggingOut) return;
     const current = ++epoch;
+    clearCampaign();
     login.disabled = true;
     status.textContent = "Выполняем вход…";
     try {
@@ -110,6 +149,7 @@ export function bindExpertAccountActions(
     loggingOut = true;
     retry.disabled = true;
     const current = ++epoch;
+    clearCampaign();
     session = undefined;
     help.replaceChildren();
     paint();

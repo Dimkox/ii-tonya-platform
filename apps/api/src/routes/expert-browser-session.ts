@@ -1,4 +1,10 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import {
+  expertCampaignQuoteRequestSchema,
+  expertCampaignCheckoutRequestSchema,
+  type ExpertCampaignService,
+} from "@ii-tonya/application";
+import { createExpertBearerPrincipalResolver } from "../expert-principal-resolver.js";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   parseExpertBearer,
@@ -15,6 +21,7 @@ export interface ExpertBrowserOptions extends ExpertSessionRoutesOptions {
   origin?: string;
   botUsername?: string;
   widgetEnabled?: boolean;
+  campaign?: ExpertCampaignService | undefined;
 }
 const SESSION = "__Host-expert-session",
   CSRF = "__Host-expert-csrf";
@@ -30,6 +37,61 @@ function cookies(r: FastifyRequest) {
     result.set(name, rest.join("="));
   }
   return result;
+}
+// These contracts are flat objects of UUID/key strings and an integer term.
+// Reject ambiguous duplicate keys before strict schema validation; never let
+// JSON.parse's last-key-wins behavior change a financial command.
+function campaignBody(r: FastifyRequest): unknown {
+  if (
+    [
+      "content-type",
+      "content-length",
+      "content-encoding",
+      "transfer-encoding",
+    ].some((h) => headerCount(r, h) > 1) ||
+    r.headers["content-encoding"] !== undefined ||
+    r.headers["transfer-encoding"] !== undefined ||
+    !/^application\/json(?:;\s*charset=utf-8)?$/iu.test(
+      r.headers["content-type"] ?? "",
+    ) ||
+    !Buffer.isBuffer(r.body) ||
+    r.body.length > 8192 ||
+    (r.headers["content-length"] !== undefined &&
+      r.headers["content-length"] !== String(r.body.length))
+  )
+    return null;
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(r.body);
+    const value: unknown = JSON.parse(text);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const keys = [...text.matchAll(/("(?:\\.|[^"\\])*")\s*:/gu)].map(
+      (match) => JSON.parse(match[1]!) as string,
+    );
+    if (
+      keys.length !== Object.keys(value).length ||
+      new Set(keys).size !== keys.length
+    )
+      return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+function campaignResult(reply: FastifyReply, result: unknown) {
+  if (result && typeof result === "object" && "kind" in result) {
+    const kind = result.kind;
+    const status =
+      kind === "invalid_request"
+        ? 400
+        : kind === "forbidden"
+          ? 403
+          : kind === "command_rejected"
+            ? 409
+            : 503;
+    return reply.code(status).send({ error: kind });
+  }
+  return reply.send(result);
 }
 export const expertBrowserSessionRoutes: FastifyPluginAsync<
   ExpertBrowserOptions
@@ -178,4 +240,57 @@ export const expertBrowserSessionRoutes: FastifyPluginAsync<
     reply.header("set-cookie", [cookie(SESSION, "", 0), cookie(CSRF, "", 0)]);
     return reply.code(204).send();
   });
+  const principals = deps.lookup
+    ? createExpertBearerPrincipalResolver({ sessions: deps.lookup })
+    : undefined;
+  const campaign =
+    deps.campaign?.kind === "campaign" ? deps.campaign : undefined;
+  async function authorize(r: FastifyRequest, reply: FastifyReply) {
+    if (!available || !principals || !campaign) {
+      reply.code(503).send({ error: "campaign_unavailable" });
+      return null;
+    }
+    const principal = await principals.resolve(`Bearer ${token(r) ?? ""}`);
+    if (!principal) reply.code(401).send({ error: "unauthorized" });
+    return principal;
+  }
+  app.get("/v1/expert/browser/residency/tariffs", async (r, reply) => {
+    const principal = await authorize(r, reply);
+    if (!principal) return;
+    return campaignResult(reply, await campaign!.listActiveTariffs(principal));
+  });
+  app.post(
+    "/v1/expert/browser/residency/quotes",
+    { bodyLimit: 8192 },
+    async (r, reply) => {
+      const principal = await authorize(r, reply);
+      if (!principal) return;
+      const parsed = expertCampaignQuoteRequestSchema.safeParse(
+        campaignBody(r),
+      );
+      if (!parsed.success)
+        return reply.code(400).send({ error: "invalid_request" });
+      return campaignResult(
+        reply,
+        await campaign!.quote(principal, parsed.data),
+      );
+    },
+  );
+  app.post(
+    "/v1/expert/browser/residency/checkouts",
+    { bodyLimit: 8192 },
+    async (r, reply) => {
+      const principal = await authorize(r, reply);
+      if (!principal) return;
+      const parsed = expertCampaignCheckoutRequestSchema.safeParse(
+        campaignBody(r),
+      );
+      if (!parsed.success)
+        return reply.code(400).send({ error: "invalid_request" });
+      return campaignResult(
+        reply,
+        await campaign!.checkout(principal, parsed.data),
+      );
+    },
+  );
 };
