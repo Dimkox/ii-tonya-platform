@@ -103,7 +103,12 @@ export interface OutboxRepository {
 
 export type DispatchOutcome =
   | { kind: "applied"; providerOperationId?: string }
-  | { kind: "not_applied"; retryable: boolean; reasonCode: string }
+  | {
+      kind: "not_applied";
+      retryable: boolean;
+      reasonCode: string;
+      retryAfterMs?: number;
+    }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string }
   | {
       kind: "terminal";
@@ -219,6 +224,31 @@ export function boundedFullJitterDelay(
 
 function retryAt(deps: OutboxRunnerDeps, now: Date, attempt: number): Date {
   return new Date(now.getTime() + deps.retryDelayMs(attempt));
+}
+
+function providerRetryAt(
+  deps: OutboxRunnerDeps,
+  now: Date,
+  attempt: number,
+  retryAfterMs?: number,
+): Date {
+  if (retryAfterMs === undefined) return retryAt(deps, now, attempt);
+  // Provider seconds are bounded at the transport boundary; defend other injected dispatchers too.
+  const backoff = deps.retryDelayMs(attempt);
+  const current = deps.now().getTime();
+  const timestamp = current + Math.max(backoff, retryAfterMs);
+  if (
+    !Number.isSafeInteger(retryAfterMs) ||
+    retryAfterMs < 0 ||
+    retryAfterMs > 2147483647000 ||
+    !Number.isFinite(backoff) ||
+    backoff < 0 ||
+    !Number.isSafeInteger(current) ||
+    !Number.isSafeInteger(timestamp) ||
+    Math.abs(timestamp) > 8640000000000000
+  )
+    throw new Error("outbox_retry_delay_invalid");
+  return new Date(timestamp);
 }
 
 function dispatchToken(message: OutboxMessage): string {
@@ -529,7 +559,7 @@ async function dispatchPending(
       message.id,
       deps.workerId,
       dispatchToken(message),
-      retryAt(deps, now, message.attempt),
+      providerRetryAt(deps, now, message.attempt, outcome.retryAfterMs),
       outcome.reasonCode,
     );
     record(deps, message.topic, "dispatch", "retry", "internal");

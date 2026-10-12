@@ -249,3 +249,4 @@ export {
   type SelartiMessagesResult,
   type SelartiRestFetch,
 } from "./selarti/rest-client.js";
+export { createClientAsyncTelegramTransport } from "./telegram/client-async-transport.js";

@@ -127,12 +127,33 @@ export function createTelegramSendTextDispatcher(deps: {
               : {}),
           };
         }
-        if (response.status === 429)
+        if (response.status === 429) {
+          const body = response.body as {
+            ok?: unknown;
+            error_code?: unknown;
+            parameters?: { retry_after?: unknown };
+          } | null;
+          const seconds = body?.parameters?.retry_after;
+          if (
+            body?.ok !== false ||
+            body.error_code !== 429 ||
+            typeof seconds !== "number" ||
+            !Number.isSafeInteger(seconds) ||
+            seconds < 0 ||
+            seconds > 2147483647
+          )
+            return {
+              kind: "unknown_outcome",
+              reconciliationKey: message.reconciliationKey,
+              reasonCode: "transport_outcome_unknown",
+            };
           return {
             kind: "not_applied",
             retryable: true,
             reasonCode: "rate_limited",
+            retryAfterMs: seconds * 1000,
           };
+        }
         if (response.status >= 500)
           return {
             kind: "unknown_outcome",

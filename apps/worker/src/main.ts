@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { composeClientAsyncTelegram } from "./client-async-composition.js";
 import {
   createYooKassaWorkerComposition,
   validateYooKassaWorkerConfig,
@@ -115,6 +116,7 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly yookassaReaderFactory?: YooKassaAuditReaderFactory;
@@ -372,18 +374,14 @@ export function createProductionWorkerRuntimeFactory(
       const selartiEnabled =
         config.features.clientHybridRouting === true ||
         config.features.testExpertSelarti === true;
-      if (
-        clientEnabled &&
-        (config.features.telegramEgressConsentGate !== true ||
-          !config.clientTelegramBotKey ||
-          !deps.clientAsyncCapabilities?.telegram ||
-          typeof deps.clientAsyncCapabilities.telegram.transport?.request !==
-            "function" ||
-          !(
-            deps.clientAsyncCapabilities.telegram.sendMessageUrl instanceof URL
-          ))
-      )
-        throw new Error("b2_telegram_delivery_capability_unavailable");
+      const telegram = composeClientAsyncTelegram(config, {
+        ...(deps.clientAsyncCapabilities?.telegram === undefined
+          ? {}
+          : { telegram: deps.clientAsyncCapabilities.telegram }),
+        ...(deps.clientTelegramFetch === undefined
+          ? {}
+          : { fetch: deps.clientTelegramFetch }),
+      });
       if (
         selartiEnabled &&
         (!clientEnabled ||
@@ -419,7 +417,12 @@ export function createProductionWorkerRuntimeFactory(
         ? createClientAsyncOutboxRegistry(
             db,
             config.clientTelegramBotKey!,
-            deps.clientAsyncCapabilities!,
+            {
+              telegram: telegram!,
+              ...(deps.clientAsyncCapabilities?.selarti === undefined
+                ? {}
+                : { selarti: deps.clientAsyncCapabilities.selarti }),
+            },
             selartiEnabled,
           )
         : undefined;
