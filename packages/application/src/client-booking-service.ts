@@ -20,6 +20,7 @@ export type ClientBookingReserveRepositoryResult =
 
 export type ClientBookingCancelRepositoryResult = Readonly<{
   kind: "cancelled" | "replayed" | "not_found" | "conflict";
+  providerCancellationPending?: boolean;
 }>;
 
 export interface ProtectedClientBookingRepository {
@@ -29,7 +30,12 @@ export interface ProtectedClientBookingRepository {
         kind: "found";
         bookings: readonly {
           bookingHandle: `bk1.${string}`;
-          state: "reserved" | "booked";
+          state:
+            | "reserved"
+            | "booked"
+            | "calendar_pending"
+            | "cancellation_pending"
+            | "confirmation_unverified";
           startsAt: Date;
           reservedUntil: Date;
         }[];
@@ -54,7 +60,12 @@ export interface ProtectedClientBookingRepository {
 
 export interface ClientActiveBooking {
   bookingHandle: `bk1.${string}`;
-  state: "reserved" | "booked";
+  state:
+    | "reserved"
+    | "booked"
+    | "calendar_pending"
+    | "cancellation_pending"
+    | "confirmation_unverified";
   startsAt: string;
   reservedUntil: string;
 }
@@ -78,7 +89,10 @@ export interface ClientBookingService {
   cancel(
     principal: ClientPrincipal,
     bookingHandle: string,
-  ): Promise<{ bookingHandle: `bk1.${string}`; state: "cancelled" }>;
+  ): Promise<{
+    bookingHandle: `bk1.${string}`;
+    state: "cancelled" | "cancellation_pending";
+  }>;
 }
 
 export class ClientBookingUnauthorizedError extends Error {
@@ -188,7 +202,13 @@ export function createClientBookingService(deps: {
         .map((row): ClientActiveBooking => {
           if (
             !BOOKING_HANDLE_PATTERN.test(row.bookingHandle) ||
-            (row.state !== "reserved" && row.state !== "booked")
+            ![
+              "reserved",
+              "booked",
+              "calendar_pending",
+              "cancellation_pending",
+              "confirmation_unverified",
+            ].includes(row.state)
           ) {
             throw new Error("client_booking_invalid_projection");
           }
@@ -266,7 +286,12 @@ export function createClientBookingService(deps: {
       });
       if (result.kind === "not_found") throw new ClientBookingNotFoundError();
       if (result.kind === "conflict") throw new ClientBookingConflictError();
-      return { bookingHandle: canonicalBookingHandle, state: "cancelled" };
+      return {
+        bookingHandle: canonicalBookingHandle,
+        state: result.providerCancellationPending
+          ? "cancellation_pending"
+          : "cancelled",
+      };
     },
   };
   return Object.freeze(service);

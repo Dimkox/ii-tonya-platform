@@ -58,7 +58,7 @@ function validateTopicAllowlist(
 }
 
 function topicPredicate(topics: WorkerOutboxTopics | undefined) {
-  if (topics === undefined) return sql``;
+  if (topics === undefined) return sql` and topic <> 'booking.handoff_revoked'`;
   if (topics.length === 1) return sql` and topic = 'telegram.send_text.v1'`;
   return topics.length === CLIENT_CATALOG_OUTBOX_TOPICS.length
     ? sql` and topic in (${topics[0]}, ${topics[1]}, ${topics[2]})`
@@ -274,6 +274,10 @@ async function lockedRow(
   ).rows[0];
   if (row === undefined)
     throw new OutboxStateConflictError(`Outbox row not found: ${id}`);
+  // Reject even an otherwise valid legacy claim: this topic is local-only and
+  // exclusively owned by the handoff consumer. All direct mutations funnel here.
+  if (row.topic === "booking.handoff_revoked")
+    throw new OutboxStateConflictError("outbox_topic_dedicated_owner");
   return row;
 }
 

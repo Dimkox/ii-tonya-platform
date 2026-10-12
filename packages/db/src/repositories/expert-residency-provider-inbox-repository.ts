@@ -7,6 +7,16 @@ import {
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
 import { grantExpertReferralReward } from "./expert-referral-reward-allocation.js";
+import {
+  expireLockedExpertResidencyOrder,
+  readLockedExpertCreditReservations,
+  releaseLockedExpertResidencyCredit,
+} from "./expert-residency-repository.js";
+import {
+  latePaymentBinding,
+  latePaymentReason,
+  invalidatedCreditPaymentReason,
+} from "./admin-repository.js";
 
 export class ExpertResidencySettlementError extends Error {
   constructor(public readonly code: string) {
@@ -24,6 +34,63 @@ export interface ExpertResidencySettlementResult {
     "eligible" | "pending_feature_hold" | "permanently_ineligible";
   readonly residencyStartsAt: string;
   readonly residencyEndsAt: string;
+}
+type SettlementOutcome =
+  | ExpertResidencySettlementResult
+  | { kind: "expired" }
+  | { kind: "credit_invalidated" };
+
+// Bound whole-transaction retries, including implicit FK lock waits. Do not
+// retry domain rejection or mutate a partly committed financial transaction.
+async function withCreditAuthorityRetry<T>(work: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await work();
+    } catch (error) {
+      let current: unknown = error;
+      const seen = new Set<unknown>();
+      let retry = false;
+      while (current && typeof current === "object" && !seen.has(current)) {
+        seen.add(current);
+        if (
+          ["40001", "40P01", "55P03"].includes(
+            String((current as { code?: unknown }).code),
+          )
+        )
+          retry = true;
+        current = (current as { cause?: unknown }).cause;
+      }
+      if (!retry || attempt >= 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+    }
+  }
+}
+
+type CreditTransaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
+async function hasCreditInvalidation(tx: CreditTransaction, orderId: string) {
+  const evidence = await tx.execute<{ bound: boolean }>(sql`select exists(
+    select 1 from expert_referral_ledger_entries r
+    join expert_referral_ledger_entries original on original.id=r.original_entry_id and original.entry_kind='reservation' and original.order_id=r.order_id and original.expert_id=r.expert_id
+    join expert_first_residency_settlements marker on marker.qualifying_order_id=r.source_id
+    join expert_referral_ledger_allocations a on a.ledger_entry_id=original.id and a.expert_id=r.expert_id
+    join expert_referral_reward_grants g on g.id=a.reward_grant_id and g.expert_id=r.expert_id
+    where r.order_id=${orderId}::uuid and r.entry_kind='release' and r.source_type='provider_reversal'
+      and marker.settlement_inviter_expert_id=r.expert_id and (
+        (g.first_settlement_id=marker.id and exists(
+          select 1 from expert_referral_ledger_entries reward
+          join expert_referral_ledger_entries reversal on reversal.original_entry_id=reward.id and reversal.entry_kind='reversal' and reversal.source_type='provider_reversal' and reversal.source_id=r.source_id and reversal.expert_id=r.expert_id
+          join expert_referral_ledger_allocations inverse on inverse.ledger_entry_id=reversal.id and inverse.reward_grant_id=g.id and inverse.expert_id=r.expert_id and inverse.amount_minor<0
+          where reward.source_id=g.id and reward.entry_kind='reward_grant' and reward.expert_id=r.expert_id
+        )) or exists(
+          select 1 from expert_referral_ledger_entries benefit
+          join expert_referral_ledger_allocations replenishment on replenishment.ledger_entry_id=benefit.id and replenishment.reward_grant_id=g.id and replenishment.expert_id=r.expert_id and replenishment.amount_minor>0
+          join expert_referral_ledger_entries reversal on reversal.original_entry_id=benefit.id and reversal.entry_kind='reversal' and reversal.source_type='provider_reversal' and reversal.source_id=r.source_id and reversal.expert_id=r.expert_id and reversal.amount_minor=-replenishment.amount_minor
+          join expert_referral_ledger_allocations inverse on inverse.ledger_entry_id=reversal.id and inverse.reward_grant_id=g.id and inverse.expert_id=r.expert_id and inverse.amount_minor=-replenishment.amount_minor
+          where benefit.entry_kind='debt_repayment' and benefit.source_id=marker.id and benefit.source_type in ('first_settlement','held_reward_replay') and benefit.expert_id=r.expert_id
+        )
+      )
+  ) bound`);
+  return evidence.rows[0]!.bound;
 }
 export interface ExpertResidencyReversalResult {
   readonly kind: "refunded" | "charged_back";
@@ -119,8 +186,13 @@ export class PostgresExpertResidencyProviderInboxRepository {
       throw new ExpertResidencySettlementError(
         "EXPERT_RESIDENCY_SETTLEMENT_EVENT_REQUIRED",
       );
-    return withSerializableRetry(() =>
-      this.db.transaction(async (tx) => {
+    const outcome = await withCreditAuthorityRetry(() =>
+      this.db.transaction<SettlementOutcome>(async (tx) => {
+        // Different orders lock different rows. Protect the max-residency read
+        // from write skew and retry the entire settlement on 40001. Taking the
+        // checkout expert advisory here would invert its control-first order.
+        await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`set local lock_timeout='250ms'`);
         const digest = input.payloadDigest.slice("sha256:".length);
         await tx.execute(
           sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
@@ -128,6 +200,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
         const existing = await tx.execute<{
           payloadDigest: string;
           status: string;
+          resultCode: string | null;
           identityVersion: number;
           paymentId: string | null;
           orderId: string | null;
@@ -139,7 +212,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           verifierKeyVersion: string | null;
           verifiedAt: Date | string | null;
         }>(
-          sql`select payload_digest as "payloadDigest",status,identity_version as "identityVersion",payment_id as "paymentId",order_id as "orderId",amount_minor as "amountMinor",currency,event_kind as "eventKind",occurred_at as "occurredAt",verification_id as "verificationId",verifier_key_version as "verifierKeyVersion",verified_at as "verifiedAt" from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} for update`,
+          sql`select payload_digest as "payloadDigest",status,result_code as "resultCode",identity_version as "identityVersion",payment_id as "paymentId",order_id as "orderId",amount_minor as "amountMinor",currency,event_kind as "eventKind",occurred_at as "occurredAt",verification_id as "verificationId",verifier_key_version as "verifierKeyVersion",verified_at as "verifiedAt" from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} for update`,
         );
         const priorEvent = existing.rows[0];
         if (
@@ -172,7 +245,30 @@ export class PostgresExpertResidencyProviderInboxRepository {
           );
         if (existing.rows[0]?.status === "processed")
           return this.prior(tx, order, input.paymentId);
-        if (order.status !== "payment_pending")
+        if (priorEvent?.status === "rejected") {
+          if (
+            priorEvent.resultCode === "EXPERT_RESIDENCY_CREDIT_INVALIDATED" &&
+            order.status === "failed" &&
+            (await hasCreditInvalidation(tx, order.id))
+          )
+            return { kind: "credit_invalidated" };
+          if (
+            priorEvent.resultCode !== "EXPERT_RESIDENCY_PAYMENT_EXPIRED" ||
+            order.status !== "expired"
+          )
+            throw new ExpertResidencySettlementError(
+              "EXPERT_RESIDENCY_REPLAY_STATE_CONFLICT",
+            );
+          return { kind: "expired" };
+        }
+        const creditInvalidated =
+          order.status === "failed" &&
+          (await hasCreditInvalidation(tx, order.id));
+        if (
+          order.status !== "payment_pending" &&
+          order.status !== "expired" &&
+          !creditInvalidated
+        )
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_ORDER_NOT_PENDING",
           );
@@ -183,19 +279,88 @@ export class PostgresExpertResidencyProviderInboxRepository {
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_PAYMENT_MISMATCH",
           );
-        const clock = await tx.execute<{ now: Date | string }>(
-          sql`select transaction_timestamp() as now`,
+        if (creditInvalidated) {
+          const reservations = await readLockedExpertCreditReservations(
+            tx,
+            order,
+          );
+          if (
+            reservations.some((r) =>
+              r.allocations.some((a) => a.remaining !== 0n),
+            )
+          )
+            throw new ExpertResidencySettlementError(
+              "EXPERT_RESIDENCY_CREDIT_ALLOCATION_INVALID",
+            );
+          await tx.execute(
+            sql`update expert_residency_provider_event_inbox set status='rejected',result_code='EXPERT_RESIDENCY_CREDIT_INVALIDATED',processed_at=clock_timestamp(),updated_at=clock_timestamp() where provider=${input.provider} and external_event_id=${input.eventId}`,
+          );
+          await tx.execute(
+            sql`insert into integration_errors(provider,reason_code,metadata_hash) select 'expert_residency',${invalidatedCreditPaymentReason},${latePaymentBinding} from expert_residency_provider_event_inbox i where i.provider=${input.provider} and i.external_event_id=${input.eventId}`,
+          );
+          return { kind: "credit_invalidated" };
+        }
+        const clock = await tx.execute<{
+          now: Date | string;
+          expired: boolean;
+        }>(
+          // Transaction-start time can precede an inbox/order lock wait and is
+          // not authority to settle an order whose deadline has since elapsed.
+          // Compare in PostgreSQL, retaining deadline sub-millisecond precision.
+          sql`select clock_timestamp() as now,clock_timestamp() >= payment_deadline as expired from expert_residency_orders where id=${order.id}::uuid`,
         );
         const now = new Date(clock.rows[0]!.now);
-        if (now >= new Date(order.paymentDeadline))
-          throw new ExpertResidencySettlementError(
-            "EXPERT_RESIDENCY_PAYMENT_EXPIRED",
+        if (order.status === "expired" || clock.rows[0]!.expired) {
+          // The expiry worker may have won, including before a 40001 retry.
+          // Retain this verified payment fact without releasing credit twice.
+          if (order.status === "payment_pending") {
+            const expired = await expireLockedExpertResidencyOrder(
+              tx,
+              order,
+              sql`clock_timestamp()`,
+            );
+            if (!expired)
+              throw new ExpertResidencySettlementError(
+                "EXPERT_RESIDENCY_EXPIRY_STATE_CONFLICT",
+              );
+          }
+          // The verified payment fact is retained. Only residency settlement is
+          // rejected; this does not claim the provider refunded or never paid.
+          await tx.execute(
+            sql`update expert_residency_provider_event_inbox set status='rejected',result_code='EXPERT_RESIDENCY_PAYMENT_EXPIRED',processed_at=${now},updated_at=${now} where provider=${input.provider} and external_event_id=${input.eventId}`,
           );
+          // Same-event replays return above under the inbox lock. Inserting only
+          // on this first transition prevents reopening an acknowledged signal.
+          await tx.execute(sql`insert into integration_errors(provider,reason_code,metadata_hash)
+            select 'expert_residency',${latePaymentReason},${latePaymentBinding}
+            from expert_residency_provider_event_inbox i
+            where i.provider=${input.provider} and i.external_event_id=${input.eventId}`);
+          return { kind: "expired" };
+        }
         const prospectiveReferral = await tx.execute<{
           inviterExpertId: string;
         }>(
           sql`select inviter_expert_id as "inviterExpertId" from expert_referrals where invitee_expert_id=${order.expertId}::uuid`,
         );
+        // Checkout takes expert before order; never wait on the inverse edge.
+        // Also cover the expert FK locks of attempts/markers/reward allocations.
+        const expertIds = [
+          ...new Set([
+            order.expertId,
+            ...prospectiveReferral.rows.map((r) => r.inviterExpertId),
+          ]),
+        ].sort();
+        await tx.execute(
+          sql`select id from experts where id in (${sql.join(
+            expertIds.map((id) => sql`${id}::uuid`),
+            sql`,`,
+          )}) order by id for update nowait`,
+        );
+        const reserved = await readLockedExpertCreditReservations(tx, order);
+        if (reserved.some((r) => r.allocations.some((a) => a.released !== 0n)))
+          throw new ExpertResidencySettlementError(
+            "EXPERT_RESIDENCY_CREDIT_ALLOCATION_INVALID",
+          );
         const expert = await tx.execute<{
           active: boolean;
           verified: boolean;
@@ -218,18 +383,41 @@ export class PostgresExpertResidencyProviderInboxRepository {
               sql`select e.user_id as "userId",(select ci.id from channel_identities ci where ci.user_id=e.user_id order by ci.id limit 1) as "channelIdentityId" from experts e where e.id=${prospectiveReferral.rows[0].inviterExpertId}::uuid`,
             )
           : { rows: [] };
-        const attempted = await tx.execute<{ id: string }>(
-          sql`insert into expert_residency_payment_attempts (order_id,provider,provider_request_id,expected_amount_minor,currency,status,idempotency_key,resolved_at) values (${order.id}::uuid,${input.provider},${input.paymentId},${input.amountMinor},${input.currency},'settled',${`settlement:${input.provider}:${input.paymentId}`},${now}) on conflict (provider,provider_request_id) do nothing returning id`,
+        const attempted = await tx.execute<{ id: string; status: string }>(
+          sql`insert into expert_residency_payment_attempts (order_id,provider,provider_request_id,expected_amount_minor,currency,status,idempotency_key,resolved_at) values (${order.id}::uuid,${input.provider},${input.paymentId},${input.amountMinor},${input.currency},'settled',${`settlement:${input.provider}:${input.paymentId}`},${now}) on conflict (provider,provider_request_id) do nothing returning id,status`,
         );
         const attempt = attempted.rows[0]
           ? attempted
-          : await tx.execute<{ id: string }>(
-              sql`select id from expert_residency_payment_attempts where provider=${input.provider} and provider_request_id=${input.paymentId} and order_id=${order.id}::uuid and expected_amount_minor=${input.amountMinor} and currency=${input.currency} for update`,
+          : await tx.execute<{ id: string; status: string }>(
+              sql`select id,status from expert_residency_payment_attempts where provider=${input.provider} and provider_request_id=${input.paymentId} and order_id=${order.id}::uuid and expected_amount_minor=${input.amountMinor} and currency=${input.currency} for update`,
             );
-        if (!attempt.rows[0])
+        const boundAttempt = attempt.rows[0];
+        if (
+          !boundAttempt ||
+          !["created", "pending", "unknown_outcome", "settled"].includes(
+            boundAttempt.status,
+          )
+        )
           throw new ExpertResidencySettlementError(
             "EXPERT_RESIDENCY_PAYMENT_ATTEMPT_CONFLICT",
           );
+        // The canonical inbox transaction owns this transition. Keep the same
+        // attempt identity, and never rewrite evidence of an earlier settlement.
+        if (boundAttempt.status !== "settled") {
+          const transitioned = await tx.execute<{ id: string }>(sql`
+            update expert_residency_payment_attempts
+            set status='settled',resolved_at=${now},updated_at=${now}
+            where id=${boundAttempt.id}::uuid and order_id=${order.id}::uuid
+              and provider=${input.provider} and provider_request_id=${input.paymentId}
+              and expected_amount_minor=${input.amountMinor} and currency=${input.currency}
+              and status in ('created','pending','unknown_outcome')
+            returning id
+          `);
+          if (transitioned.rows.length !== 1)
+            throw new ExpertResidencySettlementError(
+              "EXPERT_RESIDENCY_PAYMENT_ATTEMPT_CONFLICT",
+            );
+        }
         const current = await tx.execute<{ endAt: Date | string | null }>(
           sql`select max(residency_ends_at) as "endAt" from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled'`,
         );
@@ -241,17 +429,16 @@ export class PostgresExpertResidencyProviderInboxRepository {
         await tx.execute(
           sql`update expert_residency_orders set status='settled',provider_payment_id=${input.paymentId},settled_at=${now},residency_starts_at=${start},residency_ends_at=${end},updated_at=${now} where id=${order.id}::uuid`,
         );
-        const reservations = await tx.execute<{ id: string }>(
-          sql`select id from expert_referral_ledger_entries where order_id=${order.id}::uuid and entry_kind='reservation' order by id for update`,
+        const reservations = await releaseLockedExpertResidencyCredit(
+          tx,
+          order,
+          {
+            type: "residency_settlement",
+            id: order.id,
+            keyPrefix: "settlement-release",
+          },
         );
-        for (const reservation of reservations.rows) {
-          const release = await tx.execute<{ id: string }>(
-            sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) select expert_id,'release',-amount_minor,order_id,id,'residency_settlement',${order.id}::uuid,${`settlement-release:${reservation.id}`} from expert_referral_ledger_entries where id=${reservation.id}::uuid on conflict (idempotency_key) do nothing returning id`,
-          );
-          if (release.rows[0])
-            await tx.execute(
-              sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) select ${release.rows[0].id}::uuid,reward_grant_id,expert_id,-amount_minor from expert_referral_ledger_allocations where ledger_entry_id=${reservation.id}::uuid order by reward_grant_id`,
-            );
+        for (const reservation of reservations) {
           const spend = await tx.execute<{ id: string }>(
             sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) select expert_id,'spend',amount_minor,order_id,id,'residency_settlement',${order.id}::uuid,${`settlement-spend:${reservation.id}`} from expert_referral_ledger_entries where id=${reservation.id}::uuid on conflict (idempotency_key) do nothing returning id`,
           );
@@ -270,7 +457,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           sql`select id from expert_referral_abuse_holds where expert_id=${order.expertId}::uuid and status='open' for update`,
         );
         const control = await tx.execute<{ enabled: boolean; version: number }>(
-          sql`select reward_grants_enabled as enabled,version from expert_referral_feature_controls where control_key='expert_referrals' for update`,
+          sql`select reward_grants_enabled as enabled,version from expert_referral_feature_controls where control_key='expert_referrals' for update nowait`,
         );
         const abuseCleared = !hold.rows[0];
         const expertEligible = expert.rows[0].active && expert.rows[0].verified;
@@ -290,7 +477,8 @@ export class PostgresExpertResidencyProviderInboxRepository {
           referral.rows[0] &&
           expertEligible &&
           abuseCleared &&
-          order.commercialPolicyVersion === "expert_residency_v2" &&
+          (order.commercialPolicyVersion === "expert_residency_v2" ||
+            order.commercialPolicyVersion === "expert_campaign_v1") &&
           eligibility === "eligible"
         ) {
           await tx.execute(sql`
@@ -302,7 +490,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
               ${marker.rows[0].id}::uuid, ${referral.rows[0].id}::uuid,
               ${order.id}::uuid, ${attempt.rows[0]!.id}::uuid,
               ${referral.rows[0].inviterExpertId}::uuid, ${order.expertId}::uuid,
-              transaction_timestamp(), transaction_timestamp() + interval '30 days',
+              ${now}, ${now}::timestamptz + interval '30 days',
               ${`expert-referral-maturity:v1:${marker.rows[0].id}`}
             ) on conflict (first_settlement_id) do nothing
           `);
@@ -363,6 +551,16 @@ export class PostgresExpertResidencyProviderInboxRepository {
         };
       }),
     );
+    // Throw only after commit. Throwing inside would roll back expiry/releases.
+    if (outcome.kind === "credit_invalidated")
+      throw new ExpertResidencySettlementError(
+        "EXPERT_RESIDENCY_CREDIT_INVALIDATED",
+      );
+    if (outcome.kind === "expired")
+      throw new ExpertResidencySettlementError(
+        "EXPERT_RESIDENCY_PAYMENT_EXPIRED",
+      );
+    return outcome;
   }
   async reverse(
     input: VerifiedExpertResidencyPaymentEvent,
@@ -373,8 +571,10 @@ export class PostgresExpertResidencyProviderInboxRepository {
         "EXPERT_RESIDENCY_REVERSAL_EVENT_REQUIRED",
       );
     const reversalKind = input.kind;
-    return withSerializableRetry(() =>
+    return withCreditAuthorityRetry(() =>
       this.db.transaction(async (tx) => {
+        await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`set local lock_timeout='250ms'`);
         const digest = input.payloadDigest.slice("sha256:".length);
         await tx.execute(
           sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
@@ -460,6 +660,33 @@ export class PostgresExpertResidencyProviderInboxRepository {
         );
         const now = new Date(nowResult.rows[0]!.now);
         if (terminating) {
+          // Discover ALL reservations, including historical partial releases
+          // and older grants replenished by this marker's repayment benefits.
+          // Lock consuming orders BEFORE experts/grants/ledger. NOWAIT prevents
+          // a cycle with another reversal already holding its source order.
+          // SERIALIZABLE also covers a checkout allocation phantom; checkout
+          // reads grant balances that this transaction reverses (SSI rw cycle).
+          const affected = await tx.execute<{
+            id: string;
+            expertId: string;
+            status: string;
+          }>(sql`
+            select o.id,o.expert_id as "expertId",o.status from expert_residency_orders o
+            where o.status in ('payment_pending','failed') and exists(
+              select 1 from expert_referral_ledger_entries e
+              join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id
+              join expert_referral_reward_grants g on g.id=a.reward_grant_id
+              join expert_first_residency_settlements s on s.qualifying_order_id=${order.id}::uuid
+              where e.order_id=o.id and e.entry_kind='reservation' and (
+                g.first_settlement_id=s.id or exists(
+                  select 1 from expert_referral_ledger_entries benefit
+                  join expert_referral_ledger_allocations replenishment on replenishment.ledger_entry_id=benefit.id
+                  where benefit.entry_kind='debt_repayment' and benefit.source_id=s.id
+                    and benefit.source_type in ('first_settlement','held_reward_replay')
+                    and replenishment.reward_grant_id=g.id
+                )
+              )
+            ) order by o.id for update of o nowait`);
           const marker = await tx.execute<{
             id: string;
             eligibility: string;
@@ -494,7 +721,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
               sql`select id from experts where id in (${sql.join(
                 lockedExpertIds.map((id) => sql`${id}::uuid`),
                 sql`,`,
-              )}) order by id for update`,
+              )}) order by id for update nowait`,
             );
             const repaymentBenefits = await tx.execute<{
               entryId: string;
@@ -526,22 +753,27 @@ export class PostgresExpertResidencyProviderInboxRepository {
               )
             : { rows: [] };
           const rewardGrant = grant.rows[0];
-          if (rewardGrant) {
-            const activeReservations = await tx.execute<{
-              entryId: string;
-              amountMinor: bigint | string;
-            }>(
-              sql`select e.id as "entryId",a.amount_minor as "amountMinor" from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id where a.reward_grant_id=${rewardGrant.id}::uuid and e.entry_kind='reservation' and not exists (select 1 from expert_referral_ledger_entries r where r.original_entry_id=e.id and r.entry_kind='release') order by e.id for update of e,a`,
-            );
-            for (const reservation of activeReservations.rows) {
-              const release = await tx.execute<{ id: string }>(
-                sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) select expert_id,'release',${-BigInt(reservation.amountMinor)},order_id,id,'provider_reversal',${order.id}::uuid,${`refund-release:${firstMarker!.id}:${reservation.entryId}`} from expert_referral_ledger_entries where id=${reservation.entryId}::uuid on conflict (idempotency_key) do nothing returning id`,
+          // A marker may have only repaid older grants: cancellation cannot
+          // depend on it having issued a new rewardGrant of its own.
+          for (const consuming of affected.rows) {
+            if (
+              !firstMarker?.inviterExpertId ||
+              consuming.expertId !== firstMarker.inviterExpertId
+            )
+              throw new ExpertResidencySettlementError(
+                "EXPERT_RESIDENCY_CREDIT_ALLOCATION_INVALID",
               );
-              if (release.rows[0])
-                await tx.execute(
-                  sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${release.rows[0].id}::uuid,${rewardGrant.id}::uuid,${rewardGrant.expertId}::uuid,${-BigInt(reservation.amountMinor)})`,
-                );
-            }
+            await releaseLockedExpertResidencyCredit(tx, consuming, {
+              type: "provider_reversal",
+              id: order.id,
+              keyPrefix: `refund-release:${firstMarker.id}`,
+            });
+            if (consuming.status === "payment_pending")
+              await tx.execute(
+                sql`update expert_residency_orders set status='failed',updated_at=clock_timestamp() where id=${consuming.id}::uuid and status='payment_pending'`,
+              );
+          }
+          if (rewardGrant) {
             const expired = await tx.execute<{ amount: bigint | string }>(
               sql`select coalesce(sum(a.amount_minor),0)::bigint as amount from expert_referral_ledger_entries e join expert_referral_ledger_allocations a on a.ledger_entry_id=e.id where a.reward_grant_id=${rewardGrant.id}::uuid and e.entry_kind='expiry'`,
             );

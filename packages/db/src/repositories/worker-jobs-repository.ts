@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 
+import { lockBookingNotificationSubjects } from "./booking-notification-authority.js";
+import { captureBookingNotificationBatch } from "./booking-notification-repository.js";
+
 interface BatchResult {
   readonly examined: number;
   readonly changed: number;
@@ -43,15 +46,42 @@ export class PostgresWorkerJobsRepository {
   }): Promise<BatchResult> {
     void command.now;
     return this.db.transaction(async (tx) => {
+      const candidates = (
+        await tx.execute<{ id: string; client: string; expert: string }>(
+          sql`select r.id,r.user_id as client,e.user_id as expert from reservations r join experts e on e.id=r.expert_id where r.status='reserved' and r.reserved_until<=clock_timestamp() order by r.reserved_until,r.id limit ${command.batchSize}`,
+        )
+      ).rows;
+      if (!candidates.length) return { examined: 0, changed: 0, failed: 0 };
+      await lockBookingNotificationSubjects(
+        tx,
+        candidates.flatMap((r) => [r.client, r.expert]),
+      );
+      const ids = sql.join(
+        candidates.map((r) => sql`${r.id}::uuid`),
+        sql`, `,
+      );
+      await tx.execute(
+        sql`select e.id from reservations r join experts e on e.id=r.expert_id where r.id in (${ids}) order by e.id for share of e`,
+      );
+      await tx.execute(
+        sql`select es.id from reservations r join expert_services es on es.id=r.expert_service_id where r.id in (${ids}) order by es.id for share of es`,
+      );
+      await tx.execute(
+        sql`select s.id from reservations r join slots s on s.id=r.slot_id where r.id in (${ids}) order by s.id for share of s`,
+      );
       const result = await tx.execute<{
         examined: number | string;
         changed: number | string;
         failed: number | string;
+        sourceIds: string[];
       }>(sql`
         with due as materialized (
           select id, user_id, expert_id, version
           from reservations
-          where status = 'reserved'
+          where id in (${sql.join(
+            candidates.map((r) => sql`${r.id}::uuid`),
+            sql`, `,
+          )}) and status = 'reserved'
             and reserved_until <= clock_timestamp()
           order by reserved_until, id
           for update skip locked
@@ -101,7 +131,6 @@ export class PostgresWorkerJobsRepository {
             ), 'sha256'), 'hex')
           from expired
           cross join (values
-            ('planerka.cancel'),
             ('client.reservation_expired'),
             ('expert.reservation_expired')
           ) as topics(topic)
@@ -111,11 +140,13 @@ export class PostgresWorkerJobsRepository {
         select
           (select count(*) from due) as examined,
           (select count(*) from expired) as changed,
-          (select count(*) from due) - (select count(*) from expired) as failed
+          (select count(*) from due) - (select count(*) from expired) as failed,
+          (select array_agg(id) from effects) as "sourceIds"
       `);
       const row = result.rows[0];
       if (row === undefined)
         throw new Error("PostgreSQL expiry batch returned no count");
+      await captureBookingNotificationBatch(tx, row.sourceIds ?? []);
       return {
         examined: count(row.examined),
         changed: count(row.changed),

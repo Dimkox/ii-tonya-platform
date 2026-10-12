@@ -5,6 +5,7 @@ import type {
   YooKassaOperation,
   YooKassaOperationPort,
   YooKassaOperationStatus,
+  YooKassaMode,
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
@@ -490,14 +491,25 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
       returning id
     `);
     if (result.rows.length !== 1) {
+      const existing = await this.db.execute<{ status: string }>(sql`
+        select status from expert_residency_provider_operations
+        where id = ${operationId}::uuid
+      `);
+      if (existing.rows[0]?.status === status) return;
       throw new YooKassaOperationError("YOOKASSA_OPERATION_NOT_FOUND");
     }
   }
 
   async claimReconciliationBatch(
     limit: number,
+    mode?: YooKassaMode,
   ): Promise<readonly YooKassaOperation[]> {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100 ||
+      (mode !== undefined && mode !== "test" && mode !== "live")
+    ) {
       throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
     }
     const result = await this.db.execute<StoredOperation>(sql`
@@ -505,6 +517,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         select id
         from expert_residency_provider_operations
         where status in ('pending','unknown_outcome')
+          and (${mode ?? null}::text is null or environment_mode = ${mode ?? null})
           and provider_object_id is not null
           and (reconciliation_claimed_at is null or
                reconciliation_claimed_at < transaction_timestamp() - interval '5 minutes')
@@ -612,10 +625,18 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     leaseToken: string,
     providerObjectId: string,
   ): Promise<void> {
-    if (!UUID.test(operationId) || !UUID.test(leaseToken) || !PROVIDER_ID.test(providerObjectId))
+    if (
+      !UUID.test(operationId) ||
+      !UUID.test(leaseToken) ||
+      !PROVIDER_ID.test(providerObjectId)
+    )
       throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
     await this.db.transaction(async (tx) => {
-      const bound = await tx.execute<{ paymentAttemptId: string; operationKind: "create_payment" | "create_refund"; orderId: string }>(sql`
+      const bound = await tx.execute<{
+        paymentAttemptId: string;
+        operationKind: "create_payment" | "create_refund";
+        orderId: string;
+      }>(sql`
         update expert_residency_provider_operations
         set provider_object_id=${providerObjectId}, status='pending',
             recovery_lease_token=null, recovery_lease_until=null,
@@ -645,16 +666,30 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     });
   }
 
-  async rescheduleUnboundRecovery(operationId: string, leaseToken: string): Promise<void> {
-    await this.finishRecoveryLease(operationId, leaseToken, sql`
+  async rescheduleUnboundRecovery(
+    operationId: string,
+    leaseToken: string,
+  ): Promise<void> {
+    await this.finishRecoveryLease(
+      operationId,
+      leaseToken,
+      sql`
       recovery_next_at=transaction_timestamp() + interval '5 minutes'
-    `);
+    `,
+    );
   }
 
-  async markUnboundRecoveryManualReview(operationId: string, leaseToken: string): Promise<void> {
-    await this.finishRecoveryLease(operationId, leaseToken, sql`
+  async markUnboundRecoveryManualReview(
+    operationId: string,
+    leaseToken: string,
+  ): Promise<void> {
+    await this.finishRecoveryLease(
+      operationId,
+      leaseToken,
+      sql`
       manual_review_at=transaction_timestamp(), recovery_next_at=null
-    `);
+    `,
+    );
   }
 
   private async finishRecoveryLease(

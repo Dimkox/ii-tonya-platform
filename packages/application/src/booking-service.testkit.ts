@@ -33,6 +33,7 @@ export const bookingFixture = (initial?: {
   const topics: string[] = [];
   const charges: number[] = [];
   const actions: string[] = [];
+  let approvalRecorded = false;
   let reservation: { status: ReservationStatus; version: number } | undefined =
     initial === undefined ? undefined : { ...initial };
 
@@ -70,7 +71,6 @@ export const bookingFixture = (initial?: {
           };
         }
         reservation = { status: "reserved", version: 1 };
-        publish("planerka.reserve");
         publish("telegram.reservation_request");
         actions.push("reservation.created");
         return {
@@ -93,9 +93,14 @@ export const bookingFixture = (initial?: {
         if (command.actor.type === "client" && command.actor.id !== userId) {
           throw new Error("Reservation client ownership mismatch");
         }
+        if (command.action === "expert_confirm") {
+          if (approvalRecorded)
+            throw new Error("Provider operation already exists");
+          approvalRecorded = true;
+        }
         const nextStatus: ReservationStatus =
           command.action === "expert_confirm"
-            ? "booked"
+            ? "reserved"
             : command.action === "expert_cancel"
               ? "cancelled_by_expert"
               : command.action === "client_cancel"
@@ -105,12 +110,7 @@ export const bookingFixture = (initial?: {
           status: nextStatus,
           version: reservation.version + 1,
         };
-        if (command.action === "expert_confirm") {
-          publish("planerka.confirm");
-          publish("client.booking_confirmed");
-        }
         if (command.action === "expire") {
-          publish("planerka.cancel");
           publish("client.reservation_expired");
           publish("expert.reservation_expired");
         }

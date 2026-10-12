@@ -9,7 +9,12 @@ export interface BookingCard {
 }
 export interface ActiveBooking {
   bookingHandle: string;
-  state: "reserved" | "booked";
+  state:
+    | "reserved"
+    | "booked"
+    | "calendar_pending"
+    | "cancellation_pending"
+    | "confirmation_unverified";
   startsAt: string;
   reservedUntil: string;
 }
@@ -74,7 +79,13 @@ export class BookingClient {
       page.bookings.some(
         (row) =>
           !bk.test(row.bookingHandle) ||
-          !["reserved", "booked"].includes(row.state) ||
+          ![
+            "reserved",
+            "booked",
+            "calendar_pending",
+            "cancellation_pending",
+            "confirmation_unverified",
+          ].includes(row.state) ||
           !instant(row.startsAt) ||
           !instant(row.reservedUntil),
       )
@@ -87,11 +98,11 @@ export class BookingClient {
       this.needsReconciliation = false;
     return page;
   }
-  private async mutate(
+  private async mutate<T = void>(
     path: string,
     method: string,
     body?: unknown,
-  ): Promise<void> {
+  ): Promise<T> {
     this.assertCurrent();
     if (this.writing) throw new Error("booking_busy");
     if (this.needsReconciliation)
@@ -101,7 +112,7 @@ export class BookingClient {
     // A read must follow even a successful write; failures never auto-replay.
     this.needsReconciliation = true;
     try {
-      await this.call(path, method, body);
+      return await this.call<T>(path, method, body);
     } finally {
       this.writing = false;
     }
@@ -111,10 +122,21 @@ export class BookingClient {
       return Promise.reject(new Error("invalid_choice"));
     return this.mutate("bookings", "POST", { choiceHandle });
   }
-  cancel(bookingHandle: string): Promise<void> {
+  async cancel(
+    bookingHandle: string,
+  ): Promise<"cancelled" | "cancellation_pending"> {
     if (!bk.test(bookingHandle))
       return Promise.reject(new Error("invalid_booking"));
-    return this.mutate(`bookings/${bookingHandle}`, "DELETE");
+    const result = await this.mutate<{ bookingHandle: string; state: string }>(
+      `bookings/${bookingHandle}`,
+      "DELETE",
+    );
+    if (
+      result.bookingHandle !== bookingHandle ||
+      !["cancelled", "cancellation_pending"].includes(result.state)
+    )
+      throw new Error("invalid_cancellation_result");
+    return result.state as "cancelled" | "cancellation_pending";
   }
   async catalog(filters: {
     serviceCode?: string;

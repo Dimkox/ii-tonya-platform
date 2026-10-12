@@ -1,8 +1,23 @@
 import { randomUUID } from "node:crypto";
+import {
+  createYooKassaWorkerComposition,
+  validateYooKassaWorkerConfig,
+  type YooKassaAuditReaderFactory,
+} from "./yookassa-composition.js";
+import type { YooKassaTransport } from "@ii-tonya/integrations";
+import { PostgresExpertSessionRepository } from "@ii-tonya/db";
+import { runExpertSessionRetention } from "@ii-tonya/worker";
+import { createBookingNotificationRuntime } from "./booking-notifications.js";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
+import { createPlanerkaClient } from "@ii-tonya/integrations";
+import {
+  preflightPlanerkaBooking,
+  runPlanerkaBookingOnce,
+} from "@ii-tonya/worker";
+import { PostgresPlanerkaBookingRepository } from "@ii-tonya/db";
 import { CLIENT_ASYNC_OUTBOX_TOPICS } from "@ii-tonya/worker";
 import {
   createClientAsyncOutboxRegistry,
@@ -11,6 +26,7 @@ import {
 } from "./client-async-outbox.js";
 import {
   createDb,
+  PostgresBookingHandoffRevocationRepository,
   PostgresCatalogRepository,
   PostgresBookingRepository,
   PostgresClientCatalogRepository,
@@ -101,6 +117,9 @@ export interface WorkerRuntimeFactory {
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
+  readonly yookassaReaderFactory?: YooKassaAuditReaderFactory;
+  readonly yookassaTransport?: YooKassaTransport;
+  readonly yookassaEnv?: NodeJS.ProcessEnv;
   readonly workerOutboxRegistryFactory?: (
     db: DrizzleDb,
     config: RuntimeConfig,
@@ -335,10 +354,12 @@ export function selectExpertResidencyProviderReader(
     }
     return disabledExpertResidencyProviderReader;
   }
-  if (config.yookassa === undefined || yookassaReader === undefined) {
+  if (config.yookassa === undefined) {
     throw new Error("yookassa_worker_capability_unavailable");
   }
-  return yookassaReader;
+  if (yookassaReader !== undefined)
+    throw new Error("yookassa_unguarded_reader_rejected");
+  return disabledExpertResidencyProviderReader;
 }
 
 export function createProductionWorkerRuntimeFactory(
@@ -346,6 +367,7 @@ export function createProductionWorkerRuntimeFactory(
 ): WorkerRuntimeFactory {
   return {
     async create(config) {
+      validateYooKassaWorkerConfig(config);
       const clientEnabled = config.features.b2TelegramDispatch === true;
       const selartiEnabled =
         config.features.clientHybridRouting === true ||
@@ -381,6 +403,18 @@ export function createProductionWorkerRuntimeFactory(
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
+      const yookassa = createYooKassaWorkerComposition(config, db, {
+        ...(deps.yookassaTransport === undefined
+          ? {}
+          : { transport: deps.yookassaTransport }),
+        ...(deps.yookassaEnv === undefined ? {} : { env: deps.yookassaEnv }),
+        ...(deps.yookassaReader === undefined
+          ? {}
+          : { reader: deps.yookassaReader }),
+        ...(deps.yookassaReaderFactory === undefined
+          ? {}
+          : { readerFactory: deps.yookassaReaderFactory }),
+      });
       const clientRegistry = clientEnabled
         ? createClientAsyncOutboxRegistry(
             db,
@@ -428,6 +462,22 @@ export function createProductionWorkerRuntimeFactory(
             );
         },
       );
+      if (config.features.expertSession === true && !config.expertSession) {
+        throw new Error("expert_session_capability_unavailable");
+      }
+      const expertSessionRetention =
+        config.features.expertSession === true
+          ? () =>
+              runExpertSessionRetention(
+                {
+                  repository: new PostgresExpertSessionRepository(
+                    db,
+                    config.expertSession!.botKey,
+                  ),
+                },
+                100,
+              )
+          : undefined;
       const clientBookingErasure =
         config.features.clientBooking === true
           ? () =>
@@ -457,7 +507,31 @@ export function createProductionWorkerRuntimeFactory(
         workerOutbox?.repository ??
         clientDelivery?.repository ??
         new PostgresOutboxRepository(db);
+      const planerka =
+        config.planerkaWorkflow === undefined
+          ? undefined
+          : {
+              repository: new PostgresPlanerkaBookingRepository(db),
+              client: createPlanerkaClient({
+                apiKey: config.planerkaWorkflow.apiKey,
+              }),
+              accountId: config.planerkaWorkflow.accountId,
+              createEnabled: config.planerkaWorkflow.createEnabled,
+            };
+      if (planerka) await preflightPlanerkaBooking(planerka);
+      const bookingNotifications = await createBookingNotificationRuntime(
+        config,
+        db,
+      );
+      const bookingHandoffRevocations =
+        new PostgresBookingHandoffRevocationRepository(db);
       return createProductionWorkerRuntime({
+        bookingHandoffRevocations: () =>
+          bookingHandoffRevocations.consumePending(20),
+        ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
+        ...(planerka === undefined
+          ? {}
+          : { planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka) }),
         jobsRepository: new PostgresWorkerJobsRepository(db),
         expertReferralJobsRepository:
           new PostgresExpertReferralWorkerRepository(db),
@@ -468,7 +542,9 @@ export function createProductionWorkerRuntimeFactory(
         },
         expertTelegramCheckoutRepository:
           new PostgresExpertTelegramResidencyCallbackRepository(db),
-        expertResidencyProviderReader,
+        expertResidencyProviderReader:
+          yookassa?.reader ?? expertResidencyProviderReader,
+        ...(yookassa === undefined ? {} : { yookassaBoundRecovery: yookassa }),
         outboxRepository,
         ...(clientDelivery === undefined
           ? {}
@@ -485,6 +561,9 @@ export function createProductionWorkerRuntimeFactory(
         ...(clientSessionRetention === undefined
           ? {}
           : { clientSessionRetention }),
+        ...(expertSessionRetention === undefined
+          ? {}
+          : { expertSessionRetention }),
         ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
         ...(testExpertReconciliation === undefined
           ? {}
@@ -505,24 +584,25 @@ export function createProductionWorkerRuntimeFactory(
   };
 }
 
-const productionRuntimeFactory = createProductionWorkerRuntimeFactory({
-  workerOutboxRegistryFactory: (db, config) => {
-    const local = createLocalOperatorCaseOutboxRegistry(
-      new PostgresOperatorCaseOutboxRepository(db),
-    );
-    if (config.features.clientCatalog !== true) return local;
-    const catalog = new PostgresCatalogRepository(db);
-    return createClientCatalogOutboxRegistry({
-      local,
-      requests: new PostgresClientCatalogRepository(db),
-      source: createClientCatalogSourceReader(
-        catalog,
-        config.features.clientBooking === true ? catalog : undefined,
-        config.features.clientBooking === true ? {} : undefined,
-      ),
-    });
-  },
-});
+const productionWorkerOutboxRegistryFactory = (
+  db: DrizzleDb,
+  config: RuntimeConfig,
+): WorkerOutboxRegistry => {
+  const local = createLocalOperatorCaseOutboxRegistry(
+    new PostgresOperatorCaseOutboxRepository(db),
+  );
+  if (config.features.clientCatalog !== true) return local;
+  const catalog = new PostgresCatalogRepository(db);
+  return createClientCatalogOutboxRegistry({
+    local,
+    requests: new PostgresClientCatalogRepository(db),
+    source: createClientCatalogSourceReader(
+      catalog,
+      config.features.clientBooking === true ? catalog : undefined,
+      config.features.clientBooking === true ? {} : undefined,
+    ),
+  });
+};
 
 function waitForNextCycle(
   milliseconds: number,
@@ -602,7 +682,11 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
     throw new Error("Invalid worker shutdown grace period");
   const config = loadEnv(env);
   const runtime = await (
-    options.runtimeFactory ?? productionRuntimeFactory
+    options.runtimeFactory ??
+    createProductionWorkerRuntimeFactory({
+      yookassaEnv: env,
+      workerOutboxRegistryFactory: productionWorkerOutboxRegistryFactory,
+    })
   ).create(config);
   const controller = new AbortController();
   const hardExit =

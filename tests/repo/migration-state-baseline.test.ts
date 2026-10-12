@@ -64,7 +64,7 @@ describe("database-derived migration state baseline", () => {
     ).toEqual(["btree_gist", "pgcrypto"]);
   });
 
-  it.each([39, 40, 41])(
+  it.each([39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {
       const tag = String(last).padStart(4, "0");

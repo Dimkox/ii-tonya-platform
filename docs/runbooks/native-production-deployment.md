@@ -1,8 +1,12 @@
 # Native dedicated-server deployment
 
-Status: native production runtime `current` is
-`cb07bd1821d8106b0b0088b17bcf305662a1b792` as of 2026-09-18;
-`.previous-release` is `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`.
+Read-only observation2026-10-12: native production runtime `current` is
+`43a93e2131cde6bb09a6825fc5b83dfbf91fc600`;
+`.previous-release` is `48009f9ce4de9f8258eede8d59b950899eafd0a8`.
+The previous artifact exists, but its compatibility with a future migrated
+candidate is not verified. See
+`docs/test-evidence/production/2026-10-12-recovery-inventory.md` and the current
+commercial-review release runbook. The2026-09-18 history below is not current state.
 External-provider activation remains fail-closed and requires its own approval.
 
 ## Target topology
@@ -51,7 +55,7 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
    `current` to the prior compatible release, and restart services.
    Database rollback is forward-fix unless a separately reviewed reverse migration exists.
 
-## Current production state
+## Historical production state — 2026-09-18
 
 The old production image/Compose and GitHub Actions entrypoints are removed. The first
 native runtime at `233f3cf72e45e47117948ad5615b603252801e40` required host-only recovery

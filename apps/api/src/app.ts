@@ -1,4 +1,10 @@
 import { createRequire } from "node:module";
+import { expertSessionRoutes } from "./routes/expert-sessions.js";
+import {
+  expertBrowserSessionRoutes,
+  type ExpertBrowserOptions,
+} from "./routes/expert-browser-session.js";
+import type { BookingCallbackService } from "./booking-callback-service.js";
 import type { ClientAccountPackagesRepository } from "../../../packages/contracts/src/client-account-packages.js";
 import type {
   AdminService,
@@ -98,6 +104,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
   conversationService: ConversationService;
   bookingService: BookingService;
@@ -143,6 +150,7 @@ export interface AppDependencies {
       }
     | undefined;
   telegramWebhookSecret: string;
+  bookingCallbacks?: BookingCallbackService;
   selartiResponseSharedSecret?: string;
   selartiResponses?: {
     handle(raw: unknown): Promise<{
@@ -246,6 +254,17 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  if (
+    deps.config.features.expertSession === true &&
+    (!deps.expertSession?.sessions ||
+      !deps.expertSession.lookup ||
+      !deps.expertSession.principals ||
+      !deps.expertSession.origin ||
+      !deps.expertSession.botUsername)
+  )
+    throw new Error("expert_session_capability_unavailable");
+  const expertSession =
+    deps.config.features.expertSession === true ? deps.expertSession! : {};
   assertClientNavigationConfig(deps.config);
   if (
     deps.config.features.clientTelegramNavigation === true &&
@@ -548,6 +567,10 @@ export async function buildApp(
     rateLimiter: deps.rateLimiter,
   });
   await app.register(telegramWebhookRoutes, {
+    bookingCallbacksEnabled: deps.config.features.bookingCallbacks === true,
+    ...(deps.bookingCallbacks === undefined
+      ? {}
+      : { bookingCallbacks: deps.bookingCallbacks }),
     secret: deps.telegramWebhookSecret,
     clientIngressEnabled: deps.clientIngressEnabled,
     clientNavigationEnabled: deps.config.features.clientTelegramNavigation,
@@ -644,6 +667,22 @@ export async function buildApp(
         approvals: deps.adminApprovals,
         cases: deps.operatorCases,
       });
+    for (const path of [
+      "/v1/admin/expert-residency/late-payments",
+      "/v1/admin/expert-residency/late-payments/:errorId",
+    ])
+      app.get(path, async (request, reply) => {
+        const response = await admin.inject({
+          method: "GET",
+          url: request.url,
+          headers: request.headers,
+        });
+        reply.code(response.statusCode);
+        for (const [name, value] of Object.entries(response.headers))
+          if (name !== "content-length" && value !== undefined)
+            reply.header(name, value);
+        return reply.send(response.rawPayload);
+      });
     app.post("/v1/admin/*", async (request, reply) => {
       const expertAction =
         /^\/v1\/admin\/actions\/(?:expert_referral|expert_residency)\./u.test(
@@ -671,6 +710,8 @@ export async function buildApp(
       await expertAdmin?.close();
     });
   }
+  await app.register(expertSessionRoutes, expertSession);
+  await app.register(expertBrowserSessionRoutes, expertSession);
   return app as unknown as FastifyInstance;
 }
 

@@ -1,4 +1,13 @@
 import { randomBytes } from "node:crypto";
+import { createExpertSessionService } from "@ii-tonya/application";
+import { PostgresExpertSessionRepository } from "@ii-tonya/db";
+import { createTelegramExpertProofVerifier } from "./telegram-expert-proof.js";
+import {
+  createExpertSessionToken,
+  expertSessionTokenHash,
+} from "./expert-session-token.js";
+import { createExpertBearerPrincipalResolver } from "./expert-principal-resolver.js";
+import { createExpertCampaignComposition } from "./expert-campaign-composition.js";
 import { pathToFileURL } from "node:url";
 import {
   createPrivacyService,
@@ -6,6 +15,7 @@ import {
   createAdminService,
   createClientCatalogService,
   createClientBookingService,
+  createBookingService,
   createClientSessionService,
   createExpertReferralAdminService,
   createOperatorCaseService,
@@ -49,6 +59,7 @@ import {
   PostgresClientAccountPackagesRepository,
   PostgresCatalogRepository,
   PostgresBookingRepository,
+  PostgresBookingNotificationCallbackRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
   PostgresHybridMessageRepository,
@@ -62,6 +73,8 @@ import {
 import {
   createExpertTelegramIngress,
   DisabledSelartiAdapter,
+  createBookingCallbackVault,
+  issueCallback,
   EnvironmentExpertCodeSecretResolver,
   type ExpertTelegramIngressFactoryDependencies,
 } from "@ii-tonya/integrations";
@@ -74,6 +87,8 @@ import {
   shutdownTelemetry,
 } from "@ii-tonya/observability";
 import { buildApp, type AppDependencies } from "./app.js";
+import { createBookingCallbackService } from "./booking-callback-service.js";
+import { createBookingCallbackAck } from "./booking-callback-ack.js";
 import { createTelegramClientProofVerifier } from "./telegram-client-proof.js";
 import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
@@ -148,6 +163,12 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (
+      (config.features.expertResidencyBilling ||
+        config.features.expertReferral) &&
+      (!config.features.expertSession || !config.expertSession)
+    )
+      throw new Error("expert_session_capability_unavailable");
     assertClientNavigationConfig(config);
     if (
       config.features.clientTelegramIngress === true &&
@@ -186,7 +207,73 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (
+      (config.features.expertResidencyBilling ||
+        config.features.expertReferral) &&
+      (!config.features.expertSession || !config.expertSession)
+    )
+      throw new Error("expert_session_capability_unavailable");
     assertClientNavigationConfig(config);
+    const notificationOrigin =
+      config.bookingNotifications?.admissionEnabled === true
+        ? {
+            botKey: config.clientTelegramBotKey,
+            messagingPolicyVersion: config.clientMessagingConsentPolicyVersion,
+          }
+        : undefined;
+    if (
+      notificationOrigin &&
+      (!notificationOrigin.botKey || !notificationOrigin.messagingPolicyVersion)
+    )
+      throw new Error("booking_notification_capture_configuration_required");
+    const inbox = new PostgresWebhookInboxRepository(db);
+    let bookingCallbacks: AppDependencies["bookingCallbacks"];
+    if (config.features.bookingCallbacks === true) {
+      const material = config.bookingCallbacks;
+      if (
+        !material ||
+        !config.clientTelegramBotKey ||
+        !config.clientTelegramBotToken ||
+        !config.telegramWebhookSecret
+      ) {
+        throw new Error("booking_callback_configuration_required");
+      }
+      const hmacKey = Uint8Array.from(material.hmacKey);
+      const vault = createBookingCallbackVault(material);
+      const repository = new PostgresBookingNotificationCallbackRepository(
+        db,
+        config.clientTelegramBotKey,
+        {
+          ...vault,
+          async issue(claims) {
+            let tokenHash = "";
+            const token = await issueCallback(claims, hmacKey, {
+              async put(hash) {
+                tokenHash = hash;
+              },
+              async peek() {
+                return null;
+              },
+              async consumeIfValid() {
+                return null;
+              },
+            });
+            return { token, tokenHash };
+          },
+        },
+      );
+      bookingCallbacks = createBookingCallbackService({
+        botKey: config.clientTelegramBotKey,
+        secret: hmacKey,
+        repository,
+        inbox,
+        bookings: createBookingService({
+          repository: new PostgresBookingRepository(db),
+          clock: { now: () => new Date() },
+        }),
+        acknowledge: createBookingCallbackAck(config.clientTelegramBotToken),
+      });
+    }
     const clientBotId = clientTelegramBotId(config.clientTelegramBotToken);
     if (
       config.features.clientTelegramIngress === true &&
@@ -266,6 +353,48 @@ export const createDefaultLifecycle = (
               config.features.expertTelegramReferral === true,
             checkoutReadiness: config.features.expertTelegramCheckout === true,
           });
+    if (
+      config.features.expertSession === true &&
+      (!config.expertSession ||
+        typeof db.execute !== "function" ||
+        typeof db.transaction !== "function")
+    )
+      throw new Error("expert_session_capability_unavailable");
+    const expertSessionRepository =
+      config.features.expertSession === true
+        ? new PostgresExpertSessionRepository(db, config.expertSession!.botKey)
+        : undefined;
+    const expertSessions = expertSessionRepository
+      ? {
+          ...createExpertSessionService({
+            sessions: expertSessionRepository,
+            generateToken: createExpertSessionToken,
+            digestToken: expertSessionTokenHash,
+            verifier: createTelegramExpertProofVerifier({
+              botToken: config.expertSession!.botToken,
+              resolveIdentity: (id) =>
+                expertSessionRepository.resolveTelegramIdentity(id),
+              widgetEnabled: config.expertSession!.widgetEnabled,
+            }),
+          }),
+          revoke: (hash: string) => expertSessionRepository.revoke(hash),
+        }
+      : undefined;
+    const expertApi =
+      (config.features.expertResidencyBilling ||
+        config.features.expertReferral) &&
+      expertSessionRepository
+        ? createExpertCampaignComposition({
+            db,
+            botKey: config.expertSession!.botKey,
+            principals: createExpertBearerPrincipalResolver({
+              sessions: expertSessionRepository,
+            }),
+            codeCrypto,
+            referralEnabled: config.features.expertReferral,
+            billingEnabled: config.features.expertResidencyBilling,
+          })
+        : undefined;
     const clientSessionRepository =
       config.features.clientSession === true
         ? new PostgresClientSessionRepository(db)
@@ -311,7 +440,18 @@ export const createDefaultLifecycle = (
     const clientBookingService =
       config.features.clientBooking === true
         ? createClientBookingService({
-            repository: new PostgresBookingRepository(db),
+            repository: new PostgresBookingRepository(
+              db,
+              notificationOrigin
+                ? {
+                    notificationOrigin: {
+                      botKey: notificationOrigin.botKey!,
+                      messagingPolicyVersion:
+                        notificationOrigin.messagingPolicyVersion!,
+                    },
+                  }
+                : {},
+            ),
             confirmationBufferMs:
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
@@ -409,6 +549,8 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertApi ? { expertApi } : {}),
+      ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
       conversationService: disabledService<ConversationService>(
         "conversation ingress",
@@ -469,6 +611,7 @@ export const createDefaultLifecycle = (
           : undefined,
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
+        queries: new PostgresAdminRepository(db),
       }),
       operatorCases: createOperatorCaseService({
         cases: new PostgresOperatorCaseRepository(db),
@@ -501,7 +644,7 @@ export const createDefaultLifecycle = (
         },
       },
       logger: createLogger(),
-      inbox: new PostgresWebhookInboxRepository(db),
+      inbox,
       rateLimiter: createWindowedRateLimiter(),
       clientIngressEnabled: config.features.clientTelegramIngress,
       clientIngressReplay,
@@ -526,6 +669,18 @@ export const createDefaultLifecycle = (
         : {
             clientCatalogService,
           }),
+      ...(expertSessions && expertSessionRepository
+        ? {
+            expertSession: {
+              sessions: expertSessions,
+              lookup: expertSessionRepository,
+              principals: createExpertBearerPrincipalResolver({
+                sessions: expertSessionRepository,
+              }),
+              ...config.expertSession,
+            },
+          }
+        : {}),
       ...(clientSessionService === undefined ||
       clientSessionRepository === undefined ||
       clientPrincipal === undefined

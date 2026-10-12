@@ -1,4 +1,5 @@
 export { brandId } from "./ids.js";
+export * from "./booking-notifications.js";
 export * from "./client-consent-authority.js";
 export {
   backupVerificationBindingSchema,
@@ -39,3 +40,5 @@ export {
   type ExpertResidencyV2TariffKey,
 } from "./expert-residency-tariffs.js";
 export * from "./client-account-packages.js";
+export { serializeBookingNotificationWire } from "./booking-notification-wire.js";
+export * from "./expert-campaign-quotes.js";

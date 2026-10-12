@@ -224,6 +224,22 @@ export async function authenticateCallback(
   }
 }
 
+/** Verify wire authenticity only. DB-bound identity, expiry and consumption are mandatory afterwards. */
+export function authenticateCallbackToken(
+  token: string,
+  secret: Uint8Array,
+): string {
+  try {
+    requireStrongSecret(secret);
+    const { nonce, authenticatedTag } = parseToken(token);
+    if (!timingSafeEqual(authenticatedTag, callbackTag(nonce, secret)))
+      throw new CallbackAuthStateError("Invalid callback token");
+    return tokenHash(nonce);
+  } catch {
+    throw new CallbackVerificationError();
+  }
+}
+
 async function authenticateCallbackInternal(
   token: string,
   expectedTelegramUserId: string,

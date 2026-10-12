@@ -24,6 +24,20 @@ const time = (value: string) =>
     timeStyle: "short",
     timeZone: "Europe/Moscow",
   }).format(new Date(value));
+export function bookingStateText(row: ActiveBooking): string {
+  switch (row.state) {
+    case "calendar_pending":
+      return "Эксперт согласовал встречу. Ожидаем подтверждения календаря.";
+    case "confirmation_unverified":
+      return "Подтверждение этой записи в календаре ещё не проверено. Требуется проверка поддержки.";
+    case "cancellation_pending":
+      return "Запись отменена у нас. Проверяем отмену в календаре.";
+    case "reserved":
+      return `Резерв до ${time(row.reservedUntil)}. Встреча ещё не подтверждена.`;
+    case "booked":
+      return "Встреча подтверждена. Статус оплаты здесь не определяется.";
+  }
+}
 export function renderBookingChoices(
   cards: BookingCard[],
   reserveEnabled: boolean,
@@ -112,7 +126,7 @@ export function bindBookingActions(
       ? rows
           .map(
             (row, index) =>
-              `<section class="consent-card"><p>${escape(time(row.startsAt))} (Europe/Moscow)</p><p>${row.state === "reserved" ? `Резерв до ${escape(time(row.reservedUntil))}. Встреча ещё не подтверждена.` : "Встреча подтверждена. Статус оплаты здесь не определяется."}</p><button type="button" class="button ghost" data-cancel="${index}">Отменить запись</button></section>`,
+              `<section class="consent-card"><p>${escape(time(row.startsAt))} (Europe/Moscow)</p><p>${escape(bookingStateText(row))}</p>${row.state === "cancellation_pending" ? "" : `<button type="button" class="button ghost" data-cancel="${index}">Отменить запись</button>`}</section>`,
           )
           .join("")
       : "<p>Активных записей нет.</p>";
@@ -221,9 +235,13 @@ export function bindBookingActions(
       void run(async () => {
         const row = rows[Number(target.dataset.cancel)];
         if (!row) return;
-        await client.cancel(row.bookingHandle);
+        const cancellation = await client.cancel(row.bookingHandle);
         await load();
-        say("Отмена выполнена. Список записей обновлён.");
+        say(
+          cancellation === "cancellation_pending"
+            ? "Запись отменена у нас. Отмена в календаре ещё проверяется."
+            : "Отмена выполнена. Список записей обновлён.",
+        );
       });
   });
   controls.innerHTML = `<label>Услуга <select data-service><option value="">Все услуги</option></select></label> <label>Язык <select data-language><option value="">Все языки</option></select></label><button type="button" class="button primary" data-find>Найти время</button><button type="button" class="button ghost" data-reconcile>Сверить мои записи</button>${session.bookingReserveAvailable ? "" : "<p>Создание резервов приостановлено. Просмотр и отмена остаются доступны.</p>"}`;

@@ -37,6 +37,7 @@ export function renderLanding(config: PublicConfig): string {
       <a class="brand" href="#top" aria-label="ии-Тоня — наверх"><span>ии-</span>Тоня</a>
       <nav aria-label="Основная навигация"><a href="#about">О проекте</a><a href="#clients">Клиентам</a><a href="/catalog">Каталог услуг</a><a href="#experts">Экспертам</a><a href="#tariffs">Тарифы</a><a href="#faq">FAQ</a><a href="#contacts">Контакты</a></nav>
       <a class="header-action" href="/account">Личный кабинет</a>
+      <a class="header-action" href="/expert/account">Кабинет эксперта</a>
       <a class="header-action" href="/catalog">Открыть каталог</a>
     </header>
     <main id="main-content" tabindex="-1">

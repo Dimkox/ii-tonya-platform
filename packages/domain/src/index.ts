@@ -1,6 +1,22 @@
 export { computeReservedUntil, transitionReservation } from "./reservation.js";
+export { calculateExpertCampaignPrice } from "./expert-campaign-price.js";
+export type {
+  ExpertCampaignPrice,
+  ExpertCampaignPriceInput,
+} from "./expert-campaign-price.js";
 export type { ReservationAction, ReservationStatus } from "./reservation.js";
 export { chargeDelta, choosePackage, derivePackageBalance } from "./billing.js";
+export {
+  clientPaidGrantTerms,
+  getClientPaidPackage,
+  quoteClientService,
+} from "./client-paid-policy.js";
+export type {
+  ClientPaidGrantTerms,
+  ClientPaidPackage,
+  ClientPaidPackageCode,
+  ClientServiceQuote,
+} from "./client-paid-policy.js";
 export type {
   AvailablePackage,
   LedgerFact,

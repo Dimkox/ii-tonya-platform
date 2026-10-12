@@ -1,3 +1,8 @@
+import { lockBookingNotificationSubjects } from "./booking-notification-authority.js";
+import {
+  eraseBookingNotificationRecipients,
+  stopBookingNotificationRecipients,
+} from "./booking-notification-repository.js";
 import { createHash } from "node:crypto";
 import {
   backupScheduleSchema,
@@ -348,9 +353,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(sql`set transaction isolation level read committed`);
         await tx.execute(sql`set local statement_timeout='2000ms'`);
         await tx.execute(sql`set local lock_timeout='1000ms'`);
+        await lockBookingNotificationSubjects(tx, [command.targetUserId]);
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
+        if (command.purpose === "client_messaging")
+          await stopBookingNotificationRecipients(tx, command.targetUserId);
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
         const consent = one(
           (
@@ -784,6 +792,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await lockBookingNotificationSubjects(tx, [command.targetUserId], {
+          identityMutation: true,
+        });
         await tx.execute(sql`
         select pg_advisory_xact_lock(
           hashtextextended('choice:' || c.choice_digest,0)
@@ -943,6 +954,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute<{ userId: string }>(sql`
         delete from client_profiles where user_id = ${command.targetUserId}::uuid returning user_id as "userId"
       `);
+        await eraseBookingNotificationRecipients(tx, command.targetUserId);
         await tx.execute(
           sql`delete from channel_identities where user_id = ${command.targetUserId}::uuid`,
         );

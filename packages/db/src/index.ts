@@ -7,6 +7,11 @@ export {
   type DrizzleDb,
 } from "./client.js";
 export { sql } from "drizzle-orm";
+export * from "./repositories/expert-session-repository.js";
+export {
+  PostgresBookingHandoffRevocationRepository,
+  type BookingHandoffRevocationResult,
+} from "./repositories/booking-handoff-revocation-repository.js";
 export {
   PostgresPartnerCommerceRepository,
   type PartnerCommandResult,
@@ -297,4 +302,51 @@ export { PostgresClientCommercialPolicyRepository } from "./repositories/client-
 export * from "./repositories/client-ingress-replay-repository.js";
 export * from "./repositories/client-consent-authority.js";
 export * from "./repositories/erasure-request-repository.js";
+export * from "./repositories/client-paid-order-repository.js";
+export * from "./repositories/planerka-booking-repository.js";
 export * from "./repositories/client-account-packages-repository.js";
+
+export * from "./repositories/booking-notification-authority.js";
+export {
+  PostgresBookingNotificationRepository,
+  captureBookingNotificationIntents,
+  captureBookingNotificationBatch,
+  deferBookingNotificationCapture,
+  flushBookingNotificationCapture,
+  stopBookingNotificationRecipients,
+  eraseBookingNotificationRecipients,
+} from "./repositories/booking-notification-repository.js";
+export type {
+  BookingNotificationClaim,
+  BookingNotificationGrant,
+  BookingNotificationReceipt,
+  BookingNotificationOutcome,
+  BookingNotificationReasonCode,
+  BookingNotificationPreparation,
+  PreparedBookingSend,
+} from "./repositories/booking-notification-repository.js";
+export { PostgresBookingNotificationCallbackRepository } from "./repositories/booking-notification-callback-repository.js";
+export {
+  PostgresExpertCampaignQuoteRepository,
+  ExpertCampaignQuoteError,
+} from "./repositories/expert-campaign-quote-repository.js";
+export {
+  PostgresExpertCampaignOrderRepository,
+  ExpertCampaignOrderError,
+  type CreateExpertCampaignOrder,
+  type ExpertCampaignOrder,
+  type ExpertCampaignOrderErrorCode,
+} from "./repositories/expert-campaign-order-repository.js";
+export type {
+  CreateExpertCampaignQuote,
+  ExpertCampaignQuote,
+  ExpertCampaignQuoteErrorCode,
+} from "./repositories/expert-campaign-quote-repository.js";
+export type {
+  TelegramBookingCallbackContext,
+  BookingApprovalClaims,
+  BookingApprovalBinding,
+  BookingApprovalCrypto,
+  LinkedBookingCallback,
+} from "./repositories/booking-notification-callback-repository.js";
+export * from "./repositories/expert-campaign-read-repository.js";

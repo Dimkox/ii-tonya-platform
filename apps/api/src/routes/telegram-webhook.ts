@@ -15,7 +15,8 @@ type HybridGateway = {
     raw: unknown,
   ): Promise<{ readonly status: string; readonly route?: string }>;
 };
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { BookingCallbackService } from "../booking-callback-service.js";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
 
@@ -176,7 +177,54 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientIngressReplay?: ClientIngressReplayRead | undefined;
   testExpertPromoEnabled?: boolean;
   testExpertPromo?: TelegramTestExpertPromoIngress;
+  bookingCallbacksEnabled?: boolean;
+  bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  if (
+    deps.bookingCallbacksEnabled === true &&
+    (!deps.bookingCallbacks || !deps.clientBotKey)
+  )
+    throw new Error("Booking callback capability is required");
+  const isBookingCallback = (body: unknown) => {
+    if (!body || typeof body !== "object") return false;
+    const callback = (body as Record<string, unknown>).callback_query;
+    return (
+      callback !== null &&
+      typeof callback === "object" &&
+      typeof (callback as Record<string, unknown>).data === "string" &&
+      ((callback as Record<string, unknown>).data as string).startsWith("ct2.")
+    );
+  };
+  const bookingCallback = async (
+    body: unknown,
+    reply: FastifyReply,
+    correlationId: string,
+  ) => {
+    if (
+      deps.bookingCallbacksEnabled !== true ||
+      !deps.bookingCallbacks ||
+      !deps.clientBotKey
+    )
+      return { accepted: true, unsupported: true };
+    try {
+      const result = await deps.bookingCallbacks.handle(
+        body,
+        deps.clientBotKey,
+        correlationId,
+      );
+      if (result.kind === "rejected")
+        return reply.code(403).send({ error: "invalid_booking_callback" });
+      if (result.kind === "busy" || result.kind === "unavailable")
+        return reply.code(503).send({ error: "booking_callback_unavailable" });
+      return {
+        accepted: true,
+        route: "booking",
+        ...(result.kind === "replayed" ? { duplicate: true } : {}),
+      };
+    } catch {
+      return reply.code(503).send({ error: "booking_callback_unavailable" });
+    }
+  };
   if (
     (deps.expertQueriesEnabled === true ||
       deps.expertCheckoutEnabled === true) &&
@@ -250,6 +298,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       const updateId = clientIngressUpdateId(request.body);
       if (updateId === undefined)
         return reply.code(400).send({ error: "invalid_update" });
+      if (isBookingCallback(request.body))
+        return bookingCallback(request.body, reply, crypto.randomUUID());
       if (deps.clientNavigationEnabled === true) {
         try {
           const result = await deps.clientNavigationGateway?.handle(
@@ -369,6 +419,32 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   app.post(
     "/v1/webhooks/telegram",
     {
+      bodyLimit: 65_536,
+      onRequest: async (request, reply) => {
+        const header = request.headers["x-telegram-bot-api-secret-token"];
+        if (
+          !secureEqual(
+            typeof header === "string" ? header : undefined,
+            deps.secret,
+          )
+        ) {
+          const allowed = deps.rateLimiter.consume(
+            `telegram:unauth:${request.ip}`,
+            deps.unauthenticatedLimit ?? 100,
+            60_000,
+          );
+          return reply
+            .code(allowed ? 401 : 429)
+            .send({ error: "unauthorized" });
+        }
+      },
+      errorHandler: (error, _request, reply) => {
+        if (error.statusCode === 413)
+          return reply.code(413).send({ error: "payload_too_large" });
+        if (error.statusCode !== undefined && error.statusCode < 500)
+          return reply.code(400).send({ error: "invalid_update" });
+        return reply.code(503).send({ error: "telegram_gateway_unavailable" });
+      },
       schema: {
         body: {
           type: "object",
@@ -408,6 +484,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           ? request.headers["x-correlation-id"]
           : crypto.randomUUID();
       const callback = body.callback_query;
+      if (isBookingCallback(body))
+        return bookingCallback(body, reply, correlationId);
       if (callback && typeof callback === "object") {
         const callbackRecord = callback as Record<string, unknown>;
         const callbackQueryId = callbackRecord.id;

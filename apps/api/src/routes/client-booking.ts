@@ -261,7 +261,9 @@ export const clientBookingRoutes: FastifyPluginAsync<RouteOptions> = async (
           rawPath[1]!,
         );
         deps.metrics?.record({ operation: "cancel", outcome: "cancelled" });
-        return reply.code(200).send(result);
+        return reply
+          .code(result.state === "cancellation_pending" ? 202 : 200)
+          .send(result);
       } catch (error) {
         if (error instanceof ClientBookingInvalidRequestError) {
           deps.metrics?.record({ operation: "cancel", outcome: "invalid" });

@@ -75,6 +75,74 @@ export class AdminInvalidStateTransitionError extends Error {
 type Transaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
 type MutationResult = Record<string, unknown>;
 
+export const latePaymentReason = "expert_residency_paid_after_deadline";
+export const invalidatedCreditPaymentReason =
+  "expert_residency_paid_after_credit_invalidation";
+// Alias i is the authenticated inbox row. JSON framing and epoch timestamps
+// make the binding unambiguous and independent of connection timezone settings.
+export const latePaymentBinding = sql`'sha256:' || encode(digest(jsonb_build_array(
+  'expert-residency-late-payment-v1', i.id::text, i.provider, i.external_event_id,
+  i.payment_id, i.order_id::text, i.amount_minor::text, i.currency,
+  i.payload_digest, extract(epoch from i.occurred_at)::text,
+  i.verification_id, i.verifier_key_version, extract(epoch from i.verified_at)::text
+)::text, 'sha256'), 'hex')`;
+
+export interface LatePaymentSummary {
+  readonly id: string;
+  readonly reasonCode: string;
+  readonly status: "open" | "resolved";
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly resolvedAt: string | null;
+}
+export interface LatePaymentDetail extends LatePaymentSummary {
+  readonly inboxId: string;
+  readonly orderId: string;
+  readonly provider: string;
+  readonly paymentId: string;
+  readonly amountMinor: number;
+  readonly currency: string;
+}
+export interface LatePaymentListInput {
+  readonly sessionIdHash: string;
+  readonly limit: number;
+  readonly status?: string;
+  readonly beforeCreatedAt?: string;
+  readonly beforeId?: string;
+}
+type ReadResult<T> =
+  | ({ readonly allowed: true } & T)
+  | { readonly allowed: false; readonly reasonCode: "forbidden" };
+const canonicalUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.exec(
+    value,
+  )?.[0] === value;
+const validCursorTime = (value: string) => {
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/u.test(value) ||
+    value.length !== 27
+  )
+    return false;
+  const date = new Date(value);
+  return (
+    Number.isFinite(date.getTime()) &&
+    date.toISOString() === `${value.slice(0, 23)}Z`
+  );
+};
+const latePaymentProjection = sql`jsonb_build_object(
+ 'id',e.id,'reasonCode',e.reason_code,'status',e.status,
+ 'createdAt',to_char(e.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+ 'updatedAt',to_char(e.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+ 'resolvedAt',to_char(e.resolved_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'))`;
+const supportAuthorization = (
+  sessionIdHash: string,
+) => sql`select 1 from admin_sessions s
+ join admin_role_assignments r on r.admin_id=s.admin_id and r.role='support'
+ cross join (select clock_timestamp() as now) c
+ where s.session_id_hash=${sessionIdHash} and s.revoked_at is null
+ and s.expires_at>c.now and s.mfa_verified_at<=c.now
+ and s.mfa_verified_at>=c.now-interval '15 minutes'`;
+
 const digest = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
 
@@ -113,6 +181,72 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
 
 export class PostgresAdminRepository {
   constructor(private readonly db: DrizzleDb) {}
+
+  async listLatePayments(
+    input: LatePaymentListInput,
+  ): Promise<ReadResult<{ items: LatePaymentSummary[] }>> {
+    const status = input.status ?? "open";
+    if (
+      !Number.isSafeInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > 100 ||
+      !["open", "resolved"].includes(status) ||
+      (input.beforeId === undefined) !==
+        (input.beforeCreatedAt === undefined) ||
+      (input.beforeId !== undefined && !canonicalUuid(input.beforeId)) ||
+      (input.beforeCreatedAt !== undefined &&
+        !validCursorTime(input.beforeCreatedAt))
+    )
+      throw new Error("invalid_request");
+    const cursor =
+      input.beforeId === undefined
+        ? sql`true`
+        : sql`(e.created_at,e.id)<(${input.beforeCreatedAt}::timestamptz,${input.beforeId}::uuid)`;
+    const result = await this.db.execute<{
+      authorized: boolean;
+      items: LatePaymentSummary[];
+    }>(sql`
+      with auth as materialized (${supportAuthorization(input.sessionIdHash)}), page as (
+        select e.created_at,e.id,${latePaymentProjection} item from integration_errors e
+        where exists(select 1 from auth) and e.provider='expert_residency'
+        and e.reason_code in (${latePaymentReason},${invalidatedCreditPaymentReason}) and e.status=${status} and ${cursor}
+        order by e.created_at desc,e.id desc limit ${input.limit}
+      ) select exists(select 1 from auth) authorized,
+      coalesce((select jsonb_agg(item order by created_at desc,id desc) from page),'[]'::jsonb) items`);
+    const row = result.rows[0];
+    return row?.authorized
+      ? { allowed: true, items: row.items }
+      : { allowed: false, reasonCode: "forbidden" };
+  }
+
+  async getLatePayment(input: {
+    sessionIdHash: string;
+    errorId: string;
+  }): Promise<ReadResult<{ item: LatePaymentDetail | null }>> {
+    if (!canonicalUuid(input.errorId)) throw new Error("invalid_request");
+    const result = await this.db.execute<{
+      authorized: boolean;
+      item: LatePaymentDetail | null;
+    }>(sql`
+      with auth as materialized (${supportAuthorization(input.sessionIdHash)})
+      select exists(select 1 from auth) authorized, (
+        select ${latePaymentProjection} || jsonb_build_object('inboxId',i.id,'orderId',i.order_id,
+          'provider',i.provider,'paymentId',i.payment_id,'amountMinor',i.amount_minor,'currency',i.currency)
+        from integration_errors e join expert_residency_provider_event_inbox i
+          on e.metadata_hash=${latePaymentBinding}
+        where exists(select 1 from auth) and e.id=${input.errorId}::uuid
+          and e.provider='expert_residency'
+          and i.authenticated=true and i.identity_version=1 and i.event_kind='settled'
+          and i.status='rejected' and (
+            (e.reason_code=${latePaymentReason} and i.result_code='EXPERT_RESIDENCY_PAYMENT_EXPIRED')
+            or (e.reason_code=${invalidatedCreditPaymentReason} and i.result_code='EXPERT_RESIDENCY_CREDIT_INVALIDATED')
+          )
+      ) item`);
+    const row = result.rows[0];
+    return row?.authorized
+      ? { allowed: true, item: row.item }
+      : { allowed: false, reasonCode: "forbidden" };
+  }
 
   private grantClock() {
     const testClock = testClockByRepository.get(this);

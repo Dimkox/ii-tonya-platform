@@ -78,6 +78,7 @@ export type {
 export {
   CallbackVerificationError,
   authenticateCallback,
+  authenticateCallbackToken,
   issueCallback,
   verifyCallback,
   type CallbackClaimsStore,
@@ -85,6 +86,16 @@ export {
   type ExpertBinding,
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
+export {
+  createBookingCallbackVault,
+  type BookingCallbackBinding,
+  type SealedBookingCallback,
+} from "./telegram/booking-callback-vault.js";
+export {
+  createBookingNotificationTransport,
+  type BookingNotificationHttpRequest,
+  type BookingNotificationHttpOutcome,
+} from "./telegram/booking-notification-transport.js";
 export {
   ClientViewCallbackVerificationError,
   authenticateClientViewCallback,
@@ -229,3 +240,12 @@ export {
   type ExpertTelegramCheckoutPrincipal,
   type ExpertTelegramCheckoutResult,
 } from "./telegram/expert-residency-checkout.js";
+export {
+  SelartiRestClient,
+  type SelartiExternalSend,
+  type SelartiMessagesQuery,
+  type SelartiRestSendOutcome,
+  type SelartiRestMessage,
+  type SelartiMessagesResult,
+  type SelartiRestFetch,
+} from "./selarti/rest-client.js";

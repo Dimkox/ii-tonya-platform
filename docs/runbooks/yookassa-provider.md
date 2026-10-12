@@ -3,13 +3,30 @@
 Status: **BLOCKED**. This runbook is an activation and recovery checklist, not permission
 to activate YooKassa.
 
+## Observed configuration and composition — 2026-10-12
+
+Local project .env has merchant/fiscal values whose pure configuration-schema
+check passes in live mode. The dedicated production runtime.env does not have
+those YooKassa values populated. Receipt contact purpose/policy are empty in both
+inspected locations. No merchant authentication or provider request was performed;
+do not use the live keys for synthetic test payments. These observations supersede
+any assumption below that no merchant credentials exist anywhere.
+
+Default API/worker provider composition, verified receipt capture and bound
+pending-operation reconciliation remain incomplete. The existing terminal-payment
+audit reader is not pending-payment recovery. Current receipt-authority correction
+addresses later consent withdrawal and saved campaign payer identity; it does not
+choose the missing policy, contact source or encryption key.
+See `../operations/2026-10-12-yookassa-runtime-gap.md` for exact scope and next proof.
+
 ## Current boundary
 
 The repository contains a default-off YooKassa Merchant API client, adapter, verifier,
 PostgreSQL operation mapping, webhook seam, worker reconciliation, consent-bound receipt
 contact boundary, and encrypted exact-body recovery runtime. The API and worker default
 composition supplies no merchant capability or recovery key resolver. Credentials and
-recovery-policy inputs are empty placeholders and `YOOKASSA_ENABLED=false`; do not add a
+recovery-policy inputs in versioned examples are empty placeholders and
+`YOOKASSA_ENABLED=false`; do not add a
 credential, enable a flag, or deploy while hoster maintenance is active.
 
 Production is native: systemd API and worker services, the single existing system

@@ -29,3 +29,5 @@ export * from "./test-expert-trial-metrics.js";
 export * from "./test-expert-telegram-service.js";
 export * from "./client-navigation-gateway.js";
 export * from "./erasure-request-service.js";
+export * from "./expert-session-service.js";
+export * from "./expert-campaign-service.js";

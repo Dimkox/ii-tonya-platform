@@ -1,4 +1,8 @@
 import "./styles.css";
+import {
+  bindExpertAccountActions,
+  renderExpertAccountPage,
+} from "./expert-account-view.js";
 import { readPublicConfig } from "./config.js";
 import type { LegalDocumentCode } from "./legal-content.js";
 import { renderLegalPage } from "./legal-view.js";
@@ -22,7 +26,11 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/demo") {
+if (route === "/expert/account") {
+  app.innerHTML = renderExpertAccountPage();
+  bindExpertAccountActions(app);
+  document.title = "Кабинет эксперта — ии-Тоня";
+} else if (route === "/demo") {
   app.innerHTML = renderDemoWalkthrough();
   bindDemoWalkthrough(app);
   document.title = "Интерактивное демо — ии-Тоня";

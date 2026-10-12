@@ -67,6 +67,7 @@ export interface YooKassaOperationPort {
   ): Promise<void>;
   claimReconciliationBatch(
     limit: number,
+    mode?: YooKassaMode,
   ): Promise<readonly YooKassaOperation[]>;
 }
 
