@@ -9,7 +9,7 @@ import type {
 } from "../expert-residency/payment-port.js";
 import {
   YooKassaTerminalError,
-  serializeYooKassaPaymentRequest,
+  YooKassaUnknownOutcomeError,
   serializeYooKassaRefundRequest,
   type YooKassaClient,
 } from "./client.js";
@@ -122,6 +122,15 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
   async createCheckout(
     command: ExpertResidencyCheckoutCommand,
   ): Promise<ExpertResidencyCheckoutOutcome> {
+    if (typeof this.deps.operations.claimInitialPayment !== "function") {
+      throw new Error("yookassa_initial_send_capability_unavailable");
+    }
+    if (
+      this.deps.replayProtector !== undefined ||
+      this.deps.recoveryExpiresAt !== undefined
+    ) {
+      throw new Error("yookassa_initial_send_recovery_unsupported");
+    }
     const contact = await this.deps.contacts.receiptContactForOrder(
       command.orderId,
     );
@@ -149,7 +158,7 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
       },
     } as const;
     const commandIdentity = `${command.orderId}:${command.idempotencyKey}`;
-    const operation = await this.deps.operations.claim({
+    const admission = await this.deps.operations.claimInitialPayment({
       commandId: stableUuid("yookassa-command", commandIdentity),
       orderId: command.orderId,
       kind: "create_payment",
@@ -168,6 +177,7 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         receiptAuthority: receiptAuthority(contact),
       }),
     });
+    const operation = admission.operation;
     if (operation.status === "failed" || operation.status === "canceled") {
       throw new Error("yookassa_operation_terminal");
     }
@@ -195,14 +205,13 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     if (operation.status === "succeeded") {
       throw new Error("yookassa_operation_terminal");
     }
+    if (admission.kind !== "initial_send_admitted") {
+      throw new YooKassaUnknownOutcomeError();
+    }
     const providerCommand = {
       ...request,
       idempotencyKey: operation.idempotencyKey,
     };
-    await this.attachRecoverySnapshot(
-      operation,
-      serializeYooKassaPaymentRequest(providerCommand),
-    );
     try {
       const payment = await this.deps.client.createPayment(providerCommand);
       if (

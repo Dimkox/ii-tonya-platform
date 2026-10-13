@@ -49,6 +49,16 @@ export interface YooKassaOperationPort {
     kind: YooKassaOperationKind,
   ): Promise<YooKassaOperation | null>;
   claim(command: ClaimYooKassaOperationCommand): Promise<YooKassaOperation>;
+  /** One invocation owns the send only after its insertion transaction commits.
+   * Optional for legacy consumers; checkout fails closed when unavailable.
+   */
+  claimInitialPayment?(command: ClaimYooKassaOperationCommand): Promise<
+    | {
+        readonly kind: "initial_send_admitted";
+        readonly operation: YooKassaOperation;
+      }
+    | { readonly kind: "existing"; readonly operation: YooKassaOperation }
+  >;
   attachReplaySnapshot?(
     operationId: string,
     snapshot: NonNullable<ClaimYooKassaOperationCommand["replaySnapshot"]>,
