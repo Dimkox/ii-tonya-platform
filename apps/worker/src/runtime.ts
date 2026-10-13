@@ -85,6 +85,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientCatalogRetention?: BoundedJob;
   readonly clientSessionRetention?: BoundedJob;
   readonly expertSessionRetention?: BoundedJob;
+  readonly payerReceiptRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
   readonly clientErasureRequests?: BoundedJob;
   readonly testExpertReconciliation?: BoundedJob;
@@ -440,6 +441,7 @@ export function createProductionWorkerRuntime(
       deps.clientCatalogRetention === undefined &&
       deps.clientSessionRetention === undefined &&
       deps.expertSessionRetention === undefined &&
+      deps.payerReceiptRetention === undefined &&
       deps.clientBookingErasure === undefined &&
       deps.clientErasureRequests === undefined
         ? async () => ({
@@ -447,6 +449,9 @@ export function createProductionWorkerRuntime(
             reason: "privacy_capability_disabled",
           })
         : async () => ({
+            ...(deps.payerReceiptRetention === undefined
+              ? {}
+              : { payerReceipt: await deps.payerReceiptRetention() }),
             ...(deps.clientErasureRequests === undefined
               ? {}
               : { erasureRequests: await deps.clientErasureRequests() }),

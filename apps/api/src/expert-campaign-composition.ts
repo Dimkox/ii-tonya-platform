@@ -1,5 +1,5 @@
 import {
-  createExpertCampaignService,
+  createPayerReceiptRequiredCampaignService,
   createExpertReferralService,
   type ResidencyCheckoutProvider,
 } from "@ii-tonya/application";
@@ -14,6 +14,7 @@ import {
 } from "@ii-tonya/db";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import type { ExpertReferralApiDependencies } from "./routes/expert-referral.js";
+import type { createPayerReceiptComposition } from "./payer-receipt-composition.js";
 
 export function createExpertCampaignComposition(deps: {
   db: DrizzleDb;
@@ -23,23 +24,29 @@ export function createExpertCampaignComposition(deps: {
   referralEnabled: boolean;
   billingEnabled: boolean;
   checkoutProvider?: ResidencyCheckoutProvider;
+  payerReceipt?: ReturnType<typeof createPayerReceiptComposition>;
 }): ExpertReferralApiDependencies {
   const reads = new PostgresExpertCampaignReadRepository(deps.db, deps.botKey);
   const residency = new PostgresExpertResidencyRepository(deps.db);
   const quotes = new PostgresExpertCampaignQuoteRepository(deps.db);
-  const orders = new PostgresExpertCampaignOrderRepository(deps.db);
+  const orders = new PostgresExpertCampaignOrderRepository(
+    deps.db,
+    deps.payerReceipt?.vault,
+  );
   const referrals = new PostgresExpertReferralRepository(
     deps.db,
     deps.codeCrypto,
   );
   return {
+    ...(deps.payerReceipt ? { receiptCapture: deps.payerReceipt.service } : {}),
     principals: deps.principals,
-    residency: createExpertCampaignService({
+    residency: createPayerReceiptRequiredCampaignService({
       environmentEnabled: deps.billingEnabled,
       ownerUserId: (id) => reads.ownerUserId(id),
       listActiveTariffs: (input) => reads.listActiveTariffs(input),
       createQuote: (input) => quotes.createQuote(input),
-      createCheckoutOrder: (input) => orders.createCheckoutOrder(input),
+      createCheckoutOrderWithReceipt: (input) =>
+        orders.createCheckoutOrderWithReceipt(input),
       ...(deps.checkoutProvider
         ? { checkoutProvider: deps.checkoutProvider }
         : {}),

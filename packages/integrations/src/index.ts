@@ -250,3 +250,11 @@ export {
   type SelartiRestFetch,
 } from "./selarti/rest-client.js";
 export { createClientAsyncTelegramTransport } from "./telegram/client-async-transport.js";
+export {
+  createPayerReceiptVault,
+  resolvePayerReceiptKeys,
+  type PayerReceiptVault,
+  type PayerReceiptBinding,
+  type PayerReceiptEnvelope,
+} from "./yookassa/payer-receipt-vault.js";
+export { createPayerReceiptSource } from "./yookassa/payer-receipt-source.js";

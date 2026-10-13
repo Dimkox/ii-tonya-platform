@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  readPayerReceiptConfig,
+  type PayerReceiptConfig,
+} from "./payer-receipt-config.js";
 
 const optionalNonEmptyString = z.preprocess(
   (value) => (value === "" ? undefined : value),
@@ -387,6 +391,7 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  payerReceipt?: PayerReceiptConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -642,6 +647,7 @@ function readBookingCallbacks(
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
+  const payerReceipt = readPayerReceiptConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -765,6 +771,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   }
 
   const config: RuntimeConfig = {
+    ...(payerReceipt ? { payerReceipt } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,

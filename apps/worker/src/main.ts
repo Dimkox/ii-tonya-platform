@@ -567,6 +567,8 @@ export function createProductionWorkerRuntimeFactory(
         ...(expertSessionRetention === undefined
           ? {}
           : { expertSessionRetention }),
+        payerReceiptRetention: () =>
+          new PostgresPayerReceiptContactRepository(db).redactExpiredBatch(100),
         ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
         ...(testExpertReconciliation === undefined
           ? {}
@@ -751,3 +753,4 @@ if (isDirectExecution(import.meta.url, process.argv[1])) {
     process.exitCode = 1;
   });
 }
+import { PostgresPayerReceiptContactRepository } from "@ii-tonya/db";

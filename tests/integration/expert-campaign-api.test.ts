@@ -386,6 +386,9 @@ it("ordinary signed-session HTTP persists and replays saved quotes; unavailable 
       headers: s.headers,
       payload: {
         quoteId: first.json<{ id: string }>().id,
+        // A structurally valid selection reaches the absent-provider gate;
+        // no contact/order is looked up or reserved while the provider is absent.
+        receiptContactId: randomUUID(),
         idempotencyKey: randomUUID(),
       },
     });

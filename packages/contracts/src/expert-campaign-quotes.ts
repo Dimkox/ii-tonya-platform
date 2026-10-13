@@ -20,6 +20,23 @@ export const expertCampaignCheckoutRequestSchema = z.strictObject({
   idempotencyKey,
 });
 
+export const payerReceiptCheckoutRequestSchema = z.strictObject({
+  quoteId: identity,
+  receiptContactId: identity,
+  idempotencyKey,
+});
+export const payerReceiptCaptureRequestSchema = z.strictObject({
+  quoteId: identity,
+  email: z.email().max(254),
+  idempotencyKey,
+});
+export type PayerReceiptCheckoutRequest = z.infer<
+  typeof payerReceiptCheckoutRequestSchema
+>;
+export type PayerReceiptCaptureRequest = z.infer<
+  typeof payerReceiptCaptureRequestSchema
+>;
+
 export type ExpertCampaignQuoteRequest = z.infer<
   typeof expertCampaignQuoteRequestSchema
 >;

@@ -191,7 +191,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(49);
+    expect(newest).toBe(50);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -283,7 +283,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0049 adds purpose-specific expert sessions and proof receipts.
-    expect(declared.size).toBe(120);
+    // 0050 adds payer-supplied receipt contacts and immutable order bindings.
+    expect(declared.size).toBe(122);
   });
 });

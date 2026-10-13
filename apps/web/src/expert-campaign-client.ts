@@ -243,6 +243,7 @@ export class ExpertCampaignClient {
   async checkout(input: {
     quoteId: string;
     idempotencyKey: string;
+    receiptContactId?: string;
   }): Promise<CampaignCheckout> {
     const v = await this.call("checkouts", input);
     if (
@@ -273,6 +274,30 @@ export class ExpertCampaignClient {
       id: v.id,
       status: v.status as CampaignCheckout["status"],
       ...(url ? { checkoutUrl: url } : {}),
+    };
+  }
+  async capture(input: {
+    quoteId: string;
+    email: string;
+    idempotencyKey: string;
+  }): Promise<{
+    receiptContactId: string;
+    quoteId: string;
+    expiresAt: string;
+  }> {
+    const value = await this.call("receipt-contacts", input);
+    if (
+      !object(value) ||
+      Object.keys(value).length !== 3 ||
+      !uuid(value.receiptContactId) ||
+      value.quoteId !== input.quoteId ||
+      !instant(value.expiresAt)
+    )
+      return malformed();
+    return {
+      receiptContactId: value.receiptContactId,
+      quoteId: input.quoteId,
+      expiresAt: value.expiresAt,
     };
   }
 }

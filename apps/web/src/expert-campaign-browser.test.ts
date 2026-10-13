@@ -12,10 +12,11 @@ const scenario = new URL(location.href).searchParams.get('case');
 const assert = (condition, message) => { if (!condition) throw Error(message); };
 const wait = async (predicate) => { for(let i=0;i<300;i++){if(predicate())return; await new Promise(r=>setTimeout(r,10));} throw Error('render_timeout'); };
 const id='33333333-3333-4333-8333-333333333333', qid='44444444-4444-4444-8444-444444444444';
+const receiptId='66666666-6666-4666-8666-666666666666';
 const tariff={tariffVersionId:id,displayName:'<img src=x onerror=alert(1)>Про',baseMonthlyMinor:'100001',priceKind:'base',currency:'RUB',durationSeconds:2592000,commercialPolicyVersion:'expert_residency_v2',creditCapBps:3000,individualServicesEnabled:true,groupEventLimit:5,statisticsLevel:'expanded',supportPriority:'priority'};
 const quote={...tariff,id:qid,userId:'11111111-1111-4111-8111-111111111111',ruleVersion:'expert_energy_start_v1',calculationTimestamp:'2026-10-12T00:00:00.000Z',quotedAt:'2026-10-12T00:00:00.000Z',expiresAt:'2099-01-01T00:00:00.000Z',termMonths:3,discountedMonthlyMinor:'90001',monthlyPriceMinor:'80001',priceMinor:'240003',energyDiscountBps:1000,startDiscountBps:1000,floorApplied:false};
 const response=(body,status=200)=>new Response(status===204?null:JSON.stringify(body),{status});
-let authenticated=true, quoteCalls=[], checkoutCalls=[], release, checkoutCount=0, probeCount=0;
+let authenticated=true, quoteCalls=[], captureCalls=[], checkoutCalls=[], release, checkoutCount=0, probeCount=0;
 window.fetch=async (url,init={})=>{
  assert(!init.headers?.authorization && init.credentials==='same-origin' && init.redirect==='error','request_security');
  if(url.endsWith('/session')){if(init.method==='DELETE'){authenticated=false;return response(null,204);}probeCount++;return response({available:true,authenticated:authenticated && !(scenario==='pending-probe-unauthorized' && probeCount>1),csrfToken:'a'.repeat(64),userId:scenario==='pending-probe-identity-change' && probeCount>1?'55555555-5555-4555-8555-555555555555':'11111111-1111-4111-8111-111111111111',expertId:'22222222-2222-4222-8222-222222222222'});}
@@ -26,6 +27,11 @@ window.fetch=async (url,init={})=>{
    quoteCalls.push(body);
    if(scenario==='logout-quote')return new Promise(r=>{release=()=>r(response(quote));});
    return response(scenario==='malformed-quote'?{...quote,priceMinor:'1.5'}:{...quote,termMonths:body.termMonths,...(scenario==='expired-quote'?{expiresAt:'2026-10-12T00:10:00.000Z'}:{})});
+ }
+ if(url.endsWith('/receipt-contacts')){
+   captureCalls.push(body);
+   assert(Object.keys(body).sort().join(',')==='email,idempotencyKey,quoteId' && body.quoteId===qid && body.email==='payer@example.test','capture_authority');
+   return response({receiptContactId:receiptId,quoteId:qid,expiresAt:'2099-01-01T00:00:00.000Z'});
  }
  if(url.endsWith('/checkouts')){
    checkoutCalls.push(body);checkoutCount++;
@@ -63,8 +69,8 @@ try {
  }else{
  await wait(()=>!get('checkout').disabled);
  assert(root.textContent.includes('800,01') && root.textContent.includes('2400,03') && root.textContent.includes('2099') && root.textContent.includes('10'),'server_quote_missing');
- get('checkout').click();get('checkout').click();await wait(()=>checkoutCalls.length===1);
- assert(Object.keys(checkoutCalls[0]).sort().join(',')==='idempotencyKey,quoteId' && checkoutCalls[0].quoteId===qid,'checkout_authority');
+ get('email').value='payer@example.test';get('checkout').click();get('checkout').click();await wait(()=>checkoutCalls.length===1);
+ assert(captureCalls.length===1 && Object.keys(checkoutCalls[0]).sort().join(',')==='idempotencyKey,quoteId,receiptContactId' && checkoutCalls[0].quoteId===qid && checkoutCalls[0].receiptContactId===receiptId,'checkout_authority');
  if(scenario.startsWith('pending-') || scenario==='same-session-probe-then401'){
    const before=get('checkout');
    root.querySelector('[data-expert-retry]').click();
@@ -99,7 +105,8 @@ try {
    await wait(()=>!get('quote').disabled);assert(get('checkout').disabled,'rejected_quote_reused');get('checkout').click();assert(checkoutCalls.length===1,'rejected_auto_retry');
    get('quote').click();await wait(()=>quoteCalls.length===2);assert(quoteCalls[0].idempotencyKey!==quoteCalls[1].idempotencyKey,'new_quote_key');
  }else{
-   await wait(()=>!get('quote').disabled);
+   await wait(()=>!get('checkout').disabled);
+   assert(get('quote').disabled && captureCalls.length===1,'uncertain_purchase_not_frozen');
    assert(!root.querySelector('[data-campaign-link]') && !root.textContent.includes('Оплачено'),'unsafe_or_disabled_payment');
  }
  }

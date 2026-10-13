@@ -713,6 +713,7 @@ export async function buildApp(
   await app.register(expertSessionRoutes, expertSession);
   await app.register(expertBrowserSessionRoutes, {
     ...expertSession,
+    receiptCapture: deps.expertApi?.receiptCapture,
     // The browser facade must not activate billing or fall back to legacy pricing.
     campaign:
       deps.config.features.expertSession === true &&

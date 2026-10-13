@@ -17,6 +17,16 @@ export function bindExpertCampaign(
   root.innerHTML = `<section aria-label="Тариф эксперта"><h2>Тариф эксперта</h2><p data-campaign-status role="status" aria-live="polite">Загружаем тарифы…</p><label>Тариф <select data-campaign-tariff disabled></select></label><p data-campaign-base></p><label>Срок <select data-campaign-term disabled><option value="1">1 месяц</option><option value="3">3 месяца</option></select></label><button class="button" data-campaign-load>Обновить тарифы</button><button class="button primary" data-campaign-quote disabled>Рассчитать стоимость</button><div data-campaign-summary></div><button class="button primary" data-campaign-checkout disabled>Перейти к оплате</button><div data-campaign-payment></div></section>`;
   const element = <T extends HTMLElement>(name: string) =>
     root.querySelector<T>(`[data-campaign-${name}]`)!;
+  const receiptLabel = document.createElement("label");
+  receiptLabel.textContent = "Email для чека";
+  const email = document.createElement("input");
+  email.type = "email";
+  email.maxLength = 254;
+  email.autocomplete = "off";
+  email.required = true;
+  email.dataset.campaignEmail = "";
+  receiptLabel.append(email);
+  element("checkout").before(receiptLabel);
   const status = element("status"),
     base = element("base"),
     summary = element("summary"),
@@ -30,18 +40,27 @@ export function bindExpertCampaign(
     busy = false,
     tariffs: CampaignTariff[] = [],
     quote: CampaignQuote | undefined;
-  let command: { quoteId: string; idempotencyKey: string } | undefined;
+  let command:
+    | { quoteId: string; idempotencyKey: string; receiptContactId?: string }
+    | undefined;
+  let captureCommand:
+    { quoteId: string; email: string; idempotencyKey: string } | undefined;
   let terminal = false;
   let attempted = false;
   function controls() {
-    tariff.disabled = term.disabled = busy || tariffs.length === 0;
-    load.disabled = busy;
-    calculate.disabled = busy || tariffs.length === 0;
+    const frozen = attempted || captureCommand !== undefined;
+    tariff.disabled = term.disabled = busy || frozen || tariffs.length === 0;
+    load.disabled = busy || frozen;
+    calculate.disabled = busy || frozen || tariffs.length === 0;
+    email.disabled = busy || frozen || !quote || terminal;
+    receiptLabel.hidden = !quote;
     checkout.disabled = busy || !quote || terminal;
   }
   function clearQuote() {
     quote = undefined;
     command = undefined;
+    captureCommand = undefined;
+    email.value = "";
     terminal = false;
     attempted = false;
     summary.replaceChildren();
@@ -153,17 +172,35 @@ export function bindExpertCampaign(
       error(new Error("campaign_rejected"));
       return;
     }
+    if (!command.receiptContactId && !captureCommand && !email.reportValidity())
+      return;
+    if (!command.receiptContactId && !captureCommand)
+      captureCommand = {
+        quoteId: quote.id,
+        email: email.value,
+        idempotencyKey: crypto.randomUUID(),
+      };
     busy = true;
     // After submission the order may already exist, even without a response.
     // Its replay validity belongs to the server, not the original quote clock.
-    attempted = true;
     payment.replaceChildren();
     controls();
     status.textContent = "Подготавливаем оплату…";
     // Retained across uncertain failures: the server sees the same saved quote
     // and command, even if the original order was created before a lost reply.
-    void client
-      .checkout(command)
+    const selectedCommand = command;
+    void (async () => {
+      if (!selectedCommand.receiptContactId) {
+        const captured = await client.capture(captureCommand!);
+        if (!active) throw new Error("stale_response");
+        selectedCommand.receiptContactId = captured.receiptContactId;
+        captureCommand = undefined;
+        email.value = "";
+      }
+      if (!active) throw new Error("stale_response");
+      attempted = true;
+      return client.checkout(selectedCommand);
+    })()
       .then((value) => {
         if (!active) return;
         if (value.checkoutUrl) {
@@ -183,7 +220,10 @@ export function bindExpertCampaign(
               : value.status === "quoted"
                 ? "Заказ создан. Оплата не подтверждена."
                 : "Заказ завершён без действующей оплаты. Для новой покупки рассчитайте стоимость заново.";
-          terminal = true;
+          // Only an authoritative terminal status releases the previous purchase.
+          // A quoted order is still unresolved and retains its replay command.
+          terminal = value.status !== "quoted";
+          if (terminal) attempted = false;
         }
       }, error)
       .finally(() => {
@@ -200,6 +240,8 @@ export function bindExpertCampaign(
   void loadTariffs();
   return () => {
     active = false;
+    email.value = "";
+    captureCommand = undefined;
     client.dispose();
     quote = undefined;
     command = undefined;

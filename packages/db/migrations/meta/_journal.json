@@ -351,6 +351,13 @@
       "when": 1791763200006,
       "tag": "0049_expert_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791763200007,
+      "tag": "0050_expert_receipt_contact_bindings",
+      "breakpoints": true
     }
   ]
 }

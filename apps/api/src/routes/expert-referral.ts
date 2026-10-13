@@ -3,10 +3,13 @@ import type {
   ExpertReferralService,
   ExpertResidencyService,
   ExpertCampaignService,
+  PayerReceiptRequiredCampaignService,
+  PayerReceiptCaptureService,
 } from "@ii-tonya/application";
 import {
   expertCampaignQuoteRequestSchema,
   expertCampaignCheckoutRequestSchema,
+  payerReceiptCheckoutRequestSchema,
 } from "@ii-tonya/application";
 import { readExactAuthorization } from "../authorization-header.js";
 import { createWindowedRateLimiter } from "../rate-limit.js";
@@ -50,6 +53,7 @@ const checkoutBodySchema = {
 } as const;
 
 export interface ExpertReferralApiDependencies {
+  readonly receiptCapture?: PayerReceiptCaptureService;
   readonly principals: ExpertPrincipalResolver;
   readonly referrals: ExpertReferralService;
   readonly residency:
@@ -60,7 +64,8 @@ export interface ExpertReferralApiDependencies {
         readonly kind?: "legacy";
         readonly reconciliation?: ExpertResidencyService["reconciliation"];
       })
-    | ExpertCampaignService;
+    | ExpertCampaignService
+    | PayerReceiptRequiredCampaignService;
 }
 
 interface ExpertReferralRouteOptions extends ExpertReferralApiDependencies {
@@ -82,6 +87,35 @@ export async function expertReferralRoutes(
   deps: ExpertReferralRouteOptions,
 ): Promise<void> {
   const limiter = createWindowedRateLimiter();
+  if ("receiptRequired" in deps.residency) {
+    app.removeContentTypeParser("application/json");
+    app.addContentTypeParser(
+      "application/json",
+      { parseAs: "buffer" },
+      (_request, body, done) => {
+        try {
+          const text = new TextDecoder("utf-8", { fatal: true }).decode(
+            body as Buffer,
+          );
+          const value: unknown = JSON.parse(text);
+          if (!value || typeof value !== "object" || Array.isArray(value))
+            return done(null, null);
+          const names = [...text.matchAll(/("(?:\\.|[^"\\])*")\s*:/gu)].map(
+            (m) => JSON.parse(m[1]!) as string,
+          );
+          return done(
+            null,
+            names.length === Object.keys(value).length &&
+              new Set(names).size === names.length
+              ? value
+              : null,
+          );
+        } catch {
+          return done(null, null);
+        }
+      },
+    );
+  }
   app.addHook("onRequest", async (request, reply) => {
     reply.header("cache-control", "no-store").header("pragma", "no-cache");
     const count = request.raw.rawHeaders.filter(
@@ -224,9 +258,11 @@ export async function expertReferralRoutes(
           return reply.code(401).send({ error: "unauthorized" });
         }
         if (deps.residency.kind === "campaign") {
-          const parsed = expertCampaignCheckoutRequestSchema.safeParse(
-            request.body,
-          );
+          const parsed = (
+            "receiptRequired" in deps.residency
+              ? payerReceiptCheckoutRequestSchema
+              : expertCampaignCheckoutRequestSchema
+          ).safeParse(request.body);
           if (!parsed.success)
             return reply.code(400).send({ error: "invalid_request" });
           return sendServiceResult(

@@ -4,6 +4,11 @@ import { quoteResidency } from "@ii-tonya/domain";
 import { lockClientConsentSubject } from "./client-consent-authority.js";
 import { expireLockedExpertResidencyOrder } from "./expert-residency-repository.js";
 import { PostgresExpertReferralControlRepository } from "./expert-referral-control-repository.js";
+import type { PayerReceiptVault } from "@ii-tonya/integrations";
+import {
+  lockPayerReceiptSelection,
+  PayerReceiptError,
+} from "./payer-receipt-contact-repository.js";
 
 export interface CreateExpertCampaignOrder {
   userId: string;
@@ -60,11 +65,35 @@ export class ExpertCampaignOrderError extends Error {
   }
 }
 export class PostgresExpertCampaignOrderRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly receiptVault?: PayerReceiptVault,
+  ) {}
   async createCheckoutOrder(
     input: CreateExpertCampaignOrder,
   ): Promise<ExpertCampaignOrder> {
     const command = parseCommand(input);
+    return this.createOrder(command);
+  }
+  async createCheckoutOrderWithReceipt(
+    input: CreateExpertCampaignOrder & { receiptContactId: string },
+  ): Promise<ExpertCampaignOrder> {
+    if (
+      !input ||
+      typeof input !== "object" ||
+      Array.isArray(input) ||
+      typeof input.receiptContactId !== "string" ||
+      input.receiptContactId.length !== 36 ||
+      !uuid.test(input.receiptContactId)
+    )
+      throw new ExpertCampaignOrderError("EXPERT_CAMPAIGN_INVALID_INPUT");
+    const { receiptContactId, ...base } = input;
+    return this.createOrder(parseCommand(base), receiptContactId.toLowerCase());
+  }
+  private async createOrder(
+    command: CreateExpertCampaignOrder,
+    receiptContactId?: string,
+  ): Promise<ExpertCampaignOrder> {
     // Only this branch retries lock/deadlock failures. Every attempt owns a new
     // transaction, snapshot and all locks, including implicit FK row locks.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -133,6 +162,22 @@ export class PostgresExpertCampaignOrderRepository {
                 throw new ExpertCampaignOrderError(
                   "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",
                 );
+              if (receiptContactId !== undefined) {
+                const selected = (
+                  await tx.execute<{ contactId: string }>(
+                    sql`select contact_id as "contactId" from payer_receipt_order_bindings where order_id=${prior.id}::uuid and user_id=${command.userId}::uuid and quote_id=${command.quoteId}::uuid`,
+                  )
+                ).rows[0];
+                if (selected?.contactId !== receiptContactId)
+                  throw new ExpertCampaignOrderError(
+                    "EXPERT_CAMPAIGN_IDEMPOTENCY_CONFLICT",
+                  );
+                await lockPayerReceiptSelection(
+                  tx,
+                  { ...command, receiptContactId },
+                  this.receiptVault,
+                );
+              }
               // Return the committed expiry, never throw after the release and undo it.
               if (
                 await expireLockedExpertResidencyOrder(
@@ -159,6 +204,12 @@ export class PostgresExpertCampaignOrderRepository {
                 "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",
               );
             if (used) throw new ExpertCampaignOrderError("QUOTE_ALREADY_USED");
+            if (receiptContactId !== undefined)
+              await lockPayerReceiptSelection(
+                tx,
+                { ...command, receiptContactId },
+                this.receiptVault,
+              );
             const tariff = (
               await tx.execute<{
                 policy: string;
@@ -245,6 +296,10 @@ export class PostgresExpertCampaignOrderRepository {
             ).rows[0];
             if (!saved)
               throw new ExpertCampaignOrderError("EXPERT_CAMPAIGN_STORAGE");
+            if (receiptContactId !== undefined)
+              await tx.execute(
+                sql`insert into payer_receipt_order_bindings(order_id,contact_id,quote_id,user_id) values(${saved.id}::uuid,${receiptContactId}::uuid,${command.quoteId}::uuid,${command.userId}::uuid)`,
+              );
             if (amounts.creditMinor > 0n) {
               const entry = (
                 await tx.execute<{ id: string }>(
@@ -271,6 +326,10 @@ export class PostgresExpertCampaignOrderRepository {
         );
       } catch (error) {
         if (error instanceof ExpertCampaignOrderError) throw error;
+        if (error instanceof PayerReceiptError)
+          throw new ExpertCampaignOrderError(
+            "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",
+          );
         const pg = pgFailure(error);
         if (["40001", "55P03", "40P01"].includes(pg?.code ?? "")) {
           if (attempt < 2) continue;

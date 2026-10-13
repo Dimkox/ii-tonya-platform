@@ -3,6 +3,10 @@ import {
   expertCampaignQuoteRequestSchema,
   expertCampaignCheckoutRequestSchema,
   type ExpertCampaignService,
+  type PayerReceiptRequiredCampaignService,
+  type PayerReceiptCaptureService,
+  payerReceiptCheckoutRequestSchema,
+  payerReceiptCaptureRequestSchema,
 } from "@ii-tonya/application";
 import { createExpertBearerPrincipalResolver } from "../expert-principal-resolver.js";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -21,7 +25,9 @@ export interface ExpertBrowserOptions extends ExpertSessionRoutesOptions {
   origin?: string;
   botUsername?: string;
   widgetEnabled?: boolean;
-  campaign?: ExpertCampaignService | undefined;
+  campaign?:
+    ExpertCampaignService | PayerReceiptRequiredCampaignService | undefined;
+  receiptCapture?: PayerReceiptCaptureService | undefined;
 }
 const SESSION = "__Host-expert-session",
   CSRF = "__Host-expert-csrf";
@@ -277,14 +283,35 @@ export const expertBrowserSessionRoutes: FastifyPluginAsync<
     },
   );
   app.post(
+    "/v1/expert/browser/residency/receipt-contacts",
+    { bodyLimit: 8192 },
+    async (r, reply) => {
+      const principal = await authorize(r, reply);
+      if (!principal) return;
+      const parsed = payerReceiptCaptureRequestSchema.safeParse(
+        campaignBody(r),
+      );
+      if (!parsed.success)
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!deps.receiptCapture)
+        return reply.code(503).send({ error: "receipt_capture_unavailable" });
+      return campaignResult(
+        reply,
+        await deps.receiptCapture.capture(principal, parsed.data),
+      );
+    },
+  );
+  app.post(
     "/v1/expert/browser/residency/checkouts",
     { bodyLimit: 8192 },
     async (r, reply) => {
       const principal = await authorize(r, reply);
       if (!principal) return;
-      const parsed = expertCampaignCheckoutRequestSchema.safeParse(
-        campaignBody(r),
-      );
+      const parsed = (
+        campaign && "receiptRequired" in campaign
+          ? payerReceiptCheckoutRequestSchema
+          : expertCampaignCheckoutRequestSchema
+      ).safeParse(campaignBody(r));
       if (!parsed.success)
         return reply.code(400).send({ error: "invalid_request" });
       return campaignResult(

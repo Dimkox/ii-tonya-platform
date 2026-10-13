@@ -8,6 +8,7 @@ import {
 } from "./expert-session-token.js";
 import { createExpertBearerPrincipalResolver } from "./expert-principal-resolver.js";
 import { createExpertCampaignComposition } from "./expert-campaign-composition.js";
+import { createPayerReceiptComposition } from "./payer-receipt-composition.js";
 import { pathToFileURL } from "node:url";
 import {
   createPrivacyService,
@@ -385,6 +386,7 @@ export const createDefaultLifecycle = (
         config.features.expertReferral) &&
       expertSessionRepository
         ? createExpertCampaignComposition({
+            payerReceipt: createPayerReceiptComposition(db, config),
             db,
             botKey: config.expertSession!.botKey,
             principals: createExpertBearerPrincipalResolver({
