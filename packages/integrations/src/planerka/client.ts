@@ -257,7 +257,12 @@ export function createPlanerkaClient(
                   date >= value.start &&
                   date <= value.end &&
                   slots.every((slot) => {
-                    if (value.format === "range" && !slot.end) return false;
+                    if (
+                      value.format === "range" &&
+                      !slot.end &&
+                      value.duration === undefined
+                    )
+                      return false;
                     const parts = new Intl.DateTimeFormat("en", {
                       timeZone: value.timeZone,
                       year: "numeric",

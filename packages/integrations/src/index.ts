@@ -9,6 +9,7 @@ export {
 } from "./http/webhook-auth.js";
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
+export { planerkaSlotsSchema } from "./planerka/contracts.js";
 export {
   createPlanerkaClient,
   PlanerkaClientError,

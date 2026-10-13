@@ -13,7 +13,12 @@ import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "@ii-tonya/config";
-import { createPlanerkaClient } from "@ii-tonya/integrations";
+import {
+  createPlanerkaClient,
+  type PlanerkaTransport,
+} from "@ii-tonya/integrations";
+import { PostgresPlanerkaAvailabilityRepository } from "@ii-tonya/db";
+import { runPlanerkaAvailabilityOnce } from "@ii-tonya/worker";
 import {
   preflightPlanerkaBooking,
   runPlanerkaBookingOnce,
@@ -116,6 +121,8 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly logger?: ReturnType<typeof createLogger>;
+  readonly planerkaTransport?: PlanerkaTransport;
   readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
@@ -367,6 +374,7 @@ export function selectExpertResidencyProviderReader(
 export function createProductionWorkerRuntimeFactory(
   deps: ProductionWorkerRuntimeFactoryDependencies = {},
 ): WorkerRuntimeFactory {
+  const logger = deps.logger ?? createLogger();
   return {
     async create(config) {
       validateYooKassaWorkerConfig(config);
@@ -515,13 +523,32 @@ export function createProductionWorkerRuntimeFactory(
           ? undefined
           : {
               repository: new PostgresPlanerkaBookingRepository(db),
-              client: createPlanerkaClient({
-                apiKey: config.planerkaWorkflow.apiKey,
-              }),
+              client: createPlanerkaClient(
+                {
+                  apiKey: config.planerkaWorkflow.apiKey,
+                },
+                deps.planerkaTransport,
+              ),
               accountId: config.planerkaWorkflow.accountId,
               createEnabled: config.planerkaWorkflow.createEnabled,
             };
       if (planerka) await preflightPlanerkaBooking(planerka);
+      const availability =
+        config.planerkaWorkflow?.availabilityEnabled === true && planerka
+          ? {
+              repository: new PostgresPlanerkaAvailabilityRepository(db),
+              client: createPlanerkaClient(
+                { apiKey: config.planerkaWorkflow.apiKey, timeoutMs: 5000 },
+                deps.planerkaTransport,
+              ),
+              accountId: planerka.accountId,
+              admitRequest: (accountId: number) =>
+                planerka.repository.admitRequest(accountId, {
+                  availability: true,
+                  createEnabled: planerka.createEnabled,
+                }),
+            }
+          : undefined;
       const bookingNotifications = await createBookingNotificationRuntime(
         config,
         db,
@@ -529,6 +556,23 @@ export function createProductionWorkerRuntimeFactory(
       const bookingHandoffRevocations =
         new PostgresBookingHandoffRevocationRepository(db);
       return createProductionWorkerRuntime({
+        ...(availability === undefined
+          ? {}
+          : {
+              planerkaAvailability: async () => {
+                const result = await runPlanerkaAvailabilityOnce(availability);
+                if (result.processed > 0 || result.reason !== undefined)
+                  logger.info({
+                    event: "planerka_availability",
+                    outcome:
+                      result.reason ??
+                      (result.published > 0 ? "published" : "empty"),
+                    processed: result.processed,
+                    published: result.published,
+                  });
+                return result;
+              },
+            }),
         bookingHandoffRevocations: () =>
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),

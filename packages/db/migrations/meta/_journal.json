@@ -358,6 +358,13 @@
       "when": 1791763200007,
       "tag": "0050_expert_receipt_contact_bindings",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791849600000,
+      "tag": "0051_planerka_availability",
+      "breakpoints": true
     }
   ]
 }

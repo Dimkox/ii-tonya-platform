@@ -168,3 +168,84 @@ credential/account access, migration0043 and a compatible worker/API/web until a
 external effects are resolved. Do not roll back to a binary that confirms on expert
 approval, remove operation rows, or disable recovery just to halt new creation.
 No automatic down-migration or production mutation is authorized by this runbook.
+
+## Availability refresh (0051)
+
+`PLANERKA_AVAILABILITY_ENABLED=false` is the default. Opting in requires
+`PLANERKA_RECOVERY_ENABLED=true`, a valid `PLANERKA_API_KEY`, the configured
+`PLANERKA_ACCOUNT_ID`, migration0051 and genuinely verified service mappings.
+Creation can remain disabled. The ordinary production worker executes booking
+recovery/creation first, then refreshes at most one due mapped service per cycle.
+The optional `planerkaAvailability` cycle report exists only when composed and
+contains bounded counts and fixed diagnostic codes, never provider bodies or keys.
+
+The importer reads profile, event types and slots using the existing authenticated
+transport and account-wide admission. Its separate client has a five-second
+request timeout and the existing256KiB response cap. Account, timezone, both
+duration fields, owner, free/visible/unconfirmed/single-seat event mode must match.
+Missing range ends are accepted only with an explicit validated request duration;
+the importer derives them from the verified mapping and rejects inconsistent facts.
+
+PostgreSQL owns the90second fenced lease, observation time and seven complete UTC
+days beginning tomorrow. An optional inclusive provider end-date bucket is validated
+but excluded from publication. Success is due again after120seconds; fixed failures
+after30seconds. Neither network work nor admission waits hold database transactions.
+Failed responses leave existing slot freshness unchanged. Empty successful snapshots
+advance the durable watermark and clear covered observations without deleting slots
+or reservations. Existing slot UUIDs, external identities and capacity are retained.
+Mapping insertion, changes and deletion invalidate observations and pending claims
+atomically, including both services when a mapping moves. Availability row locks use
+NOWAIT so they never hold mapping locks while waiting for booking resources.
+Contention rolls back the whole transaction and reports `database_busy`; mapping
+mutation callers must retry SQLSTATE55P03 as a whole transaction. Such retries do
+not establish a new observation or publication. The window is168 absolute hours,
+independent of session timezone or daylight-saving changes. Valid final-day slots
+that extend beyond the window are omitted after validation.
+
+Before every availability GET, durable account admission yields to actionable or
+in-flight booking/recovery operations, including short retry delays. Pending creation
+blocks imports only when creation is enabled; terminal/manual operations do not.
+Availability admission has a50ms database lock timeout and a nonblocking account
+row lock. Booking's existing admission behavior is unchanged.
+
+Catalogue reads discard stale, past, less-than24hour lead and occupied rows before
+their500row limit and omit active expert reservations overlapping other slots or
+services; same-slot remaining capacity is preserved. Planerka choices require a
+currently eligible mapping. A disabled
+availability flag retains the previous runtime report shape. To stop imports, set
+only `PLANERKA_AVAILABILITY_ENABLED=false`; existing observations expire naturally
+after15minutes. Disable the reviewed mapping when immediate invalidation is needed.
+Do not delete refresh state, slots or reservation history as a rollback mechanism.
+
+Live provider access currently returns `access_denied`; synthetic transport evidence
+does not establish a working subscription, live inventory, or deployment acceptance.
+Provider activation, production-compatible database checks and release authorization
+remain separate. Implementation evidence is in
+`docs/test-evidence/planerka-availability-2026-10-13.md`.
+
+## Availability diagnostics
+
+Every non-idle ordinary-factory result emits `planerka_availability`, with only the
+fixed `outcome` and integer `processed`/`published` counts through the existing
+sanitized logger. Idle cycles emit no availability event. Never add account/service
+IDs, response bodies, URLs or credentials to this event. A healthy worker heartbeat
+does not establish provider access or fresh catalogue choices.
+
+For a bounded read-only inspection, the following shows current per-service failure
+states (not cumulative attempts), never-published services and oldest publication
+age. A null age with a nonzero never-published count needs investigation. Contention
+that rolled back before persisting a diagnostic is visible in the fixed log event.
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '2s';
+SELECT reason_code, count(*) AS services
+FROM planerka_availability_refreshes
+WHERE reason_code IS NOT NULL
+GROUP BY reason_code ORDER BY reason_code LIMIT 8;
+SELECT count(*) FILTER (WHERE published_at IS NULL) AS never_published,
+  extract(epoch FROM clock_timestamp() - min(published_at))::bigint
+    AS oldest_publication_age_seconds
+FROM planerka_availability_refreshes;
+COMMIT;
+```
