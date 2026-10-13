@@ -249,6 +249,15 @@ export {
   type SelartiMessagesResult,
   type SelartiRestFetch,
 } from "./selarti/rest-client.js";
+export {
+  createAuthenticatedSelartiClient,
+  type AuthenticatedSelartiClient,
+  type AuthenticatedSelartiClientOptions,
+  type AuthenticatedSelartiClientResult,
+  type AuthenticatedSelartiMessagesQuery,
+  type AuthenticatedSelartiSend,
+  type AuthenticatedSelartiUnavailableCode,
+} from "./selarti/authenticated-client.js";
 export { createClientAsyncTelegramTransport } from "./telegram/client-async-transport.js";
 export {
   createPayerReceiptVault,
