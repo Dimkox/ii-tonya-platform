@@ -1,3 +1,5 @@
+import { isUint8Array } from "node:util/types";
+import { setImmediate as yieldEventLoop } from "node:timers/promises";
 import {
   yooKassaPaymentSchema,
   yooKassaRefundSchema,
@@ -14,6 +16,7 @@ const IDEMPOTENCY_KEY =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export interface YooKassaTransport {
+  /** Must honor init.signal during connection, headers and body consumption. */
   (url: string, init: RequestInit): Promise<Response>;
 }
 
@@ -32,6 +35,13 @@ export interface CreateYooKassaPayment {
   readonly receipt: YooKassaReceiptInput;
 }
 
+export interface CreateYooKassaPaymentOptions {
+  /** Combined with the client's 15-second ceiling; never serialized to YooKassa.
+   * Cancellation reports an unknown outcome, not proof that no payment exists.
+   * It does not authorize resending with another idempotency key. */
+  readonly signal?: AbortSignal;
+}
+
 export interface CreateYooKassaRefund {
   readonly paymentId: string;
   readonly amountMinor: bigint;
@@ -41,7 +51,10 @@ export interface CreateYooKassaRefund {
 }
 
 export interface YooKassaClient {
-  createPayment(command: CreateYooKassaPayment): Promise<YooKassaPayment>;
+  createPayment(
+    command: CreateYooKassaPayment,
+    options?: CreateYooKassaPaymentOptions,
+  ): Promise<YooKassaPayment>;
   getPayment(paymentId: string): Promise<YooKassaPayment>;
   createRefund(command: CreateYooKassaRefund): Promise<YooKassaRefund>;
   getRefund(refundId: string): Promise<YooKassaRefund>;
@@ -83,17 +96,73 @@ const assertIdempotencyKey = (value: string): string => {
   return value;
 };
 
-const readJson = async (response: Response): Promise<unknown> => {
+// A response stream's cancel hook may itself reject or never settle. Initiate
+// cleanup without letting it delay the bounded request or expose private errors.
+const discardBody = (response: Response): void => {
+  void response.body?.cancel().catch(() => {});
+};
+
+const readJson = async (
+  response: Response,
+  signal: AbortSignal,
+): Promise<unknown> => {
   const declared = response.headers.get("content-length");
   if (declared !== null && Number(declared) > MAX_RESPONSE_BYTES) {
+    discardBody(response);
     throw new YooKassaTerminalError("yookassa_response_invalid");
   }
-  const text = await response.text();
-  if (text.length > MAX_RESPONSE_BYTES) {
+  if (!response.body) {
     throw new YooKassaTerminalError("yookassa_response_invalid");
+  }
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = response.body.getReader();
+  } catch {
+    throw new YooKassaUnknownOutcomeError();
+  }
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener("abort", cancel, { once: true });
+  const storage = new Uint8Array(MAX_RESPONSE_BYTES);
+  let bytes = 0;
+  let reads = 0;
+  try {
+    while (true) {
+      if (signal.aborted) throw new YooKassaUnknownOutcomeError();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        // Stream errors are untrusted, including errors imitating our classes.
+        throw new YooKassaUnknownOutcomeError();
+      }
+      if (signal.aborted) throw new YooKassaUnknownOutcomeError();
+      if (chunk.done) break;
+      if (!isUint8Array(chunk.value)) {
+        throw new YooKassaUnknownOutcomeError();
+      }
+      if (bytes + chunk.value.byteLength > MAX_RESPONSE_BYTES) {
+        throw new YooKassaTerminalError("yookassa_response_invalid");
+      }
+      // Own the consumed bytes: transports can reuse mutable backing buffers.
+      storage.set(chunk.value, bytes);
+      bytes += chunk.value.byteLength;
+      // Empty or tiny synchronous chunks must not starve timers/cancellation.
+      if (++reads % 64 === 0) await yieldEventLoop();
+    }
+  } catch (error) {
+    cancel();
+    throw error;
+  } finally {
+    signal.removeEventListener("abort", cancel);
+    reader.releaseLock();
   }
   try {
-    return JSON.parse(text) as unknown;
+    // TextDecoder preserves Response.text's UTF-8/BOM behavior across chunks.
+    return JSON.parse(
+      new TextDecoder().decode(storage.subarray(0, bytes)),
+    ) as unknown;
   } catch {
     throw new YooKassaTerminalError("yookassa_response_invalid");
   }
@@ -160,8 +229,13 @@ export const createYooKassaClient = (
   const authorization = `Basic ${Buffer.from(`${config.shopId}:${config.secretKey}`, "utf8").toString("base64")}`;
 
   const request = async (path: string, init: RequestInit): Promise<unknown> => {
+    const ceiling = AbortSignal.timeout(15_000);
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, ceiling])
+      : ceiling;
     let response: Response;
     try {
+      if (signal.aborted) throw new YooKassaUnknownOutcomeError();
       response = await transport(`${ORIGIN}${path}`, {
         ...init,
         headers: {
@@ -172,18 +246,26 @@ export const createYooKassaClient = (
             : { "Content-Type": "application/json" }),
           ...init.headers,
         },
-        signal: AbortSignal.timeout(15_000),
+        signal,
       });
     } catch {
       throw new YooKassaUnknownOutcomeError();
     }
+    if (signal.aborted) {
+      discardBody(response);
+      throw new YooKassaUnknownOutcomeError();
+    }
     if (response.status === 429 || response.status >= 500) {
+      discardBody(response);
       throw new YooKassaUnknownOutcomeError();
     }
     if (!response.ok) {
+      discardBody(response);
       throw new YooKassaTerminalError(`yookassa_http_${response.status}`);
     }
-    return readJson(response);
+    const body = await readJson(response, signal);
+    if (signal.aborted) throw new YooKassaUnknownOutcomeError();
+    return body;
   };
 
   const parsePayment = (body: unknown): YooKassaPayment => {
@@ -204,7 +286,7 @@ export const createYooKassaClient = (
   };
 
   return {
-    async createPayment(command) {
+    async createPayment(command, options) {
       const amount = formatRubMinor(command.amountMinor);
       const result = parsePayment(
         await request("/v3/payments", {
@@ -213,6 +295,7 @@ export const createYooKassaClient = (
             "Idempotence-Key": assertIdempotencyKey(command.idempotencyKey),
           },
           body: serializeYooKassaPaymentRequest(command),
+          ...(options?.signal === undefined ? {} : { signal: options.signal }),
         }),
       );
       if (result.amount.value !== amount || result.amount.currency !== "RUB") {
