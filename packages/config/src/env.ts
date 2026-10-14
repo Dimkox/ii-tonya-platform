@@ -79,6 +79,7 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_WAITLIST_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -96,6 +97,12 @@ const schema = z
     TEST_EXPERT_RECONCILIATION_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    LIFECYCLE_REMINDERS_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_CHECKUPS_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_FEEDBACK_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_COUPON_NOTICES_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     TEST_EXPERT_PROMPT_VERSION: optionalNonEmptyString,
     SELARTI_RESPONSE_SHARED_SECRET: z
       .string()
@@ -105,7 +112,7 @@ const schema = z
       .optional(),
     CLIENT_TELEGRAM_BOT_KEY: z
       .string()
-      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
       .optional(),
     CLIENT_MESSAGING_CONSENT_POLICY_VERSION: z
       .string()
@@ -327,6 +334,7 @@ export type RuntimeConfig = {
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientWaitlist?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
     clientHybridRouting?: boolean;
@@ -347,6 +355,10 @@ export type RuntimeConfig = {
     expertAiIngress?: boolean;
     expertTelegramReferral?: boolean;
     expertTelegramCheckout?: boolean;
+    lifecycleReminders?: boolean;
+    lifecycleCheckups?: boolean;
+    lifecycleFeedback?: boolean;
+    lifecycleCouponNotices?: boolean;
     yookassa?: boolean;
   };
   clientBookingConfirmationBufferMs?: number;
@@ -379,6 +391,33 @@ export type RuntimeConfig = {
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const value = schema.parse(source);
+  if (
+    value.CLIENT_WAITLIST_ENABLED === "true" &&
+    (value.CLIENT_BOOKING_ENABLED !== "true" ||
+      value.CLIENT_CATALOG_ENABLED !== "true" ||
+      value.CLIENT_SESSION_ENABLED !== "true")
+  ) {
+    throw new Error("client_waitlist_configuration_incomplete");
+  }
+  if (value.LIFECYCLE_CHECKUPS_ENABLED === "true") {
+    throw new Error("lifecycle_checkup_authority_unavailable");
+  }
+  if (value.LIFECYCLE_FEEDBACK_ENABLED === "true") {
+    throw new Error("lifecycle_feedback_authority_unavailable");
+  }
+  if (value.LIFECYCLE_COUPON_NOTICES_ENABLED === "true") {
+    throw new Error("lifecycle_coupon_authority_unavailable");
+  }
+  if (value.LIFECYCLE_REMINDERS_ENABLED === "true") {
+    if (
+      value.CLIENT_BOOKING_ENABLED !== "true" ||
+      value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true" ||
+      !value.CLIENT_TELEGRAM_BOT_KEY ||
+      !value.CLIENT_MESSAGING_CONSENT_POLICY_VERSION
+    ) {
+      throw new Error("lifecycle_scheduler_configuration_incomplete");
+    }
+  }
   if (
     value.TEST_EXPERT_PROMO_ENABLED === "true" &&
     value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true" &&
@@ -469,6 +508,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientWaitlist: value.CLIENT_WAITLIST_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
@@ -495,6 +535,10 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       expertAiIngress: value.EXPERT_AI_INGRESS_ENABLED === "true",
       expertTelegramReferral: value.EXPERT_TELEGRAM_REFERRAL_ENABLED === "true",
       expertTelegramCheckout: value.EXPERT_TELEGRAM_CHECKOUT_ENABLED === "true",
+      lifecycleReminders: value.LIFECYCLE_REMINDERS_ENABLED === "true",
+      lifecycleCheckups: false,
+      lifecycleFeedback: false,
+      lifecycleCouponNotices: false,
       yookassa: value.YOOKASSA_ENABLED === "true",
     },
     clientBookingConfirmationBufferMs:

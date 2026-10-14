@@ -93,6 +93,9 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
+  "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0040_booking_waitlist_d1.sql",
+  "packages/db/migrations/0041_booking_reschedule_replay.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -133,6 +136,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "selarti_response_proposals",
   "dialogue_deliveries",
   "dialogue_inbound_tombstones",
+  "lifecycle_jobs",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "selarti_budget_policies",
   "selarti_cost_reservations",
   "selarti_actual_usage_facts",
@@ -747,8 +754,20 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
+    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
+    "packages/db/migrations/0040_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/0041_booking_reschedule_replay.sql",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -828,7 +847,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "865ac297424e45de2afec139589e041ba830502823086a753bf944547b88c2e0",
+    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -841,6 +860,9 @@ const approvedDatabaseRelations = new Set([
   "channel_identities",
   "client_booking_erasure_work",
   "client_booking_receipts",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "client_catalog_choices",
   "client_catalog_erasure_index",
   "client_catalog_requests",

@@ -47,3 +47,33 @@ The linked-worktree CI repair mounted Git metadata into the main test container 
 Gitleaks 8.28 returned success while reporting findings because the gate did not set an explicit finding exit code; once real history access was restored, this could have produced false PASS evidence. The root cause was testing command presence and redaction but not pinning terminal semantics; the gate now fails on findings and ignores only reviewed exact fingerprints for synthetic idempotency keys, placeholder test secrets, and prose.
 
 Running `gh pr merge --delete-branch` from a linked feature worktree completed the server-side squash merge but then failed local cleanup because `main` was checked out in another worktree. The root cause was coupling the irreversible remote merge with checkout-dependent local cleanup; future merges from linked worktrees must omit automatic branch deletion, verify the remote result first, and clean remote/local refs separately.
+
+The first Release C integration run could not see `lifecycle_jobs` because the hand-authored SQL migration was not added to Drizzle's migration journal. The root cause was treating the migration filename as sufficient registration; every manual migration must update and test the journal entry before PostgreSQL integration tests run.
+
+The Task 3 repeat command used the repository runner through Corepack even though that runner spawns a bare `pnpm`, and a later Reaper startup failure triggered teardown against an uninitialized database. The root cause was not tracing executable and resource ownership across child-process/setup boundaries; direct Corepack repeats and guarded teardown now preserve the primary failure.
+
+The first waitlist-worker review-fix test inherited a booked reservation, while the reschedule test asserted an old live status after deliberately mutating it. The root cause was coupling immutable-replay assertions to mutable shared fixture state instead of resetting each transition precondition and checking replay separately from the live projection.
+
+The first immutable reschedule-replay repair edited migration `0040` after that migration had already been committed. The root cause was optimizing for fresh-schema tests without testing the applied-`0040` upgrade path; the repair now uses `0041` and a real PostgreSQL upgrade test.
+
+The first `0041` backfill copied the reservation's current deadline into every historical reschedule fact. The root cause was assuming mutable aggregate state could reconstruct per-command results even though confirmation buffers vary; old facts are now explicitly unrecoverable and cannot return invented data.
+
+The first async route-splitting change reused a nullable DOM query inside a nested async function, so TypeScript correctly rejected the lost control-flow narrowing. The root cause was relying on outer-scope narrowing across a closure; the checked element is now captured as a non-null local before the async boundary.
+
+The first final web gate invoked npm's root `--workspace` mode even though the root workspace is pnpm-managed and npm has no workspace declaration there. The root cause was mixing the repository package manager with the package-local verification contract; final web checks now use `npm --prefix apps/web` explicitly.
+
+Installing generic verification without project adaptation caused placeholder and camelCase false positives, profile-unscoped Trivy/vendor scanning, whole-stack coverage enforcement from embedded tests in a non-Python product, and tracked local runtime evidence because source workflow exclusions were omitted. The root cause was treating generic scanner patterns, infrastructure checks, coverage policy, and runtime ignore rules as universally applicable instead of binding them to identifier/value semantics, routed quality profiles, a real Python project marker, and the installed source workflow contract.
+
+Parallel aggregate Vitest workers caused unrelated PostgreSQL suites to contend beyond legacy 5-second test budgets even after concurrency was bounded at four. The root cause was treating limited parallelism as deterministic enough despite repository and Claw evidence requiring a one-worker default for aggregate database runs.
+
+Client rescheduling was coupled to the waitlist feature flag, while enabled waitlist routes accepted a missing service and deferred failure to force-unwrapped request paths. The root cause was treating independently composed booking and waitlist capabilities as one activation boundary instead of enforcing each route dependency at plugin registration.
+
+The first final full verification passed the test PostgreSQL URI as `DATABASE_URL`, while this repository's external database harness specifically requires `II_TONYA_TEST_POSTGRES_ADMIN_URL`, causing suite setup failures and cascading timeout noise. The root cause was reusing the production-style connection variable without checking the test harness's explicit environment contract.
+
+The first workflow verification ran while newly installed Python automation was untracked, so the recursive `git ls-files` boundary could not inspect or reject it until the committed-tree run. The root cause was validating executable-scope policy before staging exposed the complete delivery tree instead of pinning every reviewed automation path and normalized content hash.
+
+Waitlist join and promotion encoded different slot horizons, while promotion duplicated a fixed hold instead of sharing the booking confirmation deadline policy. The root cause was composing promotion without the existing confirmation-buffer configuration and domain deadline rule, allowing API acceptance and worker eligibility to drift.
+
+Waitlist join replay trusted an actor-scoped key without comparing the stored request hash, while leave idempotency relied on a receipt insert after mutation and ignored uniqueness conflicts, so key reuse could misreport or mutate a different owned aggregate. Promotion timing and composition also lacked direct boundary and configuration-propagation evidence; the root cause was treating command receipts and buffer wiring as post-mutation implementation details instead of pre-mutation ownership contracts.
+
+A repeated high-entropy RFC example UUID was chosen as a test fixture, and external secret scanning classified it as a secret. Future UUID fixtures use obvious low-entropy values that remain structurally valid.
