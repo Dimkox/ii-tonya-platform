@@ -36,11 +36,17 @@
 - [x] Implement metadata query, strict wrapper and adapter ordering. Remove only the prior-order live-contact check. Align the old expiry-replay assertion without executing that exhausted file.
 - [x] Run each new file once more, separately. Expected GREEN with no skipped tests. Reserve third runs for coordinator final verification after review.
 - [x] Run relevant builds/typechecks, scoped lint/format and whitespace checks. Record source hashes and limitations.
-- [ ] Obtain independent review, triage findings, then coordinator runs reserved final3. Never substitute a copied/renamed old test.
-- [ ] Commit the bounded fix and evidence. RC publication remains a separate owner-authorized coordinator action; no payment flag or app deployment follows from this task.
+- [x] Obtain independent review, triage findings, then coordinator runs reserved final3. Adapter final3 reproduced review defects; the owner separately authorized run4 after fixes, which passed68/68. PostgreSQL final3 passed21/21. Never substitute a copied/renamed old test.
+- [x] Commit the bounded fix and evidence. Draft PR105 contains the bounded source. No payment flag or app deployment follows from this task.
 
 ## Review correction checkpoint
 
 Source054ee692 passed GREEN2, adapter36/36 and PG15/15. These steps must not be replayed. Independent review found malformed disclosure and unsanitized bookkeeping failure. Adapter run3 is reassigned to review RED, before either production fix. A fourth adapter run requires the owner's pending explicit approval. PostgreSQL final3 remains reserved. See the evidence ledger for authoritative counters.
 
 Add focused coverage for nonzero reserved credit and its existing exactly-once expiry release; preserve the existing overdue-order behavior. Strengthen actual persisted admission/attempt snapshots and lost-ack replay tests without changing their authority. No terminal-bound payment redesign is included.
+
+## Owner-authorized final adapter check
+
+The preceding pending-approval checkpoint is historical. Owner approved exactly one extra adapter invocation. Run4 at17:00:01UTC passed68/68, exit0, on the unchanged reviewed source/test hashes at61b457bc. The extra authorization is consumed; no PG, old-file or full-suite rerun followed. Existing independent review is not restarted for this documentation-only update. The repository run limits override skill helper steps that would rerun tests.
+
+Owner rejected a ten-second first-disclosure permission surviving contact deletion. That separate strict requirement remains outside this replay fix; no activation or weaker semantics are inferred from the green unit result.

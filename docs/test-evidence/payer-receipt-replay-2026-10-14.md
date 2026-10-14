@@ -1,6 +1,15 @@
 # Payer receipt metadata replay — 2026-10-14
 
-Status: source31e947da7cf92ae8f9b364b05c2c68ae48ea5711 passed independent scoped fix review and PostgreSQL final3 (21/21). Adapter run3 was consumed as REVIEW RED before the fix; the fourth adapter run is NOT authorized and has not happened. Initial GREEN2 is historical, not post-fix adapter acceptance. No final release or full-checkout completion claim.
+Status: the owner-authorized fourth adapter run passed68/68 at17:00:01UTC on2026-10-14, exit0. Source/test hashes match the reviewed31e947da code retained at docs-only HEAD61b457bc. PostgreSQL final3 previously passed21/21 on that same code. No final release or full-checkout completion claim.
+
+## Owner-authorized post-fix verification
+
+- The owner explicitly answered “Да, один запуск”. This authorizes exactly one additional invocation of `packages/integrations/src/yookassa/receipt-metadata-replay.test.ts`, not another PostgreSQL, old-file or full-suite run.
+- Fresh preflight session37367 exited0: Node24.21.0, pnpm11.9.0, no failures. No local env file or real provider credential is used.
+- Run4 session14229: `pnpm exec vitest run packages/integrations/src/yookassa/receipt-metadata-replay.test.ts`; exit0,68/68 passed, no skipped tests. Start17:00:01UTC, duration818ms. Full output retained at `.superpowers/sdd/payer-receipt-replay-20261014/adapter-owner-green4.log`.
+- All three recorded adapter/source/PG-test SHA256 values were checked before execution and match the reviewed wave. There were no source/test edits or second invocation. The one additional authorization is now consumed. PostgreSQL remains3/3; its removed disposable instance was not recreated.
+- The owner rejected the separate ten-second post-admission disclosure alternative: deleting a contact must cancel a send that has not started. This replay fix does not implement that full first-disclosure contract and must not be used to activate fresh production checkout as though it did. Metadata/admission is not permission to ignore deletion.
+- This checkpoint supersedes historical pending-approval statements below. Independent review and exact-code PostgreSQL evidence are retained; no hosted CI, Database Gate, real payment, deployment or full product acceptance follows from this unit result.
 
 Environment preflight session19497: exit0, Node24.21.0, pnpm11.9.0, Docker29.9.0, Compose5.6.0. Linked worktree clean before this task; branch codex/receipt-metadata-replay-20261014. No .env is present or needed for synthetic verification.
 

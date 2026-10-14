@@ -54,8 +54,8 @@ context:
 - [x] Add regression tests in `tests/integration/payer-receipt-replay.test.ts` and `packages/integrations/src/yookassa/receipt-metadata-replay.test.ts`; record RED before product edits.
 - [x] Implement the above owned source changes, preserving first-send admission and all unrelated workflows.
 - [x] Update the single obsolete capture-test assertion; record it as modified but unrun.
-- [ ] Correct reviewed malformed-contact and bookkeeping-error paths, and cover credited/overdue and uncertain-admission replay.
-- [ ] Record focused results, compatibility evidence, independent review, limitations and rollback in `docs/test-evidence/payer-receipt-replay-2026-10-14.md`.
+- [x] Correct reviewed malformed-contact and bookkeeping-error paths, and cover credited/overdue and uncertain-admission replay.
+- [x] Record focused results, compatibility evidence, independent review, limitations and rollback in `docs/test-evidence/payer-receipt-replay-2026-10-14.md`.
 
 **Acceptance Criteria:**
 
@@ -81,7 +81,9 @@ Each new focused file has at most three runs: implementer RED1/GREEN2, coordinat
 
 ## Current Checkpoint
 
-Source31e947da passed scoped independent fix review. PostgreSQL final3 passed21/21 at16:38:59UTC; its budget is exhausted and the synthetic Compose instance has been removed. Adapter run3 was review RED before the fixes (23failed/45passed); a fourth post-fix run still needs the owner's unanswered explicit approval. Therefore this spec remains `in-review`, not done. No full workflow, hosted CI, paid-provider or production acceptance is claimed. Recovery and exact hashes are in the evidence file.
+Source31e947da passed scoped independent fix review. PostgreSQL final3 passed21/21 at16:38:59UTC; its budget is exhausted and the synthetic Compose instance has been removed. The owner explicitly authorized one fourth post-fix adapter run:68/68 passed at17:00:01UTC, exit0, on unchanged source/test hashes at docs-only HEAD61b457bc. That extra authorization is now consumed. Bounded local verification is complete; this spec remains `in-review` for release review. No full workflow, hosted CI, paid-provider or production acceptance is claimed. Recovery and exact hashes are in the evidence file.
+
+The owner also rejected the separate ten-second post-admission disclosure alternative. Deletion must cancel a send that has not started. The metadata replay fix does not implement or weaken that first-disclosure requirement and does not authorize enabling production checkout.
 
 ## Suggested Review Order
 
@@ -93,5 +95,5 @@ Source31e947da passed scoped independent fix review. PostgreSQL final3 passed21/
   [expert-campaign-order-repository.ts:145](../../../packages/db/src/repositories/expert-campaign-order-repository.ts#L145)
 - Review credited replay, exactly-once release and durable uncertainty coverage.
   [payer-receipt-replay.test.ts:321](../../../tests/integration/payer-receipt-replay.test.ts#L321)
-- Inspect disclosure regressions; post-fix adapter execution remains pending.
+- Inspect disclosure regressions; owner-authorized post-fix adapter run4 passed68/68.
   [receipt-metadata-replay.test.ts:341](../../../packages/integrations/src/yookassa/receipt-metadata-replay.test.ts#L341)
