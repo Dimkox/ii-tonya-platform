@@ -1,4 +1,8 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import {
+  parseClientAccountPackages,
+  type ClientAccountPackagesRepository,
+} from "../../../../packages/contracts/src/client-account-packages.js";
 import type {
   ClientPrincipalResolver,
   ClientSessionService,
@@ -13,6 +17,7 @@ import { resolveClientPrincipal } from "../client-principal-resolver.js";
 import { parseClientSessionBody } from "../client-session-body.js";
 import { createWindowedRateLimiter } from "../rate-limit.js";
 export interface BrowserAccountOptions {
+  clientAccountPackages?: ClientAccountPackagesRepository;
   origin?: string;
   botUsername?: string;
   widgetEnabled: boolean;
@@ -153,6 +158,31 @@ export const browserAccountRoutes: FastifyPluginAsync<
     }
     return token;
   }
+  app.get("/v1/browser/packages", async (request, reply) => {
+    const token = sessionToken(request);
+    if (!token) return reply.code(401).send({ error: "unauthorized" });
+    if (!available || !deps.principals)
+      return reply.code(503).send({ error: "temporarily_unavailable" });
+    const resolved = await resolveClientPrincipal(
+      deps.principals,
+      `Bearer ${token}`,
+    );
+    if (resolved.kind !== "resolved")
+      return reply
+        .code(resolved.kind === "unavailable" ? 503 : 401)
+        .send({ error: "session_unavailable" });
+    if (!matchesSessionBinding(request, token))
+      return reply.code(403).send({ error: "forbidden" });
+    if (!deps.clientAccountPackages)
+      return reply.code(503).send({ error: "temporarily_unavailable" });
+    try {
+      return parseClientAccountPackages(
+        await deps.clientAccountPackages.read(resolved.principal.userId),
+      );
+    } catch {
+      return reply.code(503).send({ error: "temporarily_unavailable" });
+    }
+  });
   app.get("/v1/browser/session", async (request, reply) => {
     if (!available)
       return {

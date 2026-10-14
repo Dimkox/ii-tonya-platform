@@ -5,6 +5,7 @@ import {
 } from "./privacy-client.js";
 import { readMiniAppLaunchData } from "./telegram-launch.js";
 import { bindBookingActions } from "./booking-view.js";
+import { bindAccountPackages } from "./account-packages-view.js";
 import { bindErasureActions, erasureMarkup } from "./erasure-view.js";
 
 const labels: Record<string, string> = {
@@ -77,7 +78,10 @@ export function bindPrivacyActions(root: ParentNode): void {
   let session: BrowserSession | undefined;
   let busy = false;
   let disposeBooking: (() => void) | undefined;
+  let disposePackages: (() => void) | undefined;
   client.onAuthorityChange(() => {
+    disposePackages?.();
+    disposePackages = undefined;
     disposeBooking?.();
     disposeBooking = undefined;
     privateArea.replaceChildren();
@@ -99,6 +103,8 @@ export function bindPrivacyActions(root: ParentNode): void {
     }
   }
   async function refresh() {
+    disposePackages?.();
+    disposePackages = undefined;
     disposeBooking?.();
     disposeBooking = undefined;
     privateArea.replaceChildren();
@@ -134,6 +140,9 @@ export function bindPrivacyActions(root: ParentNode): void {
     privateArea.innerHTML =
       '<button class="button ghost" type="button" data-logout disabled>Выйти</button>';
     if (window.location.pathname.replace(/\/+$/u, "") === "/account") {
+      const packagesArea = document.createElement("section");
+      privateArea.append(packagesArea);
+      disposePackages = bindAccountPackages(packagesArea, client);
       const bookingArea = document.createElement("section");
       bookingArea.dataset.bookingArea = "";
       bookingArea.setAttribute("aria-label", "Запись к эксперту");
@@ -296,7 +305,7 @@ export function bindPrivacyActions(root: ParentNode): void {
     root.querySelectorAll<HTMLButtonElement>("button").forEach((control) => {
       // Booking owns its own async locks; restoring privacy's snapshot must
       // never overwrite a newer booking controller state.
-      if (control.closest("[data-booking-area]")) return;
+      if (control.closest("[data-booking-area], [data-packages-area]")) return;
       disabled.set(control, control.disabled);
       control.disabled = true;
     });
@@ -360,6 +369,8 @@ export function bindPrivacyActions(root: ParentNode): void {
     );
     if (button)
       void act(button, async () => {
+        disposePackages?.();
+        disposePackages = undefined;
         disposeBooking?.();
         disposeBooking = undefined;
         await client.logout();

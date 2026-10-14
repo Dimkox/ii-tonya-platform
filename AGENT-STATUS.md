@@ -1,30 +1,16 @@
 # Agent status — owner-spec 2026-09-16
 
-## Published login handoff — 2026-10-10
+## Account packages isolated RC — 2026-10-10
 
-Web now serves e25865194c2a3527884cad94f50208cccda501bd; native remains
-aae05c06fdc76e74ccbd77de233d3dd7dc74efcb. Owner explicitly authorized this
-web-only release without absent application CI/Database Gate after being asked
-that exact scoped question. Those external gates remain UNVERIFIED, not passed.
-Authorization and release evidence are recorded on PR99. No merge is claimed.
-
-Exact archived-source offline/frozen build, SBOM/provenance, local-key Cosign
-signature verification and remote checksums passed. Mill independently reviewed
-atomic switch/recovery with no blocking findings. Native/services/DB/provider
-flags were not changed. Public SOURCE_SHA matches; readiness checks all true.
-New local login regression passed its final invocation; budget3/3 exhausted.
-Live Chrome final invocation2 passed with real served UI/session API, intercepted
-outgoing Telegram navigation, zero writes and zero JS errors. First live run's
-assertions passed but profile cleanup failed ENOTEMPTY; log retained and bounded
-cleanup retry fixed the harness. This is NOT real Telegram user authentication.
-
-Upload staging and owned browser profiles removed; previous webbf99509a remains
-for rollback, signed local package retained. Ops: /tmp/ii-tonya-login-release.XqpGw0/.
-Evidence: docs/test-evidence/production/2026-10-10-client-login-handoff.md.
-Correction: anonymous bookingAvailable=false is not proof the feature is off.
-Actual runtime has booking reads enabled, reserve disabled; public catalogue is
-empty. Continue authentic account acceptance and booking/payment composition;
-demo data remains fictional, Gemini remains off, full product is incomplete.
+Active branch codex/account-packages-rc-20261010 starts from published webe258651.
+Only package readout code/tests copied from78ebbc5; billing calculation/settlement
+and migration0042 excluded. Original work preserved on codex/client-paid-policy-20261010.
+Owner requested publication. Separate API/web missing-CI exception and one run of
+each four exhausted focused tests requested, pending. Do not reuse prior login
+web-only exception or run generic deploy (it starts migrations).
+Read-only live preflight: nativeaae05c0, webe258651, readiness all true.
+Evidence: docs/test-evidence/production/2026-10-10-account-packages-rc.md.
+No production mutation performed. Payments/providers stay off.
 
 ## Client login handoff — 2026-10-10, local candidate
 

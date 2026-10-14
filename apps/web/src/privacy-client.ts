@@ -181,6 +181,10 @@ export class PrivacyClient {
   private requireSession() {
     if (!this.authenticated) throw new PrivacyApiError(401);
   }
+  async packages(): Promise<ClientAccountPackages> {
+    this.requireSession();
+    return parseClientAccountPackages(await this.call<unknown>("packages"));
+  }
   async probe(): Promise<BrowserSession> {
     const session = await this.call<BrowserSession>("session");
     const authenticated = session.authenticated === true;
@@ -388,3 +392,7 @@ export class PrivacyClient {
     this.presentations.clear();
   }
 }
+import {
+  parseClientAccountPackages,
+  type ClientAccountPackages,
+} from "../../../packages/contracts/src/client-account-packages.js";

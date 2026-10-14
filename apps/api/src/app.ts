@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import type { ClientAccountPackagesRepository } from "../../../packages/contracts/src/client-account-packages.js";
 import type {
   AdminService,
   BookingService,
@@ -163,6 +164,7 @@ export interface AppDependencies {
   publicCatalog?: PublicCatalogRead;
   publicCatalogLoadState?: PublicCatalogLoadState;
   clientSessionService?: ClientSessionService;
+  clientAccountPackages?: ClientAccountPackagesRepository;
   clientSessionRepository?: ClientSessionRevocation;
   clientPrincipal?: ClientPrincipalResolver;
   clientBookingService?: ClientBookingService;
@@ -484,6 +486,10 @@ export async function buildApp(
     });
   }
   await app.register(browserAccountRoutes, {
+    ...(deps.config.features.clientSession === true &&
+    deps.clientAccountPackages
+      ? { clientAccountPackages: deps.clientAccountPackages }
+      : {}),
     logLevel: "silent",
     ...(deps.config.clientWeb === undefined
       ? {}
@@ -720,6 +726,7 @@ export async function buildTestApp(
     publicCatalog?: PublicCatalogRead;
     publicCatalogLoadState?: PublicCatalogLoadState;
     clientSessionService?: ClientSessionService;
+    clientAccountPackages?: ClientAccountPackagesRepository;
     clientSessionRepository?: ClientSessionRevocation;
     clientPrincipal?: ClientPrincipalResolver;
     features?: Partial<RuntimeConfig["features"]>;
@@ -871,6 +878,9 @@ export async function buildTestApp(
       limiter: createWindowedRateLimiter(),
       inFlight: 0,
     },
+    ...(options.clientAccountPackages === undefined
+      ? {}
+      : { clientAccountPackages: options.clientAccountPackages }),
     ...(options.clientSessionService === undefined
       ? {}
       : { clientSessionService: options.clientSessionService }),
