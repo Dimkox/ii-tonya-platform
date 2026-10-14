@@ -9,3 +9,7 @@
 - source_spec: `docs/superpowers/implementation-artifacts/spec-native-http-runtime.md`
   summary: Replace source-substring hardening checks with effective systemd directive validation in a separate automation change.
   evidence: Existing native release tests assert required directive substrings; a later conflicting assignment can coexist. This runtime fix uses effective production-unit and process-environment acceptance, not a general INI parser repair.
+
+- source_spec: `docs/superpowers/implementation-artifacts/spec-payer-receipt-metadata-replay.md`
+  summary: Define terminal provider-status behavior for an already bound checkout without conflating a confirmation URL with payment settlement.
+  evidence: The pre-existing getPayment replay branch validates ID, metadata, amount, currency, mode and HTTPS confirmation but not status/paid. A schema-valid canceled response retaining confirmation can return created with a stale URL. The metadata-replay change preserves this branch; it neither confirms payment nor grants entitlements. Independent reviewer Leibniz identified this outside the bounded replay fix.

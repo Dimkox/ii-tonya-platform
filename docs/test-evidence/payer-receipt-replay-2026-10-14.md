@@ -1,6 +1,6 @@
 # Payer receipt metadata replay — 2026-10-14
 
-Status: one bounded review-fix wave on source `054ee692a1d58081fd0f2332b27c2be84350f815` is implemented and statically checked for local handoff. Initial GREEN2 evidence below is historical, not verification of this wave. Adapter run3 was consumed as REVIEW RED; fourth adapter run is NOT authorized, so there is no post-fix GREEN. Expanded PostgreSQL cases are unrun; final3 remains reserved for coordinator after narrow review. No review/final-acceptance, release or full-checkout completion claim.
+Status: source31e947da7cf92ae8f9b364b05c2c68ae48ea5711 passed independent scoped fix review and PostgreSQL final3 (21/21). Adapter run3 was consumed as REVIEW RED before the fix; the fourth adapter run is NOT authorized and has not happened. Initial GREEN2 is historical, not post-fix adapter acceptance. No final release or full-checkout completion claim.
 
 Environment preflight session19497: exit0, Node24.21.0, pnpm11.9.0, Docker29.9.0, Compose5.6.0. Linked worktree clean before this task; branch codex/receipt-metadata-replay-20261014. No .env is present or needed for synthetic verification.
 
@@ -8,10 +8,18 @@ Environment preflight session19497: exit0, Node24.21.0, pnpm11.9.0, Docker29.9.0
 
 | File                                                               | RED1                                      | GREEN2                         | final3                                                              |
 | ------------------------------------------------------------------ | ----------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| tests/integration/payer-receipt-replay.test.ts                     | exit1: 5 failed / 10 passed, 16:04:01 UTC | exit0: 15 passed, 16:07:29 UTC | reserved                                                            |
+| tests/integration/payer-receipt-replay.test.ts                     | exit1: 5 failed / 10 passed, 16:04:01 UTC | exit0: 15 passed, 16:07:29 UTC | exit0: 21 passed, 16:38:59 UTC; 3/3 consumed                        |
 | packages/integrations/src/yookassa/receipt-metadata-replay.test.ts | exit1: 36 failed / 36, 16:03:40 UTC       | exit0: 36 passed, 16:07:05 UTC | REVIEW RED exit1: 23 failed / 45 passed, 16:24:46 UTC; 3/3 consumed |
 
-## Bounded review-fix wave
+## Coordinator final checkpoint
+
+- Exact source HEAD31e947da7cf92ae8f9b364b05c2c68ae48ea5711. Turing's scoped re-review accepted all five correction groups statically, including malformed-value rejection, sanitized bookkeeping failure, credited/overdue replay, persistent uncertainty and controlled losing callers. No remaining concrete defect found in the scoped fix or new PG fixtures. Reviewer ran no tests. All implementation/reviewer agents are now closed.
+- PostgreSQL final3 session3853: `II_TONYA_TEST_POSTGRES_ADMIN_URL=postgresql://ii_tonya:local-placeholder-only@192.168.128.2:5432/ii_tonya pnpm exec vitest run tests/integration/payer-receipt-replay.test.ts`. Exit0, 21/21 passed, no skipped tests, started16:38:59UTC, duration5.99s. Exact source31e947da, isolated Compose PG17.5. All3 PG runs consumed. Output retained at `.superpowers/sdd/payer-receipt-replay-20261014/postgres-final3.log`.
+- Adapter run4 remains unauthorized and unexecuted; the owner question is unanswered. Do not reuse pre-fix GREEN2 as post-fix acceptance or disguise another invocation. Full commercial/API composition remains incomplete.
+- Pinned-SSH read-only check16:40:01UTC: native SOURCE_SHA and web selector remain d00d24593493cb348a25abf0eec0318a1c018ddf; API426218 and worker426207 active/NRestarts0; actual `/health/ready` JSON reports all four checks true. No production mutation, credential readout, provider generation or charge. The source fix is NOT deployed.
+- Cleanup completed after exact project-label checks: removed only this task's synthetic PG container, its postgres-data volume and one backend network (`ii-tonya-receipt-replay-20261014`). Disposable test data are deleted; original output logs, source, reviews and evidence are retained. No customer data, production backup or other project's container was removed.
+
+## Bounded review-fix wave — historical implementer handoff before final3
 
 - Source confirmed live: `054ee692a1d58081fd0f2332b27c2be84350f815`; same branch/worktree, no other source writer. Coordinator owns spec/plan. Current task instruction supersedes the initial run3 allocation only for the adapter.
 - Confirmed findings: metadata disclosure checks presence/identity only and can send malformed values; awaiting `markUnknown` can expose its private rejection. Admission already commits both operation and attempt as unknown. Fix only the metadata/payer disclosure branch; preserve legacy/refund validation, v1 digest and atomic admission.
