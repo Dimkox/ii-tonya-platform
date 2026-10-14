@@ -160,6 +160,7 @@ export {
 } from "./yookassa/client.js";
 export type {
   CreateYooKassaPayment,
+  CreateYooKassaPaymentOptions,
   CreateYooKassaRefund,
   YooKassaClient,
   YooKassaClientConfig,
