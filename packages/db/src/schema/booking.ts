@@ -244,6 +244,29 @@ export const planerkaAccountRequests = pgTable("planerka_account_requests", {
     .notNull()
     .defaultNow(),
 });
+export const planerkaAvailabilityRefreshes = pgTable(
+  "planerka_availability_refreshes",
+  {
+    expertServiceId: uuid("expert_service_id")
+      .primaryKey()
+      .references(() => expertServices.id),
+    accountId: integer("account_id").notNull(),
+    eventTypeId: integer("event_type_id").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    timeZone: text("time_zone").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", {
+      withTimezone: true,
+    }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    reasonCode: text("reason_code"),
+  },
+);
 export const planerkaLegacyBookingReviews = pgTable(
   "planerka_legacy_booking_reviews",
   {

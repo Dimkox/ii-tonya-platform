@@ -351,3 +351,4 @@ export type {
 } from "./repositories/booking-notification-callback-repository.js";
 export * from "./repositories/expert-campaign-read-repository.js";
 export * from "./repositories/payer-receipt-contact-repository.js";
+export * from "./repositories/planerka-availability-repository.js";
