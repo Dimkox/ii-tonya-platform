@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { payerReceiptCaptureRequestSchema } from "@ii-tonya/contracts";
 import type {
   ExpertResidencyCheckoutCommand,
   ExpertResidencyCheckoutOutcome,
@@ -227,7 +228,15 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         );
         if (
           contact === null ||
-          (contact.email === undefined) === (contact.phone === undefined)
+          (contact.email === undefined) === (contact.phone === undefined) ||
+          (contact.email !== undefined
+            ? !payerReceiptCaptureRequestSchema.shape.email.safeParse(
+                contact.email,
+              ).success
+            : typeof contact.phone !== "string" ||
+              // YooKassa Phone: 4–15 digits; retain supported optional '+'.
+              // Compare the whole match so a trailing newline cannot pass '$'.
+              /^\+?[0-9]{4,15}$/u.exec(contact.phone)?.[0] !== contact.phone)
         )
           throw new YooKassaUnknownOutcomeError();
         const disclosed = receiptAuthority(contact);
@@ -238,7 +247,12 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
           throw new YooKassaUnknownOutcomeError();
       } catch {
         // Admission is consumed even when its one initial disclosure fails.
-        await this.deps.operations.markUnknown(operation.id);
+        try {
+          await this.deps.operations.markUnknown(operation.id);
+        } catch {
+          // Atomic admission already committed unknown; bookkeeping failure
+          // cannot authorize another send or expose a private storage error.
+        }
         throw new YooKassaUnknownOutcomeError();
       }
     }

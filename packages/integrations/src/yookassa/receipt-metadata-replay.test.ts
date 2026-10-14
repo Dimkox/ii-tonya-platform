@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createYooKassaClient } from "./client.js";
+import { createYooKassaClient, YooKassaUnknownOutcomeError } from "./client.js";
 import { createPayerReceiptSource } from "./payer-receipt-source.js";
 import { YooKassaExpertResidencyPaymentAdapter } from "./payment-adapter.js";
 import type {
@@ -388,14 +388,236 @@ describe("receipt metadata replay", () => {
     },
   );
 
-  it("does not disclose on an ambiguous admission commit", async () => {
+  it("does not disclose when admission rejects before commit", async () => {
     const f = fixture();
-    f.claimInitialPayment.mockRejectedValue(new Error("commit_response_lost"));
+    f.claimInitialPayment.mockRejectedValue(new Error("admission_rejected"));
     await expect(f.adapter.createCheckout(checkout)).rejects.toThrow(
-      "commit_response_lost",
+      "admission_rejected",
     );
+    expect(f.stored()).toBeUndefined();
     expect(f.reader.receiptContactForOrder).not.toHaveBeenCalled();
     expect(f.transport).not.toHaveBeenCalled();
+  });
+
+  it("retains a committed admission when its acknowledgement is lost and a fresh adapter retries", async () => {
+    const f = fixture();
+    const commit = f.claimInitialPayment.getMockImplementation()!;
+    f.claimInitialPayment.mockImplementationOnce(async (command) => {
+      await commit(command);
+      throw new YooKassaUnknownOutcomeError();
+    });
+    await expect(f.adapter.createCheckout(checkout)).rejects.toThrow(
+      "yookassa_unknown_outcome",
+    );
+    const stored = f.stored();
+    expect(stored).toMatchObject({
+      status: "unknown_outcome",
+      requestDigest: digests.email,
+    });
+    const retry = new YooKassaExpertResidencyPaymentAdapter({
+      ...f.deps,
+      contacts: createPayerReceiptSource(f.reader),
+    });
+    await expect(retry.createCheckout(checkout)).rejects.toThrow(
+      "yookassa_unknown_outcome",
+    );
+    expect(f.stored()).toEqual(stored);
+    expect(f.reader.receiptContactForOrder).not.toHaveBeenCalled();
+    expect(f.transport).not.toHaveBeenCalled();
+  });
+
+  it("keeps the concurrent loser contact-free while the admitted winner awaits disclosure", async () => {
+    const f = fixture();
+    const reading = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<YooKassaReceiptContact>();
+    f.reader.receiptContactForOrder.mockImplementation(async () => {
+      reading.resolve();
+      return release.promise;
+    });
+    const winner = f.adapter.createCheckout(checkout);
+    try {
+      await reading.promise;
+      expect(f.stored()?.status).toBe("unknown_outcome");
+      const loserRead = vi.fn(
+        async (): Promise<YooKassaReceiptContact | null> => {
+          throw new Error("loser_disclosed");
+        },
+      );
+      const loserTransport = vi.fn(async (): Promise<Response> => {
+        throw new Error("loser_sent");
+      });
+      const loser = new YooKassaExpertResidencyPaymentAdapter({
+        ...f.deps,
+        contacts: createPayerReceiptSource({
+          receiptAuthorityForOrder: f.reader.receiptAuthorityForOrder,
+          receiptContactForOrder: loserRead,
+        }),
+        client: createYooKassaClient(
+          { shopId: "test-shop", secretKey: "synthetic-secret", mode: "test" },
+          loserTransport,
+        ),
+      });
+      await expect(loser.createCheckout(checkout)).rejects.toThrow(
+        "yookassa_unknown_outcome",
+      );
+      expect(loserRead).not.toHaveBeenCalled();
+      expect(loserTransport).not.toHaveBeenCalled();
+      expect(f.transport).not.toHaveBeenCalled();
+      expect(f.reader.receiptContactForOrder).toHaveBeenCalledOnce();
+    } finally {
+      release.resolve({
+        email: "payer@example.test",
+        authorityReference: reference,
+      });
+      await winner;
+    }
+    expect(f.transport).toHaveBeenCalledOnce();
+    expect(f.stored()?.providerObjectId).toBe("payment-replay");
+  });
+
+  it.each([
+    { kind: "email", label: "empty", value: "" },
+    { kind: "email", label: "whitespace", value: " " },
+    { kind: "email", label: "malformed", value: "not-an-email" },
+    { kind: "email", label: "trailing newline", value: "payer@example.test\n" },
+    {
+      kind: "email",
+      label: "too long",
+      value: `${"a".repeat(243)}@example.test`,
+    },
+    { kind: "email", label: "null", value: null },
+    { kind: "email", label: "number", value: 79000000000 },
+    { kind: "email", label: "object", value: { email: "payer@example.test" } },
+    { kind: "phone", label: "empty", value: "" },
+    { kind: "phone", label: "whitespace", value: " " },
+    { kind: "phone", label: "letters", value: "phone" },
+    { kind: "phone", label: "embedded text", value: "abc79000000000xyz" },
+    { kind: "phone", label: "short", value: "123" },
+    { kind: "phone", label: "long", value: "1234567890123456" },
+    { kind: "phone", label: "double plus", value: "++79000000000" },
+    { kind: "phone", label: "formatted", value: "+7 (900) 000-00-00" },
+    { kind: "phone", label: "trailing newline", value: "79000000000\n" },
+    { kind: "phone", label: "null", value: null },
+    { kind: "phone", label: "number", value: 79000000000 },
+    { kind: "phone", label: "object", value: { phone: "79000000000" } },
+  ] as const)(
+    "rejects $label $kind after admission without POST or retry disclosure",
+    async ({ kind, value }) => {
+      const f = fixture();
+      f.reader.receiptAuthorityForOrder.mockResolvedValue({
+        contactKind: kind,
+        authorityReference: reference,
+      });
+      f.reader.receiptContactForOrder.mockResolvedValue({
+        [kind]: value,
+        authorityReference: reference,
+      } as unknown as YooKassaReceiptContact);
+      // Inspect all effects even on RED: the pre-fix path POSTs and binds.
+      const failure = await f.adapter
+        .createCheckout(checkout)
+        .catch((error: unknown) => error);
+      expect.soft(failure).toBeInstanceOf(YooKassaUnknownOutcomeError);
+      expect
+        .soft(failure)
+        .toMatchObject({ message: "yookassa_unknown_outcome" });
+      expect.soft(f.stored()).toMatchObject({
+        status: "unknown_outcome",
+        requestDigest: digests[kind],
+      });
+      expect.soft(f.transport).not.toHaveBeenCalled();
+      const retry = new YooKassaExpertResidencyPaymentAdapter(f.deps);
+      const retryFailure = await retry
+        .createCheckout(checkout)
+        .catch((error: unknown) => error);
+      expect.soft(retryFailure).toBeInstanceOf(YooKassaUnknownOutcomeError);
+      expect.soft(f.reader.receiptContactForOrder).toHaveBeenCalledOnce();
+      expect.soft(f.transport).not.toHaveBeenCalled();
+      expect.soft(f.operations.resolve).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "1234",
+    "+1234",
+    "79000000000",
+    "+79000000000",
+    "123456789012345",
+    "+123456789012345",
+  ])(
+    "preserves documented phone bounds and optional plus for %s",
+    async (phone) => {
+      const f = fixture();
+      f.reader.receiptAuthorityForOrder.mockResolvedValue({
+        contactKind: "phone",
+        authorityReference: reference,
+      });
+      f.reader.receiptContactForOrder.mockResolvedValue({
+        phone,
+        authorityReference: reference,
+      });
+      await expect(f.adapter.createCheckout(checkout)).resolves.toMatchObject({
+        kind: "created",
+      });
+      expect(
+        JSON.parse(f.transport.mock.calls[0]![1].body as string).receipt
+          .customer,
+      ).toEqual({ phone });
+      expect(f.stored()?.requestDigest).toBe(digests.phone);
+    },
+  );
+
+  it.each(["null", "throwing", "mismatch"])(
+    "sanitizes %s disclosure even when markUnknown rejects privately",
+    async (failure) => {
+      const f = fixture();
+      if (failure === "null")
+        f.reader.receiptContactForOrder.mockResolvedValue(null);
+      if (failure === "throwing")
+        f.reader.receiptContactForOrder.mockRejectedValue(
+          new Error("private contact details"),
+        );
+      if (failure === "mismatch")
+        f.reader.receiptContactForOrder.mockResolvedValue({
+          email: "payer@example.test",
+          authorityReference: "payer-receipt:other",
+        });
+      vi.mocked(f.operations.markUnknown).mockRejectedValue(
+        new Error("private SQL storage details"),
+      );
+      const error = await f.adapter
+        .createCheckout(checkout)
+        .catch((caught: unknown) => caught);
+      expect.soft(error).toBeInstanceOf(YooKassaUnknownOutcomeError);
+      expect.soft(error).toMatchObject({ message: "yookassa_unknown_outcome" });
+      expect.soft(JSON.stringify(error)).not.toContain("private");
+      expect(f.stored()?.status).toBe("unknown_outcome");
+      await expect(
+        new YooKassaExpertResidencyPaymentAdapter(f.deps).createCheckout(
+          checkout,
+        ),
+      ).rejects.toThrow("yookassa_unknown_outcome");
+      expect(f.reader.receiptContactForOrder).toHaveBeenCalledOnce();
+      expect(f.operations.markUnknown).toHaveBeenCalledOnce();
+      expect(f.operations.resolve).not.toHaveBeenCalled();
+      expect(f.transport).not.toHaveBeenCalled();
+    },
+  );
+
+  it("leaves the explicit legacy contact-only validation behavior unchanged", async () => {
+    const f = fixture();
+    f.reader.receiptContactForOrder.mockResolvedValue({
+      email: "",
+      authorityReference: reference,
+    });
+    const legacy = new YooKassaExpertResidencyPaymentAdapter({
+      ...f.deps,
+      contacts: { receiptContactForOrder: f.reader.receiptContactForOrder },
+    });
+    await expect(legacy.createCheckout(checkout)).resolves.toMatchObject({
+      kind: "created",
+    });
+    expect(f.transport).toHaveBeenCalledOnce();
+    expect(f.stored()?.requestDigest).toBe(digests.email);
   });
 
   it("does not disclose or GET when retained authority conflicts with the admission", async () => {

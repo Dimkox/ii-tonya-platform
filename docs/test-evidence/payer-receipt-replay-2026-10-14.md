@@ -1,17 +1,48 @@
 # Payer receipt metadata replay — 2026-10-14
 
-Status: implementer GREEN2 passed; awaiting coordinator independent review and reserved final3. Base821996cf09cb8149648f9d925694041bad386f08. No release or full-checkout completion claim.
+Status: one bounded review-fix wave on source `054ee692a1d58081fd0f2332b27c2be84350f815` is implemented and statically checked for local handoff. Initial GREEN2 evidence below is historical, not verification of this wave. Adapter run3 was consumed as REVIEW RED; fourth adapter run is NOT authorized, so there is no post-fix GREEN. Expanded PostgreSQL cases are unrun; final3 remains reserved for coordinator after narrow review. No review/final-acceptance, release or full-checkout completion claim.
 
 Environment preflight session19497: exit0, Node24.21.0, pnpm11.9.0, Docker29.9.0, Compose5.6.0. Linked worktree clean before this task; branch codex/receipt-metadata-replay-20261014. No .env is present or needed for synthetic verification.
 
 ## Test budget
 
-| File                                                               | RED1                                      | GREEN2                         | final3   |
-| ------------------------------------------------------------------ | ----------------------------------------- | ------------------------------ | -------- |
-| tests/integration/payer-receipt-replay.test.ts                     | exit1: 5 failed / 10 passed, 16:04:01 UTC | exit0: 15 passed, 16:07:29 UTC | reserved |
-| packages/integrations/src/yookassa/receipt-metadata-replay.test.ts | exit1: 36 failed / 36, 16:03:40 UTC       | exit0: 36 passed, 16:07:05 UTC | reserved |
+| File                                                               | RED1                                      | GREEN2                         | final3                                                              |
+| ------------------------------------------------------------------ | ----------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
+| tests/integration/payer-receipt-replay.test.ts                     | exit1: 5 failed / 10 passed, 16:04:01 UTC | exit0: 15 passed, 16:07:29 UTC | reserved                                                            |
+| packages/integrations/src/yookassa/receipt-metadata-replay.test.ts | exit1: 36 failed / 36, 16:03:40 UTC       | exit0: 36 passed, 16:07:05 UTC | REVIEW RED exit1: 23 failed / 45 passed, 16:24:46 UTC; 3/3 consumed |
 
-## Implementer execution ledger
+## Bounded review-fix wave
+
+- Source confirmed live: `054ee692a1d58081fd0f2332b27c2be84350f815`; same branch/worktree, no other source writer. Coordinator owns spec/plan. Current task instruction supersedes the initial run3 allocation only for the adapter.
+- Confirmed findings: metadata disclosure checks presence/identity only and can send malformed values; awaiting `markUnknown` can expose its private rejection. Admission already commits both operation and attempt as unknown. Fix only the metadata/payer disclosure branch; preserve legacy/refund validation, v1 digest and atomic admission.
+- Fresh `pwsh -File scripts/check-development-environment.ps1`: exit 0. No PostgreSQL run planned in this wave.
+- Official schema evidence supplied by coordinator: [YooKassa OpenAPI YAML](https://yookassa.ru/developers/api/yookassa-openapi-specification.yaml), linked from [official OpenAPI guide](https://yookassa.ru/developers/using-api/openapi-specification). `Phone` is a string with pattern `[0-9]{4,15}`, E.164 description and example `79000000000`; `Email` has format email and maxLength254. Reuse the repository's capture email validator. For phones, validate the entire string as optional `+` followed by4–15 digits, preserving existing plus-prefix fixtures without normalization. Local web open could not render octet-stream; a bounded direct document fetch timed out with partial YAML, so it was not treated as a successful independent schema verification.
+- Before product edits, added invalid email/phone, failed-bookkeeping sanitization, explicit legacy preservation, real committed-then-lost acknowledgement (in-memory adapter fixture), and a gated concurrent-loser regression in the existing adapter test file. Renamed the original fake rejection test to honestly identify pre-commit failure.
+- REVIEW RED run3 invocation: `pnpm exec vitest run packages/integrations/src/yookassa/receipt-metadata-replay.test.ts`; exit 1, 23 failed / 45 passed (68 total), 16:24:46 UTC, before product edits. All20 malformed-value cases reproduced POST/binding instead of unknown/no-send; all3 bookkeeping-rejection cases exposed the private storage error. No import/setup failure. New lost-acknowledgement, concurrent loser, valid-phone bounds and legacy-preservation cases passed. Full output: ignored `.superpowers/sdd/payer-receipt-replay-20261014/adapter-review-red3.log`. All3 adapter slots are consumed. No fourth run or disguised equivalent is authorized.
+- Implemented only in `payment-adapter.ts`: newly admitted metadata/payer disclosure validates email with `payerReceiptCaptureRequestSchema.shape.email` and phone with the bounded whole-string rule above. If disclosure or its validation fails, a rejecting `markUnknown` cannot replace the sanitized `YooKassaUnknownOutcomeError`. Durable admission remains consumed. The legacy branch, client receipt construction, refund path, v1 digest and atomic admission implementation are unchanged.
+- Expanded the existing PostgreSQL file with a real referral grant of100000 minor units created through issuance, redemption and synthetic verified settlement. Non-overdue receipt-bound replay compares exact original reservations/allocations and full stored order, grant, binding, payment-attempt and provider-operation rows after expiry/redaction, with no plaintext access. A separate overdue case preserves existing expiry behavior: only expected expiry fields and one release of the original100000 reservation may change; repeated replay must leave every row unchanged and cannot release twice. Its isolated historical fixture shifts both order creation/deadline timestamps; no product clock or expiry code is changed.
+- Added real-repository failed-disclosure, failed-bookkeeping and lost-admission-acknowledgement retry cases through fresh adapter/repository instances. The lost-ack fixture awaits the actual committed admission before throwing, then compares full stored rows and asserts unknown/no provider ID, no repeat disclosure and zero transport. A controlled concurrent loser runs while the winner awaits disclosure and must neither read contact nor POST. These PostgreSQL additions have **not been executed**; coordinator owns final3.
+
+### Review-wave static verification
+
+All commands below exited0 after the source/test edits. No suite, standalone runtime probe or disguised test rerun accompanied them.
+
+- `pnpm --workspace-concurrency=1 --filter @ii-tonya/db... -r --sort run build` (contracts, domain, integrations, db); output retained at ignored `.superpowers/sdd/payer-receipt-replay-20261014/review-build.log`.
+- `pnpm --workspace-concurrency=1 --filter @ii-tonya/db... -r --sort run typecheck`.
+- `pnpm exec tsc --noEmit -p tsconfig.tests.json`.
+- `pnpm exec eslint packages/integrations/src/yookassa/payment-adapter.ts packages/integrations/src/yookassa/receipt-metadata-replay.test.ts tests/integration/payer-receipt-replay.test.ts`.
+- `pnpm exec prettier --check` on those three TypeScript files and this evidence file, following formatting.
+- `git diff --check`.
+
+Current review-wave source/test hashes (static checks only; not post-fix runtime acceptance):
+
+```text
+39b16ddb47a45eb630ea4b50e4b2e1a717eecc51e194b54e8b03b3acd401a26a  packages/integrations/src/yookassa/payment-adapter.ts
+ad0aaec8c0a239d6b430c3ed0d81fc425094082f25956a30632cf1d82cdc9681  packages/integrations/src/yookassa/receipt-metadata-replay.test.ts
+8a157a3b9db286782b914e80281fea01677b0db5a1e707bf8369790f57ebf6a1  tests/integration/payer-receipt-replay.test.ts
+```
+
+## Initial implementation ledger (historical source054ee692)
 
 - Fresh environment check: `pwsh -File scripts/check-development-environment.ps1 -RequireDocker`, exit 0; Node24.21.0, pnpm11.9.0, PostgreSQL test URL supplied by the spec; no env file read.
 - Frontmatter context loaded fully: `AGENTS.md`, `docs/agents/expert-residency-team.md`. Spec and existing plan read fully. Baseline and assigned branch confirmed live.
@@ -24,9 +55,9 @@ Environment preflight session19497: exit0, Node24.21.0, pnpm11.9.0, Docker29.9.0
 - Initial scoped lint exit 1: five unused arguments/destructuring bindings in the two new test files. Corrected fixtures to validate request arguments and construct the legacy command explicitly; no product change needed.
 - Adapter GREEN2 invocation: `pnpm exec vitest run packages/integrations/src/yookassa/receipt-metadata-replay.test.ts`; exit 0, 36 passed, no skips, 16:07:05 UTC. Full output under `.superpowers/sdd/payer-receipt-replay-20261014/adapter-green2.log`.
 - PostgreSQL GREEN2 invocation: `II_TONYA_TEST_POSTGRES_ADMIN_URL=postgresql://ii_tonya:local-placeholder-only@192.168.128.2:5432/ii_tonya pnpm exec vitest run tests/integration/payer-receipt-replay.test.ts`; exit 0, 15 passed, no skips, 16:07:29 UTC. Isolated PostgreSQL17.5 migrations and teardown completed. Full output under `.superpowers/sdd/payer-receipt-replay-20261014/postgres-green2.log`.
-- Final scoped `pnpm exec eslint` over the nine TypeScript files below: exit 0. `pnpm exec prettier --check` on the same nine files: exit 0. Tests typecheck repeated after the fixture-only lint edits: exit 0. `git diff --check`: exit 0. No source/test change followed GREEN2.
+- Final scoped `pnpm exec eslint` over the nine TypeScript files below: exit 0. `pnpm exec prettier --check` on the same nine files: exit 0. Tests typecheck repeated after the fixture-only lint edits: exit 0. `git diff --check`: exit 0. No source/test change followed GREEN2 before the initial054ee692 commit; the review-wave edits above supersede that checkpoint.
 
-## Verified source hashes (SHA256)
+## Initial GREEN2 source hashes (SHA256, historical)
 
 ```text
 a4b49dd018756d5459b508c6e2ef12f38c04b8294be681f40e69684b1336760d  packages/db/src/repositories/payer-receipt-contact-repository.ts
@@ -40,7 +71,7 @@ e05e7a6d3806837ddecf651c575856ec0869d31a3d8782d53aaa6fe280e0ac5b  packages/integ
 485a9c67b686e56b00f12eb6d11d0990104515a25ff0806974e9779d63ef6638  tests/integration/payer-receipt-capture.test.ts
 ```
 
-## Behavior and compatibility evidence
+## Initial GREEN2 behavior and compatibility evidence
 
 - The repository metadata method selects only contact ID/kind through the existing exact composite order/quote/contact/user bindings. It neither selects ciphertext/key material nor invokes a vault or checks disclosure expiry. Real PostgreSQL tests retain the same opaque metadata before expiry, after expiry and after actual cleanup redaction, including with absent or throwing vaults.
 - Order replay retains current active user/expert and verified-expert checks, original quote ownership, policy/quote idempotency checks and exact selected-contact binding. Only the prior-order live-contact authorization was removed. The new tests compare the original order and complete stored order/ledger/allocation/binding rows; wrong selection/quote/user, reassigned expert and inactive/unverified owner fail. Fresh orders still reject absent/wrong keys, expired contacts and redacted contacts without financial writes.
@@ -53,12 +84,19 @@ e05e7a6d3806837ddecf651c575856ec0869d31a3d8782d53aaa6fe280e0ac5b  packages/integ
 
 ## Review, limitations and recovery
 
-- Independent adversarial review is **pending coordinator**, as explicitly assigned in the spec. No subagents were spawned and no reviewer execution is claimed. Coordinator should examine no-fallback behavior, retained-binding identity, consumed admission after disclosure failure and original owner eligibility.
-- Both final3 slots remain unused and reserved for coordinator after review. Do not rerun RED/GREEN or old suites. There is no hosted CI here; no exact-SHA hosted CI, Database Gate or release-readiness claim is made.
-- The PostgreSQL financial-preservation cases cover cash-only orders with zero referral credit and compare all affected rows. Broader credit/expiry concurrency suites are intentionally unrun; the existing expiry/release path and fresh-order credit calculations are unchanged.
+- Coordinator returned the confirmed review findings addressed in this wave and reported all reviewers closed. This implementer spawned no subagents. Narrow review of this wave and final acceptance remain coordinator-owned; neither is claimed complete.
+- Adapter run3 is consumed by REVIEW RED; a fourth run still requires explicit owner approval. PostgreSQL has used RED1/GREEN2 only; coordinator retains final3 for the expanded file after narrow review. Do not rerun old suites or use renamed/copied tests or standalone probes to bypass these limits. There is no hosted CI here; no exact-SHA hosted CI, Database Gate or release-readiness claim is made.
+- Initial PostgreSQL GREEN2 financial-preservation evidence covered cash-only orders. Nonzero-credit, overdue once-only release, full persistence snapshots and controlled concurrency cases have now been added but remain unrun. Their runtime behavior is the remaining concrete verification uncertainty; static checks alone do not settle it. Existing expiry/release and fresh-order credit calculations are unchanged.
+- Pre-existing terminal provider-status handling for already-bound checkout is deliberately unchanged and deferred in coordinator-owned `docs/superpowers/implementation-artifacts/deferred-work.md`; a confirmation URL is not settlement authority. No material policy decision is made here.
 - Full API checkout composition and first-disclosure-after-deletion policy remain outside this fix. Metadata is retained identity only, not evidence of consent/address verification or authority to disclose expired data. No production/provider access, feature activation, push, merge or deployment occurred.
-- Recovery: revert the implementer's bounded source/test/evidence commit after coordination. No migration rollback is required. Reversion restores the prior replay limitation; retain existing provider admissions and IDs, and never infer permission for a new POST from a failed replay or rollback.
-- Coordinator preparation files (spec and plan) are pre-existing untracked inputs and are left unchanged. Only the assigned source files, new tests, single old assertion and this evidence file will be committed.
+- Recovery: coordinate any revert. Reverting this review wave alone restores054ee692, including its two confirmed defects; reverting the initial implementation restores the prior replay limitation. Neither action requires a migration rollback or changes the authority of existing provider admissions. Retain admissions and provider IDs; a failed replay or rollback never authorizes a new POST.
+- Coordinator-owned spec, plan and deferred-work edits are left unchanged and excluded from this wave's commit. This wave contains only `payment-adapter.ts`, the two existing replay test files and this evidence file. The old capture-test assertion belongs to the initial commit and is unchanged in this wave.
+
+### Safe operator guidance: unknown or unbound admission
+
+Treat an unknown/unbound admission as consumed, including when disclosure or bookkeeping failed or the admission acknowledgement was lost. Through an independently authorized diagnostic process, inspect only non-PII order, attempt, operation and provider-object IDs plus statuses; escalate unresolved outcomes to the responsible payment/reconciliation owner. Do not inspect/log plaintext receipt contacts, ciphertext, credentials or raw private errors for this procedure. No real-data inspection was performed for this work.
+
+Never delete or reset the admission, rotate its idempotency key, or issue a new POST to bypass uncertainty. Absence of a provider ID, a failed GET, contact expiry/redaction, a sanitized error or a rollback is not proof that no payment exists. Any recovery that could resend requires independently established resolution and separate authorization under the existing reconciliation policy; this fix creates no new retry permission or manual bypass.
 
 Old suites are exhausted. The old capture-test expiry assertion was intentionally updated, but that file was not run. Full API composition tests remain separate and unused. Local results are not hosted CI or Database Gate.
 
