@@ -9,6 +9,7 @@ import {
 } from "@ii-tonya/worker";
 
 export interface WorkerCycleReport {
+  readonly planerkaAvailability?: unknown;
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
   readonly safetyHandoffs: unknown;
@@ -46,6 +47,7 @@ interface BookingNotificationLifecycle {
 }
 
 export interface WorkerRuntimeDependencies {
+  readonly planerkaAvailability?: BoundedJob;
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
   /** Dedicated safety repository/dispatcher path; never a Planerka or intent-model call. */
@@ -69,6 +71,7 @@ export interface WorkerRuntimeDependencies {
 }
 
 export interface ProductionWorkerRuntimeDependencies {
+  readonly planerkaAvailability?: BoundedJob;
   readonly yookassaBoundRecovery?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -210,12 +213,16 @@ export function createWorkerRuntime(
         : undefined;
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
+      const planerkaAvailability = acceptingClaims
+        ? await deps.planerkaAvailability?.()
+        : undefined;
       const testExpertReconciliation =
         (await deps.testExpertReconciliation?.()) ?? {
           scanned: 0,
           reason: "test_expert_reconciliation_disabled",
         };
       return {
+        ...(planerkaAvailability === undefined ? {} : { planerkaAvailability }),
         ...(bookingHandoffRevocations === undefined
           ? {}
           : { bookingHandoffRevocations }),
@@ -307,6 +314,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.planerkaAvailability === undefined
+      ? {}
+      : { planerkaAvailability: deps.planerkaAvailability }),
     ...(deps.bookingHandoffRevocations === undefined
       ? {}
       : { bookingHandoffRevocations: deps.bookingHandoffRevocations }),

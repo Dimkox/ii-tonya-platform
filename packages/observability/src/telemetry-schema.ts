@@ -110,6 +110,21 @@ const http = {
   durationMs: "duration",
 } as const;
 const schemas: Readonly<Record<string, Schema>> = {
+  planerka_availability: {
+    outcome: [
+      "published",
+      "empty",
+      "account_rate_limit",
+      "provider_unavailable",
+      "invalid_response",
+      "mapping_invalid",
+      "slot_conflict",
+      "stale_claim",
+      "database_busy",
+    ],
+    processed: "count",
+    published: "count",
+  },
   telemetry_unclassified: {},
   public_catalog_failure: {
     reason: [

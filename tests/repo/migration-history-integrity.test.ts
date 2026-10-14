@@ -61,6 +61,7 @@ const HAND_SQL_FUNCTIONS = [
   "expert_reward_grant_require_eligible_settlement",
   "lock_and_reject_selarti_budget_policy_overlap",
   "lock_partner_policy_window",
+  "planerka_availability_mapping_invalidate",
   "planerka_operation_guard",
   "planerka_privacy_completion",
   "planerka_reservation_transition",
@@ -115,6 +116,7 @@ const HAND_SQL_TRIGGERS = [
   "partner_shadow_quotes_immutable",
   "partner_tariff_policy_versions_immutable",
   "partner_tariff_policy_versions_no_overlap",
+  "planerka_availability_mapping_invalidation",
   "planerka_operation_identity_guard",
   "planerka_privacy_completion_guard",
   "planerka_reservation_transition_guard",
@@ -191,7 +193,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(50);
+    expect(newest).toBe(51);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -283,7 +285,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0050 adds payer-supplied receipt contacts and immutable order bindings.
-    expect(declared.size).toBe(122);
+    // 0051 adds the durable, fenced availability refresh state.
+    expect(declared.size).toBe(123);
   });
 });

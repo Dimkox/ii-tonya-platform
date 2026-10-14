@@ -44,6 +44,21 @@ type RawCatalogExpertRecord = Omit<CatalogExpertRecord, "slotStartsAt"> & {
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
 const MAX_RESULTS = 500;
+const providerEligible = sql`(s.provider <> 'planerka' or exists (
+  select 1 from planerka_service_mappings m
+  where m.expert_service_id=s.expert_service_id and m.enabled
+    and m.verified_at<=clock_timestamp() and m.duration_minutes=es.duration_minutes
+    and extract(epoch from (s.ends_at-s.starts_at))=m.duration_minutes*60
+    and s.capacity=1
+))`;
+// Same-slot occupancy continues to respect capacity. Other slots/services for
+// this expert conflict by actual interval, independently of their provider.
+const noExpertOverlap = (now: Date) => sql`not exists (
+  select 1 from reservations occupied join slots booked_slot on booked_slot.id=occupied.slot_id
+  where occupied.expert_id=e.id and occupied.slot_id<>s.id
+    and (occupied.status='booked' or (occupied.status='reserved' and occupied.reserved_until>${now}))
+    and booked_slot.starts_at<s.ends_at and booked_slot.ends_at>s.starts_at
+)`;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
@@ -130,6 +145,9 @@ export class PostgresCatalogRepository {
         and (${serviceCode}::text is null or es.code = ${serviceCode})
         and (${language}::text is null or es.language = ${language})
         and s.observed_at >= ${freshAfter}
+        and ${providerEligible}
+        and ${noExpertOverlap(input.now)}
+        and s.ends_at>s.starts_at and s.capacity>0
         and s.observed_at <= ${input.now}
         and s.starts_at >= ${earliest}
         and s.starts_at < ${input.to}
@@ -177,12 +195,22 @@ export class PostgresCatalogRepository {
         s.observed_at as "observedAt",
         (s.capacity-count(r.id))::int as "remainingCapacity"
       from slots s
+      join expert_services es on es.id=s.expert_service_id
+      join experts e on e.id=es.expert_id
       left join reservations r on r.slot_id=s.id and (
         r.status='booked' or
         (r.status='reserved' and r.reserved_until>${input.databaseNow})
       )
       where s.expert_service_id=${input.sourceKey}::uuid
+        and es.active and e.active and e.verified
+        and s.observed_at>=${new Date(input.databaseNow.getTime() - SLOT_FRESHNESS_MS)}
+        and s.observed_at<=${input.databaseNow}
+        and s.starts_at>=${new Date(input.databaseNow.getTime() + 86400000)}
+        and s.ends_at>s.starts_at and s.capacity>0
+        and ${providerEligible}
+        and ${noExpertOverlap(input.databaseNow)}
       group by s.id,s.starts_at,s.observed_at,s.capacity
+      having s.capacity>count(r.id)
       order by s.starts_at,s.id
       limit ${MAX_RESULTS}
     `);

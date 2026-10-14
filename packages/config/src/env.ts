@@ -56,6 +56,7 @@ const schema = z
     PLANERKA_ENABLED: z.literal("false").default("false"),
     PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_RECOVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    PLANERKA_AVAILABILITY_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_API_KEY: z
       .string()
       .regex(/^cal_[A-Za-z0-9_-]{1,252}$/u)
@@ -230,7 +231,8 @@ const schema = z
   .passthrough()
   .superRefine((value, context) => {
     if (
-      (value.PLANERKA_CREATE_ENABLED === "true" &&
+      ((value.PLANERKA_CREATE_ENABLED === "true" ||
+        value.PLANERKA_AVAILABILITY_ENABLED === "true") &&
         value.PLANERKA_RECOVERY_ENABLED !== "true") ||
       (value.PLANERKA_RECOVERY_ENABLED === "true" &&
         (!value.PLANERKA_API_KEY || !value.PLANERKA_ACCOUNT_ID))
@@ -404,6 +406,7 @@ export type RuntimeConfig = {
   };
   planerkaWorkflow?: {
     createEnabled: boolean;
+    availabilityEnabled?: true;
     apiKey: string;
     accountId: number;
   };
@@ -780,6 +783,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       : {
           planerkaWorkflow: {
             createEnabled: value.PLANERKA_CREATE_ENABLED === "true",
+            ...(value.PLANERKA_AVAILABILITY_ENABLED === "true"
+              ? { availabilityEnabled: true as const }
+              : {}),
             apiKey: value.PLANERKA_API_KEY!,
             accountId: value.PLANERKA_ACCOUNT_ID!,
           },
