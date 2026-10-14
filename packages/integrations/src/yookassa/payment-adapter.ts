@@ -16,6 +16,8 @@ import {
 import type { YooKassaMode, YooKassaVatCode } from "./contracts.js";
 import type {
   YooKassaOperationPort,
+  YooKassaReceiptAuthority,
+  YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./operation-port.js";
 import type { YooKassaReplayProtector } from "./exact-body-recovery.js";
@@ -131,32 +133,42 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     ) {
       throw new Error("yookassa_initial_send_recovery_unsupported");
     }
-    const contact = await this.deps.contacts.receiptContactForOrder(
-      command.orderId,
-    );
-    if (
-      contact === null ||
-      (contact.email === undefined) === (contact.phone === undefined)
-    ) {
-      throw new Error("yookassa_receipt_contact_unavailable");
+    const metadataSource = "receiptAuthorityForOrder" in this.deps.contacts;
+    let contact: YooKassaReceiptContact | null = null;
+    let authority: YooKassaReceiptAuthority;
+    if (metadataSource) {
+      try {
+        const retained = await this.deps.contacts.receiptAuthorityForOrder?.(
+          command.orderId,
+        );
+        if (
+          !retained ||
+          (retained.contactKind !== "email" &&
+            retained.contactKind !== "phone") ||
+          typeof retained.authorityReference !== "string" ||
+          !AUTHORITY_REFERENCE.test(retained.authorityReference)
+        )
+          throw new Error("yookassa_receipt_contact_unavailable");
+        // Preserve the v1 property order independently of the reader's object.
+        authority = {
+          contactKind: retained.contactKind,
+          authorityReference: retained.authorityReference,
+        };
+      } catch {
+        throw new Error("yookassa_receipt_contact_unavailable");
+      }
+    } else {
+      // Explicit legacy sources keep their contact-derived authority contract.
+      contact = await this.deps.contacts.receiptContactForOrder(
+        command.orderId,
+      );
+      if (
+        contact === null ||
+        (contact.email === undefined) === (contact.phone === undefined)
+      )
+        throw new Error("yookassa_receipt_contact_unavailable");
+      authority = receiptAuthority(contact);
     }
-    const receiptCustomer =
-      contact.email === undefined
-        ? { phone: contact.phone! }
-        : { email: contact.email };
-    const request = {
-      amountMinor: BigInt(command.amountMinor),
-      description: "Expert residency",
-      returnUrl: this.deps.returnUrl,
-      metadata: { order_id: command.orderId },
-      receipt: {
-        customer: receiptCustomer,
-        item: {
-          description: "Expert residency",
-          ...this.deps.receipt,
-        },
-      },
-    } as const;
     const commandIdentity = `${command.orderId}:${command.idempotencyKey}`;
     const admission = await this.deps.operations.claimInitialPayment({
       commandId: stableUuid("yookassa-command", commandIdentity),
@@ -174,7 +186,7 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
         currency: command.currency,
         returnUrl: this.deps.returnUrl,
         receiptPolicy: this.deps.receipt,
-        receiptAuthority: receiptAuthority(contact),
+        receiptAuthority: authority,
       }),
     });
     const operation = admission.operation;
@@ -208,8 +220,40 @@ export class YooKassaExpertResidencyPaymentAdapter implements ExpertResidencyPay
     if (admission.kind !== "initial_send_admitted") {
       throw new YooKassaUnknownOutcomeError();
     }
+    if (metadataSource) {
+      try {
+        contact = await this.deps.contacts.receiptContactForOrder(
+          command.orderId,
+        );
+        if (
+          contact === null ||
+          (contact.email === undefined) === (contact.phone === undefined)
+        )
+          throw new YooKassaUnknownOutcomeError();
+        const disclosed = receiptAuthority(contact);
+        if (
+          disclosed.contactKind !== authority.contactKind ||
+          disclosed.authorityReference !== authority.authorityReference
+        )
+          throw new YooKassaUnknownOutcomeError();
+      } catch {
+        // Admission is consumed even when its one initial disclosure fails.
+        await this.deps.operations.markUnknown(operation.id);
+        throw new YooKassaUnknownOutcomeError();
+      }
+    }
     const providerCommand = {
-      ...request,
+      amountMinor: BigInt(command.amountMinor),
+      description: "Expert residency",
+      returnUrl: this.deps.returnUrl,
+      metadata: { order_id: command.orderId },
+      receipt: {
+        customer:
+          contact!.email === undefined
+            ? { phone: contact!.phone! }
+            : { email: contact!.email },
+        item: { description: "Expert residency", ...this.deps.receipt },
+      },
       idempotencyKey: operation.idempotencyKey,
     };
     try {

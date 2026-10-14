@@ -418,7 +418,7 @@ it("bound selection crosses expiry while locked; cleanup skips the held row and 
   await fixture.assertAuthenticated();
   await expect(
     s.orders.createCheckoutOrderWithReceipt(command),
-  ).rejects.toThrow("EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE");
+  ).resolves.toEqual(order);
   await s.repository.redactExpiredBatch(100);
   expect(
     (

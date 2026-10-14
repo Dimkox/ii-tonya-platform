@@ -5,6 +5,13 @@ export function createPayerReceiptSource(
   reader: YooKassaReceiptContactPort,
 ): YooKassaReceiptContactPort {
   return {
+    async receiptAuthorityForOrder(orderId) {
+      try {
+        return (await reader.receiptAuthorityForOrder?.(orderId)) ?? null;
+      } catch {
+        return null;
+      }
+    },
     async receiptContactForOrder(orderId) {
       try {
         return await reader.receiptContactForOrder(orderId);
