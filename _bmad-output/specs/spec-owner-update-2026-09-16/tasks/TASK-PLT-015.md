@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `planned`; readiness: `pending_dependencies`.
 - Тип: verification; исполнитель: qa; приоритет: P1.
 - Depends on: [TASK-PLT-002](TASK-PLT-002.md), [TASK-PLT-003](TASK-PLT-003.md), [TASK-PLT-005](TASK-PLT-005.md), [TASK-PLT-010](TASK-PLT-010.md), [TASK-PLT-011](TASK-PLT-011.md), [TASK-PLT-012](TASK-PLT-012.md), [TASK-PLT-014](TASK-PLT-014.md), [TASK-EXP-021](TASK-EXP-021.md), [TASK-PLT-004](TASK-PLT-004.md), [TASK-PLT-006](TASK-PLT-006.md), [TASK-PLT-007](TASK-PLT-007.md), [TASK-PLT-016](TASK-PLT-016.md), [TASK-DEC-PLT-010](TASK-DEC-PLT-010.md).
 - Решения: DEC-PLT-010.

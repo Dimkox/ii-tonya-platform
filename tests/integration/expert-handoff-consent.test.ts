@@ -23,12 +23,16 @@ const repository = () =>
     privacyMutationCapability: { enabled: true },
   });
 
+// newest-факт журнала по каждой цели. Это НЕ оракул «действует ли согласие»: тот живёт в
+// currentConsentSatisfiedSql и при противоречии в одном мгновении отвечает «не действует».
+// Здесь нужен именно последний записанный факт, и берётся он детерминированно по `sequence`,
+// а не по случайному uuid (прежний `id desc` — дефект D2).
 async function decisions(userId: string): Promise<Record<string, string>> {
   const rows = (
     await testDb!.db.execute<{ purpose: string; decision: string }>(sql`
       select distinct on (consent_type) consent_type as purpose, decision
       from consents where user_id = ${userId}::uuid
-      order by consent_type, created_at desc, id desc
+      order by consent_type, created_at desc, "sequence" desc
     `)
   ).rows;
   return Object.fromEntries(rows.map((r) => [r.purpose, r.decision]));
@@ -57,7 +61,35 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
     expect(await handoffRevokeCount("handoff-direct")).toBe(1);
   });
 
-  it("withdrawing expert_note cascades expert_handoff to denied and enqueues one revoke event", async () => {
+  it("does not record a revocation of a consent that was never in force", async () => {
+    // Ничья в одном мгновении: granted записан позже denied, но действующим решение не считается
+    // (оракул требует, чтобы все записи самого позднего мгновения были granted). Значит отзыв
+    // не может называться `revoked` — он возвращает первоначальный отказ `denied`.
+    const userId = await testDb!.createUser();
+    const at = "2026-09-21T10:00:00.000Z";
+    for (const decision of ["denied", "granted"]) {
+      await testDb!.db.execute(sql`
+        insert into consents (user_id, consent_type, decision, policy_version, created_at)
+        values (${userId}::uuid, 'expert_handoff', ${decision}, 'handoff-v1', ${at}::timestamptz)
+      `);
+    }
+    await repository().withdrawConsentAtomically({
+      targetUserId: userId,
+      purpose: "expert_handoff",
+      policyVersion: "handoff-v1",
+      correlationId: "handoff-never-in-force",
+    });
+    expect(await decisions(userId)).toMatchObject({ expert_handoff: "denied" });
+    const projected = (
+      await testDb!.db.execute<{ decision: string }>(sql`
+        select decision from consent_states
+        where user_id = ${userId}::uuid and purpose = 'expert_handoff'
+      `)
+    ).rows[0];
+    expect(projected?.decision).toBe("denied");
+  });
+
+  it("withdrawing expert_note cascades a granted expert_handoff to revoked (never a fabricated first refusal) and enqueues one revoke event", async () => {
     const userId = await testDb!.createUser();
     await testDb!.db.execute(sql`
       insert into consents (user_id, consent_type, decision, policy_version)
@@ -70,10 +102,20 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
       correlationId: "handoff-cascade",
     });
     const state = await decisions(userId);
+    // RIGHTS-08: отзыв ранее выданного согласия отличается от первоначального отказа.
+    // Заметка никому не выдавалась -> denied; передача была выдана -> revoked.
     expect(state).toMatchObject({
       expert_note: "denied",
-      expert_handoff: "denied",
+      expert_handoff: "revoked",
     });
+    const handoffState = (
+      await testDb!.db.execute<{ decision: string; revision: string }>(sql`
+        select decision, revision::text from consent_states
+        where user_id = ${userId}::uuid and purpose = 'expert_handoff'
+      `)
+    ).rows[0];
+    expect(handoffState?.decision).toBe("revoked");
+    expect(Number(handoffState?.revision)).toBeGreaterThan(0);
     expect(await handoffRevokeCount("handoff-cascade")).toBe(1);
     // The cascaded fact records the handoff's own consent version, never the note's
     // (append-only provenance — DEC-PLT-004 §3).
@@ -81,7 +123,7 @@ describe("expert_handoff consent withdrawal (DEC-PLT-004 §3)", () => {
       await testDb!.db.execute<{ decision: string; policyVersion: string }>(sql`
         select decision, policy_version as "policyVersion" from consents
         where user_id = ${userId}::uuid and consent_type = 'expert_handoff'
-          and decision = 'denied'
+          and decision in ('denied', 'revoked')
       `)
     ).rows;
     expect(handoffRows.length).toBeGreaterThan(0);

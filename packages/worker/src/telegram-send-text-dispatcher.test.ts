@@ -8,6 +8,8 @@ import {
   type OutboxRepository,
 } from "./outbox-runner.js";
 
+const allowAll = { allowsSend: async () => true };
+
 const message = (payload: Record<string, unknown>): OutboxMessage => ({
   id: randomUUID(),
   topic: "telegram.send_text.v1",
@@ -35,6 +37,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
       body: { ok: true, result: { message_id: 42 } },
     }));
     const dispatcher = createTelegramSendTextDispatcher({
+      consentGate: allowAll,
       enabled: true,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -59,6 +62,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
 
   it("maps uncertain transport completion to unknown outcome and never retries blindly", async () => {
     const dispatcher = createTelegramSendTextDispatcher({
+      consentGate: allowAll,
       enabled: true,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -87,6 +91,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
         Promise<never> | Promise<{ status: number; body: unknown }>,
     ) =>
       createTelegramSendTextDispatcher({
+        consentGate: allowAll,
         enabled: true,
         botKey: "bot-b2",
         sendMessageUrl: new URL(
@@ -117,6 +122,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
   it("is disabled without transport and rejects token or URL authority in payload", async () => {
     const request = vi.fn();
     const dispatcher = createTelegramSendTextDispatcher({
+      consentGate: allowAll,
       enabled: false,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -132,6 +138,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
     });
     expect(request).not.toHaveBeenCalled();
     const enabled = createTelegramSendTextDispatcher({
+      consentGate: allowAll,
       ...dispatcherDeps(request),
       enabled: true,
     });
@@ -159,6 +166,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
       markUnknownOutcome,
     } as unknown as OutboxRepository;
     const dispatcher = createTelegramSendTextDispatcher({
+      consentGate: allowAll,
       ...dispatcherDeps(async () => {
         throw new TransportFailure("after_write");
       }),
@@ -198,3 +206,60 @@ function dispatcherDeps(
     transport: { request },
   };
 }
+
+describe("pre-send consent re-check (EGRESS-01)", () => {
+  const build = (
+    gate: { allowsSend(dialogueId: string): Promise<boolean> },
+    body: () => Record<string, unknown> = payload,
+  ) => {
+    const request = vi.fn(async () => ({
+      status: 200,
+      body: { ok: true, result: { message_id: 42 } },
+    }));
+    const dispatcher = createTelegramSendTextDispatcher({
+      enabled: true,
+      botKey: "bot-b2",
+      sendMessageUrl: new URL("https://api.telegram.example/bot/sendMessage"),
+      transport: { request } as never,
+      consentGate: gate,
+    });
+    const send = () => dispatcher.dispatch(message(body()) as never);
+    return { request, send };
+  };
+
+  it("refuses the network call when the consent stopped being valid", async () => {
+    const { request, send } = build({ allowsSend: async () => false });
+    await expect(send()).resolves.toEqual({
+      kind: "terminal",
+      reasonCode: "local_source_invalid",
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("asks about the dialogue of the message, not about the chat", async () => {
+    const asked: string[] = [];
+    const { request, send } = build({
+      allowsSend: async (dialogueId: string) => {
+        asked.push(dialogueId);
+        return true;
+      },
+    });
+    await send();
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a failing check as no consent", async () => {
+    const { request, send } = build({
+      allowsSend: async () => {
+        throw new Error("connection reset");
+      },
+    });
+    await expect(send()).resolves.toEqual({
+      kind: "terminal",
+      reasonCode: "local_source_invalid",
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+});

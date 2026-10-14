@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import {
+  createPrivacyService,
   createAdminService,
   createClientCatalogService,
   createClientBookingService,
@@ -31,6 +32,7 @@ import {
   migrateDb,
   PostgresAdminApprovalRepository,
   PostgresAdminRepository,
+  PostgresPrivacyRepository,
   PostgresExpertReferralAdminRepository,
   PostgresExpertReferralControlRepository,
   PostgresExpertAiRequestReceiptStore,
@@ -55,6 +57,7 @@ import {
 } from "@ii-tonya/integrations";
 import {
   createLogger,
+  installFatalProcessLogging,
   recordClientSessionMetric,
   recordSelartiBudgetMetric,
   shutdownTelemetry,
@@ -354,7 +357,22 @@ export const createDefaultLifecycle = (
       ),
       bookingService: disabledService<BookingService>("booking ingress"),
       catalogService: disabledService<CatalogService>("catalog ingress"),
-      privacyService: disabledService<PrivacyService>("privacy ingress"),
+      privacyService:
+        config.features.clientPrivacy === true
+          ? createPrivacyService({
+              repository: new PostgresPrivacyRepository(db, {
+                privacyMutationCapability: { enabled: true },
+              }),
+              // Репозиторий дописывает аудит внутри своей сериализуемой транзакции;
+              // этот порт остался в сигнатуре ради совместимости композиции.
+              audit: { append: () => undefined },
+              // Псевдоним нужен только уничтожению, а эта сборка его не выставляет.
+              pseudonymize: () => {
+                throw new Error("privacy erasure is not exposed");
+              },
+              capability: { enabled: true },
+            })
+          : disabledService<PrivacyService>("privacy ingress"),
       adminService: createAdminService({
         workflows: new PostgresAdminRepository(db),
       }),
@@ -497,8 +515,15 @@ export async function main(
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number(process.env.PORT ?? "3000");
   await listenServer(app, lifecycle, db, { host, port });
+  // Неперехваченное исключение иначе уходит в stderr мимо санитизатора.
+  const removeFatalLogging = installFatalProcessLogging({
+    logger: createLogger(),
+  });
   let closing: Promise<void> | undefined;
-  const shutdown = () => (closing ??= closeServer(app, lifecycle, db));
+  const shutdown = () => {
+    removeFatalLogging();
+    return (closing ??= closeServer(app, lifecycle, db));
+  };
   process.once("SIGTERM", shutdown);
   process.once("SIGINT", shutdown);
 }

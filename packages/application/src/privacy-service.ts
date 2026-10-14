@@ -12,6 +12,18 @@ export interface ExportSubjectCommand {
   readonly correlationId: string;
 }
 
+export interface ListConsentsCommand {
+  readonly principalUserId: string;
+  readonly targetUserId: string;
+}
+
+export interface ConsentStateView {
+  readonly purpose: string;
+  readonly inForce: boolean;
+  readonly policyVersion: string;
+  readonly decidedAt: string;
+}
+
 export interface EraseSubjectCommand {
   readonly principalUserId: string;
   readonly targetUserId: string;
@@ -81,12 +93,16 @@ export interface PrivacyRepository {
   ): Promise<WithdrawalReceipt>;
   exportOwnedSubject(userId: string): Promise<SubjectExport>;
   startErasureAtomically(command: StartErasureCommand): Promise<ErasureJob>;
+  listCurrentConsents(userId: string): Promise<readonly ConsentStateView[]>;
 }
 
 export interface PrivacyService {
   withdrawConsent(command: WithdrawConsentCommand): Promise<void>;
   exportSubject(command: ExportSubjectCommand): Promise<SubjectExport>;
   eraseSubject(command: EraseSubjectCommand): Promise<ErasureJob>;
+  listConsents(
+    command: ListConsentsCommand,
+  ): Promise<readonly ConsentStateView[]>;
 }
 
 export interface PrivacyDependencies {
@@ -122,6 +138,10 @@ export const createEnvironmentHmacPseudonymizer =
 export const createPrivacyService = (
   deps: PrivacyDependencies,
 ): PrivacyService => ({
+  async listConsents(command) {
+    assertOwner(command.principalUserId, command.targetUserId);
+    return deps.repository.listCurrentConsents(command.targetUserId);
+  },
   async withdrawConsent(command) {
     if (!deps.capability?.enabled)
       throw new Error("Privacy mutations are disabled");

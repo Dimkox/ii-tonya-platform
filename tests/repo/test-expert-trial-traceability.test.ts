@@ -23,7 +23,7 @@ describe("test expert trial traceability", () => {
       ]),
     );
   });
-  it("keeps default-off flags, migration, metric names, and analytics preservation traceable", () => {
+  it("keeps default-off flags, migration, metric names, and the deferred analytics decision traceable", () => {
     const env = readFileSync("packages/config/src/env.ts", "utf8");
     expect(env).toMatch(
       /TEST_EXPERT_(?:PROMO|DETERMINISTIC_FLOW|SELARTI)_ENABLED/gu,
@@ -57,8 +57,10 @@ describe("test expert trial traceability", () => {
       "cost_per_trial",
       "deterministic_offload",
     ]);
-    expect(readFileSync("apps/web/index.html", "utf8")).toContain(
-      "mc.yandex.ru/metrika/tag.js?id=111827123",
+    // TRACK-01 (ТЗ по ПД от 2026-09-21): аналитика не загружается до выбора
+    // пользователя, поэтому трассировка пробы не может на неё ссылаться.
+    expect(readFileSync("apps/web/index.html", "utf8")).not.toMatch(
+      /mc\.yandex|metrika/iu,
     );
   });
 

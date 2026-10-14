@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `planned`; readiness: `pending_dependencies`.
 - Тип: design; исполнитель: designer; приоритет: P2.
 - Depends on: [TASK-EXP-019](TASK-EXP-019.md), [TASK-DEC-EXP-005](TASK-DEC-EXP-005.md).
 - Решения: DEC-EXP-005.

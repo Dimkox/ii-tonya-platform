@@ -45,11 +45,12 @@ Wiki-репозиторий GitHub для приватных репозитор�
 
 ## Что крутится прямо сейчас
 
-Единственный production-деплой: `233f3cf72e45e47117948ad5615b603252801e40` (14.08.2026), релиз
-[`prod-233f3cf`](https://github.com/Dimkox/ii-tonya-platform/releases/tag/prod-233f3cf). Проверено 10.09.2026: `/health/live` = `live`,
-`/health/ready` = `postgres/migrations/workerLease/adapters` — все `true`, экспертные маршруты `404`.
-
-`origin/main` на 33 коммита впереди прода — см. [issue #48](https://github.com/Dimkox/ii-tonya-platform/issues/48).
+Текущий production `current`: `cb07bd1821d8106b0b0088b17bcf305662a1b792`
+(выкладка 2026-09-18). Previous:
+`7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`. `233f3cf7` ещё на диске.
+Loopback `/health/ready` 2026-09-18: `postgres/migrations/workerLease/adapters` —
+все `true`. Evidence:
+[`cb07bd18-deploy-2026-09-18.md`](../test-evidence/production/cb07bd18-deploy-2026-09-18.md).
 
 ## Правила связности
 

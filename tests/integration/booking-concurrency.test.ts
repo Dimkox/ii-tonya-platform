@@ -656,12 +656,17 @@ describe("booking transaction", () => {
       clientDisplayName: "Клиент",
     });
     expect(noConsentSchedule?.[0]).not.toHaveProperty("expertNote");
+    // 2026-09-21: словарь `decision` закрыт проверкой `consents_decision_known` (миграция 0039,
+    // EVID-01), поэтому не-грантовое значение здесь — легальное `revoked`. Свойство
+    // «нераспознанный токен не открывает гейт» теперь защищается на уровне БД и проверяется
+    // тестом миграции (tests/integration/consent-evidence-schema.test.ts), а на уровне домена —
+    // packages/domain/src/consent.test.ts.
     await testDb.db.execute(sql`
       insert into consents (
         user_id, consent_type, decision, policy_version, created_at
       )
       select
-        user_id, 'expert_note', 'unknown', 'expert-note-v1',
+        user_id, 'expert_note', 'revoked', 'expert-note-v1',
         '2026-07-29T09:59:00.000Z'::timestamptz
       from reservations
       where id = ${reserved.reservationId}::uuid
@@ -764,6 +769,85 @@ describe("booking transaction", () => {
       meetingUrl: "https://meeting.invalid/private",
     });
     expect(revokedSchedule?.[0]).not.toHaveProperty("expertNote");
+
+    // Зазор, найденный независимым review: note granted + handoff denied.
+    // До ужесточения CASE SQL отдавал plaintext заметки в слой приложения,
+    // и ни один тест этого состояния не покрывал.
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_note', 'granted', 'expert-note-v1',
+        '2026-07-29T10:02:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    await testDb.db.execute(sql`
+      insert into consents (
+        user_id, consent_type, decision, policy_version, created_at
+      )
+      select
+        user_id, 'expert_handoff', 'denied', 'handoff-v1',
+        '2026-07-29T10:03:00.000Z'::timestamptz
+      from reservations
+      where id = ${reserved.reservationId}::uuid
+    `);
+    const handoffDeniedSchedule = await repository.listAuthorizedExpertSchedule(
+      {
+        expertId: fixture.expertId,
+        telegramUserId: "123456789",
+        from: new Date("2026-07-29T00:00:00.000Z"),
+        to: new Date("2026-08-06T00:00:00.000Z"),
+      },
+    );
+    expect(handoffDeniedSchedule?.[0]).toMatchObject({
+      status: "booked",
+      expertNoteConsent: true,
+      expertHandoffConsent: false,
+      clientDisplayName: "Клиент",
+      meetingUrl: "https://meeting.invalid/private",
+    });
+    expect(handoffDeniedSchedule?.[0]).not.toHaveProperty("expertNote");
+
+    // DEC-PLT-004 §4 (строка Telegram): meeting_url наружу «не ранее 30 мин» до встречи.
+    const originalSlotRow = await testDb.db.execute<{ startsAt: Date }>(sql`
+      select starts_at as "startsAt" from slots where id = ${fixture.command.slotId}::uuid
+    `);
+    const originalStartsAt = originalSlotRow.rows[0]?.startsAt;
+    await testDb.db.execute(sql`
+      update slots set starts_at = now() + interval '2 hours'
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    const tooEarlySchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2027-12-31T00:00:00.000Z"),
+    });
+    expect(tooEarlySchedule?.[0]).toMatchObject({
+      status: "booked",
+      clientDisplayName: "Клиент",
+    });
+    expect(tooEarlySchedule?.[0]).not.toHaveProperty("meetingUrl");
+    await testDb.db.execute(sql`
+      update slots set starts_at = now() + interval '10 minutes'
+      where id = ${fixture.command.slotId}::uuid
+    `);
+    const insideLeadSchedule = await repository.listAuthorizedExpertSchedule({
+      expertId: fixture.expertId,
+      telegramUserId: "123456789",
+      from: new Date("2026-07-29T00:00:00.000Z"),
+      to: new Date("2027-12-31T00:00:00.000Z"),
+    });
+    expect(insideLeadSchedule?.[0]).toMatchObject({
+      status: "booked",
+      meetingUrl: "https://meeting.invalid/private",
+    });
+    await testDb.db.execute(sql`
+      update slots set starts_at = ${originalStartsAt}
+      where id = ${fixture.command.slotId}::uuid
+    `);
     await testDb.db.execute(sql`
       update experts set active = false where id = ${fixture.expertId}::uuid
     `);

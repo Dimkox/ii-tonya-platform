@@ -25,6 +25,15 @@ describe("public legal documents", () => {
     expect(legalDocuments.privacy.text).toContain(
       "не осуществляет трансграничную передачу",
     );
+    expect(legalDocuments.privacy.text).not.toMatch(
+      /начав диалог[^\n]{0,80}соглаша/iu,
+    );
+    expect(legalDocuments.privacy.text).not.toContain(
+      "Используя Сайт, Сервис «ии-Тоня» или иным образом взаимодействуя с Оператором, субъект персональных данных выражает своё согласие",
+    );
+    expect(legalDocuments.oferta.text).not.toContain(
+      "путём Акцепта Оферты и действует бессрочно",
+    );
     expect(legalDocuments.privacy.text).toContain("21 августа 2026 года");
     expect(legalDocuments.oferta.text).toContain(
       "Настоящая Оферта вступает в силу с 21 августа 2026 года и действует до её отзыва Исполнителем.",
@@ -59,7 +68,11 @@ describe("public legal documents", () => {
 
   it("states package and coupon terms without claiming default-off coupon issuance is active", () => {
     const oferta = legalDocuments.oferta.text;
-    expect(oferta).toContain("30 календарных дней");
+    expect(oferta).toContain("60 календарных дней");
+    expect(oferta).toContain("4 999 ₽");
+    expect(oferta).toContain("5 999 ₽");
+    expect(oferta).toContain("7 999 ₽");
+    expect(oferta).toContain("10 990 ₽");
     expect(oferta).toContain("100 сообщений и не имеет срока действия");
     expect(oferta).toContain("новые Купоны действуют 45 календарных дней");
     expect(oferta).not.toContain(
@@ -72,7 +85,9 @@ describe("public legal documents", () => {
     const { landingContent } = await import("./content.js");
     const faq = landingContent.faq.map((entry) => entry.join(" ")).join(" ");
     expect(faq).not.toContain("новые платные пакеты в V2 не продаются");
-    expect(faq).toContain("30 дней");
+    expect(faq).toContain("60 дней");
+    expect(faq).toContain("4 999");
+    expect(faq).toContain("10 990");
     expect(faq).toContain("100 сообщений без срока");
     expect(faq).toContain("Купоны");
     expect(faq).toContain("отключены");

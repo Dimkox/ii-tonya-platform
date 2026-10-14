@@ -105,6 +105,7 @@ export {
   PostgresOrderedTelegramOutboxRepository,
   type OutboxRecoveryCount,
 } from "./repositories/outbox-repository.js";
+export { createConsentEgressGate } from "./repositories/consent-egress-gate.js";
 export {
   PostgresB2SensitiveRetentionRepository,
   type B2SensitiveRetentionResult,
@@ -125,6 +126,17 @@ export {
   type WithdrawConsentCommand,
   type WithdrawalReceipt,
 } from "./repositories/privacy-repository.js";
+
+export {
+  CONSENT_PURPOSES,
+  ConsentGrantInvariantError,
+  PostgresConsentEvidenceRepository,
+  type ApprovedDocument,
+  type ConsentChannel,
+  type ConsentDecisionReceipt,
+  type ConsentPurpose,
+  type IssuedPresentation,
+} from "./repositories/consent-evidence-repository.js";
 export {
   AdminInvalidStateTransitionError,
   AdminTargetNotFoundError,

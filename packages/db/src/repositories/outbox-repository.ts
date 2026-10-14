@@ -1,10 +1,11 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import {
   CLIENT_CATALOG_OUTBOX_TOPICS,
   LOCAL_OPERATOR_CASE_OUTBOX_TOPICS,
   type ClientCatalogOutboxTopic,
 } from "@ii-tonya/contracts";
 import type { DrizzleDb } from "../client.js";
+import { dialogueConsentEgressPredicate } from "./consent-current.js";
 
 const MAX_OUTBOX_RECOVERY_LIMIT = 1_000;
 type WorkerOutboxTopics =
@@ -442,6 +443,14 @@ export class PostgresOutboxRepository {
     this.topics = validateTopicAllowlist(topics);
   }
 
+  /**
+   * Дополнительный предикат выдачи строки очереди. По умолчанию пуст: барьер согласия
+   * касается только клиентских исходящих и включается явным решением композиции.
+   */
+  protected egressGatePredicate(): SQL {
+    return sql``;
+  }
+
   async claim(
     limit: number,
     owner: string,
@@ -468,6 +477,7 @@ export class PostgresOutboxRepository {
             and attempt < ${maxAttempts}
             ${topicPredicate(this.topics)}
             ${orderedDialoguePredicate(this.topics)}
+            ${this.egressGatePredicate()}
           order by created_at, id
           for update skip locked
           limit ${limit}
@@ -1111,8 +1121,28 @@ export class PostgresOutboxRepository {
 
 /** B2 dispatcher view: one topic and a strict unfinished-sequence barrier. */
 export class PostgresOrderedTelegramOutboxRepository extends PostgresOutboxRepository {
-  constructor(db: DrizzleDb) {
+  /**
+   * `consentGate.enabled` обязателен явным решением: клиентская отправка без сверки согласия
+   * — это ровно тот обход, который запрещает EGRESS-01, поэтому параметры без значения
+   * по умолчанию.
+   */
+  constructor(
+    db: DrizzleDb,
+    private readonly consentGate: {
+      readonly enabled: boolean;
+      readonly purpose?: string;
+    },
+  ) {
     super(db, ["telegram.send_text.v1"]);
+  }
+
+  protected override egressGatePredicate(): SQL {
+    return this.consentGate.enabled
+      ? sql` and ${dialogueConsentEgressPredicate(
+          sql`integration_outbox.dialogue_id`,
+          this.consentGate.purpose ?? "client_messaging",
+        )}`
+      : sql``;
   }
 
   override async claimWithMetrics(

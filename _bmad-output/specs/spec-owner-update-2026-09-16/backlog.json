@@ -28,7 +28,7 @@
         ],
         "tests": []
       },
-      "current_state": "Код различает legacy_package_v1 и free_client_v2; conversation-service выбирает free для V2.",
+      "current_state": "DEC-FIN-001 variant B recorded. Cohort/rollback contract is docs/superpowers/implementation-artifacts/fin-client-access-policy.md. New free_client_v2 admission is closed; existing assignments immutable. Q-016 closed here; Q-169 remains on TASK-FIN-002. No live activation.",
       "deliverables": [
         "Утверждённая когортная матрица и migration/rollback contract."
       ],
@@ -47,10 +47,9 @@
       "resolves_decisions": [
         "DEC-FIN-001"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
-        "Q-016",
         "Q-169"
       ],
       "source_claim_ids": [
@@ -87,7 +86,7 @@
         ],
         "tests": []
       },
-      "current_state": "billing schema хранит intro ровно 100 сообщений без expiresAt; источники требуют 80/100 и 30/60 дней.",
+      "current_state": "Owner prices 4999/5999/7999/10990 RUB. Coupon grant x2. Catalog docs/superpowers/implementation-artifacts/fin-client-package-policy.md. Q-169 TZ still open. Coupons default-off until FIN-021.",
       "deliverables": [
         "Таблица SKU с price, units, coupon grant, duration, timezone и migration mapping."
       ],
@@ -109,21 +108,10 @@
         "DEC-FIN-002",
         "DEC-FIN-003"
       ],
-      "state": "planned",
-      "readiness": "pending_dependencies",
+      "state": "implemented_pending_review",
+      "readiness": "ready",
       "open_question_ids": [
-        "Q-003",
-        "Q-016",
-        "Q-018",
-        "Q-019",
-        "Q-024",
-        "Q-053",
-        "Q-054",
-        "Q-118",
-        "Q-163",
-        "Q-169",
-        "Q-178",
-        "Q-179"
+        "Q-169"
       ],
       "source_claim_ids": [
         "A010",
@@ -474,7 +462,7 @@
         ],
         "tests": []
       },
-      "current_state": "V2 CHECK constraints фиксируют START/BASE/PRO=3900/5900/9990 и cap 30%; новые личные диапазоны не помещаются в V2.",
+      "current_state": "DEC-FIN-007 keep V2 3900/5900/9990; DEC-FIN-009 Exclusive is marketing-only. Contract: docs/superpowers/implementation-artifacts/fin-expert-pricing-policy.md. No live activation.",
       "deliverables": [
         "Выбранная versioned pricing policy и eligibility Exclusive."
       ],
@@ -495,7 +483,7 @@
         "DEC-FIN-007",
         "DEC-FIN-009"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-086",
@@ -830,7 +818,7 @@
         ],
         "tests": []
       },
-      "current_state": "Shadow quote применяет >=6/>=10; source даёт 5–9 и >5 варианты.",
+      "current_state": "DEC-FIN-012 >=6/>=10 recorded in docs/superpowers/implementation-artifacts/fin-center-policy.md. Matches partner-pricing.ts. No live activation.",
       "deliverables": [
         "Centre tier table and qualified-referral definition."
       ],
@@ -850,7 +838,7 @@
       "resolves_decisions": [
         "DEC-FIN-012"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-150",
@@ -889,7 +877,7 @@
         ],
         "tests": []
       },
-      "current_state": "Current entitlements are fixed 5×50/3×100/1×500, but cross-band consumption is not stated.",
+      "current_state": "Organizer bands and strict matching consumption in docs/superpowers/implementation-artifacts/fin-organizer-policy.md.",
       "deliverables": [
         "Organizer tier table, qualifying referral and band-consumption rules."
       ],
@@ -906,7 +894,7 @@
         "REQ-FIN-012.01",
         "REQ-FIN-012.02"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-151",
@@ -947,7 +935,7 @@
         ],
         "tests": []
       },
-      "current_state": "Current partner quote knows 10%/15%+4500 but source conflicts on deposit base.",
+      "current_state": "Group settlement: 30% of project service price + 70% remainder. docs/superpowers/implementation-artifacts/fin-group-event-settlement.md.",
       "deliverables": [
         "Deposit, final settlement, registered-attendee report and invoice deadline contract."
       ],
@@ -968,7 +956,7 @@
         "DEC-FIN-013",
         "DEC-FIN-020"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-075",
@@ -1009,7 +997,7 @@
         ],
         "tests": []
       },
-      "current_state": "Baseline подтверждает expert referral repository, но источник спорит о создании/показе кода.",
+      "current_state": "Code created at registration, visible after first payment. docs/superpowers/implementation-artifacts/fin-expert-code-lifecycle.md.",
       "deliverables": [
         "Code namespace, created/visible/revoked lifecycle and content gate."
       ],
@@ -1031,7 +1019,7 @@
         "DEC-FIN-014",
         "DEC-FIN-022"
       ],
-      "state": "planned",
+      "state": "implemented_pending_review",
       "readiness": "ready",
       "open_question_ids": [
         "Q-053",
@@ -1729,7 +1717,7 @@
         "REQ-FIN-007.04"
       ],
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-075",
         "Q-079",
@@ -2333,7 +2321,7 @@
       ],
       "priority": "P1",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-005",
         "Q-008",
@@ -3127,7 +3115,7 @@
       ],
       "priority": "P2",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-103",
         "Q-110",
@@ -3624,7 +3612,7 @@
       "verification_commands": [],
       "priority": "P2",
       "state": "planned",
-      "readiness": "blocked_by_decision",
+      "readiness": "pending_dependencies",
       "open_question_ids": [
         "Q-165"
       ],
@@ -4372,7 +4360,8 @@
         "Зафиксировать цели/категории/основания/получателей/сроки в матрице поDEC004.",
         "Собирать только разрешённые поля по1–2 за диалог; добровольный отказ не заполняется догадкой.",
         "Отдельное согласие передачи эксперту связывать с бронью, версией текста и подтверждённым principal.",
-        "Отделить разговорный возраст/предположения пола от проверки18+; ограничить чтение полей каждой ролью."
+        "Отделить разговорный возраст/предположения пола от проверки18+; ограничить чтение полей каждой ролью.",
+        "Связь 2026-09-21 (вердикт Б): CAP-4-дефект персиста входящего текста вынесен в отдельную задачу TASK-PLT-018 (носителем решётки DEC-PLT-014); grant-механизм — TASK-PLT-017; вопросы Q-001/Q-117/Q-144 возвращены в open этим reopen."
       ],
       "acceptance": [
         "При отсутствии/отзыве согласия передача запроса/контактов эксперту прекращается.",
@@ -5669,7 +5658,7 @@
         "create": [],
         "tests": []
       },
-      "current_state": "Открытое противоречие/решение; ни один вариант не утверждён этим разбором.",
+      "current_state": "DEC-EXP-005 accepted: current landing :root palette is the one live palette.",
       "deliverables": [
         "Запись решения DEC-EXP-005: выбранное правило, основание, дата, ответственный, судьба существующих данных."
       ],
@@ -5686,7 +5675,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
@@ -5716,7 +5705,7 @@
         "create": [],
         "tests": []
       },
-      "current_state": "Открытое противоречие/решение; ни один вариант не утверждён этим разбором.",
+      "current_state": "DEC-EXP-006 accepted no-change: no post-visit quiet/D+1 review/daily checkups in runtime; EXP-003 must not add them.",
       "deliverables": [
         "Запись решения DEC-EXP-006: выбранное правило, основание, дата, ответственный, судьба существующих данных."
       ],
@@ -5733,7 +5722,7 @@
       ],
       "verification_commands": [],
       "priority": "P0",
-      "state": "planned",
+      "state": "merged",
       "readiness": "ready",
       "open_question_ids": [],
       "source_claim_ids": [],
@@ -6215,6 +6204,1131 @@
       "open_question_ids": [],
       "source_claim_ids": [],
       "detail_ids": []
+    },
+    {
+      "id": "TASK-DEC-PLT-011",
+      "title": "Решить: Способ ЭП, идентификация и доказательства письменного согласия",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-011"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-011-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-011: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Какой способ ЭП, уровень подтверждения личности и комплект доказательств утверждаются для письменного согласия на спецданные в подробном режиме?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-011-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "C006",
+        "C074"
+      ],
+      "detail_ids": [],
+      "state": "merged",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-DEC-PLT-012",
+      "title": "Решить: Класс защищённости УЗ и доказательство РФ-региона для персиста спецданных",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-012"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-012-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-012: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Какой класс УЗ и комплект мер по приказу ФСТЭК № 21 применяются к контуру хранения спецкатегорий и как документируется РФ-регион хостинга?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-012-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B088",
+        "C009"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-PLT-013",
+      "title": "Решить: Канал подписи и участие Telegram в обработке спецданных",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [
+        "TASK-DEC-PLT-011"
+      ],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-013"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-013-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-013: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Где подписывается письменное согласие и допускается ли подробный режим в Telegram, с какой ревизией §4 правила DEC-PLT-004?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-013-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C005",
+        "C006"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-PLT-014",
+      "title": "Решить: Правовая основа входного потока при незапрошенных спецданных и ПД третьих лиц",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-PLT-014"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/evidence/DEC-PLT-014-rule.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Открыто вердиктом владельца Б от 2026-09-21 (reopen инварианта DEC-PLT-004 под подробный режим); ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-PLT-014: выбранное правило, основание, дата, ответственный, судьба interim-режима DEC-PLT-004."
+      ],
+      "steps": [
+        "Каково основание и технический режим обработки входящего свободного текста до получения согласия: карантин без персиста, минимальная обработка с отдельным основанием, или отказ от приёма?"
+      ],
+      "acceptance": [
+        "Точное правило с границами и бинарными проверками в evidence/DEC-PLT-014-rule.md; статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C009"
+      ],
+      "detail_ids": [],
+      "state": "merged",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-017",
+      "title": "Реализовать выдачу, просмотр и отзыв согласий (grant-механизм)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "docs/operations/owner-update-data-matrix.md",
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "modify": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0039_consent_grant_audit.sql",
+          "tests/repo/consent-grant.test.ts"
+        ],
+        "tests": [
+          "tests/repo/consent-grant.test.ts"
+        ]
+      },
+      "current_state": "Исполнено на ветке 2026-09-21: миграция 0039 (аддитивно: `sequence identity` как детерминированный тай-брейкер вместо двух несовместимых дериваций, канал, scope_fields, ссылки на версию документа и предъявления, prior_decision_id, recipient_id/reservation_id, text_sha256, basis; CHECK-словарь decision='granted|denied|revoked' как NOT VALID) + три связи consent_document_versions / consent_presentations / consent_states с монотонной revision + репозиторий PostgresConsentEvidenceRepository (approveDocumentVersion, issuePresentation, recordDecision с одноразовым погашением токена, invalidatePresentations, currentState) + 12 интеграционных тестов на postgres:16-alpine, включая контроль переворотом (убрал проверку consumed_at -> тест повтора красный). + отзыв переведён в новую модель 2026-09-21 (`privacy-repository.ts`: отзыв ранее выданного пишется как `revoked`, первоначальный отказ остаётся `denied`; в той же транзакции — проекция в `consent_states` с монотонной `revision` и гашение ранее выданных предъявлений, EVID-01/03/04, RIGHTS-08)  + единая деривация «текущее решение» для всех read-гейтов (`packages/db/src/repositories/consent-current.ts`: одно выражение вместо трёх; `distinct on … order by created_at desc, id desc` с тай-брейкером-uuid удалён, ничья на одном мгновении теперь fail-closed)  + тесты: `tests/integration/consent-current-derivation.test.ts` (5, включая ничью в обоих порядках вставки) и переписанный юнит-контракт `test-expert-consent-authority.test.ts` (7: порядок опроса целей, short-circuit, fail-closed на ответе БД; контроль переворотом «строка есть = granted» красит 5); пин списка таблиц `tests/integration/schema.test.ts` обновлён под три новые таблицы 0039.\nИсполнено 2026-09-21 вечером: HTTP-поверхность просмотра и отзыва (`GET /v1/client/privacy/consents`, `POST /v1/client/privacy/consents/withdraw`) за default-off флагом `CLIENT_PRIVACY_ENABLED`, аутентификация клиентской сессией, списочная форма единого оракула `currentConsentStatesSql`. НЕ исполнено: выдача согласия по предъявлению (presentation/decision-эндпоинты), web/bot UI (D13/D14), экспорт и уничтожение как маршруты (ждут подтверждающего UX по T32), барьер ревизии в диспетчере исходящих (EGRESS-03, D6).",
+      "deliverables": [
+        "Миграция packages/db/migrations/0039_consent_grant_audit.sql: audit-колонки §3 (text_hash, scope_fields, recipient_id, evidence_uri, reservation_id) и словарь целей включая отсутствующие.",
+        "Сервисный путь grant: append-only запись decision='granted' с policy_version только по действию клиента; перенос privacyService из disabledService в реальный ингресс.",
+        "API и экран клиента: просмотр действующих согласий, выдача цели, отзыв цели с остановкой отложенных заданий и поздних ответов.",
+        "Регресс-тесты tests/repo/consent-grant.test.ts (grant→read-gate открывается, withdraw→закрывается, повторное нажатие идемпотентно)."
+      ],
+      "steps": [
+        "Спроектировать одну транзакцию grant по образцу withdrawConsentAtomically (serializable + advisory lock) и зафиксировать, что внешняя модель/промпт не имеют пути записи.",
+        "Поднять privacy-ингресс (apps/api/src/server.ts:337) за default-off флагом клиентского контура; включить его без релиза нельзя.",
+        "Согласие на подбор НЕ создавать: основание подбора — договор (DEC-PLT-004 §1), UI показывает acknowledgement без consent-записи.",
+        "Миграцию выполнить вручную (drizzle-kit generate запрещён AGENTS.md) и проверить совпадение SQL с живой БД до применения."
+      ],
+      "acceptance": [
+        "Ни одна спецкатегория не персистится: interim-правило DEC-PLT-004 §2 соблюдено, запрещённых колонок 0.",
+        "grant возможен только через верифицированный UI клиента; тест-контроль: путь записи недоступен сервису внешней модели.",
+        "CAP-5/6/7 ТЗ становятся исполнимыми: разрешение связано с экспертом/встречей/версией состава (аудит-колонки заполнены).",
+        "Публичные тексты не изменены (DEC-PLT-007); live-активация не объявлена.",
+        "Отдельно: отзыв должен писать 'revoked' через ту же модель с bump revision (сейчас остаётся 'denied' без предъявления) — не объявлять TASK-PLT-017 закрытой."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/consent-grant.test.ts"
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "implemented_pending_review",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-018",
+      "title": "Карантин входящего текста до правового основания (CAP-4 дефект)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-014"
+      ],
+      "decision_ids": [
+        "DEC-PLT-014"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/safety.ts",
+          "packages/config/src/env.ts",
+          "packages/db/src/repositories/b2-sensitive-retention-repository.ts"
+        ],
+        "modify": [
+          "packages/db/src/repositories/hybrid-message-repository.ts",
+          "packages/config/src/env.ts"
+        ],
+        "create": [
+          "tests/repo/inbound-text-quarantine.test.ts"
+        ],
+        "tests": [
+          "tests/repo/inbound-text-quarantine.test.ts"
+        ]
+      },
+      "current_state": "Правило закрыто ТЗ 2026-09-21 (SENS-03/BOT-02/RET-01): карантин без персиста. Дефект жив: путь B1 хранит сырой текст входа 30 дней без скрининга (hybrid-message-repository.ts:105-107, проверено 2026-09-21), safety-конвейер в проде отключён (apps/api/src/server.ts:332-333). Блокирующая оговорка: ТЗ требует отдельно описать «основание минимального приёма» (BOT-02) — без этой формулировки задача не закрывается, но техническую часть (не персистить, не пересылать, нейтральный ответ) можно реализовывать.",
+      "deliverables": [
+        "Режим обработки входа по DEC-PLT-014: скрининг/карантин до персиста сырого текста (hybrid-message-repository.ts:105-107) с документированным TTL.",
+        "Обновление docs/operations/owner-update-data-matrix.md: фактический состав и срок персиста входа.",
+        "Регресс-тест tests/repo/inbound-text-quarantine.test.ts: контрольный текст не попадает в постоянные хранилища и во внешние вызовы."
+      ],
+      "steps": [
+        "До принятия DEC-PLT-014 не имплементировать: задача открыта как носитель дефекта, interim-правило уже запрещает персист спецданных.",
+        "Замерить текущий фактический персист (30 дней) и зафиксировать в матрице как дефект, а не как основание.",
+        "Выбранный вариант реализовать с тест-контролем «последующее согласие не легализует задним числом».",
+        "Не объявлять выполнение без формулировки основания приёма от владельца/юриста (BOT-02, SENS-03)."
+      ],
+      "acceptance": [
+        "Контрольный текст не обнаруживается в dialogue_inbound и в исходящих payload после реализации.",
+        "TTL и состав персиста входа в матрице и в коде совпадают (проверяются тестом).",
+        "Better-than-nothing: ни один внешний ИИ-вызов не получает неэкранированный вход до granted основания."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/inbound-text-quarantine.test.ts"
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-019",
+      "title": "Письменное согласие с ЭП: подписание, идентификация, хранилище доказательств",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-011",
+        "TASK-PLT-017"
+      ],
+      "decision_ids": [
+        "DEC-PLT-011"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts",
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "modify": [
+          "packages/domain/src/consent.ts",
+          "packages/db/src/repositories/privacy-repository.ts",
+          "apps/api/src/server.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0040_consent_evidence.sql",
+          "docs/security/detailed-mode-signature.md",
+          "tests/repo/consent-evidence.test.ts"
+        ],
+        "tests": [
+          "tests/repo/consent-evidence.test.ts"
+        ]
+      },
+      "current_state": "НЕ ВХОДИТ В РЕЛИЗ по DEC-PLT-011 (2026-09-21: ЭП в этот релиз не входит; SENS-01 ТЗ). Компонентов нет ни в коде, ни в схеме; реализация возобновляется только при отдельном решении владельца о письменной форме. Доказательность согласий в этом релизе достигается серверным журналом (EVID-01…07), а не подписью.",
+      "deliverables": [
+        "Миграция packages/db/migrations/0040_consent_evidence.sql: хранилище доказательств подписания (версия документа, штамп времени, результат проверки).",
+        "docs/security/detailed-mode-signature.md: способ подписи и идентификации по DEC-PLT-011 с границами и отказными случаями.",
+        "Тесты tests/repo/consent-evidence.test.ts на отрицательные сценарии."
+      ],
+      "steps": [
+        "Начинать только после принятия DEC-PLT-011 и закрытия TASK-PLT-017 (grant — общий путь записи).",
+        "Подробный режим держать закрытым default-off флагом до приёмки всех условий CAP-3.",
+        "Не персистить спецданные до TASK-PLT-020 (класс УЗ и РФ-регион)."
+      ],
+      "acceptance": [
+        "Отрицательные сценарии (сбой подписи, повторные нажатия, отзыв, просроченная версия документа) оставляют режим закрытым.",
+        "Одной кнопки недостаточно в коде, а не только в тексте: гейт проверяет подпись, личность, объём и действительность.",
+        "interim-правило DEC-PLT-004 не нарушается ни в одном тестовом прогоне."
+      ],
+      "verification_commands": [
+        "pnpm install --frozen-lockfile && pnpm exec vitest run tests/repo/consent-evidence.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "pending_dependencies"
+    },
+    {
+      "id": "TASK-PLT-020",
+      "title": "Контур УЗ и доказательство РФ-региона для персиста спецданных",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "integration",
+      "owner": "ops",
+      "depends_on": [
+        "TASK-DEC-PLT-012",
+        "TASK-PLT-019"
+      ],
+      "decision_ids": [
+        "DEC-PLT-012"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "docs/runbooks/go-live-evidence.md",
+          "docs/security/threat-model-and-go-live-gates.md"
+        ],
+        "modify": [
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "create": [
+          "docs/security/uz-detailed-mode-measures.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Предмет отпал после DEC-PLT-011 (подписи и спецданных в релизе нет). Задача держится открытой только на случай пересмотра DEC-PLT-011; в объём текущего релиза не входит. Отдельно ТЗ требует оценить модель угроз и уровень ИСПДн без готовых выводов (SEC-01) — это не эта задача.",
+      "deliverables": [
+        "docs/security/uz-detailed-mode-measures.md: комплект мер по выбранному классу УЗ (DEC-PLT-012) с владельцем каждой меры.",
+        "Записи доказательств РФ-региона хостинга в docs/runbooks/go-live-evidence.md с точным коммитом и датой.",
+        "Свидетельства под docs/test-evidence/ на каждую меру."
+      ],
+      "steps": [
+        "Не начинать до принятия DEC-PLT-012.",
+        "Согласовать меры с текущим threat-model (docs/security/threat-model-and-go-live-gates.md) и не ослаблять существующие гейты.",
+        "Реестр гейтов включения подробного режима: физическая невозможность включить без доказанного региона."
+      ],
+      "acceptance": [
+        "Каждая мера DEC-PLT-012 имеет свидетельство с точным коммитом.",
+        "Без доказательства РФ-региона подробный режим не включается конструкцией, а не договорённостью.",
+        "Действующие гейты прода (default-off, redaction) не ослаблены."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-021",
+      "title": "Канал подписи и исключающий спецданные режим Telegram",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-PLT-013",
+        "TASK-PLT-019"
+      ],
+      "decision_ids": [
+        "DEC-PLT-013"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/config/src/env.ts",
+          "docs/operations/owner-update-data-matrix.md"
+        ],
+        "modify": [
+          "packages/config/src/env.ts"
+        ],
+        "create": [
+          "docs/operations/detailed-mode-channel-boundary.md"
+        ],
+        "tests": []
+      },
+      "current_state": "Предмет отпал после DEC-PLT-011 (подписи и спецданных в релизе нет). Задача держится открытой только на случай пересмотра DEC-PLT-011; в объём текущего релиза не входит. Отдельно ТЗ требует оценить модель угроз и уровень ИСПДн без готовых выводов (SEC-01) — это не эта задача.",
+      "deliverables": [
+        "docs/operations/detailed-mode-channel-boundary.md: границы канала по DEC-PLT-013 (что допустимо в Telegram, что только в веб-контуре).",
+        "Конфигурационный гейт в packages/config/src/env.ts, запрещающий спецданные в Telegram-пути до решения DEC-PLT-013.",
+        "Ревизия §4 правила и матрицы обработителей при допуске Telegram (отдельная запись владельца)."
+      ],
+      "steps": [
+        "Не начинать до принятия DEC-PLT-013.",
+        "Паспортные реквизиты и содержимое подробного разговора в чат не отправляются — проверить текстами интерфейса и кодом.",
+        "Отказ от подробного режима не закрывает каталог: проверить UX-путь."
+      ],
+      "acceptance": [
+        "Матрица обработителей и код канала не противоречат друг другу (проверяемый тест/скрипт).",
+        "Ни один путь Telegram не может донести спецданные до персиста или внешнего ИИ при закрытом DEC-PLT-013.",
+        "Копия не давит на клиента и не обещает несуществующего (проверка copy-guard)."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-FIN-029",
+      "title": "Решить: Многоразовость эксперского referral-кода",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-029"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто независимым review FIN-артефактов 2026-09-21; ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-FIN-029: выбранный вариант, основание, дата, ответственный."
+      ],
+      "steps": [
+        "Один код расходуется однократно или резидент приводит нескольких коллег одним кодом?"
+      ],
+      "acceptance": [
+        "Правило зафиксировано в decision-register.md со статусом accepted; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "D037"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-DEC-FIN-030",
+      "title": "Решить: Абсолютные цены партнёрских полос center и organizer",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-030"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто независимым review FIN-артефактов 2026-09-21; ни один вариант не утверждён.",
+      "deliverables": [
+        "Запись решения DEC-FIN-030: выбранный вариант, основание, дата, ответственный."
+      ],
+      "steps": [
+        "Какие цены полос публикуются как действующий approved тариф центра и организатора?"
+      ],
+      "acceptance": [
+        "Правило зафиксировано в decision-register.md со статусом accepted; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D039"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-FIN-029",
+      "title": "Подключить qualified referral count к расчёту партнёрской полосы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-FIN-031"
+      ],
+      "decision_ids": [
+        "DEC-FIN-012",
+        "DEC-FIN-031"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/partner-pricing.ts",
+          "packages/domain/src/partner-pricing.test.ts",
+          "packages/db/src/repositories/partner-commerce-repository.ts",
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "modify": [
+          "packages/db/src/repositories/partner-commerce-repository.ts"
+        ],
+        "create": [
+          "tests/repo/partner-tier-wiring.test.ts"
+        ],
+        "tests": [
+          "tests/repo/partner-tier-wiring.test.ts"
+        ]
+      },
+      "current_state": "Разделено 2026-09-21. Исполнено: границы полосы закреплены тестами 0..99 на оба kind (packages/domain/src/partner-pricing.test.ts, 52 теста; контроль: при пороге 5 вместо 6 краснеют ровно кейсы «5 -> STANDARD»), плюс DB-free гарант tests/repo/partner-quote-source.test.ts, пиннящий отсутствие источника числа (проверен переворотом: добавление колонки expert_id делает его красным). Не исполнимо сейчас: сам подсчёт qualified count — связи commercial_participants с экспертами в схеме нет (замер 2026-09-21), production-путь передаёт литерал 0 (partner-commerce-repository.ts:101) → блокируется DEC-FIN-031.",
+      "deliverables": [
+        "Котировка получает фактическое число подтверждённых квалифицированных рефералов, а не литерал 0.",
+        "Boundary-тесты на 4/5/6/9/10 подтверждают: 5 ⇒ STANDARD, 6 ⇒ REFERRED_6_9, 10 ⇒ REFERRED_10_PLUS без ретро-смены.",
+        "Гарунт tests/repo/partner-quote-source.test.ts: отсутствие аффилиации и литерал 0 в writer зафиксированы тестом и обязаны перевернуться при добавлении связи."
+      ],
+      "steps": [
+        "Взять источник qualified count из действующего движка квалификации (оплаченное/подтверждённое участие), не из числа регистраций.",
+        "Не менять пороги DEC-FIN-012 (>=6 и >=10) и не трогать conservation-тесты полос."
+      ],
+      "acceptance": [
+        "Ни одна новая котировка не сохраняется в STANDARD при >=6 подтверждённых рефералах (тест).",
+        "Поведение существующих строк не меняется задним числом: пересчёт только для новых котировок."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/partner-tier-wiring.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-FIN-030",
+      "title": "Движок расхода партнёрских полос и записи посещаемости группы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-012",
+        "DEC-FIN-013"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/domain/src/partner-pricing.ts",
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "modify": [
+          "packages/domain/src/partner-pricing.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0039_partner_band_consumption.sql",
+          "tests/repo/partner-band-consumption.test.ts"
+        ],
+        "tests": [
+          "tests/repo/partner-band-consumption.test.ts"
+        ]
+      },
+      "current_state": "Strict-band consumption описан в артефактах, но не реализован: eventEntitlements участвует только в валидации формы и в выводе котировки (partner-pricing.ts:73-74, :84), таблиц расхода/entitlement-лимита нет (проверено 2026-09-21), полей вместимости и посещаемости в expert-residency.ts нет.",
+      "deliverables": [
+        "Учёт расхода полос: одно событие не может расходовать корзину большей полосы и не может быть засчитано дважды.",
+        "Запись посещаемости включённой группы (до 20 человек по REQ-FIN-013.01) как основание распределения 30/70."
+      ],
+      "steps": [
+        "Реализовать ledger расхода поверх существующей versioned policy, без дублирования полос в коде.",
+        "Держать миграцию ручной (drizzle-kit generate запрещён) и проверить SQL-совпадение с живой БД до применения."
+      ],
+      "acceptance": [
+        "Тест: второе событие сверх лимита полосы отклоняется или тарифицируется как дополнительная группа (10%/15%).",
+        "Тест: сумма deposit+remainder conservation 30/70 сохраняется при любом числе участников до 20."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/partner-band-consumption.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "pending_dependencies"
+    },
+    {
+      "id": "TASK-FIN-031",
+      "title": "Lifecycle эксперского кода: отметка видимости и ограничение одного активного кода",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-014",
+        "DEC-FIN-029"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/schema/expert-residency.ts",
+          "packages/db/src/repositories/expert-referral-admin-repository.ts"
+        ],
+        "modify": [
+          "packages/db/src/schema/expert-residency.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0040_expert_referral_visibility.sql",
+          "tests/repo/expert-referral-code-lifecycle.test.ts"
+        ],
+        "tests": [
+          "tests/repo/expert-referral-code-lifecycle.test.ts"
+        ]
+      },
+      "current_state": "Артефакт fin-expert-code-lifecycle.md описывал несуществующее: колонки visibleAt нет (0 совпадений по packages/ и apps/), «один резидент — один активный код» не обеспечено (unique только code_hash и тривиальный (id, inviter_expert_id), expert-residency.ts:244-247), коды чеканятся батчем (expert_referral.batch_generate), а не при регистрации резидента. Многоразовость — открытый DEC-FIN-029.",
+      "deliverables": [
+        "Отметка видимости кода по первой успешной оплате резидентуры (DEC-FIN-014 ①) реализована колонкой и гейтом display/API.",
+        "Ограничение «не более одного кода в статусе issued на резидента» обеспечено схемой (partial unique) после решения DEC-FIN-029 о многоразовости."
+      ],
+      "steps": [
+        "Миграцию выполнять вручную; проверять, что выдача батча не может создать второй активный код тому же резиденту.",
+        "Не менять деривацию code_hash/key_version (это ключ идемпотентности)."
+      ],
+      "acceptance": [
+        "Тест: до первой успешной оплаты код не отдаётся в display/API, после — отдаётся.",
+        "Тест: второй issued-код тому же inviter_expert_id отклоняется (при однократной семантике)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/expert-referral-code-lifecycle.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-FIN-032",
+      "title": "Опубликовать approved партнёрские тарифные строки (seed policy rows)",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [
+        "TASK-DEC-FIN-030",
+        "TASK-FIN-029"
+      ],
+      "decision_ids": [
+        "DEC-FIN-030"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/schema/partner-commerce.ts",
+          "packages/db/migrations/0037_partner_commerce_a.sql"
+        ],
+        "modify": [
+          "packages/db/src/schema/partner-commerce.ts"
+        ],
+        "create": [
+          "packages/db/migrations/0041_partner_tariff_policy_seed.sql"
+        ],
+        "tests": []
+      },
+      "current_state": "Действующего тарифа нет: строк partner_tariff_policy_versions со статусом approved в дереве нет, а числа 15000/12000/8000 (центр) и 20000/15000/10000 (организатор) существуют только в тест-фикстуре partner-commerce-repository.test.ts:24 (проверено 2026-09-21). CHECK в 0037 закрепляет валюту, пороги полос и комиссии, но не абсолютные цены.",
+      "deliverables": [
+        "Versioned approved строки политик для CENTER и ORGANIZER с числами из DEC-FIN-030 и effective_from.",
+        "Синхронизация артефактов fin-center-policy.md и fin-organizer-policy.md: ссылаться на опубликованную политику, а не на фикстуру."
+      ],
+      "steps": [
+        "Сид — отдельная ручная миграция; в одном прогоне с ней не менять пороги полос.",
+        "Тест-фикстура остаётся фикстурой и не должна использоваться как источник продуктового тарифа."
+      ],
+      "acceptance": [
+        "После сида котировка читает approved-строку и считает полосу по DEC-FIN-012 (тест с реальной политикой).",
+        "Ни одно публичное число тарифа не берётся из теста (проверяется grep-тестом по дереву)."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-022",
+      "title": "Подключить потребитель события booking.handoff_revoked",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/contracts/src/worker-outbox.ts",
+          "packages/db/src/repositories/outbox-repository.ts",
+          "packages/db/src/repositories/privacy-repository.ts"
+        ],
+        "modify": [
+          "packages/contracts/src/worker-outbox.ts",
+          "packages/db/src/repositories/outbox-repository.ts"
+        ],
+        "create": [
+          "tests/repo/handoff-revoke-consumer.test.ts"
+        ],
+        "tests": [
+          "tests/repo/handoff-revoke-consumer.test.ts"
+        ]
+      },
+      "current_state": "Событие `booking.handoff_revoked` порождается (`privacy-repository.ts:235-243`), но темы нет ни в allowlist воркера, ни в списке claim'ов Telegram: `grep -rn handoff_revoked packages/contracts/src/worker-outbox.ts packages/db/src/repositories/outbox-repository.ts` пусто (проверено 2026-09-21), а `outbox-repository.ts:31-37` бросает `worker_outbox_topic_allowlist_invalid` на неперечисленные темы. Нога §3 «получатели удаляют свои копии» не подключена.",
+      "deliverables": [
+        "Тема `booking.handoff_revoked` в allowlist и диспетчер, который исполняет аннулирование переданного состава у получателя.",
+        "Идемпотентность: повторная доставка не порождает повторного исполнения и не возвращает данные эксперту."
+      ],
+      "steps": [
+        "Определить поведение при выключенном внешнем канале (все флаги default-off): фиксировать локальное исполнение, не изобретать внешний вызов.",
+        "Сохранить трипвайр: неизвестная тема по-прежнему должна ронять воркера."
+      ],
+      "acceptance": [
+        "Событие, поставленное отзывом, прочитано потребителем и помечено исполненным (DB-free тест по allowlist + интеграционный прогон).",
+        "Ни один путь не возвращает эксперту данные после отзыва (тот же кейс, что в read-гейте)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/handoff-revoke-consumer.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-023",
+      "title": "Гейт времени показа meeting_url эксперту (§4 «не ранее 30 минут»)",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [
+        "DEC-PLT-004"
+      ],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/db/src/repositories/booking-repository.ts",
+          "packages/integrations/src/telegram/telegram-adapter.ts",
+          "docs/runbooks/go-live-evidence.md"
+        ],
+        "modify": [
+          "packages/db/src/repositories/booking-repository.ts",
+          "packages/integrations/src/telegram/telegram-adapter.ts"
+        ],
+        "create": [
+          "tests/repo/meeting-url-timing-gate.test.ts"
+        ],
+        "tests": [
+          "tests/repo/meeting-url-timing-gate.test.ts"
+        ]
+      },
+      "current_state": "Исполнено на ветке codex/fin-001 (2026-09-21): `booking-repository.ts` гейтит `meetingUrl` условием `s.starts_at - MEETING_URL_DISCLOSURE_LEAD_MS (30 мин) * interval '1 millisecond' <= clock_timestamp()`; адаптер Telegram менять не потребовалось — он печатает `Встреча:` только когда поле присутствует в записи (telegram-adapter.ts:473-476), а маппинг репозитория опускает null (booking-repository.ts:681-682). Замер таблицы истинности выражения на postgres:16-alpine: +2h → false, +30min/+10min/прошлое → true. Интеграционный кейс проверяет обе стороны (+2h ссылки нет, +10min есть) и обязан краснеть при удалении гейта — проверено removal-экспериментом.",
+      "deliverables": [
+        "Временной гейт на обоих путях показа ссылки (SQL и рендер сообщения): до порога ссылка не раскрывается.",
+        "Порог — число из схемы env с fail-closed default: отсутствие конфигурации = не показывать."
+      ],
+      "steps": [
+        "Не менять состав §3 (минимальный handoff включает meeting_url) — ужесточение только по времени.",
+        "Контроль обязан перевернуться: за 40 минут ссылки нет, за 10 минут — есть."
+      ],
+      "acceptance": [
+        "Ссылка не попадает в expert schedule message и в schedule-запись ранее порога (тест).",
+        "При `starts_at` в прошлом или неопределённом — отказ по умолчанию (fail-closed).",
+        "Гарунт в tests/repo/booking-repository-guards.test.ts пиннит константу 30 минут и условие в SQL."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/meeting-url-timing-gate.test.ts"
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "A005"
+      ],
+      "detail_ids": [],
+      "state": "implemented_pending_review",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-DEC-FIN-031",
+      "title": "Решить: Модель аффилиации партнёра с экспертами для расчёта полосы",
+      "requirement_ids": [
+        "REQ-FIN-002"
+      ],
+      "item_ids": [],
+      "kind": "decision",
+      "owner": "product-owner",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [
+        "DEC-FIN-031"
+      ],
+      "files": {
+        "inspect": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md",
+          "packages/db/src/schema/partner-commerce.ts",
+          "packages/db/src/schema/expert-residency.ts"
+        ],
+        "modify": [
+          "_bmad-output/specs/spec-owner-update-2026-09-16/decision-register.md"
+        ],
+        "create": [],
+        "tests": []
+      },
+      "current_state": "Открыто 2026-09-21 при попытке исполнить TASK-FIN-029: связи commercial_participants (CENTER/ORGANIZER) с экспертами в схеме нет, production-котировка передаёт qualifiedExpertCount: 0 (partner-commerce-repository.ts:101).",
+      "deliverables": [
+        "Запись решения DEC-FIN-031: что считается приведёнными экспертами для партнёра, из какой таблицы и с каким статусом подтверждения."
+      ],
+      "steps": [
+        "Выбрать модель аффилиации (новая таблица связи / расширенный referral graph / признать правило неактивным) и зафиксировать её с числами и границами."
+      ],
+      "acceptance": [
+        "Правило исполнимо без изобретения источника: после решения TASK-FIN-029 получает конкретный запрос подсчёта.",
+        "Статус accepted в decision-register.md; связанные задачи переведены из blocked_by_decision."
+      ],
+      "verification_commands": [
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D037",
+        "D039"
+      ],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "blocked_by_decision"
+    },
+    {
+      "id": "TASK-PLT-024",
+      "title": "Убрать предсогласиевую аналитику из публичной оболочки (TRACK-01/02/03)",
+      "requirement_ids": [
+        "REQ-PLT-007"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "frontend",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "apps/web/index.html",
+          "apps/web/src/index-shell.test.ts",
+          "apps/web/src/main.ts",
+          "deploy/nginx/ii-tonya",
+          "apps/web/src/legal/policy.txt"
+        ],
+        "modify": [
+          "apps/web/index.html",
+          "apps/web/src/index-shell.test.ts",
+          "tests/repo/test-expert-trial-traceability.test.ts"
+        ],
+        "create": [],
+        "tests": [
+          "apps/web/src/index-shell.test.ts"
+        ]
+      },
+      "current_state": "TRACK-01 исполнен на ветке 2026-09-21: из `apps/web/index.html` удалён inline-блок Я.Метрики (wc счётчик 111827123, webvisor:true, clickmap:true, ecommerce, trackLinks) и `noscript`-пиксель `mc.yandex.ru/watch/...`; текст-подсказка про JavaScript сохранена. Тесты ранее **закрепляли** нарушение (`index-shell.test.ts` исполнял inline-скрипт в vm и сверял опции; `test-expert-trial-traceability.test.ts` требовал наличия счётчика) — переписаны в негативные (5 и 1 проверок). Контроль переворота: с возвращённой Метрикой падают 6 тестов, без неё — 8 зелёные. Замер прода: `curl --noproxy '*' https://ii-tonya.ru/` отдаёт статический HTML 1604 байта (Last-Modified 27.08.2026) **без** счётчика, то есть задеплоенная копия нарушения не содержала; дефект жил в исходниках лендинга и в локальной сборке `apps/web/dist` (артефакт, не в git).",
+      "deliverables": [
+        "Публичная оболочка не создаёт сторонних запросов до выбора пользователя (TRACK-01, T27).",
+        "Негативные CI-проверки оболочки: ни inline-скриптов, ни сторонних хостов, ни запроса в noscript-ветке.",
+        "Остаток объёма: TRACK-02 (запрет Webvisor на экранах с ПД — требуется экран согласия), TRACK-03 (чистый bootstrap приватной части — требует решения владельца о наличии web-кабинета), CSP в nginx (защетный барьер), файл подтверждения владения `apps/web/public/yandex_bece38d2993630d3.html` (нужно слово владельца: оставлять ли верификацию аккаунта Яндекса)."
+      ],
+      "steps": [
+        "Держать аналитику полностью выключенной, пока нет утверждённого выбора `cookies_analytics` и записи в реестре обработчиков.",
+        "Любое будущее включение — только динамически загружаемым модулем после серверного `granted`, никогда inline в оболочке.",
+        "Не объявлять TRACK-02/T28 выполненными, пока в web нет приватного экрана: проверять нечего (замер: в `apps/web/src/main.ts` только `/`, `/oferta`, `/privacy`; роутера и кабинета нет)."
+      ],
+      "acceptance": [
+        "`index.html` не содержит ни одного стороннего URL и ни одного inline-<script> (тест).",
+        "noscript-ветка не содержит <img|<script|url( (тест).",
+        "Возврат счётчика или любого тег-менеджера делает CI красным (проверено переворотом)."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run apps/web/src/index-shell.test.ts tests/repo/test-expert-trial-traceability.test.ts",
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P0",
+      "open_question_ids": [],
+      "source_claim_ids": [],
+      "detail_ids": [],
+      "state": "implemented_pending_review",
+      "readiness": "ready"
+    },
+    {
+      "id": "TASK-PLT-025",
+      "title": "Журналы: перестать писать URI и текст ошибки, вернуть безопасную диагностику (TRACK-05, T29)",
+      "requirement_ids": [
+        "REQ-PLT-009"
+      ],
+      "item_ids": [],
+      "kind": "implementation",
+      "owner": "backend",
+      "depends_on": [],
+      "decision_ids": [],
+      "resolves_decisions": [],
+      "files": {
+        "inspect": [
+          "packages/observability/src/logger.ts",
+          "apps/api/src/app.ts",
+          "deploy/nginx/ii-tonya",
+          "apps/worker/src/main.ts",
+          "packages/worker/src/outbox-runner.ts"
+        ],
+        "modify": [
+          "packages/observability/src/logger.ts",
+          "apps/api/src/app.ts",
+          "deploy/nginx/ii-tonya"
+        ],
+        "create": [
+          "tests/repo/log-hygiene.test.ts"
+        ],
+        "tests": [
+          "tests/repo/log-hygiene.test.ts"
+        ]
+      },
+      "current_state": "Замерено 2026-09-21: в `msg` попадает сырой путь с query (404 Fastify: `Route GET:/nope?email=…&code=EXPE-RT-12345 not found`) и текст 5xx-исключения; правила для URI/query в `packages/observability/src/logger.ts` нет (греп по uri|query|referrer пуст). Обратная сторона: в access-строке нет ни method, ни statusCode, ни шаблона маршрута, ни remote address. `botKey` — сегмент пути webhook-а, а `deploy/nginx/ii-tonya` не задаёт `access_log`/`log_format` (grep пуст) ⇒ секрет уходит в журнал nginx. Обработчиков `unhandledRejection`/`uncaughtException` нет; воркер не импортирует логгер.",
+      "deliverables": [
+        "Санитизация URI/query и текста исключения в `msg`; тест, что телефон, почта и `botKey` не проходят в лог.",
+        "Явная allow-list запись завершения запроса (метод, шаблон маршрута, код статуса, длительность, корреляция) — безопасность и диагностика одновременно.",
+        "`log_format`/`access_log` в nginx с шаблоном маршрута вместо сырого URI; `botKey` — из пути в заголовок или в шаблон.",
+        "Перехват unhandled-исключений через санитизатор и структурированные reason-code строки в воркере."
+      ],
+      "steps": [
+        "Собрать пакет observability перед проверкой (dist устарел — D20), иначе тесты врут.",
+        "Не ослаблять существующие sensitiveKey-якоря ради «меньше шуметь» (риск перестать резать реальные message/url/body).",
+        "Не подменять продуктовое решение: `botKey` в пути убирается только вместе с совместимым контрактом webhook (нужен прогон на синтетике)."
+      ],
+      "acceptance": [
+        "T29: тест с заведомо «грязным» URL/телом даёт [REDACTED] и при этом сохраняет метод, шаблон маршрута и статус.",
+        "В тестовом выводе нет ни одного совпадения с телефон/почта/botKey-формой.",
+        "Контроль переворота: при отключении правила тест краснеет."
+      ],
+      "verification_commands": [
+        "pnpm exec vitest run tests/repo/log-hygiene.test.ts packages/observability",
+        "pnpm --filter @ii-tonya/observability build",
+        "python3 _bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py --repo-root ."
+      ],
+      "priority": "P1",
+      "open_question_ids": [],
+      "source_claim_ids": [],
+      "detail_ids": [],
+      "state": "planned",
+      "readiness": "ready"
     }
   ],
   "decisions": [
@@ -6458,7 +7572,8 @@
         "TASK-FIN-022"
       ],
       "reason": "Источник не определяет строгость условия.",
-      "decision_task_id": "TASK-FIN-007"
+      "decision_task_id": "TASK-FIN-007",
+      "status": "accepted"
     },
     {
       "id": "DEC-FIN-010",
@@ -6538,7 +7653,8 @@
         "TASK-EXP-015",
         "TASK-EXP-016",
         "TASK-FIN-013",
-        "TASK-FIN-023"
+        "TASK-FIN-023",
+        "TASK-FIN-029"
       ],
       "reason": "Источники дают >5 и 5–9, код использует >=6; rule bands отсутствует.",
       "decision_task_id": "TASK-FIN-012"
@@ -6878,7 +7994,8 @@
         "TASK-EXP-020"
       ],
       "reason": "Финальный вариант не выбран.",
-      "decision_task_id": "TASK-DEC-EXP-005"
+      "decision_task_id": "TASK-DEC-EXP-005",
+      "status": "accepted"
     },
     {
       "id": "DEC-EXP-006",
@@ -6897,7 +8014,8 @@
         "TASK-EXP-003"
       ],
       "reason": "Исходник содержит одновременно эти правила, приоритет не определён.",
-      "decision_task_id": "TASK-DEC-EXP-006"
+      "decision_task_id": "TASK-DEC-EXP-006",
+      "status": "accepted"
     },
     {
       "id": "DEC-PLT-001",
@@ -6993,7 +8111,10 @@
         "TASK-PLT-008",
         "TASK-PLT-010",
         "TASK-PLT-012",
-        "TASK-PLT-016"
+        "TASK-PLT-016",
+        "TASK-PLT-017",
+        "TASK-PLT-022",
+        "TASK-PLT-023"
       ],
       "reason": "Начало диалога, cookies и акцепт перечислены как согласие; правовую достаточность и юрисдикции эта спецификация не подтверждает.",
       "decision_task_id": "TASK-DEC-PLT-004"
@@ -7130,6 +8251,151 @@
       ],
       "reason": "14–19часов и дизайнерские3–5/5–7дней — оценки старого задания, не подтверждённый срок всего обновления.",
       "decision_task_id": "TASK-DEC-PLT-010"
+    },
+    {
+      "id": "DEC-PLT-011",
+      "title": "Способ ЭП, идентификация и доказательства письменного согласия",
+      "question": "Какой способ электронной подписи, какой уровень подтверждения личности и какой комплект доказательств утверждаются для письменного согласия клиента на обработку специальных категорий в подробном режиме?",
+      "options": [
+        "Внешний оператор квалифицированной ЭП (УКЭП / Госуслуги) с хранением подписанного документа, штампа времени и результата проверочной сессии.",
+        "Простая ЭП по подтверждённому каналу при письменном юридическом заключении о достаточности для ч. 4 ст. 9.",
+        "Подробный режим не открывать, пока доступная клиенту подпись не утверждена."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "C006",
+        "C074"
+      ],
+      "blocks": [
+        "TASK-PLT-019",
+        "TASK-PLT-020"
+      ],
+      "reason": "Вердикт Б 2026-09-21 сделал подробный режим целевым; ТЗ отвергает достаточность Telegram ID/SMS/callback; задач подписи в backlog не было.",
+      "decision_task_id": "TASK-DEC-PLT-011"
+    },
+    {
+      "id": "DEC-PLT-012",
+      "title": "Класс защищённости УЗ и доказательство РФ-региона для персиста спецданных",
+      "question": "Какой класс защищённости ИС и какой комплект мер по приказу ФСТЭК № 21 применяются к контуру, где начинают храниться специальные категории, и как документируется РФ-регион хостинга?",
+      "options": [
+        "Общий контур как УЗ-1 с полным комплектом мер и подтверждением региона до включения режима.",
+        "Выделенная изолированная подсистема подробного режима класса УЗ-1.",
+        "Не открывать режим до готовности мер УЗ-1."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B088",
+        "C009"
+      ],
+      "blocks": [
+        "TASK-PLT-020"
+      ],
+      "reason": "Класс УЗ-2 выбирался под инвариант «спецданные не храним»; reopen снимает это основание, доказательство РФ-региона не внесено.",
+      "decision_task_id": "TASK-DEC-PLT-012"
+    },
+    {
+      "id": "DEC-PLT-013",
+      "title": "Канал подписи и участие Telegram в обработке спецданных",
+      "question": "Где подписывается письменное согласие и допускается ли подробный режим в Telegram-канале, с какой ревизией §4 действующего правила?",
+      "options": [
+        "Только защищённая веб-страница оператора, Telegram вне контура спецданных.",
+        "Допустить Telegram после документированного аудита его участия и ревизии §4.",
+        "Не выбирать канал до DEC-PLT-011."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C005",
+        "C006"
+      ],
+      "blocks": [
+        "TASK-PLT-021"
+      ],
+      "reason": "ТЗ предпочитает веб-подпись и отдаёт Telegram на аудит; правило §4 запрещает тексты о здоровье в переписке.",
+      "decision_task_id": "TASK-DEC-PLT-013"
+    },
+    {
+      "id": "DEC-PLT-014",
+      "title": "Правовая основа входного потока при незапрошенных спецданных и ПД третьих лиц",
+      "question": "Каково правовое основание и технический режим обработки входящего свободного текста до получения требуемого согласия: карантин без персиста, минимальная техническая обработка с отдельным основанием, или отказ от приёма?",
+      "options": [
+        "Карантин: сырой текст не персистится, детерминированный скрининг отбрасывает спецданные/ПД третьих лиц, согласие не легализует задним числом.",
+        "Ограниченный персист с укороченным TTL и отдельным основанием для минимальной технической обработки.",
+        "Приём текстов со спецданными запрещён гейтом, ручной перевод на защищённый канал."
+      ],
+      "source_claim_ids": [
+        "A005",
+        "B087",
+        "C009"
+      ],
+      "blocks": [
+        "TASK-PLT-018"
+      ],
+      "reason": "CAP-4 нарушается сейчас: dialogue_inbound.text хранит сырой текст 30 дней без скрининга (hybrid-message-repository.ts:105-107).",
+      "decision_task_id": "TASK-DEC-PLT-014"
+    },
+    {
+      "id": "DEC-FIN-029",
+      "title": "Многоразовость эксперского referral-кода",
+      "question": "Один код расходуется однократно или резидент может приводить нескольких коллег одним кодом?",
+      "options": [
+        "Код однократный: после redeem выпускается новый батч.",
+        "Код многоразовый в пределах периода с капитоном по политике.",
+        "Многоразовость только для резидента с первой успешной оплатой."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "D037"
+      ],
+      "blocks": [
+        "TASK-FIN-031"
+      ],
+      "reason": "REQ-FIN-014.02 требует lifecycle многоразового кода, схема реализует однократный расход; DEC-FIN-014 закрывало только момент создания/видимости.",
+      "decision_task_id": "TASK-DEC-FIN-029"
+    },
+    {
+      "id": "DEC-FIN-030",
+      "title": "Абсолютные цены партнёрских полос center и organizer",
+      "question": "Какие абсолютные цены полос публикуются как действующий approved тариф центра и организатора?",
+      "options": [
+        "Утвердить числа из фикстуры (15000/12000/8000 и 20000/15000/10000) отдельным решением и завести сид.",
+        "Утвердить иные абсолютные цены versioned policy row.",
+        "Не публиковать партнёрские тарифы, цены не фиксировать."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D039"
+      ],
+      "blocks": [
+        "TASK-FIN-032"
+      ],
+      "reason": "DEC-FIN-012 зафиксировало пороги, а не цены; approved-строк политик в дереве нет, есть только тест-фикстура.",
+      "decision_task_id": "TASK-DEC-FIN-030"
+    },
+    {
+      "id": "DEC-FIN-031",
+      "title": "Модель аффилиации партнёра с экспертами для расчёта полосы",
+      "question": "Что именно и из какой таблицы считается приведёнными экспертами для CENTER и ORGANIZER?",
+      "options": [
+        "Новая таблица аффилиации participant↔expert с датой подтверждения.",
+        "Переиспользовать expert→expert referral graph через новый внешний ключ к organization_profiles.",
+        "Признать правило неактивным: shadow-котировки остаются STANDARD, перенос на будущий виток."
+      ],
+      "source_claim_ids": [
+        "C022",
+        "C023",
+        "C024",
+        "D037",
+        "D039"
+      ],
+      "blocks": [
+        "TASK-FIN-029"
+      ],
+      "reason": "Схема не содержит связи партнёра с экспертами, поэтому production-котировка передаёт 0 и порог DEC-FIN-012 не исполняется.",
+      "decision_task_id": "TASK-DEC-FIN-031"
     }
   ]
 }

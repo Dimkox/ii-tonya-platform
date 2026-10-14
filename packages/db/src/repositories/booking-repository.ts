@@ -7,6 +7,7 @@ import {
   type ReservationStatus,
 } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
+import { currentConsentSatisfiedSql } from "./consent-current.js";
 
 export interface ReserveSlotCommand {
   idempotencyKey: string;
@@ -238,6 +239,8 @@ const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
 
 const SLOT_FRESHNESS_MS = 15 * 60 * 1_000;
 const MINIMUM_LEAD_MS = 24 * 60 * 60 * 1_000;
+// DEC-PLT-004 §4 (строка Telegram): meeting_url уходит наружу не ранее 30 минут до встречи.
+const MEETING_URL_DISCLOSURE_LEAD_MS = 30 * 60 * 1_000;
 const MAXIMUM_HOLD_MS = 72 * 60 * 60 * 1_000;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -599,13 +602,15 @@ export class PostgresBookingRepository {
           else 'Клиент'
         end as "clientDisplayName",
         case
-          when note_consent.granted then cp.expert_note
+          when note_consent.granted and handoff_consent.granted then cp.expert_note
           else null
         end as "expertNote",
         note_consent.granted as "expertNoteConsent",
         handoff_consent.granted as "expertHandoffConsent",
         case
-          when r.status = 'booked' then r.meeting_url
+          when r.status = 'booked'
+            and s.starts_at - ${MEETING_URL_DISCLOSURE_LEAD_MS} * interval '1 millisecond' <= clock_timestamp()
+          then r.meeting_url
           else null
         end as "meetingUrl"
       from experts e
@@ -618,34 +623,16 @@ export class PostgresBookingRepository {
       join slots s on s.id = r.slot_id
       left join client_profiles cp on cp.user_id = r.user_id
       left join lateral (
-        select coalesce(
-          bool_and(latest.decision = 'granted'),
-          false
-        ) as granted
-        from consents latest
-        where latest.user_id = r.user_id
-          and latest.consent_type = 'expert_note'
-          and latest.created_at = (
-            select max(candidate.created_at)
-            from consents candidate
-            where candidate.user_id = r.user_id
-              and candidate.consent_type = 'expert_note'
-          )
+        ${currentConsentSatisfiedSql({
+          userExpression: sql`r.user_id`,
+          purpose: "expert_note",
+        })}
       ) note_consent on true
       left join lateral (
-        select coalesce(
-          bool_and(latest.decision = 'granted'),
-          false
-        ) as granted
-        from consents latest
-        where latest.user_id = r.user_id
-          and latest.consent_type = 'expert_handoff'
-          and latest.created_at = (
-            select max(candidate.created_at)
-            from consents candidate
-            where candidate.user_id = r.user_id
-              and candidate.consent_type = 'expert_handoff'
-          )
+        ${currentConsentSatisfiedSql({
+          userExpression: sql`r.user_id`,
+          purpose: "expert_handoff",
+        })}
       ) handoff_consent on true
       where e.id = ${command.expertId}::uuid
         and e.active

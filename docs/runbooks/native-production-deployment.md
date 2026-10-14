@@ -1,8 +1,9 @@
 # Native dedicated-server deployment
 
-Status: native production runtime deployed at
-`233f3cf72e45e47117948ad5615b603252801e40`; external-provider activation remains
-fail-closed and requires its own approval.
+Status: native production runtime `current` is
+`cb07bd1821d8106b0b0088b17bcf305662a1b792` as of 2026-09-18;
+`.previous-release` is `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b`.
+External-provider activation remains fail-closed and requires its own approval.
 
 ## Target topology
 
@@ -54,9 +55,9 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
 
 The old production image/Compose and GitHub Actions entrypoints are removed. The first
 native runtime at `233f3cf72e45e47117948ad5615b603252801e40` required host-only recovery
-settings and is operational but not a reproducible release. Its replacement must be
-built and deployed from an exact SHA containing the corrected versioned units before the
-native release gate is complete.
+settings. 2026-09-18 deploy set `current` to
+`cb07bd1821d8106b0b0088b17bcf305662a1b792` (`origin/main` at sign time) with
+`7498ce65` as `.previous-release`.
 The Claw rehearsal uses one persistent
 `ii_tonya_native_smoke` database and resets only its `public` schema. No container release
 path is authorized for production.

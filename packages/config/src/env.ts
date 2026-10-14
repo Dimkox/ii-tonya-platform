@@ -227,6 +227,29 @@ const schema = z
       }
     }
     if (
+      value.TELEGRAM_EGRESS_CONSENT_GATE_ENABLED === "true" &&
+      value.B2_TELEGRAM_DISPATCH_ENABLED !== "true"
+    ) {
+      // Гейт проверяет выдачу клиентских telegram-сообщений; без самого канала это
+      // включённый флаг, который ничего не защищает.
+      context.addIssue({
+        code: "custom",
+        path: ["TELEGRAM_EGRESS_CONSENT_GATE_ENABLED"],
+        message: "telegram_egress_consent_gate_requires_dispatch",
+      });
+    }
+    if (
+      value.CLIENT_PRIVACY_ENABLED === "true" &&
+      value.CLIENT_SESSION_ENABLED !== "true"
+    ) {
+      // Маршруты согласий аутентифицируются клиентской сессией: без неё они всегда 401.
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_PRIVACY_ENABLED"],
+        message: "client_privacy_requires_client_session",
+      });
+    }
+    if (
       (value.CLIENT_BOOKING_ENABLED === "true" &&
         (value.CLIENT_SESSION_ENABLED !== "true" ||
           value.CLIENT_CATALOG_ENABLED !== "true" ||
@@ -340,6 +363,7 @@ export type RuntimeConfig = {
     clientHybridRouting?: boolean;
     selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
+    telegramEgressConsentGate?: boolean;
     b2TelegramDispatch?: boolean;
     b2SensitiveRetention?: boolean;
     testExpertPromo?: boolean;
@@ -514,6 +538,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
       selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
       selartiResponseIngress: false,
+      telegramEgressConsentGate:
+        value.TELEGRAM_EGRESS_CONSENT_GATE_ENABLED === "true",
       b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",
       b2SensitiveRetention: value.B2_SENSITIVE_RETENTION_ENABLED === "true",
       testExpertPromo: value.TEST_EXPERT_PROMO_ENABLED === "true",

@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `planned`; readiness: `blocked_by_decision`.
+- State: `planned`; readiness: `pending_dependencies`.
 - Тип: implementation; исполнитель: backend; приоритет: P1.
 - Depends on: [TASK-EXP-002](TASK-EXP-002.md), [TASK-EXP-003](TASK-EXP-003.md), [TASK-PLT-008](TASK-PLT-008.md), [TASK-DEC-PLT-004](TASK-DEC-PLT-004.md).
 - Решения: DEC-PLT-004.

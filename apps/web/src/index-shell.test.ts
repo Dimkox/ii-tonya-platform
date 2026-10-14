@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 const indexHtml = readFileSync(
@@ -7,87 +6,60 @@ const indexHtml = readFileSync(
   "utf8",
 );
 
-describe("public HTML shell", () => {
-  it("loads the configured Yandex Metrika counter once with its tracking options", () => {
-    const inlineScripts = [
-      ...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/gu),
-    ].map(([, source]) => source);
-    const bootstrap = inlineScripts.find((source) =>
-      source?.includes("mc.yandex.ru/metrika/tag.js"),
-    );
+/**
+ * TRACK-01 и T27: публичная оболочка не загружает и не отправляет ничего
+ * стороннего до выбора пользователя. Аналитика может оставаться полностью
+ * выключенной — это не требует согласия на первом экране.
+ *
+ * Тест намеренно негативный: возвращённый сторонний тег, `noscript`-пиксель
+ * или inline-скрипт делают его красным.
+ */
+describe("public HTML shell loads nothing third-party", () => {
+  it("has no inline scripts", () => {
+    const inline = [
+      ...indexHtml.matchAll(
+        /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gu,
+      ),
+    ];
 
-    expect(bootstrap).toBeDefined();
-    if (bootstrap === undefined) return;
-
-    type ScriptNode = { async?: number; src?: string };
-    const insertedScripts: ScriptNode[] = [];
-    const createdTags: string[] = [];
-    const firstScript = {
-      parentNode: {
-        insertBefore(node: ScriptNode) {
-          insertedScripts.push({ ...node });
-        },
-      },
-    };
-    const sandbox: Record<string, unknown> = {
-      document: {
-        scripts: [],
-        referrer: "https://example.test/source",
-        createElement(tag: string) {
-          createdTags.push(tag);
-          return {};
-        },
-        getElementsByTagName(tag: string) {
-          createdTags.push(tag);
-          return [firstScript];
-        },
-      },
-      location: { href: "https://ii-tonya.ru/" },
-    };
-    sandbox.window = sandbox;
-
-    runInNewContext(bootstrap, sandbox);
-
-    expect(createdTags).toEqual(["script", "script"]);
-    expect(insertedScripts).toEqual([
-      {
-        async: 1,
-        src: "https://mc.yandex.ru/metrika/tag.js?id=111827123",
-      },
-    ]);
-    const queuedCalls = (sandbox.ym as { a: Array<ArrayLike<unknown>> }).a;
-    expect(queuedCalls).toHaveLength(1);
-    const initCall = Array.from(queuedCalls[0] ?? []);
-    expect(initCall.slice(0, 2)).toEqual([111827123, "init"]);
-    expect(JSON.parse(JSON.stringify(initCall[2]))).toEqual({
-      ssr: true,
-      webvisor: true,
-      clickmap: true,
-      ecommerce: "dataLayer",
-      referrer: "https://example.test/source",
-      url: "https://ii-tonya.ru/",
-      accurateTrackBounce: true,
-      trackLinks: true,
-    });
-
-    (sandbox.document as { scripts: ScriptNode[] }).scripts = insertedScripts;
-    runInNewContext(bootstrap, sandbox);
-
-    expect(createdTags).toEqual(["script", "script"]);
-    expect(insertedScripts).toHaveLength(1);
-    expect((sandbox.ym as { a: Array<ArrayLike<unknown>> }).a).toHaveLength(2);
+    expect(inline.map(([, body]) => (body ?? "").trim())).toEqual([]);
   });
 
-  it("retains the configured Metrika image fallback and guidance without JavaScript", () => {
+  it("references no host but our own", () => {
+    const urls = [...indexHtml.matchAll(/https?:\/\/([^"' />\s]+)/gu)]
+      .map((match) => match[1])
+      .filter((value): value is string => value !== undefined);
+
+    for (const url of urls) {
+      expect(
+        url.startsWith("ii-tonya.ru") || url.startsWith("www.ii-tonya.ru"),
+      ).toBe(true);
+    }
+  });
+
+  it("has no analytics, tag-manager or tracking-beacon vocabulary", () => {
+    expect(indexHtml).not.toMatch(
+      /mc\.yandex|metrika|googletagmanager|google-analytics|hotjar|top\.mail|facebook|gtag\(/iu,
+    );
+  });
+
+  it("keeps the no-JavaScript fallback free of any network request", () => {
     const noScriptContent = indexHtml.match(
       /<noscript\b[^>]*>([\s\S]*?)<\/noscript\s*>/u,
     )?.[1];
 
-    expect(noScriptContent).toContain(
-      'src="https://mc.yandex.ru/watch/111827123"',
-    );
+    expect(noScriptContent).toBeDefined();
+    expect(noScriptContent).not.toMatch(/<img|<script|url\(/iu);
     expect(noScriptContent).toContain(
       "Для открытия диалога и полной навигации включите JavaScript.",
     );
+  });
+
+  it("keeps exactly one first-party module entry point", () => {
+    const scripts = [...indexHtml.matchAll(/<script\b[^>]*>/gu)].map(
+      (m) => m[0],
+    );
+
+    expect(scripts).toEqual(['<script type="module" src="/src/main.ts">']);
   });
 });

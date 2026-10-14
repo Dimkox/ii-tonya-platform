@@ -6,6 +6,10 @@ import {
   validateClientCatalogCards,
   type ClientCatalogCard,
 } from "./client-catalog-repository.js";
+import {
+  currentConsentGrantedSql,
+  currentConsentStatesSql,
+} from "./consent-current.js";
 import { withSerializableRetry } from "./message-repository.js";
 
 export interface WithdrawConsentCommand {
@@ -163,15 +167,35 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}, 0))`,
         );
+        // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
         const consent = one(
           (
-            await tx.execute<{ id: string }>(sql`
-        insert into consents (user_id, consent_type, decision, policy_version)
-        values (${command.targetUserId}::uuid, ${command.purpose}, 'denied', ${command.policyVersion})
-        returning id
+            await tx.execute<{ id: string; decision: string }>(sql`
+        insert into consents (user_id, consent_type, decision, policy_version, basis)
+        values (
+          ${command.targetUserId}::uuid,
+          ${command.purpose},
+          (case
+             when ${currentConsentGrantedSql({
+               userExpression: sql`${command.targetUserId}::uuid`,
+               purpose: command.purpose,
+             })}
+             then 'revoked' else 'denied'
+           end),
+          ${command.policyVersion},
+          'consent'
+        )
+        returning id, decision
       `)
           ).rows,
           "withdrawal consent fact",
+        );
+        await this.projectAndInvalidate(
+          tx,
+          command.targetUserId,
+          command.purpose,
+          consent.decision,
+          consent.id,
         );
         const profile =
           command.purpose === "client_profile"
@@ -210,21 +234,42 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
             : { rows: [] as { count: number }[] };
         // DEC-PLT-004 §3: withdrawing the note content also withdraws the transfer (never the
         // reverse), and either way receivers must delete their copies in the same transaction.
-        const handoffConsentId =
-          command.purpose === "expert_handoff"
-            ? consent.id
-            : command.purpose === "expert_note"
-              ? one(
-                  (
-                    await tx.execute<{ id: string }>(sql`
-          insert into consents (user_id, consent_type, decision, policy_version)
-          values (${command.targetUserId}::uuid, 'expert_handoff', 'denied', 'handoff-v1')
-          returning id
+        const handoffFact =
+          command.purpose === "expert_note"
+            ? one(
+                (
+                  await tx.execute<{ id: string; decision: string }>(sql`
+          insert into consents (user_id, consent_type, decision, policy_version, basis)
+          values (
+            ${command.targetUserId}::uuid,
+            'expert_handoff',
+            (case
+               when ${currentConsentGrantedSql({
+                 userExpression: sql`${command.targetUserId}::uuid`,
+                 purpose: "expert_handoff",
+               })}
+               then 'revoked' else 'denied'
+             end),
+            'handoff-v1',
+            'consent'
+          )
+          returning id, decision
         `)
-                  ).rows,
-                  "cascaded handoff withdrawal consent fact",
-                )
-              : undefined;
+                ).rows,
+                "cascaded handoff withdrawal consent fact",
+              )
+            : undefined;
+        if (handoffFact) {
+          await this.projectAndInvalidate(
+            tx,
+            command.targetUserId,
+            "expert_handoff",
+            handoffFact.decision,
+            handoffFact.id,
+          );
+        }
+        const handoffConsentId =
+          command.purpose === "expert_handoff" ? consent.id : handoffFact?.id;
         if (handoffConsentId !== undefined) {
           const handoffPayload = {
             userId: command.targetUserId,
@@ -249,7 +294,7 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           action: "privacy.consent_withdrawn",
           objectType: "consent",
           objectId: consent.id,
-          decision: "denied",
+          decision: consent.decision,
           reasonCode: command.purpose,
           correlationId: command.correlationId,
           payload: { purpose: command.purpose, consentDecisionId: consent.id },
@@ -268,6 +313,61 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         };
       }),
     );
+  }
+
+  /**
+   * EVID-03/EGRESS-03: журнал остаётся append-only, а «текущее состояние» — проекция с
+   * монотонной ревизией; отзыв дополнительно гасит ранее выданные предъявления, чтобы старая
+   * кнопка не могла возродить решение (EVID-04, BOT-05).
+   */
+  private async projectAndInvalidate(
+    tx: Transaction,
+    userId: string,
+    purpose: string,
+    decision: string,
+    decisionId: string,
+  ): Promise<void> {
+    await tx.execute(sql`
+      insert into consent_states (user_id, purpose, decision, last_decision_id, revision)
+      values (${userId}::uuid, ${purpose}, ${decision}, ${decisionId}::uuid, 1)
+      on conflict (user_id, purpose)
+        do update set decision = excluded.decision,
+                      last_decision_id = excluded.last_decision_id,
+                      revision = consent_states.revision + 1,
+                      updated_at = now()
+    `);
+    await tx.execute(sql`
+      update consent_presentations
+      set invalidated_at = now(), revoke_epoch = revoke_epoch + 1
+      where user_id = ${userId}::uuid
+        and purpose = ${purpose}
+        and consumed_at is null
+        and invalidated_at is null
+    `);
+  }
+
+  async listCurrentConsents(userId: string): Promise<
+    Array<{
+      purpose: string;
+      inForce: boolean;
+      policyVersion: string;
+      decidedAt: string;
+    }>
+  > {
+    const rows = (
+      await this.db.execute<{
+        purpose: string;
+        inForce: boolean;
+        policyVersion: string;
+        decidedAt: string;
+      }>(currentConsentStatesSql(sql`${userId}::uuid`))
+    ).rows;
+    return rows.map((row) => ({
+      purpose: row.purpose,
+      inForce: row.inForce === true,
+      policyVersion: row.policyVersion,
+      decidedAt: row.decidedAt,
+    }));
   }
 
   async exportOwnedSubject(userId: string): Promise<SubjectExport> {

@@ -262,3 +262,57 @@ describe("logger redaction", () => {
     expect(line).toContain("bk1_AAAAAAAAAAAAAAAAAAAA"); // booking handle is not a secret
   });
 });
+
+describe("webhook path secret in free text (TRACK-05, D16)", () => {
+  const capture = async (
+    write: (logger: ReturnType<typeof createLogger>) => void,
+  ) => {
+    const output = new PassThrough();
+    const chunks: Buffer[] = [];
+    output.on("data", (chunk: Buffer) => chunks.push(chunk));
+    write(createLogger(output));
+    await new Promise((resolve) => output.once("data", resolve));
+    return Buffer.concat(chunks).toString("utf8");
+  };
+
+  it("redacts the bot key embedded in a 404 route message", async () => {
+    const line = await capture((logger) =>
+      logger.warn(
+        { correlationId: "corr-1" },
+        "Route GET:/v1/webhooks/telegram/client/kk_7Td9mQz2LpXvN4sYbR8cE1uHwA6iO3gF not found",
+      ),
+    );
+    expect(line).not.toContain("kk_7Td9mQz2LpXvN4sYbR8cE1uHwA6iO3gF");
+    expect(line).toContain("/v1/webhooks/telegram/client/[REDACTED]");
+    // Диагностика остаётся: по какой форме маршрут не найден — видно.
+    expect(line).toContain("not found");
+    expect(line).toContain("corr-1");
+  });
+
+  it("keeps a query string out of the redaction and still scrubs its secrets", async () => {
+    const line = await capture((logger) =>
+      logger.error(
+        {},
+        "upstream failed for /v1/webhooks/telegram/client/SECRETSEGMENT?token=plainvalue&count=5",
+      ),
+    );
+    expect(line).not.toContain("SECRETSEGMENT");
+    expect(line).not.toContain("plainvalue");
+    // Ключ запроса остаётся видимым, значение вычёркано. Существующее правило
+    // secretAssignment захватывает значение до конца токена, поэтому &count=5 уходит
+    // вместе с ним - это пере-закрытие (безопасно), а не утечка; менять её здесь нечем.
+    expect(line).toContain("?token=[REDACTED]");
+  });
+
+  it("leaves unrelated operational text alone", async () => {
+    const line = await capture((logger) =>
+      logger.info(
+        { correlationId: "corr-2" },
+        "Маршрут /v1/client/sessions жив, attempts=3, limit reached, reservationId=резерв-7",
+      ),
+    );
+    expect(line).toContain("/v1/client/sessions");
+    expect(line).toContain("attempts=3");
+    expect(line).toContain("limit reached");
+  });
+});

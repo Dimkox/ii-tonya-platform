@@ -12,7 +12,7 @@
 
 ## Статус и область
 
-- State: `implemented_pending_review`; readiness: `ready`.
+- State: `merged`; readiness: `ready`.
 - Тип: content; исполнитель: product-owner; приоритет: P0.
 - Depends on: нет.
 - Решения: нет.

@@ -48,6 +48,7 @@ describe("native dedicated-server production release", () => {
     expect(smoke).toContain("/health/ready");
     expect(smoke).toContain("ii-tonya-worker-heartbeat");
     expect(smoke).toContain("DROP SCHEMA IF EXISTS public CASCADE");
+    expect(smoke).toContain("DROP SCHEMA IF EXISTS drizzle CASCADE");
     expect(smoke).not.toContain("DROP DATABASE");
     expect(smoke).toContain("trap cleanup EXIT");
     expect(smoke).not.toMatch(/set -x|echo.*DATABASE_URL/iu);

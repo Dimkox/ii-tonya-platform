@@ -11,7 +11,7 @@
 | БД                    | системный PostgreSQL                                                                                   |
 | Front                 | nginx + Let's Encrypt, `root /opt/ii-tonya-platform/web-current`, `/v1/` и `/health/` → 127.0.0.1:3000 |
 | Артефакт              | `native-release.tar.gz` + SPDX SBOM + provenance.json + detached cosign `.sig`                         |
-| Задеплоенный SHA      | `233f3cf72e45e47117948ad5615b603252801e40` (14.08.2026)                                                |
+| Задеплоенный SHA      | `cb07bd1821d8106b0b0088b17bcf305662a1b792` (2026-09-18); previous `7498ce656e1e49fe2d92c83f02d9667eb3f86b9b` |
 | Статус записи         | «recovered, not reproducible»                                                                          |
 
 Исходники пути доставки: [`deploy/nginx/ii-tonya`](https://github.com/Dimkox/ii-tonya-platform/blob/main/deploy/nginx/ii-tonya), [`deploy/systemd/ii-tonya-api.service`](https://github.com/Dimkox/ii-tonya-platform/blob/main/deploy/systemd/ii-tonya-api.service),
@@ -49,6 +49,12 @@ sha256sum -c native-release.sha256           OK   (тар, SBOM, provenance)
 | Миграционный approval подменяется `sed` в `/etc/ii-tonya/runtime.env` на хосте | [https://github.com/Dimkox/ii-tonya-platform/issues/49](https://github.com/Dimkox/ii-tonya-platform/issues/49) |
 
 ## Доступ к продакшену из этой машины
+
+Claw 2026-09-17: hostname `ii-tonya.ru` pinned (ED25519
+`SHA256:eHiplIy7STE3UhwVa0EozOSIysMNUQNtTKilwWdrrTE`), BatchMode `ii_tonya`
+deploy key installed. Evidence:
+[`docs/test-evidence/production/host-identity-2026-09-17.md`](https://github.com/Dimkox/ii-tonya-platform/blob/main/docs/test-evidence/production/host-identity-2026-09-17.md).
+Interactive root password login remains enabled; the password is not stored.
 
 `bootstrap-ii-tonya-deploy.ps1` (Windows) → base64-пейлод, побайтово равный
 `bootstrap-ii-tonya-remote.sh`: кладёт deploy-ключ в `~ii_tonya/.ssh/authorized_keys`, создаёт

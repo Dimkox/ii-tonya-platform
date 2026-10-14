@@ -20,6 +20,8 @@ import {
   PostgresWaitlistRepository,
 } from "@ii-tonya/db";
 import {
+  createLogger,
+  installFatalProcessLogging,
   recordClientCatalogMetric,
   recordClientSessionMetric,
   recordExpertReferralMaturityMetric,
@@ -275,13 +277,18 @@ export function composeWorkerOutboxDelivery(
 export function composeB2TelegramDelivery(
   db: DrizzleDb,
   enabled: boolean,
+  /** Явное решение: отправлять клиентские сообщения можно только сверяя согласие субъекта. */
+  consentGate: { readonly enabled: boolean },
   capability?: OutboxDispatcher & OutboxReconciler,
 ) {
   if (!enabled) return undefined;
   if (capability === undefined) {
     throw new Error("b2_telegram_delivery_capability_unavailable");
   }
-  const repository = new PostgresOrderedTelegramOutboxRepository(db);
+  const repository = new PostgresOrderedTelegramOutboxRepository(
+    db,
+    consentGate,
+  );
   return {
     repository,
     run: () =>
@@ -574,7 +581,13 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
       process.exit(status);
     });
   let hardExitTimer: NodeJS.Timeout | undefined;
+  // Без этого воркер молчал: неперехваченное исключение писалось в stderr (или не писалось
+  // вовсе), а журнал инфраструктуры его не видел.
+  const removeFatalLogging = installFatalProcessLogging({
+    logger: createLogger(),
+  });
   const stop = () => {
+    removeFatalLogging();
     controller.abort();
     if (hardExitTimer === undefined) {
       hardExitTimer = setTimeout(() => {
