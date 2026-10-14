@@ -108,6 +108,30 @@ describe("worker runtime", () => {
     );
   });
 
+  it("never touches maturity grants while the worker flag is off", async () => {
+    const grant = vi.fn(async () => ({
+      examined: 1,
+      granted: 1,
+      cancelled: 0,
+      pending: 0,
+    }));
+    const record = vi.fn();
+    const runtime = createProductionWorkerRuntime({
+      ...maturityDeps(grant, record),
+      expertReferralMaturityWorkerEnabled: false,
+    } as never);
+
+    const report = await runtime.runOnce();
+
+    expect(grant).not.toHaveBeenCalled();
+    expect(record).not.toHaveBeenCalled();
+    expect(
+      (report as { expertReferralMaturity: { reason?: string } })
+        .expertReferralMaturity.reason,
+    ).toBe("maturity_worker_disabled");
+    await runtime.close();
+  });
+
   it("runs bounded jobs in the required safety-first order", async () => {
     const calls: string[] = [];
     const job = (name: string) =>

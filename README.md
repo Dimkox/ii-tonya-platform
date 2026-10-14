@@ -3,15 +3,12 @@
 Production-oriented implementation of the client and expert workflows described in the
 authoritative ии-Тоня source document.
 
-## Local delivery workflow
+## Карта проекта
 
-Adaptive Grok Build Pro v2.0.12 is installed locally as repository workflow tooling. The
-route manifest in `.grok-stack/runtime/active-route.json` selects the applicable skills and
-single write owner; `scripts/grok_status.py`, `scripts/grok_verify.py`, and
-`scripts/grok_review.py` provide local status, verification, and review evidence. The
-workflow connects repository instructions in `AGENTS.md` with the project tree, tests, and
-change evidence; it does not claim that external Trust CI, branch protection, or production
-activation is live. The complete local toolchain is listed in the connectivity inventory.
+Разбор «что из этого действительно собрано, какой этап чем закрыт и что блокирует релиз» ведётся
+в [`docs/wiki/`](docs/wiki/Home.md): этапы S1–S10, бэклог, гейты go-live, состав и флаги, верификация
+и production-контур. То же зеркалится в GitHub как milestones `S1…S10`, labels `stage:*` и
+сводный issue [`#62`](https://github.com/Dimkox/ii-tonya-platform/issues/62).
 
 ## Status
 

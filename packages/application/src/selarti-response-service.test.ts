@@ -46,6 +46,18 @@ describe("provider-neutral Selarti response codec", () => {
     ).toThrow();
   });
 
+  it("rejects prohibited client copy before the proposal is accepted", () => {
+    expect(() =>
+      decodeProviderTextProposal(
+        {
+          ...valid,
+          text: "Запишитесь сейчас — это специально для вас, лучшая скидка года!",
+        },
+        { allowedUrlHosts: ["ii-tonya.ru"] },
+      ),
+    ).toThrow("selarti_response_copy_prohibited");
+  });
+
   it("allows an explicitly allowlisted HTTPS URL only", () => {
     expect(
       decodeProviderTextProposal(
@@ -95,5 +107,23 @@ describe("Selarti response application service", () => {
       responsePayloadHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
       receivedAt: "2026-08-29T00:00:10.000Z",
     });
+  });
+
+  it("rejects prohibited copy at the enabled ingress before repository mutation", async () => {
+    const proposals = { accept: vi.fn() };
+    const service = createSelartiResponseService({
+      enabled: true,
+      tenantKey: "bot-b2",
+      allowedUrlHosts: ["ii-tonya.ru"],
+      clock: () => new Date("2026-08-29T00:00:10.000Z"),
+      proposals,
+    });
+    await expect(
+      service.handle({
+        ...valid,
+        text: "Запишитесь сейчас — лучшая скидка года.",
+      }),
+    ).resolves.toEqual({ status: "rejected" });
+    expect(proposals.accept).not.toHaveBeenCalled();
   });
 });

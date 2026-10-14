@@ -1,0 +1,4 @@
+# Byte-exact materialization. Seven of these files carry CRLF line endings as produced by
+# the host, and local-SHA256SUMS pins their digests; the repository default
+# (`* text=auto eol=lf`) would rewrite them at checkout and make the manifest unverifiable.
+* -text

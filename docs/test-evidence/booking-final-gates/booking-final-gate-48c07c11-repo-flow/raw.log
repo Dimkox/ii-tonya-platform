@@ -1,0 +1,4 @@
+bash: line 1: scripts/run-claw-ci.sh: Permission denied
+sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+exit=126
+source_cleanup=yes

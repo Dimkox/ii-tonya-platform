@@ -50,10 +50,41 @@ if [[ "$mode" == release ]]; then
 fi
 container_script="$(mktemp)"
 evidence_dir="$source_root/docs/test-evidence/claw/$source_sha"
+
+# Seal the bundle once. ARTIFACTS.sha256 covers every file except itself and the seal's own
+# scratch name, so a later edit to any evidence file is detectable without trusting prose;
+# scripts/verify-claw-evidence.mjs re-checks it.
+claw_bundle_sealed=""
+claw_seal_bundle() {
+  local dir="$1" status="${2:-0}"
+  [[ -n "$claw_bundle_sealed" ]] && return 0
+  [[ -n "$dir" ]] || return 0
+  claw_bundle_sealed=1
+  # The snapshot is per-mode, so a seal annotates only the snapshot this run owns and never
+  # touches the one a different mode of the same SHA left behind.
+  [[ -f "$dir/environment-$mode.txt" ]] &&
+    printf 'exit_code=%s\n' "$status" >> "$dir/environment-$mode.txt"
+  [[ -d "$dir" ]] || return 0
+  (
+    cd "$dir" || exit 1
+    rm -f ARTIFACTS.sha256.tmp
+    : > ARTIFACTS.sha256.tmp
+    local file
+    for file in *; do
+      [[ "$file" == "ARTIFACTS.sha256" || "$file" == "ARTIFACTS.sha256.tmp" ]] && continue
+      [[ -f "$file" ]] || continue
+      sha256sum "$file" >> ARTIFACTS.sha256.tmp
+    done
+    mv ARTIFACTS.sha256.tmp ARTIFACTS.sha256
+  )
+}
+
 release_output="$source_root/.native-release"
 mkdir -p "$evidence_dir" "$release_output"
 
 cleanup() {
+  local status=$?
+  claw_seal_bundle "${evidence_dir:-}" "$status"
   rm -f "$container_script"
   if [[ "$mode" == client-booking && -f "$source_root/.claw-client-booking-node-modules" ]]; then
     rm -rf "$source_root/node_modules" "$source_root/.claw-client-booking-node-modules"
@@ -67,19 +98,62 @@ cat > "$container_script" <<'SCRIPT'
 set -Eeuo pipefail
 cd /workspace/source
 export CI=true
+
+# Evidence goes into the mounted source tree so that a gate which dies half-way still
+# leaves a checkable bundle instead of silence.
+evidence_dir="/workspace/source/docs/test-evidence/claw/$CLAW_SOURCE_SHA"
+mkdir -p "$evidence_dir"
+# One step log and one environment snapshot per gate mode (#81). Before this, every run
+# truncated the single shared summary.tsv and environment.txt, so a release run after a ci
+# run on the same SHA erased the proof that the ci gate ever happened and the bundle showed
+# one step out of dozens. Repeating the same mode still replaces that mode's own record:
+# the previous log of this mode is removed rather than appended to, so a re-run cannot
+# accumulate stale steps. A mode that records no step at all leaves no log instead of an
+# empty one.
+summary_tsv="$evidence_dir/summary-$CLAW_GATE_MODE.tsv"
+environment_txt="$evidence_dir/environment-$CLAW_GATE_MODE.txt"
+rm -f "$summary_tsv"
+
+# step <name> <command...>: record exit status and wall clock without swallowing the status.
+step() {
+  local name="$1"
+  shift
+  local started finished code
+  started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  if "$@"; then
+    code=0
+  else
+    code=$?
+  fi
+  finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$started" "$finished" >> "$summary_tsv"
+  return "$code"
+}
+
+{
+  printf 'source_sha=%s\n' "$CLAW_SOURCE_SHA"
+  printf 'gate_mode=%s\n' "$CLAW_GATE_MODE"
+  printf 'container_hostname=%s\n' "$(hostname -s)"
+  printf 'node=%s\n' "$(node --version)"
+  printf 'pnpm=%s\n' "$(pnpm --version)"
+  printf 'kernel=%s\n' "$(uname -r)"
+  printf 'cpu_max=%s\n' "$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo unknown)"
+  printf 'memory_max=%s\n' "$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo unknown)"
+  printf 'pids_max=%s\n' "$(cat /sys/fs/cgroup/pids.max 2>/dev/null || echo unknown)"
+} > "$environment_txt"
 if [[ "$CLAW_GATE_MODE" != client-booking ]]; then
-  pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
+  step frozen-install pnpm install --offline --frozen-lockfile --trust-lockfile --store-dir /workspace/.pnpm-store
 fi
 case "$CLAW_GATE_MODE" in
   ci)
-    pnpm build
-    pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
-    pnpm format:check
-    pnpm verify:deploy
-    pnpm lint
-    NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
-    pnpm exec vitest run --coverage --maxWorkers=1
-    docker run --rm \
+    step build pnpm build
+    step env-policy pnpm exec vitest run tests/repo/env-policy.test.ts --maxWorkers=1
+    step format pnpm format:check
+    step deploy-contract pnpm verify:deploy
+    step lint pnpm lint
+    step typecheck env NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
+    step coverage pnpm exec vitest run --coverage --maxWorkers=1
+    step gitleaks docker run --rm \
       -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \
       -v "$CLAW_HOST_GIT_COMMON_DIR:$CLAW_HOST_GIT_COMMON_DIR:ro" \
       ghcr.io/gitleaks/gitleaks:v8.28.0 \
@@ -87,28 +161,31 @@ case "$CLAW_GATE_MODE" in
       --gitleaks-ignore-path=/repo/.gitleaksignore --no-banner --redact --exit-code=1
     ;;
   database)
-    pnpm build
-    pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
-    pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-referral-redemption-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-checkout-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/test-expert-trial-postgres.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
-    pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
+    step build pnpm build
+    step drizzle-check pnpm exec drizzle-kit check --config packages/db/drizzle.config.ts
+    step schema pnpm exec vitest run tests/integration/schema.test.ts tests/repo/db-schema-parity.test.ts --maxWorkers=1
+    step referral-schema pnpm exec vitest run tests/integration/expert-referral-schema.test.ts tests/integration/expert-referral-migration-upgrade.test.ts --maxWorkers=1
+    step message-ledger pnpm exec vitest run tests/integration/message-ledger-concurrency.test.ts --maxWorkers=1
+    step conversation-messages pnpm exec vitest run tests/integration/conversation-message-repository.test.ts --maxWorkers=1
+    step booking-concurrency pnpm exec vitest run tests/integration/booking-concurrency.test.ts --maxWorkers=1
+    step redemption-concurrency pnpm exec vitest run tests/integration/expert-referral-redemption-concurrency.test.ts --maxWorkers=1
+    step checkout-concurrency pnpm exec vitest run tests/integration/expert-residency-checkout-concurrency.test.ts --maxWorkers=1
+    step settlement-concurrency pnpm exec vitest run tests/integration/expert-residency-settlement-concurrency.test.ts --maxWorkers=1
+    step residency-deadline pnpm exec vitest run tests/integration/expert-residency-deadline.test.ts --maxWorkers=1
+    step hold-replay pnpm exec vitest run tests/integration/expert-residency-hold-replay.test.ts --maxWorkers=1
+    step test-expert-trial pnpm exec vitest run tests/integration/test-expert-trial-postgres.test.ts --maxWorkers=1
+    step yookassa-migration pnpm exec vitest run tests/integration/yookassa-migration-upgrade.test.ts --maxWorkers=1
+    step yookassa-concurrency pnpm exec vitest run tests/integration/yookassa-operation-concurrency.test.ts --maxWorkers=1
+    step yookassa-reconciliation pnpm exec vitest run tests/integration/yookassa-reconciliation.test.ts --maxWorkers=1
+    step sandbox-provider pnpm exec vitest run tests/e2e/sandbox-payment-provider.test.ts tests/integration/sandbox-payment-reconciliation.test.ts --maxWorkers=1
     ;;
   release)
-    SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
+    # #81: this was the only gate body that ran outside `step`, so the bundle recorded nothing
+    # about the release build - not that it ran, not its exit status, not how long it took.
+    # Both the build and the artifact assertion are recorded now.
+    step build-native-release env SOURCE_SHA="$CLAW_SOURCE_SHA" OUTPUT_DIR=/workspace/release-output \
       bash scripts/build-native-release.sh
-    test -f /workspace/release-output/native-release.tar.gz
+    step release-artifact-present test -f /workspace/release-output/native-release.tar.gz
     ;;
   client-booking)
     mkdir node_modules
@@ -232,3 +309,6 @@ cat > "$evidence_dir/${mode}.md" <<EOF
 - repeat_limit: 1
 - github_actions: not_used
 EOF
+
+claw_seal_bundle "$evidence_dir" 0
+

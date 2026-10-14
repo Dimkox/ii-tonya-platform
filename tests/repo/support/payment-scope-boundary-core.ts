@@ -270,7 +270,9 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    "3e656cfe463533a05e0c55be93a963811d7c01a2f5e203e61a96e232964d88a0",
+    // Re-registered: verify:deploy now syntax-checks each script separately (a multi-file
+    // `bash -n` validated only the first operand), and the pre-push gate scripts are wired in.
+    "a876cdc0275f096e74209dbf94da4d689d1d28cb7d5fb82bbd4b6f22a0530665",
   ],
   [
     "packages/application/package.json",
@@ -310,209 +312,44 @@ const approvedPackageManifestHashes = new Map([
   ],
 ]);
 const approvedAutomationArtifactHashes = new Map([
+  // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
   [
-    ".grok-stack/adaptive_grok/__init__.py",
-    "4c8bb7854a2800b179b36a0b814d1fbab103f65380ff66c5e1e301ddeadaca1e",
+    "_bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py",
+    "c9fe761993a035ff74b6ce6c8469eab888bb4469e509e9e0c54423cc56977395",
+  ],
+  // Host bootstrap for the native production runtime (PR #70). These mutate the server
+  // out of band, so their content is pinned here as well as in deploy/bootstrap/SHA256SUMS.
+  [
+    "deploy/bootstrap/bootstrap-ii-tonya-remote.sh",
+    "a8a191b91ce4510137a8018af9fe4111570988ef52445c645ef50adfb7cf7372",
   ],
   [
-    ".grok-stack/adaptive_grok/_policy_legacy.py",
-    "dfea131b4d33bf135a138e73deb6848aa4eca63f6ddde9529d9ae5f1788b9145",
+    "deploy/bootstrap/bootstrap-ii-tonya-deploy.ps1",
+    "34a3b1a8df60c835f221117ad17013efe758838abfe7739d0cdf2fda4889ec1f",
   ],
   [
-    ".grok-stack/adaptive_grok/bitrix_checks.py",
-    "a741852a839e678d836b79299f5f882874d155cd239c74b24601a68d9d806a4a",
+    "deploy/bootstrap/bootstrap-ii-tonya-deploy.cmd",
+    "a0e47f22d78674efa3dcdac1e7119bdf09d7d12e1baba7ec3c94c34daa255b0b",
   ],
   [
-    ".grok-stack/adaptive_grok/change.py",
-    "6d0c7c17214faa4920e6980ed6ef42e708dc3e949a9c1b505d46cb4ae6db297c",
-  ],
-  [
-    ".grok-stack/adaptive_grok/deploy.py",
-    "1dfb923458a05f2f7963f4eaec6dc3ed853effb37ee245dce748a1d7bbf0de2a",
-  ],
-  [
-    ".grok-stack/adaptive_grok/doctor.py",
-    "3a4e22e19c0046855fe194ead66647a16cf40acc2120379e4f0b33d0c0ee1a4d",
-  ],
-  [
-    ".grok-stack/adaptive_grok/manifest.py",
-    "56b5b06615358b984711b0bd37881e420b36103ac8ab03863846e0b0386985a8",
-  ],
-  [
-    ".grok-stack/adaptive_grok/policy.py",
-    "e139523289057979d547d69b1c0ac0f9bfd979658be72f986a36ebea677b0ffa",
-  ],
-  [
-    ".grok-stack/adaptive_grok/protected_write.py",
-    "ef9cafb89ae22d8a88bb8bd953f679e33b4fbcbc4c3391136eac83e5a5dec3ca",
-  ],
-  [
-    ".grok-stack/adaptive_grok/receipts.py",
-    "e6037fc3445abf283e1db2846a84e63f6b2bd3166f9b9485dadddb759169abfa",
-  ],
-  [
-    ".grok-stack/adaptive_grok/repo.py",
-    "c0525e24e2ed24fca5235b5012b8e9cad13296ef39bd151d344db3738085f011",
-  ],
-  [
-    ".grok-stack/adaptive_grok/router.py",
-    "99a50875b6af2e6a419d984071b5d87b50332b5bffd79a2ff223f8db32ae4d8e",
-  ],
-  [
-    ".grok-stack/adaptive_grok/shell_targets.py",
-    "aa2585164c4c3d68584f9f58f79caca5e0efc305da1c15b38709bb8a16bfc30d",
-  ],
-  [
-    ".grok-stack/adaptive_grok/spec.py",
-    "52eea68cd97727befb252a6fee41b2536ccfcd7414e5c8868f1da769d706300d",
-  ],
-  [
-    ".grok-stack/adaptive_grok/state.py",
-    "a7d7fcca4a4c756c5409f1114fcce047dbf380c186ad6230e2ef763668ac217d",
-  ],
-  [
-    ".grok-stack/adaptive_grok/toolchain.py",
-    "4c50ae7dd8f18f3792e065f529c09b93037ba23d8e3faaef0278b9f0f604c930",
-  ],
-  [
-    ".grok-stack/adaptive_grok/util.py",
-    "1eb764b037ef335ed9a42416fcb8e038d7e2fed6ac37d78a947748d2ed72347d",
-  ],
-  [
-    ".grok-stack/adaptive_grok/verification.py",
-    "49fa0bd6f815323725460c6c3623af84b1a86222fd54fe4dae2ab9bcf4b65104",
-  ],
-  [
-    ".grok-stack/templates/hook_root_shim.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    ".grok/hooks/_lib.py",
-    "8b7bb18f58104133058d013668beae86ea67b4082b4e56223c7444bdd07e3ac0",
-  ],
-  [
-    ".grok/hooks/post_tool_use.py",
-    "2d416c9f45448a18a05cfd6779dd4564203379ec7ca66e6569630f0b085fe2af",
-  ],
-  [
-    ".grok/hooks/pre_compact.py",
-    "5beba302fbb82d38271a575053d4b50fca554f8abecb35f2181e04cbc02a5f18",
-  ],
-  [
-    ".grok/hooks/pre_tool_use.py",
-    "87ac222e91eef75316140b7bd13b374aa1d9d316de88564cf0c5e44bf22fa4de",
-  ],
-  [
-    ".grok/hooks/session_end.py",
-    "3f326c8c5ec3f592a959f952d14a90baf10809c19745818342d86d96c27c7279",
-  ],
-  [
-    ".grok/hooks/session_start.py",
-    "a10fccca02f28b02319beaceed4d609e41ab89c275fe05722b75810683aeef29",
-  ],
-  [
-    ".grok/hooks/stop_gate.py",
-    "fb6b79bb978866ae3b31011205feda36c40224c639bde0aedc913ca06330c2d8",
-  ],
-  [
-    ".grok/hooks/subagent_start.py",
-    "64d8792a1f84210f00906540a57cd3b49adf8214a86251bc9fa31de3c126275d",
-  ],
-  [
-    ".grok/hooks/subagent_stop.py",
-    "d1589871b20a21ee68adf3eabaaabb62dd25a027752c367abc40b27512b55865",
-  ],
-  [
-    ".grok/hooks/user_prompt_submit.py",
-    "8262e8f581cfa4d35b7f7c48eeb1da172d100b96c8cb1346e722840d10b41b66",
-  ],
-  [
-    "post_tool_use.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "pre_compact.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "pre_tool_use.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "scripts/grok_approve.py",
-    "9ec482e0fae2bdcc843fd8340ca4f4888772346d155c57db012eaecfb5cf7cf2",
-  ],
-  [
-    "scripts/grok_change.py",
-    "d40381314fd763af34d0fbd4df58eaf54fa5ee7d412222a83d6d615b0132517c",
-  ],
-  [
-    "scripts/grok_deploy.py",
-    "9fe62594655e1f091ebcd84b71c6c9c3bdb29a9247ba6000d096cd804eb3d8c3",
-  ],
-  [
-    "scripts/grok_doctor.py",
-    "03b1d25e597039dcd0b20ec579f4110b68b3d84c93faa388c161e88609197cd1",
-  ],
-  [
-    "scripts/grok_review.py",
-    "a8a5d994240e1caa6e52eb4896ee90855e36381f8ea7e508b386d074ab48a0aa",
-  ],
-  [
-    "scripts/grok_route.py",
-    "8279504f1b929483af450d3499a3d9487ae21c7f09546422f5deb7cce438348f",
-  ],
-  [
-    "scripts/grok_spec.py",
-    "899a02855a71cde23f34dec95f42f96606ffbc1e3f6f9662cd741edd36d057e2",
-  ],
-  [
-    "scripts/grok_status.py",
-    "2a53134da3fc04f5db4faf1601f126005d1f29d35ad070701cdf23233f142faa",
-  ],
-  [
-    "scripts/grok_verify.py",
-    "8e2a8fcb807f4131f1cf9c560d1832dbe38e6b36f7306baa971b78a1caaabc04",
-  ],
-  [
-    "session_end.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "session_start.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "stop_gate.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "subagent_start.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "subagent_stop.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
-    "tests/test_grok_verification_adaptation.py",
-    "1eaad5ec7978c0d02f1597483a4583594449c3d596e51b78cbe4f72c968d1b8e",
-  ],
-  [
-    "user_prompt_submit.py",
-    "0e7e9fc65eac55eccaca4b8c318bc41165eec7eb6335e1888c34bcb6ee2cb8c5",
-  ],
-  [
+    // #81 gave every gate mode its own step log and environment snapshot
+    // (summary-<mode>.tsv, environment-<mode>.txt) instead of one shared pair that every run
+    // truncated, and wrapped the release gate body in step() so the artifact build is
+    // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "b2c8dcf60b5bf06b1e4785a232e5995cfe3f38251ce70a1eddec33f76e74129b",
+    "0151459fce14199efb65e25e71025ba9c4cbcf6023aa7639436cae994082812a",
   ],
   [
     "scripts/build-native-release.sh",
     "f8157d9d0c23de1cf813f32664e702f25c06ec4f6cad0b2404808307b2cfd0b5",
   ],
   [
+    // 87f6270 switched the release signature check to `cosign verify-blob --bundle` (the
+    // artifact is a sigstore bundle, not a bare signature) and added `--retry-connrefused`
+    // to the readiness probe, so a cold API start no longer aborts a good deployment.
+    // Registering the new normalized-content hash instead of relaxing the rule.
     "scripts/deploy-native-remote.sh",
-    "6bd755bf0e4b0ee994e1b04267c4e175fb49c6355f7dec38ed0fbc704dd78891",
+    "0bfe4350610d253d0cdc56c19df2fc715d29300f1d056f529dd8b7a514655af2",
   ],
   [
     "scripts/provision-claw-syft.sh",
@@ -546,9 +383,32 @@ const approvedAutomationArtifactHashes = new Map([
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
   ],
+  // Host-side Claw drivers. They were the single unversioned copy of the test ladder that
+  // repeats a suite and uses the container's proxy egress - neither of which
+  // scripts/run-claw-ci.sh does. Registered on first versioning, content unchanged.
+  [
+    "deploy/claw/claw-final-policy.sh",
+    "319d62945717789e475a53883c7c74e166f1d646a3b950a35f48229f9b852180",
+  ],
+  [
+    "deploy/claw/claw-final-three-pass.sh",
+    "79d791ba5556de31ee0fe5972ed286cc3ab01202bb0149767dd03a6aa40320d2",
+  ],
   [
     "scripts/validate-runtime-env.sh",
     "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
+  ],
+  // Pre-push gate: this repository has no hosted CI by its own policy
+  // (workflow-semantics requires .github/workflows to be empty) and branch protection is
+  // unavailable on the current plan, so these scripts are the only automatic check between a
+  // commit and a push.
+  [
+    "scripts/pre-push-gate.sh",
+    "435e4e1c4242f66acf18b22a5465f2e1413406cf1968530445781522ffb29ca6",
+  ],
+  [
+    "scripts/install-git-hooks.sh",
+    "a10b4d8c12942164e0636ee04403091c389c8311bcad591e923e8ff76dd1574d",
   ],
   [
     "scripts/run-claw-container-tests.sh",

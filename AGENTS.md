@@ -3,6 +3,11 @@
 This file is the portable operating contract for human and AI contributors. It applies
 to the entire repository and must be read before making changes.
 
+**This worktree (`codex/owner-spec-2026-09-16`):** before any other work, read
+[`AGENT-STATUS.md`](AGENT-STATUS.md). That file is the live agent continuation
+status (copy-guard, Selarti env, remaining work). This AGENTS.md stays the standing
+operating contract and does not replace it.
+
 ## Establish identity first
 
 Never assume a checkout path, branch, remote, or inherited machine configuration. Run:
@@ -46,6 +51,40 @@ Read these files before continuing the expert residency referral extension:
 If the environment check fails, repair or isolate the environment. Do not weaken engine
 constraints, lockfiles, tests, feature flags, or CI to fit the machine.
 
+## Migration history is hand-authored
+
+Migrations in `packages/db/migrations` are authored, reviewed, and applied as SQL. The Drizzle
+snapshot chain stops at `0021`: journal entries `0014`, `0019`, `0020`, and `0022`-`0038` have SQL
+but no `meta/NNNN_snapshot.json`.
+
+- Do not run `drizzle-kit generate`. It diffs against the newest stored snapshot (`0021`) and
+  therefore re-emits every object added afterwards - a 2026-09-10 probe produced a 215-statement
+  `0039_*.sql` recreating existing tables. It also aborts before that on the BigInt default
+  `bigint("next_delivery_sequence", { mode: "bigint" }).notNull().default(0n)` in
+  `packages/db/src/schema/integration.ts`, with
+  `TypeError: Do not know how to serialize a BigInt`.
+- The history also carries 27 hand-authored functions, 33 triggers,
+  1 view (`package_balances`) and 2 extensions
+  (`btree_gist`, `pgcrypto`) that no Drizzle schema declaration represents. A schema-derived
+  snapshot cannot contain them, so rebuilding the chain from `packages/db/src/schema` is not
+  available: a full `generate` already fails with
+  `ERROR: function expert_jsonb_has_exact_keys(jsonb, text[]) does not exist`, because the CHECK
+  constraints that call these functions are emitted while the functions are not.
+  `tests/repo/migration-history-integrity.test.ts` pins that exact set.
+
+- Do not read `drizzle-kit check` or `drizzle-kit up` as a safety net here: both report
+  `Everything's fine`, and neither restores the missing snapshots. The Database Gate step
+  `Validate Drizzle metadata` is therefore green regardless.
+- Add a migration by hand: the `.sql` file plus its `_journal.json` entry in the same change, with a
+  contiguous `idx`, a matching `NNNN_tag`, and `breakpoints: true`.
+- `tests/repo/migration-history-integrity.test.ts` freezes the grandfathered gap list and the
+  bigint-default list. Closing a real gap is welcome - shrink that baseline in the same change; a new
+  gap fails the guard.
+
+Rebuilding the snapshot chain (the only way to make `generate` usable again) needs a state-based
+snapshot for the newest migration; `drizzle-kit introspect` emits a Drizzle schema, not snapshot JSON,
+so there is no tool-supported path. Track that in the migration-integrity issue before attempting it.
+
 ## Test execution rules
 
 These rules override plan steps that ask an agent to burn time or tokens on repeated
@@ -75,6 +114,22 @@ Database Gate runs.
 
 Do not force-push or rewrite shared history. Preserve failed CI runs as diagnostic
 evidence. Keep PR #4 Draft until Tasks 10–12 and their final checks are complete.
+
+### Pre-push gate
+
+There is no hosted CI: `.github/workflows` is empty by repository policy
+(`tests/repo/workflow-semantics.test.ts` asserts it) and branch protection is unavailable on
+the current plan, so a push is otherwise entirely unchecked. Install the gate once per clone
+— the hook it writes lives outside the worktree and therefore covers every linked worktree:
+
+`pnpm hooks:install`
+
+It refuses a push when `tests/repo`, formatting, evidence integrity, whitespace checks, or the
+syntax of any automation script fails, and it lints the files in the outgoing range.
+`pnpm hooks:check` reports whether the gate is active; `pnpm verify:gate` runs the same checks
+without pushing. A push targeting `main` additionally requires a clean working tree whose HEAD
+is the commit being pushed, and also runs the tests typecheck. Bypass only deliberately with
+`git push --no-verify`, and state the reason in the PR description.
 
 ## Authority and safety boundaries
 

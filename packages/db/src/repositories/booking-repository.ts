@@ -83,6 +83,7 @@ export interface BookingExpertScheduleRecord {
   clientDisplayName: string;
   expertNote?: string;
   expertNoteConsent: boolean;
+  expertHandoffConsent: boolean;
   meetingUrl?: string;
 }
 
@@ -585,6 +586,7 @@ export class PostgresBookingRepository {
       clientDisplayName: string;
       expertNote: string | null;
       expertNoteConsent: boolean;
+      expertHandoffConsent: boolean;
       meetingUrl: string | null;
     }>(sql`
       select
@@ -592,12 +594,16 @@ export class PostgresBookingRepository {
         r.expert_id as "expertId",
         r.status,
         s.starts_at as "startsAt",
-        coalesce(nullif(cp.display_name, ''), 'Клиент') as "clientDisplayName",
+        case
+          when handoff_consent.granted then coalesce(nullif(cp.display_name, ''), 'Клиент')
+          else 'Клиент'
+        end as "clientDisplayName",
         case
           when note_consent.granted then cp.expert_note
           else null
         end as "expertNote",
         note_consent.granted as "expertNoteConsent",
+        handoff_consent.granted as "expertHandoffConsent",
         case
           when r.status = 'booked' then r.meeting_url
           else null
@@ -626,6 +632,21 @@ export class PostgresBookingRepository {
               and candidate.consent_type = 'expert_note'
           )
       ) note_consent on true
+      left join lateral (
+        select coalesce(
+          bool_and(latest.decision = 'granted'),
+          false
+        ) as granted
+        from consents latest
+        where latest.user_id = r.user_id
+          and latest.consent_type = 'expert_handoff'
+          and latest.created_at = (
+            select max(candidate.created_at)
+            from consents candidate
+            where candidate.user_id = r.user_id
+              and candidate.consent_type = 'expert_handoff'
+          )
+      ) handoff_consent on true
       where e.id = ${command.expertId}::uuid
         and e.active
         and e.verified
@@ -670,6 +691,7 @@ export class PostgresBookingRepository {
           ? { expertNote: row.expertNote }
           : {}),
         expertNoteConsent: row.expertNoteConsent,
+        expertHandoffConsent: row.expertHandoffConsent,
         ...(row.status === "booked" && row.meetingUrl !== null
           ? { meetingUrl: row.meetingUrl }
           : {}),

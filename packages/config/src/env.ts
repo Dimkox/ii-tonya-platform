@@ -57,6 +57,9 @@ const schema = z
     INTENT_MODEL_ENABLED: z.literal("false").default("false"),
     PAYMENTS_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_REFERRAL_MATURITY_WORKER_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     EXPERT_RESIDENCY_BILLING_ENABLED: z
       .enum(["true", "false"])
       .default("false"),

@@ -1,5 +1,7 @@
 import {
+  guardClientCopy,
   isActionableSafetyContact,
+  type ClientCopyRejectionReason,
   type SafetyContact,
   type SafetyRisk,
 } from "@ii-tonya/domain";
@@ -61,6 +63,7 @@ type IntentRejectionReason =
   | "persistent_tool_instruction"
   | "unauthorized_scope"
   | "unapproved_destination"
+  | ClientCopyRejectionReason
   | "invalid_shape";
 
 export type IntentProposalValidation =
@@ -167,6 +170,10 @@ const validateIntentProposalUnsafe = (
       /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value.text)
     ) {
       return { accepted: false, reasonCode: "invalid_shape" };
+    }
+    const copyGuard = guardClientCopy(value.text);
+    if (!copyGuard.accepted) {
+      return { accepted: false, reasonCode: copyGuard.reasonCode };
     }
     proposal = { kind: "answer", text: value.text };
   } else if (value.kind === "show_catalog") {

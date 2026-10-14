@@ -1,0 +1,16 @@
+/seed/scripts/run-claw-container-tests.sh: line 3: II_TONYA_SOURCE_SHA: II_TONYA_SOURCE_SHA is required
+source_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+ci=true
+max_workers=1
+controller=seed-only-no-corepack-no-pnpm-install
+image=ii-tonya-test:45750b4d1a8748aedae5e765f11300bc3a63d6cd
+preexisting_testcontainers=none
+actual_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+exit_code=1
+test_output_lines=0
+failed_test_files=
+failed_tests=
+remaining_testcontainers=none
+source_exists_after_cleanup=no
+remote_raw=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-seed-retry/client-booking.raw.log
+remote_result=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-seed-retry/client-booking.result

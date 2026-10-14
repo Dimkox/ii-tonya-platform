@@ -1,0 +1,44 @@
+{
+  "$comment": "Documented deviations in docs/test-evidence/claw/ bundles. An entry here does not excuse a failure silently: it records both hashes, so the deviation stays re-checkable by scripts/verify-claw-evidence.mjs, and the verifier still exits 1 if a mismatch is not listed or if a listed pair stops matching. Never re-hash a manifest to make a bundle pass - that destroys the provenance the bundle exists to provide.",
+  "$stepCoverageWaiversComment": "stepCoverageWaivers covers the other way a bundle can lie: it is machine-checkable and its step logs record nothing but the dependency install, so the bundle proves that packages were fetched and no gate was verified. Each entry names every step log the bundle holds with its current hash and the exact recorded step list; the waiver is honoured only while all of that still matches, so regenerating the bundle on the next gate run turns the waiver into a stale-step-waiver failure that forces the entry to be deleted. Bundles with no step log at all are not waived and not failed - they make no machine-checkable step claim.",
+  "exemptions": [
+    {
+      "dir": "c560cbb65e105e1aaeb8d86f544ff95cfd218346",
+      "reason": "verification.md was edited after ARTIFACTS.sha256 had been written, so the manifest no longer describes the committed file. The evidence content itself is unaffected; the bundle simply lost self-consistency and nobody noticed for a month because no check existed.",
+      "manifest": "ARTIFACTS.sha256",
+      "deviations": [
+        {
+          "file": "verification.md",
+          "hashAtManifestTime": "dc2ed9f0289c70ac912cacc4d4f886c0ff214812f451f8f45ad064bb96782bb9",
+          "hashNow": "036053d4713a1ff73634d1d1a48d6f89dde1df1a9a95004394a35f4f2efbb836"
+        }
+      ],
+      "evidence": {
+        "manifestWrittenIn": "3f8ed564 (2026-08-12T00:28:12+03:00, 'docs: record focused expert residency e2e evidence')",
+        "fileLastModifiedIn": "ebd40858 (2026-08-12T19:41:47+03:00, 'Add provider-neutral expert Bearer principal boundary (#9)')",
+        "observed": "2026-09-11 by scripts/verify-claw-evidence.mjs"
+      },
+      "resolution": "Leave both files as they are. Either regenerate the manifest on the next gate run for this SHA, or add the amendment hash pair; do not overwrite history."
+    }
+  ],
+  "stepCoverageWaivers": [
+    {
+      "dir": "7498ce656e1e49fe2d92c83f02d9667eb3f86b9b",
+      "stepLogs": [
+        {
+          "file": "summary.tsv",
+          "hash": "70d36d24aa34317ed1a9562da462811765c0d58e37ff57351787ae89e1e01e27"
+        }
+      ],
+      "recordedSteps": ["frozen-install"],
+      "reason": "ci.md, database.md and release.md all claim status: PASS for this SHA, but the bundle's only step log holds one line: frozen-install. The pre-#81 runner wrote a single shared summary.tsv and environment.txt and truncated them at the start of every run, so the release run at 11:11 destroyed the ci (09:25-09:47) and database (09:48-09:54) step sets, and because the release branch ran its build outside step(), nothing from that build was recorded either. The surviving log is therefore consistent with environment.txt (gate_mode=release, exit_code=0) and with ARTIFACTS.sha256, which is why the verifier reported failures=0 while the bundle proved one gate out of three. Recorded, not repaired: the gate cannot be re-created from here.",
+      "evidence": {
+        "bundleRecordedIn": "ddd607d (2026-09-11, 'docs: record the 7498ce6 gate bundle and its signed release (#82)')",
+        "gapDescribedIn": "docs/test-evidence/releases/7498ce656e1e49fe2d92c83f02d9667eb3f86b9b/artifacts.md, section 'Known deviation in the accompanying gate bundle'",
+        "trackedIn": "https://github.com/Dimkox/ii-tonya-platform/issues/81",
+        "observed": "2026-09-11 by scripts/verify-claw-evidence.mjs"
+      },
+      "resolution": "Re-run each gate mode (ci, database, release) on the Claw host for this SHA with the per-mode runner, commit the regenerated bundle, then delete this waiver: the verifier reports it as a stale-step-waiver failure once the step logs change. Do not re-hash summary.tsv."
+    }
+  ]
+}

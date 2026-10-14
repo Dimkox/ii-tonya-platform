@@ -1,0 +1,106 @@
+started_at=2026-08-14T15:04:12Z
+source_sha_expected=0f1851c1a65d899a2c381eb041ab0480a1a2af05
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m11.30 KB[39m
+[32mESM[39m ⚡️ Build success in 86ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m10.82 KB[39m
+[32mESM[39m ⚡️ Build success in 87ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m2.55 KB[39m
+[32mESM[39m ⚡️ Build success in 87ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m69.79 KB[39m
+[32mESM[39m ⚡️ Build success in 189ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m99.90 KB[39m
+[32mESM[39m ⚡️ Build success in 189ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m504.62 KB[39m
+[32mESM[39m ⚡️ Build success in 479ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m12.59 KB[39m
+[32mESM[39m ⚡️ Build success in 88ms
+[34mCLI[39m Building entry: src/index.ts
+[34mCLI[39m Using tsconfig: ../../tsconfig.base.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Target: es2024
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/index.js [22m[32m39.63 KB[39m
+[32mESM[39m ⚡️ Build success in 95ms
+Scope: all 13 workspace projects
+Recreating /workspace/mvp-client-booking-final-0f1851c/node_modules
+? Verifying lockfile against supply-chain policies (621 entries)...
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +464
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 464, reused 75, downloaded 0, added 0
+Progress: resolved 464, reused 148, downloaded 0, added 0
+Progress: resolved 464, reused 262, downloaded 0, added 0
+Progress: resolved 464, reused 311, downloaded 0, added 0
+Progress: resolved 464, reused 373, downloaded 0, added 0
+Progress: resolved 464, reused 428, downloaded 0, added 0
+Progress: resolved 464, reused 464, downloaded 0, added 0
+Progress: resolved 464, reused 464, downloaded 0, added 30
+✓ Lockfile passes supply-chain policies (621 entries in 9.7s)
+Progress: resolved 464, reused 464, downloaded 0, added 104
+Progress: resolved 464, reused 464, downloaded 0, added 464, done
+[EROFS] EROFS: read-only file system, open '/workspace/mvp-client-booking-final-0f1851c/node_modules/.package-map.json'
+
+pnpm: EROFS: read-only file system, open '/workspace/mvp-client-booking-final-0f1851c/node_modules/.package-map.json'
+    at async open (node:internal/fs/promises:640:25)
+    at async Object.writeFile (node:internal/fs/promises:1260:14)
+    at async writePackageMap (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:184976:3)
+    at async headlessInstall (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:186930:7)
+    at async tryFrozenInstall (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:190364:56)
+    at async _install (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:190098:33)
+[ERROR] Command failed with exit code 226: pnpm install
+
+pnpm: Command failed with exit code 226: pnpm install
+    at getFinalError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:34291:14)
+    at makeError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:36598:21)
+    at getSyncResult (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38442:10)
+    at spawnSubprocessSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38402:14)
+    at execaCoreSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38332:23)
+    at callBoundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40860:23)
+    at boundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40837:49)
+    at sync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40992:14)
+    at runPnpmCli (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:247128:5)
+    at runDepsStatusCheck (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:248869:7)

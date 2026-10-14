@@ -269,6 +269,23 @@ describe("loadEnv", () => {
     ).toBe(true);
   });
 
+  it("validates the maturity worker flag instead of letting a typo mean off", () => {
+    expect(loadEnv(localEnv()).features.expertReferralMaturityWorker).toBe(
+      false,
+    );
+    expect(
+      loadEnv(localEnv({ EXPERT_REFERRAL_MATURITY_WORKER_ENABLED: "true" }))
+        .features.expertReferralMaturityWorker,
+    ).toBe(true);
+    for (const value of ["1", "TRUE", "yes", ""]) {
+      expect(
+        () =>
+          loadEnv(localEnv({ EXPERT_REFERRAL_MATURITY_WORKER_ENABLED: value })),
+        value,
+      ).toThrow();
+    }
+  });
+
   it("defaults expert Telegram financial views off and exposes an independent flag", () => {
     expect(loadEnv(localEnv()).features.expertTelegramFinancialViews).toBe(
       false,

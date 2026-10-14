@@ -213,6 +213,8 @@ describe("native dedicated-server production release", () => {
     expect(claw).not.toMatch(
       /GITHUB_|docker push|API_IMAGE_REF|WORKER_IMAGE_REF/u,
     );
-    expect(claw.match(/^\s*pnpm build$/gmu)).toHaveLength(2);
+    // Two builds: the ci gate and the database gate. Since the runner started recording
+    // per-step timings, each build may sit behind the step recorder instead of standing bare.
+    expect(claw.match(/^\s*(?:step \S+ )?pnpm build$/gmu)).toHaveLength(2);
   });
 });

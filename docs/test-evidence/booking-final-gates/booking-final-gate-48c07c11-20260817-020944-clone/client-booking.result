@@ -1,0 +1,13 @@
+source_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+ci=true
+max_workers=1
+preexisting_testcontainers=none
+actual_sha=48c07c11dc1375332980f4f019c8e1bfebec65fe
+exit_code=1
+test_output_lines=0
+failed_test_files=
+failed_tests=
+remaining_testcontainers=none
+source_exists_after_cleanup=no
+remote_raw=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-clone/client-booking.raw.log
+remote_result=/home/pall/app-stack/ii-tonya-test-workspace/results/48c07c11dc1375332980f4f019c8e1bfebec65fe-client-booking-20260817-gate4-clone/client-booking.result

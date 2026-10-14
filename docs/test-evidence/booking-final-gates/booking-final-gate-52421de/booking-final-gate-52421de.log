@@ -1,0 +1,43 @@
+started_at=2026-08-14T14:54:07Z
+source_sha_expected=52421de57e38a5fdbb2ae3bd374b76ccdfc4d6d6
+Scope: 12 of 13 workspace projects
+Scope: all 13 workspace projects
+Recreating /workspace/mvp-client-booking-final-52421de/node_modules
+? Verifying lockfile against supply-chain policies (621 entries)...
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +464
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 464, reused 102, downloaded 0, added 0
+Progress: resolved 464, reused 182, downloaded 0, added 0
+Progress: resolved 464, reused 220, downloaded 0, added 0
+Progress: resolved 464, reused 299, downloaded 0, added 0
+Progress: resolved 464, reused 356, downloaded 0, added 0
+Progress: resolved 464, reused 392, downloaded 0, added 0
+Progress: resolved 464, reused 464, downloaded 0, added 0
+Progress: resolved 464, reused 464, downloaded 0, added 43
+✓ Lockfile passes supply-chain policies (621 entries in 9.4s)
+Progress: resolved 464, reused 464, downloaded 0, added 132
+Progress: resolved 464, reused 464, downloaded 0, added 464, done
+[EROFS] EROFS: read-only file system, open '/workspace/mvp-client-booking-final-52421de/node_modules/.package-map.json'
+
+pnpm: EROFS: read-only file system, open '/workspace/mvp-client-booking-final-52421de/node_modules/.package-map.json'
+    at async open (node:internal/fs/promises:640:25)
+    at async Object.writeFile (node:internal/fs/promises:1260:14)
+    at async writePackageMap (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:184976:3)
+    at async headlessInstall (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:186930:7)
+    at async tryFrozenInstall (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:190364:56)
+    at async _install (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:190098:33)
+[ERROR] Command failed with exit code 226: pnpm install
+
+pnpm: Command failed with exit code 226: pnpm install
+    at getFinalError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:34291:14)
+    at makeError (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:36598:21)
+    at getSyncResult (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38442:10)
+    at spawnSubprocessSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38402:14)
+    at execaCoreSync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:38332:23)
+    at callBoundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40860:23)
+    at boundExeca (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40837:49)
+    at sync (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:40992:14)
+    at runPnpmCli (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:247128:5)
+    at runDepsStatusCheck (file:///usr/local/lib/node_modules/pnpm/dist/pnpm.mjs:248869:7)

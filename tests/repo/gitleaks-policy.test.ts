@@ -44,6 +44,23 @@ const EXPECTED_HISTORICAL_FIXTURE_FINGERPRINTS = new Set([
   "b757f1db68aac4c8c2cf806ec821d599048455c3:packages/integrations/src/yookassa/payment-adapter.test.ts:generic-api-key:211",
   "b757f1db68aac4c8c2cf806ec821d599048455c3:packages/integrations/src/yookassa/payment-adapter.test.ts:generic-api-key:244",
   "db2eb47f8a1457b46bbba40ba208678574f49fc5:packages/integrations/src/yookassa/client.test.ts:generic-api-key:20",
+  "0330264cbf96c193fd5319e44e174ab1f31b0478:tests/e2e/expert-residency-referral.test.ts:generic-api-key:251",
+  "98af0496bc131026ac2705ed0c24042c9387260e:tests/e2e/expert-residency-referral.test.ts:generic-api-key:251",
+  "ddb3509f0d338d4f89a8c834e2d738a955d319ae:apps/api/src/expert-telegram-command.test.ts:generic-api-key:80",
+  "ddb3509f0d338d4f89a8c834e2d738a955d319ae:apps/api/src/expert-telegram-command.test.ts:generic-api-key:87",
+  "ddb3509f0d338d4f89a8c834e2d738a955d319ae:apps/api/src/expert-telegram-command.test.ts:generic-api-key:247",
+  "7d62ab1c3871028cd9c8d68a53794e4247951a02:apps/api/src/expert-telegram-command.test.ts:generic-api-key:80",
+  "7d62ab1c3871028cd9c8d68a53794e4247951a02:apps/api/src/expert-telegram-command.test.ts:generic-api-key:87",
+  "7d62ab1c3871028cd9c8d68a53794e4247951a02:apps/api/src/expert-telegram-command.test.ts:generic-api-key:247",
+  "f75deacac8f927986d5c08ec0713e925ea27db51:apps/api/src/routes/expert-referral.test.ts:generic-api-key:222",
+  "38cdd71ebffa1bd5978e34718829d470ff101ebb:apps/api/src/routes/expert-referral.test.ts:generic-api-key:222",
+  "ae1e981780fe8c635c706326b9811f66b960e761:tests/test_grok_verification_adaptation.py:stripe-access-token:47",
+  "ae1e981780fe8c635c706326b9811f66b960e761:tests/test_grok_verification_adaptation.py:generic-api-key:24",
+  "125d5a100816d5a10b01fd64fba3cb62bc1bc801:tests/test_grok_verification_adaptation.py:generic-api-key:24",
+  "125d5a100816d5a10b01fd64fba3cb62bc1bc801:tests/test_grok_verification_adaptation.py:stripe-access-token:47",
+  "9e3e47e2dbe91e0f63d05fb51eab1b279c700a1a:packages/config/src/hybrid-message-env.test.ts:generic-api-key:24",
+  "9e3e47e2dbe91e0f63d05fb51eab1b279c700a1a:tests/integration/test-expert-trial-postgres.test.ts:generic-api-key:41",
+  "9e3e47e2dbe91e0f63d05fb51eab1b279c700a1a:tests/integration/test-expert-trial-postgres.test.ts:generic-api-key:84",
 ]);
 
 describe("Gitleaks policy", () => {

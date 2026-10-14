@@ -83,6 +83,7 @@ export interface ExpertScheduleRecord {
   readonly clientDisplayName: string;
   readonly expertNote?: string;
   readonly expertNoteConsent: boolean;
+  readonly expertHandoffConsent: boolean;
   readonly meetingUrl?: string;
 }
 
@@ -283,6 +284,7 @@ export const createBookingService = (
             ? {}
             : { expertNote: record.expertNote }),
           expertNoteConsent: record.expertNoteConsent,
+          expertHandoffConsent: record.expertHandoffConsent,
         });
         return {
           ...view,

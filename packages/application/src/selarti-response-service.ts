@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { guardClientCopy } from "@ii-tonya/domain";
+
 export type ProviderTextProposal = {
   readonly requestId: string;
   readonly dialogueId: string;
@@ -73,6 +75,9 @@ export function decodeProviderTextProposal(
       body.dialogueId !== options.expectedDialogueId)
   ) {
     throw new Error("selarti_response_invalid_proposal");
+  }
+  if (!guardClientCopy(body.text).accepted) {
+    throw new Error("selarti_response_copy_prohibited");
   }
   const allowed = new Set(
     options.allowedUrlHosts.map((host) => host.toLowerCase()),
