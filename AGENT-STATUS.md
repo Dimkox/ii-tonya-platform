@@ -1,5 +1,24 @@
 # Agent status — owner-spec 2026-09-16
 
+## Account packages published — 2026-10-10
+
+API/web now43a93e2131cde6bb09a6825fc5b83dfbf91fc600, PR100. Owner “Делай прод”
+authorized this scoped API/web no-hosted-CI exception and one extra run each of
+four package tests; permission recorded on PR100 before mutation. ExactRC tests
+passed DB5/API8/client18/Chrome1. Those authorizations are consumed; no more runs.
+Clean isolated offline/frozen build, SBOM/provenance, local-key Cosign signatures,
+remote checksums and independent deployment-script review completed. First attempt
+stopped before switching due to root-owned web-releases; corrected new-directory
+sudo install, then switch succeeded. Both previous release directories retained.
+Readiness all true, API/worker/nginx active, /account200, anonymous packages401.
+Live Chrome passes login handoff/source/no-write/no-JS-error checks. Actual Telegram
+login and authenticated production balances NOT verified. Worker was not restarted.
+Migration directories identical; no migration, runtime.env or systemd changes.
+Payments and providers remain off. Commercial product is NOT fully accepted.
+Evidence: docs/test-evidence/production/2026-10-10-account-packages-rc.md.
+Ops /tmp/ii-tonya-account-release.hwz92Z/, signed artifacts in ignored .native-release.
+Disposable test container/network/volume removed; previous prod data untouched.
+
 ## Account packages isolated RC — 2026-10-10
 
 Active branch codex/account-packages-rc-20261010 starts from published webe258651.
