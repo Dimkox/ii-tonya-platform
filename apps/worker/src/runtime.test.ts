@@ -144,6 +144,8 @@ describe("worker runtime", () => {
       recoverExpiredLeases: job("lease-recovery"),
       reconcileUnknownOutcomes: job("unknown-reconciliation"),
       reservationExpiry: job("expiry"),
+      waitlistPromotion: job("waitlist-promotion"),
+      lifecycleScheduler: job("lifecycle-scheduler"),
       expertResidencyExpiry: job("expert-residency-expiry"),
       expertTelegramCheckoutCleanup: job("expert-telegram-checkout-cleanup"),
       expertResidencyReconciliation: job("expert-residency-reconciliation"),
@@ -162,6 +164,8 @@ describe("worker runtime", () => {
       "lease-recovery",
       "unknown-reconciliation",
       "expiry",
+      "waitlist-promotion",
+      "lifecycle-scheduler",
       "expert-residency-expiry",
       "expert-telegram-checkout-cleanup",
       "expert-residency-reconciliation",
@@ -173,6 +177,8 @@ describe("worker runtime", () => {
     expect(report.expertResidencyExpiry).toEqual({
       name: "expert-residency-expiry",
     });
+    expect(report.lifecycleScheduler).toEqual({ name: "lifecycle-scheduler" });
+    expect(report.waitlistPromotion).toEqual({ name: "waitlist-promotion" });
     expect(report.expertTelegramCheckoutCleanup).toEqual({
       name: "expert-telegram-checkout-cleanup",
     });

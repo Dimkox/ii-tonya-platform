@@ -25,5 +25,7 @@ _bmad/*.bak
 .worktrees/
 work/
 /.native-release/
-*.bundle
-*.tar.gz
+.grok-stack/runtime/*
+!.grok-stack/runtime/.gitkeep
+.coverage
+.coverage.*

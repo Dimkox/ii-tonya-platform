@@ -1,28 +1,35 @@
 import "./styles.css";
-import { readPublicConfig } from "./config.js";
-import type { LegalDocumentCode } from "./legal-content.js";
-import { renderLegalPage } from "./legal-view.js";
-import { renderLanding } from "./landing-view.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("web_root_missing");
+const root = app;
 
 const route = window.location.pathname.replace(/\/+$/u, "") || "/";
-const legalRoute: LegalDocumentCode | undefined =
+const legalRoute: "oferta" | "privacy" | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (legalRoute !== undefined) {
-  app.innerHTML = renderLegalPage(legalRoute);
-  document.title =
-    legalRoute === "oferta"
-      ? "Договор-оферта — ии-Тоня"
-      : "Политика конфиденциальности — ии-Тоня";
-} else {
-  app.innerHTML = renderLanding(
-    readPublicConfig({
-      VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
-    }),
-  );
+async function initialize(): Promise<void> {
+  if (legalRoute !== undefined) {
+    const { renderLegalPage } = await import("./legal-view.js");
+    root.innerHTML = renderLegalPage(legalRoute);
+    document.title =
+      legalRoute === "oferta"
+        ? "Договор-оферта — ии-Тоня"
+        : "Политика конфиденциальности — ии-Тоня";
+    return;
+  }
+
+  if (root.dataset.prerendered !== "true") {
+    const [{ readPublicConfig }, { renderLanding }] = await Promise.all([
+      import("./config.js"),
+      import("./landing-view.js"),
+    ]);
+    root.innerHTML = renderLanding(
+      readPublicConfig({
+        VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
+      }),
+    );
+  }
   const reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
@@ -44,3 +51,5 @@ if (legalRoute !== undefined) {
     revealElements.forEach((element) => observer.observe(element));
   }
 }
+
+void initialize();

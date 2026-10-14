@@ -392,6 +392,8 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
     "packages/db/migrations/0037_partner_commerce_a.sql",
     "packages/db/migrations/0038_test_expert_trial.sql",
+    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "packages/db/migrations/0040_booking_waitlist_d1.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {
@@ -485,6 +487,18 @@ describe("MVP scope boundary", () => {
       classifyApprovedTrackedScopeContent({
         path,
         content: `${content}\n# changed\n`,
+      }),
+    ).not.toEqual([]);
+  });
+
+  it("pins reviewed Adaptive Grok workflow automation content", () => {
+    const path = ".grok-stack/adaptive_grok/verification.py";
+    const content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: `${content}#`,
       }),
     ).not.toEqual([]);
   });

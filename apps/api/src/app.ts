@@ -6,6 +6,7 @@ import type {
   ClientBookingService,
   ClientPrincipalResolver,
   ClientSessionService,
+  WaitlistService,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
@@ -20,7 +21,6 @@ import type { SelartiPort } from "@ii-tonya/integrations";
 import {
   createLogger,
   recordClientSessionMetric,
-  recordClientBookingMetric,
   type Logger,
 } from "@ii-tonya/observability";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -116,6 +116,7 @@ export interface AppDependencies {
   clientPrincipal?: ClientPrincipalResolver;
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
+  clientWaitlistService?: WaitlistService;
   now?: () => Date;
   testExpertPromo?: TelegramTestExpertPromoIngress;
 }
@@ -157,6 +158,14 @@ export async function buildApp(
       deps.clientCatalogService === undefined)
   ) {
     throw new Error("Client booking runtime capability is required");
+  }
+  if (
+    deps.config.features.clientWaitlist === true &&
+    (deps.clientWaitlistService === undefined ||
+      deps.clientBookingService === undefined ||
+      deps.clientBookingPrincipal === undefined)
+  ) {
+    throw new Error("Client waitlist runtime capability is required");
   }
   if (
     (deps.config.features.expertTelegramQueries === true ||
@@ -265,7 +274,10 @@ export async function buildApp(
       bookings: deps.clientBookingService,
       principals: deps.clientBookingPrincipal,
       reserveEnabled: deps.config.features.clientBookingReserve === true,
-      metrics: { record: recordClientBookingMetric },
+      waitlistEnabled: deps.config.features.clientWaitlist === true,
+      ...(deps.clientWaitlistService === undefined
+        ? {}
+        : { waitlist: deps.clientWaitlistService }),
     });
   }
   if (

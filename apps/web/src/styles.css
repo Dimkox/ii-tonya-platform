@@ -4,9 +4,9 @@
   --paper-deep: #e9dfd1;
   --paper-light: #fffaf3;
   --ink: #242722;
-  --muted: #696b63;
+  --muted: #595c55;
   --line: rgba(36, 39, 34, 0.18);
-  --terracotta: #b95f45;
+  --terracotta: #a84e36;
   --terracotta-dark: #8f432f;
   --terracotta-light: #db9d82;
   --forest: #31554a;
@@ -278,6 +278,33 @@ footer nav a {
   flex-wrap: wrap;
   gap: 0.8rem;
   align-items: center;
+}
+
+.hero-subtitle {
+  max-width: 35rem;
+  margin-bottom: 1.25rem;
+  color: var(--forest-dark);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+}
+
+.hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0;
+  margin: 0 0 1.8rem;
+  list-style: none;
+}
+
+.hero-proof li {
+  padding: 0.5rem 0.75rem;
+  color: var(--forest-dark);
+  background: rgba(255, 253, 249, 0.64);
+  border: 1px solid rgba(49, 85, 74, 0.28);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 750;
 }
 
 .button {
@@ -790,7 +817,7 @@ footer nav a {
 }
 
 .featured .tariff-number {
-  color: #efc2ac;
+  color: #ffe0d1;
 }
 
 .tariff-card h3 {
@@ -834,7 +861,7 @@ footer nav a {
 }
 
 .featured .tariff-setup {
-  color: #efc2ac;
+  color: #ffe0d1;
 }
 
 .tariff-card a {
@@ -1069,6 +1096,10 @@ footer > div:first-child p {
   margin-bottom: 1rem;
   color: var(--white);
   font-size: 2.2rem;
+}
+
+.footer-brand span {
+  color: #e8a086;
 }
 
 footer nav {
@@ -1412,6 +1443,11 @@ summary:focus-visible {
   .hero-actions,
   .contact-actions {
     display: grid;
+  }
+
+  .hero-proof {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .message-packages,

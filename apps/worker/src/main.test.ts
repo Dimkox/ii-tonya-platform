@@ -82,6 +82,37 @@ describe("worker main", () => {
     expect(registryFactory).not.toHaveBeenCalled();
   });
 
+  it("passes the configured booking confirmation buffer to the waitlist repository factory", async () => {
+    const { createProductionWorkerRuntimeFactory } = await import("./main.js");
+    const waitlistRepositoryFactory = vi.fn(() => ({
+      processPromotionCommandsBatch: vi.fn(async () => ({
+        examined: 0,
+        promoted: 0,
+        completed: 0,
+      })),
+    }));
+    const confirmationBufferMs = 1_234_567;
+    const factory = createProductionWorkerRuntimeFactory({
+      waitlistRepositoryFactory,
+    });
+
+    await expect(
+      factory.create({
+        databaseUrl:
+          "postgresql://worker:worker@localhost/worker?sslmode=require",
+        clientBookingConfirmationBufferMs: confirmationBufferMs,
+        features: {
+          workerOutboxDelivery: false,
+          clientWaitlist: true,
+        },
+      } as never),
+    ).resolves.toBeDefined();
+    expect(waitlistRepositoryFactory).toHaveBeenCalledWith(
+      expect.any(Object),
+      confirmationBufferMs,
+    );
+  });
+
   it("accepts an injected YooKassa reader only with complete enabled metadata", async () => {
     const { selectExpertResidencyProviderReader } = await import("./main.js");
     const reader = {

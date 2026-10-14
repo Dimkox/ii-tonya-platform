@@ -31,6 +31,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // Serialize aggregate DB suites; focused commands may still override this deterministic default.
+    maxWorkers: 1,
     // Eight parallel PostgreSQL schema teardowns exceeded 10s in the full suite; 45s is the measured shared ceiling.
     hookTimeout: 45_000,
     include: [
