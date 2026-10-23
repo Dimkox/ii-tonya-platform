@@ -224,7 +224,8 @@ it("explains price objections using only the original server offer date in every
 
 const personalOffer = {
   offer_start_date: "2026-10-23T00:00:00.000Z",
-  current_discount_stage: 40,
+  current_discount_stage: 1,
+  discount_percent: 40,
   locked_price_monthly: "540000",
   locked_price_package: "1500000",
   payment_link_expires_at: "2026-10-27T00:00:00.000Z",
@@ -266,6 +267,7 @@ it("includes owned current offer fields and masks a premature payment URL", asyn
 it.each([
   { offer_start_date: "made up" },
   { current_discount_stage: 50 },
+  { current_discount_stage: 1, discount_percent: 30 },
   { locked_price_monthly: "54.0" },
   { locked_price_package: "-1" },
   { payment_link_expires_at: "later" },
@@ -301,4 +303,57 @@ it("does not fetch offers for an unauthenticated or forbidden principal", async 
     }),
   ).toEqual({ kind: "forbidden" });
   expect(readOwned).not.toHaveBeenCalled();
+});
+
+it("uses only personal offer pricing when an owned offers backend is configured", async () => {
+  const deps = promptDeps();
+  const result = await buildExpertPromptContext({
+    ...deps,
+    tariffVersionId,
+    personalOffers: { readOwned: async () => personalOffer },
+  });
+  expect(result.kind === "ready" && result.context).toHaveProperty(
+    "currentOffer",
+    personalOffer,
+  );
+  expect(result.kind === "ready" && result.context).not.toHaveProperty(
+    "residencyQuote",
+  );
+  expect(deps.residency.quote).not.toHaveBeenCalled();
+});
+it("snapshots the principal and offer reader before asynchronous ownership checks", async () => {
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const original = { ...principal };
+  const readOwned = vi.fn(async () => personalOffer);
+  const deps = {
+    ...promptDeps(),
+    principal: original,
+    personalOffers: { readOwned },
+  };
+  deps.referrals.summary = vi.fn(async () => {
+    await barrier;
+    return {
+      availableMinor: "0",
+      reservedMinor: "0",
+      debtMinor: "0",
+      nearestExpiry: null,
+    };
+  });
+  const pending = buildExpertPromptContext(deps);
+  original.userId = "other-owner";
+  original.expertId = "other-expert";
+  deps.personalOffers.readOwned = vi.fn(async () => ({
+    ...personalOffer,
+    locked_price_monthly: "1",
+  }));
+  release();
+  const result = await pending;
+  expect(readOwned).toHaveBeenCalledWith(principal.userId, principal.expertId);
+  expect(result.kind === "ready" && result.context).toHaveProperty(
+    "currentOffer.locked_price_monthly",
+    "540000",
+  );
 });
