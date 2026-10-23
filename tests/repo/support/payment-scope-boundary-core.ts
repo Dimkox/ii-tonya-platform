@@ -332,7 +332,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "9d7150fd46a6a38d9a3968b6f551e96a70c5f5fbe671b0c22d513920f3b7e11f",
+    "857ba70d19d695f08a7bd6b8e0a497a078525a6caa118a729bfc082b455e672b",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",

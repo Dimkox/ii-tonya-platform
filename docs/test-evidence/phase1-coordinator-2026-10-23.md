@@ -199,3 +199,28 @@ Phase2 primary references checked2026-10-23, documentation only:
 Rendered VK documentation was unavailable; the official SDK/schema supplied the
 contract evidence. No provider API, credentials, TLS policy or runtime activation
 was changed. The implementation lead received these references for inactive modules.
+
+## Final branch gate correction
+
+The first full branch gate at90495c4811a6c06cd8dddc6e8ed687cc48b119d4 failed
+tests/repo. Shell syntax, formatting, full-range whitespace, evidence integrity,
+changed-file lint and tests typecheck passed. Coordinator preserved the summary in
+/tmp/phase1-through-phase2-final-gate.log and used Vitest's result cache to identify
+six failed repository files without repeating the aggregate suite. Six focused
+diagnostic logs preserve the actual failures.
+
+The corrections retain exact literal inventories and existing denial probes,
+update only reviewed VK/MAX barrel content registration, preserve historical0041
+alongside the current0055 tail, and correct two example placeholder conventions.
+Coordinator independently reviewed the complete guard deltas and grouped rationale
+in docs/spec/phase-final-guard-reconciliation.md; no classifier expansion or
+assertion removal was accepted. All six focused guards subsequently passed.
+
+The inherited receipt-contact SQL also duplicated the current consent moment.
+Its exact decision/owner/purpose/latest-moment binding now delegates to the sole
+canonical consent helper, preserving tied-denial and preventing revival of an old
+contact by a later grant. Coordinator reviewed that production delta independently.
+The new four-case isolated PostgreSQL test passed4/4; coordinator inspected its
+actual terminal log /tmp/phase-final-receipt-consent-pg1.log. No old functional
+Phase0/A–D/Phase2 suite was repeated for this correction. A passing aggregate gate
+is not claimed until the coordinator's final rerun completes.

@@ -29,3 +29,9 @@ reward, never an additional reward or registration credit. Eligibility,30-day
 maturity, debt/reversal and spend caps remain. No profitable-margin guarantee is
 possible without actual costs. Client coupon money and message units remain
 separate from expert bonus/referral state.
+
+The first final branch gate exposed six guard failures; exact inventories/parity/
+placeholder corrections and one inherited receipt-consent centralization fix are
+recorded in [final guard reconciliation](phase-final-guard-reconciliation-2026-10-23.md).
+All six focused guards and the new four-case semantic PostgreSQL regression pass.
+Coordinator final clean-commit gate remains separately recorded.

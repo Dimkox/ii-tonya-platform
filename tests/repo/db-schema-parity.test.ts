@@ -106,7 +106,11 @@ describe("authoritative Drizzle schema parity", () => {
       return names(table as AnyPgTable);
     };
 
-    expect(names(experts).uniques).toEqual(["experts_user_id_unique"]);
+    // 0054 adds the composite owner identity referenced by paid publication.
+    expect(names(experts).uniques).toEqual([
+      "experts_id_user_unique",
+      "experts_user_id_unique",
+    ]);
     expect(requiredTable("expertReferralCodeBatches")?.uniques).toContain(
       "expert_referral_batches_id_inviter_unique",
     );
@@ -119,17 +123,23 @@ describe("authoritative Drizzle schema parity", () => {
       ]),
     });
     expect(requiredTable("expertReferrals")).toMatchObject({
-      checks: ["expert_referrals_distinct_experts"],
-      foreignKeys: expect.arrayContaining(["expert_referrals_code_owner_fk"]),
+      // 0054 preserves the legacy code source and adds an audited promo source.
+      checks: ["expert_referrals_distinct_experts", "expert_referrals_source"],
+      foreignKeys: expect.arrayContaining([
+        "expert_referrals_code_owner_fk",
+        "expert_referrals_promo_qualification_fk",
+      ]),
       uniques: [
         "expert_referrals_code_unique",
         "expert_referrals_id_invitee_unique",
         "expert_referrals_id_inviter_unique",
         "expert_referrals_invitee_unique",
+        "expert_referrals_promo_qualification_unique",
       ],
     });
     expect(requiredTable("expertResidencyOrders")).toMatchObject({
       checks: [
+        "expert_campaign_order_binding",
         "expert_order_cash_credit_conservation",
         "expert_order_cash_remainder",
         "expert_order_credit_cap",
@@ -148,6 +158,7 @@ describe("authoritative Drizzle schema parity", () => {
         "expert_order_v2_price",
       ],
       uniques: [
+        "expert_campaign_order_quote_unique",
         "expert_orders_expert_idempotency_unique",
         "expert_orders_id_expert_unique",
       ],

@@ -37,11 +37,22 @@ describe("B1 schema/migration parity", () => {
         (entry) => entry.tag === "0034_hybrid_message_gateway_b1",
       ),
     ).toHaveLength(1);
+    // 0041 remains an exact historical contract, rather than a moving tail.
+    expect(journal.entries.filter((entry) => entry.idx === 41)).toEqual([
+      {
+        idx: 41,
+        version: "7",
+        when: 1791504000000,
+        tag: "0041_client_erasure_requests",
+        breakpoints: true,
+      },
+    ]);
+    // The reviewed 0055 SQL/state baseline is the actual current journal tail.
     expect(journal.entries.at(-1)).toEqual({
-      idx: 41,
+      idx: 55,
       version: "7",
-      when: 1791504000000,
-      tag: "0041_client_erasure_requests",
+      when: 1791763200012,
+      tag: "0055_expert_residency_lifecycle",
       breakpoints: true,
     });
   });

@@ -47,6 +47,29 @@ export function currentConsentGrantedSql(args: {
   return sql`(${currentConsentSatisfiedSql(args)})`;
 }
 
+/** Bind specific evidence to the current journal moment, without choosing a
+ * random UUID winner. A tied denial or policy mismatch still fails the shared
+ * all-latest decision oracle; a later regrant cannot revive older evidence. */
+export function currentConsentDecisionIsCurrentSql(args: {
+  readonly userExpression: SQL;
+  readonly decisionExpression: SQL;
+  readonly purpose: string;
+  readonly policyVersion?: SQL;
+}): SQL {
+  return sql`exists (
+    select 1 from consents bound_decision
+    where bound_decision.id = ${args.decisionExpression}
+      and bound_decision.user_id = ${args.userExpression}
+      and bound_decision.consent_type = ${args.purpose}
+      and bound_decision.created_at = (
+        select max(candidate.created_at) from consents candidate
+        where candidate.user_id = ${args.userExpression}
+          and candidate.consent_type = ${args.purpose}
+      )
+      and ${currentConsentGrantedSql(args)}
+  )`;
+}
+
 /**
  * Списочная форма того же правила: по каждой цели — самое позднее мгновение и «действует ли».
  * Нужна ровно одна строка на цель, поэтому `bool_and` здесь группировочный, а не скалярный;
