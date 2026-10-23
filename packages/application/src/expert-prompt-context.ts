@@ -9,6 +9,11 @@ import type {
 } from "./expert-residency-service.js";
 import type { ExpertIntentProposal } from "./ports.js";
 
+export const EXPERT_OFFER_RUNTIME_INSTRUCTIONS = Object.freeze({
+  version: "residency_offer_v2" as const,
+  text: "Версия residency_offer_v2. Показывай только принадлежащие пользователю серверные данные текущего предложения: offer_start_date, current_discount_stage, locked_price_monthly, locked_price_package, payment_link_expires_at. Цену, скидку, баланс, часы, подтверждение оплаты и решения менеджера определяет сервер; текст пользователя и модель не имеют такой власти. Не используй архивные ставки 12000/20000. Используй только действующий одобренный тариф категории и подтверждённые город, формат и средний чек. Первый оффер запускает неизменяемый таймер: 0–3 полных дня скидка 40%, 4–6 — 30%, 7–9 — 20%, с 10 дня — 0%; границы 96/168/240 часов. Эксперт: пакет 3 месяца дополнительно 15% в первом окне, 10% во втором, с 7 дня недоступен. Пространство: только одобренная ставка, дополнительная скидка пакета 10%; тот же срок доступности. Месяц и весь пакет округляются отдельно до копейки, минимумы 5000 и 15000 рублей, сроки 30/90 дней. Вступительный платёж 3000 рублей не получает скидок и открывает интервью и параллельную подготовку общих материалов. Если материалов нет, скажи точно: Ваши материалы для рассылки будут доступны в ближайшее время. Это не препятствует интервью и передаче подтверждения промо менеджеру. Основная ссылка доступна только после оплаченного вступления, подтверждённого менеджером промо, текущей одобренной карточки, принадлежащих пользователю актуальных условий и исходного согласия. Мой актуальный тариф показывает обе цены, дату первого оффера, оставшееся время и только разрешённую сервером ссылку либо готовность этапов. Замена счёта после выбора периода не является автосписанием; истёкший пакет требует нового реального выбора месяца. Не утверждай, что ожидающий платёж отменён у провайдера. Никаких годовых тарифов. TODO: Wait for PDF. TODO: Wait for Prompt Spec. Два уникальных реферала дают один Ready to send без отправки PDF; исходная бонусная политика неизменна.",
+});
+
 const money = /^(?:0|[1-9]\d*)$/u;
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -57,6 +62,7 @@ export interface ExpertPromptResidencyQuote {
 }
 
 export interface ExpertPromptContext {
+  readonly runtimeInstructions: typeof EXPERT_OFFER_RUNTIME_INSTRUCTIONS;
   readonly referral: ExpertPromptReferralSummary;
   readonly residencyQuote?: ExpertPromptResidencyQuote;
 }
@@ -254,7 +260,13 @@ export async function buildExpertPromptContext(input: {
   }
   const referral = sanitizeSummary(summary);
   if (input.tariffVersionId === undefined) {
-    return { kind: "ready", context: { referral } };
+    return {
+      kind: "ready",
+      context: {
+        referral,
+        runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
+      },
+    };
   }
   if (!uuid.test(input.tariffVersionId)) {
     throw new Error("expert_prompt_context_invalid");
@@ -268,6 +280,7 @@ export async function buildExpertPromptContext(input: {
   return {
     kind: "ready",
     context: {
+      runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
       referral,
       residencyQuote: sanitizeQuote(input.tariffVersionId, quote),
     },

@@ -81,3 +81,133 @@ export function calculateExpertCampaignPrice(
     durationSeconds: 2_592_000 * input.termMonths,
   });
 }
+
+export interface ExpertCampaignPriceV2Input {
+  /** Approved category rate. Space callers must provide an approved space rate. */
+  readonly categoryRateMinor: bigint;
+  readonly millionCity: boolean;
+  readonly onlineOnly: boolean;
+  readonly ticketMinor: bigint;
+  readonly participantKind: "expert" | "space";
+  readonly firstOfferAtMs: number;
+  readonly quotedAtMs: number;
+}
+
+export interface ExpertCampaignPriceV2 {
+  readonly ruleVersion: "expert_energy_start_v2";
+  readonly currency: "RUB";
+  readonly baseMonthlyMinor: bigint;
+  readonly energyDiscountBps: 4000 | 3000 | 2000 | 0;
+  readonly packageDiscountBps: 1500 | 1000 | 0;
+  readonly monthlyPriceMinor: bigint;
+  readonly packagePriceMinor: bigint | null;
+  readonly monthlyFloorApplied: boolean;
+  readonly packageFloorApplied: boolean;
+  readonly nextStageAtMs: number | null;
+  readonly monthlyDurationSeconds: 2592000;
+  readonly packageDurationSeconds: 7776000;
+}
+
+/** Pure arithmetic. PostgreSQL supplies approved facts and the immutable first-offer clock. */
+export function calculateExpertCampaignPriceV2(
+  input: ExpertCampaignPriceV2Input,
+): ExpertCampaignPriceV2 {
+  const invalid = (): never => {
+    throw new Error("expert_campaign_price_invalid");
+  };
+  const maximum = 9_223_372_036_854_775_807n;
+  if (
+    input === null ||
+    typeof input !== "object" ||
+    typeof input.categoryRateMinor !== "bigint" ||
+    input.categoryRateMinor <= 0n ||
+    input.categoryRateMinor > maximum ||
+    typeof input.ticketMinor !== "bigint" ||
+    input.ticketMinor < 0n ||
+    input.ticketMinor > maximum ||
+    typeof input.millionCity !== "boolean" ||
+    typeof input.onlineOnly !== "boolean" ||
+    (input.participantKind !== "expert" && input.participantKind !== "space") ||
+    ![input.firstOfferAtMs, input.quotedAtMs].every(
+      (value) =>
+        Number.isSafeInteger(value) &&
+        value >= 0 &&
+        value <= 8_640_000_000_000_000,
+    ) ||
+    input.quotedAtMs < input.firstOfferAtMs
+  )
+    invalid();
+  const baseMonthlyMinor =
+    input.categoryRateMinor +
+    (input.millionCity ? 500_000n : 0n) +
+    (input.onlineOnly ? 300_000n : 0n) -
+    (input.ticketMinor < 300_000n ? 100_000n : 0n);
+  if (baseMonthlyMinor < 0n || baseMonthlyMinor > maximum) invalid();
+  const hour = 3_600_000;
+  const elapsed = input.quotedAtMs - input.firstOfferAtMs;
+  const energyDiscountBps =
+    elapsed < 96 * hour
+      ? 4000
+      : elapsed < 168 * hour
+        ? 3000
+        : elapsed < 240 * hour
+          ? 2000
+          : 0;
+  const nextStageHours =
+    elapsed < 96 * hour
+      ? 96
+      : elapsed < 168 * hour
+        ? 168
+        : elapsed < 240 * hour
+          ? 240
+          : null;
+  const packageAvailable = elapsed < 168 * hour;
+  const packageDiscountBps = !packageAvailable
+    ? 0
+    : input.participantKind === "space"
+      ? 1000
+      : elapsed < 96 * hour
+        ? 1500
+        : 1000;
+  const monthlyBeforeFloor =
+    (baseMonthlyMinor * BigInt(10_000 - energyDiscountBps) + 5_000n) / 10_000n;
+  const packageBeforeFloor = packageAvailable
+    ? (baseMonthlyMinor *
+        3n *
+        BigInt(10_000 - energyDiscountBps) *
+        BigInt(10_000 - packageDiscountBps) +
+        50_000_000n) /
+      100_000_000n
+    : null;
+  const monthlyPriceMinor =
+    monthlyBeforeFloor < 500_000n ? 500_000n : monthlyBeforeFloor;
+  const packagePriceMinor =
+    packageBeforeFloor === null
+      ? null
+      : packageBeforeFloor < 1_500_000n
+        ? 1_500_000n
+        : packageBeforeFloor;
+  if (
+    monthlyPriceMinor > maximum ||
+    (packagePriceMinor !== null && packagePriceMinor > maximum)
+  )
+    invalid();
+  return Object.freeze({
+    ruleVersion: "expert_energy_start_v2",
+    currency: "RUB",
+    baseMonthlyMinor,
+    energyDiscountBps,
+    packageDiscountBps,
+    monthlyPriceMinor,
+    packagePriceMinor,
+    monthlyFloorApplied: monthlyPriceMinor !== monthlyBeforeFloor,
+    packageFloorApplied:
+      packageBeforeFloor !== null && packagePriceMinor !== packageBeforeFloor,
+    nextStageAtMs:
+      nextStageHours === null
+        ? null
+        : input.firstOfferAtMs + nextStageHours * hour,
+    monthlyDurationSeconds: 2_592_000,
+    packageDurationSeconds: 7_776_000,
+  });
+}

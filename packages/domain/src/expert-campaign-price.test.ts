@@ -179,3 +179,115 @@ it("returns immutable versioned RUB terms without modifying input", () => {
   expect(Object.isFrozen(result)).toBe(true);
   expect(original.baseMonthlyMinor).toBe(2_000_000n);
 });
+
+// V2 preserves the historical v1 contract above.
+import { calculateExpertCampaignPriceV2 } from "./expert-campaign-price.js";
+const v2Input = (overrides = {}) => ({
+  categoryRateMinor: 900_000n,
+  millionCity: false,
+  onlineOnly: false,
+  ticketMinor: 300_000n,
+  participantKind: "expert" as const,
+  firstOfferAtMs: anchor,
+  quotedAtMs: anchor,
+  ...overrides,
+});
+
+it.each([
+  [0, 4000, 540_000n, 1_500_000n, 96],
+  [96 * hour - 1, 4000, 540_000n, 1_500_000n, 96],
+  [96 * hour, 3000, 630_000n, 1_701_000n, 168],
+  [168 * hour - 1, 3000, 630_000n, 1_701_000n, 168],
+  [168 * hour, 2000, 720_000n, null, 240],
+  [240 * hour - 1, 2000, 720_000n, null, 240],
+  [240 * hour, 0, 900_000n, null, null],
+] as const)(
+  "v2 exact elapsed boundary %s",
+  (elapsed, discount, monthly, pack, next) => {
+    expect(
+      calculateExpertCampaignPriceV2(v2Input({ quotedAtMs: anchor + elapsed })),
+    ).toMatchObject({
+      ruleVersion: "expert_energy_start_v2",
+      energyDiscountBps: discount,
+      monthlyPriceMinor: monthly,
+      packagePriceMinor: pack,
+      nextStageAtMs: next === null ? null : anchor + next * hour,
+      monthlyDurationSeconds: 2_592_000,
+      packageDurationSeconds: 7_776_000,
+    });
+  },
+);
+it("v2 computes base from structured qualifications at the exact ticket threshold", () => {
+  expect(
+    calculateExpertCampaignPriceV2(
+      v2Input({ millionCity: true, onlineOnly: true, ticketMinor: 299_999n }),
+    ),
+  ).toMatchObject({
+    baseMonthlyMinor: 1_600_000n,
+    monthlyPriceMinor: 960_000n,
+    packagePriceMinor: 2_448_000n,
+  });
+  expect(
+    calculateExpertCampaignPriceV2(v2Input({ ticketMinor: 300_000n }))
+      .baseMonthlyMinor,
+  ).toBe(900_000n);
+});
+it("v2 rounds the whole package once rather than multiplying rounded months", () => {
+  expect(
+    calculateExpertCampaignPriceV2(v2Input({ categoryRateMinor: 1_000_007n })),
+  ).toMatchObject({
+    monthlyPriceMinor: 600_004n,
+    packagePriceMinor: 1_530_011n,
+  });
+  expect(
+    calculateExpertCampaignPriceV2(v2Input({ categoryRateMinor: 1_000_050n }))
+      .packagePriceMinor,
+  ).toBe(1_530_077n);
+});
+it("v2 space pricing requires an explicit rate and uses ten percent package discount", () => {
+  expect(
+    calculateExpertCampaignPriceV2(
+      v2Input({ participantKind: "space", categoryRateMinor: 2_000_000n }),
+    ),
+  ).toMatchObject({
+    packageDiscountBps: 1000,
+    monthlyPriceMinor: 1_200_000n,
+    packagePriceMinor: 3_240_000n,
+  });
+});
+it("v2 floors monthly and package independently", () => {
+  expect(
+    calculateExpertCampaignPriceV2(v2Input({ categoryRateMinor: 100_000n })),
+  ).toMatchObject({
+    monthlyPriceMinor: 500_000n,
+    packagePriceMinor: 1_500_000n,
+    monthlyFloorApplied: true,
+    packageFloorApplied: true,
+  });
+});
+it.each([
+  { categoryRateMinor: 0n },
+  { categoryRateMinor: -1n },
+  { categoryRateMinor: 9_223_372_036_854_775_808n },
+  { categoryRateMinor: undefined },
+  { millionCity: "yes" },
+  { onlineOnly: null },
+  { ticketMinor: -1n },
+  { participantKind: "partner" },
+  { quotedAtMs: anchor - 1 },
+  { firstOfferAtMs: NaN },
+  { quotedAtMs: anchor + 0.5 },
+  { quotedAtMs: Infinity },
+  { firstOfferAtMs: -1 },
+  { categoryRateMinor: 9_223_372_036_854_775_807n, millionCity: true },
+])("v2 rejects invalid or overflowing input %#", (overrides) => {
+  expect(() => calculateExpertCampaignPriceV2(v2Input(overrides))).toThrow(
+    "expert_campaign_price_invalid",
+  );
+});
+it("v2 returns frozen values without mutating the offer anchor", () => {
+  const original = Object.freeze(v2Input());
+  const result = calculateExpertCampaignPriceV2(original);
+  expect(Object.isFrozen(result)).toBe(true);
+  expect(original.firstOfferAtMs).toBe(anchor);
+});

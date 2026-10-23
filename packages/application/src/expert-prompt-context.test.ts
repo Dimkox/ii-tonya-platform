@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildExpertPromptContext,
+  EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
   type ExpertPromptContext,
   validateExpertIntentProposal,
 } from "./expert-prompt-context.js";
@@ -50,9 +51,14 @@ describe("expert prompt context", () => {
       residency: residency(vi.fn()),
     });
 
+    expect(result.kind === "ready" && result.context).toHaveProperty(
+      "runtimeInstructions.version",
+      "residency_offer_v2",
+    );
     expect(result).toEqual({
       kind: "ready",
       context: {
+        runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
         referral: {
           availableMinor: "100000",
           reservedMinor: "25000",
@@ -99,6 +105,7 @@ describe("expert prompt context", () => {
     expect(result.kind).toBe("ready");
     const context = result.kind === "ready" ? result.context : undefined;
     expect(context).toEqual({
+      runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
       referral: {
         availableMinor: "100000",
         reservedMinor: "0",
