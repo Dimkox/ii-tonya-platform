@@ -161,6 +161,12 @@ export function calculateExpertCampaignPriceV2(
         : elapsed < 240 * hour
           ? 240
           : null;
+  const nextStageAtMs =
+    nextStageHours === null
+      ? null
+      : input.firstOfferAtMs + nextStageHours * hour;
+  if (nextStageAtMs !== null && nextStageAtMs > 8_640_000_000_000_000)
+    invalid();
   const packageAvailable = elapsed < 168 * hour;
   const packageDiscountBps = !packageAvailable
     ? 0
@@ -203,10 +209,7 @@ export function calculateExpertCampaignPriceV2(
     monthlyFloorApplied: monthlyPriceMinor !== monthlyBeforeFloor,
     packageFloorApplied:
       packageBeforeFloor !== null && packagePriceMinor !== packageBeforeFloor,
-    nextStageAtMs:
-      nextStageHours === null
-        ? null
-        : input.firstOfferAtMs + nextStageHours * hour,
+    nextStageAtMs,
     monthlyDurationSeconds: 2_592_000,
     packageDurationSeconds: 7_776_000,
   });

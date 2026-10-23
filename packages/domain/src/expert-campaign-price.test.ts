@@ -291,3 +291,14 @@ it("v2 returns frozen values without mutating the offer anchor", () => {
   expect(Object.isFrozen(result)).toBe(true);
   expect(original.firstOfferAtMs).toBe(anchor);
 });
+
+it("v2 rejects an unrepresentable next-stage timestamp", () => {
+  expect(() =>
+    calculateExpertCampaignPriceV2(
+      v2Input({
+        firstOfferAtMs: 8_640_000_000_000_000,
+        quotedAtMs: 8_640_000_000_000_000,
+      }),
+    ),
+  ).toThrow("expert_campaign_price_invalid");
+});
