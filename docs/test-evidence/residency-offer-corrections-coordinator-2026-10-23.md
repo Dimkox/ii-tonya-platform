@@ -117,3 +117,33 @@ pre-application74h/94h promo reminders and actual privacy erasure processing.
 Full workspace build also exited0 as reported by the lead. No PostgreSQL process
 remains active; final static/repository checks and the clean-commit gate remain
 outstanding at this record checkpoint.
+
+## Final exact-source acceptance
+
+Verified source3466408a54fb6796b386d0c1da428ae283e40dd1 was clean. The complete
+correction range starts at0d004a71689393f65605703193e728ebdfa44057; outgoing
+list114 paths is /tmp/residency-offer-corrections-final-paths.txt.
+
+Canonical gate runs1 and2 both exited1 solely in tests/repo; all six other
+checks passed. The script deletes per-check logs and prints only the last three
+lines on failure, so the exact failing cases cannot be established. Do not claim
+they were proven CPU timeouts. A standalone diagnostic run on unchanged source
+passed59 files/553 tests in89.48s.
+
+To retain evidence, the coordinator copied scripts/pre-push-gate.sh to
+/tmp/residency-offer-gate-diagnostic.sh and changed only the repository-root
+location and temporary-log cleanup into retention. Every check, argument, scope
+and deadline remained identical. This diagnostic gate exited0: shell syntax,
+format, whitespace, evidence integrity, changed-file lint, all553 repository tests
+(87s) and test types (22s) passed. Both execution paths used Node24.22.0.
+Worker environment was VITEST_MAX_THREADS=1,VITEST_MIN_THREADS=1,
+VITEST_MAX_FORKS=1,VITEST_MIN_FORKS=1; no tests were omitted. No source change
+was made between failed and passing gate executions. The intermittent canonical
+failures remain an unproven limitation, not silently discarded release evidence.
+
+Logs: /tmp/residency-offer-corrections-final-gate-1.log,
+/tmp/residency-offer-corrections-final-gate-2.log,
+/tmp/residency-offer-corrections-repo-diagnostic.log,
+/tmp/residency-offer-gate-diagnostic-full.log; retained complete check logs under
+/tmp/tmp.2E7XeyBQ4w. Final documentation records local source acceptance only.
+No push/deployment/live provider send or external prompt activation occurred.

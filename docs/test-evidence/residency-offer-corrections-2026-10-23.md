@@ -96,7 +96,7 @@ PostgreSQL170005; see [persistence provenance](residency-offer-persistence-2026-
 
 ## Final boundary
 
-Local implementation is ready for the coordinator's clean-commit branch gate.
+Local implementation3466408a passed all seven clean-commit gate checks with diagnostic log retention; repository tests553/553. Earlier canonical gate failures and diagnostic limitations are retained in the coordinator record.
 External strict first-send checkout custody remains an explicitly injected,
 default-off capability; missing reviewed capability never yields a payment link.
 Live merchant, provider, public webhook and production release acceptance remain

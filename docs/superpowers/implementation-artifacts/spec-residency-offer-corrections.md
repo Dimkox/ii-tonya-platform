@@ -2,7 +2,7 @@
 title: Correct the paid residency funnel and automatic personal offer lifecycle
 type: feature
 created: 2026-10-23
-status: in-review
+status: completed
 baseline_commit: 0d004a71689393f65605703193e728ebdfa44057
 review_loop_iteration: 1
 context:

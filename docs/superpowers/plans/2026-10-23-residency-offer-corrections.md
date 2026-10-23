@@ -42,12 +42,12 @@ timestamps. Return separate one-month/package totals, discounts, floor flags and
 next boundary. Existing v1 function/outputs remain available for historical use.
 Use stage0 before offer,1=40%,2=30%,3=20%,4=standard for the new owned projection.
 
-- [ ] Write and run RED boundaries at96/168/240h±1ms, modifiers, expert/space package,
+- [x] Write and run RED boundaries at96/168/240h±1ms, modifiers, expert/space package,
       independent floors, total-only rounding and bigint/invalid input tests.
-- [ ] Implement and run focused GREEN; build domain before dependent consumers.
-- [ ] Add mandatory Russian first-offer explanation and payment/material ordering
+- [x] Implement and run focused GREEN; build domain before dependent consumers.
+- [x] Add mandatory Russian first-offer explanation and payment/material ordering
       to new working prompt assets/runtime instructions. Preserve archive/hash@1.
-- [ ] Test actual prompt composition, absence of annual/manual-recalculate claims,
+- [x] Test actual prompt composition, absence of annual/manual-recalculate claims,
       and absence of LLM price authority; review and commit the tested deliverable.
 
 ### Task2: First-offer authority and parallel paid workflow
@@ -62,19 +62,19 @@ materials job and interview access. Independent application promo proof/confirma
 feeds the main gate alongside approved card and owned schedule evidence. Manager
 Telegram actions delegate to the existing fresh-MFA decision transaction.
 
-- [ ] Add RED tests for fixed fee despite all discounts, actual fee/main purpose
+- [x] Add RED tests for fixed fee despite all discounts, actual fee/main purpose
       separation, old anchor reuse, qualifier ownership and profile-revision changes.
-- [ ] Implement additive normalized storage, preserving integer money and source
+- [x] Implement additive normalized storage, preserving integer money and source
       constraints. Do not convert unapproved archival tariffs into published rates.
-- [ ] Add generic application-bound materials at verified fee success, using the
+- [x] Add generic application-bound materials at verified fee success, using the
       real original promo identity when available. Missing content retains honest
       AWAITING_MATERIALS while sending the exact placeholder; no inferred work identity.
-- [ ] Accept protected raw text/photo/files and promo proof independently; keep
+- [x] Accept protected raw text/photo/files and promo proof independently; keep
       explicit TODO: Wait for Prompt Spec, TODO: Wait for PDF and one durable masked
       Ready to send event after two unique referrals. No fake files or sent state.
-- [ ] Add trusted staff pairing, scoped expiring approve/reject callbacks and real
+- [x] Add trusted staff pairing, scoped expiring approve/reject callbacks and real
       notification worker using current admin/MFA authority and existing fee checkout.
-- [ ] Add read/admission-time archive filters and demonstrate exclusion before
+- [x] Add read/admission-time archive filters and demonstrate exclusion before
       the lifecycle worker runs. Preserve current paid coverage and refund behavior.
 
 ### Task3: Automatic offer renewal, reminders and bot menu
@@ -88,27 +88,33 @@ owner selection/schedule evidence, never fabricated Telegram events. Due notices
 are unique per offer/stage/type and use current consent/target/attempt fences.
 The current-offer projection exposes the owner-requested fields and permitted link.
 
-- [ ] RED test early quotes without a main link;24h/3h uniqueness/catch-up; stage
+- [x] RED test early quotes without a main link;24h/3h uniqueness/catch-up; stage
       transition expiry plus a new exact-price invoice/link; unknown send quarantine.
-- [ ] Implement a15min bounded scheduled cycle using DB time after locks, gate-aware
+- [x] Implement a15min bounded scheduled cycle using DB time after locks, gate-aware
       link creation and existing strict checkout/GET recovery. Stop on paid/erased/revoked.
-- [ ] Preserve old payment facts on expiry. Mark local expiry honestly; pending
+- [x] Preserve old payment facts on expiry. Mark local expiry honestly; pending
       provider payments cannot be claimed remotely cancelled. No autocharge.
-- [ ] Handle loss of quarterly availability with explicit monthly selection;
+- [x] Handle loss of quarterly availability with explicit monthly selection;
       use declared24h operational TTL after the final stage without false price alerts.
-- [ ] Wire “Мой актуальный тариф” in the real promo-bot keyboard/callback and return
+- [x] Wire “Мой актуальный тариф” in the real promo-bot keyboard/callback and return
       first-offer date, current prices/TTL/readiness/link. No manual recalculation action.
-- [ ] Run meaningful focused PG scenarios with heavy setup in bounded hooks and
+- [x] Run meaningful focused PG scenarios with heavy setup in bounded hooks and
       purpose/owner/replay/expiry/consent/manager/parallelism coverage; review source
       before the first integrated run and diagnose any failure comprehensively.
 
 ### Task4: Compatibility and final delivery
 
-- [ ] Reconstruct only new SQL metadata on an isolated task-owned PG17.5 instance;
+- [x] Reconstruct only new SQL metadata on an isolated task-owned PG17.5 instance;
       never drizzle-kit generate. Reuse the protected rotated local config in memory,
       never print it or read obsolete Docker credentials.
-- [ ] Update exact guard inventories/hashes with grouped provenance, independently
+- [x] Update exact guard inventories/hashes with grouped provenance, independently
       reviewed additions only; preserve all prior financial/privacy denial probes.
-- [ ] Run relevant builds/types/lint/format/diff and independent adversarial review.
-- [ ] Commit local tested checkpoints and final coverage/status, then one final
+- [x] Run relevant builds/types/lint/format/diff and independent adversarial review.
+- [x] Commit local tested checkpoints and final coverage/status, then one final
       branch gate over the correction range. No remote activation/prompt publication claim.
+
+## Local acceptance
+
+Implementation3466408a passed all seven final checks with diagnostic log retention,
+including553 repository tests. Earlier failed gate runs and their missing-detail
+limitation remain recorded in the coordinator evidence. No release/provider claim.
