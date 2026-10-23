@@ -1,3 +1,37 @@
+# Owner extra4 consumed; fresh isolated PG ready, extra5 NOT authorized — 2026-10-23
+
+Owner answered «разрешаю» for exactly ONE extra phase1-promo.test.ts invocation.
+Coordinator ran4 once: exit1,15skipped; beforeAll CREATE DATABASE connection died.
+No migration/application case or correctedfixture executed. Existingowned PG17.5
+backend9942 exited2 and internallyrecovered; rootcause unknown, not a source failure
+or PASS. DirectComposeIP(3) vs loopbackpublishedport(4) difference is not proven causal.
+Log /tmp/phase1-promo-owner-extra4.log. Invocation4 authority is fully consumed.
+
+Parent prepared separate owned Compose project
+`ii-tonya-phase1-promo-owner-recovery-20261023`, samepostgres17.5bookworm,
+loopback55483, dedicatedgeneratedvolume,1CPU/1GiB/256MiBshm. Privategenerated
+configuration /tmp/phase1-promo-owner-recovery.compose.json mode0600 contains
+syntheticcredentials: never print/copy/commit its values. Originalproject retained.
+Infrastructure-only actual17.5 TCP+uniqueemptyDB CREATE/DROP PASS; no domainSQL,
+migrations/testfile/assertions executed. Log /tmp/phase1-promo-infrastructure-recovery.log.
+Detailed evidence docs/test-evidence/phase1-block-a-owner-extra4-2026-10-23.md.
+
+Source/test still reviewed WIP2ceedcf92052f1d51e502a08cc5e8520022f6e93 plus prior
+docsbea76b2748aa030494f172c58aac43ed15694d7e; parent only changedstatus/evidence.
+Need explicit exactlyONE new focusedfile invocation5 authority, not elapsedtime or
+ordinarycontinuation. No equivalentprobe, old/full/provider run. All commands and
+childowners terminal; B/C/D/Phase2 stillrequired but blocked by A runtimegate.
+
+# Owner extra PG invocation4 authorized and CONSUMED — 2026-10-23
+
+Owner explicitly answered «разрешаю» to exactly ONE extra invocation of
+`pnpm exec vitest run tests/integration/phase1-promo.test.ts`.
+Coordinator is starting that invocation on the existing task-owned synthetic
+PostgreSQL17.5 Compose project only. Authority is consumed; do not run5 or retry
+on missing output. Resume the running command/read /tmp/phase1-promo-owner-extra4.log.
+Source is bea76b2748aa030494f172c58aac43ed15694d7e with corrected ::text fixture.
+No broader/old/full/provider/production authority. B starts only after actualPASS.
+
 # Reviewable BlockA WIP saved; exact extra-run request ready — 2026-10-23 14:35 UTC
 
 Source WIP commit:2ceedcf92052f1d51e502a08cc5e8520022f6e93 on thisisolatedbranch.
