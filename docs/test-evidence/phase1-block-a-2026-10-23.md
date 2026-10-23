@@ -3,6 +3,13 @@
 Status: corrected expired-quote fixture awaiting explicit extra-run authority. Baseline:
 `8b41802cd0156f8596fbf0e1ba67890f2ed969f2`.
 
+Reviewable source WIP commit: `2ceedcf92052f1d51e502a08cc5e8520022f6e93`.
+Corrected fixture: `tests/integration/phase1-promo.test.ts:335`, explicit
+`${randomUUID()}::text`. Independent source reviewer accepts the cast and finds
+no remaining untyped interpolations; no runtime probe was performed. Post-correction
+fixture scoped lint/format, tests TypeScript and whitespace passed. All child file
+owners and reviewers have ended; only the explicit extra-run answer is pending.
+
 ## Scope and behavior
 
 P1.A1–A4 add a separate default-off private promo bot capability. First-time users

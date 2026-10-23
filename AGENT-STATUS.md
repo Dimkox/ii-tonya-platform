@@ -1,3 +1,26 @@
+# Reviewable BlockA WIP saved; exact extra-run request ready — 2026-10-23 14:35 UTC
+
+Source WIP commit:2ceedcf92052f1d51e502a08cc5e8520022f6e93 on thisisolatedbranch.
+This is explicitly PENDING PostgreSQL verification, NOT BlockAcomplete. Parent
+permitted a local WIPcheckpoint because the repository3run cap is now the solegate.
+All childfileowners/reviewers are terminal; no builder/test/probe/session remains.
+Owned synthetic PG17.5 Compose infrastructure remains for an authorized followup.
+
+Correctedfixture exactlocation: tests/integration/phase1-promo.test.ts:335 adds only
+`${randomUUID()}::text` for jsonb_build_object idempotency_key. Readonly independent
+block_a_storage_review accepted this cast and confirmed otherparameters alreadyhave
+UUID/typedcolumn/interval types; no further typeinference gaps found. It performed
+NO runtimeprobe. Correctedfile lint/format/testsTypeScript/diffchecks PASS; source
+reviews accepted all actualcode/guards. Scope123/history8 remainverified as below.
+
+Requested permission is EXACTLY ONE additional local invocation of
+`pnpm exec vitest run tests/integration/phase1-promo.test.ts` on taskowned synthetic
+PG17.5 only. All3 original slots CONSUMED; final3 produced14/15. No answer yet.
+Do not run4, equivalentSQLprobe, old/full/provider suites or beginBlockB without
+actualowneranswer. Source/metadata/evidence are concrete and reviewable. No push,
+merge, deploy, paidprovider or liveflag authority follows. Remaining B/C/D/Phase2
+are still required after this predecessor gate closes; Phase3 remains excluded.
+
 # BlockA corrected fixture awaiting one extra PG run — 2026-10-23 14:33 UTC
 
 All3 invocations of NEW tests/integration/phase1-promo.test.ts are CONSUMED.
