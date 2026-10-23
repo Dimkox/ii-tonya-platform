@@ -51,6 +51,33 @@ import { yookassaWebhookRoutes } from "../../apps/api/src/routes/yookassa-webhoo
 
 import { createAsyncCaseDrainFence } from "../support/async-case-drain.js";
 const caseDrain = createAsyncCaseDrainFence({ drainTimeoutMs: 2000 });
+async function configuredPhase<T>(
+  label: string,
+  body: () => Promise<T>,
+): Promise<T> {
+  if (process.env.II_TONYA_PHASE1_TRACE_CONFIGURED !== "true") return body();
+  const started = performance.now();
+  process.stderr.write(
+    JSON.stringify({
+      event: "phase1_configured_phase",
+      label,
+      stage: "start",
+    }) + "\n",
+  );
+  try {
+    return await body();
+  } finally {
+    process.stderr.write(
+      JSON.stringify({
+        event: "phase1_configured_phase",
+        label,
+        stage: "end",
+        elapsedMs: Math.round(performance.now() - started),
+      }) + "\n",
+    );
+  }
+}
+
 const registerCase = (
   name: string,
   body: () => Promise<void>,
@@ -1736,6 +1763,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       let paymentId: string;
       let checkoutUrl: string;
       let portCalls: number;
+      let traceRestore: (() => void)[];
       let app: Awaited<ReturnType<typeof workHttp>>;
       let fixture: {
         f: Awaited<ReturnType<typeof readyCard>>;
@@ -1756,10 +1784,54 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
         });
         fixture = { f, quote };
         calls = [];
+        traceRestore = [];
+        if (process.env.II_TONYA_PHASE1_TRACE_CONFIGURED === "true") {
+          const create = financial.createMainInvoice.bind(financial);
+          const binding = financial.checkoutBindingForOwner.bind(financial);
+          const verify = financial.verifyMainCheckoutForOwner.bind(financial);
+          const createSpy = vi
+            .spyOn(financial, "createMainInvoice")
+            .mockImplementation((...args) =>
+              configuredPhase("service_create_invoice", () => create(...args)),
+            );
+          const bindingSpy = vi
+            .spyOn(financial, "checkoutBindingForOwner")
+            .mockImplementation((...args) =>
+              configuredPhase("service_owner_binding", () => binding(...args)),
+            );
+          const verifySpy = vi
+            .spyOn(financial, "verifyMainCheckoutForOwner")
+            .mockImplementation((...args) =>
+              configuredPhase("service_verify_binding", () => verify(...args)),
+            );
+          traceRestore.push(
+            () => createSpy.mockRestore(),
+            () => bindingSpy.mockRestore(),
+            () => verifySpy.mockRestore(),
+          );
+        }
         let providerBody: Record<string, unknown> | undefined;
         paymentId = `synthetic_${randomUUID()}`;
         checkoutUrl = `https://yoomoney.ru/checkout/payments/v2/contract?orderId=${paymentId}`;
         const operations = new PostgresYooKassaOperationRepository(database.db);
+        if (process.env.II_TONYA_PHASE1_TRACE_CONFIGURED === "true") {
+          const claim = operations.claimInitialPayment.bind(operations);
+          const bind = operations.bindProviderObject.bind(operations);
+          const claimSpy = vi
+            .spyOn(operations, "claimInitialPayment")
+            .mockImplementation((...args) =>
+              configuredPhase("operation_claim", () => claim(...args)),
+            );
+          const bindSpy = vi
+            .spyOn(operations, "bindProviderObject")
+            .mockImplementation((...args) =>
+              configuredPhase("operation_bind", () => bind(...args)),
+            );
+          traceRestore.push(
+            () => claimSpy.mockRestore(),
+            () => bindSpy.mockRestore(),
+          );
+        }
         const provider = createYooKassaClient(
           {
             mode: "test",
@@ -1822,12 +1894,14 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             createOrRecover: async (binding) => {
               portCalls++;
               try {
-                const result = await adapter.createCheckout({
-                  orderId: binding.orderId,
-                  amountMinor: binding.amountMinor,
-                  currency: binding.currency,
-                  idempotencyKey: binding.idempotencyKey,
-                });
+                const result = await configuredPhase("adapter_checkout", () =>
+                  adapter.createCheckout({
+                    orderId: binding.orderId,
+                    amountMinor: binding.amountMinor,
+                    currency: binding.currency,
+                    idempotencyKey: binding.idempotencyKey,
+                  }),
+                );
                 return {
                   kind: "ready" as const,
                   orderId: binding.orderId,
@@ -1861,16 +1935,22 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
           });
         try {
           const first = payload(++sequence);
-          const response = await send(first);
+          const response = await configuredPhase("http_first", () =>
+            send(first),
+          );
           expect(response.statusCode).toBe(200);
           expect(JSON.stringify(response.json()).includes(checkoutUrl)).toBe(
             !lostResponse,
           );
-          const replay = await send(first);
+          const replay = await configuredPhase("http_replay", () =>
+            send(first),
+          );
           expect(replay.statusCode).toBe(200);
           expect(JSON.stringify(replay.json())).not.toContain(checkoutUrl);
           expect(portCalls).toBe(1);
-          const recovery = await send(payload(++sequence));
+          const recovery = await configuredPhase("http_recovery", () =>
+            send(payload(++sequence)),
+          );
           expect(recovery.statusCode).toBe(200);
           expect(JSON.stringify(recovery.json()).includes(checkoutUrl)).toBe(
             !lostResponse,
@@ -1894,7 +1974,9 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
           const orderId = String(stored[0]!.id);
           const frame = { ...event(f.workScope), revision: f.revision };
           expect(
-            await financial.checkoutBindingForOwner(frame, orderId),
+            await configuredPhase("db_binding", () =>
+              financial.checkoutBindingForOwner(frame, orderId),
+            ),
           ).toMatchObject({
             orderId,
             amountMinor: quote.priceMinor,
@@ -1902,21 +1984,25 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             providerMode: "test",
           });
           expect(
-            await financial.verifyMainCheckoutForOwner(
-              frame,
-              orderId,
-              paymentId,
+            await configuredPhase("db_verify_match", () =>
+              financial.verifyMainCheckoutForOwner(frame, orderId, paymentId),
             ),
           ).toBe(!lostResponse);
           expect(
-            await financial.verifyMainCheckoutForOwner(
-              frame,
-              orderId,
-              "synthetic_wrong_payment",
+            await configuredPhase("db_verify_mismatch", () =>
+              financial.verifyMainCheckoutForOwner(
+                frame,
+                orderId,
+                "synthetic_wrong_payment",
+              ),
             ),
           ).toBe(false);
         } finally {
-          await app.close();
+          try {
+            await configuredPhase("http_close", () => app.close());
+          } finally {
+            for (const restore of traceRestore.reverse()) restore();
+          }
         }
       });
     });

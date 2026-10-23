@@ -1,3 +1,69 @@
+# Block C locally accepted; continue D then Phase2 — 2026-10-23
+
+C8 lead37597 EXIT0 FULL20/20 (started18:13:50UTC); log/tmp/phase1-c-card-pg8-traced.log,
+71.57stotal/4.30scollection. C7 filtereddiagnostic1PASS/19filtered remainsseparate.
+Alloriginal5sbodylimits/15squoteexpiryoverride/real3sTTL/assertions/drain unchanged.
+Gatedtest-onlysafephase trace found allconfiguredawaitsfinite; C6isolatedtimeoutcause
+unproven, no runtimebugclaim/globalbudgetincrease. Lowspycleanupfixedunconditional
+finally, independentlyaccepted; finaltesttypes/lint/format/diffPASS. No unchanged
+fullrerun. Priorprod/package/state/scope/history/reviews remainvalidrecorded.
+
+Cspecstatusdone LOCALONLY, mainexecutionamendmentrecords task-wide countoverride.
+Actualperfilecounts retained A5/B2/C8(includingdiagnostic7), helper3. Ownerexplicit
+current-task override supersedes historicalcountapprovalrestrictions below; NOmore
+countpermissionloops. Necessarytargetedverification only, repeat-toolcount<=3,
+no weakening/unnecessaryunchangedrepetition. Rootcoordinatorrecordread/included.
+
+AllCfileowners/commandsended. ThislocalcheckpointclosesCbeforeDimplementation.
+Next: proportionalDreuseaudit/spec/plan then actualworker+workbotrenewal/reminders,
+overduevisibility/access, archive<=3calendarmonths andtransactionalaudit-backed
+paid-entitlementreevaluation; neverrewrite settledperiods or grantunpaidreturn.
+ThenPhase2slotreuse/clientbotreadmethods/inactiveVKMAXofficialcontracts. Continue
+underexistingallplanauthority, no approvalloop. Parentavailableentitlementreview.
+
+Strictfirstsendcustody/content/merchant/processorbackup/exactSHArelease remain
+separate/defaultoff. No provider/push/deploy/liveflag. FreshprotectedrotatedCompose
+JSON MEMORYONLY, neverDockerEnv/secretoutput. SeeCevidencefullchronology.
+
+# C7 focused phase diagnostic active; task-wide override — 2026-10-23
+
+C6 root89705 EXIT1 17/20PASS: configurednormal5s timeout+2sdrain poisonedlast2.
+Log/tmp/phase1-c-card-pg6.log88.45s. No countapprovalneeded: explicit task-wide
+owner override remains. Lead nowsoleverificationowner; no rootduplicate launches.
+
+Systematicdebugging: readonlycallgraph found no demonstratednestedtransaction or
+lockcycle; configuredbody executes3HTTPmutations+3standalonefinancialgatechecks.
+Legacyoperation/pool/port potentialunboundedwaits remainrisks, notproven currentcause.
+Hypothesis cumulative intendedwork vs single stalledawait. C7 filtereddiagnostic
+ONLYconfigurednormal nowstarting withUNCHANGED5000ms, safephase labels/durations
+(noIDs/URLs/params); log/tmp/phase1-c-card-pg7-diagnostic.log. This is NOT fullCacceptance.
+FreshcurrentprivateJSON memoryonly, noDockerEnv/secretoutput. Nohelper/probe/rerun
+othercases. Sourceinstrumentationtestonly/typeslintPASS; preserveallassertions.
+Afterevidence identifyrootcause, independentlyreview any explicitcasebudget rationale;
+no globaltimeout/runtime/SLO weakening. D/Phase2awaitCclosure.
+
+# Task-wide verification count override; C6 active — 2026-10-23
+
+The owner explicitly answered “разрешаю, что за бесконечный цикл” to the coordinator's
+request to override verification run-count limits for this entire current task.
+This user authority supersedes the historical three-run and exact-extra-run approval
+restrictions recorded below. Do not ask for count approval again. Preserve actual
+per-file run facts and failed logs. Run only checks justified by source changes,
+failures or unresolved acceptance; keep repeat-tool count at most3, existing runtime
+limits/assertions and all financial/privacy/release boundaries intact.
+
+Root solely launched C invocation6: session89705, log/tmp/phase1-c-card-pg6.log,
+on82b72348349fd9f8ba66b7082c991130a45b6b0c after RequireDockerPASS. Active; no result
+claimed. Do not duplicate, probe or run the unchanged helper while root owns this
+session. Current private rotated Compose JSON stays memory-only, never DockerEnv.
+Only this status/authority record changes while the C test source runs unchanged.
+
+After actualPASS close C evidence/local checkpoint, then implement proportional
+D→Phase2 autonomously under existing all-plan authority. On a failure diagnose the
+whole concrete source/fixture issue before targeted verification; no piecemeal
+prep fixes or repeated approval loop. C remains in-progress until actual result.
+No provider call, remote push, deployment or live flag follows from this override.
+
 # Block C comprehensive fixture WIP ready for exact extra6 request — 2026-10-23
 
 Allfileowners/reviewers/commandsended. CsourceNOTaccepted; D/Phase2NOTstarted.

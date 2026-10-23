@@ -1,11 +1,13 @@
 # Phase1 Block C local implementation evidence — 2026-10-23
 
-Status: in progress, not local acceptance or release evidence. Baseline
+Status: local implementation accepted after C8; release gates remain separate. Baseline
 `656cf89a025d46dfa6bc8e0cf92a3e6eee355c21`. New integrated PostgreSQL file
-`tests/integration/phase1-card-publication.test.ts`: zero of three invocations.
+`tests/integration/phase1-card-publication.test.ts`: eight recorded invocations, including the single-case C7 diagnostic; full C8 passed20/20 under the task-wide owner count override.
 No provider calls, push, deployment or live activation.
 
-## Implemented boundaries under final integration
+The entries retain chronological investigation history; final C8 acceptance is recorded below.
+
+## Implemented boundaries
 
 Private trusted work-bot text/photo/document references enter revisioned drafts.
 Protected existing staff sessions edit strict professional fields, approve/return
@@ -282,3 +284,58 @@ ended. Only the C test file and evidence/status/spec records changed; helper and
 production remain untouched. No test/PG/probe or scope/history rerun occurred.
 A clean local WIP checkpoint is required before any exact sixth-run permission
 request. This remains an unexecuted fixture revision, not C acceptance.
+
+## Explicit task-wide verification count override
+
+The owner answered “разрешаю, что за бесконечный цикл” to the coordinator's exact
+request to override the number-of-runs restriction for the current entire task.
+Necessary focused verification may continue without further count-permission loops;
+actual invocations and failures remain recorded. Existing assertions, runtime
+limits, repeat-tool maximum3 and financial/privacy/release boundaries remain.
+
+Root alone launched C invocation6, session89705, on
+`82b72348349fd9f8ba66b7082c991130a45b6b0c` after RequireDocker passed, with current
+protected synthetic configuration read only in memory and an exclusive log:
+`/tmp/phase1-c-card-pg6.log`. Result is pending. The implementation lead ran no
+duplicate, helper rerun or probe. C acceptance and D/Phase2 continuation await the
+actual result, with no further count approval request required.
+
+## C8 full local acceptance
+
+C6 exited1 with17/20 passing: configured normal checkout timed out and its expired
+drain correctly fenced the last two cases. No source hang was proven. A systematic
+read-only callgraph audit found sequential transactions across the HTTP/provider
+boundary, with potential legacy wait risks but no demonstrated nested transaction
+or lock cycle in this fixture. No unrelated production hardening was introduced.
+
+C7 selected only normal configured checkout with safe fixed-label phase tracing.
+It passed under the unchanged5000ms limit: HTTP482/188/279ms; standalone binding and
+verification66/65/71ms. This diagnostic did not constitute full acceptance.
+Log`/tmp/phase1-c-card-pg7-diagnostic.log`.
+
+C8 ran the complete ordered file once with the same gated phase capture and exited0:
+20/20 passed,71.57s total,4.30s collection,66.82s cases. Log
+`/tmp/phase1-c-card-pg8-traced.log`, lead session37597. Normal checkout HTTP phases
+515/168/308ms, standalone DB73/72/72ms; unknown checkout HTTP363/143/228ms,
+standalone DB80/79/77ms. Every phase completed. The earlier isolated timeout's cause
+remains unproven; no product latency claim or widened case budget follows.
+
+All original assertions, default5000ms case limits, existing15000ms quote-expiry
+override, actual3-second TTL and two-second cleanup drain remain. Gated test-only
+trace logs fixed labels/stage/rounded milliseconds, with no identifiers, URLs,
+parameters or errors. Independent review accepted forwarding and safety; its low
+spy-restoration finding was fixed with an unconditional nested finally. That cleanup
+change received static review/checks without an unchanged full-file rerun.
+
+Prior relevant package builds/types,38/38 card regression, application/config/API/
+worker/web focused checks, actual0054 reconstruction, scope123/123/history8/8 and
+independent financial/storage/privacy/ingress/staff/transport/fixture reviews remain
+recorded. No aggregate or unchanged suite was repeated. C is locally complete;
+strict first-send custody, approved owner content, merchant/processor/backup and
+exact-SHA release gates stay separate/default-off. D then Phase2 continue under the
+already-authorized execution contract.
+
+Final post-cleanup static checks passed: full tests TypeScript
+(`/tmp/phase1-c-accepted-types.log`), scoped ESLint
+(`/tmp/phase1-c-accepted-lint.log`), formatting and whitespace. No unchanged full
+run followed the reviewed unconditional spy-cleanup change.

@@ -139,3 +139,18 @@ record local evidence and commit actual passing implementation before continuing
 Only mark local implementation complete where verified; never mark release/live
 provider acceptance complete from fixtures. Full aggregate gates cannot silently
 rerun exhausted files; preserve this limitation for the final evidence owner.
+
+## Owner verification amendment and local progress — 2026-10-23
+
+The owner explicitly overrode verification run-count restrictions for this entire
+current task (“разрешаю, что за бесконечный цикл”). This supersedes historical
+three-run/exact-extra-run approval caps above and in continuation records for this
+task. Do not request further count approval. Preserve run facts/failed logs, keep
+repeat-tool count at most3, and run only verification justified by changes,
+failures or unresolved acceptance. Assertions, runtime and release boundaries stay.
+
+A and B are locally complete. C is locally complete after C8 passed20/20 on isolated
+PostgreSQL17.5; its spec/evidence retain all failed attempts, reviews and external
+gates. D and Phase2 continue in order with proportional reuse, per-block focused
+verification/review/local checkpoints and no new permission loop. Local fixture
+acceptance is not provider or release acceptance.

@@ -1,6 +1,6 @@
 ---
 title: Expert card interview through verified main-payment publication
-status: in-progress
+status: done
 baseline_commit: 656cf89a025d46dfa6bc8e0cf92a3e6eee355c21
 context:
   - docs/superpowers/implementation-artifacts/spec-phase1-through-phase2-execution.md
@@ -143,16 +143,16 @@ failure, absent allows C's durable bot-ID/update receipt. It never claims fresh 
 unhandled legacy events. C durable mutation replays suppress another message and
 provider call; a distinct owner recovery command can recover the existing invoice.
 
-## Local WIP checkpoint
+## Local acceptance
 
-C source is implemented and independently reviewed. The owner-authorized fifth
-PG invocation passed19/20, with only qualified-reward fixture setup exceeding the
-unchanged5000ms body limit. All five authorized invocations are consumed.
+C8 passed all20 integrated PostgreSQL17.5 cases with unchanged default5000ms case
+limits, existing expiry override, actual3-second TTL, financial/privacy assertions
+and bounded cleanup. The focused C7 trace passed its single selected checkout case;
+C8 supplied the full ordered acceptance. Earlier failed invocations remain evidence.
+Gated test-only tracing records fixed phase labels/durations and preserves original
+arguments/results; its cleanup finding is fixed and independently reviewed.
 
-A complete20-case setup/body audit accompanies the final fixture-only repair.
-Normal heavy preparation moves to tracked bounded hooks; actual callbacks, races,
-financial/erasure assertions,20 cases, default5000ms limits, real3-second TTL and
-bounded drain remain unchanged. That revised integrated fixture is unexecuted.
-Status stays in-progress; D and Phase2 await an explicitly authorized extra focused
-run and C critical-gate closure. No sixth run or equivalent manual execution is
-implied.
+Local implementation is complete. Real first-send custody, owner content, merchant,
+processor/backup erasure and exact-SHA release gates remain separate/default-off.
+Continue D then Phase2 under the existing execution contract and explicit task-wide
+verification count override; no new approval loop.
