@@ -169,3 +169,33 @@ invocation6 (session89705, exclusive /tmp/phase1-c-card-pg6.log), launched only 
 using current synthetic credentials in memory. No success is claimed before its
 actual terminal result. The implementation lead was instructed not to duplicate it
 and to continue C closure, D and Phase2 after passing the critical local gate.
+
+## C and D local acceptance; Phase2 official connector references
+
+Coordinator inspected the actual C8 terminal log:20/20 passed,71.57s, unchanged
+timeouts and assertions. The accepted C checkpoint is
+35f341c0e5c5bc1507f46a0cf87250f92b186eeb. The earlier sporadic checkout timeout's
+cause remains unproven; focused and full-order phase traces completed every await.
+Coordinator also inspected D's first integrated terminal log:12/12 passed,52.14s.
+The accepted D checkpoint is552b40dd3aceb7b00479ff9d7bff7ef11ee6281b.
+
+Independent coordinator D source review identified and rechecked closure of
+continuous prepaid coverage after pause, settlement/checkout lock order, and
+financial settlement during a refunded coverage gap. Restoration uses a current
+continuous settled chain and exact approved main-card binding; no interval or
+reward is minted. D read/worker reconciles a refunded future publication anchor
+before billing/reminders; immediate reverse-callback anchor reconciliation is not
+claimed. These reviews were read-only, without coordinator functional probes.
+
+Phase2 primary references checked2026-10-23, documentation only:
+
+- [MAX send](https://dev.max.ru/docs-api/methods/POST/messages): fixed API origin
+  platform-api2.max.ru, token in Authorization header, bounded text send contract.
+- [Official VK SDK endpoint/version](https://raw.githubusercontent.com/VKCOM/vk-php-sdk/master/src/VK/Client/VKApiClient.php)
+  and [POST envelope](https://raw.githubusercontent.com/VKCOM/vk-php-sdk/master/src/VK/Client/VKApiRequest.php).
+- [Official VK messages schema](https://raw.githubusercontent.com/VKCOM/vk-api-schema/master/messages/methods.json)
+  and [version reference](https://raw.githubusercontent.com/VKCOM/vk-api-schema/master/README.md).
+
+Rendered VK documentation was unavailable; the official SDK/schema supplied the
+contract evidence. No provider API, credentials, TLS policy or runtime activation
+was changed. The implementation lead received these references for inactive modules.

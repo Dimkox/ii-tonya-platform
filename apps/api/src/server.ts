@@ -1,3 +1,5 @@
+import { createClientBotAccountComposition } from "./client-bot-account-composition.js";
+import { assertClientAccountQueriesConfig } from "@ii-tonya/config";
 import {
   createExpertResidencyLifecycleComposition,
   assertExpertResidencyLifecycleCheckout,
@@ -189,6 +191,7 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertClientAccountQueriesConfig(config);
     assertExpertResidencyLifecycleConfig(config);
     assertExpertResidencyLifecycleCheckout(
       config,
@@ -568,6 +571,7 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
+    const clientAccountQueries = createClientBotAccountComposition(db, config);
     const expertVerification = createExpertVerificationComposition(
       db,
       config,
@@ -642,6 +646,7 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(clientAccountQueries ? { clientAccountQueries } : {}),
       ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
       ...(expertCard ? { expertCard } : {}),
       ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),

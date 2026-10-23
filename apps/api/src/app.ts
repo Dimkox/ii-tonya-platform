@@ -1,4 +1,8 @@
 import {
+  assertClientBotAccountCapability,
+  type ClientBotAccountCapability,
+} from "./client-bot-account-composition.js";
+import {
   assertExpertResidencyLifecycleCapability,
   type ExpertResidencyLifecycleCapability,
 } from "./expert-residency-lifecycle-composition.js";
@@ -124,6 +128,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  clientAccountQueries?: ClientBotAccountCapability;
   expertResidencyLifecycle?: ExpertResidencyLifecycleCapability;
   expertCard?: ExpertCardCapability;
   expertVerification?: ExpertVerificationCapability;
@@ -279,6 +284,14 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertClientBotAccountCapability(deps.config, deps.clientAccountQueries);
+  if (
+    deps.config.features.clientAccountQueries === true &&
+    (deps.telegramWebhookSecret !== deps.config.telegramWebhookSecret ||
+      deps.clientBotId !== deps.clientAccountQueries?.botId ||
+      deps.clientBotKey !== deps.clientAccountQueries?.botKey)
+  )
+    throw new Error("client_account_queries_webhook_scope_conflict");
   assertExpertResidencyLifecycleCapability(
     deps.config,
     deps.expertResidencyLifecycle,
@@ -644,6 +657,11 @@ export async function buildApp(
       : {}),
   });
   await app.register(telegramWebhookRoutes, {
+    clientAccountQueriesEnabled:
+      deps.config.features.clientAccountQueries === true,
+    ...(deps.clientAccountQueries
+      ? { clientAccountQueries: deps.clientAccountQueries }
+      : {}),
     expertResidencyLifecycleEnabled:
       deps.config.features.expertResidencyLifecycleCommands === true,
     ...(deps.expertResidencyLifecycle

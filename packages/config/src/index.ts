@@ -16,3 +16,5 @@ export type { ExpertCardConfig } from "./expert-card-config.js";
 
 export { assertExpertResidencyLifecycleConfig } from "./expert-residency-lifecycle-config.js";
 export type { ExpertResidencyLifecycleConfig } from "./expert-residency-lifecycle-config.js";
+
+export * from "./client-account-queries-config.js";

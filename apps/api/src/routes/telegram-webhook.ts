@@ -1,3 +1,5 @@
+import { isClientBotAccountCommand } from "@ii-tonya/application";
+import type { ClientBotAccountCapability } from "../client-bot-account-composition.js";
 import {
   validRawExpertCardUpdateId,
   isExpertResidencyLifecycleUpdate,
@@ -183,6 +185,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientHybridRoutingEnabled: boolean | undefined;
   clientBotKey: string | undefined;
   clientGateway: HybridGateway | undefined;
+  clientAccountQueriesEnabled?: boolean;
+  clientAccountQueries?: ClientBotAccountCapability;
   clientNavigationEnabled?: boolean | undefined;
   clientNavigationGateway?: Pick<ClientNavigationGateway, "handle"> | undefined;
   clientBotId?: string | undefined;
@@ -383,6 +387,29 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       if (await deletion(request.body, reply)) return;
       if (isBookingCallback(request.body))
         return bookingCallback(request.body, reply, crypto.randomUUID());
+      if (isClientBotAccountCommand(request.body)) {
+        if (
+          deps.clientAccountQueriesEnabled !== true ||
+          !deps.clientAccountQueries ||
+          deps.clientAccountQueries.botId !== deps.clientBotId ||
+          deps.clientAccountQueries.botKey !== deps.clientBotKey
+        )
+          return reply
+            .code(503)
+            .send({ error: "client_account_queries_unavailable" });
+        const result = await deps.clientAccountQueries.service.handle(
+          request.body,
+        );
+        if (result.status === "reply")
+          return reply.type("application/json").send(result.reply);
+        if (result.status === "duplicate")
+          return { accepted: true, duplicate: true };
+        if (result.status === "invalid")
+          return reply.code(400).send({ error: "invalid_account_query" });
+        return reply
+          .code(503)
+          .send({ error: "client_account_queries_unavailable" });
+      }
       if (deps.clientNavigationEnabled === true) {
         try {
           const result = await deps.clientNavigationGateway?.handle(

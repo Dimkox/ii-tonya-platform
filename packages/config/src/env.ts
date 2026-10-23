@@ -1,4 +1,8 @@
 import {
+  readClientAccountQueriesConfig,
+  type ClientAccountQueriesConfig,
+} from "./client-account-queries-config.js";
+import {
   readExpertResidencyLifecycleConfig,
   assertExpertResidencyLifecycleConfig,
   type ExpertResidencyLifecycleConfig,
@@ -408,6 +412,7 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
   expertVerification?: ExpertVerificationConfig;
@@ -457,6 +462,7 @@ export type RuntimeConfig = {
   telegramWebhookSecret?: string;
   selartiResponseSharedSecret?: string;
   features: {
+    clientAccountQueries?: boolean;
     expertApplicant?: boolean;
     expertVerification?: boolean;
     expertCard?: boolean;
@@ -678,6 +684,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
   const expertApplicant = readExpertApplicantConfig(source);
   const expertVerification = readExpertVerificationConfig(source);
+  const clientAccountQueries = readClientAccountQueriesConfig(source);
   const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
   const expertCard = readExpertCardConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
@@ -803,6 +810,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   }
 
   const config: RuntimeConfig = {
+    ...(clientAccountQueries ? { clientAccountQueries } : {}),
     ...(payerReceipt ? { payerReceipt } : {}),
     ...(expertApplicant ? { expertApplicant } : {}),
     ...(expertVerification ? { expertVerification } : {}),
@@ -873,6 +881,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
+      ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
       ...(expertApplicant ? { expertApplicant: true } : {}),
       ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
       ...(expertResidencyLifecycle?.enabled

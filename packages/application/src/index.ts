@@ -47,3 +47,5 @@ export * from "./expert-card-service.js";
 export * from "./expert-card-admin-service.js";
 
 export * from "./expert-residency-lifecycle-service.js";
+
+export * from "./client-bot-account-read-service.js";

@@ -65,6 +65,13 @@ export type ReserveSlotResult =
         | "expert_active_overlap";
     };
 
+/** Internal transaction-local timing result, never external send authority. */
+interface ProtectedReservationTiming {
+  choiceDigest: `sha256:${string}`;
+  databaseNow: Date;
+  choiceExpired: boolean;
+}
+
 export interface TransitionReservationCommand {
   reservationId: string;
   expectedVersion: number;
@@ -926,86 +933,7 @@ export class PostgresBookingRepository {
         }[];
       }
   > {
-    if (
-      !UUID_PATTERN.test(command.userId) ||
-      (command.after !== undefined &&
-        !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.after))
-    ) {
-      return { kind: "not_found" };
-    }
-    // Resolve the anchor and the page in one snapshot. Keep microsecond cursor
-    // comparisons in PostgreSQL; cancelled receipts remain valid anchors.
-    const rows = (
-      await this.db.execute<{
-        anchorFound: boolean;
-        bookingHandle: `bk1.${string}` | null;
-        state:
-          | "reserved"
-          | "booked"
-          | "calendar_pending"
-          | "cancellation_pending"
-          | "confirmation_unverified";
-        startsAt: Date | string;
-        reservedUntil: Date | string;
-      }>(sql`
-      with anchor as (
-        select b.created_at,b.booking_handle
-        from client_booking_receipts b
-        join users u on u.id=b.user_id and u.active
-        where b.user_id=${command.userId}::uuid and b.booking_handle=${command.after ?? null}
-      ), authority as (
-        select (${command.after === undefined} or exists(select 1 from anchor)) as valid
-      )
-      select authority.valid as "anchorFound", page.booking_handle as "bookingHandle",
-        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil"
-      from authority
-      left join lateral (
-        select b.booking_handle,b.created_at,
-          case when o.cancel_requested and o.state not in ('cancelled','rejected') then 'cancellation_pending'
-            when l.reservation_id is not null and l.resolved_at is null and r.status in ('cancelled_by_client','cancelled_by_expert','expired') then 'cancellation_pending'
-            when r.status='booked' and o.provider_uid is null then 'confirmation_unverified'
-            when r.status='reserved' and o.id is not null then 'calendar_pending'
-            else r.status::text end as status,s.starts_at,r.reserved_until
-        from client_booking_receipts b
-        join reservations r on r.id=b.reservation_id and r.user_id=b.user_id
-        left join planerka_booking_operations o on o.reservation_id=r.id
-        left join planerka_legacy_booking_reviews l on l.reservation_id=r.id
-        join slots s on s.id=r.slot_id
-        join users u on u.id=b.user_id and u.active
-        where authority.valid and b.user_id=${command.userId}::uuid
-          and (r.status in ('reserved','booked') or (
-            r.status in ('cancelled_by_client','cancelled_by_expert','expired')
-            and ((o.cancel_requested and o.state not in ('cancelled','rejected')) or (l.reservation_id is not null and l.resolved_at is null))
-          ))
-          and (${command.after === undefined} or (b.created_at,b.booking_handle) > (select created_at,booking_handle from anchor))
-        order by b.created_at,b.booking_handle
-        limit 21
-      ) page on true
-      order by page.created_at,page.booking_handle
-    `)
-    ).rows;
-    if (rows[0]?.anchorFound !== true) return { kind: "not_found" };
-    return {
-      kind: "found",
-      bookings: rows.flatMap((row) =>
-        row.bookingHandle === null
-          ? []
-          : [
-              {
-                bookingHandle: row.bookingHandle,
-                state: row.state,
-                startsAt: normalizeBookingTimestamp(
-                  row.startsAt,
-                  "slots.starts_at",
-                ),
-                reservedUntil: normalizeBookingTimestamp(
-                  row.reservedUntil,
-                  "reservations.reserved_until",
-                ),
-              },
-            ],
-      ),
-    };
+    return readOwnedActiveBookingsInTransaction(this.db, command);
   }
 
   async reserveProtectedChoice(
@@ -1025,6 +953,7 @@ export class PostgresBookingRepository {
     ) {
       return { kind: "conflict" };
     }
+    command = { ...command };
     try {
       return await this.runSerializable(async (tx) => {
         const notificationChoice = (
@@ -1097,20 +1026,30 @@ export class PostgresBookingRepository {
           `)
         ).rows[0];
         if (choice === undefined) return { kind: "not_found" as const };
-        const reservation = await this.reserveInTransaction(tx, {
-          idempotencyKey: command.idempotencyKey,
-          userId: command.userId,
-          slotId: choice.slotId,
-          now,
-          minimumLeadMs: command.minimumLeadMs,
-          confirmationBufferMs: command.confirmationBufferMs,
-          correlationId: command.correlationId,
-        });
+        const timing: ProtectedReservationTiming = {
+          choiceDigest: command.choiceDigest,
+          databaseNow: now,
+          choiceExpired: false,
+        };
+        const reservation = await this.reserveInTransaction(
+          tx,
+          {
+            idempotencyKey: command.idempotencyKey,
+            userId: command.userId,
+            slotId: choice.slotId,
+            now,
+            minimumLeadMs: command.minimumLeadMs,
+            confirmationBufferMs: command.confirmationBufferMs,
+            correlationId: command.correlationId,
+          },
+          timing,
+        );
+        if (timing.choiceExpired) return { kind: "not_found" as const };
         if (reservation.kind === "unavailable") {
           return { kind: "conflict" as const };
         }
         if (
-          reservation.reservedUntil.getTime() - now.getTime() >
+          reservation.reservedUntil.getTime() - timing.databaseNow.getTime() >
           MAXIMUM_HOLD_MS
         ) {
           throw new Error("client_booking_hold_policy_invalid");
@@ -1298,6 +1237,7 @@ export class PostgresBookingRepository {
   private async reserveInTransaction(
     tx: Transaction,
     command: ReserveSlotCommand,
+    protectedTiming?: ProtectedReservationTiming,
   ): Promise<ReserveSlotResult> {
     await lockBookingNotificationSlot(tx, command.userId, command.slotId);
     await tx.execute(sql`
@@ -1364,6 +1304,53 @@ export class PostgresBookingRepository {
         command,
         normalizeReservationResultRow(rawDuplicate),
       );
+    }
+
+    if (protectedTiming) {
+      // Choice/request/user and slot/service/expert rows, and all advisory locks,
+      // are now held. A pure row-lock wait does not require an SSI retry: acquire
+      // fresh database time here and compare source timestamps at full precision.
+      const timing = one(
+        (
+          await tx.execute<{
+            databaseNow: Date | string;
+            choiceValid: boolean;
+            slotFresh: boolean;
+            leadValid: boolean;
+            deadlineValid: boolean;
+          }>(sql`
+        with current_clock as materialized (select clock_timestamp() as at)
+        select current_clock.at as "databaseNow",
+          exists(select 1 from client_catalog_choices c
+            join client_catalog_requests cr on cr.id=c.request_id
+            join users u on u.id=cr.user_id
+            where c.choice_digest=${protectedTiming.choiceDigest}
+              and c.slot_id=${command.slotId}::uuid
+              and cr.user_id=${command.userId}::uuid and u.active and cr.state='ready'
+              and c.expires_at>current_clock.at and cr.expires_at>current_clock.at) as "choiceValid",
+          (s.observed_at between current_clock.at-interval '15 minutes' and current_clock.at) as "slotFresh",
+          (s.starts_at>=current_clock.at+${command.minimumLeadMs}::bigint*interval '1 millisecond') as "leadValid",
+          (s.starts_at-${command.confirmationBufferMs}::bigint*interval '1 millisecond'>current_clock.at) as "deadlineValid"
+        from slots s cross join current_clock where s.id=${command.slotId}::uuid
+      `)
+        ).rows,
+        "the protected reservation clock",
+      );
+      protectedTiming.databaseNow = normalizeBookingTimestamp(
+        timing.databaseNow,
+        "clock_timestamp",
+      );
+      if (timing.choiceValid !== true) {
+        protectedTiming.choiceExpired = true;
+        return { kind: "unavailable", reason: "deadline" };
+      }
+      if (timing.slotFresh !== true)
+        return { kind: "unavailable", reason: "stale_slot" };
+      if (timing.leadValid !== true)
+        return { kind: "unavailable", reason: "lead_time" };
+      if (timing.deadlineValid !== true)
+        return { kind: "unavailable", reason: "deadline" };
+      command = { ...command, now: protectedTiming.databaseNow };
     }
 
     if (!isFresh(slot.observedAt, command.now)) {
@@ -1807,3 +1794,108 @@ export class PostgresBookingRepository {
 }
 
 export type { ReservationAction };
+
+export async function readOwnedActiveBookingsInTransaction(
+  tx: Pick<DrizzleDb, "execute">,
+  command: {
+    userId: string;
+    after?: `bk1.${string}`;
+  },
+): Promise<
+  | { kind: "not_found" }
+  | {
+      kind: "found";
+      bookings: {
+        bookingHandle: `bk1.${string}`;
+        state:
+          | "reserved"
+          | "booked"
+          | "calendar_pending"
+          | "cancellation_pending"
+          | "confirmation_unverified";
+        startsAt: Date;
+        reservedUntil: Date;
+      }[];
+    }
+> {
+  if (
+    !UUID_PATTERN.test(command.userId) ||
+    (command.after !== undefined &&
+      !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.after))
+  ) {
+    return { kind: "not_found" };
+  }
+  // Resolve the anchor and the page in one snapshot. Keep microsecond cursor
+  // comparisons in PostgreSQL; cancelled receipts remain valid anchors.
+  const rows = (
+    await tx.execute<{
+      anchorFound: boolean;
+      bookingHandle: `bk1.${string}` | null;
+      state:
+        | "reserved"
+        | "booked"
+        | "calendar_pending"
+        | "cancellation_pending"
+        | "confirmation_unverified";
+      startsAt: Date | string;
+      reservedUntil: Date | string;
+    }>(sql`
+      with anchor as (
+        select b.created_at,b.booking_handle
+        from client_booking_receipts b
+        join users u on u.id=b.user_id and u.active
+        where b.user_id=${command.userId}::uuid and b.booking_handle=${command.after ?? null}
+      ), authority as (
+        select (${command.after === undefined} or exists(select 1 from anchor)) as valid
+      )
+      select authority.valid as "anchorFound", page.booking_handle as "bookingHandle",
+        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil"
+      from authority
+      left join lateral (
+        select b.booking_handle,b.created_at,
+          case when o.cancel_requested and o.state not in ('cancelled','rejected') then 'cancellation_pending'
+            when l.reservation_id is not null and l.resolved_at is null and r.status in ('cancelled_by_client','cancelled_by_expert','expired') then 'cancellation_pending'
+            when r.status='booked' and o.provider_uid is null then 'confirmation_unverified'
+            when r.status='reserved' and o.id is not null then 'calendar_pending'
+            else r.status::text end as status,s.starts_at,r.reserved_until
+        from client_booking_receipts b
+        join reservations r on r.id=b.reservation_id and r.user_id=b.user_id
+        left join planerka_booking_operations o on o.reservation_id=r.id
+        left join planerka_legacy_booking_reviews l on l.reservation_id=r.id
+        join slots s on s.id=r.slot_id
+        join users u on u.id=b.user_id and u.active
+        where authority.valid and b.user_id=${command.userId}::uuid
+          and (r.status in ('reserved','booked') or (
+            r.status in ('cancelled_by_client','cancelled_by_expert','expired')
+            and ((o.cancel_requested and o.state not in ('cancelled','rejected')) or (l.reservation_id is not null and l.resolved_at is null))
+          ))
+          and (${command.after === undefined} or (b.created_at,b.booking_handle) > (select created_at,booking_handle from anchor))
+        order by b.created_at,b.booking_handle
+        limit 21
+      ) page on true
+      order by page.created_at,page.booking_handle
+    `)
+  ).rows;
+  if (rows[0]?.anchorFound !== true) return { kind: "not_found" };
+  return {
+    kind: "found",
+    bookings: rows.flatMap((row) =>
+      row.bookingHandle === null
+        ? []
+        : [
+            {
+              bookingHandle: row.bookingHandle,
+              state: row.state,
+              startsAt: normalizeBookingTimestamp(
+                row.startsAt,
+                "slots.starts_at",
+              ),
+              reservedUntil: normalizeBookingTimestamp(
+                row.reservedUntil,
+                "reservations.reserved_until",
+              ),
+            },
+          ],
+    ),
+  };
+}

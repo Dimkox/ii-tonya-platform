@@ -273,3 +273,41 @@ export {
   type ExpertMaterialReceipt,
   type ExpertMaterialTransport,
 } from "./telegram/expert-material-transport.js";
+
+export {
+  VK_COMMUNITY_CONTRACT,
+  type VkCommunityPort,
+  type VkCommunitySendCommand,
+  type VkCommunityWebhookCommand,
+} from "./vk-community/port.js";
+export {
+  DisabledVkCommunityAdapter,
+  VkCommunityDisabledError,
+} from "./vk-community/disabled-adapter.js";
+export {
+  MAX_BUSINESS_CONTRACT,
+  type MaxBusinessPort,
+  type MaxBusinessTarget,
+  type MaxBusinessSendCommand,
+  type MaxBusinessWebhookCommand,
+} from "./max-business/port.js";
+export {
+  DisabledMaxBusinessAdapter,
+  MaxBusinessDisabledError,
+} from "./max-business/disabled-adapter.js";
+export {
+  buildVkCommunityTextRequest,
+  parseVkCommunityTextResponse,
+  VkCommunityContractError,
+  type VkCommunityTextRequestInput,
+  type VkCommunityTextRequest,
+  type VkCommunityTextResponse,
+} from "./vk-community/text-contract.js";
+export {
+  buildMaxBusinessTextRequest,
+  parseMaxBusinessTextResponse,
+  MaxBusinessContractError,
+  type MaxBusinessTextRequestInput,
+  type MaxBusinessTextRequest,
+  type MaxBusinessTextResponse,
+} from "./max-business/text-contract.js";

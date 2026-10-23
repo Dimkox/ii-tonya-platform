@@ -1,7 +1,7 @@
 ---
 title: Execute approved residency plan through Phase2
 created: 2026-10-23
-status: in-progress
+status: done
 baseline_commit: 47e6680e9fdadf8416574afa003737691504b16a
 context:
   - AGENTS.md
@@ -151,6 +151,9 @@ failures or unresolved acceptance. Assertions, runtime and release boundaries st
 
 A and B are locally complete. C is locally complete after C8 passed20/20 on isolated
 PostgreSQL17.5; its spec/evidence retain all failed attempts, reviews and external
-gates. D is locally complete after its first focused run passed12/12. Phase2 continues with proportional reuse, per-block focused
-verification/review/local checkpoints and no new permission loop. Local fixture
-acceptance is not provider or release acceptance.
+gates. D is locally complete after its first focused run passed12/12. Phase2 is locally complete: slot genuine TTL regression RED→GREEN2/2 and first
+private client integrated run8/8, plus57 inactive connector tests. Relevant builds,
+types/static and independent reviews passed. Final plan coverage is recorded in
+`docs/test-evidence/phase1-through-phase2-coverage-2026-10-23.md`; the coordinator
+owns the final branch gate. Local fixture acceptance is not provider or release
+acceptance. No Phase3 work was added.

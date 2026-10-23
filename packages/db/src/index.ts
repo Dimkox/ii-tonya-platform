@@ -362,3 +362,5 @@ export * from "./repositories/expert-manager-authority.js";
 export * from "./repositories/expert-onboarding-main-payment-repository.js";
 
 export * from "./repositories/expert-residency-lifecycle-repository.js";
+
+export * from "./repositories/client-bot-account-read-repository.js";
