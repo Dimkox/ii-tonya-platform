@@ -1,3 +1,8 @@
+import { expertVerificationRoutes } from "./routes/expert-verification.js";
+import {
+  assertExpertVerificationCapability,
+  type ExpertVerificationCapability,
+} from "./expert-verification-composition.js";
 import {
   expertApplicantTelegramRoutes,
   type ExpertApplicantTelegramCapability,
@@ -110,6 +115,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertVerification?: ExpertVerificationCapability;
   expertApplicantTelegram?: ExpertApplicantTelegramCapability;
   expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
@@ -262,6 +268,7 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertExpertVerificationCapability(deps.config, deps.expertVerification);
   assertExpertApplicantCapability(deps.config, deps.expertApplicantTelegram);
   if (
     deps.config.features.expertSession === true &&
@@ -375,6 +382,14 @@ export async function buildApp(
       deps.config.features.b2SensitiveRetention !== true)
   )
     throw new Error("Test expert residual runtime capability is required");
+  if (
+    deps.config.expertVerification?.paymentVerificationEnabled &&
+    (!deps.config.features.yookassa ||
+      !deps.expertVerification?.onboardingWebhook ||
+      deps.yookassaWebhook?.onboarding !==
+        deps.expertVerification.onboardingWebhook)
+  )
+    throw new Error("expert_verification_merchant_callback_required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -574,6 +589,12 @@ export async function buildApp(
       },
     },
     rateLimiter: deps.rateLimiter,
+  });
+  await app.register(expertVerificationRoutes, {
+    enabled: deps.config.features.expertVerification === true,
+    ...(deps.expertVerification
+      ? { service: deps.expertVerification.service }
+      : {}),
   });
   await app.register(expertApplicantTelegramRoutes, {
     enabled: deps.config.features.expertApplicant === true,

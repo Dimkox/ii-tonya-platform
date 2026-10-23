@@ -9,6 +9,9 @@ import {
 import type { WebhookInbox } from "./selarti-webhook.js";
 
 export interface YooKassaWebhookDependencies {
+  readonly onboarding?: {
+    handle(notification: YooKassaNotification): Promise<boolean>;
+  };
   readonly effectivePeerAddress: (request: FastifyRequest) => string;
   readonly inbox: WebhookInbox;
   readonly verify: (
@@ -81,7 +84,19 @@ export async function yookassaWebhookRoutes(
         return reply.code(503).send({ error: "delivery_pending" });
       }
       try {
+        if (deps.onboarding && (await deps.onboarding.handle(parsed.data))) {
+          await deps.inbox.complete(claim.claimId);
+          return reply.send({ accepted: true });
+        }
         const event = await deps.verify(parsed.data);
+        // A terminal payment/refund notification without verified ownership is retryable.
+        // In particular, an early callback must survive provider binding commit.
+        if (
+          event === null &&
+          (parsed.data.event === "payment.succeeded" ||
+            parsed.data.event === "refund.succeeded")
+        )
+          throw new Error("yookassa_webhook_pending");
         if (event !== null) {
           await deps.deliver(event);
           await deps.resolveSucceeded(parsed.data);

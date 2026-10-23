@@ -59,3 +59,24 @@ Per-block verification/review and local commit precede the next block. No repeat
 exhausted PostgreSQL/provider file, full suite or multi-path inner loop is permitted.
 External merchant delivery, processor/backup proof and exact-SHA release gates
 remain distinct from local fixture verification.
+
+## Local synthetic database credential containment
+
+During BlockB preparation, a child accidentally printed the one-line private
+Compose JSON while searching local configuration. It contained only the disposable
+password of the task-owned PostgreSQL17.5 environment, not merchant/customer data
+or provider credentials. The incident was reported; the value is not repeated here.
+
+Coordinator paused new DB/metadata/test invocations, changed the actual local role
+password, and atomically updated the private Compose file with mode0600. A separate
+infrastructure-only connection check confirmed the replacement works and the
+retired value is rejected (28P01). Log /tmp/phase1-local-credential-rotation.log.
+No migration, application test/domain assertion or provider operation ran in that
+check, so no functional verification budget was reset or consumed.
+
+Container Config.Env still records the obsolete invalid initial value until a
+future recreation. All future task DB connections must read the private current
+Compose configuration in memory; never dump/grep/print it, cached URLs, or env.
+The old transcript cannot be erased, but its credential no longer authenticates.
+No source, real environment, customer/provider credential or other container was
+changed. BlockB new focused PG-file count was0 when work resumed.

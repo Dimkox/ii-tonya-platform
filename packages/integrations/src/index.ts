@@ -258,3 +258,11 @@ export {
   type PayerReceiptEnvelope,
 } from "./yookassa/payer-receipt-vault.js";
 export { createPayerReceiptSource } from "./yookassa/payer-receipt-source.js";
+
+export {
+  YooKassaOnboardingPaymentVerifier,
+  assertVerifiedOnboardingPayment,
+  type OnboardingPaymentBinding,
+  type VerifiedOnboardingPayment,
+} from "./yookassa/onboarding-verifier.js";
+export { YooKassaOnboardingWebhookCapability } from "./yookassa/onboarding-webhook-capability.js";

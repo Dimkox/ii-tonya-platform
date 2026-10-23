@@ -42,6 +42,7 @@ export const expertOnboardingApplications = pgTable(
   },
   (t) => [
     unique("expert_onboarding_user_unique").on(t.userId),
+    unique("expert_onboarding_id_user_unique").on(t.id, t.userId),
     foreignKey({
       name: "expert_onboarding_user_fk",
       columns: [t.userId],

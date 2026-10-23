@@ -20,3 +20,5 @@ export * from "./payer-receipt-contacts.js";
 export * from "./expert-onboarding.js";
 
 export * from "./expert-promo.js";
+
+export * from "./expert-verification.js";

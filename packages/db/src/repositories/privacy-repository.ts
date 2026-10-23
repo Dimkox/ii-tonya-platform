@@ -357,8 +357,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
-        if (command.purpose === "client_messaging")
+        if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
+          await tx.execute(
+            sql`update expert_verification_work set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          );
+          await tx.execute(
+            sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          );
+          await tx.execute(
+            sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+          );
+        }
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
         const consent = one(
           (
@@ -938,6 +948,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Preserve immutable onboarding financial facts and audit UUIDs. Nullable
+        // live application FKs are cleared by its physical deletion below; late
+        // verified payment remains financial truth but can never recreate admission.
+        await tx.execute(
+          sql`delete from expert_verification_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+        );
         // Promo acquisition has no financial retention authority. Remove queued
         // sends, pending enrollment and direct identity digests; keep only inactive
         // UUID ownership tombstones so an erased inviter can never be reassigned.

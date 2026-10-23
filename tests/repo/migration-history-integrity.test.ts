@@ -47,10 +47,13 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_admin_package_provenance",
   "enforce_client_coupon_purchase",
   "enforce_client_paid_settlement",
+  "enforce_expert_application_identity_immutable",
   "enforce_expert_campaign_order_source",
   "enforce_expert_campaign_quote_source",
   "enforce_expert_promo_immutable",
   "enforce_expert_referral_admin_approval_global_unique",
+  "enforce_expert_verification_decision_source",
+  "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
   "expert_first_settlement_guard_change",
   "expert_jsonb_has_exact_keys",
@@ -108,6 +111,12 @@ const HAND_SQL_TRIGGERS = [
   "expert_campaign_order_source",
   "expert_campaign_quote_source",
   "expert_campaign_quotes_append_only",
+  "expert_onboarding_application_identity_immutable",
+  "expert_onboarding_invoices_immutable",
+  "expert_onboarding_invoices_no_delete",
+  "expert_onboarding_operations_immutable",
+  "expert_onboarding_operations_no_delete",
+  "expert_onboarding_payment_facts_immutable",
   "expert_promo_codes_immutable",
   "expert_promo_registrations_immutable",
   "expert_promo_requests_immutable",
@@ -116,6 +125,9 @@ const HAND_SQL_TRIGGERS = [
   "expert_referral_admin_results_truncate_immutable",
   "expert_referral_maturities_delete_guard",
   "expert_referral_maturities_terminal_guard",
+  "expert_verification_decisions_immutable",
+  "expert_verification_decisions_no_delete",
+  "expert_verification_decisions_source",
   "human_escalations_append_only",
   "message_ledger_entries_append_only",
   "message_packages_append_only",
@@ -200,7 +212,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(52);
+    expect(newest).toBe(53);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -292,7 +304,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0052 adds seven nonfinancial acquisition/work relations to the0051 applicant metadata.
-    expect(declared.size).toBe(130);
+    // 0053 adds five purpose-bound onboarding verification/payment relations.
+    expect(declared.size).toBe(135);
   });
 });

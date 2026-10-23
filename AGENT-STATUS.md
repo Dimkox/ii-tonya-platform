@@ -1,3 +1,79 @@
+# BlockB PG2 active after DBclock/finiteauth review — 2026-10-23 15:33 UTC
+
+NEWphase1-verification.test.ts invocation2 ACTIVE session88902,
+log/tmp/phase1-b-verification-pg2.log.23cases. Run1CONSUMED21fail sharedrawtimestamp
+bug. Actualproduction manager andcaptureauthorization nowSQLunderlocks/fullprecision,
+finiteexpiry/MFA predicates in TS+0053; newnonPGregression10/10, independentreview
+accepted. Lastslot3reserved after finalreview, noPG3yet. Read/resumerun2 output;
+neverduplicate. FreshcurrentprotectedComposeJSON parsedmemoryonly, no credentialURL
+orDockerEnvoutput. RelevantDB/applicationbuilds/APItypesgreen; globalteststypes wait
+staffUIowner's newtest/sourcecompletion, no backendTSerrors.
+
+ActualstaffUI nowrequiredandactiveowner block_b_manager_ui: apps/web newclient/view/
+tests+main.ts only. LeadnativeNginx no-store staffshellandprotectedAPI testRED→GREEN1/1;
+no deploy. API no-store10/10, terminalrefundretry6/6, documentedconfirmationhost
+positive/negative service15/15. Guardfiniteauthscope refresh123/123; historyprior8/8
+stillvalid, no repeat.0053recaptureactualfunctionfiniteconstraints complete.
+NoBcommit/Cstartyet. ContinueB→C→D→Phase2 onlyafteractualcriticalgateclosure.
+
+# BlockB PG1 failed shared manager bootstrap; sourcefix active — 2026-10-23 15:16 UTC
+
+NEWphase1-verification.test.ts invocation1 CONSUMED session1462 EXIT1:21failed,
+1unhandledrejection. Log/tmp/phase1-b-verification-pg1.log. FreshrotatedPGauth and
+migrations succeeded; no PGSQLerror/crash logged. Shared boundedmanager failure
+prevented downstream acceptance; DO NOTclaimmoney/GETcases passed. Storageowner
+investigates rawDrizzle timestamptz string vs Date.getTime assumptions; nonPG
+regression/sourcefix before run2. Remaining2/3 slots, final3reserved. No rerunyet.
+StaticB scope123/123 andhistory8/8 firsttryPASS. Metadata/pins135tablesstable.
+Leadlintfixedunusedtestlocal; testsTypeScriptgreen. Sourceowners/reviewsongoing,
+noBcommit/Cstart/provider/push/liveflag. Parentcoordinatorinformedactualfailure.
+
+# BlockB first integrated PG run active — 2026-10-23 15:13 UTC
+
+NEW tests/integration/phase1-verification.test.ts invocation1 ACTIVE session1462,
+log /tmp/phase1-b-verification-pg1.log.21cases; remaining2/3 slots, final3reserved.
+Resume/read completedoutput, never rerun on lostoutput. Freshprotected recoveryJSON
+read only in memory, rotatedcredentials and loopback55483; no URL/envvalues printed.
+No DockerConfig.Env used (obsolete invalidpassword). Parentcontainment record in
+coordinator evidence; storage accidental localfixtureprint retired by role rotation.
+
+B latestlocalgreens: GETverifier32, webhook11, manager service13, managerroute9,
+merchantroute5, config24, standardcomposition16. Relevantbuilds/typesgreen; leadlint
+one unusedtestlocal corrected, finalcheckpending. Independentstorage source/test
+review accepted after fixing testshop literal BEFOREPG1; no guardweakening.
+Admit→physicalerase→sameproof replay now tested alongside latebind/latepayment.
+Metadata isolated54SQLreplay:135tables/46functions/84triggers; exactpinsready for
+staging/staticguards. Scope/historyruns not yet invoked for B. No Bcommit yet.
+C/D/Phase2 have NOT started until Bcriticalgates close. No provider/push/liveflag.
+
+# BlockB implementation active — 2026-10-23 14:57 UTC
+
+BlockA accepted by owner-authorized5:15/15; all5consumed/no6. CurrentBbaseline
+is e880246f641ede57b4ab0512dccbd1031226dacb. Mainexecutioncontract stillrequires
+B→C→D→Phase2; Phase3excluded. Sourcework localonly, no provider/liveflag/push.
+
+Lead remaining_plan_implement owns B applicationservice, managerAPI, merchantcallback
+route integration and overallstatus/evidence. block_a_storage owns new0053SQL/journal,
+expert-verification schema/repo, privacydisposition and NEWphase1-verification PGfile.
+block_b_payment_verifier owns narrowGET/privateproof and onboardingwebhookcapability
+plus NEWunitfiles. block_a_composition owns Bconfig+composition/tests; its initial
+app/serverregistration edits complete, leadnowowns their callbackwiring sections.
+No sharedfile editing. Scope/state reconstruction owner will be assigned afterSQLsettles.
+
+NonPGtestfacts: actualGET verifier32/32 GREEN; managerapplicationservice11/11 GREEN;
+newconfig22/22 GREEN including existingpaymentverification with newcheckout/manageroff.
+Webhookcapabilityunit GREENpending. NEW BPGfile invocations0/3, first integratedrun
+will follow independent sourcereview; don't rerun any A/exhaustedlegacy/providerfile.
+Relevant configbuild/types/lintgreen. Preflight RequireDocker82299 checked baseline.
+
+Bfinancialboundary: separate purposeonboarding invoice/operation300000RUBkopecks;
+NEVER expert_residency_order or active/verifiedexpert. PrivateGETproof must bind stored
+invoice/application/user/op/mode/providerid. Actualsettlement opens interviewonly;
+no residencyinterval/firstmarker/referralgrant. ApplicationliveFK nullable for erasure,
+financialauditUUID retained; lateactualpayment recorded but erasure/withdrawal blocks
+access without resurrectingapp. Acceptedmainquote cannot be replaced afterdecision.
+Strict firstsenddeletion/custody productiongap remains defaultoff, no leaseexception.
+
 # BlockA local gate PASS; continue BlockB — 2026-10-23
 
 Owner explicitly authorized one further focused invocation after infrastructure

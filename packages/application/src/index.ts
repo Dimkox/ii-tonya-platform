@@ -39,3 +39,5 @@ export {
 } from "@ii-tonya/contracts";
 
 export * from "./expert-applicant-service.js";
+
+export * from "./expert-verification-service.js";

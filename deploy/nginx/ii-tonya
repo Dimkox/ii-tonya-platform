@@ -103,6 +103,19 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # Staff shell contains no embedded identity, but must never be cached.
+    location = /admin/expert-verification {
+        try_files /index.html =404;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+    }
+
+    location = /admin/expert-verification/ {
+        try_files /index.html =404;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
         add_header Cache-Control "no-cache";

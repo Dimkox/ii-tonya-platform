@@ -353,3 +353,5 @@ export * from "./repositories/expert-campaign-read-repository.js";
 export * from "./repositories/payer-receipt-contact-repository.js";
 
 export * from "./repositories/expert-promo-repository.js";
+
+export * from "./repositories/expert-verification-repository.js";

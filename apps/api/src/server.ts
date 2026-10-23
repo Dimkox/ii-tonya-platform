@@ -1,3 +1,9 @@
+import type { YooKassaWebhookDependencies } from "./routes/yookassa-webhook.js";
+import {
+  createExpertVerificationComposition,
+  assertExpertVerificationPayments,
+  type ExpertVerificationPaymentCapabilities,
+} from "./expert-verification-composition.js";
 import { createExpertApplicantComposition } from "./expert-applicant-composition.js";
 import { assertExpertApplicantConfig } from "@ii-tonya/config";
 import { createTelegramDeletionCapability } from "./telegram-deletion-composition.js";
@@ -127,6 +133,8 @@ const disabledService = <T extends object>(name: string): T =>
 
 export const createDefaultLifecycle = (
   options: {
+    expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
+    yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
     expertCodeSecretResolver?: {
       resolve(input: {
         reference: string;
@@ -167,6 +175,15 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertExpertVerificationPayments(
+      config,
+      options.expertVerificationPayments,
+    );
+    if (
+      config.expertVerification?.paymentVerificationEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_verification_merchant_callback_required");
     assertExpertApplicantConfig(config);
     if (
       (config.features.expertResidencyBilling ||
@@ -519,6 +536,11 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
+    const expertVerification = createExpertVerificationComposition(
+      db,
+      config,
+      options.expertVerificationPayments,
+    );
     const expertApplicantTelegram = createExpertApplicantComposition(
       db,
       config,
@@ -560,6 +582,17 @@ export const createDefaultLifecycle = (
     return {
       config,
       ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),
+      ...(expertVerification ? { expertVerification } : {}),
+      ...(options.yookassaWebhook
+        ? {
+            yookassaWebhook: {
+              ...options.yookassaWebhook,
+              ...(expertVerification?.onboardingWebhook
+                ? { onboarding: expertVerification.onboardingWebhook }
+                : {}),
+            },
+          }
+        : {}),
       ...(expertApi ? { expertApi } : {}),
       ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),

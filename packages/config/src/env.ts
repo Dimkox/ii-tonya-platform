@@ -1,4 +1,8 @@
 import {
+  readExpertVerificationConfig,
+  type ExpertVerificationConfig,
+} from "./expert-verification-config.js";
+import {
   readExpertApplicantConfig,
   type ExpertApplicantConfig,
 } from "./expert-applicant-config.js";
@@ -397,6 +401,7 @@ const schema = z
 export type RuntimeConfig = {
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
+  expertVerification?: ExpertVerificationConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -442,6 +447,7 @@ export type RuntimeConfig = {
   selartiResponseSharedSecret?: string;
   features: {
     expertApplicant?: boolean;
+    expertVerification?: boolean;
     bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -655,6 +661,7 @@ function readBookingCallbacks(
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
   const expertApplicant = readExpertApplicantConfig(source);
+  const expertVerification = readExpertVerificationConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -780,6 +787,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const config: RuntimeConfig = {
     ...(payerReceipt ? { payerReceipt } : {}),
     ...(expertApplicant ? { expertApplicant } : {}),
+    ...(expertVerification ? { expertVerification } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,
@@ -846,6 +854,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
       ...(expertApplicant ? { expertApplicant: true } : {}),
+      ...(source.EXPERT_VERIFICATION_ENABLED === "true"
+        ? { expertVerification: true }
+        : {}),
       bookingCallbacks: bookingCallbacks !== undefined,
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",

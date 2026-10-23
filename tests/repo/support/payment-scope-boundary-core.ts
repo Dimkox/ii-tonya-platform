@@ -15,6 +15,9 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  // BlockB purpose-bound onboarding verifier; no residency mint authority.
+  "packages/integrations/src/yookassa/onboarding-verifier.ts",
+  "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "packages/integrations/src/yookassa/payer-receipt-source.ts",
   "packages/integrations/src/yookassa/payer-receipt-vault.ts",
@@ -93,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0053_expert_verification_onboarding.sql",
   // BlockA exact inventory: docs/spec/phase1-block-a-guard-registration.md.
   "packages/db/migrations/0052_expert_promo_applicants.sql",
   "packages/db/migrations/0051_expert_onboarding_applications.sql",
@@ -121,6 +125,12 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
+  "expert_verification_decisions",
+  "expert_onboarding_invoices",
+  "expert_onboarding_payment_operations",
+  "expert_verification_work",
+  "expert_onboarding_payment_facts",
   // Nonfinancial acquisition only; BlockA registration rationale is versioned.
   "expert_promo_codes",
   "expert_promo_registrations",
@@ -203,6 +213,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-verification",
+  "/v1/admin/expert-verification/:applicationId",
+  "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
+  "/v1/admin/expert-verification/:applicationId/decision",
   "/v1/webhooks/telegram/expert-promo/:botKey",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "/v1/expert/browser/residency/checkouts",
@@ -259,6 +273,15 @@ const approvedPaymentBoundaryPaths = new Set([
 ]);
 const approvedPaymentBoundaryHashes = new Map([
   [
+    "packages/integrations/src/yookassa/onboarding-verifier.ts",
+    "0c4867e541393854644eac11b2e7b8ac0221a3d183850f40a40d75763bda1b82",
+  ],
+  [
+    "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
+    "a6b8ec8649dcc9c8865630d610d466a64e8cf2d8afc072790befd99a05e32c13",
+  ],
+
+  [
     "packages/integrations/src/expert-residency/verified-event-internal.ts",
     "4a6637fe6f456ad97fed9aefeed336558a590d07178a01ededd1649928baa2c4",
   ],
@@ -276,7 +299,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "d2518f5b6a8b0004d7ee58f8100bc2cb3693254425bf7b1d3e3d91eaee2dcfe0",
+    "d2108e783b2024479557e0fe6dbcfca1ece0aa146e0affbfbf3dd85b5f1802ff",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -682,6 +705,24 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // BlockB full SQL replay; docs/spec/phase1-block-b-guard-registration.md.
+  [
+    "packages/db/migrations/0053_expert_verification_onboarding.sql",
+    "28563c02972211e931645521b2a5f1f36668c2c621813c1a942850120803b182",
+  ],
+  [
+    "packages/db/migrations/meta/0053_snapshot.json",
+    "455be9c95a7e086ce42d1b432176f7fc07368d0846c400386bb036b8ad8f8dbb",
+  ],
+  [
+    "packages/db/migrations/state/0053_manifest.json",
+    "fafd4b12b1fab06e6292cab3ffd7bdcd520b3aac164d1c99f61dd91b1172ab80",
+  ],
+  [
+    "packages/db/migrations/state/0053_sql_objects.json",
+    "f56c527a2794a5f3fe71b155bb4133d012d56225ac240c11faa0980259ac3f75",
+  ],
+
   // BlockA SQL-replayed state: docs/spec/phase1-block-a-guard-registration.md.
   [
     "packages/db/migrations/0052_expert_promo_applicants.sql",
@@ -1071,7 +1112,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "3c44a24677aa3e5079c25334cd329ee66b324d4b1186c775e330ac3224bbe58f",
+    "f92ca609c344ac21cd922d16f692fdfeae8a3ed0229aceced37614934dd1a2f1",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1151,10 +1192,16 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "3c44a24677aa3e5079c25334cd329ee66b324d4b1186c775e330ac3224bbe58f",
+    "f92ca609c344ac21cd922d16f692fdfeae8a3ed0229aceced37614934dd1a2f1",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
+  "expert_verification_decisions",
+  "expert_onboarding_invoices",
+  "expert_onboarding_payment_operations",
+  "expert_verification_work",
+  "expert_onboarding_payment_facts",
   // Nonfinancial acquisition only; BlockA registration rationale is versioned.
   "expert_promo_codes",
   "expert_promo_registrations",

@@ -1,3 +1,7 @@
+import {
+  bindExpertVerificationActions,
+  renderExpertVerificationPage,
+} from "./expert-verification-view.js";
 import "./styles.css";
 import {
   bindExpertAccountActions,
@@ -26,7 +30,11 @@ const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: LegalDocumentCode | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/expert/account") {
+if (route === "/admin/expert-verification") {
+  app.innerHTML = renderExpertVerificationPage();
+  bindExpertVerificationActions(app);
+  document.title = "Проверка заявок — ии-Тоня";
+} else if (route === "/expert/account") {
   app.innerHTML = renderExpertAccountPage();
   bindExpertAccountActions(app);
   document.title = "Кабинет эксперта — ии-Тоня";

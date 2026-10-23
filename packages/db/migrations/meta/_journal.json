@@ -372,6 +372,13 @@
       "when": 1791763200009,
       "tag": "0052_expert_promo_applicants",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791763200010,
+      "tag": "0053_expert_verification_onboarding",
+      "breakpoints": true
     }
   ]
 }
