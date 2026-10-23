@@ -34,4 +34,5 @@ The first final branch gate exposed six guard failures; exact inventories/parity
 placeholder corrections and one inherited receipt-consent centralization fix are
 recorded in [final guard reconciliation](phase-final-guard-reconciliation-2026-10-23.md).
 All six focused guards and the new four-case semantic PostgreSQL regression pass.
-Coordinator final clean-commit gate remains separately recorded.
+The coordinator's [final clean-commit gate](phase1-through-phase2-final-gate-2026-10-23.md)
+passed every check on source SHA8d72381ed1e92cd984930c5cbfa06a195ac88871.
