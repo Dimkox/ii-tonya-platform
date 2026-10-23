@@ -145,14 +145,14 @@ provider call; a distinct owner recovery command can recover the existing invoic
 
 ## Local WIP checkpoint
 
-C source is implemented and independently reviewed. The owner-authorized fourth
-PG invocation passed12/20 and exposed an incorrect fixture expectation for the
-canonical committed-expiry rejection, remaining setup timeouts and correct drain
-poisoning of later cases. All four authorized invocations are consumed.
+C source is implemented and independently reviewed. The owner-authorized fifth
+PG invocation passed19/20, with only qualified-reward fixture setup exceeding the
+unchanged5000ms body limit. All five authorized invocations are consumed.
 
-Only caller expectations and normal setup placement are repaired; production,
-20 cases, default5000ms limits, real3-second TTL, financial assertions and bounded
-drain remain unchanged. That revised integrated fixture remains unexecuted. Status
-stays in-progress; no D or Phase2 implementation begins before an explicitly
-authorized extra focused run and C critical-gate closure. No fifth run or equivalent
-manual execution is implied.
+A complete20-case setup/body audit accompanies the final fixture-only repair.
+Normal heavy preparation moves to tracked bounded hooks; actual callbacks, races,
+financial/erasure assertions,20 cases, default5000ms limits, real3-second TTL and
+bounded drain remain unchanged. That revised integrated fixture is unexecuted.
+Status stays in-progress; D and Phase2 await an explicitly authorized extra focused
+run and C critical-gate closure. No sixth run or equivalent manual execution is
+implied.

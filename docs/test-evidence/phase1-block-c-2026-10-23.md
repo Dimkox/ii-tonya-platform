@@ -218,3 +218,67 @@ passed; logs`/tmp/phase1-c-pg4-fixture-types-done.log` and
 fixture is unexecuted. No PG, helper, scope/history or manual-probe invocation ran
 during the correction. A new local WIP checkpoint precedes the coordinator's exact
 request for one additional focused invocation; C remains unaccepted.
+
+## Owner-authorized extra invocation5
+
+The owner explicitly authorized one fifth C-file invocation. Root alone launched
+session69562 on clean`572c7a5b1335e3e3c8d8524b963ef1502bd2c592` after RequireDocker
+passed, using the current protected synthetic configuration in memory. It exited1:
+19/20 passed, with only the qualified1000RUB reward case exceeding the unchanged
+5000ms body deadline (6484ms including hooks). Total126.03s, collection10.21s;
+log`/tmp/phase1-c-card-pg5.log`. All five authorizations are consumed. No sixth or
+manual equivalent is authorized.
+
+The previous canonical-expiry, first-source, normal checkout, erasure and notice
+cases passed. The remaining reward fixture still performed inviter/consent/
+registration setup, full approved-card setup, two additional registrations, feature
+control approval and main checkout/provider preparation inside its timed body.
+That coherent prepayment preparation moves into a tracked bounded hook, retaining
+its frozen100 precondition and every subsequent money/maturity/immutability/
+erasure/late-proof assertion. All20 cases are also audited for the same remaining
+setup/body mistake, without adding behavior or widening any timeout, TTL or drain.
+Only fixture source/static checks and independent review may run before a new
+reviewable WIP checkpoint and exact owner permission request.
+
+### Complete revised fixture boundary audit (source only)
+
+Independent review audited all20 expanded cases against`572c7a5b`. Ordinary
+preparation runs in tracked bounded hooks. The table describes source structure;
+it is not a claim that the revised fixture has run.
+
+|   # | Case                         | Hook preparation                                                                                                     | Timed behavior retained                                                                                                  |
+| --: | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+|   1 | Publication,1 month          | Approved card, accepted checkout, bound provider                                                                     | Prepayment authority checks, actual callback/replay, publication, erasure/audit                                          |
+|   2 | Publication,3 months         | Approved card, accepted checkout, bound provider                                                                     | Prepayment checks, actual callback/replay, publication                                                                   |
+|   3 | Owner/bot/revision/replay    | Paid interview and handoff                                                                                           | Wrong owner/token/bot/revision/digest and exact update replay                                                            |
+|   4 | Materials/unknown outcome    | Approved card                                                                                                        | Missing-content gate, real template transition, partial send, quarantine/no retry                                        |
+|   5 | Telegram reference rejection | Approved card                                                                                                        | Private public-payload rejection                                                                                         |
+|   6 | RF reference rejection       | Approved card                                                                                                        | Private public-payload rejection                                                                                         |
+|   7 | HTTPS reference rejection    | Approved card                                                                                                        | Private public-payload rejection                                                                                         |
+|   8 | Accepted quote replay        | Approved card and original checkout                                                                                  | Fresh acceptance, original invoice replay, no extra order                                                                |
+|   9 | Raw erasure/late payment     | Approved card, checkout, bound provider                                                                              | Actual erasure, merchant GET, no recreation                                                                              |
+|  10 | NULL/source escape           | Approved card/review and expert actors                                                                               | Invalid entry/review/receipt/code-source writes rejected                                                                 |
+|  11 | Qualified1000 reward         | Inviter consent/registration, card, extra registrations, frozen100 precondition, control approval, checkout/provider | First callback, exact100000/30-day pending/no available credit, supersession, immutability, erasure/late GET/old handoff |
+|  12 | Immutable quote expiry       | Approved card and real3-second BASE quote                                                                            | Real DB-clock expiry, old acceptance rejected, explicit new acceptance; existing15-second override                       |
+|  13 | Deadline without withdrawal  | Card,3-second quote/acceptance/order, provider/proof                                                                 | Observed lock wait across expiry, exact canonical rejection and committed financial truth                                |
+|  14 | Deadline with withdrawal     | Same preparation                                                                                                     | Observed lock wait, actual withdrawal, canonical expiry and audit                                                        |
+|  15 | New consent notice race      | Card, checkout, provider/proof                                                                                       | Observed wait, real new notice, bounded SERIALIZABLE retry/no authority                                                  |
+|  16 | Legacy first source          | Audited code, actors/consents, card, checkout/provider                                                               | Actual callback, original source precedence/audit                                                                        |
+|  17 | Prior ineligible first       | Canonical first snapshot, actors/consents, card, checkout/provider                                                   | Actual callback, no retroactive qualification, marker retained                                                           |
+|  18 | Configured checkout          | Card/acceptance, provider/client/adapter/service and actual HTTP app                                                 | Actual first POST, stored binding, GET recovery, no extra POST                                                           |
+|  19 | Unknown checkout             | Same variant-specific preparation                                                                                    | Actual unknown POST, next update cannot retry POST or return a URL                                                       |
+|  20 | Legacy receipt fence         | Paid interview, normal composition, completed/pending receipts and HTTP app                                          | Duplicate ACK/retryable rejection, no claim/card mutation, fresh update works                                            |
+
+Post-settlement session seeding stays with erasure behavior because it references
+the newly established financial marker identity; moving it earlier would fabricate
+that snapshot. All money/maturity/immutability/erasure/late-proof assertions remain.
+No helper, production, migration, timeout or TTL changed. Independent fixture
+source review accepted the complete audit; functional verification remains pending.
+
+Final comprehensive fixture closure passed full tests TypeScript, focused lint,
+formatting and whitespace checks. Logs`/tmp/phase1-c-pg5-fixture-types-final.log` and
+`/tmp/phase1-c-pg5-fixture-lint-final.log` are empty with exit0. All file ownership
+ended. Only the C test file and evidence/status/spec records changed; helper and
+production remain untouched. No test/PG/probe or scope/history rerun occurred.
+A clean local WIP checkpoint is required before any exact sixth-run permission
+request. This remains an unexecuted fixture revision, not C acceptance.

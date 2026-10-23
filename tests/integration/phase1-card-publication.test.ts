@@ -732,6 +732,133 @@ async function firstSourceCaseFixture(
   const payment = await mainPayment(order);
   return { oldInviter, invitee, originalReferral, payment };
 }
+async function ownerReplayFixture() {
+  const f = await interview();
+  return { f };
+}
+async function materialDeliveryFixture() {
+  const f = await approvedCard();
+  return { f };
+}
+async function erasedPaymentFixture() {
+  const f = await readyCard();
+  const { order } = await checkout(f);
+  const payment = await mainPayment(order);
+  return { f, order, payment };
+}
+async function sqlRejectionFixture() {
+  const f = await approvedCard();
+  const review = (
+    await database.db.execute<{ id: string }>(
+      sql`select id from expert_card_reviews where draft_id=${f.draftId}::uuid`,
+    )
+  ).rows[0]!;
+  const a = await database.createExpertIdentity(),
+    b = await database.createExpertIdentity();
+  return { f, review, a, b };
+}
+async function qualifiedRewardFixture() {
+  const inviter = await database.createExpertIdentity({
+    provider: "telegram",
+    externalId: String(++sequence),
+  });
+  const inviterScope = {
+    ...promoScope,
+    telegramUserId: inviter.externalId,
+    chatId: inviter.externalId,
+  };
+  await database.db.execute(
+    sql`update channel_identities set bot_key=${promoScope.botKey},external_chat_id=external_id where user_id=${inviter.userId}::uuid`,
+  );
+  await seedClientConsent(database.db, inviter.userId, "client_messaging");
+  const registered = await promo.register(event(inviterScope));
+  const f = await readyCard(registered.refCode);
+  // Three independently consented referrals earn the visible, nonspendable indication.
+  for (let n = 0; n < 2; n++) {
+    const userId = await database.createUser(),
+      externalId = String(++sequence);
+    await database.db.execute(
+      sql`insert into channel_identities(user_id,provider,external_id,external_chat_id,bot_key,status) values(${userId}::uuid,'telegram',${externalId},${externalId},${promoScope.botKey},'active')`,
+    );
+    await seedClientConsent(database.db, userId, "client_messaging");
+    await promo.register({
+      ...event({
+        ...promoScope,
+        telegramUserId: externalId,
+        chatId: externalId,
+      }),
+      refCode: registered.refCode,
+    });
+  }
+  expect(await promo.register(event(inviterScope))).toMatchObject({
+    bonusStatus: "frozen",
+    bonusPoints: 100,
+  });
+  const control = await database.createFeatureControlApproval({
+    expectedVersion: 1,
+    newCommandsEnabled: true,
+    rewardGrantsEnabled: true,
+  });
+  await new PostgresExpertReferralControlRepository(
+    database.db,
+  ).setFeatureControl({
+    expectedVersion: 1,
+    newCommandsEnabled: true,
+    rewardGrantsEnabled: true,
+    approvalId: control.approvalId,
+    adminSessionIdHash: control.sessionIdHash,
+  });
+  const { order } = await checkout(f);
+  const payment = await mainPayment(order);
+  return { f, inviterScope, order, payment };
+}
+async function expiredQuoteFixture() {
+  const f = await readyCard();
+  const tariffVersionId = await shortTariff();
+  const quote = await financial.quoteMain({
+    ...event(f.workScope),
+    tariffVersionId,
+    termMonths: 1,
+    revision: f.revision,
+  });
+  return { f, quote };
+}
+async function noticeRaceFixture() {
+  const f = await readyCard();
+  const { order } = await checkout(f);
+  const payment = await mainPayment(order);
+  const proof = await payment.proof();
+  if (!proof) throw new Error("fixture_main_proof_missing");
+  return { f, order, payment, proof };
+}
+async function legacyReceiptFixture() {
+  const f = await interview();
+  const config = loadEnv({
+    DATABASE_URL: "postgresql://local:local@localhost/test",
+    ALLOW_INSECURE_LOCAL_DATABASE: "true",
+    EXPERT_CARD_ENABLED: "true",
+    EXPERT_CARD_PAYMENT_MODE: "test",
+    EXPERT_CARD_WORK_BOT_ID: work.botId,
+    EXPERT_CARD_WORK_BOT_KEY: work.botKey,
+    EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_card_bot",
+    EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
+    TELEGRAM_WEBHOOK_SECRET: secret,
+  });
+  const capability = createExpertCardComposition(database.db, config);
+  if (!capability) throw new Error("fixture_card_capability_missing");
+  const inbox = new PostgresWebhookInboxRepository(database.db);
+  const completeId = ++sequence,
+    pendingId = ++sequence;
+  const complete = await inbox.claim("telegram", String(completeId));
+  if (complete.kind !== "claimed")
+    throw new Error("fixture_legacy_claim_missing");
+  await inbox.complete(complete.claimId);
+  const pending = await inbox.claim("telegram", String(pendingId));
+  if (pending.kind !== "claimed")
+    throw new Error("fixture_legacy_pending_missing");
+  const app = await workHttp(cardService(), capability.legacyReplay);
+  return { f, completeId, pendingId, pending, app };
+}
 describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () => {
   beforeAll(async () => {
     database = await startExpertReferralTestDatabase();
@@ -808,14 +935,16 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       let fixture: {
         f: Awaited<ReturnType<typeof readyCard>>;
         order: Awaited<ReturnType<typeof checkout>>["order"];
+        payment: Awaited<ReturnType<typeof mainPayment>>;
       };
       beforeEach(async () => {
         const f = await readyCard();
         const { order } = await checkout(f, term);
-        fixture = { f, order };
+        const payment = await mainPayment(order);
+        fixture = { f, order, payment };
       });
       it(`publishes only after real verified main payment for ${term} months; fee, private interview and review grant no residency`, async () => {
-        const { f, order } = fixture;
+        const { f, order, payment } = fixture;
         expect(
           (
             await database.db.execute(
@@ -844,7 +973,6 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             )
           ).rows[0]?.n,
         ).toBe(0);
-        const payment = await mainPayment(order);
         try {
           expect((await payment.notify()).statusCode).toBe(200);
           expect((await payment.notify()).statusCode).toBe(200);
@@ -934,99 +1062,114 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       });
     });
 
-  it("binds owner, bot, revision, digest and durable update replay without leaking raw entries", async () => {
-    const f = await interview();
-    await expect(
-      cards.redeemWorkHandoff({
-        ...event({
-          ...f.workScope,
-          telegramUserId: "999999",
-          chatId: "999999",
-        }),
-        token: f.handoffToken,
-      }),
-    ).rejects.toThrow();
-    await expect(
-      cards.redeemWorkHandoff({ ...event(f.workScope), token: f.handoffToken }),
-    ).rejects.toThrow();
-    const state = await cards.getWorkflow(f.workScope);
-    const command = {
-      ...event(f.workScope),
-      expectedRevision: state!.revision,
-      entry: { kind: "text" as const, text: "private answer" },
-    };
-    const first = await cards.addEntry(command);
-    expect(await cards.addEntry(command)).toMatchObject({
-      revision: first.revision,
-      replay: true,
+  describe("ownerReplayFixture", () => {
+    let fixture: Awaited<ReturnType<typeof ownerReplayFixture>>;
+    beforeEach(async () => {
+      fixture = await ownerReplayFixture();
     });
-    await expect(
-      cards.addEntry({ ...command, requestDigest: hash("changed") }),
-    ).rejects.toThrow();
-    await expect(
-      cards.addEntry({
-        ...event({ ...f.workScope, botId: "919191" }),
-        expectedRevision: first.revision,
-        entry: command.entry,
-      }),
-    ).rejects.toThrow();
-    await expect(
-      cards.addEntry({
-        ...event({
-          ...f.workScope,
-          telegramUserId: "999999",
-          chatId: "999999",
+    it("binds owner, bot, revision, digest and durable update replay without leaking raw entries", async () => {
+      const { f } = fixture;
+      await expect(
+        cards.redeemWorkHandoff({
+          ...event({
+            ...f.workScope,
+            telegramUserId: "999999",
+            chatId: "999999",
+          }),
+          token: f.handoffToken,
         }),
-        expectedRevision: first.revision,
-        entry: command.entry,
-      }),
-    ).rejects.toThrow();
-    await expect(
-      cards.addEntry({
+      ).rejects.toThrow();
+      await expect(
+        cards.redeemWorkHandoff({
+          ...event(f.workScope),
+          token: f.handoffToken,
+        }),
+      ).rejects.toThrow();
+      const state = await cards.getWorkflow(f.workScope);
+      const command = {
         ...event(f.workScope),
         expectedRevision: state!.revision,
-        entry: command.entry,
-      }),
-    ).rejects.toThrow("card_revision_conflict");
-    expect(
-      (
-        await database.db.execute(
-          sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
-        )
-      ).rows[0]?.n,
-    ).toBe(1);
-  });
-  it("requires approved real materials and manager promo confirmation, quarantining unknown send without retry", async () => {
-    const f = await approvedCard();
-    const runner = createExpertCardMaterialsRunner({
-      enabled: true,
-      repository: cards,
+        entry: { kind: "text" as const, text: "private answer" },
+      };
+      const first = await cards.addEntry(command);
+      expect(await cards.addEntry(command)).toMatchObject({
+        revision: first.revision,
+        replay: true,
+      });
+      await expect(
+        cards.addEntry({ ...command, requestDigest: hash("changed") }),
+      ).rejects.toThrow();
+      await expect(
+        cards.addEntry({
+          ...event({ ...f.workScope, botId: "919191" }),
+          expectedRevision: first.revision,
+          entry: command.entry,
+        }),
+      ).rejects.toThrow();
+      await expect(
+        cards.addEntry({
+          ...event({
+            ...f.workScope,
+            telegramUserId: "999999",
+            chatId: "999999",
+          }),
+          expectedRevision: first.revision,
+          entry: command.entry,
+        }),
+      ).rejects.toThrow();
+      await expect(
+        cards.addEntry({
+          ...event(f.workScope),
+          expectedRevision: state!.revision,
+          entry: command.entry,
+        }),
+      ).rejects.toThrow("card_revision_conflict");
+      expect(
+        (
+          await database.db.execute(
+            sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
+          )
+        ).rows[0]?.n,
+      ).toBe(1);
     });
-    expect(await runner.runOnce()).toMatchObject({ examined: 0 });
-    await expect(
-      financial.quoteMain({
-        ...event(f.workScope),
-        tariffVersionId: tariffId,
-        termMonths: 1,
-        revision: f.revision,
-      }),
-    ).rejects.toThrow();
-    await template();
-    transportFailure = true;
-    expect(await runner.runOnce()).toMatchObject({ examined: 1, unknown: 1 });
-    const sends = transportCalls.length;
-    transportFailure = false;
-    expect(await runner.runOnce()).toMatchObject({ examined: 0 });
-    expect(transportCalls).toHaveLength(sends);
-    expect(sends).toBe(2);
-    await expect(
-      cards.confirmPromo({
-        sessionHash: manager.sessionHash,
-        applicationId: f.applicationId,
-        expectedRevision: f.revision,
-        idempotencyKey: randomUUID(),
-      }),
-    ).rejects.toThrow();
+  });
+  describe("materialDeliveryFixture", () => {
+    let fixture: Awaited<ReturnType<typeof materialDeliveryFixture>>;
+    beforeEach(async () => {
+      fixture = await materialDeliveryFixture();
+    });
+    it("requires approved real materials and manager promo confirmation, quarantining unknown send without retry", async () => {
+      const { f } = fixture;
+      const runner = createExpertCardMaterialsRunner({
+        enabled: true,
+        repository: cards,
+      });
+      expect(await runner.runOnce()).toMatchObject({ examined: 0 });
+      await expect(
+        financial.quoteMain({
+          ...event(f.workScope),
+          tariffVersionId: tariffId,
+          termMonths: 1,
+          revision: f.revision,
+        }),
+      ).rejects.toThrow();
+      await template();
+      transportFailure = true;
+      expect(await runner.runOnce()).toMatchObject({ examined: 1, unknown: 1 });
+      const sends = transportCalls.length;
+      transportFailure = false;
+      expect(await runner.runOnce()).toMatchObject({ examined: 0 });
+      expect(transportCalls).toHaveLength(sends);
+      expect(sends).toBe(2);
+      await expect(
+        cards.confirmPromo({
+          sessionHash: manager.sessionHash,
+          applicationId: f.applicationId,
+          expectedRevision: f.revision,
+          idempotencyKey: randomUUID(),
+        }),
+      ).rejects.toThrow();
+    });
   });
   describe("private public-card references", () => {
     let f: Awaited<ReturnType<typeof approvedCard>>;
@@ -1082,338 +1225,299 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       ).toBe(1);
     });
   });
-  it("erases real raw media and reconciles later verified money without recreating applicant access", async () => {
-    const f = await readyCard();
-    const { order } = await checkout(f);
-    const payment = await mainPayment(order);
-    try {
-      await privacy().startErasureAtomically({
-        targetUserId: f.userId,
-        correlationId: `card-erasure:${f.userId}`,
-        idempotencyKey: `card-erasure:${f.userId}`,
-        pseudonym: "hmac:synthetic-card-erasure",
-      });
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_card_promo_proofs where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect((await payment.notify()).statusCode).toBe(200);
-      expect(await cards.getWorkflow(f.workScope)).toBeNull();
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_onboarding_applications where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from experts_published`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select status from expert_residency_orders where id=${order.orderId}::uuid`,
-          )
-        ).rows[0]?.status,
-      ).toBe("settled");
-    } finally {
-      await payment.app.close();
-    }
-  });
-  it("rejects NULL SQL entry/review/receipt authority and cannot erase code-source identity", async () => {
-    const f = await approvedCard();
-    const review = (
-      await database.db.execute<{ id: string }>(
-        sql`select id from expert_card_reviews where draft_id=${f.draftId}::uuid`,
-      )
-    ).rows[0]!;
-    await expect(
-      database.db.execute(
-        sql`insert into expert_card_entries(draft_id,user_id,revision,kind) values(${f.draftId}::uuid,${f.userId}::uuid,99,'text')`,
-      ),
-    ).rejects.toThrow();
-    await expect(
-      database.db.execute(
-        sql`insert into expert_card_reviews(draft_id,user_id,revision,action,public_payload,public_digest,manager_id,manager_session_hash) select draft_id,user_id,revision+1,'approve',public_payload,null,manager_id,manager_session_hash from expert_card_reviews where id=${review.id}::uuid`,
-      ),
-    ).rejects.toThrow();
-    await expect(
-      database.db.execute(
-        sql`update expert_card_material_jobs set status='delivered',delivery_receipt='{}'::jsonb,delivered_at=clock_timestamp(),attempt_id=gen_random_uuid(),attempt_started_at=clock_timestamp() where review_id=${review.id}::uuid`,
-      ),
-    ).rejects.toThrow();
-    const a = await database.createExpertIdentity(),
-      b = await database.createExpertIdentity();
-    await expect(
-      database.db.execute(
-        sql`insert into expert_referrals(code_id,inviter_expert_id,invitee_expert_id) values(null,${a.expertId}::uuid,${b.expertId}::uuid)`,
-      ),
-    ).rejects.toThrow();
-  });
-  it("qualifies one canonical1000 reward pending30days and supersedes the indicative100 before any spendable grant", async () => {
-    const inviter = await database.createExpertIdentity({
-      provider: "telegram",
-      externalId: String(++sequence),
+  describe("erasedPaymentFixture", () => {
+    let fixture: Awaited<ReturnType<typeof erasedPaymentFixture>>;
+    beforeEach(async () => {
+      fixture = await erasedPaymentFixture();
     });
-    const inviterScope = {
-      ...promoScope,
-      telegramUserId: inviter.externalId,
-      chatId: inviter.externalId,
-    };
-    await database.db.execute(
-      sql`update channel_identities set bot_key=${promoScope.botKey},external_chat_id=external_id where user_id=${inviter.userId}::uuid`,
-    );
-    await seedClientConsent(database.db, inviter.userId, "client_messaging");
-    const registered = await promo.register(event(inviterScope));
-    const f = await readyCard(registered.refCode);
-    // Three independently consented referrals earn the visible, nonspendable indication.
-    for (let n = 0; n < 2; n++) {
-      const userId = await database.createUser(),
-        externalId = String(++sequence);
-      await database.db.execute(
-        sql`insert into channel_identities(user_id,provider,external_id,external_chat_id,bot_key,status) values(${userId}::uuid,'telegram',${externalId},${externalId},${promoScope.botKey},'active')`,
-      );
-      await seedClientConsent(database.db, userId, "client_messaging");
-      await promo.register({
-        ...event({
-          ...promoScope,
-          telegramUserId: externalId,
-          chatId: externalId,
-        }),
-        refCode: registered.refCode,
-      });
-    }
-    expect(await promo.register(event(inviterScope))).toMatchObject({
-      bonusStatus: "frozen",
-      bonusPoints: 100,
-    });
-    const control = await database.createFeatureControlApproval({
-      expectedVersion: 1,
-      newCommandsEnabled: true,
-      rewardGrantsEnabled: true,
-    });
-    await new PostgresExpertReferralControlRepository(
-      database.db,
-    ).setFeatureControl({
-      expectedVersion: 1,
-      newCommandsEnabled: true,
-      rewardGrantsEnabled: true,
-      approvalId: control.approvalId,
-      adminSessionIdHash: control.sessionIdHash,
-    });
-    const { order } = await checkout(f);
-    const payment = await mainPayment(order);
-    try {
-      expect((await payment.notify()).statusCode).toBe(200);
-      const maturity = (
-        await database.db.execute(
-          sql`select amount_minor::text amount,status,matures_at=settled_at+interval '30 days' as thirty_days from expert_referral_reward_maturities where qualifying_order_id=${order.orderId}::uuid`,
-        )
-      ).rows;
-      expect(maturity).toEqual([
-        { amount: "100000", status: "pending", thirty_days: true },
-      ]);
-      expect(await promo.register(event(inviterScope))).toMatchObject({
-        bonusStatus: "superseded",
-        bonusPoints: 0,
-      });
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_referral_reward_grants`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_referral_ledger_entries`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      const referral = (
-        await database.db.execute<{
-          id: string;
-          inviter_expert_id: string;
-          invitee_expert_id: string;
-          promo_qualification_id: string;
-        }>(
-          sql`select id,inviter_expert_id,invitee_expert_id,promo_qualification_id from expert_referrals`,
-        )
-      ).rows[0]!;
-      await expect(
-        database.db.execute(
-          sql`insert into expert_referrals(code_id,inviter_expert_id,invitee_expert_id,acquisition_source,promo_qualification_id) values(null,${referral.inviter_expert_id}::uuid,${referral.invitee_expert_id}::uuid,'promo_registration',${referral.promo_qualification_id}::uuid)`,
-        ),
-      ).rejects.toThrow();
-      await expect(
-        database.db.execute(
-          sql`update expert_referrals set acquisition_source='qualified_code',promo_qualification_id=null where id=${referral.id}::uuid`,
-        ),
-      ).rejects.toThrow();
-
-      const markerBefore = (
-        await database.db.execute(
-          sql`select id,settlement_invitee_channel_identity_id,settlement_inviter_channel_identity_id,referral_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
-        )
-      ).rows[0];
-      await seedExpertSession(f.userId);
-      await privacy().startErasureAtomically({
-        targetUserId: f.userId,
-        correlationId: `qualified-card-erasure:${f.userId}`,
-        idempotencyKey: `qualified-card-erasure:${f.userId}`,
-        pseudonym: "hmac:synthetic-qualified-card-erasure",
-      });
-      await assertErasedFinancialIdentity(f.userId, f.scope.telegramUserId);
-      const lateProof = await payment.proof();
-      if (!lateProof) throw new Error("fixture_late_verified_proof_missing");
-      expect(
-        await new PostgresExpertResidencyProviderInboxRepository(
-          database.db,
-        ).settle(lateProof),
-      ).toMatchObject({
-        kind: "settled",
-        orderId: order.orderId,
-        rewardGranted: false,
-      });
-      const oldWork = await workHttp();
+    it("erases real raw media and reconciles later verified money without recreating applicant access", async () => {
+      const { f, order, payment } = fixture;
       try {
-        const oldStart = await oldWork.inject({
-          method: "POST",
-          url: "/v1/webhooks/telegram",
-          headers: { "x-telegram-bot-api-secret-token": secret },
-          payload: {
-            update_id: ++sequence,
-            message: {
-              from: { id: Number(f.scope.telegramUserId) },
-              chat: { id: Number(f.scope.chatId), type: "private" },
-              text: `/start card_${f.handoffToken}`,
-            },
-          },
+        await privacy().startErasureAtomically({
+          targetUserId: f.userId,
+          correlationId: `card-erasure:${f.userId}`,
+          idempotencyKey: `card-erasure:${f.userId}`,
+          pseudonym: "hmac:synthetic-card-erasure",
         });
-        expect(oldStart.statusCode).toBe(503);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_card_promo_proofs where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect((await payment.notify()).statusCode).toBe(200);
+        expect(await cards.getWorkflow(f.workScope)).toBeNull();
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_onboarding_applications where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from experts_published`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select status from expert_residency_orders where id=${order.orderId}::uuid`,
+            )
+          ).rows[0]?.status,
+        ).toBe("settled");
       } finally {
-        await oldWork.close();
+        await payment.app.close();
       }
-      expect(await cards.getWorkflow(f.workScope)).toBeNull();
-      expect(
-        (
+    });
+  });
+  describe("sqlRejectionFixture", () => {
+    let fixture: Awaited<ReturnType<typeof sqlRejectionFixture>>;
+    beforeEach(async () => {
+      fixture = await sqlRejectionFixture();
+    });
+    it("rejects NULL SQL entry/review/receipt authority and cannot erase code-source identity", async () => {
+      const { f, review, a, b } = fixture;
+      await expect(
+        database.db.execute(
+          sql`insert into expert_card_entries(draft_id,user_id,revision,kind) values(${f.draftId}::uuid,${f.userId}::uuid,99,'text')`,
+        ),
+      ).rejects.toThrow();
+      await expect(
+        database.db.execute(
+          sql`insert into expert_card_reviews(draft_id,user_id,revision,action,public_payload,public_digest,manager_id,manager_session_hash) select draft_id,user_id,revision+1,'approve',public_payload,null,manager_id,manager_session_hash from expert_card_reviews where id=${review.id}::uuid`,
+        ),
+      ).rejects.toThrow();
+      await expect(
+        database.db.execute(
+          sql`update expert_card_material_jobs set status='delivered',delivery_receipt='{}'::jsonb,delivered_at=clock_timestamp(),attempt_id=gen_random_uuid(),attempt_started_at=clock_timestamp() where review_id=${review.id}::uuid`,
+        ),
+      ).rejects.toThrow();
+      await expect(
+        database.db.execute(
+          sql`insert into expert_referrals(code_id,inviter_expert_id,invitee_expert_id) values(null,${a.expertId}::uuid,${b.expertId}::uuid)`,
+        ),
+      ).rejects.toThrow();
+    });
+  });
+  describe("qualifiedRewardFixture", () => {
+    let fixture: Awaited<ReturnType<typeof qualifiedRewardFixture>>;
+    beforeEach(async () => {
+      fixture = await qualifiedRewardFixture();
+    });
+    it("qualifies one canonical1000 reward pending30days and supersedes the indicative100 before any spendable grant", async () => {
+      const { f, inviterScope, order, payment } = fixture;
+      try {
+        expect((await payment.notify()).statusCode).toBe(200);
+        const maturity = (
           await database.db.execute(
-            sql`select count(*)::int n from expert_onboarding_applications where user_id=${f.userId}::uuid`,
+            sql`select amount_minor::text amount,status,matures_at=settled_at+interval '30 days' as thirty_days from expert_referral_reward_maturities where qualifying_order_id=${order.orderId}::uuid`,
           )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from experts_published where user_id=${f.userId}::uuid`,
+        ).rows;
+        expect(maturity).toEqual([
+          { amount: "100000", status: "pending", thirty_days: true },
+        ]);
+        expect(await promo.register(event(inviterScope))).toMatchObject({
+          bonusStatus: "superseded",
+          bonusPoints: 0,
+        });
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_referral_reward_grants`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_referral_ledger_entries`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        const referral = (
+          await database.db.execute<{
+            id: string;
+            inviter_expert_id: string;
+            invitee_expert_id: string;
+            promo_qualification_id: string;
+          }>(
+            sql`select id,inviter_expert_id,invitee_expert_id,promo_qualification_id from expert_referrals`,
           )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select active,verified,public_display_name from experts where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0],
-      ).toEqual({ active: false, verified: false, public_display_name: null });
-      expect(
-        (
+        ).rows[0]!;
+        await expect(
+          database.db.execute(
+            sql`insert into expert_referrals(code_id,inviter_expert_id,invitee_expert_id,acquisition_source,promo_qualification_id) values(null,${referral.inviter_expert_id}::uuid,${referral.invitee_expert_id}::uuid,'promo_registration',${referral.promo_qualification_id}::uuid)`,
+          ),
+        ).rejects.toThrow();
+        await expect(
+          database.db.execute(
+            sql`update expert_referrals set acquisition_source='qualified_code',promo_qualification_id=null where id=${referral.id}::uuid`,
+          ),
+        ).rejects.toThrow();
+
+        const markerBefore = (
           await database.db.execute(
             sql`select id,settlement_invitee_channel_identity_id,settlement_inviter_channel_identity_id,referral_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
           )
-        ).rows[0],
-      ).toEqual(markerBefore);
+        ).rows[0];
+        await seedExpertSession(f.userId);
+        await privacy().startErasureAtomically({
+          targetUserId: f.userId,
+          correlationId: `qualified-card-erasure:${f.userId}`,
+          idempotencyKey: `qualified-card-erasure:${f.userId}`,
+          pseudonym: "hmac:synthetic-qualified-card-erasure",
+        });
+        await assertErasedFinancialIdentity(f.userId, f.scope.telegramUserId);
+        const lateProof = await payment.proof();
+        if (!lateProof) throw new Error("fixture_late_verified_proof_missing");
+        expect(
+          await new PostgresExpertResidencyProviderInboxRepository(
+            database.db,
+          ).settle(lateProof),
+        ).toMatchObject({
+          kind: "settled",
+          orderId: order.orderId,
+          rewardGranted: false,
+        });
+        const oldWork = await workHttp();
+        try {
+          const oldStart = await oldWork.inject({
+            method: "POST",
+            url: "/v1/webhooks/telegram",
+            headers: { "x-telegram-bot-api-secret-token": secret },
+            payload: {
+              update_id: ++sequence,
+              message: {
+                from: { id: Number(f.scope.telegramUserId) },
+                chat: { id: Number(f.scope.chatId), type: "private" },
+                text: `/start card_${f.handoffToken}`,
+              },
+            },
+          });
+          expect(oldStart.statusCode).toBe(503);
+        } finally {
+          await oldWork.close();
+        }
+        expect(await cards.getWorkflow(f.workScope)).toBeNull();
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_onboarding_applications where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from experts_published where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select active,verified,public_display_name from experts where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0],
+        ).toEqual({
+          active: false,
+          verified: false,
+          public_display_name: null,
+        });
+        expect(
+          (
+            await database.db.execute(
+              sql`select id,settlement_invitee_channel_identity_id,settlement_inviter_channel_identity_id,referral_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
+            )
+          ).rows[0],
+        ).toEqual(markerBefore);
+        expect(
+          (
+            await database.db.execute(
+              sql`select amount_minor::text amount,status from expert_referral_reward_maturities where qualifying_order_id=${order.orderId}::uuid`,
+            )
+          ).rows,
+        ).toEqual([{ amount: "100000", status: "pending" }]);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_promo_qualification_audits where main_order_id=${order.orderId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(1);
+      } finally {
+        await payment.app.close();
+      }
+    });
+  });
+  describe("expiredQuoteFixture", () => {
+    let fixture: Awaited<ReturnType<typeof expiredQuoteFixture>>;
+    beforeEach(async () => {
+      fixture = await expiredQuoteFixture();
+    });
+    it("expires the immutable main quote normally and requires a new explicit acceptance", async () => {
+      const { f, quote } = fixture;
+      await database.db.execute(
+        sql`select pg_sleep(greatest(0,extract(epoch from (expires_at-clock_timestamp())))+0.02) from expert_campaign_quotes where id=${quote.id}::uuid`,
+      );
+      await expect(
+        financial.acceptMain({
+          ...event(f.workScope),
+          quoteId: quote.id,
+          revision: f.revision,
+        }),
+      ).rejects.toThrow();
       expect(
         (
           await database.db.execute(
-            sql`select amount_minor::text amount,status from expert_referral_reward_maturities where qualifying_order_id=${order.orderId}::uuid`,
+            sql`select price_minor::text as price from expert_campaign_quotes where id=${quote.id}::uuid`,
           )
-        ).rows,
-      ).toEqual([{ amount: "100000", status: "pending" }]);
+        ).rows[0]?.price,
+      ).toBe(quote.priceMinor);
+      const renewed = await financial.quoteMain({
+        ...event(f.workScope),
+        tariffVersionId: tariffId,
+        termMonths: 3,
+        revision: f.revision,
+      });
+      expect(renewed.id).not.toBe(quote.id);
+      await expect(
+        financial.createMainInvoice({
+          ...event(f.workScope),
+          revision: f.revision,
+        }),
+      ).rejects.toThrow();
       expect(
         (
           await database.db.execute(
-            sql`select count(*)::int n from expert_promo_qualification_audits where main_order_id=${order.orderId}::uuid`,
+            sql`select count(*)::int n from expert_residency_orders`,
           )
         ).rows[0]?.n,
-      ).toBe(1);
-    } finally {
-      await payment.app.close();
-    }
+      ).toBe(0);
+      await financial.acceptMain({
+        ...event(f.workScope),
+        quoteId: renewed.id,
+        revision: f.revision,
+      });
+      expect(
+        await financial.createMainInvoice({
+          ...event(f.workScope),
+          revision: f.revision,
+        }),
+      ).toMatchObject({ quoteId: renewed.id, priceMinor: renewed.priceMinor });
+    }, 15000);
   });
-  it("expires the immutable main quote normally and requires a new explicit acceptance", async () => {
-    const f = await readyCard();
-    const tariffVersionId = await shortTariff();
-    const quote = await financial.quoteMain({
-      ...event(f.workScope),
-      tariffVersionId,
-      termMonths: 1,
-      revision: f.revision,
-    });
-    await database.db.execute(
-      sql`select pg_sleep(greatest(0,extract(epoch from (expires_at-clock_timestamp())))+0.02) from expert_campaign_quotes where id=${quote.id}::uuid`,
-    );
-    await expect(
-      financial.acceptMain({
-        ...event(f.workScope),
-        quoteId: quote.id,
-        revision: f.revision,
-      }),
-    ).rejects.toThrow();
-    expect(
-      (
-        await database.db.execute(
-          sql`select price_minor::text as price from expert_campaign_quotes where id=${quote.id}::uuid`,
-        )
-      ).rows[0]?.price,
-    ).toBe(quote.priceMinor);
-    const renewed = await financial.quoteMain({
-      ...event(f.workScope),
-      tariffVersionId: tariffId,
-      termMonths: 3,
-      revision: f.revision,
-    });
-    expect(renewed.id).not.toBe(quote.id);
-    await expect(
-      financial.createMainInvoice({
-        ...event(f.workScope),
-        revision: f.revision,
-      }),
-    ).rejects.toThrow();
-    expect(
-      (
-        await database.db.execute(
-          sql`select count(*)::int n from expert_residency_orders`,
-        )
-      ).rows[0]?.n,
-    ).toBe(0);
-    await financial.acceptMain({
-      ...event(f.workScope),
-      quoteId: renewed.id,
-      revision: f.revision,
-    });
-    expect(
-      await financial.createMainInvoice({
-        ...event(f.workScope),
-        revision: f.revision,
-      }),
-    ).toMatchObject({ quoteId: renewed.id, priceMinor: renewed.priceMinor });
-  }, 15000);
   describe("main settlement deadline races", () => {
     let fixture: Awaited<ReturnType<typeof deadlineCaseFixture>>;
     beforeEach(async () => {
@@ -1496,79 +1600,81 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       },
     );
   });
-  it("retries the whole SERIALIZABLE settlement after a newer approved consent notice wins during a binding wait", async () => {
-    const f = await readyCard();
-    const { order } = await checkout(f);
-    const payment = await mainPayment(order);
-    const proof = await payment.proof();
-    if (!proof) throw new Error("fixture_main_proof_missing");
-    let settlement: ReturnType<typeof observeSettlement> | undefined;
-    let attempts = 0;
-    let restoreSpy = () => {};
-    try {
-      await database.db.transaction(async (tx) => {
-        await tx.execute(
-          sql`select order_id from expert_card_main_orders where order_id=${order.orderId}::uuid for update`,
-        );
-        const original = database.db.transaction.bind(database.db);
-        const spy = vi
-          .spyOn(database.db, "transaction")
-          .mockImplementation((...args) => {
-            attempts++;
-            return original(...args);
-          });
-        restoreSpy = () => spy.mockRestore();
-        settlement = observeSettlement(
-          new PostgresExpertResidencyProviderInboxRepository(
-            database.db,
-          ).settle(proof),
-        );
-        await waitForMainBindingLock();
-        // A genuine new immutable notice invalidates the previous presentation;
-        // no fabricated grant is made for the applicant's new notice version.
-        await database.db.execute(
-          sql`insert into consent_document_versions(document_key,version,title,body,text_sha256,status,effective_at,approved_at,approved_by) select document_key,version+1,title,body,text_sha256,'approved',clock_timestamp(),clock_timestamp(),'synthetic-c-race' from consent_document_versions where document_key='consent.client_messaging' and version=1`,
-        );
-      });
-      expect(await settledOutcome(settlement)).toMatchObject({
-        kind: "settled",
-      });
-      expect(attempts).toBeGreaterThanOrEqual(2);
-      expect(attempts).toBeLessThanOrEqual(3);
-      expect(
-        (
+  describe("noticeRaceFixture", () => {
+    let fixture: Awaited<ReturnType<typeof noticeRaceFixture>>;
+    beforeEach(async () => {
+      fixture = await noticeRaceFixture();
+    });
+    it("retries the whole SERIALIZABLE settlement after a newer approved consent notice wins during a binding wait", async () => {
+      const { f, order, payment, proof } = fixture;
+      let settlement: ReturnType<typeof observeSettlement> | undefined;
+      let attempts = 0;
+      let restoreSpy = () => {};
+      try {
+        await database.db.transaction(async (tx) => {
+          await tx.execute(
+            sql`select order_id from expert_card_main_orders where order_id=${order.orderId}::uuid for update`,
+          );
+          const original = database.db.transaction.bind(database.db);
+          const spy = vi
+            .spyOn(database.db, "transaction")
+            .mockImplementation((...args) => {
+              attempts++;
+              return original(...args);
+            });
+          restoreSpy = () => spy.mockRestore();
+          settlement = observeSettlement(
+            new PostgresExpertResidencyProviderInboxRepository(
+              database.db,
+            ).settle(proof),
+          );
+          await waitForMainBindingLock();
+          // A genuine new immutable notice invalidates the previous presentation;
+          // no fabricated grant is made for the applicant's new notice version.
           await database.db.execute(
-            sql`select active,verified from experts where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0],
-      ).toEqual({ active: false, verified: false });
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from experts_published`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_referral_reward_maturities`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(await cards.getWorkflow(f.workScope)).toBeNull();
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from consents where user_id=${f.userId}::uuid and decision='granted' and document_version_id in(select id from consent_document_versions where version=2)`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-    } finally {
-      await settlement;
-      restoreSpy();
-      await payment.app.close();
-    }
+            sql`insert into consent_document_versions(document_key,version,title,body,text_sha256,status,effective_at,approved_at,approved_by) select document_key,version+1,title,body,text_sha256,'approved',clock_timestamp(),clock_timestamp(),'synthetic-c-race' from consent_document_versions where document_key='consent.client_messaging' and version=1`,
+          );
+        });
+        expect(await settledOutcome(settlement)).toMatchObject({
+          kind: "settled",
+        });
+        expect(attempts).toBeGreaterThanOrEqual(2);
+        expect(attempts).toBeLessThanOrEqual(3);
+        expect(
+          (
+            await database.db.execute(
+              sql`select active,verified from experts where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0],
+        ).toEqual({ active: false, verified: false });
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from experts_published`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_referral_reward_maturities`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(await cards.getWorkflow(f.workScope)).toBeNull();
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from consents where user_id=${f.userId}::uuid and decision='granted' and document_version_id in(select id from consent_document_versions where version=2)`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+      } finally {
+        await settlement;
+        restoreSpy();
+        await payment.app.close();
+      }
+    });
   });
   for (const prior of ["legacy_source", "prior_ineligible"] as const)
     describe(`first source ${prior}`, () => {
@@ -1624,34 +1730,35 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       });
     });
 
-  describe("configured main checkout", () => {
-    let fixture: {
-      f: Awaited<ReturnType<typeof readyCard>>;
-      quote: Awaited<ReturnType<typeof financial.quoteMain>>;
-    };
-    beforeEach(async () => {
-      const f = await readyCard();
-      const quote = await financial.quoteMain({
-        ...event(f.workScope),
-        tariffVersionId: tariffId,
-        termMonths: 1,
-        revision: f.revision,
-      });
-      await financial.acceptMain({
-        ...event(f.workScope),
-        quoteId: quote.id,
-        revision: f.revision,
-      });
-      fixture = { f, quote };
-    });
-    it.each([false, true])(
-      "configured owner invoice path binds the canonical adapter to one order (lostresponse=%s)",
-      async (lostResponse) => {
-        const { f, quote } = fixture;
-        const calls: { method: string; url: string }[] = [];
+  for (const lostResponse of [false, true] as const)
+    describe(`configured main checkout ${lostResponse}`, () => {
+      let calls: { method: string; url: string }[];
+      let paymentId: string;
+      let checkoutUrl: string;
+      let portCalls: number;
+      let app: Awaited<ReturnType<typeof workHttp>>;
+      let fixture: {
+        f: Awaited<ReturnType<typeof readyCard>>;
+        quote: Awaited<ReturnType<typeof financial.quoteMain>>;
+      };
+      beforeEach(async () => {
+        const f = await readyCard();
+        const quote = await financial.quoteMain({
+          ...event(f.workScope),
+          tariffVersionId: tariffId,
+          termMonths: 1,
+          revision: f.revision,
+        });
+        await financial.acceptMain({
+          ...event(f.workScope),
+          quoteId: quote.id,
+          revision: f.revision,
+        });
+        fixture = { f, quote };
+        calls = [];
         let providerBody: Record<string, unknown> | undefined;
-        const paymentId = `synthetic_${randomUUID()}`;
-        const checkoutUrl = `https://yoomoney.ru/checkout/payments/v2/contract?orderId=${paymentId}`;
+        paymentId = `synthetic_${randomUUID()}`;
+        checkoutUrl = `https://yoomoney.ru/checkout/payments/v2/contract?orderId=${paymentId}`;
         const operations = new PostgresYooKassaOperationRepository(database.db);
         const provider = createYooKassaClient(
           {
@@ -1708,7 +1815,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             paymentMode: "full_payment",
           },
         });
-        let portCalls = 0;
+        portCalls = 0;
         const service = cardService({
           mainCheckout: {
             strictFirstSendCancellation: true,
@@ -1733,7 +1840,10 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             },
           },
         });
-        const app = await workHttp(service);
+        app = await workHttp(service);
+      });
+      it(`configured owner invoice path binds the canonical adapter to one order (lostresponse=${lostResponse})`, async () => {
+        const { f, quote } = fixture;
         const payload = (updateId: number) => ({
           update_id: updateId,
           message: {
@@ -1808,76 +1918,57 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
         } finally {
           await app.close();
         }
-      },
-    );
-  });
-  it("normal composition fences historical generic Telegram receipts without reclaiming or mutating cards", async () => {
-    const f = await interview();
-    const config = loadEnv({
-      DATABASE_URL: "postgresql://local:local@localhost/test",
-      ALLOW_INSECURE_LOCAL_DATABASE: "true",
-      EXPERT_CARD_ENABLED: "true",
-      EXPERT_CARD_PAYMENT_MODE: "test",
-      EXPERT_CARD_WORK_BOT_ID: work.botId,
-      EXPERT_CARD_WORK_BOT_KEY: work.botKey,
-      EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_card_bot",
-      EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
-      TELEGRAM_WEBHOOK_SECRET: secret,
-    });
-    const capability = createExpertCardComposition(database.db, config);
-    if (!capability) throw new Error("fixture_card_capability_missing");
-    const inbox = new PostgresWebhookInboxRepository(database.db);
-    const completeId = ++sequence,
-      pendingId = ++sequence;
-    const complete = await inbox.claim("telegram", String(completeId));
-    if (complete.kind !== "claimed")
-      throw new Error("fixture_legacy_claim_missing");
-    await inbox.complete(complete.claimId);
-    const pending = await inbox.claim("telegram", String(pendingId));
-    if (pending.kind !== "claimed")
-      throw new Error("fixture_legacy_pending_missing");
-    const app = await workHttp(cardService(), capability.legacyReplay);
-    const send = (id: number) =>
-      app.inject({
-        method: "POST",
-        url: "/v1/webhooks/telegram",
-        headers: { "x-telegram-bot-api-secret-token": secret },
-        payload: {
-          update_id: id,
-          message: {
-            from: { id: Number(f.scope.telegramUserId) },
-            chat: { id: Number(f.scope.chatId), type: "private" },
-            text: "historical raw update",
-          },
-        },
       });
-    try {
-      expect((await send(completeId)).statusCode).toBe(200);
-      expect((await send(pendingId)).statusCode).toBe(503);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select status,claim_id::text from webhook_inbox where provider='telegram' and external_event_id=${String(pendingId)}`,
-          )
-        ).rows[0],
-      ).toEqual({ status: "processing", claim_id: pending.claimId });
-      expect((await send(++sequence)).statusCode).toBe(200);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0]?.n,
-      ).toBe(1);
-    } finally {
-      await app.close();
-    }
+    });
+  describe("legacyReceiptFixture", () => {
+    let fixture: Awaited<ReturnType<typeof legacyReceiptFixture>>;
+    beforeEach(async () => {
+      fixture = await legacyReceiptFixture();
+    });
+    it("normal composition fences historical generic Telegram receipts without reclaiming or mutating cards", async () => {
+      const { f, completeId, pendingId, pending, app } = fixture;
+      const send = (id: number) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: { "x-telegram-bot-api-secret-token": secret },
+          payload: {
+            update_id: id,
+            message: {
+              from: { id: Number(f.scope.telegramUserId) },
+              chat: { id: Number(f.scope.chatId), type: "private" },
+              text: "historical raw update",
+            },
+          },
+        });
+      try {
+        expect((await send(completeId)).statusCode).toBe(200);
+        expect((await send(pendingId)).statusCode).toBe(503);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select status,claim_id::text from webhook_inbox where provider='telegram' and external_event_id=${String(pendingId)}`,
+            )
+          ).rows[0],
+        ).toEqual({ status: "processing", claim_id: pending.claimId });
+        expect((await send(++sequence)).statusCode).toBe(200);
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from expert_card_entries where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(1);
+      } finally {
+        await app.close();
+      }
+    });
   });
 });

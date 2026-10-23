@@ -1,3 +1,50 @@
+# Block C comprehensive fixture WIP ready for exact extra6 request — 2026-10-23
+
+Allfileowners/reviewers/commandsended. CsourceNOTaccepted; D/Phase2NOTstarted.
+CfocusedPGall5CONSUMED. Lastrootrun69562 on572c7a5b EXIT1 19/20PASS, solequalified
+reward5000ms timeout; log/tmp/phase1-c-card-pg5.log. NO6/filter/manualprobe/equivalent
+withoutEXPLICITnewownerauthority. Helper3/3CONSUMED/unchanged; NOhelper4.
+Userlimitquestionwasnotanoverride; parentowns exactpermissionquestion/anynewlaunch.
+
+Comprehensivefixtureaudit CLOSED/sourceaccepted: all20expandedcases audited, ordinary
+heavyactor/provider/HTTPsetup nowintrackedboundedhooks, includingfullqualification
+inviter/3referrals/frozen100precondition/control/checkout/provider andbothconfigured
+checkoutvariants. No readyCard/approvedCard/interview/checkout/providercomposition
+orGETproof preparation remains in timedcase bodies. Actualcallbacks/races/money/
+maturity/immutability/erasure/lateGET/replay assertions retained; necessarypostmarker
+sessionseeding staysbehavior. Same20originalittitles/default5000ms/existing15000
+quoteexpiryoverride/real3sTTL/2smonotonicdrain. Nohelper/prod/SQL/state changes.
+Fulltesttypes/lint/format/diffPASS; independent20casefixture reviewACCEPTED.
+Logs/tmp/phase1-c-pg5-fixture-{types,lint}-final.log emptyEXIT0. RevisedfixtureUNEXECUTED.
+Audit20rowtable in docs/test-evidence/phase1-block-c-2026-10-23.md. No furtherchecks
+or codeplanned beforeconcreteownerask; unchangedscope/historynotrepeated.
+
+Parentmayask EXACTLYONE extra
+pnpm exec vitest run tests/integration/phase1-card-publication.test.ts
+oncurrentlocalWIPHEAD. Rootsolepreflight/launch/log withfreshprotectedrotatedCompose
+JSON MEMORYONLY, neverDockerEnv/secretoutput. Noimplicit6or7. AfteractualPASS closeC
+checkpoint thenproportionalD→Phase2 underexistingallplanauthority. Strictproduction
+firstsend/content/merchant/exactSHArelease gates separate/defaultoff. No provider/
+push/deploy/liveflag. A5/B2unchanged.
+
+# Block C extra5 consumed; complete setup audit/repair — 2026-10-23
+
+Ownerexplicitoneextra5 ranbyroot69562 on572c7a5b EXIT1:19/20PASS, solequalified
+1000rewardcase timeout5000 (6484ms total). Log/tmp/phase1-c-card-pg5.log126.03s,
+collect10.21s. Allprevious canonicalexpiry/legacy/maincheckout/erasure/noticecasesPASS.
+ALL5CslotsCONSUMED; NO6/filter/manualprobe/equivalent withoutEXPLICITnewowner
+permission. Helper3/3CONSUMED/unchanged; NOhelper4. CNOTcomplete; D/Phase2NOTstarted.
+
+Authorizedfix owner block_c_pg_test_author ONLYCfile: coherentfullqualifiedprepayment
+setup→trackedboundedhook (inviter/consent/reg,readyCard,2extraregs,featurecontrol,
+checkout/providerfixture/frozen100precondition). ALLmoney/maturity/immutability/
+erasure/lateproof assertions retained. AUDITall20case setup/bodyboundaries andmove
+same remainingnormalheavyfixtureprep tohooks comprehensively; no newbehavior.
+Preserve20/default5000/real3sTTL/drain/helper/prod/SQL/state. No execution/probe.
+Independentreadonlyreview owner block_a_ingress_review awaitsfinalsource+20caseaudit.
+Finaltypes/lint/format/diff+review/evidence/localWIP beforeparentexact6request.
+Userquestionaboutlimitdoesnotcancel task orauthorize6; rootowns anyfuturelaunch.
+
 # Block C revised WIP ready for exact extra5 request — 2026-10-23
 
 Allfileowners/reviewers/commandsended; onlyCfixture+evidencechanged since921d108d.

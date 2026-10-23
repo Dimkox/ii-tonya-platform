@@ -130,3 +130,23 @@ cleanup bound or financial assertion was weakened by this invocation.
 The implementation lead owns the remaining fixture preparation, independent
 review, types/lint/format and local WIP checkpoint before any further exact
 permission request. Block C remains unaccepted; D and Phase2 have not started.
+
+## Owner-authorized Block C invocation5
+
+The owner answered “Делай” to the request for exactly one fifth focused run.
+Coordinator verified clean572c7a5b1335e3e3c8d8524b963ef1502bd2c592 and a passing
+RequireDocker preflight, then launched only invocation5 with protected current
+synthetic credentials in memory and a new exclusive log.
+
+Session69562 exited1:19/20 passed; the canonical1000 reward scenario alone exceeded
+its default5000ms body timeout. No SQL or assertion failure was reported. All
+deadline, legacy-source, main checkout, publication and erasure scenarios passed.
+Log /tmp/phase1-c-card-pg5.log; duration126.03s, collection10.21s. All five focused
+invocations are consumed; no sixth or equivalent functional probe is authorized.
+
+The lead owns a full20-case setup/body audit and fixture-only repair with independent
+review and static verification before a revised local WIP checkpoint. Runtime
+limits, financial assertions, production code and the drain helper remain unchanged.
+The owner's subsequent question about the limit is not an override: coordinator
+explained the three-run rule comes from AGENTS.md:105 and the default5000ms body
+timeout comes from the test runner. No further functional command followed.
