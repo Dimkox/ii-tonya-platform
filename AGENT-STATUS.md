@@ -1,3 +1,28 @@
+# Owner payment/offer corrections starting — 2026-10-23
+
+New user specification supersedes conflicting old funnel/pricing details.
+Baseline0d004a71689393f65605703193e728ebdfa44057 was pushed successfully to
+origin/codex/phase1-owner-plan-20261023 after the previous local acceptance.
+Current isolated worktree remains the authorized development tree; append commits,
+do not rewrite shared history. New specification/plan:
+docs/superpowers/implementation-artifacts/spec-residency-offer-corrections.md and
+docs/superpowers/plans/2026-10-23-residency-offer-corrections.md.
+
+Read-only audits complete: fixed3000 fee/main separation already exists; real gaps
+are parallel pre-card materials, application promo proof, exact placeholders,
+Telegram staff actions, archive read fences, v2 pricing/automatic link lifecycle,
+and working prompt assets. Legacy pricing72/144/216h/15minTTL and archived source
+hashes remain immutable. New full-day schedule uses96/168/240h, separate monthly/
+package totals/floors, existing approved base rates and structured qualifications.
+No implementation tests have run yet. RequireDocker preflight passed Node24.22.0,
+pnpm11.9.0, Docker29.9.2/Compose5.6.1; no.env or live provider action.
+
+The existing owner opt-out from per-step approvals and focused count limits
+continues for these same residency-plan corrections. No blind test repetition.
+Root owns coordinator/final gate; a fresh implementation lead will own source,
+plan/status/test records and disjoint within-block assignments. No push/deploy or
+actual Telegram/provider send is authorized by this development increment.
+
 # Approved Phase0–Phase2 local work complete; final gate PASS — 2026-10-23
 
 Verified source checkpoint: 8d72381ed1e92cd984930c5cbfa06a195ac88871.
