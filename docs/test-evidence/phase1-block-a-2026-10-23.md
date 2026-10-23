@@ -82,3 +82,19 @@ ordered predecessor gate remains open. All other15-case-file scenarios produced
 No full/multi-path suite, exhausted legacy PostgreSQL/provider suite, provider call,
 credential transfer, push, deployment or live flag change occurred. External merchant,
 processor/backup and exact-SHA release acceptance remain separate gates.
+
+## Owner-authorized final verification5 — 2026-10-23
+
+The owner explicitly authorized one further focused-file invocation after the
+failed infrastructure startup4. Coordinator invoked exactly
+`pnpm exec vitest run tests/integration/phase1-promo.test.ts` on fresh task-owned
+PostgreSQL17.5 Compose project ii-tonya-phase1-promo-owner-recovery-20261023.
+Invocation5 exited0: **15/15 PASS** in19.60seconds, including corrected expired-quote
+fixture and actual database expiry rejection. Log /tmp/phase1-promo-owner-extra5.log.
+No source/expectation change since the reviewed ::text correction. The authority
+is consumed: do not run6 or infer permission for old/full/provider suites.
+
+BlockA local implementation gate is now closed; BlockB can proceed in the approved
+sequence. Earlier failed/skipped runs remain diagnostic history. This is not
+external merchant/delivery/erasure proof or exact-SHA release acceptance. No push,
+deployment, real-provider request, paid operation or live flag change occurred.

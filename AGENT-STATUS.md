@@ -1,3 +1,32 @@
+# BlockA local gate PASS; continue BlockB — 2026-10-23
+
+Owner explicitly authorized one further focused invocation after infrastructure
+failure4. Coordinator invocation5 of tests/integration/phase1-promo.test.ts on
+fresh owned PostgreSQL17.5 project ii-tonya-phase1-promo-owner-recovery-20261023
+exited0:15/15PASS,19.60seconds. Corrected expiredquote fixture executed and rejected
+actual expiredquote. Log /tmp/phase1-promo-owner-extra5.log. Source unchangedfrom
+reviewedWIP2ceedcf92052f1d51e502a08cc5e8520022f6e93; latestpre-run docs80313bf6.
+
+All5 invocations consumed (3original+2specificownergrants). Do not run6/equivalent
+functionalprobe/oldfullprovidersuites. FreshisolatedPGavailable for NEW independent
+blockfocusedfiles with their own boundedbudgets. OriginalfailedPGretainedforensics.
+Private config /tmp/phase1-promo-owner-recovery.compose.json mode0600 holds only
+synthetic taskcredentials; neverprint/copy/commitvalues.
+
+BlockA locallyverified/reviewed, not releaseaccepted. Previoussourcechecks service25,
+route10, config16, composition8, scope123/history8 and relevanttypes/lint/formatgreen
+remain applicable; thisnewrun closed remainingPGgate. Continue B thenC/D/Phase2 per
+ownerall-planinstruction; Phase3excluded. No push/deploy/provider/liveflag authority.
+
+# Owner extra5 authorized and CONSUMED — 2026-10-23
+
+Owner explicitly authorized ONE further invocation of phase1-promo.test.ts after
+infrastructure isolation. Coordinator starts invocation5 on healthy task-owned
+fresh PostgreSQL17.5 project ii-tonya-phase1-promo-owner-recovery-20261023 only.
+Do NOT rerun6 or infer broader authority. Resume current command/read
+/tmp/phase1-promo-owner-extra5.log if output is lost. Source unchanged80313bf6.
+No old/full/provider suite, push/deployment/liveflag permission follows.
+
 # Owner extra4 consumed; fresh isolated PG ready, extra5 NOT authorized — 2026-10-23
 
 Owner answered «разрешаю» for exactly ONE extra phase1-promo.test.ts invocation.

@@ -54,3 +54,9 @@ New focusedPGfile used all3 invocations, final14/15. Expiredquote fixture had an
 untyped JSON parameter42P18; explicit `::text` correction is source-reviewed but
 unrun. Exactly one additional invocation requires explicit owner authorization.
 Do not start Block B until this critical predecessor verification gate closes.
+
+## Local verification checkpoint
+
+Owner-authorized coordinator invocation5 passed15/15 on fresh ownedPG17.5.
+All invocations consumed; do not rerun6. Localblockgate closed, externalrelease
+acceptance remains open. See docs/test-evidence/phase1-block-a-2026-10-23.md.
