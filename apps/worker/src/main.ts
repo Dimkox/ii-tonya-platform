@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  assertExpertCardMaterialsWorkerConfig,
+  createExpertCardMaterialsLifecycle,
+} from "./expert-card-materials-composition.js";
 import { composeClientAsyncTelegram } from "./client-async-composition.js";
 import {
   createYooKassaWorkerComposition,
@@ -32,6 +36,7 @@ import {
   PostgresBookingRepository,
   PostgresClientCatalogRepository,
   PostgresClientSessionRepository,
+  PostgresExpertCardRepository,
   PostgresExpertReferralWorkerRepository,
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
@@ -117,6 +122,7 @@ export interface WorkerRuntimeFactory {
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly clientTelegramFetch?: typeof globalThis.fetch;
+  readonly expertCardMaterialFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly yookassaReaderFactory?: YooKassaAuditReaderFactory;
@@ -369,6 +375,7 @@ export function createProductionWorkerRuntimeFactory(
 ): WorkerRuntimeFactory {
   return {
     async create(config) {
+      assertExpertCardMaterialsWorkerConfig(config);
       validateYooKassaWorkerConfig(config);
       const clientEnabled = config.features.b2TelegramDispatch === true;
       const selartiEnabled =
@@ -526,12 +533,26 @@ export function createProductionWorkerRuntimeFactory(
         config,
         db,
       );
+      const expertCardMaterials = createExpertCardMaterialsLifecycle(config, {
+        createRepository: (materialTransport) =>
+          new PostgresExpertCardRepository(db, {
+            messagingConsentPolicyVersion:
+              config.expertCard!.messagingConsentPolicyVersion,
+            workBotId: config.expertCard!.workBotId,
+            workBotKey: config.expertCard!.workBotKey,
+            materialTransport,
+          }),
+        ...(deps.expertCardMaterialFetch === undefined
+          ? {}
+          : { fetch: deps.expertCardMaterialFetch }),
+      });
       const bookingHandoffRevocations =
         new PostgresBookingHandoffRevocationRepository(db);
       return createProductionWorkerRuntime({
         bookingHandoffRevocations: () =>
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
+        ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
         ...(planerka === undefined
           ? {}
           : { planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka) }),

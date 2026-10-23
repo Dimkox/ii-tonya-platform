@@ -41,3 +41,7 @@ export {
 export * from "./expert-applicant-service.js";
 
 export * from "./expert-verification-service.js";
+
+export * from "./expert-card-service.js";
+
+export * from "./expert-card-admin-service.js";

@@ -1,4 +1,9 @@
 import {
+  bindExpertCardReview,
+  renderExpertCardReview,
+} from "./expert-card-view.js";
+import type { ExpertCardAdminClient } from "./expert-card-client.js";
+import {
   ExpertVerificationClient,
   type VerificationDetail,
   type VerificationDecision,
@@ -7,9 +12,9 @@ import {
 type Client = Pick<
   ExpertVerificationClient,
   "list" | "detail" | "decide" | "recover" | "clear"
->;
+> & { readonly cards?: ExpertCardAdminClient };
 export function renderExpertVerificationPage(): string {
-  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section></main>`;
+  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section>${renderExpertCardReview()}</main>`;
 }
 export function bindExpertVerificationActions(
   root: HTMLElement,
@@ -75,6 +80,7 @@ export function bindExpertVerificationActions(
         : undefined;
     invoice.disabled = !active || busy;
     recover.disabled = !active || busy || !invoiceId;
+    cardReview?.sync();
   }
   function clearDetail() {
     selected = undefined;
@@ -88,6 +94,7 @@ export function bindExpertVerificationActions(
     generation++;
     client?.clear();
     client = undefined;
+    cardReview?.reset();
     busy = false;
     token.value = "";
     pending.clear();
@@ -302,11 +309,20 @@ export function bindExpertVerificationActions(
         }
       });
   };
+  const cardRoot = root.querySelector<HTMLElement>("[data-expert-card-root]");
+  const cardReview = cardRoot
+    ? bindExpertCardReview(cardRoot, {
+        getClient: () => client?.cards,
+        onUnauthorized: end,
+        ...(deps.randomKey ? { randomKey: deps.randomKey } : {}),
+      })
+    : undefined;
   win?.addEventListener("pagehide", end);
   controls();
   return () => {
     end();
     mounted = false;
+    cardReview?.dispose();
     win?.removeEventListener("pagehide", end);
     invoice.oninput = null;
     connect.onclick =

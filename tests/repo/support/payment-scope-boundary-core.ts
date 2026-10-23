@@ -96,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0054_expert_card_publication.sql",
   "packages/db/migrations/0053_expert_verification_onboarding.sql",
   // BlockA exact inventory: docs/spec/phase1-block-a-guard-registration.md.
   "packages/db/migrations/0052_expert_promo_applicants.sql",
@@ -125,6 +126,22 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
+  "expert_card_drafts",
+  "expert_card_entries",
+  "expert_card_reviews",
+  "expert_card_material_templates",
+  "expert_card_material_jobs",
+  "expert_card_promo_proofs",
+  "expert_card_promo_confirmations",
+  "expert_card_handoffs",
+  "expert_card_requests",
+  "expert_card_staff_actions",
+  "expert_card_consent_epoch",
+  "expert_card_main_acceptances",
+  "expert_card_main_orders",
+  "expert_promo_qualification_audits",
+  "experts_published",
   // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
   "expert_verification_decisions",
   "expert_onboarding_invoices",
@@ -213,6 +230,11 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-cards",
+  "/v1/admin/expert-cards/:applicationId",
+  "/v1/admin/expert-cards/:applicationId/public-card",
+  "/v1/admin/expert-cards/:applicationId/review",
+  "/v1/admin/expert-cards/:applicationId/promo-review",
   "/v1/admin/expert-verification",
   "/v1/admin/expert-verification/:applicationId",
   "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
@@ -299,7 +321,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "d2108e783b2024479557e0fe6dbcfca1ece0aa146e0affbfbf3dd85b5f1802ff",
+    "9d7150fd46a6a38d9a3968b6f551e96a70c5f5fbe671b0c22d513920f3b7e11f",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -705,6 +727,24 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // BlockC actual full-chain SQL catalogue; no generation authority.
+  [
+    "packages/db/migrations/0054_expert_card_publication.sql",
+    "526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8",
+  ],
+  [
+    "packages/db/migrations/meta/0054_snapshot.json",
+    "6740fe1ebd96adf044694be07759d99a3b45f0aaa67ea910588940741f87ff69",
+  ],
+  [
+    "packages/db/migrations/state/0054_manifest.json",
+    "9e13049f850d32a0fd6c4c816ff45359f9d1e9d40a32e9f3130523a530c94cc3",
+  ],
+  [
+    "packages/db/migrations/state/0054_sql_objects.json",
+    "2f21249b5210b9725bd5a0ff029827b4c55b54fb859d6e98f4799cecebe7c9c2",
+  ],
+
   // BlockB full SQL replay; docs/spec/phase1-block-b-guard-registration.md.
   [
     "packages/db/migrations/0053_expert_verification_onboarding.sql",
@@ -1112,7 +1152,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "f92ca609c344ac21cd922d16f692fdfeae8a3ed0229aceced37614934dd1a2f1",
+    "f8042b1ac0e8b0fcae77cda08905ac0151f1c269f2348fb9c152a19a13dccdf3",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1192,10 +1232,26 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "f92ca609c344ac21cd922d16f692fdfeae8a3ed0229aceced37614934dd1a2f1",
+    "f8042b1ac0e8b0fcae77cda08905ac0151f1c269f2348fb9c152a19a13dccdf3",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
+  "expert_card_drafts",
+  "expert_card_entries",
+  "expert_card_reviews",
+  "expert_card_material_templates",
+  "expert_card_material_jobs",
+  "expert_card_promo_proofs",
+  "expert_card_promo_confirmations",
+  "expert_card_handoffs",
+  "expert_card_requests",
+  "expert_card_staff_actions",
+  "expert_card_consent_epoch",
+  "expert_card_main_acceptances",
+  "expert_card_main_orders",
+  "expert_promo_qualification_audits",
+  "experts_published",
   // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
   "expert_verification_decisions",
   "expert_onboarding_invoices",

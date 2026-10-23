@@ -32,7 +32,10 @@ export const experts = pgTable(
     verified: boolean("verified").notNull().default(false),
     ...mutableTimestamps,
   },
-  (table) => [unique("experts_user_id_unique").on(table.userId)],
+  (table) => [
+    unique("experts_user_id_unique").on(table.userId),
+    unique("experts_id_user_unique").on(table.id, table.userId),
+  ],
 );
 
 export const expertServices = pgTable("expert_services", {

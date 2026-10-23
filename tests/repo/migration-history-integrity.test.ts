@@ -36,6 +36,7 @@ const BIGINT_LITERAL_DEFAULTS_BASELINE = [
 // Adding a new one is legitimate, but it must be listed here so the author sees that
 // the migration tool cannot produce it.
 const HAND_SQL_FUNCTIONS = [
+  "advance_expert_card_consent_epoch",
   "audit_test_expert_lifecycle_transition",
   "booking_notification_attempt_state_valid",
   "booking_notification_context_immutable",
@@ -50,11 +51,26 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_application_identity_immutable",
   "enforce_expert_campaign_order_source",
   "enforce_expert_campaign_quote_source",
+  "enforce_expert_card_draft_identity",
+  "enforce_expert_card_immutable",
+  "enforce_expert_card_main_acceptance",
+  "enforce_expert_card_main_order",
+  "enforce_expert_card_promo_confirmation_source",
+  "enforce_expert_card_review_source",
   "enforce_expert_promo_immutable",
+  "enforce_expert_promo_qualification",
+  "enforce_expert_promo_referral_source",
+  "enforce_expert_published_card_source",
   "enforce_expert_referral_admin_approval_global_unique",
   "enforce_expert_verification_decision_source",
   "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
+  "expert_card_activation_gate_valid",
+  "expert_card_current_messaging_authority",
+  "expert_card_delivery_receipt_valid",
+  "expert_card_manager_authority_valid",
+  "expert_card_proof_digest",
+  "expert_card_public_payload_valid",
   "expert_first_settlement_guard_change",
   "expert_jsonb_has_exact_keys",
   "expert_provider_reversal_result_guard",
@@ -70,6 +86,7 @@ const HAND_SQL_FUNCTIONS = [
   "planerka_privacy_completion",
   "planerka_reservation_transition",
   "protect_expert_campaign_order_snapshot",
+  "protect_expert_card_financial_binding",
   "protect_payer_receipt_binding",
   "protect_payer_receipt_contact",
   "reject_append_only_change",
@@ -111,6 +128,23 @@ const HAND_SQL_TRIGGERS = [
   "expert_campaign_order_source",
   "expert_campaign_quote_source",
   "expert_campaign_quotes_append_only",
+  "expert_card_consent_document_epoch",
+  "expert_card_draft_identity",
+  "expert_card_entries_immutable",
+  "expert_card_handoffs_immutable",
+  "expert_card_main_acceptance_immutable",
+  "expert_card_main_acceptance_source",
+  "expert_card_main_order_immutable",
+  "expert_card_main_order_source",
+  "expert_card_material_templates_immutable",
+  "expert_card_promo_confirmation_source",
+  "expert_card_promoconfirm_immutable",
+  "expert_card_proofs_immutable",
+  "expert_card_requests_immutable",
+  "expert_card_requests_no_delete",
+  "expert_card_review_source",
+  "expert_card_reviews_immutable",
+  "expert_card_staff_actions_immutable",
   "expert_onboarding_application_identity_immutable",
   "expert_onboarding_invoices_immutable",
   "expert_onboarding_invoices_no_delete",
@@ -118,8 +152,12 @@ const HAND_SQL_TRIGGERS = [
   "expert_onboarding_operations_no_delete",
   "expert_onboarding_payment_facts_immutable",
   "expert_promo_codes_immutable",
+  "expert_promo_qualification_immutable",
+  "expert_promo_qualification_source",
+  "expert_promo_referral_source",
   "expert_promo_registrations_immutable",
   "expert_promo_requests_immutable",
+  "expert_published_card_source",
   "expert_referral_admin_approval_global_unique",
   "expert_referral_admin_results_immutable",
   "expert_referral_admin_results_truncate_immutable",
@@ -212,7 +250,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(53);
+    expect(newest).toBe(54);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -304,7 +342,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0053 adds five purpose-bound onboarding verification/payment relations.
-    expect(declared.size).toBe(135);
+    // 0054 adds15 card, material, consent-epoch and main-publication relations.
+    expect(declared.size).toBe(150);
   });
 });

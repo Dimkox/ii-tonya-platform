@@ -1,3 +1,8 @@
+import {
+  prepareMainCardSettlement,
+  publishSettledMainCard,
+  suspendReversedMainCard,
+} from "./expert-card-main-gates.js";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
@@ -309,7 +314,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           // Compare in PostgreSQL, retaining deadline sub-millisecond precision.
           sql`select clock_timestamp() as now,clock_timestamp() >= payment_deadline as expired from expert_residency_orders where id=${order.id}::uuid`,
         );
-        const now = new Date(clock.rows[0]!.now);
+        let now = new Date(clock.rows[0]!.now);
         if (order.status === "expired" || clock.rows[0]!.expired) {
           // The expiry worker may have won, including before a 40001 retry.
           // Retain this verified payment fact without releasing credit twice.
@@ -336,6 +341,37 @@ export class PostgresExpertResidencyProviderInboxRepository {
             from expert_residency_provider_event_inbox i
             where i.provider=${input.provider} and i.external_event_id=${input.eventId}`);
           return { kind: "expired" };
+        }
+        const mainCardAdmission = await prepareMainCardSettlement(
+          tx,
+          input,
+          order,
+        );
+        if (mainCardAdmission?.expired) {
+          const expired = await expireLockedExpertResidencyOrder(
+            tx,
+            order,
+            sql`clock_timestamp()`,
+          );
+          if (!expired)
+            throw new ExpertResidencySettlementError(
+              "EXPERT_RESIDENCY_EXPIRY_STATE_CONFLICT",
+            );
+          await tx.execute(
+            sql`update expert_residency_provider_event_inbox set status='rejected',result_code='EXPERT_RESIDENCY_PAYMENT_EXPIRED',processed_at=clock_timestamp(),updated_at=clock_timestamp() where provider=${input.provider} and external_event_id=${input.eventId}`,
+          );
+          await tx.execute(
+            sql`insert into integration_errors(provider,reason_code,metadata_hash) select 'expert_residency',${latePaymentReason},${latePaymentBinding} from expert_residency_provider_event_inbox i where i.provider=${input.provider} and i.external_event_id=${input.eventId}`,
+          );
+          return { kind: "expired" };
+        }
+        if (mainCardAdmission) {
+          const actual = (
+            await tx.execute<{ now: Date | string }>(
+              sql`select clock_timestamp() as now`,
+            )
+          ).rows[0]!;
+          now = new Date(actual.now);
         }
         const prospectiveReferral = await tx.execute<{
           inviterExpertId: string;
@@ -523,6 +559,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           });
           rewardGranted = allocation !== "already_granted";
         }
+        await publishSettledMainCard(tx, mainCardAdmission, end);
         const outboxPayload = JSON.stringify({
           orderId: order.id,
           expertId: order.expertId,
@@ -803,6 +840,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           await tx.execute(
             sql`update expert_residency_orders set status=${reversalKind === "charged_back" ? "charged_back" : "refunded"},updated_at=${now} where id=${order.id}::uuid`,
           );
+          await suspendReversedMainCard(tx, order.id);
           await tx.execute(
             sql`update expert_residency_payment_attempts set status=${reversalKind === "charged_back" ? "charged_back" : "refunded"},resolved_at=${now},updated_at=${now} where order_id=${order.id}::uuid and provider=${input.provider} and provider_request_id=${input.paymentId}`,
           );

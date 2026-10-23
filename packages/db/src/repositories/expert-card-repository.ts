@@ -1,0 +1,1418 @@
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
+import type { DrizzleDb } from "../client.js";
+import type { ExpertPromoScope } from "./expert-promo-repository.js";
+import {
+  captureClientConsentAuthority,
+  lockClientConsentSubject,
+} from "./client-consent-authority.js";
+import { originalClientConsentSql } from "./consent-current.js";
+import {
+  lockExpertManagerAuthority,
+  ExpertManagerAuthorityError,
+} from "./expert-manager-authority.js";
+export type ExpertCardTransaction = Parameters<
+  Parameters<DrizzleDb["transaction"]>[0]
+>[0];
+export interface ExpertCardEvent extends ExpertPromoScope {
+  requestKey: string;
+  requestDigest: string;
+}
+export interface ProfessionalCard {
+  displayName: string;
+  profession: string;
+  city: string;
+  summary: string;
+}
+export type CardEntry =
+  | { kind: "text"; text: string }
+  | { kind: "photo" | "document"; reference: string };
+export type CardPromoProof = {
+  kind: "link" | "photo" | "document";
+  reference: string;
+};
+export type CardStatus =
+  "collecting" | "manager_review" | "changes_requested" | "approved";
+export interface CardWorkflow {
+  applicationId: string;
+  draftId: string | null;
+  revision: number;
+  status: CardStatus;
+  entryCount: number;
+  materialStatus:
+    "none" | "waiting_content" | "pending" | "delivered" | "unknown_outcome";
+  promoConfirmed: boolean;
+  activeResident: boolean;
+}
+export interface CardActivationGate {
+  applicationId: string;
+  userId: string;
+  draftId: string;
+  reviewId: string;
+  revision: number;
+  publicPayload: ProfessionalCard;
+  publicDigest: string;
+  messagingConsentPolicyVersion: string;
+}
+export interface ExpertCardMaterialPayload {
+  text: string;
+  assets: readonly { kind: "photo" | "document"; reference: string }[];
+}
+export interface ExpertCardMaterialTransport {
+  send(input: {
+    botId: string;
+    botKey: string;
+    userId: string;
+    chatId: string;
+    reviewId: string;
+    revision: number;
+    contentVersion: string;
+    payloadDigest: string;
+    payload: ExpertCardMaterialPayload;
+    signal: AbortSignal;
+  }): Promise<{
+    messageIds: readonly string[];
+    botId: string;
+    chatId: string;
+    contentVersion: string;
+    payloadDigest: string;
+  }>;
+}
+export class ExpertCardError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+    this.name = "ExpertCardError";
+  }
+}
+const fail = (code: string): never => {
+  throw new ExpertCardError(code);
+};
+const sha = (value: string) => createHash("sha256").update(value).digest("hex");
+const id =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const forbiddenControl =
+  /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ud800-\udfff]/u;
+function record(
+  value: unknown,
+  keys: readonly string[],
+  code: string,
+): Record<string, unknown> {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype ||
+    Object.keys(value).sort().join("|") !== [...keys].sort().join("|")
+  )
+    return fail(code);
+  return value as Record<string, unknown>;
+}
+export function decodeProfessionalCard(value: unknown): ProfessionalCard {
+  const code = "card_invalid_public_payload";
+  const raw = record(
+    value,
+    ["displayName", "profession", "city", "summary"],
+    code,
+  );
+  const limits = { displayName: 80, profession: 120, city: 80, summary: 2000 };
+  const result = {} as ProfessionalCard;
+  for (const key of Object.keys(limits) as (keyof ProfessionalCard)[]) {
+    const original = raw[key];
+    const text =
+      typeof original === "string" ? original.normalize("NFKC") : original;
+    if (
+      typeof text !== "string" ||
+      !text.trim() ||
+      text.trim().length > limits[key] ||
+      forbiddenControl.test(text) ||
+      /(?:https?:\/\/|www\.|telegram:file:|rfpg:|@|[0-9][0-9()+\s-]{7,}[0-9])/iu.test(
+        text,
+      )
+    )
+      return fail(code);
+    result[key] = text.trim();
+  }
+  return result;
+}
+const media = (value: unknown) =>
+  typeof value === "string" &&
+  /^telegram:file:[A-Za-z0-9_-]{1,512}$/u.test(value);
+export function decodeCardEntry(value: unknown): CardEntry {
+  const raw = value as Record<string, unknown>;
+  const code = "card_invalid_entry";
+  if (raw?.kind === "text") {
+    const r = record(value, ["kind", "text"], code);
+    if (
+      typeof r.text !== "string" ||
+      !r.text.trim() ||
+      r.text.length > 4000 ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(r.text)
+    )
+      return fail(code);
+    return { kind: "text", text: r.text };
+  }
+  const r = record(value, ["kind", "reference"], code);
+  if ((r.kind !== "photo" && r.kind !== "document") || !media(r.reference))
+    return fail(code);
+  return { kind: r.kind, reference: r.reference as string };
+}
+function publicHttps(reference: string) {
+  try {
+    const url = new URL(reference);
+    const host = url.hostname.replace(/^\[|\]$/gu, "").toLowerCase();
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host.endsWith(".local") ||
+      host === "::1" ||
+      /^(?:fc|fd|fe80):/u.test(host)
+    )
+      return false;
+    if (/^\d+\.\d+\.\d+\.\d+$/u.test(host)) {
+      const [a, b] = host.split(".").map(Number);
+      if (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b! >= 16 && b! <= 31) ||
+        (a === 192 && b === 168) ||
+        a! >= 224
+      )
+        return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function decodeCardPromoProof(value: unknown): CardPromoProof {
+  const code = "card_invalid_proof";
+  const r = record(value, ["kind", "reference"], code);
+  if (typeof r.reference !== "string") return fail(code);
+  if (r.kind === "link") {
+    if (
+      r.reference.length > 2048 ||
+      !publicHttps(r.reference) ||
+      forbiddenControl.test(r.reference)
+    )
+      return fail(code);
+    return { kind: "link", reference: r.reference };
+  }
+  if ((r.kind !== "photo" && r.kind !== "document") || !media(r.reference))
+    return fail(code);
+  return { kind: r.kind, reference: r.reference };
+}
+export function normalizeCardEvent(raw: ExpertCardEvent) {
+  if (!raw || typeof raw !== "object") return fail("card_invalid_event");
+  const scope = {
+    botKey: raw.botKey,
+    botId: raw.botId,
+    telegramUserId: raw.telegramUserId,
+    chatId: raw.chatId,
+    requestKey: raw.requestKey,
+    requestDigest: raw.requestDigest,
+  };
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(scope.botKey) ||
+    !/^[1-9]\d{0,19}$/u.test(scope.botId) ||
+    !/^[1-9]\d{0,19}$/u.test(scope.telegramUserId) ||
+    scope.chatId !== scope.telegramUserId ||
+    typeof scope.requestKey !== "string" ||
+    !scope.requestKey.startsWith(`${scope.botId}:`) ||
+    !/^[0-9a-f]{64}$/u.test(scope.requestDigest)
+  )
+    return fail("card_invalid_event");
+  const updateId = scope.requestKey.slice(scope.botId.length + 1);
+  if (!/^(?:0|[1-9]\d{0,19})$/u.test(updateId))
+    return fail("card_invalid_event");
+  return { ...scope, updateId };
+}
+const canonical = (value: unknown): string => {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isSafeInteger(value))
+  )
+    return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (
+    value &&
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  )
+    return `{${Object.keys(value)
+      .sort()
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
+      )
+      .join(",")}}`;
+  return fail("card_invalid_event");
+};
+type Operation =
+  | "entry"
+  | "submit"
+  | "promo_proof"
+  | "handoff_issue"
+  | "handoff_redeem"
+  | "main_quote"
+  | "main_accept"
+  | "main_checkout";
+export interface StartedCardRequest {
+  readonly userId: string;
+  readonly replay: boolean;
+  readonly resultId?: string;
+}
+type RequestData = {
+  scope: ReturnType<typeof normalizeCardEvent>;
+  userId: string;
+  operation: Operation;
+  semanticDigest: string;
+};
+const requests = new WeakMap<
+  object,
+  RequestData & { tx: ExpertCardTransaction }
+>();
+async function originalConsent(
+  tx: ExpertCardTransaction,
+  userId: string,
+  expected?: string,
+) {
+  const rows = (
+    await tx.execute<{ policyVersion: string }>(
+      originalClientConsentSql(userId, "client_messaging"),
+    )
+  ).rows;
+  return rows.length === 1 && (!expected || rows[0]!.policyVersion === expected)
+    ? rows[0]!.policyVersion
+    : null;
+}
+async function paidApplication(tx: ExpertCardTransaction, userId: string) {
+  return (
+    (
+      await tx.execute<{ applicationId: string }>(
+        sql`select a.id as "applicationId" from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.purpose='onboarding' and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.user_id=a.user_id and f.admission='interview' where a.user_id=${userId}::uuid and a.verification_status='approved' and a.onboarding_stage is not null for share of a,u`,
+      )
+    ).rows[0] ?? null
+  );
+}
+async function owner(
+  tx: ExpertCardTransaction,
+  scope: ExpertPromoScope,
+  expected?: string,
+) {
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(scope.botKey) ||
+    !/^[1-9]\d{0,19}$/u.test(scope.telegramUserId) ||
+    scope.chatId !== scope.telegramUserId
+  )
+    return null;
+  const identities = (
+    await tx.execute<{ userId: string }>(
+      sql`select ci.user_id as "userId" from channel_identities ci join users u on u.id=ci.user_id and u.active=true where ci.provider='telegram' and ci.bot_key=${scope.botKey} and ci.external_id=${scope.telegramUserId} and ci.external_chat_id=${scope.chatId} and ci.status='active' order by ci.id limit 2`,
+    )
+  ).rows;
+  if (identities.length !== 1) return null;
+  const userId = identities[0]!.userId;
+  await lockClientConsentSubject(tx, userId);
+  const policy = await originalConsent(tx, userId, expected);
+  if (
+    !policy ||
+    !(await captureClientConsentAuthority(tx, {
+      subjectId: userId,
+      botKey: scope.botKey,
+      chatId: scope.chatId,
+      externalUserId: scope.telegramUserId,
+      messagingPolicyVersion: policy,
+    }))
+  )
+    return null;
+  const application = await paidApplication(tx, userId);
+  return application
+    ? { userId, applicationId: application.applicationId, policy }
+    : null;
+}
+async function startKnownRequest(
+  tx: ExpertCardTransaction,
+  scope: ReturnType<typeof normalizeCardEvent>,
+  userId: string,
+  operation: Operation,
+  semanticDigest: string,
+): Promise<StartedCardRequest> {
+  const prior = (
+    await tx.execute<{
+      userId: string | null;
+      operation: string;
+      requestDigest: string | null;
+      semanticDigest: string | null;
+      resultId: string | null;
+    }>(
+      sql`select user_id as "userId",operation,request_digest as "requestDigest",semantic_digest as "semanticDigest",result_id as "resultId" from expert_card_requests where bot_id=${scope.botId} and update_id=${scope.updateId}`,
+    )
+  ).rows[0];
+  if (
+    prior &&
+    (prior.userId !== userId ||
+      prior.operation !== operation ||
+      prior.requestDigest !== scope.requestDigest ||
+      prior.semanticDigest !== semanticDigest)
+  )
+    return fail("card_idempotency_conflict");
+  const started = Object.freeze({
+    userId,
+    replay: !!prior,
+    ...(prior?.resultId ? { resultId: prior.resultId } : {}),
+  });
+  requests.set(started, { tx, scope, userId, operation, semanticDigest });
+  return started;
+}
+export async function beginCardRequest(
+  tx: ExpertCardTransaction,
+  raw: ExpertCardEvent,
+  operation: Operation,
+  semanticPayload: unknown = null,
+): Promise<StartedCardRequest> {
+  const scope = normalizeCardEvent(raw);
+  const semanticDigest = sha(canonical(semanticPayload));
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`card:${scope.botId}:${scope.updateId}`},0))`,
+  );
+  const identity = await owner(tx, scope);
+  if (!identity) return fail("card_forbidden");
+  return startKnownRequest(
+    tx,
+    scope,
+    identity.userId,
+    operation,
+    semanticDigest,
+  );
+}
+export async function finishCardRequest(
+  tx: ExpertCardTransaction,
+  started: StartedCardRequest,
+  resultId?: string,
+) {
+  const data = requests.get(started);
+  if (!data || data.tx !== tx) return fail("card_forbidden");
+  if (started.replay) return;
+  await tx.execute(
+    sql`insert into expert_card_requests(bot_id,update_id,user_id,operation,request_digest,semantic_digest,result_id) values(${data.scope.botId},${data.scope.updateId},${data.userId}::uuid,${data.operation},${data.scope.requestDigest},${data.semanticDigest},${resultId ?? null}::uuid)`,
+  );
+}
+export async function lockCardActivationGate(
+  tx: ExpertCardTransaction,
+  input: { applicationId: string; userId: string; reviewId?: string },
+): Promise<CardActivationGate | null> {
+  if (
+    !id.test(input.applicationId) ||
+    !id.test(input.userId) ||
+    (input.reviewId !== undefined && !id.test(input.reviewId))
+  )
+    return null;
+  await lockClientConsentSubject(tx, input.userId);
+  const rows = (
+    await tx.execute<{
+      applicationId: string;
+      userId: string;
+      draftId: string;
+      reviewId: string;
+      revision: number;
+      publicPayload: ProfessionalCard;
+      publicDigest: string;
+      messagingConsentPolicyVersion: string;
+    }>(
+      sql`select d.application_id as "applicationId",d.user_id as "userId",d.id as "draftId",r.id as "reviewId",d.revision,r.public_payload as "publicPayload",r.public_digest as "publicDigest",d.messaging_policy_version as "messagingConsentPolicyVersion" from expert_card_drafts d join expert_card_reviews r on r.id=d.approved_review_id and r.draft_id=d.id and r.user_id=d.user_id where d.application_id=${input.applicationId}::uuid and d.user_id=${input.userId}::uuid ${input.reviewId ? sql`and r.id=${input.reviewId}::uuid` : sql``} for update of d for share of r`,
+    )
+  ).rows;
+  const row = rows[0];
+  if (rows.length !== 1 || !row) return null;
+  const activeUser = (
+    await tx.execute<{ active: boolean }>(
+      sql`select active from users where id=${input.userId}::uuid for share`,
+    )
+  ).rows[0]?.active;
+  if (activeUser !== true) return null;
+  const consentEpoch = (
+    await tx.execute(
+      sql`select revision from consent_states where user_id=${input.userId}::uuid and purpose='client_messaging' for share`,
+    )
+  ).rows;
+  const noticeEpoch = (
+    await tx.execute(
+      sql`select revision from expert_card_consent_epoch where id=1 for share`,
+    )
+  ).rows;
+  const draftScope = (
+    await tx.execute<{ botKey: string; chatId: string }>(
+      sql`select work_bot_key as "botKey",work_chat_id as "chatId" from expert_card_drafts where id=${row.draftId}::uuid`,
+    )
+  ).rows[0];
+  if (!consentEpoch.length || !noticeEpoch.length || !draftScope) return null;
+  const identities = (
+    await tx.execute(
+      sql`select id from channel_identities where user_id=${input.userId}::uuid and provider='telegram' and bot_key=${draftScope.botKey} and external_id=${draftScope.chatId} and external_chat_id=${draftScope.chatId} and status='active' for share`,
+    )
+  ).rows;
+  if (identities.length !== 1) return null;
+
+  await tx.execute(
+    sql`select j.id from expert_card_material_jobs j where j.review_id=${row.reviewId}::uuid for share`,
+  );
+  await tx.execute(
+    sql`select p.id from expert_card_promo_confirmations p where p.review_id=${row.reviewId}::uuid for share`,
+  );
+  await tx.execute(
+    sql`select p.id from expert_card_promo_proofs p where p.review_id=${row.reviewId}::uuid for share`,
+  );
+  if (
+    !(await originalConsent(
+      tx,
+      input.userId,
+      row.messagingConsentPolicyVersion,
+    ))
+  )
+    return null;
+  const valid = (
+    await tx.execute<{ valid: boolean }>(
+      sql`select expert_card_activation_gate_valid(${input.userId}::uuid,${row.reviewId}::uuid) as valid`,
+    )
+  ).rows[0]?.valid;
+  if (valid !== true) return null;
+  try {
+    const validated = decodeProfessionalCard(row.publicPayload);
+    if (canonical(validated) !== canonical(row.publicPayload)) return null;
+    return { ...row, publicPayload: validated };
+  } catch (error) {
+    if (
+      error instanceof ExpertCardError &&
+      error.code === "card_invalid_public_payload"
+    )
+      return null;
+    throw error;
+  }
+}
+type DraftRow = {
+  id: string;
+  applicationId: string;
+  userId: string;
+  revision: number;
+  status: CardStatus;
+  publicCard: ProfessionalCard | null;
+  approvedReviewId: string | null;
+  policy: string;
+  botId: string;
+  botKey: string;
+  chatId: string;
+};
+type StaffCommand = {
+  sessionHash: string;
+  applicationId: string;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+export class PostgresExpertCardRepository {
+  private readonly policy: Readonly<{
+    messagingConsentPolicyVersion: string;
+    workBotId: string;
+    workBotKey: string;
+  }>;
+  private readonly transport: ExpertCardMaterialTransport | undefined;
+  constructor(
+    private readonly db: DrizzleDb,
+    options: {
+      messagingConsentPolicyVersion: string;
+      workBotId: string;
+      workBotKey: string;
+      materialTransport?: ExpertCardMaterialTransport;
+    },
+  ) {
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(
+        options.messagingConsentPolicyVersion,
+      ) ||
+      !/^[1-9]\d{0,19}$/u.test(options.workBotId) ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(options.workBotKey)
+    )
+      fail("card_invalid_configuration");
+    this.policy = Object.freeze({
+      messagingConsentPolicyVersion: options.messagingConsentPolicyVersion,
+      workBotId: options.workBotId,
+      workBotKey: options.workBotKey,
+    });
+    this.transport = options.materialTransport
+      ? { send: options.materialTransport.send.bind(options.materialTransport) }
+      : undefined;
+  }
+  private async tx<T>(
+    work: (tx: ExpertCardTransaction) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.db.transaction(async (tx) => {
+        await tx.execute(sql`set local statement_timeout='2000ms'`);
+        await tx.execute(sql`set local lock_timeout='1000ms'`);
+        return work(tx);
+      });
+    } catch (error) {
+      if (error instanceof ExpertCardError) throw error;
+      if (error instanceof ExpertManagerAuthorityError)
+        throw new ExpertCardError("card_forbidden");
+      throw new ExpertCardError("card_storage_unavailable");
+    }
+  }
+  private work(scope: ExpertPromoScope) {
+    return (
+      scope.botId === this.policy.workBotId &&
+      scope.botKey === this.policy.workBotKey &&
+      scope.chatId === scope.telegramUserId
+    );
+  }
+  private revision(value: number) {
+    if (!Number.isInteger(value) || value < 0 || value >= 1000000)
+      fail("card_revision_conflict");
+  }
+  private async draft(tx: ExpertCardTransaction, userId: string) {
+    return (
+      (
+        await tx.execute<DraftRow>(
+          sql`select id,application_id as "applicationId",user_id as "userId",revision,status,public_payload as "publicCard",approved_review_id as "approvedReviewId",messaging_policy_version as policy,work_bot_id as "botId",work_bot_key as "botKey",work_chat_id as "chatId" from expert_card_drafts where user_id=${userId}::uuid for update`,
+        )
+      ).rows[0] ?? null
+    );
+  }
+  private async ensureDraft(
+    tx: ExpertCardTransaction,
+    userId: string,
+    scope: ExpertPromoScope,
+  ) {
+    let draft = await this.draft(tx, userId);
+    if (!draft) {
+      const app = await paidApplication(tx, userId);
+      if (!app) return fail("card_forbidden");
+      await tx.execute(
+        sql`insert into expert_card_drafts(application_id,user_id,messaging_policy_version,work_bot_id,work_bot_key,work_chat_id) values(${app.applicationId}::uuid,${userId}::uuid,${this.policy.messagingConsentPolicyVersion},${scope.botId},${scope.botKey},${scope.chatId})`,
+      );
+      draft = await this.draft(tx, userId);
+    }
+    if (
+      !draft ||
+      draft.botId !== scope.botId ||
+      draft.botKey !== scope.botKey ||
+      draft.chatId !== scope.chatId
+    )
+      return fail("card_forbidden");
+    return draft;
+  }
+  private async workflow(
+    tx: ExpertCardTransaction,
+    userId: string,
+    applicationId: string,
+  ): Promise<CardWorkflow> {
+    const row = (
+      await tx.execute<{
+        draftId: string;
+        revision: number;
+        status: CardStatus;
+        entryCount: number;
+        materialStatus: CardWorkflow["materialStatus"];
+        promoConfirmed: boolean;
+      }>(
+        sql`select d.id as "draftId",d.revision,d.status,(select count(*)::int from expert_card_entries e where e.draft_id=d.id) as "entryCount",coalesce((select case when j.status='cancelled' then 'none' else j.status end from expert_card_material_jobs j where j.review_id=d.approved_review_id),'none') as "materialStatus",expert_card_activation_gate_valid(d.user_id,d.approved_review_id) as "promoConfirmed" from expert_card_drafts d where d.user_id=${userId}::uuid and d.application_id=${applicationId}::uuid`,
+      )
+    ).rows[0];
+    const active =
+      (
+        await tx.execute<{ active: boolean }>(
+          sql`select exists(select 1 from experts e join experts_published p on p.expert_id=e.id and p.user_id=e.user_id and p.active and p.next_billing_date>clock_timestamp() where e.user_id=${userId}::uuid and e.active and e.verified and exists(select 1 from expert_residency_orders o where o.expert_id=e.id and o.status='settled' and o.residency_starts_at<=clock_timestamp() and o.residency_ends_at>clock_timestamp())) as active`,
+        )
+      ).rows[0]?.active === true;
+    return {
+      applicationId,
+      draftId: row?.draftId ?? null,
+      revision: row?.revision ?? 0,
+      status: row?.status ?? "collecting",
+      entryCount: row?.entryCount ?? 0,
+      materialStatus: row?.materialStatus ?? "none",
+      promoConfirmed: row?.promoConfirmed ?? false,
+      activeResident: active,
+    };
+  }
+  async getWorkflow(scope: ExpertPromoScope): Promise<CardWorkflow | null> {
+    const input = { ...scope };
+    if (!this.work(input)) return null;
+    return this.tx(async (tx) => {
+      const identity = await owner(
+        tx,
+        input,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      return identity
+        ? this.workflow(tx, identity.userId, identity.applicationId)
+        : null;
+    });
+  }
+  private async ownerAction(
+    raw: ExpertCardEvent,
+    operation: Operation,
+    semantic: unknown,
+    action: (tx: ExpertCardTransaction, draft: DraftRow) => Promise<void>,
+  ) {
+    const event = normalizeCardEvent(raw);
+    if (!this.work(event)) fail("card_forbidden");
+    return this.tx(async (tx) => {
+      const started = await beginCardRequest(tx, event, operation, semantic);
+      if (
+        !(await originalConsent(
+          tx,
+          started.userId,
+          this.policy.messagingConsentPolicyVersion,
+        ))
+      )
+        fail("card_forbidden");
+      const app = await paidApplication(tx, started.userId);
+      if (!app) return fail("card_forbidden");
+      if (started.replay)
+        return {
+          ...(await this.workflow(tx, started.userId, app.applicationId)),
+          replay: true,
+        };
+      const draft = await this.ensureDraft(tx, started.userId, event);
+      await action(tx, draft);
+      await finishCardRequest(tx, started, draft.id);
+      return {
+        ...(await this.workflow(tx, started.userId, app.applicationId)),
+        replay: false,
+      };
+    });
+  }
+  async addEntry(
+    raw: ExpertCardEvent & { expectedRevision: number; entry: CardEntry },
+  ) {
+    const event = normalizeCardEvent(raw);
+    const entry = decodeCardEntry(raw.entry);
+    const expected = raw.expectedRevision;
+    this.revision(expected);
+    return this.ownerAction(event, "entry", { entry }, async (tx, draft) => {
+      if (draft.revision !== expected) fail("card_revision_conflict");
+      if (!["collecting", "changes_requested"].includes(draft.status))
+        fail("card_state_conflict");
+      const count = (
+        await tx.execute<{ n: number }>(
+          sql`select count(*)::int n from expert_card_entries where draft_id=${draft.id}::uuid`,
+        )
+      ).rows[0]!.n;
+      if (count >= 100) fail("card_state_conflict");
+      await tx.execute(
+        sql`insert into expert_card_entries(draft_id,user_id,revision,kind,text_content,media_reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision + 1},${entry.kind},${entry.kind === "text" ? entry.text : null},${entry.kind === "text" ? null : entry.reference})`,
+      );
+      await tx.execute(
+        sql`update expert_card_drafts set revision=revision+1,status='collecting',public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+      );
+      await this.invalidateJobs(tx, draft.id);
+    });
+  }
+  async submitDraft(raw: ExpertCardEvent & { expectedRevision: number }) {
+    const event = normalizeCardEvent(raw);
+    const expected = raw.expectedRevision;
+    this.revision(expected);
+    return this.ownerAction(
+      event,
+      "submit",
+      { revision: expected },
+      async (tx, draft) => {
+        if (draft.revision !== expected) fail("card_revision_conflict");
+        if (!["collecting", "changes_requested"].includes(draft.status))
+          fail("card_state_conflict");
+        const count = (
+          await tx.execute<{ n: number }>(
+            sql`select count(*)::int n from expert_card_entries where draft_id=${draft.id}::uuid`,
+          )
+        ).rows[0]!.n;
+        if (count < 1) fail("card_state_conflict");
+        await tx.execute(
+          sql`update expert_card_drafts set status='manager_review',updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_applications set onboarding_stage='manager_review',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
+        );
+      },
+    );
+  }
+  async submitPromoProof(
+    raw: ExpertCardEvent & { expectedRevision: number; proof: CardPromoProof },
+  ) {
+    const event = normalizeCardEvent(raw);
+    const proof = decodeCardPromoProof(raw.proof);
+    const expected = raw.expectedRevision;
+    this.revision(expected);
+    return this.ownerAction(
+      event,
+      "promo_proof",
+      { proof, revision: expected },
+      async (tx, draft) => {
+        if (draft.revision !== expected) fail("card_revision_conflict");
+        if (draft.status !== "approved" || !draft.approvedReviewId)
+          fail("card_state_conflict");
+        const delivered = (
+          await tx.execute<{ ready: boolean }>(
+            sql`select exists(select 1 from expert_card_material_jobs where review_id=${draft.approvedReviewId}::uuid and revision=${expected} and status='delivered' and delivery_receipt is not null) as ready`,
+          )
+        ).rows[0]?.ready;
+        if (delivered !== true) fail("card_gate_unavailable");
+        const n = (
+          await tx.execute<{ n: number }>(
+            sql`select count(*)::int n from expert_card_promo_proofs where review_id=${draft.approvedReviewId}::uuid`,
+          )
+        ).rows[0]!.n;
+        if (n >= 50) fail("card_state_conflict");
+        await tx.execute(
+          sql`insert into expert_card_promo_proofs(draft_id,user_id,review_id,revision,kind,reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.approvedReviewId}::uuid,${expected},${proof.kind},${proof.reference})`,
+        );
+      },
+    );
+  }
+  private async invalidateJobs(tx: ExpertCardTransaction, draftId: string) {
+    await tx.execute(
+      sql`update expert_card_material_jobs set status='cancelled' where draft_id=${draftId}::uuid and status in ('waiting_content','pending') and attempt_id is null`,
+    );
+    await tx.execute(
+      sql`update experts_published set active=false,updated_at=clock_timestamp() where draft_id=${draftId}::uuid and active=true`,
+    );
+  }
+  async listDrafts(sessionHash: string, limit = 50) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+      fail("card_invalid_event");
+    return this.tx(async (tx) => {
+      await lockExpertManagerAuthority(tx, sessionHash);
+      const identities = (
+        await tx.execute<{ userId: string; applicationId: string }>(
+          sql`select d.user_id as "userId",d.application_id as "applicationId" from expert_card_drafts d join users u on u.id=d.user_id and u.active=true order by d.updated_at,d.id limit ${limit}`,
+        )
+      ).rows;
+      const result: CardWorkflow[] = [];
+      for (const row of identities) {
+        const summary = await this.workflow(tx, row.userId, row.applicationId);
+        if (summary.draftId !== null) result.push(summary);
+      }
+      return result;
+    });
+  }
+  async readDraft(sessionHash: string, applicationId: string) {
+    if (!id.test(applicationId)) fail("card_invalid_event");
+    return this.tx(async (tx) => {
+      await lockExpertManagerAuthority(tx, sessionHash);
+      const initial = (
+        await tx.execute<{ userId: string }>(
+          sql`select user_id as "userId" from expert_card_drafts where application_id=${applicationId}::uuid`,
+        )
+      ).rows[0];
+      if (!initial) return null;
+      await lockClientConsentSubject(tx, initial.userId);
+      await lockExpertManagerAuthority(tx, sessionHash);
+      if (
+        !(await originalConsent(
+          tx,
+          initial.userId,
+          this.policy.messagingConsentPolicyVersion,
+        )) ||
+        !(await paidApplication(tx, initial.userId))
+      )
+        return null;
+      const draft = await this.draft(tx, initial.userId);
+      if (!draft) return null;
+      const entries = (
+        await tx.execute<{
+          id: string;
+          kind: CardEntry["kind"];
+          text: string | null;
+          reference: string | null;
+          revision: number;
+        }>(
+          sql`select id,kind,text_content as text,media_reference as reference,revision from expert_card_entries where draft_id=${draft.id}::uuid order by revision,id limit 100`,
+        )
+      ).rows;
+      const materials =
+        (
+          await tx.execute<{
+            jobId: string;
+            status: string;
+            contentVersion: string | null;
+          }>(
+            sql`select id as "jobId",status,content_version as "contentVersion" from expert_card_material_jobs where draft_id=${draft.id}::uuid order by created_at desc,id desc limit 1`,
+          )
+        ).rows[0] ?? null;
+      const promoProofs = (
+        await tx.execute<{
+          id: string;
+          kind: CardPromoProof["kind"];
+          reference: string;
+          revision: number;
+          reviewId: string;
+        }>(
+          sql`select id,kind,reference,revision,review_id as "reviewId" from expert_card_promo_proofs where draft_id=${draft.id}::uuid and review_id=${draft.approvedReviewId}::uuid order by created_at,id limit 50`,
+        )
+      ).rows;
+      return {
+        ...(await this.workflow(tx, draft.userId, draft.applicationId)),
+        entries,
+        publicCard: draft.publicCard,
+        approvedReviewId: draft.approvedReviewId,
+        materials,
+        promoProofs,
+      };
+    });
+  }
+  private async staffAction(
+    input: StaffCommand,
+    operation: "edit_public" | "approve" | "return_changes" | "confirm_promo",
+    payload: unknown,
+    action: (
+      tx: ExpertCardTransaction,
+      draft: DraftRow,
+      managerId: string,
+    ) => Promise<string | undefined>,
+  ) {
+    this.revision(input.expectedRevision);
+    if (
+      !id.test(input.applicationId) ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(input.idempotencyKey)
+    )
+      fail("card_invalid_event");
+    const semantic = sha(
+      canonical({
+        operation,
+        applicationId: input.applicationId,
+        revision: input.expectedRevision,
+        payload,
+      }),
+    );
+    return this.tx(async (tx) => {
+      const managerId = await lockExpertManagerAuthority(tx, input.sessionHash);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`card-staff:${managerId}:${input.idempotencyKey}`},0))`,
+      );
+      const initial = (
+        await tx.execute<{ userId: string }>(
+          sql`select user_id as "userId" from expert_card_drafts where application_id=${input.applicationId}::uuid`,
+        )
+      ).rows[0];
+      if (!initial) return fail("card_state_conflict");
+      await lockClientConsentSubject(tx, initial.userId);
+      await lockExpertManagerAuthority(tx, input.sessionHash);
+      if (
+        !(await originalConsent(
+          tx,
+          initial.userId,
+          this.policy.messagingConsentPolicyVersion,
+        )) ||
+        !(await paidApplication(tx, initial.userId))
+      )
+        fail("card_forbidden");
+      const draft = await this.draft(tx, initial.userId);
+      if (!draft) return fail("card_state_conflict");
+      const prior = (
+        await tx.execute<{
+          draftId: string;
+          operation: string;
+          semantic: string;
+          resultId: string | null;
+        }>(
+          sql`select draft_id as "draftId",operation,semantic_digest as semantic,result_id as "resultId" from expert_card_staff_actions where manager_id=${managerId}::uuid and idempotency_key=${input.idempotencyKey}`,
+        )
+      ).rows[0];
+      if (prior) {
+        if (
+          prior.draftId !== draft.id ||
+          prior.operation !== operation ||
+          prior.semantic !== semantic
+        )
+          fail("card_idempotency_conflict");
+        return {
+          ...(await this.workflow(tx, draft.userId, draft.applicationId)),
+          ...(prior.resultId ? { reviewId: prior.resultId } : {}),
+          replay: true,
+        };
+      }
+      if (draft.revision !== input.expectedRevision)
+        fail("card_revision_conflict");
+      const resultId = await action(tx, draft, managerId);
+      await tx.execute(
+        sql`insert into expert_card_staff_actions(manager_id,idempotency_key,draft_id,operation,semantic_digest,result_id) values(${managerId}::uuid,${input.idempotencyKey},${draft.id}::uuid,${operation},${semantic},${resultId ?? null}::uuid)`,
+      );
+      await tx.execute(
+        sql`insert into audit_events(actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values('admin',${managerId}::uuid,${input.sessionHash},${`expert_card.${operation}`},'expert_card_draft',${draft.id}::uuid,'applied','card_review',${`card:${semantic}`},clock_timestamp(),${semantic})`,
+      );
+      return {
+        ...(await this.workflow(tx, draft.userId, draft.applicationId)),
+        ...(resultId ? { reviewId: resultId } : {}),
+        replay: false,
+      };
+    });
+  }
+  async editPublicCard(raw: StaffCommand & { publicCard: ProfessionalCard }) {
+    const input = { ...raw };
+    const publicCard = decodeProfessionalCard(raw.publicCard);
+    return this.staffAction(
+      input,
+      "edit_public",
+      publicCard,
+      async (tx, draft) => {
+        if (
+          !["manager_review", "changes_requested", "approved"].includes(
+            draft.status,
+          )
+        )
+          fail("card_state_conflict");
+        await tx.execute(
+          sql`update expert_card_drafts set public_payload=${JSON.stringify(publicCard)}::jsonb,revision=revision+1,status='manager_review',approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        );
+        await this.invalidateJobs(tx, draft.id);
+        return undefined;
+      },
+    );
+  }
+  async reviewCard(
+    raw: StaffCommand & { action: "approve" | "return_changes" },
+  ) {
+    const input = { ...raw };
+    if (input.action !== "approve" && input.action !== "return_changes")
+      fail("card_invalid_event");
+    return this.staffAction(
+      input,
+      input.action,
+      null,
+      async (tx, draft, managerId) => {
+        if (
+          !["manager_review", "approved"].includes(draft.status) ||
+          (input.action === "approve" &&
+            (draft.status !== "manager_review" || !draft.publicCard))
+        )
+          fail("card_state_conflict");
+        if (draft.publicCard) decodeProfessionalCard(draft.publicCard);
+        const review = (
+          await tx.execute<{ id: string }>(
+            sql`insert into expert_card_reviews(draft_id,user_id,revision,action,public_payload,public_digest,manager_id,manager_session_hash) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision},${input.action},${input.action === "approve" ? JSON.stringify(draft.publicCard) : null}::jsonb,${input.action === "approve" ? sql`'sha256:'||encode(digest(${JSON.stringify(draft.publicCard)}::jsonb::text,'sha256'),'hex')` : sql`null`},${managerId}::uuid,${input.sessionHash}) returning id`,
+          )
+        ).rows[0]!;
+        if (input.action === "approve") {
+          await tx.execute(
+            sql`update expert_card_drafts set status='approved',approved_review_id=${review.id}::uuid,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+          );
+          await tx.execute(
+            sql`insert into expert_card_material_jobs(draft_id,user_id,review_id,revision,target_bot_id,target_chat_id) values(${draft.id}::uuid,${draft.userId}::uuid,${review.id}::uuid,${draft.revision},${draft.botId},${draft.chatId})`,
+          );
+          await tx.execute(
+            sql`update expert_onboarding_applications set onboarding_stage='promo_check',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
+          );
+        } else {
+          await tx.execute(
+            sql`update expert_card_drafts set status='changes_requested',approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+          );
+          await this.invalidateJobs(tx, draft.id);
+        }
+        return review.id;
+      },
+    );
+  }
+  async confirmPromo(raw: StaffCommand) {
+    const input = { ...raw };
+    return this.staffAction(
+      input,
+      "confirm_promo",
+      null,
+      async (tx, draft, managerId) => {
+        if (draft.status !== "approved" || !draft.approvedReviewId)
+          fail("card_state_conflict");
+        const ready = (
+          await tx.execute<{ ready: boolean }>(
+            sql`select exists(select 1 from expert_card_material_jobs where review_id=${draft.approvedReviewId}::uuid and revision=${draft.revision} and status='delivered' and delivery_receipt is not null) and exists(select 1 from expert_card_promo_proofs where review_id=${draft.approvedReviewId}::uuid) as ready`,
+          )
+        ).rows[0]?.ready;
+        if (ready !== true) fail("card_gate_unavailable");
+        await tx.execute(
+          sql`insert into expert_card_promo_confirmations(draft_id,user_id,review_id,revision,proof_digest,manager_id,manager_session_hash) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.approvedReviewId}::uuid,${draft.revision},expert_card_proof_digest(${draft.id}::uuid,${draft.approvedReviewId}::uuid),${managerId}::uuid,${input.sessionHash}) on conflict(review_id,proof_digest) do nothing`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_applications set onboarding_stage='payment_ready',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
+        );
+        return draft.approvedReviewId!;
+      },
+    );
+  }
+  async issueWorkHandoff(raw: ExpertCardEvent) {
+    const event = normalizeCardEvent(raw);
+    return this.tx(async (tx) => {
+      const started = await beginCardRequest(tx, event, "handoff_issue", {
+        targetBotId: this.policy.workBotId,
+      });
+      if (started.replay) return { kind: "duplicate" as const };
+      const identity = await owner(
+        tx,
+        event,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return fail("card_forbidden");
+      await tx.execute(
+        sql`update expert_card_handoffs set consumed_at=clock_timestamp() where user_id=${identity.userId}::uuid and consumed_at is null`,
+      );
+      const token = randomBytes(32).toString("base64url");
+      const row = (
+        await tx.execute<{ expiresAt: string }>(
+          sql`insert into expert_card_handoffs(token_digest,user_id,application_id,source_bot_key,external_id,target_bot_id,target_bot_key) values(${`sha256:${sha(token)}`},${identity.userId}::uuid,${identity.applicationId}::uuid,${event.botKey},${event.telegramUserId},${this.policy.workBotId},${this.policy.workBotKey}) returning to_char(expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "expiresAt"`,
+        )
+      ).rows[0]!;
+      await finishCardRequest(tx, started, identity.applicationId);
+      return { kind: "issued" as const, token, expiresAt: row.expiresAt };
+    });
+  }
+  async redeemWorkHandoff(raw: ExpertCardEvent & { token: string }) {
+    const event = normalizeCardEvent(raw);
+    const token = raw.token;
+    if (
+      !this.work(event) ||
+      typeof token !== "string" ||
+      !/^[A-Za-z0-9_-]{43}$/u.test(token)
+    )
+      fail("card_handoff_unavailable");
+    const tokenDigest = `sha256:${sha(token)}`;
+    const semanticDigest = sha(canonical({ tokenDigest }));
+    return this.tx(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`card:${event.botId}:${event.updateId}`},0))`,
+      );
+      const receipt = (
+        await tx.execute<{
+          userId: string | null;
+          operation: string;
+          requestDigest: string;
+          semanticDigest: string;
+          resultId: string | null;
+        }>(
+          sql`select user_id as "userId",operation,request_digest as "requestDigest",semantic_digest as "semanticDigest",result_id as "resultId" from expert_card_requests where bot_id=${event.botId} and update_id=${event.updateId}`,
+        )
+      ).rows[0];
+      if (receipt) {
+        if (
+          !receipt.userId ||
+          receipt.operation !== "handoff_redeem" ||
+          receipt.requestDigest !== event.requestDigest ||
+          receipt.semanticDigest !== semanticDigest
+        )
+          fail("card_idempotency_conflict");
+        const identity = await owner(
+          tx,
+          event,
+          this.policy.messagingConsentPolicyVersion,
+        );
+        if (!identity || identity.userId !== receipt.userId)
+          return fail("card_forbidden");
+        return {
+          kind: "duplicate" as const,
+          applicationId: identity.applicationId,
+          userId: identity.userId,
+        };
+      }
+      const candidate = (
+        await tx.execute<{ userId: string }>(
+          sql`select user_id as "userId" from expert_card_handoffs where token_digest=${tokenDigest}`,
+        )
+      ).rows[0];
+      if (!candidate) return fail("card_handoff_unavailable");
+      await lockClientConsentSubject(tx, candidate.userId);
+      const row = (
+        await tx.execute<{
+          userId: string;
+          applicationId: string;
+          sourceBotKey: string;
+          externalId: string;
+          botId: string;
+          botKey: string;
+          consumed: boolean;
+        }>(
+          sql`select user_id as "userId",application_id as "applicationId",source_bot_key as "sourceBotKey",external_id as "externalId",target_bot_id as "botId",target_bot_key as "botKey",consumed_at is not null as consumed from expert_card_handoffs where token_digest=${tokenDigest} for update`,
+        )
+      ).rows[0];
+      const valid = (
+        await tx.execute<{ valid: boolean }>(
+          sql`select expires_at>clock_timestamp() as valid from expert_card_handoffs where token_digest=${tokenDigest}`,
+        )
+      ).rows[0]?.valid;
+      if (
+        !row ||
+        row.consumed ||
+        valid !== true ||
+        row.botId !== event.botId ||
+        row.botKey !== event.botKey ||
+        row.externalId !== event.telegramUserId
+      )
+        return fail("card_handoff_unavailable");
+      const source = await owner(
+        tx,
+        {
+          botKey: row.sourceBotKey,
+          botId: event.botId,
+          telegramUserId: row.externalId,
+          chatId: row.externalId,
+        },
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (
+        !source ||
+        source.userId !== row.userId ||
+        source.applicationId !== row.applicationId
+      )
+        return fail("card_forbidden");
+      const target = (
+        await tx.execute<{ userId: string; status: string }>(
+          sql`select user_id as "userId",status from channel_identities where provider='telegram' and bot_key=${event.botKey} and external_id=${event.telegramUserId} and external_chat_id=${event.chatId} order by id limit 2 for update`,
+        )
+      ).rows;
+      if (
+        target.length > 1 ||
+        (target[0] &&
+          (target[0].userId !== row.userId || target[0].status !== "active"))
+      )
+        return fail("card_forbidden");
+      if (!target.length)
+        await tx.execute(
+          sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${row.userId}::uuid,'telegram',${event.telegramUserId},${event.botKey},${event.chatId},'active')`,
+        );
+      await tx.execute(
+        sql`update expert_card_handoffs set consumed_at=clock_timestamp() where token_digest=${tokenDigest}`,
+      );
+      const started = await startKnownRequest(
+        tx,
+        event,
+        row.userId,
+        "handoff_redeem",
+        semanticDigest,
+      );
+      await finishCardRequest(tx, started, row.applicationId);
+      return {
+        kind: "linked" as const,
+        applicationId: row.applicationId,
+        userId: row.userId,
+      };
+    });
+  }
+  async listDueMaterialJobs(limit = 25): Promise<readonly { jobId: string }[]> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50)
+      fail("card_invalid_event");
+    return this.tx(
+      async (tx) =>
+        (
+          await tx.execute<{ jobId: string }>(
+            sql`select j.id as "jobId" from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join users u on u.id=j.user_id and u.active=true where j.status in ('waiting_content','pending') and j.attempt_id is null and exists(select 1 from expert_card_material_templates t where t.status='approved') order by j.created_at,j.id limit ${limit}`,
+          )
+        ).rows,
+    );
+  }
+  private async materialJob(tx: ExpertCardTransaction, jobId: string) {
+    const initial = (
+      await tx.execute<{ userId: string }>(
+        sql`select user_id as "userId" from expert_card_material_jobs where id=${jobId}::uuid`,
+      )
+    ).rows[0];
+    if (!initial) return null;
+    await lockClientConsentSubject(tx, initial.userId);
+    const row = (
+      await tx.execute<{
+        id: string;
+        userId: string;
+        draftId: string;
+        reviewId: string;
+        revision: number;
+        status: string;
+        attemptId: string | null;
+        contentVersion: string | null;
+        templateId: string | null;
+        botId: string;
+        botKey: string;
+        chatId: string;
+        publicCard: ProfessionalCard;
+        payloadDigest: string | null;
+        policy: string;
+      }>(
+        sql`select j.id,j.user_id as "userId",j.draft_id as "draftId",j.review_id as "reviewId",j.revision,j.status,j.attempt_id as "attemptId",j.content_version as "contentVersion",j.template_id as "templateId",d.work_bot_id as "botId",d.work_bot_key as "botKey",d.work_chat_id as "chatId",r.public_payload as "publicCard",j.payload_digest as "payloadDigest",d.messaging_policy_version as policy from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.user_id=j.user_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join expert_card_reviews r on r.id=j.review_id and r.draft_id=d.id and r.revision=d.revision and r.action='approve' join users u on u.id=j.user_id and u.active=true where j.id=${jobId}::uuid and j.target_bot_id=d.work_bot_id and j.target_chat_id=d.work_chat_id for update of j,d for share of r,u`,
+      )
+    ).rows[0];
+    if (
+      !row ||
+      row.botId !== this.policy.workBotId ||
+      row.botKey !== this.policy.workBotKey ||
+      row.policy !== this.policy.messagingConsentPolicyVersion ||
+      !(await paidApplication(tx, row.userId))
+    )
+      return null;
+    const identity = await owner(
+      tx,
+      {
+        botKey: row.botKey,
+        botId: row.botId,
+        telegramUserId: row.chatId,
+        chatId: row.chatId,
+      },
+      this.policy.messagingConsentPolicyVersion,
+    );
+    return identity && identity.userId === row.userId ? row : null;
+  }
+  private materialPayload(
+    template: { text: string; assets: unknown },
+    publicCard: ProfessionalCard,
+  ): ExpertCardMaterialPayload {
+    const card = decodeProfessionalCard(publicCard);
+    if (
+      typeof template.text !== "string" ||
+      !Array.isArray(template.assets) ||
+      template.assets.length > 8
+    )
+      fail("card_content_unavailable");
+    const text = template.text.replace(
+      /\{\{\s*(displayName|profession|city|summary)\s*\}\}/gu,
+      (_match, key: keyof ProfessionalCard) => card[key],
+    );
+    if (
+      !text.trim() ||
+      text.length > 4000 ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(text) ||
+      /\{\{|\}\}/u.test(text)
+    )
+      fail("card_content_unavailable");
+    const rawAssets = template.assets;
+    if (!Array.isArray(rawAssets)) return fail("card_content_unavailable");
+    const assets = rawAssets.map((value: unknown) => {
+      const asset = decodeCardEntry(value);
+      if (asset.kind === "text") return fail("card_content_unavailable");
+      return { kind: asset.kind, reference: asset.reference };
+    });
+    return { text, assets };
+  }
+  async deliverMaterials(
+    jobId: string,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<{
+    kind:
+      | "delivered"
+      | "already_delivered"
+      | "waiting_content"
+      | "unknown_outcome"
+      | "cancelled"
+      | "unavailable";
+  }> {
+    if (!id.test(jobId)) fail("card_invalid_event");
+    if (options.signal?.aborted) return { kind: "cancelled" };
+    if (!this.transport) return { kind: "unavailable" };
+    // A committed attempt is quarantine, NOT permission to disclose. Each actual
+    // send below re-acquires current original consent and owns its barrier.
+    const prepared = await this.tx(async (tx) => {
+      const job = await this.materialJob(tx, jobId);
+      if (!job) return { kind: "cancelled" as const };
+      if (job.status === "delivered")
+        return { kind: "already_delivered" as const };
+      if (job.attemptId || job.status === "unknown_outcome")
+        return { kind: "unknown_outcome" as const };
+      if (job.status === "cancelled") return { kind: "cancelled" as const };
+      const template = (
+        await tx.execute<{
+          id: string;
+          version: string;
+          text: string;
+          assets: unknown;
+        }>(
+          sql`select id,content_version as version,text_body as text,assets from expert_card_material_templates where status='approved' order by created_at desc,id desc limit 1 for share`,
+        )
+      ).rows[0];
+      if (!template) return { kind: "waiting_content" as const };
+      const payload = this.materialPayload(template, job.publicCard);
+      const payloadDigest = `sha256:${sha(JSON.stringify(payload))}`;
+      const attemptId = randomUUID();
+      await tx.execute(
+        sql`update expert_card_material_jobs set template_id=${template.id}::uuid,content_version=${template.version},payload_digest=${payloadDigest},expected_message_count=${1 + payload.assets.length},attempt_id=${attemptId}::uuid,attempt_started_at=clock_timestamp(),status='unknown_outcome' where id=${jobId}::uuid`,
+      );
+      return {
+        kind: "prepared" as const,
+        attemptId,
+        payload,
+        payloadDigest,
+        version: template.version,
+      };
+    });
+    if (prepared.kind !== "prepared") return prepared;
+    return this.tx(async (tx) => {
+      const job = await this.materialJob(tx, jobId);
+      if (!job) return { kind: "cancelled" as const };
+      if (
+        job.attemptId !== prepared.attemptId ||
+        job.contentVersion !== prepared.version ||
+        job.payloadDigest !== prepared.payloadDigest
+      )
+        return { kind: "unknown_outcome" as const };
+      const selectedTemplate = (
+        await tx.execute<{
+          id: string;
+          version: string;
+          text: string;
+          assets: unknown;
+        }>(
+          sql`select id,content_version as version,text_body as text,assets from expert_card_material_templates where id=${job.templateId}::uuid and content_version=${prepared.version} and status='approved' for share`,
+        )
+      ).rows[0];
+      if (
+        !selectedTemplate ||
+        `sha256:${sha(JSON.stringify(this.materialPayload(selectedTemplate, job.publicCard)))}` !==
+          prepared.payloadDigest
+      )
+        return { kind: "unknown_outcome" as const };
+      if (options.signal?.aborted) return { kind: "unknown_outcome" as const };
+      const signal = options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(8000)])
+        : AbortSignal.timeout(8000);
+      try {
+        const receipt = await this.transport!.send({
+          botId: job.botId,
+          botKey: job.botKey,
+          userId: job.userId,
+          chatId: job.chatId,
+          reviewId: job.reviewId,
+          revision: job.revision,
+          contentVersion: prepared.version,
+          payloadDigest: prepared.payloadDigest,
+          payload: prepared.payload,
+          signal,
+        });
+        if (
+          signal.aborted ||
+          receipt.botId !== job.botId ||
+          receipt.chatId !== job.chatId ||
+          receipt.contentVersion !== prepared.version ||
+          receipt.payloadDigest !== prepared.payloadDigest ||
+          !Array.isArray(receipt.messageIds) ||
+          receipt.messageIds.length !== 1 + prepared.payload.assets.length ||
+          new Set(receipt.messageIds).size !== receipt.messageIds.length ||
+          receipt.messageIds.some(
+            (value) =>
+              typeof value !== "string" || !/^[1-9]\d{0,19}$/u.test(value),
+          )
+        )
+          return { kind: "unknown_outcome" as const };
+        const boundReceipt = {
+          messageIds: [...receipt.messageIds],
+          botId: receipt.botId,
+          chatId: receipt.chatId,
+          contentVersion: receipt.contentVersion,
+          payloadDigest: receipt.payloadDigest,
+        };
+        await tx.execute(
+          sql`update expert_card_material_jobs set status='delivered',delivery_receipt=${JSON.stringify(boundReceipt)}::jsonb,delivered_at=clock_timestamp() where id=${jobId}::uuid and attempt_id=${prepared.attemptId}::uuid`,
+        );
+        return { kind: "delivered" as const };
+      } catch {
+        return { kind: "unknown_outcome" as const };
+      }
+    });
+  }
+}

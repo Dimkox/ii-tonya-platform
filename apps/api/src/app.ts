@@ -1,3 +1,8 @@
+import { expertCardAdminRoutes } from "./routes/expert-cards.js";
+import {
+  assertExpertCardCapability,
+  type ExpertCardCapability,
+} from "./expert-card-composition.js";
 import { expertVerificationRoutes } from "./routes/expert-verification.js";
 import {
   assertExpertVerificationCapability,
@@ -115,6 +120,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertCard?: ExpertCardCapability;
   expertVerification?: ExpertVerificationCapability;
   expertApplicantTelegram?: ExpertApplicantTelegramCapability;
   expertSession?: ExpertBrowserOptions;
@@ -268,6 +274,12 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertExpertCardCapability(deps.config, deps.expertCard);
+  if (
+    deps.config.features.expertCard === true &&
+    deps.expertCard?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_card_webhook_scope_conflict");
   assertExpertVerificationCapability(deps.config, deps.expertVerification);
   assertExpertApplicantCapability(deps.config, deps.expertApplicantTelegram);
   if (
@@ -390,6 +402,12 @@ export async function buildApp(
         deps.expertVerification.onboardingWebhook)
   )
     throw new Error("expert_verification_merchant_callback_required");
+  if (
+    deps.config.features.expertCard === true &&
+    deps.config.expertCard?.mainCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_card_merchant_callback_required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -590,6 +608,10 @@ export async function buildApp(
     },
     rateLimiter: deps.rateLimiter,
   });
+  await app.register(expertCardAdminRoutes, {
+    enabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { service: deps.expertCard.admin } : {}),
+  });
   await app.register(expertVerificationRoutes, {
     enabled: deps.config.features.expertVerification === true,
     ...(deps.expertVerification
@@ -603,6 +625,8 @@ export async function buildApp(
       : {}),
   });
   await app.register(telegramWebhookRoutes, {
+    expertCardEnabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { expertCard: deps.expertCard } : {}),
     ...(deps.config.features.clientPrivacy === true &&
     deps.config.features.clientErasureRequests === true &&
     deps.telegramDeletion

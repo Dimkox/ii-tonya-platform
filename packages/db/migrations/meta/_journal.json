@@ -379,6 +379,13 @@
       "when": 1791763200010,
       "tag": "0053_expert_verification_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791763200011,
+      "tag": "0054_expert_card_publication",
+      "breakpoints": true
     }
   ]
 }

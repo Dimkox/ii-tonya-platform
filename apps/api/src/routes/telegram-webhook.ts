@@ -1,3 +1,8 @@
+import {
+  validRawExpertCardUpdateId,
+  parseExpertCardTelegramUpdate,
+  type ExpertCardTelegramIngress,
+} from "../expert-card-telegram-ingress.js";
 import { createSecurityEvent } from "@ii-tonya/observability";
 import {
   handleTelegramDeletion,
@@ -183,9 +188,22 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientIngressReplay?: ClientIngressReplayRead | undefined;
   testExpertPromoEnabled?: boolean;
   testExpertPromo?: TelegramTestExpertPromoIngress;
+  expertCardEnabled?: boolean;
+  expertCard?: ExpertCardTelegramIngress;
   bookingCallbacksEnabled?: boolean;
   bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  if (
+    deps.expertCardEnabled === true &&
+    (!deps.expertCard ||
+      !Number.isSafeInteger(Number(deps.expertCard.workBotId)) ||
+      !/^[1-9][0-9]{0,15}$/u.test(deps.expertCard.workBotId) ||
+      !deps.expertCard.workBotKey ||
+      typeof deps.expertCard.service?.handleWork !== "function" ||
+      typeof deps.expertCard.legacyReplay?.read !== "function" ||
+      !secureEqual(deps.expertCard.webhookSecret, deps.secret))
+  )
+    throw new Error("expert_card_capability_required");
   const securityEvent = createSecurityEvent();
   app.addHook("onResponse", async (request, reply) => {
     if (
@@ -462,6 +480,13 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     "/v1/webhooks/telegram",
     {
       bodyLimit: 65_536,
+      preValidation: async (request, reply) => {
+        if (
+          deps.expertCardEnabled === true &&
+          !validRawExpertCardUpdateId(request.body)
+        )
+          return reply.code(400).send({ error: "invalid_update" });
+      },
       onRequest: async (request, reply) => {
         const header = request.headers["x-telegram-bot-api-secret-token"];
         if (
@@ -521,6 +546,60 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         return reply.code(429).send({ error: "rate_limited" });
       }
       if (await deletion(request.body, reply)) return;
+      if (deps.expertCardEnabled === true && deps.expertCard) {
+        const parsed = parseExpertCardTelegramUpdate(
+          request.body,
+          deps.expertCard,
+        );
+        if (parsed.kind === "invalid")
+          return reply.code(400).send({ error: "invalid_card_update" });
+        if (parsed.kind === "parsed") {
+          try {
+            const legacy = await deps.expertCard.legacyReplay.read({
+              botId: deps.expertCard.workBotId,
+              updateId: parsed.input.updateId,
+            });
+            if (legacy === "complete")
+              return { accepted: true, duplicate: true };
+            if (legacy !== "absent")
+              return reply
+                .code(503)
+                .send({ error: "expert_card_replay_unavailable" });
+          } catch {
+            return reply
+              .code(503)
+              .send({ error: "expert_card_replay_unavailable" });
+          }
+          if (
+            !deps.rateLimiter.consume(
+              `telegram:expert-card:${deps.expertCard.workBotId}:${parsed.input.telegramUserId}`,
+              20,
+              60000,
+            )
+          )
+            return reply.code(429).send({ error: "rate_limited" });
+          try {
+            const result = await deps.expertCard.service.handleWork(
+              parsed.input,
+            );
+            if (result.status === "handled")
+              return {
+                method: "sendMessage",
+                chat_id: parsed.input.chatId,
+                text: result.text,
+                protect_content: true,
+              };
+            if (result.status === "duplicate")
+              return { accepted: true, duplicate: true };
+            if (result.status === "rejected")
+              return reply.code(400).send({ error: "invalid_card_update" });
+            if (result.status !== "unhandled")
+              return reply.code(503).send({ error: "expert_card_unavailable" });
+          } catch {
+            return reply.code(503).send({ error: "expert_card_unavailable" });
+          }
+        }
+      }
       const body = request.body as Record<string, unknown>;
       const correlationId =
         typeof request.headers["x-correlation-id"] === "string"

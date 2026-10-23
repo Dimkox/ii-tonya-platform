@@ -1,3 +1,15 @@
+import {
+  parseMainCardCommand,
+  CardMainPaymentError,
+  type MainCardCheckoutCommand,
+} from "./expert-card-main-command.js";
+import {
+  beginMainCardCheckout,
+  assertMainCardPriorOrder,
+  recordMainCardOrder,
+  finishMainCardCheckout,
+  type MainCheckoutAdmission,
+} from "./expert-card-main-gates.js";
 import type { DrizzleDb } from "../client.js";
 import { sql } from "drizzle-orm";
 import { quoteResidency } from "@ii-tonya/domain";
@@ -75,6 +87,27 @@ export class PostgresExpertCampaignOrderRepository {
     const command = parseCommand(input);
     return this.createOrder(command);
   }
+  async createOnboardingCheckoutOrder(
+    raw: MainCardCheckoutCommand,
+    rawPolicy: {
+      providerMode: "test" | "live";
+      messagingConsentPolicyVersion: string;
+    },
+  ): Promise<ExpertCampaignOrder & { revision: number; replay: boolean }> {
+    const input = parseMainCardCommand(raw, "checkout");
+    const policy = Object.freeze({ ...rawPolicy });
+    if (
+      (policy.providerMode !== "test" && policy.providerMode !== "live") ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(
+        policy.messagingConsentPolicyVersion,
+      )
+    )
+      throw new CardMainPaymentError("card_main_configuration_invalid");
+    const order = await this.createOrder(null, undefined, { input, policy });
+    if (order.revision === undefined || order.replay === undefined)
+      throw new CardMainPaymentError("card_main_storage_unavailable");
+    return { ...order, revision: order.revision, replay: order.replay };
+  }
   async createCheckoutOrderWithReceipt(
     input: CreateExpertCampaignOrder & { receiptContactId: string },
   ): Promise<ExpertCampaignOrder> {
@@ -91,9 +124,16 @@ export class PostgresExpertCampaignOrderRepository {
     return this.createOrder(parseCommand(base), receiptContactId.toLowerCase());
   }
   private async createOrder(
-    command: CreateExpertCampaignOrder,
+    baseCommand: CreateExpertCampaignOrder | null,
     receiptContactId?: string,
-  ): Promise<ExpertCampaignOrder> {
+    main?: {
+      input: MainCardCheckoutCommand;
+      policy: {
+        providerMode: "test" | "live";
+        messagingConsentPolicyVersion: string;
+      };
+    },
+  ): Promise<ExpertCampaignOrder & { revision?: number; replay?: boolean }> {
     // Only this branch retries lock/deadlock failures. Every attempt owns a new
     // transaction, snapshot and all locks, including implicit FK row locks.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -101,6 +141,25 @@ export class PostgresExpertCampaignOrderRepository {
         return await this.db.transaction(
           async (tx) => {
             await tx.execute(sql`set local lock_timeout = '250ms'`);
+            let mainAdmission: MainCheckoutAdmission | undefined;
+            if (main)
+              mainAdmission = await beginMainCardCheckout(
+                tx,
+                main.input,
+                main.policy,
+              );
+            const command = mainAdmission
+              ? {
+                  userId: mainAdmission.request.userId,
+                  expertId: mainAdmission.acceptance.expertId,
+                  quoteId: mainAdmission.acceptance.quoteId,
+                  idempotencyKey: `card-main:${mainAdmission.acceptance.id}`,
+                }
+              : baseCommand;
+            if (!command)
+              throw new ExpertCampaignOrderError(
+                "EXPERT_CAMPAIGN_INVALID_INPUT",
+              );
             await lockClientConsentSubject(tx, command.userId);
             const user = (
               await tx.execute<{ active: boolean }>(
@@ -130,9 +189,9 @@ export class PostgresExpertCampaignOrderRepository {
               )
             ).rows[0];
             if (
-              !expert?.active ||
-              !expert.verified ||
-              expert.userId !== command.userId
+              !expert ||
+              expert.userId !== command.userId ||
+              (!mainAdmission && (!expert.active || !expert.verified))
             )
               throw new ExpertCampaignOrderError(
                 "EXPERT_CAMPAIGN_OWNER_INELIGIBLE",
@@ -187,6 +246,15 @@ export class PostgresExpertCampaignOrderRepository {
                 )
               )
                 prior.status = "expired";
+              if (mainAdmission) {
+                await assertMainCardPriorOrder(tx, mainAdmission, prior.id);
+                await finishMainCardCheckout(tx, mainAdmission, prior.id);
+                return {
+                  ...(await hydrate(tx, prior)),
+                  revision: mainAdmission.gate.revision,
+                  replay: mainAdmission.request.replay,
+                };
+              }
               return hydrate(tx, prior);
             }
             const used = (
@@ -296,6 +364,8 @@ export class PostgresExpertCampaignOrderRepository {
             ).rows[0];
             if (!saved)
               throw new ExpertCampaignOrderError("EXPERT_CAMPAIGN_STORAGE");
+            if (mainAdmission)
+              await recordMainCardOrder(tx, mainAdmission, saved.id);
             if (receiptContactId !== undefined)
               await tx.execute(
                 sql`insert into payer_receipt_order_bindings(order_id,contact_id,quote_id,user_id) values(${saved.id}::uuid,${receiptContactId}::uuid,${command.quoteId}::uuid,${command.userId}::uuid)`,
@@ -320,12 +390,24 @@ export class PostgresExpertCampaignOrderRepository {
             ).rows[0];
             if (!row)
               throw new ExpertCampaignOrderError("EXPERT_CAMPAIGN_STORAGE");
+            if (mainAdmission) {
+              await finishMainCardCheckout(tx, mainAdmission, row.id);
+              return {
+                ...(await hydrate(tx, row)),
+                revision: mainAdmission.gate.revision,
+                replay: mainAdmission.request.replay,
+              };
+            }
             return hydrate(tx, row);
           },
           { isolationLevel: "serializable" },
         );
       } catch (error) {
-        if (error instanceof ExpertCampaignOrderError) throw error;
+        if (
+          error instanceof ExpertCampaignOrderError ||
+          error instanceof CardMainPaymentError
+        )
+          throw error;
         if (error instanceof PayerReceiptError)
           throw new ExpertCampaignOrderError(
             "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",

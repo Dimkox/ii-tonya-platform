@@ -146,7 +146,7 @@ export class PostgresExpertPromoRepository {
         superseded: boolean;
         guideStatus: ExpertPromoRegistration["guideStatus"];
       }>(
-        sql`select c.ref_code as "refCode",(select count(*)::int from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=c.user_id) as "referralCount", exists(select 1 from expert_promo_bonus_indications b where b.user_id=c.user_id) as "hasBonus", exists(select 1 from expert_referral_reward_grants g join experts e on e.id=g.expert_id where e.user_id=c.user_id and g.amount_minor=100000) as superseded, coalesce((select status from expert_promo_guide_work w where w.user_id=c.user_id),'none') as "guideStatus" from expert_promo_codes c where c.user_id=${userId}::uuid`,
+        sql`select c.ref_code as "refCode",(select count(*)::int from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=c.user_id) as "referralCount", exists(select 1 from expert_promo_bonus_indications b where b.user_id=c.user_id) as "hasBonus", (exists(select 1 from expert_referral_reward_grants g join experts e on e.id=g.expert_id where e.user_id=c.user_id and g.amount_minor=100000) OR exists(select 1 from expert_referral_reward_maturities m join experts e on e.id=m.inviter_expert_id where e.user_id=c.user_id)) as superseded, coalesce((select status from expert_promo_guide_work w where w.user_id=c.user_id),'none') as "guideStatus" from expert_promo_codes c where c.user_id=${userId}::uuid`,
       )
     ).rows[0];
     if (!row) return fail("promo_registration_unavailable");

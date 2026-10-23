@@ -80,3 +80,27 @@ Compose configuration in memory; never dump/grep/print it, cached URLs, or env.
 The old transcript cannot be erased, but its credential no longer authenticates.
 No source, real environment, customer/provider credential or other container was
 changed. BlockB new focused PG-file count was0 when work resumed.
+
+## Block B local acceptance and Block C financial review
+
+Block B source is committed as dd73dfb30be327d1e3e86458826c956375834ece;
+its documentation checkpoint is 656cf89a025d46dfa6bc8e0cf92a3e6eee355c21.
+The lead reports the second focused verification invocation passed 23/23 on the
+isolated PostgreSQL17.5 environment. Two of three invocations are consumed; the
+third remains unused. These results establish local verification only.
+
+The coordinator independently read the new Block C main-payment gate helper,
+canonical settlement integration, financial DDL supplement, and original0048
+campaign constraint. Three findings were reported to the implementation lead:
+explicit verified-event/order binding and scalar snapshots; exact paid-order,
+review and activation-gate binding in the publication trigger; and deadline
+re-evaluation after newly introduced lock waits, including blocked paths.
+
+Source re-review confirms those findings are addressed: canonical inbox evidence
+is bound to the event and order; publication requires the main-order/review/digest
+and current card gate; every blocked path checks database time, and settlement
+preserves the expired-payment fact while refreshing its clock after main gates.
+The original0048 price, quote, tariff, TTL and snapshot checks remain present.
+The coordinator performed no edits to those implementation files, test runs,
+database probes or provider calls. This narrow source acceptance does not replace
+the lead's integration tests, wider independent reviews or release gates.

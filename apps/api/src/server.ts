@@ -1,3 +1,9 @@
+import {
+  createExpertCardComposition,
+  assertExpertCardCheckout,
+  type ExpertCardCompositionOptions,
+} from "./expert-card-composition.js";
+import { assertExpertCardConfig } from "@ii-tonya/config";
 import type { YooKassaWebhookDependencies } from "./routes/yookassa-webhook.js";
 import {
   createExpertVerificationComposition,
@@ -133,6 +139,7 @@ const disabledService = <T extends object>(name: string): T =>
 
 export const createDefaultLifecycle = (
   options: {
+    expertCard?: ExpertCardCompositionOptions;
     expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
     yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
     expertCodeSecretResolver?: {
@@ -175,6 +182,14 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertExpertCardConfig(config);
+    assertExpertCardCheckout(config, options.expertCard);
+    if (
+      config.features.expertCard === true &&
+      config.expertCard?.mainCheckoutEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_card_merchant_callback_required");
     assertExpertVerificationPayments(
       config,
       options.expertVerificationPayments,
@@ -541,10 +556,34 @@ export const createDefaultLifecycle = (
       config,
       options.expertVerificationPayments,
     );
-    const expertApplicantTelegram = createExpertApplicantComposition(
+    const expertCard = createExpertCardComposition(
+      db,
+      config,
+      options.expertCard,
+    );
+    const originalExpertApplicantTelegram = createExpertApplicantComposition(
       db,
       config,
     );
+    const expertApplicantTelegram =
+      originalExpertApplicantTelegram && expertCard
+        ? {
+            ...originalExpertApplicantTelegram,
+            service: {
+              async handle(
+                input: Parameters<
+                  typeof originalExpertApplicantTelegram.service.handle
+                >[0],
+              ) {
+                const result =
+                  await expertCard.service.handlePromoHandoff(input);
+                return result.status === "unhandled"
+                  ? originalExpertApplicantTelegram.service.handle(input)
+                  : result;
+              },
+            },
+          }
+        : originalExpertApplicantTelegram;
     const testExpertRepository = new PostgresTestExpertTelegramRepository(db, {
       messagingConsentPolicyVersion:
         config.clientMessagingConsentPolicyVersion ?? "unconfigured",
@@ -581,6 +620,7 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertCard ? { expertCard } : {}),
       ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),
       ...(expertVerification ? { expertVerification } : {}),
       ...(options.yookassaWebhook

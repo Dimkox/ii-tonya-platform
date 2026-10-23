@@ -266,3 +266,10 @@ export {
   type VerifiedOnboardingPayment,
 } from "./yookassa/onboarding-verifier.js";
 export { YooKassaOnboardingWebhookCapability } from "./yookassa/onboarding-webhook-capability.js";
+
+export {
+  createExpertMaterialTransport,
+  type ExpertMaterialSendInput,
+  type ExpertMaterialReceipt,
+  type ExpertMaterialTransport,
+} from "./telegram/expert-material-transport.js";

@@ -44,3 +44,5 @@ export {
   type YooKassaBoundControl,
   type YooKassaBoundReconciliationDependencies,
 } from "./yookassa-bound-reconciliation.js";
+
+export * from "./expert-card-materials.js";

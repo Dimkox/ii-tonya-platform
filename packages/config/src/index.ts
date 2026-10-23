@@ -10,3 +10,6 @@ export type { ExpertApplicantConfig } from "./expert-applicant-config.js";
 
 export { assertExpertVerificationConfig } from "./expert-verification-config.js";
 export type { ExpertVerificationConfig } from "./expert-verification-config.js";
+
+export { assertExpertCardConfig } from "./expert-card-config.js";
+export type { ExpertCardConfig } from "./expert-card-config.js";

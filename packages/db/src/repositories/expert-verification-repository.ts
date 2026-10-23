@@ -1,3 +1,7 @@
+import {
+  lockExpertManagerAuthority,
+  ExpertManagerAuthorityError,
+} from "./expert-manager-authority.js";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
@@ -81,31 +85,15 @@ export class PostgresExpertVerificationRepository {
     }
   }
   private async manager(tx: Tx, sessionHash: string): Promise<string> {
-    if (
-      typeof sessionHash !== "string" ||
-      sessionHash.length < 1 ||
-      sessionHash.length > 200
-    )
-      return fail("verification_forbidden");
-    // Lock original session/assignment/user rows, then check actual DB time after
-    // all waits. Caller-supplied principal roles never authorize this workflow.
-    const rows = (
-      await tx.execute<{ adminId: string }>(
-        sql`select s.admin_id as "adminId" from admin_sessions s join users u on u.id=s.admin_id join admin_role_assignments r on r.admin_id=s.admin_id and r.role in ('support','security_admin') where s.session_id_hash=${sessionHash} for share of s,u,r`,
-      )
-    ).rows;
-    const row = rows[0];
-    if (!row) return fail("verification_forbidden");
-    // Raw execute() returns PostgreSQL timestamps as strings. Keep temporal
-    // authority inside PostgreSQL, at full precision, AFTER the original locks.
-    const allowed = (
-      await tx.execute<{ authorized: boolean }>(
-        sql`with auth_clock as materialized (select clock_timestamp() as checked_at) select exists(select 1 from admin_sessions s join users u on u.id=s.admin_id and u.active=true join admin_role_assignments r on r.admin_id=s.admin_id and r.role in ('support','security_admin') cross join auth_clock c where s.session_id_hash=${sessionHash} and s.admin_id=${row.adminId}::uuid and s.revoked_at is null and isfinite(s.expires_at) and isfinite(s.mfa_verified_at) and s.expires_at>c.checked_at and s.mfa_verified_at<=c.checked_at and s.mfa_verified_at>=c.checked_at-interval '15 minutes') as authorized`,
-      )
-    ).rows[0]?.authorized;
-    if (allowed !== true) return fail("verification_forbidden");
-    return row.adminId;
+    try {
+      return await lockExpertManagerAuthority(tx, sessionHash);
+    } catch (error) {
+      if (error instanceof ExpertManagerAuthorityError)
+        throw new ExpertVerificationError("verification_forbidden");
+      throw error;
+    }
   }
+
   private async owner(tx: Tx, scope: ExpertPromoScope): Promise<string | null> {
     if (
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(scope.botKey) ||

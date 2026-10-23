@@ -1,4 +1,8 @@
 import {
+  readExpertCardConfig,
+  type ExpertCardConfig,
+} from "./expert-card-config.js";
+import {
   readExpertVerificationConfig,
   type ExpertVerificationConfig,
 } from "./expert-verification-config.js";
@@ -402,6 +406,7 @@ export type RuntimeConfig = {
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
   expertVerification?: ExpertVerificationConfig;
+  expertCard?: ExpertCardConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -448,6 +453,8 @@ export type RuntimeConfig = {
   features: {
     expertApplicant?: boolean;
     expertVerification?: boolean;
+    expertCard?: boolean;
+    expertCardMaterialDelivery?: boolean;
     bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -662,6 +669,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
   const expertApplicant = readExpertApplicantConfig(source);
   const expertVerification = readExpertVerificationConfig(source);
+  const expertCard = readExpertCardConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -788,6 +796,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(payerReceipt ? { payerReceipt } : {}),
     ...(expertApplicant ? { expertApplicant } : {}),
     ...(expertVerification ? { expertVerification } : {}),
+    ...(expertCard ? { expertCard } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,
@@ -854,6 +863,10 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
       ...(expertApplicant ? { expertApplicant: true } : {}),
+      ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
+      ...(source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED === "true"
+        ? { expertCardMaterialDelivery: true }
+        : {}),
       ...(source.EXPERT_VERIFICATION_ENABLED === "true"
         ? { expertVerification: true }
         : {}),

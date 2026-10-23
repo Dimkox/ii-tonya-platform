@@ -1,3 +1,7 @@
+import {
+  createExpertCardClient,
+  type ExpertCardAdminClient,
+} from "./expert-card-client.js";
 export interface VerificationEntry {
   applicationId: string;
   status: "pending" | "approved" | "rejected";
@@ -91,6 +95,7 @@ function payment(v: unknown): VerificationPayment {
   return { status: "ready", url: url.toString(), paymentId: v.paymentId };
 }
 export class ExpertVerificationClient {
+  readonly cards: ExpertCardAdminClient;
   private token: string;
   private readonly abort = new AbortController();
   constructor(
@@ -100,6 +105,9 @@ export class ExpertVerificationClient {
     if (!/^[A-Za-z0-9._~-]{24,512}$/u.test(token))
       throw new Error("verification_unauthorized");
     this.token = token;
+    this.cards = createExpertCardClient((path, body) =>
+      this.request(path, body, body !== undefined, "/v1/admin/expert-cards"),
+    );
   }
   clear() {
     this.token = "";
@@ -109,31 +117,30 @@ export class ExpertVerificationClient {
     path: string,
     body?: unknown,
     post = false,
+    base = "/v1/admin/expert-verification",
   ): Promise<Record<string, unknown>> {
     if (!this.token) throw new Error("verification_unauthorized");
-    const response = await this.fetcher(
-      `/v1/admin/expert-verification${path}`,
-      {
-        method: post ? "POST" : "GET",
-        credentials: "omit",
-        cache: "no-store",
-        redirect: "error",
-        referrerPolicy: "no-referrer",
-        signal: this.abort.signal,
-        headers: {
-          authorization: `Bearer ${this.token}`,
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    const response = await this.fetcher(`${base}${path}`, {
+      method: post ? "POST" : "GET",
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+      signal: this.abort.signal,
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
-    );
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
     if (response.status === 401 || response.status === 403) {
       this.clear();
       throw new Error("verification_unauthorized");
     }
     if (!response.ok) throw new Error("verification_unavailable");
     const text = await response.text();
-    if (text.length > 262144) return invalid();
+    if (text.length > (base === "/v1/admin/expert-cards" ? 1048576 : 262144))
+      return invalid();
     let value: unknown;
     try {
       value = JSON.parse(text);

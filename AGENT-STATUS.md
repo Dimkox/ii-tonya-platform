@@ -1,3 +1,215 @@
+# Block C WIP checkpoint ready; extra PG authority required — 2026-10-23
+
+HEAD checkpoint contains Cimplementation and reviewed fixture repair, NOT Cacceptance.
+Allfileowners/reviewers/commands/builders/DBsessions ended. Cspec remainsin-progress;
+D and Phase2 NOTstarted. Parent coordinator owns finalexactpermissionquestion.
+
+C PGfile tests/integration/phase1-card-publication.test.ts all3slotsCONSUMED:
+1 collectionfailure(configimportfixed);2 SQLAREfailure(fixed+38nonPGgreen+state);
+3 EXIT1 15/20PASS,5default5000msTIMEOUTS. Logs/tmp/phase1-c-card-pg{1,2,3}.log.
+NO4, filtered/manualequivalent or SQLprobe without explicit newownerauthority.
+Passingfinancial/publication/qualifiederasure cases do NOT establishfullacceptance.
+
+Finalfixturefix verifiedNONPG only: tests/support/async-case-drain.ts tracks whole
+bodies+setup; afterEach2smonotonicdrain/failclosedpoison prevents nextDBreset while
+oldbodycontinues. Heavysetup movedtoboundedhooks for timeoutcases. Same20cases,
+default5000ms, existing15000quoteexpiryoverride, real3sTTL/assertions unchanged.
+Helperunitall3runsCONSUMED; final3PASS5/5, fulltesttypes/lint/format/diffPASS;
+independentfixture sourceaccepted. Nohelper4 withoutnewauthority either.
+
+CorrectedSQL frozen526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8;
+actualmetadata150tables/63functions/105triggers recaptured, schema/DBbuildPASS.
+Finalscope3PASS123/123 (scope2timeoutpreserved), history2PASS8/8. No guard weakening.
+Pinnedpnpm11.9.0 cacherepaired exactversion; RequireDockerPASS, no deps/lockchanges.
+Hostpressure correlates withtiming butsolecauseunproven; ownedPGhealthy0restarts.
+
+Ifownergrants exactlyoneextraCfocusedfileinvocation, use freshprotectedrotated
+/tmp/phase1-promo-owner-recovery.compose.json MEMORYONLY, neverDockerEnv(oldinvalid
+password)/config/URLoutput. Existing/tmp/phase1-c-pg-launch.py rejects4 untilnew
+explicitauthoritychangesitsallowedcounter; preserveslogs(nooverwrite). AfterPASS,
+closeC evidence/review/localcommit then proportionalD→Phase2 underalreadyexisting
+allplanauthority. Strictproductionfirstsendcustody/content/merchant/exactSHAgates
+remainseparate/defaultoff. No provider/push/deploy/liveflag. A5/B2unchanged.
+
+# Block C all three PG slots consumed — fixture repair/WIP pending — 2026-10-23
+
+PG3 session48536 EXIT1:15/20PASS,5default5000msTIMEOUTS; no assertion/SQLfailures.
+Log/tmp/phase1-c-card-pg3.log,182.17stotal/53.01scollection. PASS includes real1/3main
+publication, erasure/lateGET, qualified100000pending/noextra100, consentepochretry,
+legacyfirstsource/priorineligible andunknownPOSTnoresend. Fiveuncompletedcases:
+HTTPSpublicboundary, originalinvoice replaynewquote, deadlinewait±withdrawal,
+configuredsuccessfulcheckout. Do NOTclaimCcomplete/startD. NO4/probe/equivalent
+withoutEXPLICITownernewauthority. Parentowns finalexactpermissionquestion only
+AFTERconcretereviewableWIPfix/evidence/commit.
+
+Authorizedordinaryfixturefix activeowner block_c_pg_test_author: full-case bounded
+asyncdrain/rejectionobservation/failclosed nextsetup beforeDBreset; move normalsetup
+of timeoutcases toboundednestedhooks while retaining5000ms testcase,3secondsynthetic
+TTL/actualLock/deadline assertions. NewnonPGhelperregression only, noPGexecution.
+Independentfixtureonlyreview owner block_a_ingress_review waitingreadyfiles.
+Lead owns evidence/status/environmentread-only/WIPcommit. Nootherfilewriters.
+
+Hosttiminginflation iscorrelation, notprovenrootcause; ownedPGhealthy0restarts,1CPU/
+1GiB. Concretefixturebudget anduncancelled-body cleanuphazard identified. Current
+prodSQL526ac3bd/state/build/nonPG38/staticguards remainreviewed; preservefailedlogs.
+No source/provider/liveflag/deployment/push authority beyondlocal. A5/B2unchanged.
+
+# Block C final focused PG3 starting — 2026-10-23 17:15 UTC
+
+QuietscopeCrun3PASS123/123 (scan11.407s unchanged30stimeout); historyrun2PASS8/8.
+Fulltesttypes, SQLAREregression38/38, schema lint/types, DBbuild, repairedRequireDocker,
+actualcorrected0054state/pins and parentnarrowreview allPASS. FrozenSQL526ac3bd.
+NEWCfile invocation3 NOWstarting20cases, log/tmp/phase1-c-card-pg3.log. Lastslot:
+all3consumedwhenlaunched, NO4 withoutownerexplicitauthorization. Resumeactualsession,
+neverduplicate. FreshprotectedrotatedComposeJSON memoryonly/noDockerEnv/secretoutput.
+PG1collectionerror andPG2SQLAREfailure preserved. Nootherourcommandsactive.
+NoDstartuntilactualCcriticalgates/review/commit; no providers/liveflags/push/deploy.
+
+# Block C corrected-source static timing gate — 2026-10-23 17:15 UTC
+
+CorrectedAREsource/state complete:38/38nonPG, parentreviewaccepted, actualrecapture
+150tables/63functions/105triggers, schema lint/types+finalDBbuild+fulltesttypesPASS.
+HistoryCrun2PASS8/8. ScopeCrun2:122/123, existing30s tracked-production scan timed
+out37s underhostload13.38 (priorwholefile5s); no concreteviolation. Preservedfailure.
+Allourcommands nowended; parentauthorizedONE quiet focusedscoperetry (Cscope3)
+owned block_a_audit, no timeout/guardweakening, no historyrepeat/externalprocesskill.
+PG3stillUNUSED/HELDuntilactualstaticpass/environmentcoherent. No functionalDB/probes.
+A5/B2unchanged, noDstart/provider/liveflag/push/deploy. FrozenSQL526ac3bd unchanged.
+
+# Block C final-slot preparation after reviewed ARE fix — 2026-10-23
+
+Cbudget2/3consumed; finalPG3UNUSED, no activefunctionalDB. SQLfixed/frozen SHA256
+526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8.
+ParentnarrowreviewACCEPTED explicitnonnull+charset+total15..526 onentry/proof;
+allremainingboundedAREcounts<=199. Storageowner exactnonPGregressionGREEN pending;
+schemaowner actualmetadatarecapture33811 active afterCHECKparity/types/lint.
+
+Unexpected pinnedpnpmcache lostdist but retainedmarker; causeunconfirmed. Preserved
+incompletecache/tmp/phase1-pnpm-11.9.0-incomplete-20261023, exactcorepackprepare
+11.9.0repairEXIT0/versionconfirmed; no source/dependency/lockchanges. Repaired
+RequireDockerenvironment70084EXIT0. Launchfailureswerenotfunctionalinvocations.
+Need recapturedstate/pins+nonPGgreen, finalDBbuild/types/review andchangedstaticguards
+beforePG3. NoextraSQLprobes/manualequivalents. Preserveallpriorreviewedboundaries;
+A5/B2unchanged, noDstart/provider/liveflag/push/deploy.
+
+# Block C PG2 failed; concrete SQL ARE fix before final slot — 2026-10-23 17:02 UTC
+
+PG2 session27795 EXIT1,18failed/2passed20; log/tmp/phase1-c-card-pg2.log.
+SharedapprovedCard private text/photo/document insertion returns503 before review;
+no downstreammoney/publicationclaim. Ownerbinding/replay+legacyfence cases passed.
+Existingserverlogs/source CONFIRM PostgreSQL ARE invalid repetitioncount:
+0054entry/proof patterns use{1,512}, whileARE upperboundmax255. StorageSOLEDDLowner
+fixes charset+ with explicit15..526totalcharlength preserving512fileID/nullguards;
+newnonPGboundary+SQLpatternregression and all0054regexaudit before finalPG3.
+Metadataowner resumes schemaCHECKparity+actualstate/hashrecapture afternewSQLfreeze.
+Parentnarrowreadonlyfixreview pending. NO extraDB/SQLprobe/manualfunctionalexecution.
+
+Cbudget2/3consumed (PG1collectionfailure included), final3UNUSED/RESERVED.
+Do not launchuntilactualfix/nonPG/review/state/build/typegatesclose. A5/B2unchanged.
+NoDstartuntilClocalcriticalgates+commit. No providers/liveflags/push/deploy.
+
+# Block C PG2 starting after collection-import correction — 2026-10-23 17:00 UTC
+
+PG1 session14754 EXIT1 beforecollection: directroottest @ii-tonya/config unresolved;
+zero tests/DBsetup executed, stillcountedconsumed. Log/tmp/phase1-c-card-pg1.log.
+Exactline8 nowrelative actualconfigsource; no runner/alias/guardchange. Independent
+importgraphreviewaccepted, fulltesttypes/scopedlintPASS. Integrationproofbrand alias
+unchanged. NEWCfile invocation2 nowstarting20cases; log/tmp/phase1-c-card-pg2.log.
+Resumeactualsession; finalslot3reserved, neverduplicatelostoutput. ProtectedfreshJSON
+memoryonly. NoDstart/PG3untilactualresultreview. A5/B2unchanged, no providers/liveflags.
+
+# Block C first integrated PG invocation starting — 2026-10-23 16:57 UTC
+
+NEW tests/integration/phase1-card-publication.test.ts invocation1 authorized by
+standing Cbudget,20cases; log /tmp/phase1-c-card-pg1.log. Resume actual session,
+neverduplicate. Remaining2/3 slots, final3reserved for actualcorrections.
+All finalsource/fixture independentreviews accepted. Stagedscope123/123 and
+history8/8 firstinvocationPASS. Fulltesttypes/lint/diffPASS. RequireDockerPASS;
+normalDB/integration/application/config/workerbuilds and relevanttypesPASS.
+Fresh protectedrotatedComposeJSON parsedmemoryonly; no DockerEnv/secretoutput.
+No provider/liveflag/push/deploy. A5exhausted/B2unchanged. Do not startD untilC
+actualPG/localcriticalgates/review/commit close.
+
+# Block C final pre-PG staging — 2026-10-23
+
+C functional PG 0/3; no active run. Actualmetadata capture150tables/63functions/
+105triggers complete, exact0054pins ready. Source finalreviews accepted financial,
+materials, staff, ingress/config/composition, actualapp/server and privacytombstones.
+Finalservice42/config28/workroute20/normalcomposition9/wiring6 PASS; app/config/
+DB/integrations/worker builds and relevanttypes PASS; fullwebtypes PASS.
+
+Only NEW C testauthor finalfulltesttypes/lint and narrowassertionrereview pending;
+20expandedcases include configuredrealadapterbinding/recovery/unknownPOST,
+observeddeadlinewait±withdrawal, consentepochretry, legacyfirstsource, qualified
+100000pending/noadditional100, actualpublished/qualifiederasure+lateGET+oldstart.
+Afterhandoff stagefinalsource, run scope/history eachonce, then firstPGfocusedfile.
+LeadsolePGlauncher mustreadcurrentprotectedComposeJSON memoryonly, notDockerEnv.
+Strictproductionfirstsendcustody remainsoff; configuredsyntheticfixture does NOT
+prove cancellation. No providers/push/deploy/liveflags. A5consumed; B2/3unchanged.
+
+# Block C frozen SQL, checkout/replay/privacy closure — 2026-10-23
+
+C PG file remains 0/3; no active functional DB invocation. Actual isolated metadata
+reconstruction active52164, owned block_a_audit; source0054 frozen SHA256
+4820d720ccf047a84cdea0aa3fe6b1c0dc4ce0a824e423ab8eabbabe838e6ed9.
+15 new tables,17 new functions plus one narrow0048 replacement,21 triggers.
+Consent epoch schema/22 coreCHECK parity complete. Integrations/DB normal builds
+PASS; DB rebuild needed only after pending privacy copied-name clear.
+
+C5 owner-bound checkout pre/post DB verification now25/25 unit, types/lint PASS;
+root narrow review accepted. Ingress owner implements strict configured sameorder
+link/recovery, legacy receipt fence, replay reply suppression and actual app/server
+wiring. Original firstsend custody runtime remains defaultoff. Testauthor adding
+configured checkout case;17 expanded integratedcases independently reviewed before
+any PG. Reviewer caught standalone template/notice leakage and unhandled race
+promises; fixtures corrected. Actual publication→erase assertion added and caught
+copied experts.public_display_name surviving erasure; storage owner fixing same-tx.
+
+Staff interface independent review/full webtypes PASS. Transport/receipt final
+review accepted bounded monotonic deadline, exact multipart receipt and template
+relock. Manager facade null edit regression RED1/11→GREEN11/11; own lint/diff PASS.
+No providers/push/deploy/liveflags. A5 exhausted; B2/3 unchanged. Continue allplan.
+
+# Block C source integration and review — 2026-10-23
+
+Baseline 656cf89a025d46dfa6bc8e0cf92a3e6eee355c21; source uncommitted.
+NEW tests/integration/phase1-card-publication.test.ts: 0/3 invocations, no active PG.
+A all five consumed/no sixth; B 2/3 with 23/23 PASS, no unchanged third.
+
+Lead remaining_plan_implement coordinates C and owns manager application/API and
+status/evidence. block_a_composition exclusively owns actual app/server C wiring,
+work ingress/config/service; block_a_storage owns card repository/privacy/0054 SQL;
+block_c_main_financial financial source ready, ownership ended pending findings;
+block_a_audit owns card schema then actual metadata reconstruction after SQL freeze;
+block_c_pg_test_author owns only new integrated C test. Staff UI, real materials
+transport and actual worker source owners ended; independent final reviews active.
+
+Observed greens: financial command18/helper3, card contract36, config24/service28/
+work route17/source composition9, manager facade10/API7, staff client10/view10/
+shared session2, actual transport26, worker20. Relevant source types/lint passed.
+Root narrow financial review accepted exact event/order binding, publication guard,
+all post-lock deadline paths and canonical clock refresh. No provider calls.
+
+Remaining critical gates: actual app/server wiring, consent-document epoch barrier
+and matching schema, final integrated test/source review, rebuilt package artifacts,
+actual isolated PG17.5 metadata recapture, C focused PG and final checks/review/commit.
+Test author covers observed lock-wait expiry with withdrawal, new approved notice
+bounded SERIALIZABLE retry, legacy source precedence, pending1000 reward and actual
+privacy erasure/late proof. No fabricated delivery/content/consent or early active.
+Protected rotated private Compose config must be read fresh memory-only, never
+Docker Env or printed values. Continue C→D→Phase2 after C local gates, no approval loop.
+
+# BlockC implementation started — 2026-10-23
+
+Bsource dd73dfb30be327d1e3e86458826c956375834ece, docs656cf89a025d46dfa6bc8e0cf92a3e6eee355c21, cleanbaseline.
+Cspec/plan nowpresent. New CPGfile0/3; no BPG3 or A6. MaincontractC→D→Phase2 remains.
+Cowners beingassigned disjoint cardstorage/PIIerasure, actualmainpayment/corebridge,
+workbot/config/application and staffreviewUI. Existinggeneric financialmint forbidden.
+Cmainactivation only after verifiedpayment+allcard/promo/delivery/ownerquote gates;
+no earlyactiveflags. Promoqualifiedsource explicitauditedvariant, cross-sourceunique,
+canonical1000/30day/debt/abuse retained; no legacycodeautoissue or doublecount100.
+Parentavailable for independentbridge/entitlement audit. No provider/push/deploy.
+
 # BlockB local gates PASS; source committed, continue C — 2026-10-23
 
 B source commit dd73dfb30be327d1e3e86458826c956375834ece. PG2 session88902 EXIT0:

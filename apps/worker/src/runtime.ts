@@ -11,6 +11,7 @@ import {
 export interface WorkerCycleReport {
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
+  readonly expertCardMaterials?: unknown;
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
@@ -48,6 +49,10 @@ interface BookingNotificationLifecycle {
 export interface WorkerRuntimeDependencies {
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   /** Dedicated safety repository/dispatcher path; never a Planerka or intent-model call. */
   readonly safetyHandoffs: BoundedJob;
   readonly recoverExpiredLeases: BoundedJob;
@@ -76,6 +81,10 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly planerkaBookingRunner?: BoundedJob;
   readonly clientAsyncOutboxRunner?: BoundedJob;
   readonly workerOutboxRegistry?: Readonly<{
@@ -208,6 +217,9 @@ export function createWorkerRuntime(
       const bookingNotifications = acceptingClaims
         ? await deps.bookingNotifications?.runOnce()
         : undefined;
+      const expertCardMaterials = acceptingClaims
+        ? await deps.expertCardMaterials?.runOnce()
+        : undefined;
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
       const testExpertReconciliation =
@@ -220,6 +232,7 @@ export function createWorkerRuntime(
           ? {}
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
+        ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
         safetyHandoffs,
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
@@ -249,6 +262,7 @@ export function createWorkerRuntime(
     acceptingClaims = false;
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
+    deps.expertCardMaterials?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
     closePromise = (async () => {
       let failure: unknown;
@@ -307,6 +321,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.expertCardMaterials === undefined
+      ? {}
+      : { expertCardMaterials: deps.expertCardMaterials }),
     ...(deps.bookingHandoffRevocations === undefined
       ? {}
       : { bookingHandoffRevocations: deps.bookingHandoffRevocations }),

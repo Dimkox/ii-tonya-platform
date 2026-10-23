@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   uuid,
+  unique,
 } from "drizzle-orm/pg-core";
 import { users, channelIdentities } from "./identity.js";
 import { consentPresentations } from "./identity.js";
@@ -42,6 +43,10 @@ export const expertPromoRegistrations = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    unique("expert_promo_registration_owner_unique").on(
+      t.userId,
+      t.referrerUserId,
+    ),
     check(
       "expert_promo_identity_digest",
       sql`${t.identityDigest} ~ '^[0-9a-f]{64}$'`,

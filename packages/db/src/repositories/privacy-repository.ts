@@ -360,6 +360,13 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
           await tx.execute(
+            sql`update experts_published set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active=true`,
+          );
+          await tx.execute(
+            sql`update expert_card_material_jobs set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('waiting_content','pending','unknown_outcome')`,
+          );
+
+          await tx.execute(
             sql`update expert_verification_work set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
           );
           await tx.execute(
@@ -948,6 +955,24 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Card raw entries, private media/proofs, approved public payload and live
+        // publication have no financial retention authority. Financial C bindings
+        // retain UUID/digest audit facts via nullable live FKs, never raw content.
+        await tx.execute(
+          sql`update experts set public_display_name=null,active=false,verified=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from experts_published where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_card_handoffs where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_card_requests set user_id=null,request_digest=null,semantic_digest=null,result_id=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_card_drafts where user_id=${command.targetUserId}::uuid`,
+        );
         // Preserve immutable onboarding financial facts and audit UUIDs. Nullable
         // live application FKs are cleared by its physical deletion below; late
         // verified payment remains financial truth but can never recreate admission.
@@ -1007,8 +1032,17 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         delete from client_profiles where user_id = ${command.targetUserId}::uuid returning user_id as "userId"
       `);
         await eraseBookingNotificationRecipients(tx, command.targetUserId);
+        // A first-settlement snapshot retains its immutable channel UUID FK.
+        // Remove session PII and all unreferenced mappings; referenced identities
+        // become blocked, content-free financial tombstones, never live transport.
         await tx.execute(
-          sql`delete from channel_identities where user_id = ${command.targetUserId}::uuid`,
+          sql`delete from expert_sessions where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from channel_identities ci where ci.user_id=${command.targetUserId}::uuid and not exists(select 1 from expert_first_residency_settlements f where f.settlement_invitee_channel_identity_id=ci.id or f.settlement_inviter_channel_identity_id=ci.id)`,
+        );
+        await tx.execute(
+          sql`update channel_identities set external_id='erased:'||id::text,bot_key=null,external_chat_id=null,status='blocked',updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
           sql`delete from provider_subject_mappings where user_id = ${command.targetUserId}::uuid`,

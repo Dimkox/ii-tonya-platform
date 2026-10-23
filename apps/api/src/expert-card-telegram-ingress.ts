@@ -1,0 +1,127 @@
+import { createHash } from "node:crypto";
+import type {
+  ExpertCardService,
+  ExpertCardContent,
+} from "@ii-tonya/application";
+export interface ExpertCardLegacyReplayRead {
+  read(input: {
+    botId: string;
+    updateId: string;
+  }): Promise<"absent" | "complete" | "pending">;
+}
+export interface ExpertCardTelegramIngress {
+  legacyReplay: ExpertCardLegacyReplayRead;
+  workBotId: string;
+  workBotKey: string;
+  webhookSecret: string;
+  service: Pick<ExpertCardService, "handleWork">;
+}
+export function validRawExpertCardUpdateId(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const id = (body as Record<string, unknown>).update_id;
+  return typeof id === "number" && Number.isSafeInteger(id) && id >= 0;
+}
+const record = (value: unknown): Record<string, unknown> | null =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+const id = (value: unknown) =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? String(value)
+    : null;
+const file = (value: unknown): string | null =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{1,512}$/u.test(value)
+    ? `telegram:file:${value}`
+    : null;
+export function parseExpertCardTelegramUpdate(
+  body: unknown,
+  scope: Pick<ExpertCardTelegramIngress, "workBotId" | "workBotKey">,
+):
+  | { kind: "unhandled" | "invalid" }
+  | { kind: "parsed"; input: Parameters<ExpertCardService["handleWork"]>[0] } {
+  const root = record(body);
+  if (!root || root.callback_query) return { kind: "unhandled" };
+  const message = record(root.message);
+  if (!message) return { kind: "unhandled" };
+  // Existing slash commands retain their original authorization and rate limits.
+  if (
+    typeof message.text === "string" &&
+    message.text.startsWith("/") &&
+    !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice)(?:\s|$)|^\/start card_/u.test(
+      message.text,
+    )
+  )
+    return { kind: "unhandled" };
+  const from = record(message.from),
+    chat = record(message.chat),
+    telegramUserId = id(from?.id),
+    chatId = id(chat?.id);
+  if (
+    !validRawExpertCardUpdateId(root) ||
+    !telegramUserId ||
+    telegramUserId !== chatId ||
+    chat?.type !== "private" ||
+    (from?.is_bot !== undefined && typeof from.is_bot !== "boolean") ||
+    from?.is_bot === true
+  )
+    return { kind: "invalid" };
+  let content: ExpertCardContent;
+  const hasText = message.text !== undefined,
+    hasPhoto = message.photo !== undefined,
+    hasDocument = message.document !== undefined;
+  if ([hasText, hasPhoto, hasDocument].filter(Boolean).length === 0)
+    return { kind: "unhandled" };
+  if ([hasText, hasPhoto, hasDocument].filter(Boolean).length !== 1)
+    return { kind: "invalid" };
+  if (hasText) {
+    if (
+      typeof message.text !== "string" ||
+      message.text.length < 1 ||
+      message.text.length > 4000
+    )
+      return { kind: "invalid" };
+    content = { kind: "text", text: message.text };
+  } else {
+    let reference: string | null = null;
+    if (hasPhoto) {
+      if (
+        !Array.isArray(message.photo) ||
+        message.photo.length < 1 ||
+        message.photo.length > 10 ||
+        message.photo.some((p) => !file(record(p)?.file_id))
+      )
+        return { kind: "invalid" };
+      reference = file(record(message.photo.at(-1))?.file_id);
+    } else reference = file(record(message.document)?.file_id);
+    if (
+      !reference ||
+      (message.caption !== undefined &&
+        (typeof message.caption !== "string" || message.caption.length > 4000))
+    )
+      return { kind: "invalid" };
+    content = {
+      kind: hasPhoto ? "photo" : "document",
+      reference,
+      ...(message.caption === undefined
+        ? {}
+        : { caption: message.caption as string }),
+    };
+  }
+  const input = {
+    botId: scope.workBotId,
+    botKey: scope.workBotKey,
+    telegramUserId,
+    chatId: chatId!,
+    updateId: String(root.update_id),
+    content,
+  };
+  return {
+    kind: "parsed",
+    input: {
+      ...input,
+      requestDigest: createHash("sha256")
+        .update(JSON.stringify(input))
+        .digest("hex"),
+    },
+  };
+}
