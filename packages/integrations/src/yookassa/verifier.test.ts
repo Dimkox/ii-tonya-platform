@@ -58,10 +58,18 @@ const canonical = () => {
 };
 
 const client = (overrides: Partial<YooKassaClient>): YooKassaClient => ({
-  createPayment: async () => { throw new Error("unused"); },
-  getPayment: async () => { throw new Error("unused"); },
-  createRefund: async () => { throw new Error("unused"); },
-  getRefund: async () => { throw new Error("unused"); },
+  createPayment: async () => {
+    throw new Error("unused");
+  },
+  getPayment: async () => {
+    throw new Error("unused");
+  },
+  createRefund: async () => {
+    throw new Error("unused");
+  },
+  getRefund: async () => {
+    throw new Error("unused");
+  },
   ...overrides,
 });
 
@@ -167,7 +175,11 @@ describe("YooKassaPaymentVerifier", () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
       client({
-        getPayment: async () => ({ ...payment, status: "canceled", paid: false }),
+        getPayment: async () => ({
+          ...payment,
+          status: "canceled",
+          paid: false,
+        }),
       }),
       operations,
       createCanonicalExpertResidencyPaymentEventVerifier(),
@@ -304,5 +316,88 @@ describe("YooKassaPaymentVerifier", () => {
       verifier.verifyRefund({ ...refundOperation, status: "canceled" }),
     ).resolves.toBeNull();
     expect(operations.resolve).not.toHaveBeenCalled();
+  });
+});
+
+describe("authoritative capture-wait acknowledgment", () => {
+  it.each(["waiting_for_capture", "succeeded", "canceled"] as const)(
+    "acknowledges %s repeatedly without financial events or writes",
+    async (status) => {
+      const operations = operationPort();
+      const eventVerifier = canonical();
+      const verifier = new YooKassaPaymentVerifier(
+        client({
+          getPayment: async () => ({
+            ...payment,
+            status,
+            paid: status !== "canceled",
+          }),
+        }),
+        operations,
+        eventVerifier,
+      );
+      await verifier.verifyWaitingForCapture(operation);
+      await verifier.verifyWaitingForCapture({
+        ...operation,
+        status: "canceled",
+      });
+      expect(operations.resolve).not.toHaveBeenCalled();
+      expect(eventVerifier.verifyCanonical).not.toHaveBeenCalled();
+    },
+  );
+  it("rejects pending, unpaid holds, binding mismatches and provider failures without effects", async () => {
+    for (const changed of [
+      { ...payment, status: "pending" as const, paid: false },
+      { ...payment, status: "waiting_for_capture" as const, paid: false },
+      { ...payment, id: "foreign" },
+      { ...payment, metadata: { order_id: "foreign" } },
+      { ...payment, amount: { value: "500.01", currency: "RUB" as const } },
+      { ...payment, amount: { value: "500.00", currency: "USD" as never } },
+      { ...payment, test: false },
+      null,
+    ]) {
+      const operations = operationPort();
+      const eventVerifier = canonical();
+      const verifier = new YooKassaPaymentVerifier(
+        client({
+          getPayment: async () => {
+            if (changed === null) throw new Error("provider_unavailable");
+            return changed;
+          },
+        }),
+        operations,
+        eventVerifier,
+      );
+      await expect(
+        verifier.verifyWaitingForCapture(operation),
+      ).rejects.toThrow();
+      expect(operations.resolve).not.toHaveBeenCalled();
+      expect(eventVerifier.verifyCanonical).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("capture-wait terminal consistency", () => {
+  it("rejects inconsistent terminal facts without canonical verification or writes", async () => {
+    const { capturedAt, ...uncaptured } = payment;
+    expect(capturedAt).toBeDefined();
+    for (const changed of [
+      { ...payment, status: "canceled" as const, paid: true },
+      { ...payment, status: "succeeded" as const, paid: false },
+      uncaptured,
+    ]) {
+      const operations = operationPort();
+      const eventVerifier = canonical();
+      const verifier = new YooKassaPaymentVerifier(
+        client({ getPayment: async () => changed }),
+        operations,
+        eventVerifier,
+      );
+      await expect(verifier.verifyWaitingForCapture(operation)).rejects.toThrow(
+        "yookassa_payment_binding_mismatch",
+      );
+      expect(eventVerifier.verifyCanonical).not.toHaveBeenCalled();
+      expect(operations.resolve).not.toHaveBeenCalled();
+    }
   });
 });

@@ -938,6 +938,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Applicant workflow metadata has no financial retention authority.
+        // Remove it atomically before identity mappings, preserving quote/ledger facts.
+        await tx.execute(sql`
+        delete from expert_onboarding_applications
+        where user_id = ${command.targetUserId}::uuid
+      `);
         const content = await tx.execute<{ id: string }>(sql`
         update conversation_messages cm set content_ref = null
         from conversations c where cm.conversation_id = c.id and c.user_id = ${command.targetUserId}::uuid

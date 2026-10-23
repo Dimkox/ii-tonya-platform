@@ -75,6 +75,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0051_expert_onboarding_applications.sql",
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
   "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
@@ -100,6 +101,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "expert_onboarding_applications",
   "commercial_participants",
   "expert_ai_request_receipts",
   "expert_referral_admin_execution_results",
@@ -214,7 +216,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
-    "499c6f3f16a54ce403ffcb7ae355f48793934ed76af7bdba5185106b0112c376",
+    "2f2dec6322fb43c669bcc2dcc1b2ba3a85ec39b740120034182b3d1a846556e0",
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
@@ -238,11 +240,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/verifier.ts",
-    "3414dfe6e335b072180519599b88f9f98ec6522b0e5fdc7eeabf2e75a74373a8",
+    "1b60690a615be2f3ce38956b6d59c04e915207b744a91822a39a176a87a3d25c",
   ],
   [
     "packages/integrations/src/yookassa/webhook-capability.ts",
-    "56ceea9a45aa7b620528e090dfef549093656e2ec26baa7f799ba5081d752636",
+    "5aad24de2f1ab17b9fa4a22155a49b2b41eb6a5935af33e6d93b5e75ce323d3a",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
@@ -592,6 +594,22 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0051_expert_onboarding_applications.sql",
+    "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64",
+  ],
+  [
+    "packages/db/migrations/meta/0051_snapshot.json",
+    "0c16dd5981f99e2b018dad31c7ab4d867c1c68e7beb2cf206fe5fbb05ffff681",
+  ],
+  [
+    "packages/db/migrations/state/0051_manifest.json",
+    "3f1c4fa63a8778d232d049b449a89242736db879260fc4f192f5c7c95bf6c18a",
+  ],
+  [
+    "packages/db/migrations/state/0051_sql_objects.json",
+    "0a203b2d46e09d345a19c0c71bbe849cc35e4164800689d0739ba4cd16af957a",
+  ],
+  [
     "packages/db/migrations/0041_client_erasure_requests.sql",
     "2e54f405b3a15acccf8c5cafd88dc385ccba5a0b5b287e8e0e5c8cd1c04a18ee",
   ],
@@ -801,7 +819,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
+    "827ffdf2acac06df281b546e88857b9085da62c2442a13bf3c83720a32307805",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -881,10 +899,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
+    "827ffdf2acac06df281b546e88857b9085da62c2442a13bf3c83720a32307805",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  "expert_onboarding_applications",
   "admin_case_actions",
   "admin_approvals",
   "admin_object_assignments",

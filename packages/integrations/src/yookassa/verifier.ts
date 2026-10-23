@@ -31,9 +31,7 @@ export class YooKassaPaymentVerifier {
     private readonly canonical: CanonicalExpertResidencyPaymentEventVerifier,
   ) {}
 
-  async verifyPayment(
-    operation: YooKassaOperation,
-  ): Promise<VerifiedExpertResidencyPaymentEvent | null> {
+  private async readBoundPayment(operation: YooKassaOperation) {
     if (
       operation.kind !== "create_payment" ||
       operation.providerObjectId === undefined ||
@@ -51,6 +49,28 @@ export class YooKassaPaymentVerifier {
     ) {
       throw new Error("yookassa_payment_binding_mismatch");
     }
+    return payment;
+  }
+
+  // A delayed hold notification may observe a terminal GET result. Acknowledge
+  // it without minting settlement facts or changing durable operation state.
+  async verifyWaitingForCapture(operation: YooKassaOperation): Promise<void> {
+    const payment = await this.readBoundPayment(operation);
+    if (
+      payment.status === "pending" ||
+      (payment.status === "waiting_for_capture" && !payment.paid) ||
+      (payment.status === "canceled" && payment.paid) ||
+      (payment.status === "succeeded" &&
+        (!payment.paid || payment.capturedAt === undefined))
+    ) {
+      throw new Error("yookassa_payment_binding_mismatch");
+    }
+  }
+
+  async verifyPayment(
+    operation: YooKassaOperation,
+  ): Promise<VerifiedExpertResidencyPaymentEvent | null> {
+    const payment = await this.readBoundPayment(operation);
     if (
       payment.status === "pending" ||
       payment.status === "waiting_for_capture"

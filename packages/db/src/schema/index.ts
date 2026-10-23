@@ -17,3 +17,4 @@ export * from "./booking-handoff-revocations.js";
 export * from "./expert-campaign-quotes.js";
 export * from "./expert-sessions.js";
 export * from "./payer-receipt-contacts.js";
+export * from "./expert-onboarding.js";

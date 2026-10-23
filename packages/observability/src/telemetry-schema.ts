@@ -79,7 +79,10 @@ export function httpRetryAfter(error: unknown): string | undefined {
 }
 
 type Schema = Readonly<
-  Record<string, readonly string[] | "status" | "duration" | "count">
+  Record<
+    string,
+    readonly string[] | "status" | "duration" | "count" | "fingerprint"
+  >
 >;
 const modules = ["api", "worker", "integrations"];
 const failureClasses = [
@@ -110,6 +113,11 @@ const http = {
   durationMs: "duration",
 } as const;
 const schemas: Readonly<Record<string, Schema>> = {
+  telegram_ingress_security: {
+    reason: ["authentication_rejected", "rate_limited"],
+    ipFingerprint: "fingerprint",
+    uaFingerprint: "fingerprint",
+  },
   telemetry_unclassified: {},
   public_catalog_failure: {
     reason: [
@@ -152,6 +160,9 @@ function project(
     const item = ownData(value, key);
     if (typeof rule !== "string") {
       if (typeof item === "string" && rule.includes(item)) result[key] = item;
+    } else if (rule === "fingerprint") {
+      if (typeof item === "string" && /^h1:[0-9a-f]{64}$/u.test(item))
+        result[key] = item;
     } else if (typeof item === "number" && Number.isFinite(item)) {
       if (
         rule === "status" &&

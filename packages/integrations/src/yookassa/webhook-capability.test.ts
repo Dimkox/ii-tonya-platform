@@ -3,6 +3,8 @@ import type {
   YooKassaOperation,
   YooKassaOperationPort,
 } from "./operation-port.js";
+import { createCanonicalExpertResidencyPaymentEventVerifier } from "../expert-residency/verified-event.js";
+import { YooKassaPaymentVerifier } from "./verifier.js";
 import { YooKassaWebhookCapability } from "./webhook-capability.js";
 
 const operation = (kind: YooKassaOperation["kind"]): YooKassaOperation => ({
@@ -208,4 +210,109 @@ describe("YooKassa webhook capability", () => {
     ).resolves.toBeUndefined();
     expect(operations.resolve).not.toHaveBeenCalled();
   });
+});
+
+describe("capture-wait webhook", () => {
+  it.each(["pending", "succeeded", "canceled"] as const)(
+    "acknowledges replay for %s without settlement verification or resolution",
+    async (status) => {
+      const operations = {
+        findByProviderObject: vi.fn(async () => ({
+          ...operation("create_payment"),
+          status,
+        })),
+        resolve: vi.fn(),
+      };
+      const verifier = {
+        verifyWaitingForCapture: vi.fn(async () => undefined),
+        verifyPayment: vi.fn(),
+        verifyRefund: vi.fn(),
+      };
+      const capability = new YooKassaWebhookCapability(operations, verifier);
+      const notification = {
+        type: "notification",
+        event: "payment.waiting_for_capture",
+        object: { id: "payment-1" },
+      } as const;
+      await expect(capability.verify(notification)).resolves.toBeNull();
+      await expect(capability.verify(notification)).resolves.toBeNull();
+      expect(verifier.verifyWaitingForCapture).toHaveBeenCalledTimes(2);
+      expect(verifier.verifyPayment).not.toHaveBeenCalled();
+      expect(operations.resolve).not.toHaveBeenCalled();
+      await expect(capability.resolveSucceeded(notification)).rejects.toThrow(
+        "yookassa_webhook_binding_mismatch",
+      );
+    },
+  );
+  it("propagates unavailable or mismatched authoritative verification", async () => {
+    const verifier = {
+      verifyWaitingForCapture: vi.fn(async () => {
+        throw new Error("yookassa_payment_binding_mismatch");
+      }),
+      verifyPayment: vi.fn(),
+      verifyRefund: vi.fn(),
+    };
+    const capability = new YooKassaWebhookCapability(
+      {
+        findByProviderObject: vi.fn(async () => operation("create_payment")),
+        resolve: vi.fn(),
+      },
+      verifier,
+    );
+    await expect(
+      capability.verify({
+        type: "notification",
+        event: "payment.waiting_for_capture",
+        object: { id: "payment-1" },
+      }),
+    ).rejects.toThrow("yookassa_payment_binding_mismatch");
+  });
+});
+
+describe("capture-wait real verifier boundary", () => {
+  it.each([null, "failed", "claimed"] as const)(
+    "fails closed for missing or non-reconcilable operation %s before any provider read",
+    async (status) => {
+      const stored =
+        status === null ? null : { ...operation("create_payment"), status };
+      const operations = {
+        findByProviderObject: vi.fn(async () => stored),
+        resolve: vi.fn(async () => undefined),
+      };
+      const provider = {
+        getPayment: vi.fn(async () => {
+          throw new Error("unexpected_provider_read");
+        }),
+        getRefund: vi.fn(async () => {
+          throw new Error("unexpected_provider_read");
+        }),
+      };
+      const canonical = {
+        verifyCanonical: vi.fn(
+          createCanonicalExpertResidencyPaymentEventVerifier().verifyCanonical,
+        ),
+      };
+      const verifier = new YooKassaPaymentVerifier(
+        provider,
+        operations,
+        canonical,
+      );
+      const capability = new YooKassaWebhookCapability(operations, verifier);
+      await expect(
+        capability.verify({
+          type: "notification",
+          event: "payment.waiting_for_capture",
+          object: { id: status === null ? "unknown-payment" : "payment-1" },
+        }),
+      ).rejects.toThrow(
+        status === null
+          ? "yookassa_webhook_binding_not_found"
+          : "yookassa_payment_binding_mismatch",
+      );
+      expect(provider.getPayment).not.toHaveBeenCalled();
+      expect(provider.getRefund).not.toHaveBeenCalled();
+      expect(canonical.verifyCanonical).not.toHaveBeenCalled();
+      expect(operations.resolve).not.toHaveBeenCalled();
+    },
+  );
 });

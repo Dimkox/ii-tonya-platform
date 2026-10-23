@@ -1,3 +1,4 @@
+import { createTelegramDeletionCapability } from "./telegram-deletion-composition.js";
 import { randomBytes } from "node:crypto";
 import { createExpertSessionService } from "@ii-tonya/application";
 import { PostgresExpertSessionRepository } from "@ii-tonya/db";
@@ -585,6 +586,22 @@ export const createDefaultLifecycle = (
           : disabledService<PrivacyService>("privacy ingress"),
       // Reads stay composed when request creation is closed. Physical execution
       // remains gated separately on real capture, custody and backup evidence.
+      ...(config.features.clientPrivacy === true &&
+      config.features.clientErasureRequests === true
+        ? {
+            telegramDeletion: createTelegramDeletionCapability({
+              enabled: true,
+              botKey: config.clientTelegramBotKey,
+              botId: clientBotId,
+              receiptKey: config.telegramWebhookSecret,
+              repository: new PostgresErasureRequestRepository(db),
+              service: createErasureRequestService({
+                repository: new PostgresErasureRequestRepository(db),
+                requestEnabled: true,
+              }),
+            }),
+          }
+        : {}),
       erasureRequests: createErasureRequestService({
         repository: new PostgresErasureRequestRepository(db),
         requestEnabled:

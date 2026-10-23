@@ -358,6 +358,13 @@
       "when": 1791763200007,
       "tag": "0050_expert_receipt_contact_bindings",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791763200008,
+      "tag": "0051_expert_onboarding_applications",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type { TelegramDeletionCapability } from "./telegram-deletion.js";
 import { createRequire } from "node:module";
 import { expertSessionRoutes } from "./routes/expert-sessions.js";
 import {
@@ -111,6 +112,7 @@ export interface AppDependencies {
   catalogService: CatalogService;
   privacyService: PrivacyService;
   erasureRequests?: ErasureRequestService;
+  telegramDeletion?: TelegramDeletionCapability | undefined;
   consentEvidence?:
     | {
         issuePresentation(command: {
@@ -567,6 +569,11 @@ export async function buildApp(
     rateLimiter: deps.rateLimiter,
   });
   await app.register(telegramWebhookRoutes, {
+    ...(deps.config.features.clientPrivacy === true &&
+    deps.config.features.clientErasureRequests === true &&
+    deps.telegramDeletion
+      ? { deletion: deps.telegramDeletion }
+      : {}),
     bookingCallbacksEnabled: deps.config.features.bookingCallbacks === true,
     ...(deps.bookingCallbacks === undefined
       ? {}
@@ -757,6 +764,7 @@ export type TestApp = FastifyInstance & {
 };
 export async function buildTestApp(
   options: {
+    telegramDeletion?: TelegramDeletionCapability;
     callbackVerified?: boolean;
     authorizedIdentity?: boolean;
     telegramFailOnce?: boolean;
@@ -864,6 +872,9 @@ export async function buildTestApp(
         throw new Error("disabled");
       },
     },
+    ...(options.telegramDeletion
+      ? { telegramDeletion: options.telegramDeletion }
+      : {}),
     telegramCallbacks: telegram,
     readiness: {
       check: async () => ({

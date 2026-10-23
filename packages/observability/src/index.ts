@@ -42,3 +42,8 @@ export {
   shutdownTelemetry,
   traced,
 } from "./tracing.js";
+
+export {
+  createSecurityEvent,
+  type TelegramSecurityReason,
+} from "./security-event.js";

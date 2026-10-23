@@ -1,3 +1,24 @@
+# Phase 0 isolated continuation — 2026-10-23
+
+This checkout is `codex/phase1-owner-plan-20261023`, based on
+`031ae46065b58223a2b6cd47e002b388a41ec89c`. The owner explicitly requested an
+isolated tree, recording the approved Phase 1 plan, then executing Phase 0.
+Plan commit: `d32da25dcdaf54ceb2039049ab348b3b54e9e2d4`.
+
+New continuation truth is scoped to this local Phase 0 work. The primary checkout's
+uncommitted provider/evidence changes were preserved; do not copy or amend them.
+See `docs/test-evidence/phase0-local-2026-10-23.md`, the execution plan and two
+`spec-phase0-*-foundation.md` files for implementation, review and bounded tests.
+The owner approved existing financial authority plus an application table and has
+a test YooKassa merchant; protected runtime settings are supplied separately.
+
+No push, merge, deployment, shared-database migration, provider request or live
+flag change is included. Physical erasure/backup proof and external YooKassa
+delivery remain gates. Existing scope/history guard drift must not be hidden by
+rebaselining unrelated artifacts. No exact-SHA CI or release acceptance is claimed.
+The prior provider-specific blocked goal is historical context, not automatically
+resumed by this separate request. Do not repeat its exhausted suites.
+
 # Agent status — owner-spec 2026-09-16
 
 ## Trusted peer verified; review exposure assessed

@@ -1,3 +1,8 @@
+import { createSecurityEvent } from "@ii-tonya/observability";
+import {
+  handleTelegramDeletion,
+  type TelegramDeletionCapability,
+} from "../telegram-deletion.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   ClientNavigationGateway,
@@ -157,6 +162,7 @@ const secureEqual = (actual: string | undefined, expected: string): boolean => {
 
 export const telegramWebhookRoutes: FastifyPluginAsync<{
   secret: string;
+  deletion?: TelegramDeletionCapability;
   callbacks: TelegramCallbackService;
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
@@ -180,6 +186,33 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   bookingCallbacksEnabled?: boolean;
   bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  const securityEvent = createSecurityEvent();
+  app.addHook("onResponse", async (request, reply) => {
+    if (
+      reply.statusCode === 401 ||
+      reply.statusCode === 403 ||
+      reply.statusCode === 429
+    )
+      app.log.warn(
+        securityEvent(
+          reply.statusCode === 429 ? "rate_limited" : "authentication_rejected",
+          request.ip,
+          request.headers["user-agent"],
+        ),
+      );
+  });
+  const deletion = async (
+    body: unknown,
+    reply: FastifyReply,
+  ): Promise<boolean> => {
+    const result = await handleTelegramDeletion(body, deps.deletion);
+    if (result.kind === "unhandled") return false;
+    if (result.kind === "reply") reply.send(result.reply);
+    else if (result.kind === "denied")
+      reply.code(403).send({ error: "deletion_denied" });
+    else reply.code(503).send({ error: "deletion_unavailable" });
+    return true;
+  };
   if (
     deps.bookingCallbacksEnabled === true &&
     (!deps.bookingCallbacks || !deps.clientBotKey)
@@ -260,8 +293,16 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         if (
           deps.clientBotKey === undefined ||
           !secureEqual(request.params.botKey, deps.clientBotKey)
-        )
+        ) {
+          app.log.warn(
+            securityEvent(
+              "authentication_rejected",
+              request.ip,
+              request.headers["user-agent"],
+            ),
+          );
           return reply.send({ accepted: true, rejected: true });
+        }
         if (
           !deps.rateLimiter.consume(
             `telegram:client:auth:${deps.clientBotKey}`,
@@ -298,6 +339,7 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       const updateId = clientIngressUpdateId(request.body);
       if (updateId === undefined)
         return reply.code(400).send({ error: "invalid_update" });
+      if (await deletion(request.body, reply)) return;
       if (isBookingCallback(request.body))
         return bookingCallback(request.body, reply, crypto.randomUUID());
       if (deps.clientNavigationEnabled === true) {
@@ -478,6 +520,7 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       ) {
         return reply.code(429).send({ error: "rate_limited" });
       }
+      if (await deletion(request.body, reply)) return;
       const body = request.body as Record<string, unknown>;
       const correlationId =
         typeof request.headers["x-correlation-id"] === "string"
