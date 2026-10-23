@@ -1,6 +1,6 @@
 ---
 title: Manager verification and purpose-bound onboarding payment
-status: in-progress
+status: done
 baseline_commit: e880246f641ede57b4ab0512dccbd1031226dacb
 context:
   - docs/superpowers/implementation-artifacts/spec-phase1-through-phase2-execution.md
@@ -95,3 +95,11 @@ handling, duplicate command keys, errors and inactive content slots.
 
 Owned files: apps/web/src/expert-verification-client.ts,
 apps/web/src/expert-verification-view.ts, their new tests, and minimal main.ts route.
+
+## Local acceptance
+
+Source dd73dfb30be327d1e3e86458826c956375834ece locally implemented/reviewed/verified.
+PG2 passed23/23 after production SQL-clock fix;2/3 invocations consumed, thirdunused.
+Actual staff UI client10/binding8 and native nginxedge1 passed; relevant builds,
+types, lint, format and guards passed. Evidence:
+../../test-evidence/phase1-block-b-2026-10-23.md. No provider/release acceptance.

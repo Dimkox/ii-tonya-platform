@@ -1,3 +1,26 @@
+# BlockB local gates PASS; source committed, continue C — 2026-10-23
+
+B source commit dd73dfb30be327d1e3e86458826c956375834ece. PG2 session88902 EXIT0:
+23/23 at15:33:05UTC, /tmp/phase1-b-verification-pg2.log. Only2/3consumed; thirdUNUSED,
+no unchangedrerun. PG1rawDatebug fixed in production SQLunderlocks/DBclock withfinite
+expiry/MFA, regression10/10 and independentreviewaccepted. A5consumed/no6 unchanged.
+
+ActualstaffUI /admin/expert-verification complete: client10/binding8/build/typesPASS;
+MFAissuedtokenmemoryonly, escapedtext, asyncPIIclear, normalapproveauto invoice/link,
+existing-ID exceptionrecovery afterlostresponse/relogin. UI rereviewaccepted. Native
+Nginx staff/APIcache1/1 and managerHTTP10 no-store; merchantHTTP6, service15,
+verifier32, capability11, config24, normalcomposition16PASS. Relevantbuilds,
+API/web/DBtypes/testsTypeScript/scopedlint/format/whitespacePASS; edgeformatwarning
+corrected. Finalstagedscope123/history8; actualcatalog135tables/46functions/84triggers.
+AllBfileowners/reviewers/builders/commandsended. NoBcriticalgate remainsopen.
+
+Evidence docs/test-evidence/phase1-block-b-2026-10-23.md. A docs-update script failed
+syntax immediately before sourcecommit, leaving conservative oldprogress text; this
+followup corrects documentation only, no productcode or runtimeevidence changed.
+Proceed C→D→Phase2 perallplanauthority, noapprovalloop. No push/deploy/provider/liveflag.
+Strictfirstsendcustody, realmerchant/processorbackup/exactSHArelease gates separate.
+ProtectedrotatedPGconfig memoryonly, notDockerEnv; incident retiredlocalvalue only.
+
 # BlockB PG2 active after DBclock/finiteauth review — 2026-10-23 15:33 UTC
 
 NEWphase1-verification.test.ts invocation2 ACTIVE session88902,

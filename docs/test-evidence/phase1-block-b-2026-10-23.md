@@ -1,71 +1,86 @@
 # Phase1 Block B local verification ledger
 
-Status: implementation in progress; shared raw-timestamp production defect found in
-first integrated run. No Block B completion/release claim. Baseline:
-`e880246f641ede57b4ab0512dccbd1031226dacb`.
+Status: locally implemented, independently reviewed and verified; not release or
+provider acceptance. Source commit: `dd73dfb30be327d1e3e86458826c956375834ece`.
+Baseline: `e880246f641ede57b4ab0512dccbd1031226dacb`.
 
 ## Implemented boundary
 
-Manager API uses existing bearer-session digest, original PostgreSQL admin sessions,
-MFA and support/security roles. Masked queue and protected contact detail have typed
-inactive questionnaire content. Decisions are audited/idempotent and lock the
-accepted campaign quote against later replacement.
+The actual staff interface `/admin/expert-verification` uses the existing issued MFA
+admin session. Masked queue, protected detail, approve/reject buttons and exception
+invoice recovery are connected to authenticated APIs. The bearer stays in memory;
+logout/auth failure/pagehide clear protected state and late replies cannot restore
+it. Normal approval automatically requests the invoice/link when its capability is
+configured; recovery does not repeat a decision or blindly create another payment.
+Questionnaire content remains a typed inactive slot.
 
-An approval creates a distinct300000-kopeck onboarding invoice and preallocated
+Approval creates a distinct300000-kopeck onboarding invoice and preallocated
 operation with immutable owner/application/purpose/mode/amount binding. Neither is
 an expert residency order. Narrow authoritative GET verification creates a frozen
-private proof; no generic mint is exported. Settlement rechecks stored purpose and
-bindings and opens interview only. No expert activation, residency interval,
-first-residency marker, referral grant, coupon or message-credit mutation follows.
+private proof; no generic mint is exported. Settlement rechecks stored bindings and
+opens interview only. No expert activation, residency interval, first-residency
+marker, referral grant, coupon or message-credit mutation follows.
 
-Existing merchant webhook authentication/inbox is preserved. Stored onboarding
-objects route through the actual GET verifier and PostgreSQL settlement; unknown
-successes stay retryable until binding, and refund IDs are never treated as payment
-IDs. Manager/new-checkout disablement does not disable existing payment truth.
+The existing merchant webhook authentication and inbox remain authoritative.
+Stored onboarding objects route through the actual GET verifier and PostgreSQL
+settlement. Unresolved success/refund notifications stay retryable; refund IDs are
+never treated as payment IDs. Existing payment truth remains available while
+manager/new-checkout admission is disabled.
 
-Checkout requires complete injected strict-cancellation custody, authoritative GET,
-connected merchant callback and invoice-bound recovery. Recovery never calls blind
-initial creation from this service or repeats a manager decision. No production
-first-disclosure lease exception, transport activation or fake checkout URL exists.
-Actual live first-send custody/recovery remains an external enablement gate.
+Checkout requires explicit strict-cancellation custody, GET verification, connected
+merchant callback and invoice-bound recovery capabilities. These are default off;
+no production first-disclosure lease exception or fake link/success is introduced.
+Financial rows retain immutable audit UUIDs and nullable live application references.
+Erasure physically removes applicant data; late payment/receipt facts are retained
+without recreating an application or access.
 
-Financial rows retain immutable audit UUIDs but nullable live application references.
-Erasure can physically remove applicant data; late verified payment/receipt facts
-are retained without recreating an application or access. Source review caught and
-fixed the protected-detail read/erasure race before integrated execution.
+## Verification
 
-## Bounded execution facts
+- GET verifier32/32; webhook capability11/11. Real fixed-origin decoder, malformed
+  bindings/GET, private-proof copy rejection and distinct refund-ID cases executed.
+- Manager service15/15; manager HTTP10/10; merchant routing6/6.
+- Config24/24; standard package-loader composition16/16.
+- Staff client10/10; actual binding/controller8/8, including uncertain decision,
+  logout/reconnect and empty-queue existing-invoice recovery without persistence.
+- Native nginx edge1/1 verifies staff shell/API no-store with a synthetic shell.
+  This is actual cache/routing evidence, not browser UI E2E evidence.
+- New repository raw-row regression10/10. Expected RED exposed the real Drizzle
+  TIMESTAMPTZ-string bug; production authorization/capture checks now execute in
+  PostgreSQL after locks, at full precision, with finite expiry/MFA predicates and
+  strict boolean checks. No host clock, NaN or NULL authorization fallback.
+- NEW `tests/integration/phase1-verification.test.ts` invocation1: exit1,
+  21failed/one unhandled rejection,15:13:51UTC; shared raw-Date assumptions stopped
+  downstream acceptance. Preserved `/tmp/phase1-b-verification-pg1.log`.
+- Invocation2: **exit0,23/23 PASS**,15:33:05UTC;
+  `/tmp/phase1-b-verification-pg2.log`. Actual configured GET callback, concurrency,
+  fixed purpose/owner/mode/amount, finite MFA, immutable accepted quote, copied proof,
+  withdrawal, physical erasure, late binding and same-proof replay executed.
+- **2/3 PG invocations consumed; third unused/reserved.** No material backend change
+  followed passing invocation2, so no unchanged functional rerun was performed.
+- Relevant DB/application/integrations/config/web builds; API/web/DB types; tests
+  TypeScript; scoped ESLint/Prettier and whitespace passed. A final edge formatting
+  warning was corrected without behavioral change.
+- Scope123/123 and history8/8 passed. Finite-auth metadata recapture preserved the
+  supported snapshot and all prior objects. Final staged staff UI/edge scope scan
+  also passed123/123; history was not needlessly repeated.
 
-- New verifier unit32/32; webhook capability11/11. Real fixed-origin client decoder,
-  malformed GET/bindings, private proof/copy rejection and proper refund IDs tested.
-- New manager service13/13; manager HTTP9/9; merchant routing5/5. Relevant failing
-  regressions preceded corrections for recovery, early binding and authority fields.
-- New config24/24; standard package-loader composition16/16, including actual
-  class composition, recovery completeness and existing-payment-only mode.
-- New `tests/integration/phase1-verification.test.ts` invocation1 consumed:
-  **21failed and one unhandled rejection**, exit1,15:13:51UTC. Log:
-  `/tmp/phase1-b-verification-pg1.log`. Fresh rotated-role authentication and all
-  migrations succeeded; failures were shared manager bootstrap before downstream
-  acceptance. No payment/erasure authority acceptance is inferred from that run.
-- Root cause confirmed in installed Drizzle node-postgres adapter: raw SQL
-  TIMESTAMPTZ values are strings, while new repository code assumed `Date` and
-  called `.getTime()` in manager and payment-time checks. Production SQL authority
-  correction plus a separate non-PG real-row-shape regression is in progress.
-- New PG file has **two invocations remaining**, final3 reserved after review.
-  No immediate repeat, skipped case, fake green or old exhausted test is allowed.
-- B scope123/123 and history8/8 passed first invocation each. Metadata replayed all
-  54 SQL files on a separate PostgreSQL17.5 database:135tables,46functions,
-  84triggers,903constraints,373indexes,2extensions. All prior objects preserved.
-  Exact guard/artifact evidence: `docs/spec/phase1-block-b-guard-registration.md`.
+Metadata replayed all54 SQL files on a separate PostgreSQL17.5 database:
+135tables,46functions,84triggers,903constraints,373indexes,2extensions. See
+`docs/spec/phase1-block-b-guard-registration.md` for exact hashes and inventories.
 
-## Local credential containment
+Independent storage, API/payment, staff UI/nginx and guard reviews accepted the
+remediated source. Public [YooKassa documentation](https://yookassa.ru/developers/using-api/response-handling/http-codes)
+confirmed its YooMoney-hosted merchant confirmation page; no merchant API was called.
 
-A child accidentally printed the disposable database Compose configuration. Parent
-rotated only that local role/password and private file; old authentication was
-proven rejected. No customer/provider credential or repository secret was involved.
-The original tool output cannot be erased, but its credential no longer works.
-All future invocations parse the current private configuration in memory and never
-use stale container environment or print/copy its values. See coordinator evidence.
+## Local credential containment and remaining gates
 
-No full/multi-path/exhausted A/provider suite, provider call, push, deployment or
-live flag change. C/D/Phase2 remain required after the Block B predecessor gate.
+A child printed the disposable local database Compose configuration. Parent rotated
+only that local role/password and private file; old authentication was proven
+rejected. No customer/provider credential or repository secret was involved. Future
+invocations parse current private configuration in memory and never use stale
+container environment or print/copy its values. Coordinator evidence records this
+without the retired value.
+
+No full/multi-path/exhausted A/provider suite, push, deployment or live flag change.
+C/D/Phase2 remain required. Actual production first-send custody, real merchant
+execution, processor/backup and exact-SHA release evidence remain separate gates.
