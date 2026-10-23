@@ -37,3 +37,5 @@ export {
   payerReceiptCheckoutRequestSchema,
   payerReceiptCaptureRequestSchema,
 } from "@ii-tonya/contracts";
+
+export * from "./expert-applicant-service.js";

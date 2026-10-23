@@ -93,6 +93,8 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  // BlockA exact inventory: docs/spec/phase1-block-a-guard-registration.md.
+  "packages/db/migrations/0052_expert_promo_applicants.sql",
   "packages/db/migrations/0051_expert_onboarding_applications.sql",
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
@@ -119,6 +121,14 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // Nonfinancial acquisition only; BlockA registration rationale is versioned.
+  "expert_promo_codes",
+  "expert_promo_registrations",
+  "expert_promo_requests",
+  "expert_promo_guide_work",
+  "expert_promo_bonus_indications",
+  "expert_promo_manager_work",
+  "expert_promo_enrollments",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "client_paid_orders",
   "client_paid_payment_bindings",
@@ -193,6 +203,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/webhooks/telegram/expert-promo/:botKey",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "/v1/expert/browser/residency/checkouts",
   "/v1/expert/browser/residency/quotes",
@@ -671,6 +682,24 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // BlockA SQL-replayed state: docs/spec/phase1-block-a-guard-registration.md.
+  [
+    "packages/db/migrations/0052_expert_promo_applicants.sql",
+    "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1",
+  ],
+  [
+    "packages/db/migrations/meta/0052_snapshot.json",
+    "91120bff86bcc62bae1bd7883d875c9409dcc1adca1ee9e0104a8f56fe6fd8e8",
+  ],
+  [
+    "packages/db/migrations/state/0052_manifest.json",
+    "76bef7cc0003b995bd0d9afc1b45a5d33e5c5da73a7e7b42c56e17ff5bab1029",
+  ],
+  [
+    "packages/db/migrations/state/0052_sql_objects.json",
+    "2b5870f64ef8a125e474b8bb404340b570b8c4e7291d964a3d2113e0958b1c42",
+  ],
+
   // Reviewed SQL0042–0050 and reconstructed metadata; no bytes changed.
   [
     "packages/db/migrations/0042_client_paid_orders.sql",
@@ -1042,7 +1071,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "827ffdf2acac06df281b546e88857b9085da62c2442a13bf3c83720a32307805",
+    "3c44a24677aa3e5079c25334cd329ee66b324d4b1186c775e330ac3224bbe58f",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1122,10 +1151,18 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "827ffdf2acac06df281b546e88857b9085da62c2442a13bf3c83720a32307805",
+    "3c44a24677aa3e5079c25334cd329ee66b324d4b1186c775e330ac3224bbe58f",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // Nonfinancial acquisition only; BlockA registration rationale is versioned.
+  "expert_promo_codes",
+  "expert_promo_registrations",
+  "expert_promo_requests",
+  "expert_promo_guide_work",
+  "expert_promo_bonus_indications",
+  "expert_promo_manager_work",
+  "expert_promo_enrollments",
   "expert_onboarding_applications",
   "admin_case_actions",
   "admin_approvals",

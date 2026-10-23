@@ -365,6 +365,13 @@
       "when": 1791763200008,
       "tag": "0051_expert_onboarding_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791763200009,
+      "tag": "0052_expert_promo_applicants",
+      "breakpoints": true
     }
   ]
 }

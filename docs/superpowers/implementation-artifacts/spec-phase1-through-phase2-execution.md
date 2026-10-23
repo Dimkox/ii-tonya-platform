@@ -1,7 +1,7 @@
 ---
 title: Execute approved residency plan through Phase2
 created: 2026-10-23
-status: ready-for-dev
+status: in-progress
 baseline_commit: 47e6680e9fdadf8416574afa003737691504b16a
 context:
   - AGENTS.md

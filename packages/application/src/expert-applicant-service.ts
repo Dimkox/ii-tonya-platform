@@ -1,0 +1,222 @@
+import { createHash } from "node:crypto";
+
+export type ExpertApplicantScope = {
+  botId: string;
+  botKey: string;
+  telegramUserId: string;
+  chatId: string;
+};
+type Command = ExpertApplicantScope & {
+  requestKey: string;
+  requestDigest: string;
+};
+export interface ExpertApplicantRepository {
+  beginEnrollment(input: Command & { refCode?: string }): Promise<
+    | { kind: "ready" | "waiting_content" | "consent_pending" }
+    | {
+        kind: "consent_required";
+        token: string;
+        policyVersion: string;
+        document: {
+          id: string;
+          documentKey: string;
+          version: number;
+          textSha256: string;
+          title: string;
+          body: string;
+        };
+      }
+  >;
+  completeEnrollment(
+    input: Command & { token: string; decision: "granted" | "denied" },
+  ): Promise<{ kind: "granted" | "denied"; replay: boolean }>;
+  resolve(scope: ExpertApplicantScope): Promise<{ userId: string } | null>;
+  register(input: Command & { refCode?: string }): Promise<{
+    userId: string;
+    refCode: string;
+    referralCount: number;
+    bonusPoints: 0 | 100;
+    bonusStatus: "none" | "frozen" | "superseded";
+    guideStatus:
+      "none" | "waiting_content" | "pending" | "delivered" | "cancelled";
+    replay: boolean;
+  }>;
+  listTariffs(
+    input: Command,
+  ): Promise<{
+    tariffs: { id: string; displayName: string }[];
+    replay: boolean;
+  }>;
+  createQuote(
+    input: Command & { tariffVersionId: string; termMonths: 1 | 3 },
+  ): Promise<{
+    id: string;
+    priceMinor: string;
+    termMonths: 1 | 3;
+    expiresAt: string;
+    replay?: boolean;
+  }>;
+  createApplication(input: Command & { quoteId: string }): Promise<{
+    applicationId: string;
+    userId: string;
+    quoteId: string;
+    status: "pending";
+    replay: boolean;
+  }>;
+}
+export type ExpertApplicantReply =
+  | { status: "handled"; text: string }
+  | {
+      status:
+        "disabled" | "unavailable" | "rejected" | "unhandled" | "duplicate";
+      text?: never;
+    };
+const uuid =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
+const apply = new RegExp(`^/apply (${uuid})$`, "u");
+export function createExpertApplicantService(deps: {
+  enabled: boolean;
+  repository: ExpertApplicantRepository;
+}) {
+  return {
+    async handle(
+      input: ExpertApplicantScope & { updateId: number; text: string },
+    ): Promise<ExpertApplicantReply> {
+      if (!deps.enabled) return { status: "disabled" };
+      if (
+        !/^[1-9]\d{0,15}$/u.test(input.botId) ||
+        !Number.isSafeInteger(Number(input.botId)) ||
+        !Number.isSafeInteger(input.updateId) ||
+        input.updateId < 0 ||
+        !/^[1-9]\d{0,19}$/u.test(input.telegramUserId) ||
+        input.chatId !== input.telegramUserId ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(input.botKey) ||
+        typeof input.text !== "string" ||
+        input.text.length > 256
+      )
+        return { status: "rejected" };
+      const { botId, botKey, telegramUserId, chatId, updateId } = input;
+      const scope = { botId, botKey, telegramUserId, chatId };
+      const digest = createHash("sha256").update(input.text).digest("hex");
+      const command = () => ({
+        ...scope,
+        requestKey: `${botId}:${updateId}`,
+        requestDigest: digest,
+      });
+      try {
+        const start = /^\/start(?: (promo_[A-Za-z0-9_-]{8,48}))?$/u.exec(
+          input.text,
+        );
+        if (start) {
+          const enrollment = await deps.repository.beginEnrollment({
+            ...command(),
+            ...(start[1] ? { refCode: start[1] } : {}),
+          });
+          if (enrollment.kind === "waiting_content")
+            return { status: "handled", text: "TODO: Wait for Content Spec" };
+          if (enrollment.kind === "consent_pending")
+            return { status: "duplicate" };
+          if (enrollment.kind === "consent_required") {
+            const text = `${enrollment.document.title}\n${enrollment.document.body}\nСогласиться: /consent ${enrollment.token} granted\nОтказаться: /consent ${enrollment.token} denied`;
+            // Preserve the complete approved notice. Never truncate legal text.
+            if (text.length > 4096)
+              return { status: "handled", text: "TODO: Wait for Content Spec" };
+            return { status: "handled", text };
+          }
+          const result = await deps.repository.register({
+            ...command(),
+            ...(start[1] ? { refCode: start[1] } : {}),
+          });
+          if (result.replay) return { status: "duplicate" };
+          const guide =
+            result.guideStatus === "waiting_content"
+              ? "Гайд ожидает подготовки материала."
+              : result.guideStatus === "delivered"
+                ? "Доставка гайда подтверждена."
+                : "";
+          const bonus =
+            result.bonusStatus === "frozen"
+              ? "Предварительные 100 бонусов заморожены и входят в квалифицированное вознаграждение; доступного баланса пока нет."
+              : "";
+          return {
+            status: "handled",
+            text: `Ваш промокод: ${result.refCode}. Уникальных регистраций: ${result.referralCount}. Тарифы: /tariffs. ${guide} ${bonus}`.trim(),
+          };
+        }
+        const consent =
+          /^\/consent ([A-Za-z0-9_-]{16,128}) (granted|denied)$/u.exec(
+            input.text,
+          );
+        if (consent) {
+          const result = await deps.repository.completeEnrollment({
+            ...command(),
+            token: consent[1]!,
+            decision: consent[2] as "granted" | "denied",
+          });
+          if (result.replay) return { status: "duplicate" };
+          return {
+            status: "handled",
+            text:
+              result.kind === "granted"
+                ? "Выбор сохранён. Для регистрации отправьте /start."
+                : "Отказ сохранён. Регистрация и начисления не выполнены.",
+          };
+        }
+        if (input.text === "/tariffs") {
+          const result = await deps.repository.listTariffs(command());
+          if (result.replay) return { status: "duplicate" };
+          return {
+            status: "handled",
+            text: result.tariffs.length
+              ? result.tariffs
+                  .slice(0, 10)
+                  .map(
+                    (t) =>
+                      `${t.displayName.slice(0, 100)}\n1 мес.: /tariff ${t.id} 1\n3 мес.: /tariff ${t.id} 3`,
+                  )
+                  .join("\n\n")
+              : "Доступных предложений пока нет.",
+          };
+        }
+        const selection = tariff.exec(input.text);
+        if (selection) {
+          const quote = await deps.repository.createQuote({
+            ...command(),
+            tariffVersionId: selection[1]!,
+            termMonths: Number(selection[2]) as 1 | 3,
+          });
+          if (quote.replay) return { status: "duplicate" };
+          return {
+            status: "handled",
+            text: `Предложение ${quote.id}: ${quote.priceMinor} коп., срок ${quote.termMonths} мес. Действует до ${quote.expiresAt}. Для заявки: /apply ${quote.id}`,
+          };
+        }
+        const application = apply.exec(input.text);
+        if (application) {
+          const result = await deps.repository.createApplication({
+            ...command(),
+            quoteId: application[1]!,
+          });
+          if (result.replay) return { status: "duplicate" };
+          return {
+            status: "handled",
+            text: `Заявка ${result.applicationId} ожидает проверки менеджером. TODO: Wait for Content Spec`,
+          };
+        }
+        return {
+          status: /^\/(?:start|tariff|tariffs|apply|consent)(?: |$)/u.test(
+            input.text,
+          )
+            ? "rejected"
+            : "unhandled",
+        };
+      } catch {
+        return { status: "unavailable" };
+      }
+    },
+  };
+}
+export type ExpertApplicantService = ReturnType<
+  typeof createExpertApplicantService
+>;

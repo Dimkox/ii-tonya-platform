@@ -49,6 +49,7 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_client_paid_settlement",
   "enforce_expert_campaign_order_source",
   "enforce_expert_campaign_quote_source",
+  "enforce_expert_promo_immutable",
   "enforce_expert_referral_admin_approval_global_unique",
   "enforce_human_escalation_transition",
   "expert_first_settlement_guard_change",
@@ -107,6 +108,9 @@ const HAND_SQL_TRIGGERS = [
   "expert_campaign_order_source",
   "expert_campaign_quote_source",
   "expert_campaign_quotes_append_only",
+  "expert_promo_codes_immutable",
+  "expert_promo_registrations_immutable",
+  "expert_promo_requests_immutable",
   "expert_referral_admin_approval_global_unique",
   "expert_referral_admin_results_immutable",
   "expert_referral_admin_results_truncate_immutable",
@@ -196,7 +200,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(51);
+    expect(newest).toBe(52);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -288,7 +292,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0051 adds the inactive applicant queue foundation.
-    expect(declared.size).toBe(123);
+    // 0052 adds seven nonfinancial acquisition/work relations to the0051 applicant metadata.
+    expect(declared.size).toBe(130);
   });
 });

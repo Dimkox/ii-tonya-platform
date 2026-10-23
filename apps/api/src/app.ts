@@ -1,3 +1,8 @@
+import {
+  expertApplicantTelegramRoutes,
+  type ExpertApplicantTelegramCapability,
+} from "./routes/expert-applicant-telegram.js";
+import { assertExpertApplicantCapability } from "./expert-applicant-composition.js";
 import type { TelegramDeletionCapability } from "./telegram-deletion.js";
 import { createRequire } from "node:module";
 import { expertSessionRoutes } from "./routes/expert-sessions.js";
@@ -105,6 +110,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertApplicantTelegram?: ExpertApplicantTelegramCapability;
   expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
   conversationService: ConversationService;
@@ -256,6 +262,7 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertExpertApplicantCapability(deps.config, deps.expertApplicantTelegram);
   if (
     deps.config.features.expertSession === true &&
     (!deps.expertSession?.sessions ||
@@ -567,6 +574,12 @@ export async function buildApp(
       },
     },
     rateLimiter: deps.rateLimiter,
+  });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: deps.config.features.expertApplicant === true,
+    ...(deps.expertApplicantTelegram
+      ? { capability: deps.expertApplicantTelegram }
+      : {}),
   });
   await app.register(telegramWebhookRoutes, {
     ...(deps.config.features.clientPrivacy === true &&

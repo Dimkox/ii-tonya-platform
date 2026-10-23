@@ -1,0 +1,275 @@
+{
+  "databaseVersion": "170005",
+  "drizzleKitVersion": "0.31.10",
+  "method": "Full-chain hand-authored SQL replay on isolated PostgreSQL17.5; fresh empty-directory introspection normalized against exact positional constraint/index catalogue. SQL-only functions/triggers retained separately.",
+  "generatePermitted": false,
+  "migrations": [
+    {
+      "idx": 0,
+      "tag": "0000_mvp",
+      "sha256": "067926dd1249fabdc59f91dedd39ebfade05a55a3de38059705092f512139216"
+    },
+    {
+      "idx": 1,
+      "tag": "0001_message-package-metadata",
+      "sha256": "eb09df658b46f735c4dbaedf899c8b4b87ac77649655842666cdd3ab2972c6a2"
+    },
+    {
+      "idx": 2,
+      "tag": "0002_atomic-message-accounting",
+      "sha256": "d29a4db9cd25d98cf9b586e2d64e8094fbd8ccbf4a41fe2b2c3752843b5ffea5"
+    },
+    {
+      "idx": 3,
+      "tag": "0003_booking-concurrency",
+      "sha256": "c070a7696279f3379ade453e4291626aae6e81bc21162c7bc0d628435131bbcd"
+    },
+    {
+      "idx": 4,
+      "tag": "0004_durable_outbox",
+      "sha256": "e2a2292c1401e0e5b19f4d7cf2adfd79a37391fe7854049cc3c4a883777794ab"
+    },
+    {
+      "idx": 5,
+      "tag": "0005_outbox_fencing_tokens",
+      "sha256": "d726342f962f66f975e7350ec1a3dadb78eac6d32349a0c09932bf56d5edcb4d"
+    },
+    {
+      "idx": 6,
+      "tag": "0006_telegram-callback-expert-fk",
+      "sha256": "551998e8ae51fe5d2267ca2dc4d13e54d8af05f084bcfd8cb92a63f0ba3d1567"
+    },
+    {
+      "idx": 7,
+      "tag": "0007_catalog-eligibility-fields",
+      "sha256": "cd056b56578fd09915da44e99bb63f025757c2561bfb0391a327107680748303"
+    },
+    {
+      "idx": 8,
+      "tag": "0008_booking-expert-view",
+      "sha256": "d08810977e9e8fef657e60147627a7c078ff91929626d4e2cd52a083f0bef840"
+    },
+    {
+      "idx": 9,
+      "tag": "0009_young_arachne",
+      "sha256": "4ffb0a9a5746c46873fed26adeac21865b02c3bac50a22bf8cf96b6a00c99f34"
+    },
+    {
+      "idx": 10,
+      "tag": "0010_brown_purifiers",
+      "sha256": "b00006d3b168a7b1295e7da6028756e3fd8dda5f13310765c54484fd205b8da0"
+    },
+    {
+      "idx": 11,
+      "tag": "0011_sad_red_ghost",
+      "sha256": "e51142adf199100404453875cff4088614019eb126805d28ce2922fe114b1bf7"
+    },
+    {
+      "idx": 12,
+      "tag": "0012_productive_siren",
+      "sha256": "12fe46e565320459cccb9c23f7637b1a34ccb4407fef3ad25fc767cfa5ca6851"
+    },
+    {
+      "idx": 13,
+      "tag": "0013_gorgeous_deathstrike",
+      "sha256": "2e7d88b34ca12b010c18ca722cddad2323c7a60dbb0c56db408d8db5d5d292c2"
+    },
+    {
+      "idx": 14,
+      "tag": "0014_admin_feedback_controls",
+      "sha256": "b1b36ae08655a70398b0133e38bbb1442a6bc0ea37f75a78c1e5b01808e67339"
+    },
+    {
+      "idx": 15,
+      "tag": "0015_admin_iam",
+      "sha256": "c84622593e18513feae28abf47d82f52bf2bb77f54a50e77d4d5c353cda1aabc"
+    },
+    {
+      "idx": 16,
+      "tag": "0016_task17c_admin_workflows",
+      "sha256": "3fb0532ce45de66c4d1f86c74aaf473e525d9440e6937d716ed50dc3e93e9045"
+    },
+    {
+      "idx": 17,
+      "tag": "0017_adorable_sinister_six",
+      "sha256": "255b88191d6bdfc679ea5066b247c47ad19fca41832baace209db424736972fa"
+    },
+    {
+      "idx": 18,
+      "tag": "0018_expert_residency_referrals",
+      "sha256": "8ecae37aea385c75659f0dbba2c06f62e5bffabca20ed85dd1b703e7d7a032a4"
+    },
+    {
+      "idx": 19,
+      "tag": "0019_expert_order_provider_deadline",
+      "sha256": "be80e9b716d42bb6e39fb4da8958b6685337cc6ef73ee0beb58f8487c058918a"
+    },
+    {
+      "idx": 20,
+      "tag": "0020_expert_provider_verification_evidence",
+      "sha256": "651c8a5a99acb9c36e7cf8e99d8f9202e37bd077dfe6d8826079e7a8f402605e"
+    },
+    {
+      "idx": 21,
+      "tag": "0021_expert_settlement_snapshot",
+      "sha256": "e62b24ccf54900eb4bdb7014881d1a9ae0e555ab5a8875177f20ac30ef21ce14"
+    },
+    {
+      "idx": 22,
+      "tag": "0022_expert_referral_admin_replays",
+      "sha256": "f4262b0905c945ccec107603106e120875f12ea23d570fc4d90bdddd8bc899cc"
+    },
+    {
+      "idx": 23,
+      "tag": "0023_yookassa_provider_operations",
+      "sha256": "2c6f04eb2d1e5d019f710e3111d09e6f3ac01be986e3ee8e6e548a551aa9d5fc"
+    },
+    {
+      "idx": 24,
+      "tag": "0024_yookassa_encrypted_recovery",
+      "sha256": "05c9447c12d75a0b4a8400822a43d9dfd8ed4855fdb3913dd5836923a8c0679c"
+    },
+    {
+      "idx": 25,
+      "tag": "0025_expert_telegram_residency_callbacks",
+      "sha256": "7af18618c6a06638b85dfbba734ee9ffea416629493eb139575ac6c5d3905b2d"
+    },
+    {
+      "idx": 26,
+      "tag": "0026_expert_telegram_checkout_outcomes",
+      "sha256": "35868ffc1cb73de322942aebee08922a75d226e30d5e739b1dc5d6681de2816b"
+    },
+    {
+      "idx": 27,
+      "tag": "0027_expert_ai_request_receipts",
+      "sha256": "67eed73ef55735f94a3b4727bd5bcd8479b678d6b61f0ebb7c2d7d46d3bf9c7e"
+    },
+    {
+      "idx": 28,
+      "tag": "0028_operator_case_inbox",
+      "sha256": "ae71d45564466e71f3efa4c3c96227d28ea21af2483ff1c2c14b60210ba22d4c"
+    },
+    {
+      "idx": 29,
+      "tag": "0029_client_catalog_requests",
+      "sha256": "5f0e0ac72df3021946dcad4215137aba3d0724d4c8e4fb9d74767e31e920bb8c"
+    },
+    {
+      "idx": 30,
+      "tag": "0030_client_sessions",
+      "sha256": "01b13ed88582144faefad2fb0ca4e4ec0767ed25d3b6ebddb357a78e2250b31a"
+    },
+    {
+      "idx": 31,
+      "tag": "0031_client_booking_references",
+      "sha256": "b625de5a14c3aa542116b4ad7c88df6ddeab99b893fdbda83bca0f6d8c1f4529"
+    },
+    {
+      "idx": 32,
+      "tag": "0032_commercial_core_v2_a1",
+      "sha256": "e70a77073e08bb15b4ad37dc49b75842bf8ff4284f9e062c5302a54bc7ba8a6d"
+    },
+    {
+      "idx": 33,
+      "tag": "0033_expert_referral_maturity_a2",
+      "sha256": "dd263b77ae2e8dde0ebe8bde6a3ce1886858c2e465afe0df8857323845e48746"
+    },
+    {
+      "idx": 34,
+      "tag": "0034_hybrid_message_gateway_b1",
+      "sha256": "b7b8136238d8533f641887c0fccf33cc2021f67c1046f0e4cf540200abcff456"
+    },
+    {
+      "idx": 35,
+      "tag": "0035_hybrid_message_gateway_b2",
+      "sha256": "90ff0fd219c2ec882919d7328089950e69920fd4eede30000484080ab9c0b205"
+    },
+    {
+      "idx": 36,
+      "tag": "0036_selarti_budget_controls_b3",
+      "sha256": "233680aade58a86cfcbb46197ba4281158812c4bd370c9f8acf40b4c5ecce4df"
+    },
+    {
+      "idx": 37,
+      "tag": "0037_partner_commerce_a",
+      "sha256": "922701d401fc6ca39f4c71d914f00477faf587078d1e38e02a3afbc4fc86d4f2"
+    },
+    {
+      "idx": 38,
+      "tag": "0038_test_expert_trial",
+      "sha256": "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957"
+    },
+    {
+      "idx": 39,
+      "tag": "0039_consent_evidence_grant",
+      "sha256": "1da4691ba27f4e22bc84346cc367b820d4f12280fcb1f04077f75111bc5b2e0f"
+    },
+    {
+      "idx": 40,
+      "tag": "0040_client_session_booking_grants",
+      "sha256": "abd7de7b230598e2f63309c660c98de4d1812e87737dcefbfe0e8a15f2f32979"
+    },
+    {
+      "idx": 41,
+      "tag": "0041_client_erasure_requests",
+      "sha256": "2e54f405b3a15acccf8c5cafd88dc385ccba5a0b5b287e8e0e5c8cd1c04a18ee"
+    },
+    {
+      "idx": 42,
+      "tag": "0042_client_paid_orders",
+      "sha256": "adc94b568ddee0b8e29244e5f602f1781b02aba70dfca3bc8048d9882e250d94"
+    },
+    {
+      "idx": 43,
+      "tag": "0043_planerka_booking_operations",
+      "sha256": "259104111cfe60ad07d77a4e6e07d65f2df741f1fa77b19114a1d385fcd0c913"
+    },
+    {
+      "idx": 44,
+      "tag": "0044_booking_notification_delivery",
+      "sha256": "f8bedcec57d442018bf10bf8f6f496a7bb686decd26d7f94ecda0ff7f04c1f60"
+    },
+    {
+      "idx": 45,
+      "tag": "0045_booking_notification_controls",
+      "sha256": "2d48d6e29661a5f6c405a0ccd45ee7deca900392d2d7fec229c489abf839a3ec"
+    },
+    {
+      "idx": 46,
+      "tag": "0046_booking_handoff_revocation",
+      "sha256": "67898707a8d46162e06706681632900f956b0c961f480994fc98bdcd51c2997e"
+    },
+    {
+      "idx": 47,
+      "tag": "0047_expert_campaign_quotes",
+      "sha256": "feab6a3d5afe04d32f89b5e1ca7f157252a2aad10bc4c252a2f5a889d8c0d8eb"
+    },
+    {
+      "idx": 48,
+      "tag": "0048_expert_campaign_orders",
+      "sha256": "4d89da04a0dee6f6b6f5fa360ebb2c6cc84c4341770b3b11854b5c57b0f76d59"
+    },
+    {
+      "idx": 49,
+      "tag": "0049_expert_sessions",
+      "sha256": "5e3f0283ad5e1e065bf2e21e21dd4c9f7b4dbbbdbff9bbea345708b4b47c25de"
+    },
+    {
+      "idx": 50,
+      "tag": "0050_expert_receipt_contact_bindings",
+      "sha256": "bfaeb278183a8fefe2c9bd14e094618a15de754a02be1fd11d25f4dfd5d04399"
+    },
+    {
+      "idx": 51,
+      "tag": "0051_expert_onboarding_applications",
+      "sha256": "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64"
+    },
+    {
+      "idx": 52,
+      "tag": "0052_expert_promo_applicants",
+      "sha256": "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1"
+    }
+  ],
+  "snapshotSha256": "91120bff86bcc62bae1bd7883d875c9409dcc1adca1ee9e0104a8f56fe6fd8e8",
+  "sqlObjectsSha256": "2b5870f64ef8a125e474b8bb404340b570b8c4e7291d964a3d2113e0958b1c42"
+}

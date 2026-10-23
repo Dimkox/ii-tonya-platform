@@ -1,3 +1,7 @@
+import {
+  readExpertApplicantConfig,
+  type ExpertApplicantConfig,
+} from "./expert-applicant-config.js";
 import { z } from "zod";
 import {
   readPayerReceiptConfig,
@@ -392,6 +396,7 @@ const schema = z
 
 export type RuntimeConfig = {
   payerReceipt?: PayerReceiptConfig;
+  expertApplicant?: ExpertApplicantConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -436,6 +441,7 @@ export type RuntimeConfig = {
   telegramWebhookSecret?: string;
   selartiResponseSharedSecret?: string;
   features: {
+    expertApplicant?: boolean;
     bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -648,6 +654,7 @@ function readBookingCallbacks(
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
+  const expertApplicant = readExpertApplicantConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -772,6 +779,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
 
   const config: RuntimeConfig = {
     ...(payerReceipt ? { payerReceipt } : {}),
+    ...(expertApplicant ? { expertApplicant } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,
@@ -837,6 +845,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
+      ...(expertApplicant ? { expertApplicant: true } : {}),
       bookingCallbacks: bookingCallbacks !== undefined,
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",

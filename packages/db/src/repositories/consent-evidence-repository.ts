@@ -158,33 +158,43 @@ export class PostgresConsentEvidenceRepository {
     channel: ConsentChannel;
     documentKey: string;
   }): Promise<IssuedPresentation> {
+    return this.db.transaction((tx) =>
+      this.issuePresentationInTransaction(tx, command),
+    );
+  }
+
+  async issuePresentationInTransaction(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    command: Parameters<
+      PostgresConsentEvidenceRepository["issuePresentation"]
+    >[0],
+  ): Promise<IssuedPresentation> {
     this.assertEnabled();
     PostgresConsentEvidenceRepository.assertPurpose(command.purpose);
     if (command.documentKey !== `consent.${command.purpose}`)
       throw new ConsentGrantInvariantError("consent_command_incomplete");
     const ttlMs = this.options.presentationTtlMs ?? DEFAULT_PRESENTATION_TTL_MS;
     const token = randomBytes(32).toString("base64url");
-    return this.db.transaction(async (tx) => {
-      await tx.execute(sql`set local statement_timeout='2000ms'`);
-      await tx.execute(sql`set local lock_timeout='1000ms'`);
-      // Serializes document publication/retirement with presentation issuance.
-      await tx.execute(sql`lock table consent_document_versions in share mode`);
-      const document = single<ApprovedDocument>(
-        await tx.execute(sql`
+    await tx.execute(sql`set local statement_timeout='2000ms'`);
+    await tx.execute(sql`set local lock_timeout='1000ms'`);
+    // Serializes document publication/retirement with presentation issuance.
+    await tx.execute(sql`lock table consent_document_versions in share mode`);
+    const document = single<ApprovedDocument>(
+      await tx.execute(sql`
       select id, document_key as "documentKey", version, title, body, text_sha256 as "textSha256"
       from consent_document_versions
       where document_key=${command.documentKey} and status='approved'
         and effective_at <= clock_timestamp()
       order by version desc limit 1
     `),
-        "document_version",
-      );
-      const stored = single<{
-        presentationId: string;
-        documentVersionId: string;
-        expiresAt: string;
-      }>(
-        await tx.execute(sql`
+      "document_version",
+    );
+    const stored = single<{
+      presentationId: string;
+      documentVersionId: string;
+      expiresAt: string;
+    }>(
+      await tx.execute(sql`
         insert into consent_presentations
           (user_id, purpose, document_version_id, token_digest, channel, expires_at)
         select
@@ -198,19 +208,18 @@ export class PostgresConsentEvidenceRepository {
         returning id as "presentationId", document_version_id as "documentVersionId",
                   expires_at as "expiresAt"
       `),
-        "presentation",
-      );
-      return {
-        presentationId: stored.presentationId,
-        token,
-        expiresAt: stored.expiresAt,
-        document,
-        policyVersion: this.policyVersion(
-          command.purpose as ConsentPurpose,
-          document.version,
-        ),
-      };
-    });
+      "presentation",
+    );
+    return {
+      presentationId: stored.presentationId,
+      token,
+      expiresAt: stored.expiresAt,
+      document,
+      policyVersion: this.policyVersion(
+        command.purpose as ConsentPurpose,
+        document.version,
+      ),
+    };
   }
 
   /**
@@ -234,34 +243,46 @@ export class PostgresConsentEvidenceRepository {
       throw new ConsentGrantInvariantError("consent_command_incomplete");
 
     return withSerializableRetry(() =>
-      this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
-        await tx.execute(sql`set local statement_timeout='2000ms'`);
-        await tx.execute(sql`set local lock_timeout='1000ms'`);
-        await tx.execute(
-          sql`lock table consent_document_versions in share mode`,
-        );
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
-        );
-        if (command.decision === "denied") {
-          const active = single<{ granted: boolean }>(
-            await tx.execute(sql`
+      this.db.transaction(
+        (tx) => this.recordDecisionInTransaction(tx, command),
+        { isolationLevel: "serializable" },
+      ),
+    );
+  }
+
+  /** Same authority implementation for trusted composition with atomic scope/replay effects. */
+  async recordDecisionInTransaction(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    command: Parameters<PostgresConsentEvidenceRepository["recordDecision"]>[0],
+  ): Promise<ConsentDecisionReceipt> {
+    this.assertEnabled();
+    PostgresConsentEvidenceRepository.assertPurpose(command.purpose);
+    if (!command.token || !command.policyVersion)
+      throw new ConsentGrantInvariantError("consent_command_incomplete");
+    await tx.execute(sql`set local statement_timeout='2000ms'`);
+    await tx.execute(sql`set local lock_timeout='1000ms'`);
+    await tx.execute(sql`lock table consent_document_versions in share mode`);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
+    );
+    if (command.decision === "denied") {
+      const active = single<{ granted: boolean }>(
+        await tx.execute(sql`
             select ${currentConsentGrantedSql({ userExpression: sql`${command.userId}::uuid`, purpose: command.purpose })} as granted
           `),
-            "state",
-          );
-          if (active.granted)
-            throw new ConsentGrantInvariantError("consent_withdrawal_required");
-        }
+        "state",
+      );
+      if (active.granted)
+        throw new ConsentGrantInvariantError("consent_withdrawal_required");
+    }
 
-        const redeemed = rows<{
-          presentationId: string;
-          documentVersionId: string;
-          textSha256: string;
-          version: number;
-        }>(
-          await tx.execute(sql`
+    const redeemed = rows<{
+      presentationId: string;
+      documentVersionId: string;
+      textSha256: string;
+      version: number;
+    }>(
+      await tx.execute(sql`
             update consent_presentations p
             set consumed_at = clock_timestamp()
             from consent_document_versions d
@@ -282,27 +303,27 @@ export class PostgresConsentEvidenceRepository {
                       d.id as "documentVersionId",
                       d.text_sha256 as "textSha256", d.version
           `),
-        );
-        if (redeemed.length !== 1)
-          throw new ConsentGrantInvariantError("consent_presentation_invalid");
-        const presentation = redeemed[0] as (typeof redeemed)[number];
-        const policyVersion = this.policyVersion(
-          command.purpose as ConsentPurpose,
-          presentation.version,
-        );
-        if (command.policyVersion !== policyVersion)
-          throw new ConsentGrantInvariantError("consent_presentation_invalid");
+    );
+    if (redeemed.length !== 1)
+      throw new ConsentGrantInvariantError("consent_presentation_invalid");
+    const presentation = redeemed[0] as (typeof redeemed)[number];
+    const policyVersion = this.policyVersion(
+      command.purpose as ConsentPurpose,
+      presentation.version,
+    );
+    if (command.policyVersion !== policyVersion)
+      throw new ConsentGrantInvariantError("consent_presentation_invalid");
 
-        const prior = rows<{ lastDecisionId: string | null }>(
-          await tx.execute(sql`
+    const prior = rows<{ lastDecisionId: string | null }>(
+      await tx.execute(sql`
             select last_decision_id as "lastDecisionId" from consent_states
             where user_id = ${command.userId}::uuid and purpose = ${command.purpose}
           `),
-        );
-        const priorDecisionId = prior[0]?.lastDecisionId ?? null;
+    );
+    const priorDecisionId = prior[0]?.lastDecisionId ?? null;
 
-        const decision = single<{ id: string }>(
-          await tx.execute(sql`
+    const decision = single<{ id: string }>(
+      await tx.execute(sql`
             insert into consents
               (user_id, consent_type, decision, policy_version, channel, scope_fields,
                document_version_id, presentation_id, prior_decision_id, recipient_id,
@@ -321,11 +342,11 @@ export class PostgresConsentEvidenceRepository {
               'consent'
             returning id
           `),
-          "decision",
-        );
+      "decision",
+    );
 
-        const state = single<{ revision: number | string }>(
-          await tx.execute(sql`
+    const state = single<{ revision: number | string }>(
+      await tx.execute(sql`
             insert into consent_states
               (user_id, purpose, decision, document_version_id, last_decision_id, revision)
             values
@@ -339,10 +360,10 @@ export class PostgresConsentEvidenceRepository {
                             updated_at = now()
             returning revision
           `),
-          "state",
-        );
+      "state",
+    );
 
-        await tx.execute(sql`
+    await tx.execute(sql`
           insert into audit_events
             (actor_type, actor_id, authenticated_session_id_hash, action, object_type,
              object_id, decision, reason_code, correlation_id, occurred_at, metadata_hash)
@@ -360,14 +381,12 @@ export class PostgresConsentEvidenceRepository {
              )})
         `);
 
-        return {
-          decisionId: decision.id,
-          revision: Number(state.revision),
-          documentVersionId: presentation.documentVersionId,
-          textSha256: presentation.textSha256,
-        };
-      }),
-    );
+    return {
+      decisionId: decision.id,
+      revision: Number(state.revision),
+      documentVersionId: presentation.documentVersionId,
+      textSha256: presentation.textSha256,
+    };
   }
 
   /**

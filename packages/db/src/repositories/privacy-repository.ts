@@ -938,6 +938,30 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Promo acquisition has no financial retention authority. Remove queued
+        // sends, pending enrollment and direct identity digests; keep only inactive
+        // UUID ownership tombstones so an erased inviter can never be reassigned.
+        await tx.execute(
+          sql`delete from expert_promo_guide_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_manager_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_enrollments where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_promo_requests set user_id=null,request_digest=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_bonus_indications where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_codes where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_promo_registrations set identity_digest=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and identity_digest is not null`,
+        );
         // Applicant workflow metadata has no financial retention authority.
         // Remove it atomically before identity mappings, preserving quote/ledger facts.
         await tx.execute(sql`

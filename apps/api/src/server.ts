@@ -1,3 +1,5 @@
+import { createExpertApplicantComposition } from "./expert-applicant-composition.js";
+import { assertExpertApplicantConfig } from "@ii-tonya/config";
 import { createTelegramDeletionCapability } from "./telegram-deletion-composition.js";
 import { randomBytes } from "node:crypto";
 import { createExpertSessionService } from "@ii-tonya/application";
@@ -165,6 +167,7 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertExpertApplicantConfig(config);
     if (
       (config.features.expertResidencyBilling ||
         config.features.expertReferral) &&
@@ -516,6 +519,10 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
+    const expertApplicantTelegram = createExpertApplicantComposition(
+      db,
+      config,
+    );
     const testExpertRepository = new PostgresTestExpertTelegramRepository(db, {
       messagingConsentPolicyVersion:
         config.clientMessagingConsentPolicyVersion ?? "unconfigured",
@@ -552,6 +559,7 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),
       ...(expertApi ? { expertApi } : {}),
       ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),

@@ -1,3 +1,83 @@
+# BlockA corrected fixture awaiting one extra PG run — 2026-10-23 14:33 UTC
+
+All3 invocations of NEW tests/integration/phase1-promo.test.ts are CONSUMED.
+Final3 session7976 at14:32:01UTC:14passed/1failed. The new expiredquote fixture
+failed PostgreSQL42P18 (`jsonb_build_object` idempotency-key parameter had no SQLtype).
+Lead added explicit `::text` to that syntheticfixture parameter only; no productcode,
+guard or expectation weakened. Correctedfixture has NOT run. Do NOT run4 or equivalent
+SQLprobe without explicit owner authorization. Parent coordinator informed and asked
+to request exactly ONE additional invocation of this file on the sameowned PG17.5.
+No old/full/provider suite permission follows. Source reviewers rechecking exactcast;
+TypeScript/scopedlint/format checks active29147 (read logs before rerun).
+
+The14passing cases include real enrollment/consent/candidate preservation/denyreplay,
+identity and ownership conflicts, two-referral concurrency, privacy erasure and oldstart
+replay fence, forced inviter inactivation race. Earlier quote/handoff checks in the
+remaining case passed before fixturecreationfailed; expiredquote rejection unverified.
+A critical verification gate remains OPEN, so A is uncommitted and B/C/D/Phase2 have
+NOT started. No independent implementation remains before this gate; await actualowner
+extra-run answer, never infer approval from elapsedtime/automaticcontinuation.
+Owned Compose project ii-tonya-phase1-promo-20261023 remains for authorized followup;
+no customerdata/secrets/providers/liveflags involved. Other worktrees untouched.
+
+# BlockA final verification checkpoint — 2026-10-23 14:30 UTC
+
+Source and final independent reviews accepted, except pending runtime finalPG3.
+Relevant db/application/config builds, APItypes, testsTypeScript, scopedlint passed.
+Scope123/123 PASS; historyRED7/8→correctnewest52→GREEN8/8. Newservice25/25,
+route10/10, config16/16, composition8/8. PG GREEN2 consumed:11pass/4fixturefail;
+fixtures corrected preserving immutableguards. Final3 NOT yet consumed; storage
+adds actualexpiredquote rejection case before lead-owned single finalrun. No Bwork.
+Metadata0052 reconstructed130tables/43functions/75triggers, exactcatalogue/pins
+independently accepted. See docs/test-evidence/phase1-block-a-2026-10-23.md.
+Storage finaldbbuild55440 exited0; no distwriter active. Lead earlierbuild94304
+pipeline exited0. No providers/deployment/push. A remains uncommitted until final3.
+
+## BlockA review checkpoint — 2026-10-23 14:20 UTC
+
+Current service23/23 and route10/10 green after real new source changes; config16/16,
+composition8/8 green. Config builds/types and owned scoped lint are locally verified.
+Storage independent review fixed quote wrapper snapshot/error sanitization, quote
+replay flag, inviter erasure locking and consent timeout regressions before PGgreen.
+Remaining review fixes actively owned by block_a_storage: retain firstreferrer and
+stable event receipt even when approvednotice missing; exact denieddecision replay;
+24h pending renewal preserving candidate; erasure-safe PII-minimal bot/update tombstone
+so oldaccepted/start cannot recreate deleted user. PG remains RED1 only, GREEN2 pending,
+final3 reserved. Metadata/schema guard finalization waits source SQLsettled. No Acommit
+yet. B/C/D/Phase2 remain unstarted; no production/provider action.
+
+# Phase1 BlockA implementation active — 2026-10-23 14:15 UTC
+
+Execution owner: coordinator child `remaining_plan_implement`; keep this isolated
+worktree/branch. Source baseline8b41802cd0156f8596fbf0e1ba67890f2ed969f2.
+Main contract: docs/superpowers/implementation-artifacts/spec-phase1-through-phase2-execution.md.
+BlockA spec/plan present; B/C/D/Phase2 have NOT started because A critical storage,
+enrollment and review gates remain open. Do not duplicate active implementation.
+
+Within A, disjoint child owners: block_a_storage owns0052 SQL/schema/metadata,
+PostgresExpertPromoRepository, quote-transaction reuse, consent presentation reuse,
+privacy erasure and NEW tests/integration/phase1-promo.test.ts. block_a_composition
+owns config + app/server composition. block_a_audit owns exact scope/history guard
+registrations/rationale. Lead owns application service and dedicated promo route.
+Read-only block_a_ingress_review found global replay/quote authorization/duplicate
+reply gaps; remediation is active. Reviewers never edit source.
+
+New service tests: initial GREEN15/15; review RED6fail/11pass then GREEN17/17;
+enrollment RED then current GREEN21/21. New dedicated route RED then GREEN9/9.
+New config helper RED then GREEN15/15; composition GREEN awaits db/app builds.
+NEW PG file: RED1 consumed; GREEN2 pending; final3 reserved after independentreview.
+No existing exhausted PG/provider/verifier files, full suite or multi-path run.
+Preflight PASS Node24.22.0/pnpm11.9.0. No providers, secret copying, pushes or deploys.
+
+First unknown private/start requires approved document presentation and explicit
+bound-token consent; missing approved copy stays inactive TODO. No attribution,
+bonus or guide work before consent. Preserve first deep-link candidate until grant.
+Single event receipt must bind stable numeric receivingbotId/update to owner/digest
+across command types. Dedicated promo scope must differ from client/workbot.
+Quotes reuse existing immutable campaign engine; no new prices or ledger credit.
+Guide PDF absent: waiting_content; frozen100points is indication within1000RUB
+qualified reward (not additional available balance), no margin guarantee.
+
 # Phase0 guards repaired; continue approved plan — 2026-10-23
 
 Owner explicitly instructed: implement the entire approved plan in order and fix
