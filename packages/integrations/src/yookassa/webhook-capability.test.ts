@@ -3,7 +3,6 @@ import type {
   YooKassaOperation,
   YooKassaOperationPort,
 } from "./operation-port.js";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../expert-residency/verified-event.js";
 import { YooKassaPaymentVerifier } from "./verifier.js";
 import { YooKassaWebhookCapability } from "./webhook-capability.js";
 
@@ -287,16 +286,7 @@ describe("capture-wait real verifier boundary", () => {
           throw new Error("unexpected_provider_read");
         }),
       };
-      const canonical = {
-        verifyCanonical: vi.fn(
-          createCanonicalExpertResidencyPaymentEventVerifier().verifyCanonical,
-        ),
-      };
-      const verifier = new YooKassaPaymentVerifier(
-        provider,
-        operations,
-        canonical,
-      );
+      const verifier = new YooKassaPaymentVerifier(provider, operations);
       const capability = new YooKassaWebhookCapability(operations, verifier);
       await expect(
         capability.verify({
@@ -311,7 +301,6 @@ describe("capture-wait real verifier boundary", () => {
       );
       expect(provider.getPayment).not.toHaveBeenCalled();
       expect(provider.getRefund).not.toHaveBeenCalled();
-      expect(canonical.verifyCanonical).not.toHaveBeenCalled();
       expect(operations.resolve).not.toHaveBeenCalled();
     },
   );

@@ -1,3 +1,18 @@
+# Phase0 guards repaired; continue approved plan — 2026-10-23
+
+Owner explicitly instructed: implement the entire approved plan in order and fix
+findings along the way. Continue this isolated worktree; no new per-step approval.
+Current source repair: see docs/test-evidence/phase0-guard-reconciliation-2026-10-23.md.
+Scope123/123 and migration-history8/8 now PASS; earlier red status below is historical.
+New verifier-authority10/10 and import-boundary41/41 PASS, three independent reviews.
+No old exhausted test/PG rerun, provider request, push, deploy or feature activation.
+Next: BlockA, then B/C/D and Phase2 backlog; preserve Phase3 exclusions.
+Owner delegated bonus economics: use one-time100 frozen bonus points for2unique
+promo leads, included within existing1000RUB qualified referral reward, never100+1000.
+Registration alone cannot create available financial balance. PDF absent: prepare
+pending delivery/content slots, do not mark pdf_sent or fabricate a guide.
+External merchant, processor/backup and exact-SHA release gates remain separate.
+
 # Phase 0 isolated continuation — 2026-10-23
 
 This checkout is `codex/phase1-owner-plan-20261023`, based on

@@ -1,8 +1,6 @@
+import { mintVerifiedExpertResidencyPaymentEvent } from "../expert-residency/verified-event-internal.js";
 import { createHash } from "node:crypto";
-import type {
-  CanonicalExpertResidencyPaymentEventVerifier,
-  VerifiedExpertResidencyPaymentEvent,
-} from "../expert-residency/verified-event.js";
+import type { VerifiedExpertResidencyPaymentEvent } from "../expert-residency/verified-event.js";
 import type { YooKassaClient } from "./client.js";
 import type {
   YooKassaOperation,
@@ -28,7 +26,6 @@ export class YooKassaPaymentVerifier {
   constructor(
     private readonly client: Pick<YooKassaClient, "getPayment" | "getRefund">,
     private readonly operations: Pick<YooKassaOperationPort, "resolve">,
-    private readonly canonical: CanonicalExpertResidencyPaymentEventVerifier,
   ) {}
 
   private async readBoundPayment(operation: YooKassaOperation) {
@@ -105,7 +102,7 @@ export class YooKassaPaymentVerifier {
       occurredAt,
     };
     const event = { ...facts, payloadDigest: payloadDigest(facts) };
-    const verified = this.canonical.verifyCanonical(event, {
+    const verified = mintVerifiedExpertResidencyPaymentEvent(event, {
       verificationId: `yookassa-read:${payloadDigest(event).slice(7, 39)}`,
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,
@@ -164,7 +161,7 @@ export class YooKassaPaymentVerifier {
       occurredAt,
     };
     const event = { ...facts, payloadDigest: payloadDigest(facts) };
-    const verified = this.canonical.verifyCanonical(event, {
+    const verified = mintVerifiedExpertResidencyPaymentEvent(event, {
       verificationId: `yookassa-read:${payloadDigest(event).slice(7, 39)}`,
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,

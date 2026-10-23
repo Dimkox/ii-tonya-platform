@@ -23,7 +23,6 @@ import type { YooKassaOperation } from "@ii-tonya/integrations";
 import {
   createYooKassaClient,
   YooKassaPaymentVerifier,
-  createCanonicalExpertResidencyPaymentEventVerifier,
   YooKassaWebhookCapability,
   YooKassaExpertResidencyProviderReader,
 } from "../../packages/integrations/src/index.js";
@@ -194,7 +193,6 @@ async function verifiedPayment(operation: YooKassaOperation) {
       secretKey: "synthetic-secret",
     }),
     operations,
-    createCanonicalExpertResidencyPaymentEventVerifier(),
   );
   const event = await verifier.verifyPayment(operation);
   if (!event) throw new Error("fixture_success_required");
@@ -463,7 +461,6 @@ it("concurrent webhook and worker acceptance produces one canonical settlement",
       secretKey: "synthetic-secret",
     }),
     operations,
-    createCanonicalExpertResidencyPaymentEventVerifier(),
   );
   const webhook = new YooKassaWebhookCapability(operations, verifier);
   const notice = {

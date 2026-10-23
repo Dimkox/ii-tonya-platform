@@ -6,7 +6,6 @@ import {
 } from "@ii-tonya/db";
 import {
   createYooKassaClient,
-  createCanonicalExpertResidencyPaymentEventVerifier,
   YooKassaPaymentVerifier,
   YooKassaTerminalError,
   type YooKassaTransport,
@@ -88,11 +87,7 @@ export function createYooKassaWorkerComposition(
     },
   );
   const operations = new PostgresYooKassaOperationRepository(db);
-  const verifier = new YooKassaPaymentVerifier(
-    client,
-    operations,
-    createCanonicalExpertResidencyPaymentEventVerifier(),
-  );
+  const verifier = new YooKassaPaymentVerifier(client, operations);
   const inbox = new PostgresExpertResidencyProviderInboxRepository(db);
   // Every audit GET crosses the same admission and cancellation boundary.
   const auditReader = options.readerFactory?.(
