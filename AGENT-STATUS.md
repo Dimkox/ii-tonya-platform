@@ -4,6 +4,12 @@ This checkout is `codex/phase1-owner-plan-20261023`, based on
 `031ae46065b58223a2b6cd47e002b388a41ec89c`. The owner explicitly requested an
 isolated tree, recording the approved Phase 1 plan, then executing Phase 0.
 Plan commit: `d32da25dcdaf54ceb2039049ab348b3b54e9e2d4`.
+Implementation: `be3dfb270680aeed748e1769088fd7dbe573a51b`; clean committed technical
+review with MIGRATION-COMPATIBILITY marker is recorded in the evidence report.
+Focused PG schema18/18, atomic deletion10/10, payment16/16+16/16 and Telegram43/43
+passed. Both new PG-file three-invocation budgets are consumed; do not rerun.
+Scope121/123 and history7/8 remain failing, including inherited registration debt
+propagated into the new full snapshot. No full or multi-path suite was run.
 
 New continuation truth is scoped to this local Phase 0 work. The primary checkout's
 uncommitted provider/evidence changes were preserved; do not copy or amend them.
