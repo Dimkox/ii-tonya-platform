@@ -1,3 +1,7 @@
+import {
+  assertExpertResidencyLifecycleCapability,
+  type ExpertResidencyLifecycleCapability,
+} from "./expert-residency-lifecycle-composition.js";
 import { expertCardAdminRoutes } from "./routes/expert-cards.js";
 import {
   assertExpertCardCapability,
@@ -120,6 +124,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertResidencyLifecycle?: ExpertResidencyLifecycleCapability;
   expertCard?: ExpertCardCapability;
   expertVerification?: ExpertVerificationCapability;
   expertApplicantTelegram?: ExpertApplicantTelegramCapability;
@@ -274,6 +279,15 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertExpertResidencyLifecycleCapability(
+    deps.config,
+    deps.expertResidencyLifecycle,
+  );
+  if (
+    deps.config.features.expertResidencyLifecycleCommands === true &&
+    deps.expertResidencyLifecycle?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_residency_lifecycle_webhook_scope_conflict");
   assertExpertCardCapability(deps.config, deps.expertCard);
   if (
     deps.config.features.expertCard === true &&
@@ -408,6 +422,11 @@ export async function buildApp(
     (!deps.config.features.yookassa || !deps.yookassaWebhook)
   )
     throw new Error("expert_card_merchant_callback_required");
+  if (
+    deps.config.expertResidencyLifecycle?.renewalCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_residency_lifecycle_merchant_callback_required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -625,6 +644,11 @@ export async function buildApp(
       : {}),
   });
   await app.register(telegramWebhookRoutes, {
+    expertResidencyLifecycleEnabled:
+      deps.config.features.expertResidencyLifecycleCommands === true,
+    ...(deps.expertResidencyLifecycle
+      ? { expertResidencyLifecycle: deps.expertResidencyLifecycle }
+      : {}),
     expertCardEnabled: deps.config.features.expertCard === true,
     ...(deps.expertCard ? { expertCard: deps.expertCard } : {}),
     ...(deps.config.features.clientPrivacy === true &&

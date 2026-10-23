@@ -1,4 +1,9 @@
 import {
+  readExpertResidencyLifecycleConfig,
+  assertExpertResidencyLifecycleConfig,
+  type ExpertResidencyLifecycleConfig,
+} from "./expert-residency-lifecycle-config.js";
+import {
   readExpertCardConfig,
   type ExpertCardConfig,
 } from "./expert-card-config.js";
@@ -407,6 +412,7 @@ export type RuntimeConfig = {
   expertApplicant?: ExpertApplicantConfig;
   expertVerification?: ExpertVerificationConfig;
   expertCard?: ExpertCardConfig;
+  expertResidencyLifecycle?: ExpertResidencyLifecycleConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -455,6 +461,9 @@ export type RuntimeConfig = {
     expertVerification?: boolean;
     expertCard?: boolean;
     expertCardMaterialDelivery?: boolean;
+    expertResidencyLifecycle?: boolean;
+    expertResidencyLifecycleCommands?: boolean;
+    expertResidencyNoticeDelivery?: boolean;
     bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -669,6 +678,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
   const expertApplicant = readExpertApplicantConfig(source);
   const expertVerification = readExpertVerificationConfig(source);
+  const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
   const expertCard = readExpertCardConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
@@ -797,6 +807,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(expertApplicant ? { expertApplicant } : {}),
     ...(expertVerification ? { expertVerification } : {}),
     ...(expertCard ? { expertCard } : {}),
+    ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,
@@ -864,6 +875,15 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     features: {
       ...(expertApplicant ? { expertApplicant: true } : {}),
       ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
+      ...(expertResidencyLifecycle?.enabled
+        ? { expertResidencyLifecycle: true }
+        : {}),
+      ...(expertResidencyLifecycle?.commandsEnabled
+        ? { expertResidencyLifecycleCommands: true }
+        : {}),
+      ...(expertResidencyLifecycle?.noticeDeliveryEnabled
+        ? { expertResidencyNoticeDelivery: true }
+        : {}),
       ...(source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED === "true"
         ? { expertCardMaterialDelivery: true }
         : {}),
@@ -954,6 +974,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         }
       : {}),
   };
+  assertExpertResidencyLifecycleConfig(config);
   assertClientNavigationConfig(config);
   return config;
 }

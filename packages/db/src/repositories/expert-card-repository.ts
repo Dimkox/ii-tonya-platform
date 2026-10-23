@@ -262,7 +262,9 @@ type Operation =
   | "handoff_redeem"
   | "main_quote"
   | "main_accept"
-  | "main_checkout";
+  | "main_checkout"
+  | "residency_pause"
+  | "residency_resume";
 export interface StartedCardRequest {
   readonly userId: string;
   readonly replay: boolean;
@@ -301,10 +303,28 @@ async function paidApplication(tx: ExpertCardTransaction, userId: string) {
     ).rows[0] ?? null
   );
 }
+type PrivateCardOwner = {
+  userId: string;
+  applicationId: string;
+  policy: string;
+};
 async function owner(
   tx: ExpertCardTransaction,
   scope: ExpertPromoScope,
   expected?: string,
+  residencyOnly?: false,
+): Promise<PrivateCardOwner | null>;
+async function owner(
+  tx: ExpertCardTransaction,
+  scope: ExpertPromoScope,
+  expected: string | undefined,
+  residencyOnly: true,
+): Promise<{ userId: string; policy: string } | null>;
+async function owner(
+  tx: ExpertCardTransaction,
+  scope: ExpertPromoScope,
+  expected?: string,
+  residencyOnly = false,
 ) {
   if (
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(scope.botKey) ||
@@ -333,6 +353,14 @@ async function owner(
   )
     return null;
   const application = await paidApplication(tx, userId);
+  if (!application && residencyOnly) {
+    const settled = (
+      await tx.execute<{ id: string }>(
+        sql`select o.id from expert_residency_orders o join experts e on e.id=o.expert_id where e.user_id=${userId}::uuid and o.status in('settled','refunded','charged_back') limit 1`,
+      )
+    ).rows[0];
+    if (settled) return { userId, policy };
+  }
   return application
     ? { userId, applicationId: application.applicationId, policy }
     : null;
@@ -382,7 +410,10 @@ export async function beginCardRequest(
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtextextended(${`card:${scope.botId}:${scope.updateId}`},0))`,
   );
-  const identity = await owner(tx, scope);
+  const identity =
+    operation === "residency_pause" || operation === "residency_resume"
+      ? await owner(tx, scope, undefined, true)
+      : await owner(tx, scope);
   if (!identity) return fail("card_forbidden");
   return startKnownRequest(
     tx,

@@ -1,3 +1,52 @@
+# Block D first integrated PG active — 2026-10-23 19:16 UTC
+
+NEWtests/integration/phase1-residency-lifecycle.test.ts invocation1 NOWstarting12cases,
+log/tmp/phase1-d-lifecycle-pg1.log. Leadsolelauncher, no duplicate/probe. Task-wide
+countoverrideapplies; preserveactualattempts and onlytargetedneededverification.
+
+Allfinitepregatesclosed: fairscanRED1/37→GREEN37/sourceaccepted; finalDBbuild50244
+EXIT0, appworkerfinaltypes/buildEXIT0; fulltesttypes/lint/format+fixture12reviewPASS;
+leadAPIwiring5/ingress23+14+11+11/worker25/finance12+2+3GREEN. RequireDockerD45472
+EXIT0. Actual0055state155/67/109ready; stagedscopeFIRST123/123/historyFIRST8/8PASS,
+no retries. SQLff08821b unchanged. Allotherowners/commandsended(exceptrationaleappend).
+
+D1usesuniqueprovisionalbill+freshowneraccept+sameorderactualconfiguredlink; nofake
+acceptance/updates. Currentcoveragechain/paused/futuregap financialtruth preserved;
+legacyrequires_card explicit. No monetaryhistory/clockoverride/provider/liveflag.
+Readactualsessioncompletion, reportactualresult andcomprehensivediagnosisiffail;
+no permissionloop or speculativeunchangedsuite repetition. AfterDcommitPhase2next.
+
+# Block D final first-PG gates — 2026-10-23
+
+C localacceptance checkpoint35f341c0e5c5bc1507f46a0cf87250f92b186eeb complete;
+Dspec/plan/source active, NEWphase1-residency-lifecycle.test.ts12cases DPG0.
+Explicitcurrent-task verificationcountoverride remains; no countpermissionloop,
+no unnecessaryunchangedreruns/repeat-tool>3. No provider/push/deploy/liveflag.
+
+Disjointowners: storage lifecycle/0055/contracts/privacy (finalfairscanfix), finance
+mainacceptedbill/projection/canonicalearlysubject (ended/rootreviewaccepted), ingress
+application/config/Dcomposition/route (ended), worker actualrunner/main/runtime
+(ended), schema/state/guards owner (ready), Dfixtureauthor (finalstatic/assertions),
+lead actualapp/server/wiring/evidence/integratedlauncher. Reviewers readonly.
+
+Observedgreens: storage36 (finalfairscanregressionpending), finance12+2+3, worker25,
+service23/config14/actualroute11/normalcomposition11, leadnormalAPIwiring5. Relevant
+modulebuild/types/lintpassed; leadDBbuild34711PASS butfinalDBartifactafterfairscan
+needed. NewDfixture12types/lintpriorPASS, finalassertionchecksactive; no executions.
+Rootfinancialchain/gap/earlybarrier sourcefindingsallclosed. StoragereviewNULLbill/
+legacyrequires_card/noticeauthorityclosed. WorkerreviewONLYremainingblocker:
+futurepausedrowsmustadvancescanupdated_at toavoidstarvinglateroverdue residents;
+storagefix/regressionactive. No schemachangeexpected.
+
+0055frozenff08821bc86ffb3157fa759419251dbb5e68167629cf8e1d8114826e42be74d1;
+actual56migrationstate155tables/67functions/109triggers/1057constraints/418indexes,
+2extensions, onlyoldCHECKdeltaCrequestoperations. State/pinsready, Dscope/history0
+awaitfinalstage. Afterfairnesssourcefix+review, finalDB/appworkerartifactchecks,
+fixturehandoff+review, stageguards and FIRSTDfocusedPG promptly. Allsetupintracked
+hooks; actualfinancialintervals/DBclock unmodified, lawfulshortlegacytestfixture
+limitation explicit. Cmainresidentsfullrenewal; legacynewDfinancialflowrequiresreal
+Ccard (typedgate), oldgenericlegacycheckout/navigationpreserved.
+
 # Block C locally accepted; continue D then Phase2 — 2026-10-23
 
 C8 lead37597 EXIT0 FULL20/20 (started18:13:50UTC); log/tmp/phase1-c-card-pg8-traced.log,

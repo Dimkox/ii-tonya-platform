@@ -343,7 +343,7 @@ export const expertCardRequests = pgTable(
     ),
     check(
       "expert_card_request_operation",
-      sql`coalesce((${t.operation} IN ('entry','submit','promo_proof','handoff_issue','handoff_redeem','main_quote','main_accept','main_checkout')),false)`,
+      sql`coalesce((${t.operation} IN ('entry','submit','promo_proof','handoff_issue','handoff_redeem','main_quote','main_accept','main_checkout','residency_pause','residency_resume')),false)`,
     ),
   ],
 );

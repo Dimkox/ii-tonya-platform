@@ -96,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0055_expert_residency_lifecycle.sql",
   "packages/db/migrations/0054_expert_card_publication.sql",
   "packages/db/migrations/0053_expert_verification_onboarding.sql",
   // BlockA exact inventory: docs/spec/phase1-block-a-guard-registration.md.
@@ -126,6 +127,12 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
+  "expert_residency_lifecycle",
+  "expert_residency_renewal_bills",
+  "expert_residency_lifecycle_audits",
+  "expert_residency_lifecycle_notices",
+  "expert_residency_renewal_attempts",
   // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
   "expert_card_drafts",
   "expert_card_entries",
@@ -260,6 +267,10 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "EXPERT_RESIDENCY_LIFECYCLE_ENABLED",
+  "EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED",
+  "EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED",
+  "EXPERT_RESIDENCY_RENEWAL_CHECKOUT_ENABLED",
   "EXPERT_REFERRAL_ENABLED",
   "EXPERT_RESIDENCY_BILLING_ENABLED",
   "EXPERT_TELEGRAM_QUERIES_ENABLED",
@@ -727,6 +738,24 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // BlockD actual full-chain replay; docs/spec/phase1-block-d-guard-registration.md.
+  [
+    "packages/db/migrations/0055_expert_residency_lifecycle.sql",
+    "ff08821bc86ffb3157fa759419251dbb5e68167629cf8e1d8114826e42be74d1",
+  ],
+  [
+    "packages/db/migrations/meta/0055_snapshot.json",
+    "d6d7052022a575a9ca297e407a36a993d30e9548ae8034ab96c3e36d8cab758c",
+  ],
+  [
+    "packages/db/migrations/state/0055_manifest.json",
+    "03e735f484bed1b70522a03479b06e8eb71ffb2c9493f9d19e58701b3e58de0a",
+  ],
+  [
+    "packages/db/migrations/state/0055_sql_objects.json",
+    "19376bc5d926c10c68b35839526d0685199fab172d9eee4001fb2ce320032dce",
+  ],
+
   // BlockC actual full-chain SQL catalogue; no generation authority.
   [
     "packages/db/migrations/0054_expert_card_publication.sql",
@@ -1152,7 +1181,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "f8042b1ac0e8b0fcae77cda08905ac0151f1c269f2348fb9c152a19a13dccdf3",
+    "64fb1f05732a4f17de1f9ea14ac1aba17cb17df1b93167e9470c5037637efa58",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1232,10 +1261,16 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "f8042b1ac0e8b0fcae77cda08905ac0151f1c269f2348fb9c152a19a13dccdf3",
+    "64fb1f05732a4f17de1f9ea14ac1aba17cb17df1b93167e9470c5037637efa58",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
+  "expert_residency_lifecycle",
+  "expert_residency_renewal_bills",
+  "expert_residency_lifecycle_audits",
+  "expert_residency_lifecycle_notices",
+  "expert_residency_renewal_attempts",
   // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
   "expert_card_drafts",
   "expert_card_entries",

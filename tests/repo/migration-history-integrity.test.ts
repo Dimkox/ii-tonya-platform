@@ -62,6 +62,7 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_promo_referral_source",
   "enforce_expert_published_card_source",
   "enforce_expert_referral_admin_approval_global_unique",
+  "enforce_expert_residency_calendar_pause",
   "enforce_expert_verification_decision_source",
   "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
@@ -77,6 +78,7 @@ const HAND_SQL_FUNCTIONS = [
   "expert_referral_maturities_append_only_terminal",
   "expert_referral_maturities_no_delete",
   "expert_referral_validate_ledger_allocation_total",
+  "expert_residency_current_coverage",
   "expert_residency_default_provider_deadline",
   "expert_reward_grant_require_eligible_settlement",
   "lock_and_reject_selarti_budget_policy_overlap",
@@ -87,6 +89,8 @@ const HAND_SQL_FUNCTIONS = [
   "planerka_reservation_transition",
   "protect_expert_campaign_order_snapshot",
   "protect_expert_card_financial_binding",
+  "protect_expert_residency_renewal_attempt",
+  "protect_expert_residency_renewal_bill",
   "protect_payer_receipt_binding",
   "protect_payer_receipt_contact",
   "reject_append_only_change",
@@ -163,6 +167,10 @@ const HAND_SQL_TRIGGERS = [
   "expert_referral_admin_results_truncate_immutable",
   "expert_referral_maturities_delete_guard",
   "expert_referral_maturities_terminal_guard",
+  "expert_residency_calendar_pause_access",
+  "expert_residency_calendar_pause_publication",
+  "expert_residency_renewal_attempt_source",
+  "expert_residency_renewal_bill_source",
   "expert_verification_decisions_immutable",
   "expert_verification_decisions_no_delete",
   "expert_verification_decisions_source",
@@ -250,7 +258,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(54);
+    expect(newest).toBe(55);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -342,7 +350,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0054 adds15 card, material, consent-epoch and main-publication relations.
-    expect(declared.size).toBe(150);
+    // 0055 adds five calendar lifecycle, renewal and delivery-history relations.
+    expect(declared.size).toBe(155);
   });
 });

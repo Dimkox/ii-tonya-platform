@@ -13,3 +13,6 @@ export type { ExpertVerificationConfig } from "./expert-verification-config.js";
 
 export { assertExpertCardConfig } from "./expert-card-config.js";
 export type { ExpertCardConfig } from "./expert-card-config.js";
+
+export { assertExpertResidencyLifecycleConfig } from "./expert-residency-lifecycle-config.js";
+export type { ExpertResidencyLifecycleConfig } from "./expert-residency-lifecycle-config.js";

@@ -1,3 +1,11 @@
+import { restoreSettledMainCardProjection } from "./expert-residency-main-projection.js";
+import { acceptMainCardQuote } from "./expert-card-main-acceptance.js";
+import { lockClientConsentSubject } from "./client-consent-authority.js";
+import {
+  lockRenewalBillForCheckout,
+  finishRenewalBillOrder,
+  lockResidencyLifecycle,
+} from "./expert-residency-lifecycle-repository.js";
 import { sql } from "drizzle-orm";
 import {
   assertVerifiedExpertResidencyPaymentEvent,
@@ -60,6 +68,10 @@ export async function beginMainCardCheckout(
 ) {
   const request = await beginCardRequest(tx, input, "main_checkout", {
     revision: input.revision,
+    ...(input.renewalBillId ? { renewalBillId: input.renewalBillId } : {}),
+    ...(input.renewalAcceptedQuoteId
+      ? { renewalAcceptedQuoteId: input.renewalAcceptedQuoteId }
+      : {}),
   });
   const gate = await lockMainFrameGate(
     tx,
@@ -71,9 +83,31 @@ export async function beginMainCardCheckout(
     gate.messagingConsentPolicyVersion !== policy.messagingConsentPolicyVersion
   )
     fail("card_main_forbidden");
+  if (input.renewalAcceptedQuoteId && !request.replay)
+    await acceptMainCardQuote(tx, {
+      userId: request.userId,
+      quoteId: input.renewalAcceptedQuoteId,
+      renewalBillId: input.renewalBillId!,
+      gate,
+    });
+  if (input.renewalBillId && request.replay) {
+    const original = (
+      await tx.execute<{ id: string }>(
+        sql`select b.id from expert_residency_renewal_bills b join expert_residency_renewal_attempts a on a.bill_id=b.id where b.id=${input.renewalBillId}::uuid and b.user_id=${request.userId}::uuid and a.order_id=${request.resultId ?? null}::uuid`,
+      )
+    ).rows[0];
+    if (!original) return fail("card_main_renewal_forbidden");
+  }
+  const renewal =
+    input.renewalBillId && !request.replay
+      ? await lockRenewalBillForCheckout(tx, {
+          userId: request.userId,
+          billId: input.renewalBillId,
+        })
+      : null;
   const acceptance = (
     await tx.execute<MainCardAcceptance>(
-      sql`select id,application_id as "applicationId",application_audit_id as "applicationAuditId",user_id as "userId",expert_id as "expertId",quote_id as "quoteId",review_id as "reviewId",review_audit_id as "reviewAuditId",revision,public_digest as "publicDigest" from expert_card_main_acceptances a where user_id=${request.userId}::uuid and application_id=${gate.applicationId}::uuid and review_id=${gate.reviewId}::uuid and revision=${gate.revision} ${request.replay ? sql`and exists(select 1 from expert_card_main_orders m where m.acceptance_id=a.id and m.order_id=${request.resultId ?? null}::uuid and m.user_id=${request.userId}::uuid)` : sql``} order by created_at desc,id desc limit 1 for update`,
+      sql`select id,application_id as "applicationId",application_audit_id as "applicationAuditId",user_id as "userId",expert_id as "expertId",quote_id as "quoteId",review_id as "reviewId",review_audit_id as "reviewAuditId",revision,public_digest as "publicDigest" from expert_card_main_acceptances a where user_id=${request.userId}::uuid and application_id=${gate.applicationId}::uuid and review_id=${gate.reviewId}::uuid and revision=${gate.revision} ${renewal ? sql`and id=${renewal.acceptanceId}::uuid and quote_id=${renewal.quoteId}::uuid and expert_id=${renewal.expertId}::uuid` : sql``} ${request.replay ? sql`and exists(select 1 from expert_card_main_orders m where m.acceptance_id=a.id and m.order_id=${request.resultId ?? null}::uuid and m.user_id=${request.userId}::uuid)` : sql``} order by created_at desc,id desc limit 1 for update`,
     )
   ).rows[0];
   if (!acceptance || acceptance.publicDigest !== gate.publicDigest)
@@ -83,6 +117,7 @@ export async function beginMainCardCheckout(
     acceptance: acceptance!,
     gate,
     providerMode: policy.providerMode,
+    renewal,
   };
 }
 export type MainCheckoutAdmission = Awaited<
@@ -115,6 +150,8 @@ export async function finishMainCardCheckout(
   admission: MainCheckoutAdmission,
   orderId: string,
 ) {
+  if (admission.renewal)
+    await finishRenewalBillOrder(tx, admission.renewal, orderId);
   await finishCardRequest(tx, admission.request, orderId);
 }
 export interface MainCardAdmission {
@@ -138,6 +175,13 @@ export async function prepareMainCardSettlement(
     fail("card_main_payment_binding_mismatch");
   input = Object.freeze({ ...input });
   order = Object.freeze({ ...order });
+  const subject = (
+    await tx.execute<{ userId: string }>(
+      sql`select user_id as "userId" from expert_card_main_orders where order_id=${order.id}::uuid and expert_id=${order.expertId}::uuid and purpose='main_residency'`,
+    )
+  ).rows[0];
+  if (!subject) return null;
+  await lockClientConsentSubject(tx, subject.userId);
   const binding = (
     await tx.execute<{
       userId: string;
@@ -150,7 +194,8 @@ export async function prepareMainCardSettlement(
       sql`select user_id as "userId",application_id as "applicationId",review_id as "reviewId",revision,public_digest as "publicDigest",provider_mode as mode from expert_card_main_orders where order_id=${order.id}::uuid and expert_id=${order.expertId}::uuid and purpose='main_residency' for update`,
     )
   ).rows[0];
-  if (!binding) return null;
+  if (!binding || binding.userId !== subject.userId)
+    return fail("card_main_payment_binding_mismatch");
   const canonical = (
     await tx.execute<{ id: string }>(
       sql`select id from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} and order_id=${order.id}::uuid and payment_id=${input.paymentId} and amount_minor=${input.amountMinor}::bigint and currency=${input.currency} and event_kind='settled' and authenticated=true and identity_version=1 and verification_id=${input.verificationId} and verifier_key_version=${input.verifierKeyVersion} and verified_at=${new Date(input.verifiedAt)} and status='processing' for update nowait`,
@@ -176,6 +221,8 @@ export async function prepareMainCardSettlement(
       ...(expired !== false ? { expired: true } : {}),
     });
   };
+  const lifecycle = await lockResidencyLifecycle(tx, binding.userId);
+  if (lifecycle.paused) return blocked();
   if (!binding.applicationId || !binding.reviewId) return blocked();
   const gate = await lockCardActivationGate(tx, {
     applicationId: binding.applicationId,
@@ -238,6 +285,28 @@ export async function prepareMainCardSettlement(
   if (expired !== false)
     return Object.freeze({ orderId: order.id, admitted: false, expired: true });
 
+  await tx.execute(
+    sql`select id from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled' order by id for share nowait`,
+  );
+  const currentAccess = (
+    await tx.execute<{ valid: boolean }>(
+      sql`select not exists(select 1 from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled' and residency_ends_at>clock_timestamp()) or exists(select 1 from expert_residency_current_coverage(${order.expertId}::uuid)) as valid`,
+    )
+  ).rows[0]?.valid;
+  // Original calendar stacking can place this payment after a disconnected
+  // prepaid future interval. Record that money/period without current access.
+  if (currentAccess !== true) {
+    await tx.execute(
+      sql`update experts_published set active=false,updated_at=clock_timestamp() where expert_id=${order.expertId}::uuid`,
+    );
+    await tx.execute(
+      sql`update experts set active=false,updated_at=clock_timestamp() where id=${order.expertId}::uuid`,
+    );
+    await tx.execute(
+      sql`update expert_residency_lifecycle set status='payment_required' where user_id=${binding.userId}::uuid and status<>'paused'`,
+    );
+    return blocked();
+  }
   const enabled = (
     await tx.execute<{ id: string }>(
       sql`update experts set active=true,verified=true,public_display_name=${gate.publicPayload.displayName},updated_at=clock_timestamp() where id=${order.expertId}::uuid and user_id=${binding.userId}::uuid and exists(select 1 from users where id=${binding.userId}::uuid and active=true) returning id`,
@@ -282,15 +351,30 @@ export async function prepareMainCardSettlement(
 export async function publishSettledMainCard(
   tx: ExpertCardTransaction,
   admission: MainCardAdmission | null,
-  endsAt: Date,
 ) {
   if (!admission?.admitted) return;
   const held = admissions.get(admission);
-  if (!held || held.tx !== tx) fail("card_main_forbidden");
-  const g = held!.gate;
+  if (!held || held.tx !== tx) return fail("card_main_forbidden");
   await tx.execute(
-    sql`insert into experts_published(expert_id,user_id,application_audit_id,draft_id,review_id,revision,public_payload,public_digest,paid_order_id,next_billing_date,active) values(${held!.expertId}::uuid,${g.userId}::uuid,${g.applicationId}::uuid,${g.draftId}::uuid,${g.reviewId}::uuid,${g.revision},${JSON.stringify(g.publicPayload)}::jsonb,${g.publicDigest},${admission.orderId}::uuid,${endsAt},true) on conflict(expert_id) do update set draft_id=excluded.draft_id,review_id=excluded.review_id,revision=excluded.revision,public_payload=excluded.public_payload,public_digest=excluded.public_digest,paid_order_id=excluded.paid_order_id,next_billing_date=excluded.next_billing_date,active=true,updated_at=clock_timestamp()`,
+    sql`insert into expert_residency_lifecycle(user_id,expert_id,status) values(${held.gate.userId}::uuid,${held.expertId}::uuid,'payment_required') on conflict(user_id) do nothing`,
   );
+  const projected = await restoreSettledMainCardProjection(tx, {
+    userId: held.gate.userId,
+    expertId: held.expertId,
+  });
+  if (!projected) {
+    // A verified payment remains settled even when its interval is disconnected
+    // or current public-card eligibility changed. Never mint an access exception.
+    await tx.execute(
+      sql`update experts_published set active=false,updated_at=clock_timestamp() where expert_id=${held.expertId}::uuid`,
+    );
+    await tx.execute(
+      sql`update experts set active=false,updated_at=clock_timestamp() where id=${held.expertId}::uuid`,
+    );
+    await tx.execute(
+      sql`update expert_residency_lifecycle set status='payment_required' where user_id=${held.gate.userId}::uuid and status<>'paused'`,
+    );
+  }
 }
 export async function suspendReversedMainCard(
   tx: ExpertCardTransaction,

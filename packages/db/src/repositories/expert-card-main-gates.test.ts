@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   createYooKassaClient,
   YooKassaPaymentVerifier,
@@ -76,6 +77,11 @@ describe("main-card canonical settlement admission", () => {
     const execute = vi
       .fn()
       .mockResolvedValueOnce({
+        rows: [{ userId: "00000000-0000-4000-8000-000000000116" }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
         rows: [
           {
             userId: "00000000-0000-4000-8000-000000000116",
@@ -95,6 +101,14 @@ describe("main-card canonical settlement admission", () => {
         { id: orderId, expertId },
       ),
     ).rejects.toThrow("card_main_payment_binding_mismatch");
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(5);
+    const dialect = new PgDialect();
+    const statements = execute.mock.calls.map(
+      ([query]) => dialect.sqlToQuery(query).sql,
+    );
+    expect(statements[0]).not.toContain("for update");
+    expect(statements[1]).toContain("lock table consent_document_versions");
+    expect(statements[2]).toContain("pg_advisory_xact_lock");
+    expect(statements[3]).toContain("for update");
   });
 });

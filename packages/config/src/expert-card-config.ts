@@ -10,7 +10,13 @@ export interface ExpertCardConfig {
   webhookSecret: string;
 }
 type Config = {
-  features: { expertCard?: boolean; expertCardMaterialDelivery?: boolean };
+  features: {
+    expertCard?: boolean;
+    expertCardMaterialDelivery?: boolean;
+    expertResidencyLifecycle?: boolean;
+    expertResidencyLifecycleCommands?: boolean;
+    expertResidencyNoticeDelivery?: boolean;
+  };
   expertCard?: ExpertCardConfig;
   clientTelegramBotToken?: string;
   clientTelegramBotKey?: string;
@@ -24,7 +30,10 @@ export function assertExpertCardConfig(config: Config): void {
   if (
     config.features.expertCard !== true &&
     config.features.expertCardMaterialDelivery !== true &&
-    config.expertCard?.materialDeliveryEnabled !== true
+    config.expertCard?.materialDeliveryEnabled !== true &&
+    config.features.expertResidencyLifecycle !== true &&
+    config.features.expertResidencyLifecycleCommands !== true &&
+    config.features.expertResidencyNoticeDelivery !== true
   )
     return;
   const c = config.expertCard;
@@ -36,7 +45,8 @@ export function assertExpertCardConfig(config: Config): void {
     (c.mainCheckoutEnabled && config.features.expertCard !== true) ||
     (config.features.expertCardMaterialDelivery === true &&
       !c.materialDeliveryEnabled) ||
-    (c.materialDeliveryEnabled &&
+    ((c.materialDeliveryEnabled ||
+      config.features.expertResidencyNoticeDelivery === true) &&
       (!exact(/^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u, c.workBotToken) ||
         c.workBotToken.split(":")[0] !== c.workBotId)) ||
     !exact(/^[1-9][0-9]{0,15}$/u, c.workBotId) ||
@@ -57,7 +67,8 @@ export function assertExpertCardConfig(config: Config): void {
   )
     throw new Error("expert_card_configuration_required");
   if (
-    config.features.expertCard === true &&
+    (config.features.expertCard === true ||
+      config.features.expertResidencyLifecycleCommands === true) &&
     config.yookassa &&
     config.yookassa.mode !== c.paymentMode
   )
@@ -85,6 +96,9 @@ export function readExpertCardConfig(
 ): ExpertCardConfig | undefined {
   const enabled = source.EXPERT_CARD_ENABLED || "false";
   const delivery = source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED || "false";
+  const lifecycle = source.EXPERT_RESIDENCY_LIFECYCLE_ENABLED === "true",
+    commands = source.EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED === "true",
+    notice = source.EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED === "true";
   const checkout = source.EXPERT_CARD_MAIN_CHECKOUT_ENABLED || "false";
   if (
     !["true", "false"].includes(enabled) ||
@@ -94,9 +108,16 @@ export function readExpertCardConfig(
     throw new Error("expert_card_configuration_invalid");
   if (checkout === "true" && enabled !== "true")
     throw new Error("expert_card_configuration_required");
-  if (enabled !== "true" && delivery !== "true") return undefined;
   if (
-    enabled === "true" &&
+    enabled !== "true" &&
+    delivery !== "true" &&
+    !lifecycle &&
+    !commands &&
+    !notice
+  )
+    return undefined;
+  if (
+    (enabled === "true" || commands) &&
     source.YOOKASSA_MODE &&
     source.YOOKASSA_MODE !== source.EXPERT_CARD_PAYMENT_MODE
   )
@@ -105,7 +126,7 @@ export function readExpertCardConfig(
     paymentMode: source.EXPERT_CARD_PAYMENT_MODE as "test" | "live",
     materialDeliveryEnabled: delivery === "true",
     mainCheckoutEnabled: checkout === "true",
-    ...(delivery === "true" && source.EXPERT_TELEGRAM_BOT_TOKEN
+    ...((delivery === "true" || notice) && source.EXPERT_TELEGRAM_BOT_TOKEN
       ? { workBotToken: source.EXPERT_TELEGRAM_BOT_TOKEN }
       : {}),
     workBotId: source.EXPERT_CARD_WORK_BOT_ID ?? "",
@@ -119,6 +140,9 @@ export function readExpertCardConfig(
     features: {
       expertCard: enabled === "true",
       expertCardMaterialDelivery: delivery === "true",
+      expertResidencyLifecycle: lifecycle,
+      expertResidencyLifecycleCommands: commands,
+      expertResidencyNoticeDelivery: notice,
     },
     expertCard: card,
     ...(source.TELEGRAM_BOT_TOKEN

@@ -1,5 +1,6 @@
 import {
   validRawExpertCardUpdateId,
+  isExpertResidencyLifecycleUpdate,
   parseExpertCardTelegramUpdate,
   type ExpertCardTelegramIngress,
 } from "../expert-card-telegram-ingress.js";
@@ -190,6 +191,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   testExpertPromo?: TelegramTestExpertPromoIngress;
   expertCardEnabled?: boolean;
   expertCard?: ExpertCardTelegramIngress;
+  expertResidencyLifecycleEnabled?: boolean;
+  expertResidencyLifecycle?: ExpertCardTelegramIngress;
   bookingCallbacksEnabled?: boolean;
   bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
@@ -204,6 +207,26 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       !secureEqual(deps.expertCard.webhookSecret, deps.secret))
   )
     throw new Error("expert_card_capability_required");
+  if (deps.expertResidencyLifecycleEnabled === true) {
+    const c = deps.expertResidencyLifecycle;
+    if (
+      !c ||
+      !Number.isSafeInteger(Number(c.workBotId)) ||
+      !/^[1-9][0-9]{0,15}$/u.test(c.workBotId) ||
+      !c.workBotKey ||
+      typeof c.service?.handleWork !== "function" ||
+      typeof c.legacyReplay?.read !== "function" ||
+      !secureEqual(c.webhookSecret, deps.secret)
+    )
+      throw new Error("expert_residency_lifecycle_capability_required");
+    if (
+      deps.expertCardEnabled === true &&
+      deps.expertCard &&
+      (deps.expertCard.workBotId !== c.workBotId ||
+        deps.expertCard.workBotKey !== c.workBotKey)
+    )
+      throw new Error("expert_residency_lifecycle_scope_conflict");
+  }
   const securityEvent = createSecurityEvent();
   app.addHook("onResponse", async (request, reply) => {
     if (
@@ -482,7 +505,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       bodyLimit: 65_536,
       preValidation: async (request, reply) => {
         if (
-          deps.expertCardEnabled === true &&
+          (deps.expertCardEnabled === true ||
+            deps.expertResidencyLifecycleEnabled === true) &&
           !validRawExpertCardUpdateId(request.body)
         )
           return reply.code(400).send({ error: "invalid_update" });
@@ -546,17 +570,26 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         return reply.code(429).send({ error: "rate_limited" });
       }
       if (await deletion(request.body, reply)) return;
-      if (deps.expertCardEnabled === true && deps.expertCard) {
+      const lifecycleRequest =
+        deps.expertResidencyLifecycleEnabled === true &&
+        isExpertResidencyLifecycleUpdate(request.body);
+      const interceptor = lifecycleRequest
+        ? deps.expertResidencyLifecycle
+        : deps.expertCardEnabled === true
+          ? deps.expertCard
+          : undefined;
+      if (interceptor) {
         const parsed = parseExpertCardTelegramUpdate(
           request.body,
-          deps.expertCard,
+          interceptor,
+          { lifecycleCommands: lifecycleRequest },
         );
         if (parsed.kind === "invalid")
           return reply.code(400).send({ error: "invalid_card_update" });
         if (parsed.kind === "parsed") {
           try {
-            const legacy = await deps.expertCard.legacyReplay.read({
-              botId: deps.expertCard.workBotId,
+            const legacy = await interceptor.legacyReplay.read({
+              botId: interceptor.workBotId,
               updateId: parsed.input.updateId,
             });
             if (legacy === "complete")
@@ -572,16 +605,14 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           }
           if (
             !deps.rateLimiter.consume(
-              `telegram:expert-card:${deps.expertCard.workBotId}:${parsed.input.telegramUserId}`,
+              `telegram:${lifecycleRequest ? "expert-residency-lifecycle" : "expert-card"}:${interceptor.workBotId}:${parsed.input.telegramUserId}`,
               20,
               60000,
             )
           )
             return reply.code(429).send({ error: "rate_limited" });
           try {
-            const result = await deps.expertCard.service.handleWork(
-              parsed.input,
-            );
+            const result = await interceptor.service.handleWork(parsed.input);
             if (result.status === "handled")
               return {
                 method: "sendMessage",

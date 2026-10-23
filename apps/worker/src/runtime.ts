@@ -12,6 +12,7 @@ export interface WorkerCycleReport {
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
   readonly expertCardMaterials?: unknown;
+  readonly expertResidencyLifecycle?: unknown;
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
@@ -53,6 +54,10 @@ export interface WorkerRuntimeDependencies {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
+  readonly expertResidencyLifecycle?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   /** Dedicated safety repository/dispatcher path; never a Planerka or intent-model call. */
   readonly safetyHandoffs: BoundedJob;
   readonly recoverExpiredLeases: BoundedJob;
@@ -82,6 +87,10 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
   readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertResidencyLifecycle?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -204,6 +213,9 @@ export function createWorkerRuntime(
         await deps.expertTelegramCheckoutCleanup();
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
+      const expertResidencyLifecycle = acceptingClaims
+        ? await deps.expertResidencyLifecycle?.runOnce()
+        : undefined;
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
       const expertReferralMaturity =
         (await deps.expertReferralMaturity?.()) ?? {
@@ -233,6 +245,9 @@ export function createWorkerRuntime(
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(expertResidencyLifecycle === undefined
+          ? {}
+          : { expertResidencyLifecycle }),
         safetyHandoffs,
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
@@ -263,6 +278,7 @@ export function createWorkerRuntime(
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
     deps.expertCardMaterials?.stopAccepting();
+    deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
     closePromise = (async () => {
       let failure: unknown;
@@ -321,6 +337,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.expertResidencyLifecycle === undefined
+      ? {}
+      : { expertResidencyLifecycle: deps.expertResidencyLifecycle }),
     ...(deps.expertCardMaterials === undefined
       ? {}
       : { expertCardMaterials: deps.expertCardMaterials }),

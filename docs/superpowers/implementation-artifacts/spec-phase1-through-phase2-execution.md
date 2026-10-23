@@ -151,6 +151,6 @@ failures or unresolved acceptance. Assertions, runtime and release boundaries st
 
 A and B are locally complete. C is locally complete after C8 passed20/20 on isolated
 PostgreSQL17.5; its spec/evidence retain all failed attempts, reviews and external
-gates. D and Phase2 continue in order with proportional reuse, per-block focused
+gates. D is locally complete after its first focused run passed12/12. Phase2 continues with proportional reuse, per-block focused
 verification/review/local checkpoints and no new permission loop. Local fixture
 acceptance is not provider or release acceptance.

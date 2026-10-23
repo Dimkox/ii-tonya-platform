@@ -1,3 +1,4 @@
+import { lockClientConsentSubject } from "./client-consent-authority.js";
 import {
   prepareMainCardSettlement,
   publishSettledMainCard,
@@ -198,6 +199,14 @@ export class PostgresExpertResidencyProviderInboxRepository {
         // checkout expert advisory here would invert its control-first order.
         await tx.execute(sql`set transaction isolation level serializable`);
         await tx.execute(sql`set local lock_timeout='250ms'`);
+        // Main checkout takes subject before order. Match that order before
+        // inbox/order locks; the immutable binding is revalidated in prepare.
+        const mainSubject = (
+          await tx.execute<{ userId: string }>(
+            sql`select user_id as "userId" from expert_card_main_orders where order_id=${input.orderId}::uuid and purpose='main_residency'`,
+          )
+        ).rows[0];
+        if (mainSubject) await lockClientConsentSubject(tx, mainSubject.userId);
         const digest = input.payloadDigest.slice("sha256:".length);
         await tx.execute(
           sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
@@ -559,7 +568,7 @@ export class PostgresExpertResidencyProviderInboxRepository {
           });
           rewardGranted = allocation !== "already_granted";
         }
-        await publishSettledMainCard(tx, mainCardAdmission, end);
+        await publishSettledMainCard(tx, mainCardAdmission);
         const outboxPayload = JSON.stringify({
           orderId: order.id,
           expertId: order.expertId,

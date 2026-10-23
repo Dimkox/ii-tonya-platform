@@ -360,6 +360,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
           await tx.execute(
+            sql`update experts set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active`,
+          );
+          await tx.execute(
+            sql`update expert_residency_lifecycle_notices set status='cancelled' where user_id=${command.targetUserId}::uuid and status<>'delivered'`,
+          );
+          await tx.execute(
             sql`update experts_published set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active=true`,
           );
           await tx.execute(
@@ -955,6 +961,20 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Lifecycle routing/schedules are not financial retention data. Immutable
+        // renewal attempts retain only the canonical financial UUID bindings.
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle_notices where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle_audits where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_residency_renewal_bills set user_id=null where user_id=${command.targetUserId}::uuid`,
+        );
         // Card raw entries, private media/proofs, approved public payload and live
         // publication have no financial retention authority. Financial C bindings
         // retain UUID/digest audit facts via nullable live FKs, never raw content.

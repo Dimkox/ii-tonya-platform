@@ -360,3 +360,5 @@ export * from "./repositories/expert-card-repository.js";
 export * from "./repositories/expert-manager-authority.js";
 
 export * from "./repositories/expert-onboarding-main-payment-repository.js";
+
+export * from "./repositories/expert-residency-lifecycle-repository.js";

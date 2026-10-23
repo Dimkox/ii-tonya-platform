@@ -91,26 +91,7 @@ export function createExpertCardComposition(
     ...(settings.mainCheckoutEnabled && options.mainCheckout
       ? { mainCheckout: options.mainCheckout }
       : {}),
-    legacyReplay: {
-      async read(input) {
-        if (
-          input.botId !== settings.workBotId ||
-          !/^(0|[1-9][0-9]{0,15})$/u.test(input.updateId) ||
-          !Number.isSafeInteger(Number(input.updateId))
-        )
-          throw new Error("expert_card_legacy_replay_invalid");
-        const row = (
-          await db.execute<{ status: string }>(
-            sql`select status from webhook_inbox where provider='telegram' and external_event_id=${input.updateId} limit 1`,
-          )
-        ).rows[0];
-        return !row
-          ? "absent"
-          : row.status === "complete"
-            ? "complete"
-            : "pending";
-      },
-    },
+    legacyReplay: createExpertCardLegacyReplayRead(db, settings.workBotId),
     service: createExpertCardService({
       enabled: true,
       paymentMode: settings.paymentMode,
@@ -150,4 +131,30 @@ export function assertExpertCardCheckout(
     typeof options.mainCheckout.createOrRecover !== "function"
   )
     throw new Error("expert_card_checkout_capability_required");
+}
+
+export function createExpertCardLegacyReplayRead(
+  db: DrizzleDb,
+  workBotId: string,
+): ExpertCardLegacyReplayRead {
+  return {
+    async read(input) {
+      if (
+        input.botId !== workBotId ||
+        !/^(0|[1-9][0-9]{0,15})$/u.test(input.updateId) ||
+        !Number.isSafeInteger(Number(input.updateId))
+      )
+        throw new Error("expert_card_legacy_replay_invalid");
+      const row = (
+        await db.execute<{ status: string }>(
+          sql`select status from webhook_inbox where provider='telegram' and external_event_id=${input.updateId} limit 1`,
+        )
+      ).rows[0];
+      return !row
+        ? "absent"
+        : row.status === "complete"
+          ? "complete"
+          : "pending";
+    },
+  };
 }

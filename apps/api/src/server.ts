@@ -1,4 +1,10 @@
 import {
+  createExpertResidencyLifecycleComposition,
+  assertExpertResidencyLifecycleCheckout,
+  type ExpertResidencyLifecycleCompositionOptions,
+} from "./expert-residency-lifecycle-composition.js";
+import { assertExpertResidencyLifecycleConfig } from "@ii-tonya/config";
+import {
   createExpertCardComposition,
   assertExpertCardCheckout,
   type ExpertCardCompositionOptions,
@@ -139,6 +145,7 @@ const disabledService = <T extends object>(name: string): T =>
 
 export const createDefaultLifecycle = (
   options: {
+    expertResidencyLifecycle?: ExpertResidencyLifecycleCompositionOptions;
     expertCard?: ExpertCardCompositionOptions;
     expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
     yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
@@ -182,6 +189,16 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertExpertResidencyLifecycleConfig(config);
+    assertExpertResidencyLifecycleCheckout(
+      config,
+      options.expertResidencyLifecycle,
+    );
+    if (
+      config.expertResidencyLifecycle?.renewalCheckoutEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_residency_lifecycle_merchant_callback_required");
     assertExpertCardConfig(config);
     assertExpertCardCheckout(config, options.expertCard);
     if (
@@ -556,6 +573,11 @@ export const createDefaultLifecycle = (
       config,
       options.expertVerificationPayments,
     );
+    const expertResidencyLifecycle = createExpertResidencyLifecycleComposition(
+      db,
+      config,
+      options.expertResidencyLifecycle,
+    );
     const expertCard = createExpertCardComposition(
       db,
       config,
@@ -620,6 +642,7 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
       ...(expertCard ? { expertCard } : {}),
       ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),
       ...(expertVerification ? { expertVerification } : {}),

@@ -46,3 +46,5 @@ export {
 } from "./yookassa-bound-reconciliation.js";
 
 export * from "./expert-card-materials.js";
+
+export * from "./expert-residency-lifecycle.js";

@@ -42,3 +42,5 @@ export {
 export * from "./client-account-packages.js";
 export { serializeBookingNotificationWire } from "./booking-notification-wire.js";
 export * from "./expert-campaign-quotes.js";
+
+export * from "./expert-residency-lifecycle.js";

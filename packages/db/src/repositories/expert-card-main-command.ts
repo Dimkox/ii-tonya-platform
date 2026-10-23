@@ -10,12 +10,18 @@ export type MainCardQuoteCommand = MainCardScope & {
   tariffVersionId: string;
   termMonths: 1 | 3;
   revision: number;
+  renewalBillId?: string;
 };
 export type MainCardAcceptanceCommand = MainCardScope & {
   quoteId: string;
   revision: number;
+  renewalBillId?: string;
 };
-export type MainCardCheckoutCommand = MainCardScope & { revision: number };
+export type MainCardCheckoutCommand = MainCardScope & {
+  revision: number;
+  renewalBillId?: string;
+  renewalAcceptedQuoteId?: string;
+};
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 export class CardMainPaymentError extends Error {
@@ -60,6 +66,10 @@ export function parseMainCardCommand(
     "requestKey",
     "requestDigest",
     ...specific,
+    ...(operation === "checkout" && Object.hasOwn(r, "renewalAcceptedQuoteId")
+      ? ["renewalAcceptedQuoteId"]
+      : []),
+    ...(Object.hasOwn(r, "renewalBillId") ? ["renewalBillId"] : []),
   ];
   if (
     Object.keys(r).length !== keys.length ||
@@ -78,6 +88,19 @@ export function parseMainCardCommand(
     !Number.isSafeInteger(Number(r.requestKey.slice(r.botId.length + 1))) ||
     typeof r.requestDigest !== "string" ||
     !/^[0-9a-f]{64}$/u.test(r.requestDigest)
+  )
+    return fail("card_main_invalid_request");
+  if (
+    Object.hasOwn(r, "renewalBillId") &&
+    (typeof r.renewalBillId !== "string" || !uuid.test(r.renewalBillId))
+  )
+    return fail("card_main_invalid_request");
+  if (
+    Object.hasOwn(r, "renewalAcceptedQuoteId") &&
+    (operation !== "checkout" ||
+      typeof r.renewalAcceptedQuoteId !== "string" ||
+      !uuid.test(r.renewalAcceptedQuoteId) ||
+      typeof r.renewalBillId !== "string")
   )
     return fail("card_main_invalid_request");
   if (

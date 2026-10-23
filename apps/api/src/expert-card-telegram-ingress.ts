@@ -36,6 +36,7 @@ const file = (value: unknown): string | null =>
 export function parseExpertCardTelegramUpdate(
   body: unknown,
   scope: Pick<ExpertCardTelegramIngress, "workBotId" | "workBotKey">,
+  options: { lifecycleCommands?: boolean } = {},
 ):
   | { kind: "unhandled" | "invalid" }
   | { kind: "parsed"; input: Parameters<ExpertCardService["handleWork"]>[0] } {
@@ -49,7 +50,8 @@ export function parseExpertCardTelegramUpdate(
     message.text.startsWith("/") &&
     !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice)(?:\s|$)|^\/start card_/u.test(
       message.text,
-    )
+    ) &&
+    !(options.lifecycleCommands && isExpertResidencyLifecycleUpdate(root))
   )
     return { kind: "unhandled" };
   const from = record(message.from),
@@ -124,4 +126,15 @@ export function parseExpertCardTelegramUpdate(
         .digest("hex"),
     },
   };
+}
+
+export function isExpertResidencyLifecycleUpdate(body: unknown): boolean {
+  const root = record(body),
+    message = record(root?.message);
+  return (
+    typeof message?.text === "string" &&
+    /^\/(?:residency|renewal|renewal_quote|renewal_accept|renewal_invoice|pause|resume)(?:\s|$)/u.test(
+      message.text.trim(),
+    )
+  );
 }

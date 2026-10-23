@@ -1,7 +1,14 @@
+import {
+  lockRenewalBillForMutation,
+  acceptMainCardQuote,
+} from "./expert-card-main-acceptance.js";
 export * from "./expert-card-main-command.js";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
-import { PostgresExpertCampaignQuoteRepository } from "./expert-campaign-quote-repository.js";
+import {
+  PostgresExpertCampaignQuoteRepository,
+  ExpertCampaignQuoteError,
+} from "./expert-campaign-quote-repository.js";
 import { PostgresExpertCampaignOrderRepository } from "./expert-campaign-order-repository.js";
 import {
   beginCardRequest,
@@ -77,6 +84,11 @@ export class PostgresExpertOnboardingMainPaymentRepository {
     } catch (error) {
       if (error instanceof CardMainPaymentError) throw error;
       if (
+        error instanceof ExpertCampaignQuoteError &&
+        error.code === "EXPERT_CAMPAIGN_TERM_UNAVAILABLE"
+      )
+        throw new CardMainPaymentError("card_main_term_unavailable");
+      if (
         error instanceof Error &&
         "code" in error &&
         typeof error.code === "string" &&
@@ -93,6 +105,7 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         tariffVersionId: input.tariffVersionId,
         termMonths: input.termMonths,
         revision: input.revision,
+        ...(input.renewalBillId ? { renewalBillId: input.renewalBillId } : {}),
       });
       const gate = await lockMainFrameGate(
         tx,
@@ -125,6 +138,12 @@ export class PostgresExpertOnboardingMainPaymentRepository {
           replay: true,
         };
       }
+      if (input.renewalBillId)
+        await lockRenewalBillForMutation(
+          tx,
+          started.userId,
+          input.renewalBillId,
+        );
       const quote = await new PostgresExpertCampaignQuoteRepository(
         this.db,
       ).createQuoteInTransaction(tx, {
@@ -133,6 +152,10 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         termMonths: input.termMonths,
         idempotencyKey: `card-quote:${input.requestKey}`,
       });
+      if (input.renewalBillId)
+        await tx.execute(
+          sql`update expert_residency_renewal_bills set quote_id=${quote.id}::uuid,acceptance_id=null,tariff_version_id=${input.tariffVersionId}::uuid,term_months=${input.termMonths} where id=${input.renewalBillId}::uuid and user_id=${started.userId}::uuid`,
+        );
       await finishCardRequest(tx, started, quote.id);
       return {
         id: quote.id,
@@ -151,6 +174,7 @@ export class PostgresExpertOnboardingMainPaymentRepository {
       const started = await beginCardRequest(tx, input, "main_accept", {
         quoteId: input.quoteId,
         revision: input.revision,
+        ...(input.renewalBillId ? { renewalBillId: input.renewalBillId } : {}),
       });
       const gate = await lockMainFrameGate(
         tx,
@@ -176,41 +200,12 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         if (!prior) invalid("card_main_replay_unavailable");
         return { ...prior!, replay: true };
       }
-      const quote = (
-        await tx.execute<{ id: string }>(
-          sql`select id from expert_campaign_quotes where id=${input.quoteId}::uuid and user_id=${started.userId}::uuid for share`,
-        )
-      ).rows[0];
-      const valid =
-        quote &&
-        (
-          await tx.execute<{ valid: boolean }>(
-            sql`select quoted_at<=clock_timestamp() and expires_at>clock_timestamp() as valid from expert_campaign_quotes where id=${quote.id}::uuid`,
-          )
-        ).rows[0]?.valid;
-      if (valid !== true) invalid("card_main_quote_expired_or_unavailable");
-      // Creating a private inactive expert identity grants no API or paid access.
-      await tx.execute(
-        sql`insert into experts(user_id,active,verified) values(${started.userId}::uuid,false,false) on conflict(user_id) do nothing`,
-      );
-      const expert = (
-        await tx.execute<{ id: string }>(
-          sql`select id from experts where user_id=${started.userId}::uuid for update`,
-        )
-      ).rows[0];
-      if (!expert) invalid("card_main_forbidden");
-      const accepted =
-        (
-          await tx.execute<{ id: string }>(
-            sql`insert into expert_card_main_acceptances(application_id,application_audit_id,user_id,expert_id,review_id,review_audit_id,revision,public_digest,quote_id,created_at) values(${gate.applicationId}::uuid,${gate.applicationId}::uuid,${started.userId}::uuid,${expert!.id}::uuid,${gate.reviewId}::uuid,${gate.reviewId}::uuid,${gate.revision},${gate.publicDigest},${input.quoteId}::uuid,clock_timestamp()) on conflict(user_id,review_audit_id,quote_id) do nothing returning id`,
-          )
-        ).rows[0] ??
-        (
-          await tx.execute<{ id: string }>(
-            sql`select id from expert_card_main_acceptances where user_id=${started.userId}::uuid and review_audit_id=${gate.reviewId}::uuid and quote_id=${input.quoteId}::uuid`,
-          )
-        ).rows[0];
-      if (!accepted) invalid("card_main_storage_unavailable");
+      const accepted = await acceptMainCardQuote(tx, {
+        userId: started.userId,
+        quoteId: input.quoteId,
+        gate,
+        ...(input.renewalBillId ? { renewalBillId: input.renewalBillId } : {}),
+      });
       await finishCardRequest(tx, started, accepted!.id);
       return {
         acceptanceId: accepted!.id,
@@ -297,6 +292,15 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         )
       ).rows[0]?.valid;
       return !!operation && valid === true;
+    });
+  }
+  async acceptRenewalAndCreateInvoice(raw: MainCardAcceptanceCommand) {
+    const input = parseMainCardCommand(raw, "accept");
+    if (!input.renewalBillId) invalid("card_main_invalid_request");
+    const { quoteId, ...frame } = input;
+    return this.createMainInvoice({
+      ...frame,
+      renewalAcceptedQuoteId: quoteId,
     });
   }
   async createMainInvoice(raw: MainCardCheckoutCommand) {

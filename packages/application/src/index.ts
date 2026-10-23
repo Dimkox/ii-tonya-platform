@@ -45,3 +45,5 @@ export * from "./expert-verification-service.js";
 export * from "./expert-card-service.js";
 
 export * from "./expert-card-admin-service.js";
+
+export * from "./expert-residency-lifecycle-service.js";
