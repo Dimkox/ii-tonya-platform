@@ -104,3 +104,29 @@ The original0048 price, quote, tariff, TTL and snapshot checks remain present.
 The coordinator performed no edits to those implementation files, test runs,
 database probes or provider calls. This narrow source acceptance does not replace
 the lead's integration tests, wider independent reviews or release gates.
+
+## Owner-authorized Block C invocation4
+
+The owner explicitly granted one additional focused invocation after checkpoint
+921d108d0b947e164a56314e8185d91862fac6e1. The coordinator confirmed that SHA,
+clean worktree, canonical remote and isolated branch; RequireDocker preflight
+passed with Node24.22.0 and pnpm11.9.0. A separate launcher accepted only invocation4,
+read rotated synthetic credentials in memory, and opened a new log exclusively.
+
+The exact focused file ran once (session66416), exited1:12/20 passed,8 failed.
+Log: /tmp/phase1-c-card-pg4.log. Duration103.68s, collection4.38s. This permission is
+fully consumed; no fifth invocation or equivalent functional probe is authorized.
+
+The two deadline cases reached the canonical committed-expiry path, which throws
+EXPERT_RESIDENCY_PAYMENT_EXPIRED after committing financial truth. Their resolved
+result expectation contradicts that existing contract and needs a fixture-only fix;
+all subsequent stored-state assertions must remain. Three other cases exceeded
+the default5000ms body deadline. One exceeded the bounded cleanup drain too, so
+the next three cases correctly stopped with async_case_drain_poisoned rather than
+resetting a database while the previous body continued. Neither timeout cause is
+claimed to be proven solely by host load. No production behavior, runtime timeout,
+cleanup bound or financial assertion was weakened by this invocation.
+
+The implementation lead owns the remaining fixture preparation, independent
+review, types/lint/format and local WIP checkpoint before any further exact
+permission request. Block C remains unaccepted; D and Phase2 have not started.

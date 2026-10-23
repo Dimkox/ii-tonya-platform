@@ -32,7 +32,10 @@ import { PostgresExpertCardRepository } from "../../packages/db/src/repositories
 import { PostgresExpertOnboardingMainPaymentRepository } from "../../packages/db/src/repositories/expert-onboarding-main-payment-repository.js";
 import { PostgresExpertPromoRepository } from "../../packages/db/src/repositories/expert-promo-repository.js";
 import { PostgresExpertVerificationRepository } from "../../packages/db/src/repositories/expert-verification-repository.js";
-import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
+import {
+  ExpertResidencySettlementError,
+  PostgresExpertResidencyProviderInboxRepository,
+} from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
 import { PostgresYooKassaOperationRepository } from "../../packages/db/src/repositories/yookassa-operation-repository.js";
 import { PostgresWebhookInboxRepository } from "../../packages/db/src/repositories/webhook-inbox-repository.js";
 import { PostgresPrivacyRepository } from "../../packages/db/src/repositories/privacy-repository.js";
@@ -659,6 +662,76 @@ async function deadlineCaseFixture() {
   if (!proof) throw new Error("fixture_main_proof_missing");
   return { f, order, payment, proof };
 }
+async function firstSourceCaseFixture(
+  prior: "legacy_source" | "prior_ineligible",
+) {
+  const oldInviter = await database.createExpertIdentity({
+    externalId: String(++sequence),
+  });
+  const newInviter = await database.createExpertIdentity({
+    externalId: String(++sequence),
+  });
+  const invitee = await database.createExpertIdentity({
+    externalId: String(++sequence),
+  });
+  for (const identity of [oldInviter, newInviter, invitee]) {
+    await database.db.execute(
+      sql`update channel_identities set bot_key=${promoScope.botKey},external_chat_id=external_id where user_id=${identity.userId}::uuid`,
+    );
+    await seedClientConsent(database.db, identity.userId, "client_messaging");
+  }
+  const referralRepo = new PostgresExpertReferralRepository(
+    database.db,
+    new ExpertCodeCrypto({
+      currentVersion: "v1",
+      activeVersions: ["v1"],
+      key: () => new Uint8Array(32).fill(29),
+    }),
+  );
+  let originalReferral: string | undefined;
+  if (prior === "legacy_source") {
+    const audit = await database.createAdminAudit({
+      action: "expert_referral.batch_generate",
+      objectId: oldInviter.expertId,
+    });
+    const issued = await referralRepo.issueBatch({
+      inviterExpertId: oldInviter.expertId,
+      count: 1,
+      issuedByAdminId: audit.adminId,
+      approvalId: audit.approvalId,
+      adminSessionIdHash: audit.sessionIdHash,
+    });
+    // Redeem before a second bot identity exists; no legacy code is auto-issued by production.
+    await referralRepo.redeemCode({
+      plaintext: issued.codes[0]!.plaintext,
+      userId: invitee.userId,
+      provider: invitee.provider,
+      externalId: invitee.externalId,
+    });
+    originalReferral = (
+      await database.db.execute<{ id: string }>(
+        sql`select id from expert_referrals where invitee_expert_id=${invitee.expertId}::uuid`,
+      )
+    ).rows[0]!.id;
+  } else await database.seedFirstSettlement(invitee.expertId);
+  const inviterScope = {
+    ...promoScope,
+    telegramUserId: newInviter.externalId,
+    chatId: newInviter.externalId,
+  };
+  const registered = await promo.register(event(inviterScope));
+  // Existing verified actor was suspended before this onboarding application.
+  await database.db.execute(
+    sql`update experts set active=false,verified=false where id=${invitee.expertId}::uuid`,
+  );
+  const f = await readyCard(registered.refCode, {
+    userId: invitee.userId,
+    telegramUserId: invitee.externalId,
+  });
+  const { order } = await checkout(f);
+  const payment = await mainPayment(order);
+  return { oldInviter, invitee, originalReferral, payment };
+}
 describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () => {
   beforeAll(async () => {
     database = await startExpertReferralTestDatabase();
@@ -730,125 +803,137 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       materialTransport: transport,
     });
   });
-  it.each([1, 3] as const)(
-    "publishes only after real verified main payment for %s months; fee, private interview and review grant no residency",
-    async (term) => {
-      const f = await readyCard();
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_first_residency_settlements`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_referral_ledger_entries`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      const { order } = await checkout(f, term);
-      expect(
-        (
-          await database.db.execute(
-            sql`select active,verified from experts where user_id=${f.userId}::uuid`,
-          )
-        ).rows[0],
-      ).toEqual({ active: false, verified: false });
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from experts_published`,
-          )
-        ).rows[0]?.n,
-      ).toBe(0);
-      const payment = await mainPayment(order);
-      try {
-        expect((await payment.notify()).statusCode).toBe(200);
-        expect((await payment.notify()).statusCode).toBe(200);
-        expect(payment.calls).toHaveLength(1);
-        const state = (
-          await database.db.execute(
-            sql`select e.active,e.verified,p.next_billing_date is not null as billed,p.public_payload from experts e join experts_published p on p.expert_id=e.id where e.user_id=${f.userId}::uuid`,
-          )
-        ).rows[0];
-        expect(state).toEqual({
-          active: true,
-          verified: true,
-          billed: true,
-          public_payload: publicCard,
-        });
-        expect(JSON.stringify(state)).not.toMatch(
-          /telegram:file:|private_promo|Исходные/u,
-        );
+  for (const term of [1, 3] as const)
+    describe(`publication for ${term} months`, () => {
+      let fixture: {
+        f: Awaited<ReturnType<typeof readyCard>>;
+        order: Awaited<ReturnType<typeof checkout>>["order"];
+      };
+      beforeEach(async () => {
+        const f = await readyCard();
+        const { order } = await checkout(f, term);
+        fixture = { f, order };
+      });
+      it(`publishes only after real verified main payment for ${term} months; fee, private interview and review grant no residency`, async () => {
+        const { f, order } = fixture;
         expect(
           (
             await database.db.execute(
               sql`select count(*)::int n from expert_first_residency_settlements`,
             )
           ).rows[0]?.n,
-        ).toBe(1);
-        expect(transportCalls).toHaveLength(3);
-        if (term === 1) {
-          const markerBefore = (
+        ).toBe(0);
+        expect(
+          (
             await database.db.execute(
-              sql`select id,settlement_invitee_channel_identity_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
+              sql`select count(*)::int n from expert_referral_ledger_entries`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        expect(
+          (
+            await database.db.execute(
+              sql`select active,verified from experts where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0],
+        ).toEqual({ active: false, verified: false });
+        expect(
+          (
+            await database.db.execute(
+              sql`select count(*)::int n from experts_published`,
+            )
+          ).rows[0]?.n,
+        ).toBe(0);
+        const payment = await mainPayment(order);
+        try {
+          expect((await payment.notify()).statusCode).toBe(200);
+          expect((await payment.notify()).statusCode).toBe(200);
+          expect(payment.calls).toHaveLength(1);
+          const state = (
+            await database.db.execute(
+              sql`select e.active,e.verified,p.next_billing_date is not null as billed,p.public_payload from experts e join experts_published p on p.expert_id=e.id where e.user_id=${f.userId}::uuid`,
             )
           ).rows[0];
-          await seedExpertSession(f.userId);
-          await privacy().startErasureAtomically({
-            targetUserId: f.userId,
-            correlationId: `published-card-erasure:${f.userId}`,
-            idempotencyKey: `published-card-erasure:${f.userId}`,
-            pseudonym: "hmac:synthetic-published-card-erasure",
+          expect(state).toEqual({
+            active: true,
+            verified: true,
+            billed: true,
+            public_payload: publicCard,
           });
+          expect(JSON.stringify(state)).not.toMatch(
+            /telegram:file:|private_promo|Исходные/u,
+          );
           expect(
             (
               await database.db.execute(
-                sql`select (select count(*)::int from experts_published where user_id=${f.userId}::uuid) as published,(select count(*)::int from expert_card_entries where user_id=${f.userId}::uuid) as entries,(select count(*)::int from expert_card_promo_proofs where user_id=${f.userId}::uuid) as proofs,(select count(*)::int from expert_card_reviews where user_id=${f.userId}::uuid) as reviews`,
+                sql`select count(*)::int n from expert_first_residency_settlements`,
               )
-            ).rows[0],
-          ).toEqual({ published: 0, entries: 0, proofs: 0, reviews: 0 });
-          await assertErasedFinancialIdentity(f.userId, f.scope.telegramUserId);
-          expect(
-            (
+            ).rows[0]?.n,
+          ).toBe(1);
+          expect(transportCalls).toHaveLength(3);
+          if (term === 1) {
+            const markerBefore = (
               await database.db.execute(
                 sql`select id,settlement_invitee_channel_identity_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
               )
-            ).rows[0],
-          ).toEqual(markerBefore);
+            ).rows[0];
+            await seedExpertSession(f.userId);
+            await privacy().startErasureAtomically({
+              targetUserId: f.userId,
+              correlationId: `published-card-erasure:${f.userId}`,
+              idempotencyKey: `published-card-erasure:${f.userId}`,
+              pseudonym: "hmac:synthetic-published-card-erasure",
+            });
+            expect(
+              (
+                await database.db.execute(
+                  sql`select (select count(*)::int from experts_published where user_id=${f.userId}::uuid) as published,(select count(*)::int from expert_card_entries where user_id=${f.userId}::uuid) as entries,(select count(*)::int from expert_card_promo_proofs where user_id=${f.userId}::uuid) as proofs,(select count(*)::int from expert_card_reviews where user_id=${f.userId}::uuid) as reviews`,
+                )
+              ).rows[0],
+            ).toEqual({ published: 0, entries: 0, proofs: 0, reviews: 0 });
+            await assertErasedFinancialIdentity(
+              f.userId,
+              f.scope.telegramUserId,
+            );
+            expect(
+              (
+                await database.db.execute(
+                  sql`select id,settlement_invitee_channel_identity_id from expert_first_residency_settlements where qualifying_order_id=${order.orderId}::uuid`,
+                )
+              ).rows[0],
+            ).toEqual(markerBefore);
 
-          expect(
-            (
-              await database.db.execute(
-                sql`select public_display_name,active,verified from experts where user_id=${f.userId}::uuid`,
-              )
-            ).rows[0],
-          ).toEqual({
-            public_display_name: null,
-            active: false,
-            verified: false,
-          });
-          expect(
-            (
-              await database.db.execute(
-                sql`select o.status,m.application_id,m.review_id,m.application_audit_id is not null as applicant_audit,m.review_audit_id is not null as review_audit from expert_residency_orders o join expert_card_main_orders m on m.order_id=o.id where o.id=${order.orderId}::uuid`,
-              )
-            ).rows[0],
-          ).toEqual({
-            status: "settled",
-            application_id: null,
-            review_id: null,
-            applicant_audit: true,
-            review_audit: true,
-          });
+            expect(
+              (
+                await database.db.execute(
+                  sql`select public_display_name,active,verified from experts where user_id=${f.userId}::uuid`,
+                )
+              ).rows[0],
+            ).toEqual({
+              public_display_name: null,
+              active: false,
+              verified: false,
+            });
+            expect(
+              (
+                await database.db.execute(
+                  sql`select o.status,m.application_id,m.review_id,m.application_audit_id is not null as applicant_audit,m.review_audit_id is not null as review_audit from expert_residency_orders o join expert_card_main_orders m on m.order_id=o.id where o.id=${order.orderId}::uuid`,
+                )
+              ).rows[0],
+            ).toEqual({
+              status: "settled",
+              application_id: null,
+              review_id: null,
+              applicant_audit: true,
+              review_audit: true,
+            });
+          }
+        } finally {
+          await payment.app.close();
         }
-      } finally {
-        await payment.app.close();
-      }
-    },
-  );
+      });
+    });
+
   it("binds owner, bot, revision, digest and durable update replay without leaking raw entries", async () => {
     const f = await interview();
     await expect(
@@ -1366,8 +1451,11 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
               sql`select pg_sleep(greatest(0,extract(epoch from (payment_deadline-clock_timestamp())))+0.01) from expert_residency_orders where id=${order.orderId}::uuid`,
             );
           });
-          expect(await settledOutcome(settlement)).toMatchObject({
-            kind: "expired",
+          await expect(settledOutcome(settlement)).rejects.toBeInstanceOf(
+            ExpertResidencySettlementError,
+          );
+          await expect(settledOutcome(settlement)).rejects.toMatchObject({
+            code: "EXPERT_RESIDENCY_PAYMENT_EXPIRED",
           });
           expect(
             (
@@ -1482,123 +1570,60 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       await payment.app.close();
     }
   });
-  it.each(["legacy_source", "prior_ineligible"] as const)(
-    "preserves authoritative first source/snapshot: %s",
-    async (prior) => {
-      const oldInviter = await database.createExpertIdentity({
-        externalId: String(++sequence),
+  for (const prior of ["legacy_source", "prior_ineligible"] as const)
+    describe(`first source ${prior}`, () => {
+      let fixture: Awaited<ReturnType<typeof firstSourceCaseFixture>>;
+      beforeEach(async () => {
+        fixture = await firstSourceCaseFixture(prior);
       });
-      const newInviter = await database.createExpertIdentity({
-        externalId: String(++sequence),
-      });
-      const invitee = await database.createExpertIdentity({
-        externalId: String(++sequence),
-      });
-      for (const identity of [oldInviter, newInviter, invitee]) {
-        await database.db.execute(
-          sql`update channel_identities set bot_key=${promoScope.botKey},external_chat_id=external_id where user_id=${identity.userId}::uuid`,
-        );
-        await seedClientConsent(
-          database.db,
-          identity.userId,
-          "client_messaging",
-        );
-      }
-      const referralRepo = new PostgresExpertReferralRepository(
-        database.db,
-        new ExpertCodeCrypto({
-          currentVersion: "v1",
-          activeVersions: ["v1"],
-          key: () => new Uint8Array(32).fill(29),
-        }),
-      );
-      let originalReferral: string | undefined;
-      if (prior === "legacy_source") {
-        const audit = await database.createAdminAudit({
-          action: "expert_referral.batch_generate",
-          objectId: oldInviter.expertId,
-        });
-        const issued = await referralRepo.issueBatch({
-          inviterExpertId: oldInviter.expertId,
-          count: 1,
-          issuedByAdminId: audit.adminId,
-          approvalId: audit.approvalId,
-          adminSessionIdHash: audit.sessionIdHash,
-        });
-        // Redeem before a second bot identity exists; no legacy code is auto-issued by production.
-        await referralRepo.redeemCode({
-          plaintext: issued.codes[0]!.plaintext,
-          userId: invitee.userId,
-          provider: invitee.provider,
-          externalId: invitee.externalId,
-        });
-        originalReferral = (
-          await database.db.execute<{ id: string }>(
-            sql`select id from expert_referrals where invitee_expert_id=${invitee.expertId}::uuid`,
-          )
-        ).rows[0]!.id;
-      } else await database.seedFirstSettlement(invitee.expertId);
-      const inviterScope = {
-        ...promoScope,
-        telegramUserId: newInviter.externalId,
-        chatId: newInviter.externalId,
-      };
-      const registered = await promo.register(event(inviterScope));
-      // Existing verified actor was suspended before this onboarding application.
-      await database.db.execute(
-        sql`update experts set active=false,verified=false where id=${invitee.expertId}::uuid`,
-      );
-      const f = await readyCard(registered.refCode, {
-        userId: invitee.userId,
-        telegramUserId: invitee.externalId,
-      });
-      const { order } = await checkout(f);
-      const payment = await mainPayment(order);
-      try {
-        expect((await payment.notify()).statusCode).toBe(200);
-        const sources = (
-          await database.db.execute(
-            sql`select id,inviter_expert_id,acquisition_source from expert_referrals where invitee_expert_id=${invitee.expertId}::uuid`,
-          )
-        ).rows;
-        expect(sources).toEqual(
-          prior === "legacy_source"
-            ? [
-                {
-                  id: originalReferral,
-                  inviter_expert_id: oldInviter.expertId,
-                  acquisition_source: "qualified_code",
-                },
-              ]
-            : [],
-        );
-        expect(
-          (
+      it(`preserves authoritative first source/snapshot: ${prior}`, async () => {
+        const { oldInviter, invitee, originalReferral, payment } = fixture;
+        try {
+          expect((await payment.notify()).statusCode).toBe(200);
+          const sources = (
             await database.db.execute(
-              sql`select count(*)::int n from expert_promo_qualification_audits`,
+              sql`select id,inviter_expert_id,acquisition_source from expert_referrals where invitee_expert_id=${invitee.expertId}::uuid`,
             )
-          ).rows[0]?.n,
-        ).toBe(0);
-        expect(
-          (
-            await database.db.execute(
-              sql`select count(*)::int n from expert_first_residency_settlements where expert_id=${invitee.expertId}::uuid`,
-            )
-          ).rows[0]?.n,
-        ).toBe(1);
-        if (prior === "prior_ineligible")
+          ).rows;
+          expect(sources).toEqual(
+            prior === "legacy_source"
+              ? [
+                  {
+                    id: originalReferral,
+                    inviter_expert_id: oldInviter.expertId,
+                    acquisition_source: "qualified_code",
+                  },
+                ]
+              : [],
+          );
           expect(
             (
               await database.db.execute(
-                sql`select count(*)::int n from expert_referral_reward_maturities`,
+                sql`select count(*)::int n from expert_promo_qualification_audits`,
               )
             ).rows[0]?.n,
           ).toBe(0);
-      } finally {
-        await payment.app.close();
-      }
-    },
-  );
+          expect(
+            (
+              await database.db.execute(
+                sql`select count(*)::int n from expert_first_residency_settlements where expert_id=${invitee.expertId}::uuid`,
+              )
+            ).rows[0]?.n,
+          ).toBe(1);
+          if (prior === "prior_ineligible")
+            expect(
+              (
+                await database.db.execute(
+                  sql`select count(*)::int n from expert_referral_reward_maturities`,
+                )
+              ).rows[0]?.n,
+            ).toBe(0);
+        } finally {
+          await payment.app.close();
+        }
+      });
+    });
+
   describe("configured main checkout", () => {
     let fixture: {
       f: Awaited<ReturnType<typeof readyCard>>;

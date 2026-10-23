@@ -183,3 +183,38 @@ This is a local WIP checkpoint pending explicit owner authorization for exactly 
 additional focused C-file invocation. C is not complete; D and Phase2 have not
 started. Production first-send custody, owner content, merchant and exact-SHA release
 gates remain separately closed. No provider call, deployment or remote push occurred.
+
+## Owner-authorized extra invocation4
+
+The owner explicitly authorized exactly one additional C-file invocation. The root
+coordinator launched it on WIP`921d108d0b947e164a56314e8185d91862fac6e1` after a passing
+RequireDocker preflight; the implementation lead ran no duplicate or probe.
+Log:`/tmp/phase1-c-card-pg4.log`, exit1,12/20 passing and8 failing,103.68s total with
+4.38s collection. All four invocations are now consumed; no fifth is authorized.
+
+The two deadline cases reached the canonical committed-expiry rejection
+`EXPERT_RESIDENCY_PAYMENT_EXPIRED`. The fixture incorrectly expected a resolved
+expired result; production deliberately commits expiry/releases and then throws.
+Only that caller expectation is being corrected, preserving every subsequent
+expired/no-interval/inbox/no-publication/no-access assertion. Production behavior
+remains unchanged.
+
+One-month publication and both first-source cases hit the unchanged5000ms case
+limit. The latter unfinished body exceeded the two-second drain and correctly
+poisoned the following three cases before they could reset shared fixtures. Those
+three are not described as runtime assertions completed. Remaining heavy fixture
+setup moves to bounded hooks;20 cases,5000ms limits, real3-second TTL and all financial
+assertions remain. The helper is unchanged and its3/3 verification budget remains
+exhausted. No functional run or manual SQL probe is permitted during this repair.
+
+The extra4 fixture correction is complete and independently source-accepted against
+`921d108d`. It asserts the canonical expiry error class and exact code before every
+existing financial-truth check. Remaining publication and first-source setup moved
+to tracked bounded hooks; no production, helper, SQL or state artifact changed.
+Twenty cases, default5000ms limits, existing15000ms override, real3-second TTL and
+all assertions remain. Full tests TypeScript, focused lint, formatting and whitespace
+passed; logs`/tmp/phase1-c-pg4-fixture-types-done.log` and
+`/tmp/phase1-c-pg4-fixture-lint-done.log` are empty with exit0. This revised integrated
+fixture is unexecuted. No PG, helper, scope/history or manual-probe invocation ran
+during the correction. A new local WIP checkpoint precedes the coordinator's exact
+request for one additional focused invocation; C remains unaccepted.

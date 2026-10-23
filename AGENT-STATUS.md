@@ -1,3 +1,50 @@
+# Block C revised WIP ready for exact extra5 request — 2026-10-23
+
+Allfileowners/reviewers/commandsended; onlyCfixture+evidencechanged since921d108d.
+CurrentcheckpointNOTCacceptance, D/Phase2NOTstarted. Parentowns finalpermissionask.
+CfocusedPGall4CONSUMED; NO5/filter/manualprobe/equivalent withoutEXPLICITnewowner
+authority. Helperall3CONSUMED/unchanged; NOhelper4. Lastrootrun66416 EXIT1 12/20PASS,
+8FAIL/tmp/phase1-c-card-pg4.log; priorlogs1..3preserved, no duplicate/probe.
+
+Concretefixturefix CLOSED/sourceaccepted: deadlinecases assert exactcanonical
+ExpertResidencySettlementError+EXPERT_RESIDENCY_PAYMENT_EXPIRED aftercommit and
+continueALLexistingexpired/nointerval/inbox/noactive/nopub DBtruthchecks. Production
+settle592-600unchanged. Remainingpublication1/3+firstsource heavysetup moved to
+boundedtrackedhooks. Same20cases/default5000ms/existing15000override/real3sTTL/
+assertions and2smonotonicdrain unchanged. No helper/prod/SQL/statechange.
+Finalfulltesttypes/lint/format/diffPASS; independentfixture revieweraccepted.
+Logs/tmp/phase1-c-pg4-fixture-{types,lint}-done.log emptyEXIT0. RevisedfixturehasNOT
+beenexecuted. Previoushelperfinal5/5remainsvalidunchanged, nohelperrerun.
+
+Parentmaynowask EXACTLYONE extra invocation of
+pnpm exec vitest run tests/integration/phase1-card-publication.test.ts
+oncurrentlocalWIPHEAD. Rootsolelaunch/preflight/log withfreshprotectedrotated
+ComposeJSON memoryonly/noDockerEnv/secretoutput. Noimplicit5 or6 authority.
+AfteractualPASS closeC evidence/localcheckpoint then proportionalD→Phase2 under
+existingallplanauthority. Strictproductionfirstsend/content/merchant/exactSHArelease
+remainseparate/defaultoff; no provider/push/deploy/liveflag. A5/B2unchanged.
+
+# Block C extra4 consumed; caller-contract/setup repair — 2026-10-23
+
+OwnerexplicitlyauthorizedoneextraCrun; rootsolelaunch66416 on921d108d EXIT1:
+12/20PASS,8FAIL, log/tmp/phase1-c-card-pg4.log (103.68s/4.38scollect).
+ALL4CinvocationsCONSUMED. NO5/filter/manualprobe/equivalent withoutnewownerexplicit
+authority. Helper3/3consumed/untouched. CNOTaccepted; D/Phase2NOTstarted.
+
+Concretefailures: publication1month timeout5000; two observeddeadlinecases expose
+correct canonical EXPERT_RESIDENCY_PAYMENT_EXPIRED rejection after committedexpiry
+(thefixtureincorrectlyexpectedresolvedexpired); legacy/priorineligible5000timeouts;
+priorineligiblebodyoutlived2sdrain, correctlypoisoningnext3cases beforeDBreset.
+Canonicalsettle592-600mustremainunchanged: commitmoneytruth/releases, thenreject.
+
+Authorizedfix owner block_c_pg_test_author ONLYCtestfile: assert exactexpiredcode
+rejection and continueEVERYexistingDBtruth assertion; move remainingpublication/
+firstsource heavysetup toboundedtrackedhooks. Preserve20cases/default5000/3sTTL,
+allassertions/drain; no helper/prod/SQL/statechange, no functionalexecution.
+Independentreadonlyreview owner block_a_ingress_review waitingready. Lead evidence/
+status/localWIPcheckpoint aftertypes/lint/format/diff+review; parentowns exactextra5
+permissionquestion onlywhenconcrete. No scope/history repeatneeded unchangedinputs.
+
 # Block C WIP checkpoint ready; extra PG authority required — 2026-10-23
 
 HEAD checkpoint contains Cimplementation and reviewed fixture repair, NOT Cacceptance.
