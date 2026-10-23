@@ -375,3 +375,38 @@ it("settles a stalled asset body as unknown and never writes later assets after 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(calls).toBe(2);
 });
+
+it("allows revision-zero generic materials only with an explicit matching application scope", async () => {
+  const f = fixture(),
+    value = input();
+  const generic = {
+    ...value,
+    revision: 0 as const,
+    materialPurpose: "application_generic" as const,
+    applicationId: value.reviewId,
+    payloadDigest: digest({
+      purpose: "application_generic",
+      applicationId: value.reviewId,
+      payload: value.payload,
+    }),
+  };
+  expect((await f.transport.send(generic)).messageIds).toEqual(["1", "2", "3"]);
+  const invalid = fixture();
+  await expect(
+    invalid.transport.send({ ...input(), revision: 0 }),
+  ).rejects.toThrow("card_material_request_invalid");
+  await expect(
+    invalid.transport.send({ ...generic, applicationId: value.userId }),
+  ).rejects.toThrow("card_material_request_invalid");
+  await expect(
+    invalid.transport.send({
+      ...generic,
+      applicationId: value.userId,
+      reviewId: value.userId,
+    }),
+  ).rejects.toThrow("card_material_request_invalid");
+  await expect(
+    invalid.transport.send({ ...generic, payloadDigest: value.payloadDigest }),
+  ).rejects.toThrow("card_material_request_invalid");
+  expect(invalid.fetcher).not.toHaveBeenCalled();
+});

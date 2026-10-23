@@ -1,4 +1,8 @@
 import {
+  beginScheduledMainCheckout,
+  scheduledMainInput,
+} from "./expert-scheduled-main-checkout.js";
+import {
   lockRenewalBillForMutation,
   acceptMainCardQuote,
 } from "./expert-card-main-acceptance.js";
@@ -146,7 +150,7 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         );
       const quote = await new PostgresExpertCampaignQuoteRepository(
         this.db,
-      ).createQuoteInTransaction(tx, {
+      ).createCurrentQuoteInTransaction(tx, {
         userId: started.userId,
         tariffVersionId: input.tariffVersionId,
         termMonths: input.termMonths,
@@ -207,6 +211,13 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         ...(input.renewalBillId ? { renewalBillId: input.renewalBillId } : {}),
       });
       await finishCardRequest(tx, started, accepted!.id);
+      // The genuine owner acceptance also authorizes later replacement invoice
+      // issuance, never an automatic charge or a fabricated Telegram command.
+      if (!input.renewalBillId)
+        await tx.execute(sql`insert into expert_offer_schedules(user_id,application_id,tariff_version_id,profile_revision,term_months,source_update_id,consent_version,original_acceptance_id,revision,original_quote_id,review_id,expert_id,public_digest,bot_id,bot_key,chat_id,request_key,request_digest)
+          select a.user_id,a.application_id,q.tariff_version_id,q.profile_revision,q.term_months,${input.requestKey},${gate.messagingConsentPolicyVersion},a.id,a.revision,a.quote_id,a.review_id,a.expert_id,a.public_digest,${input.botId},${input.botKey},${input.chatId},${input.requestKey},${input.requestDigest}
+          from expert_card_main_acceptances a join expert_campaign_quotes q on q.id=a.quote_id and q.user_id=a.user_id where a.id=${accepted!.id}::uuid and a.user_id=${started.userId}::uuid and q.rule_version='expert_energy_start_v2'
+          on conflict(user_id,source_update_id) do nothing`);
       return {
         acceptanceId: accepted!.id,
         quoteId: input.quoteId,
@@ -292,6 +303,93 @@ export class PostgresExpertOnboardingMainPaymentRepository {
         )
       ).rows[0]?.valid;
       return !!operation && valid === true;
+    });
+  }
+  async createScheduledMainInvoice(scheduleId: string, quoteId: string) {
+    const input = scheduledMainInput(scheduleId, quoteId);
+    const order = await new PostgresExpertCampaignOrderRepository(
+      this.db,
+    ).createScheduledCheckoutOrder(
+      input.scheduleId,
+      input.quoteId,
+      this.policy,
+    );
+    return {
+      orderId: order.id,
+      quoteId: order.quoteId,
+      priceMinor: order.priceMinor,
+      cashMinor: order.cashMinor,
+      currency: order.currency,
+      status: order.status,
+      paymentDeadline: order.paymentDeadline,
+      replay: order.replay ?? false,
+    };
+  }
+  async checkoutBindingForSchedule(
+    scheduleId: string,
+    orderId: string,
+  ): Promise<MainCardCheckoutBinding> {
+    scheduledMainInput(scheduleId, orderId);
+    return this.transaction(async (tx) => {
+      const row = (
+        await tx.execute<{ quoteId: string }>(
+          sql`select m.quote_id as "quoteId" from expert_card_main_orders m join expert_card_main_acceptances a on a.id=m.acceptance_id where m.order_id=${orderId}::uuid and a.offer_schedule_id=${scheduleId}::uuid and a.acceptance_source='schedule'`,
+        )
+      ).rows[0];
+      if (!row) invalid("card_main_checkout_unavailable");
+      const admission = await beginScheduledMainCheckout(
+        tx,
+        { scheduleId, quoteId: row!.quoteId },
+        this.policy,
+      );
+      await assertMainCardPriorOrder(tx, admission, orderId);
+      const binding = (
+        await tx.execute<{
+          orderId: string;
+          userId: string;
+          expertId: string;
+          amountMinor: string;
+          currency: "RUB";
+          providerMode: "test" | "live";
+          paymentDeadline: string | Date;
+        }>(
+          sql`select o.id as "orderId",m.user_id as "userId",o.expert_id as "expertId",o.cash_minor::text as "amountMinor",o.currency,m.provider_mode as "providerMode",o.payment_deadline as "paymentDeadline" from expert_residency_orders o join expert_card_main_orders m on m.order_id=o.id where o.id=${orderId}::uuid and m.acceptance_id=${admission.acceptance.id}::uuid and m.user_id=${admission.request.userId}::uuid and m.provider_mode=${this.policy.providerMode} and m.purpose='main_residency' and o.status='payment_pending' for update of o,m`,
+        )
+      ).rows[0];
+      const valid =
+        binding &&
+        (
+          await tx.execute<{ valid: boolean }>(
+            sql`select payment_deadline>clock_timestamp() as valid from expert_residency_orders where id=${orderId}::uuid and status='payment_pending'`,
+          )
+        ).rows[0]?.valid;
+      if (valid !== true) invalid("card_main_checkout_unavailable");
+      return Object.freeze({
+        ...binding!,
+        paymentDeadline: iso(binding!.paymentDeadline),
+        purpose: "main_residency" as const,
+        idempotencyKey: `card-main-checkout:${orderId}`,
+      });
+    });
+  }
+  async verifyMainCheckoutForSchedule(
+    scheduleId: string,
+    orderId: string,
+    paymentId: string,
+  ): Promise<boolean> {
+    if (
+      typeof paymentId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,64}$/u.test(paymentId)
+    )
+      return false;
+    const binding = await this.checkoutBindingForSchedule(scheduleId, orderId);
+    return this.transaction(async (tx) => {
+      const proof = (
+        await tx.execute<{ valid: boolean }>(
+          sql`select exists(select 1 from expert_residency_provider_operations p join expert_residency_orders o on o.id=p.order_id where p.order_id=${orderId}::uuid and p.provider='yookassa' and p.operation_kind='create_payment' and p.environment_mode=${binding.providerMode} and p.provider_object_id=${paymentId} and p.amount_minor=${binding.amountMinor}::bigint and p.currency=${binding.currency} and p.status in('pending','unknown_outcome','succeeded') and o.status='payment_pending' and o.payment_deadline>clock_timestamp()) as valid`,
+        )
+      ).rows[0];
+      return proof?.valid === true;
     });
   }
   async acceptRenewalAndCreateInvoice(raw: MainCardAcceptanceCommand) {

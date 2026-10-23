@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -42,6 +43,7 @@ const HAND_SQL_FUNCTIONS = [
   "booking_notification_context_immutable",
   "booking_notification_delivery_immutable",
   "booking_notification_fact_immutable",
+  "clear_expert_offer_delivery_state",
   "client_booking_guard_privacy_completion",
   "client_commercial_policy_assignment_immutable",
   "enforce_admin_ledger_provenance",
@@ -49,6 +51,7 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_client_coupon_purchase",
   "enforce_client_paid_settlement",
   "enforce_expert_application_identity_immutable",
+  "enforce_expert_application_promo_owner",
   "enforce_expert_campaign_order_source",
   "enforce_expert_campaign_quote_source",
   "enforce_expert_card_draft_identity",
@@ -57,6 +60,11 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_card_main_order",
   "enforce_expert_card_promo_confirmation_source",
   "enforce_expert_card_review_source",
+  "enforce_expert_main_activation_admission",
+  "enforce_expert_offer_manager_fact",
+  "enforce_expert_offer_schedule_source",
+  "enforce_expert_offer_subject_cleanup",
+  "enforce_expert_offer_v2_source",
   "enforce_expert_promo_immutable",
   "enforce_expert_promo_qualification",
   "enforce_expert_promo_referral_source",
@@ -66,6 +74,8 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_verification_decision_source",
   "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
+  "erase_expert_offer_delivery_state",
+  "expert_campaign_current_profile_valid",
   "expert_card_activation_gate_valid",
   "expert_card_current_messaging_authority",
   "expert_card_delivery_receipt_valid",
@@ -89,6 +99,7 @@ const HAND_SQL_FUNCTIONS = [
   "planerka_reservation_transition",
   "protect_expert_campaign_order_snapshot",
   "protect_expert_card_financial_binding",
+  "protect_expert_offer_schedule",
   "protect_expert_residency_renewal_attempt",
   "protect_expert_residency_renewal_bill",
   "protect_payer_receipt_binding",
@@ -127,6 +138,9 @@ const HAND_SQL_TRIGGERS = [
   "consent_document_versions_append_only",
   "consents_append_only",
   "delivery_attempts_append_only",
+  "expert_application_confirmation_owner",
+  "expert_application_material_owner",
+  "expert_application_proof_owner",
   "expert_campaign_anchors_append_only",
   "expert_campaign_order_snapshot_immutable",
   "expert_campaign_order_source",
@@ -149,6 +163,18 @@ const HAND_SQL_TRIGGERS = [
   "expert_card_review_source",
   "expert_card_reviews_immutable",
   "expert_card_staff_actions_immutable",
+  "expert_main_activation_admission_source",
+  "expert_main_activation_admissions_append_only",
+  "expert_offer_application_erasure",
+  "expert_offer_consent_revocation",
+  "expert_offer_identity_revocation",
+  "expert_offer_profile_verification_source",
+  "expert_offer_profiles_append_only",
+  "expert_offer_schedule_source",
+  "expert_offer_schedules_append_only",
+  "expert_offer_user_deactivation",
+  "expert_offer_v2_source",
+  "expert_offer_verifications_append_only",
   "expert_onboarding_application_identity_immutable",
   "expert_onboarding_invoices_immutable",
   "expert_onboarding_invoices_no_delete",
@@ -171,6 +197,8 @@ const HAND_SQL_TRIGGERS = [
   "expert_residency_calendar_pause_publication",
   "expert_residency_renewal_attempt_source",
   "expert_residency_renewal_bill_source",
+  "expert_space_tariff_approval_source",
+  "expert_space_tariff_approvals_append_only",
   "expert_verification_decisions_immutable",
   "expert_verification_decisions_no_delete",
   "expert_verification_decisions_source",
@@ -258,9 +286,32 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(55);
+    expect(newest).toBe(56);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
+    );
+  });
+
+  it("pins additive offer metadata to the replayed SQL and normalized snapshot", () => {
+    const supplement = JSON.parse(
+      readFileSync(`${MIGRATIONS}/state/0056_offer_sql_objects.json`, "utf8"),
+    ) as {
+      serverVersionNum: number;
+      sourceMigrationSha256: string;
+      parentSnapshotSha256: string;
+      normalizedSnapshotSha256: string;
+      functions: { name: string }[];
+    };
+    const digest = (path: string) =>
+      createHash("sha256").update(readFileSync(path)).digest("hex");
+    expect(supplement.serverVersionNum).toBe(170005);
+    expect(supplement.sourceMigrationSha256).toBe(
+      digest(`${MIGRATIONS}/0056_residency_offer_corrections.sql`),
+    );
+    expect(supplement.parentSnapshotSha256).toBe(digest(snapshotPath(55)));
+    expect(supplement.normalizedSnapshotSha256).toBe(digest(snapshotPath(56)));
+    expect(supplement.functions.map((row) => row.name)).toContain(
+      "expert_campaign_current_profile_valid",
     );
   });
 
@@ -303,11 +354,11 @@ describe("migration history integrity", () => {
       ].sort();
 
     expect(
-      collect(/create\s+(?:or replace\s+)?function\s+([a-z_]+)/gi),
+      collect(/create\s+(?:or replace\s+)?function\s+([a-z_][a-z0-9_]*)/gi),
     ).toEqual([...HAND_SQL_FUNCTIONS]);
-    expect(collect(/create\s+(?:constraint\s+)?trigger\s+([a-z_]+)/gi)).toEqual(
-      [...HAND_SQL_TRIGGERS],
-    );
+    expect(
+      collect(/create\s+(?:constraint\s+)?trigger\s+([a-z_][a-z0-9_]*)/gi),
+    ).toEqual([...HAND_SQL_TRIGGERS]);
     expect(collect(/create\s+(?:or replace\s+)?view\s+([a-z_.]+)/gi)).toEqual([
       ...HAND_SQL_VIEWS,
     ]);
@@ -350,7 +401,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0055 adds five calendar lifecycle, renewal and delivery-history relations.
-    expect(declared.size).toBe(155);
+    // 0056 adds fourteen offer, qualification, manager, application-material and admission relations.
+    expect(declared.size).toBe(169);
   });
 });

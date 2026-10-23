@@ -1,3 +1,4 @@
+import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/expert-offer-v2.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { loadEnv } from "../../packages/config/src/index.js";
@@ -152,8 +153,28 @@ async function onboarding(refCode?: string, existing?: ExistingActor) {
     await database.db.execute(
       sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram',${telegramUserId},${scope.botKey},${telegramUserId},'active')`,
     );
-  await seedClientConsent(database.db, userId, "client_messaging");
+  const consent = await seedClientConsent(
+    database.db,
+    userId,
+    "client_messaging",
+  );
+  await database.db.execute(
+    sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,presentation_id,policy_version,status) select ${userId}::uuid,ci.id,${scope.botId},c.presentation_id,'client-messaging-v1','granted' from channel_identities ci join consents c on c.id=${consent.decisionId}::uuid where ci.user_id=${userId}::uuid and ci.provider='telegram' and ci.bot_key=${scope.botKey} and ci.external_id=${scope.telegramUserId} and ci.external_chat_id=${scope.chatId} and ci.status='active' on conflict(user_id) do nothing`,
+  );
   await promo.register({ ...event(scope), ...(refCode ? { refCode } : {}) });
+  const profile = await promo.saveProfile({
+    ...event(scope),
+    cityCode: "kazan",
+    millionCity: false,
+    serviceFormat: "offline",
+    ticketMinor: "300000",
+    participantKind: "expert",
+  });
+  await verifyExpertOfferProfile(database.db, {
+    sessionHash: manager.sessionHash,
+    userId,
+    revision: profile.revision,
+  });
   const quote = await promo.createQuote({
     ...event(scope),
     tariffVersionId: tariffId,
@@ -1174,25 +1195,39 @@ describe("Phase1 residency lifecycle real calendar and canonical renewal (PG17.5
       workBotKey: work.botKey,
       messagingConsentPolicyVersion: "client-messaging-v1",
     });
-    const materialTransport = createExpertMaterialTransport({
-      token: "818181:synthetic_fixture_material_token",
-      botId: work.botId,
-      botKey: work.botKey,
-      fetch: async (url, init) => {
-        const body = JSON.parse(String(init?.body)) as { chat_id: string };
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            result: {
-              message_id: ++messageSequence,
-              from: { id: Number(work.botId), is_bot: true },
-              chat: { id: Number(body.chat_id), type: "private" },
-            },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
+    const materialTransportFor = (bot: { botId: string; botKey: string }) =>
+      createExpertMaterialTransport({
+        token: `${bot.botId}:synthetic_fixture_material_token`,
+        botId: bot.botId,
+        botKey: bot.botKey,
+        fetch: async (url, init) => {
+          const body = JSON.parse(String(init?.body)) as { chat_id: string };
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: {
+                message_id: ++messageSequence,
+                from: { id: Number(bot.botId), is_bot: true },
+                chat: { id: Number(body.chat_id), type: "private" },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        },
+      });
+    const materialTransport = {
+      send: (
+        input: Parameters<
+          ReturnType<typeof createExpertMaterialTransport>["send"]
+        >[0],
+      ) => {
+        const bot =
+          input.botId === promoScope.botId && input.botKey === promoScope.botKey
+            ? promoScope
+            : work;
+        return materialTransportFor(bot).send(input);
       },
-    });
+    };
     cards = new PostgresExpertCardRepository(database.db, {
       workBotId: work.botId,
       workBotKey: work.botKey,
@@ -1670,6 +1705,13 @@ describe("Phase1 residency lifecycle real calendar and canonical renewal (PG17.5
             )
           ).rows[0],
         ).toEqual({ status: "settled", future_stacked: true });
+        expect(
+          (
+            await database.db.execute(
+              sql`select order_id from expert_main_activation_admissions where order_id=${future.order.orderId}::uuid`,
+            )
+          ).rows,
+        ).toHaveLength(1);
         expect(await lifecycle.readLifecycle(f.workScope)).toMatchObject({
           status: "payment_required",
           paidUntil: f.pastEnd,

@@ -523,3 +523,35 @@ it("missing main checkout remains explicitly inactive", async () => {
     }),
   ).toMatchObject({ payment: { status: "waiting_configuration" } });
 });
+
+it("shows honest awaiting-materials copy while the interview remains open", async () => {
+  const f = fixture();
+  const result = await f.service.handleWork({
+    ...input,
+    content: { kind: "text", text: "/card" },
+  });
+  expect(result).toMatchObject({ status: "handled" });
+  if (result.status === "handled")
+    expect(result.text).toContain(
+      "Ваши материалы для рассылки будут доступны в ближайшее время",
+    );
+  expect(f.addEntry).not.toHaveBeenCalled();
+});
+it("accepts application promo proof through the verified promo bot before card approval", async () => {
+  const f = fixture();
+  const result = await f.service.handlePromoHandoff({
+    botId: "22",
+    botKey: "promo",
+    telegramUserId: "33",
+    chatId: "33",
+    updateId: 19,
+    text: "/promo_proof 0 https://example.com/announcement",
+  });
+  expect(result.status).toBe("handled");
+  expect(f.submitPromoProof).toHaveBeenCalledWith(
+    expect.objectContaining({
+      expectedRevision: 0,
+      proof: { kind: "link", reference: "https://example.com/announcement" },
+    }),
+  );
+});

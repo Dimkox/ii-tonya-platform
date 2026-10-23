@@ -560,3 +560,56 @@ describe("MVP scope boundary", () => {
     expect(violations).toEqual([]);
   }, 30_000);
 });
+
+describe("residency offer correction registration", () => {
+  it.each([
+    "packages/db/migrations/0056_residency_offer_corrections.sql",
+    "packages/db/migrations/meta/0056_snapshot.json",
+    "packages/db/migrations/state/0056_offer_sql_objects.json",
+  ])(
+    "pins the reviewed correction artifact and rejects changed bytes: %s",
+    (path) => {
+      const content = readFileSync(path, "utf8");
+      expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual(
+        [],
+      );
+      expect(
+        classifyApprovedTrackedScopeContent({ path, content: content + "\n" }),
+      ).not.toEqual([]);
+    },
+  );
+  it.each([
+    "/v1/admin/expert-verification/:applicationId/profile-verification",
+    "/v1/admin/expert-verification/telegram-pairing",
+    "/v1/webhooks/telegram/expert-manager/:botKey",
+  ])("allows only the exact reviewed manager route: %s", (route) => {
+    const path = "apps/api/src/routes/neutral.ts";
+    expect(
+      classifyPaymentScopeProbe({
+        path,
+        content: `app.post(${JSON.stringify(route)}, handler);`,
+      }),
+    ).toEqual([]);
+    const shadow = route + "/unsafe";
+    expect(
+      classifyPaymentScopeProbe({
+        path,
+        content: `app.post(${JSON.stringify(shadow)}, handler);`,
+      }),
+    ).toContain(`unapproved expert residency API route: ${shadow}`);
+  });
+  it("rejects an unreviewed correction relation or migration lookalike", () => {
+    expect(
+      classifyPaymentScopeProbe({
+        path: "packages/db/src/schema/neutral.ts",
+        content: 'export const x=pgTable("expert_offer_profiles_shadow",{});',
+      }),
+    ).not.toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path: "packages/db/migrations/0056_residency_offer_corrections_shadow.sql",
+        content: "CREATE TABLE expert_offer_profiles(id uuid);",
+      }),
+    ).not.toEqual([]);
+  });
+});

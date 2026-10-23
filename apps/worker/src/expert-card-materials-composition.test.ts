@@ -15,6 +15,7 @@ const config = (enabled = true) =>
           expertCard: {
             paymentMode: "test",
             materialDeliveryEnabled: true,
+            mainCheckoutEnabled: false,
             workBotToken: token,
             workBotId: "12345",
             workBotKey: "work-fixture",
@@ -114,4 +115,61 @@ it("worker-only mode composes actual transport and sends only through repository
     `https://api.telegram.org/bot${token}/sendMessage`,
   );
   lifecycle!.stopAccepting();
+});
+it("routes early generic materials only to the configured verified promo bot", async () => {
+  const c = config();
+  c.expertApplicant = {
+    botId: "54321",
+    botKey: "promo-fixture",
+    botToken: `54321:${"synthetic_fixture_".repeat(2)}`,
+    webhookSecret: "s".repeat(32),
+    messagingConsentPolicyVersion: "client-messaging-v1",
+  };
+  const requested: string[] = [];
+  let transport!: ExpertMaterialTransport;
+  const lifecycle = createExpertCardMaterialsLifecycle(c, {
+    createRepository: (value) => {
+      transport = value;
+      return {
+        listDueMaterialJobs: async () => [],
+        deliverMaterials: async () => ({ kind: "cancelled" as const }),
+      };
+    },
+    fetch: async (input) => {
+      requested.push(String(input));
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          result: {
+            message_id: 19,
+            from: { id: 54321, is_bot: true },
+            chat: { id: 67890, type: "private" },
+          },
+        }),
+        { status: 200 },
+      );
+    },
+  });
+  expect(lifecycle).toBeDefined();
+  const payload = { text: "Generic materials", assets: [] };
+  const request = {
+    botId: "54321",
+    botKey: "promo-fixture",
+    userId: "00000000-0000-4000-8000-000000000002",
+    chatId: "67890",
+    reviewId: "00000000-0000-4000-8000-000000000003",
+    revision: 1,
+    contentVersion: "generic-v2",
+    payloadDigest: `sha256:${createHash("sha256").update(JSON.stringify(payload)).digest("hex")}`,
+    payload,
+    signal: AbortSignal.timeout(1000),
+  };
+  expect(await transport.send(request)).toMatchObject({
+    botId: "54321",
+    messageIds: ["19"],
+  });
+  await expect(
+    transport.send({ ...request, botKey: "work-fixture" }),
+  ).rejects.toThrow();
+  expect(requested).toHaveLength(1);
 });

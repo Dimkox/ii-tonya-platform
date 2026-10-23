@@ -26,6 +26,7 @@ function fixture(enabled = true) {
   const beginEnrollment = port({ kind: "ready" as const });
   const completeEnrollment = port({ kind: "granted" as const, replay: false });
   const resolve = port({ userId: "u" });
+  const saveProfile = port({ revision: 1, replay: false });
   const createApplication = port({
     applicationId: quoteId,
     userId: "u",
@@ -45,6 +46,7 @@ function fixture(enabled = true) {
   });
   return {
     register,
+    saveProfile,
     resolve,
     createApplication,
     createQuote,
@@ -55,6 +57,7 @@ function fixture(enabled = true) {
       enabled,
       repository: {
         register,
+        saveProfile,
         resolve,
         createApplication,
         createQuote,
@@ -214,7 +217,7 @@ it("keeps missing consent copy inactive", async () => {
   const f = fixture();
   f.beginEnrollment.mockResolvedValueOnce({ kind: "waiting_content" } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r.text).toContain("TODO: Wait for Content Spec");
+  expect(r.text).toContain("TODO: Wait for Prompt Spec");
   expect(f.register).not.toHaveBeenCalled();
 });
 it("accepts only explicit bound consent decision", async () => {
@@ -295,7 +298,25 @@ it("keeps oversized consent documents inactive instead of truncating legal text"
     },
   } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r).toEqual({ status: "handled", text: "TODO: Wait for Content Spec" });
+  expect(r).toEqual({ status: "handled", text: "TODO: Wait for Prompt Spec" });
   expect(f.completeEnrollment).not.toHaveBeenCalled();
   expect(f.register).not.toHaveBeenCalled();
+});
+
+it("saves structured qualifications without caller money authority", async () => {
+  const f = fixture();
+  const result = await f.service.handle({
+    ...scope,
+    text: "/profile kazan 1 online_only 299999 expert",
+  });
+  expect(result.status).toBe("handled");
+  expect(f.saveProfile).toHaveBeenCalledWith(
+    expect.objectContaining({
+      cityCode: "kazan",
+      millionCity: true,
+      serviceFormat: "online_only",
+      ticketMinor: "299999",
+      participantKind: "expert",
+    }),
+  );
 });

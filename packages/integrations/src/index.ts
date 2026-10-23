@@ -311,3 +311,5 @@ export {
   type MaxBusinessTextRequest,
   type MaxBusinessTextResponse,
 } from "./max-business/text-contract.js";
+
+export * from "./telegram/manager-notification-transport.js";

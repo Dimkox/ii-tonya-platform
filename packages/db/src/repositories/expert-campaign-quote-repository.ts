@@ -1,3 +1,9 @@
+import {
+  createCurrentExpertOffer,
+  saveExpertOfferProfile,
+  verifyExpertOfferProfile,
+  type ExpertOfferProfileInput,
+} from "./expert-offer-v2.js";
 import type { DrizzleDb } from "../client.js";
 import { and, eq, sql } from "drizzle-orm";
 import { calculateExpertCampaignPrice } from "@ii-tonya/domain";
@@ -17,7 +23,9 @@ export interface ExpertCampaignQuote {
   id: string;
   userId: string;
   tariffVersionId: string;
-  ruleVersion: "expert_energy_start_v1";
+  ruleVersion: "expert_energy_start_v1" | "expert_energy_start_v2";
+  profileRevision: number | null;
+  packagePriceMinor: string | null;
   calculationTimestamp: string;
   quotedAt: string;
   expiresAt: string;
@@ -45,7 +53,8 @@ export type ExpertCampaignQuoteErrorCode =
   | "EXPERT_CAMPAIGN_IDEMPOTENCY_CONFLICT"
   | "EXPERT_CAMPAIGN_TERM_UNAVAILABLE"
   | "EXPERT_CAMPAIGN_EXPIRY_BOUNDARY"
-  | "EXPERT_CAMPAIGN_STORAGE";
+  | "EXPERT_CAMPAIGN_STORAGE"
+  | "EXPERT_CAMPAIGN_PROFILE_REQUIRED";
 export class ExpertCampaignQuoteError extends Error {
   constructor(readonly code: ExpertCampaignQuoteErrorCode) {
     super(code);
@@ -55,6 +64,35 @@ export class ExpertCampaignQuoteError extends Error {
 
 export class PostgresExpertCampaignQuoteRepository {
   constructor(private readonly db: DrizzleDb) {}
+  async saveProfile(input: ExpertOfferProfileInput) {
+    return saveExpertOfferProfile(this.db, input);
+  }
+  async verifyProfile(input: {
+    sessionHash: string;
+    userId: string;
+    revision: number;
+  }) {
+    return verifyExpertOfferProfile(this.db, input);
+  }
+  async createCurrentQuote(
+    input: CreateExpertCampaignQuote,
+  ): Promise<ExpertCampaignQuote> {
+    const request = parseCommand(input);
+    try {
+      return await this.db.transaction((tx) =>
+        this.createCurrentQuoteInTransaction(tx, request),
+      );
+    } catch (error) {
+      if (error instanceof ExpertCampaignQuoteError) throw error;
+      throw new ExpertCampaignQuoteError("EXPERT_CAMPAIGN_STORAGE");
+    }
+  }
+  async createCurrentQuoteInTransaction(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    input: CreateExpertCampaignQuote,
+  ): Promise<ExpertCampaignQuote> {
+    return toQuote(await createCurrentExpertOffer(tx, parseCommand(input)));
+  }
   async createQuote(
     input: CreateExpertCampaignQuote,
   ): Promise<ExpertCampaignQuote> {
@@ -270,6 +308,8 @@ function toQuote(
     userId: row.userId,
     tariffVersionId: row.tariffVersionId,
     ruleVersion: row.ruleVersion,
+    profileRevision: row.profileRevision,
+    packagePriceMinor: row.packagePriceMinor?.toString() ?? null,
     calculationTimestamp: row.calculationTimestamp.toISOString(),
     quotedAt: row.quotedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),

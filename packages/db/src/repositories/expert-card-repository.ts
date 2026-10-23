@@ -1,3 +1,7 @@
+import {
+  PostgresExpertApplicationMaterials,
+  applicationProofDigest,
+} from "./expert-application-materials.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
@@ -66,6 +70,8 @@ export interface ExpertCardMaterialTransport {
     chatId: string;
     reviewId: string;
     revision: number;
+    materialPurpose?: "application_generic";
+    applicationId?: string;
     contentVersion: string;
     payloadDigest: string;
     payload: ExpertCardMaterialPayload;
@@ -508,6 +514,12 @@ export async function lockCardActivationGate(
     ))
   )
     return null;
+  await tx.execute(
+    sql`select application_id from expert_application_promo_confirmations where application_id=${row.applicationId}::uuid for share`,
+  );
+  await tx.execute(
+    sql`select id from expert_application_promo_proofs where application_id=${row.applicationId}::uuid for share`,
+  );
   const valid = (
     await tx.execute<{ valid: boolean }>(
       sql`select expert_card_activation_gate_valid(${input.userId}::uuid,${row.reviewId}::uuid) as valid`,
@@ -661,20 +673,30 @@ export class PostgresExpertCardRepository {
           sql`select exists(select 1 from experts e join experts_published p on p.expert_id=e.id and p.user_id=e.user_id and p.active and p.next_billing_date>clock_timestamp() where e.user_id=${userId}::uuid and e.active and e.verified and exists(select 1 from expert_residency_orders o where o.expert_id=e.id and o.status='settled' and o.residency_starts_at<=clock_timestamp() and o.residency_ends_at>clock_timestamp())) as active`,
         )
       ).rows[0]?.active === true;
+    const appMaterial = (
+      await tx.execute<{ status: CardWorkflow["materialStatus"] }>(
+        sql`select case when status='cancelled' then 'none' else status end as status from expert_application_material_jobs where application_id=${applicationId}::uuid and user_id=${userId}::uuid`,
+      )
+    ).rows[0];
+    const appConfirmed =
+      (
+        await tx.execute<{ ready: boolean }>(
+          sql`select exists(select 1 from expert_application_promo_confirmations p where p.application_id=${applicationId}::uuid and p.user_id=${userId}::uuid and p.proof_digest=${await applicationProofDigest(tx, applicationId)}) as ready`,
+        )
+      ).rows[0]?.ready === true;
     return {
       applicationId,
       draftId: row?.draftId ?? null,
       revision: row?.revision ?? 0,
       status: row?.status ?? "collecting",
       entryCount: row?.entryCount ?? 0,
-      materialStatus: row?.materialStatus ?? "none",
-      promoConfirmed: row?.promoConfirmed ?? false,
+      materialStatus: appMaterial?.status ?? row?.materialStatus ?? "none",
+      promoConfirmed: appConfirmed || (row?.promoConfirmed ?? false),
       activeResident: active,
     };
   }
   async getWorkflow(scope: ExpertPromoScope): Promise<CardWorkflow | null> {
     const input = { ...scope };
-    if (!this.work(input)) return null;
     return this.tx(async (tx) => {
       const identity = await owner(
         tx,
@@ -776,35 +798,41 @@ export class PostgresExpertCardRepository {
   async submitPromoProof(
     raw: ExpertCardEvent & { expectedRevision: number; proof: CardPromoProof },
   ) {
-    const event = normalizeCardEvent(raw);
-    const proof = decodeCardPromoProof(raw.proof);
-    const expected = raw.expectedRevision;
-    this.revision(expected);
-    return this.ownerAction(
-      event,
-      "promo_proof",
-      { proof, revision: expected },
-      async (tx, draft) => {
-        if (draft.revision !== expected) fail("card_revision_conflict");
-        if (draft.status !== "approved" || !draft.approvedReviewId)
-          fail("card_state_conflict");
-        const delivered = (
-          await tx.execute<{ ready: boolean }>(
-            sql`select exists(select 1 from expert_card_material_jobs where review_id=${draft.approvedReviewId}::uuid and revision=${expected} and status='delivered' and delivery_receipt is not null) as ready`,
-          )
-        ).rows[0]?.ready;
-        if (delivered !== true) fail("card_gate_unavailable");
+    const event = normalizeCardEvent(raw),
+      proof = decodeCardPromoProof(raw.proof);
+    const expectedRevision = raw.expectedRevision;
+    this.revision(expectedRevision);
+    return this.tx(async (tx) => {
+      const started = await beginCardRequest(tx, event, "promo_proof", {
+        proof,
+        revision: expectedRevision,
+      });
+      const identity = await owner(
+        tx,
+        event,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return fail("card_forbidden");
+      const draft = await this.draft(tx, identity.userId);
+      if ((draft?.revision ?? 0) !== expectedRevision)
+        return fail("card_revision_conflict");
+      if (!started.replay) {
         const n = (
           await tx.execute<{ n: number }>(
-            sql`select count(*)::int n from expert_card_promo_proofs where review_id=${draft.approvedReviewId}::uuid`,
+            sql`select count(*)::int n from expert_application_promo_proofs where application_id=${identity.applicationId}::uuid`,
           )
         ).rows[0]!.n;
-        if (n >= 50) fail("card_state_conflict");
+        if (n >= 50) return fail("card_state_conflict");
         await tx.execute(
-          sql`insert into expert_card_promo_proofs(draft_id,user_id,review_id,revision,kind,reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.approvedReviewId}::uuid,${expected},${proof.kind},${proof.reference})`,
+          sql`insert into expert_application_promo_proofs(application_id,user_id,kind,reference) values(${identity.applicationId}::uuid,${identity.userId}::uuid,${proof.kind},${proof.reference})`,
         );
-      },
-    );
+        await finishCardRequest(tx, started, identity.applicationId);
+      }
+      return {
+        ...(await this.workflow(tx, identity.userId, identity.applicationId)),
+        replay: started.replay,
+      };
+    });
   }
   private async invalidateJobs(tx: ExpertCardTransaction, draftId: string) {
     await tx.execute(
@@ -884,7 +912,7 @@ export class PostgresExpertCardRepository {
           revision: number;
           reviewId: string;
         }>(
-          sql`select id,kind,reference,revision,review_id as "reviewId" from expert_card_promo_proofs where draft_id=${draft.id}::uuid and review_id=${draft.approvedReviewId}::uuid order by created_at,id limit 50`,
+          sql`select id,kind,reference,0::int as revision,null::uuid as "reviewId" from expert_application_promo_proofs where application_id=${draft.applicationId}::uuid order by created_at,id limit 50`,
         )
       ).rows;
       return {
@@ -1034,7 +1062,7 @@ export class PostgresExpertCardRepository {
             sql`update expert_card_drafts set status='approved',approved_review_id=${review.id}::uuid,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
           );
           await tx.execute(
-            sql`insert into expert_card_material_jobs(draft_id,user_id,review_id,revision,target_bot_id,target_chat_id) values(${draft.id}::uuid,${draft.userId}::uuid,${review.id}::uuid,${draft.revision},${draft.botId},${draft.chatId})`,
+            sql`insert into expert_card_material_jobs(draft_id,user_id,review_id,revision,target_bot_id,target_chat_id) select ${draft.id}::uuid,${draft.userId}::uuid,${review.id}::uuid,${draft.revision},${draft.botId},${draft.chatId} where not exists(select 1 from expert_application_material_jobs where application_id=${draft.applicationId}::uuid)`,
           );
           await tx.execute(
             sql`update expert_onboarding_applications set onboarding_stage='promo_check',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
@@ -1051,28 +1079,72 @@ export class PostgresExpertCardRepository {
   }
   async confirmPromo(raw: StaffCommand) {
     const input = { ...raw };
-    return this.staffAction(
-      input,
-      "confirm_promo",
-      null,
-      async (tx, draft, managerId) => {
-        if (draft.status !== "approved" || !draft.approvedReviewId)
-          fail("card_state_conflict");
-        const ready = (
-          await tx.execute<{ ready: boolean }>(
-            sql`select exists(select 1 from expert_card_material_jobs where review_id=${draft.approvedReviewId}::uuid and revision=${draft.revision} and status='delivered' and delivery_receipt is not null) and exists(select 1 from expert_card_promo_proofs where review_id=${draft.approvedReviewId}::uuid) as ready`,
-          )
-        ).rows[0]?.ready;
-        if (ready !== true) fail("card_gate_unavailable");
+    this.revision(input.expectedRevision);
+    if (
+      !id.test(input.applicationId) ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(input.idempotencyKey)
+    )
+      return fail("card_invalid_event");
+    return this.tx(async (tx) => {
+      const managerId = await lockExpertManagerAuthority(tx, input.sessionHash);
+      const app = (
+        await tx.execute<{ userId: string }>(
+          sql`select user_id as "userId" from expert_onboarding_applications where id=${input.applicationId}::uuid`,
+        )
+      ).rows[0];
+      if (!app) return fail("card_forbidden");
+      await lockClientConsentSubject(tx, app.userId);
+      await lockExpertManagerAuthority(tx, input.sessionHash);
+      if (
+        !(await originalConsent(
+          tx,
+          app.userId,
+          this.policy.messagingConsentPolicyVersion,
+        )) ||
+        !(await paidApplication(tx, app.userId))
+      )
+        return fail("card_forbidden");
+      const draft = await this.draft(tx, app.userId);
+      if ((draft?.revision ?? 0) !== input.expectedRevision)
+        return fail("card_revision_conflict");
+      const proofs = (
         await tx.execute(
-          sql`insert into expert_card_promo_confirmations(draft_id,user_id,review_id,revision,proof_digest,manager_id,manager_session_hash) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.approvedReviewId}::uuid,${draft.revision},expert_card_proof_digest(${draft.id}::uuid,${draft.approvedReviewId}::uuid),${managerId}::uuid,${input.sessionHash}) on conflict(review_id,proof_digest) do nothing`,
-        );
+          sql`select id from expert_application_promo_proofs where application_id=${input.applicationId}::uuid and user_id=${app.userId}::uuid for share`,
+        )
+      ).rows;
+      if (!proofs.length) return fail("card_gate_unavailable");
+      const proofDigest = await applicationProofDigest(tx, input.applicationId);
+      const prior = (
+        await tx.execute<{ proofDigest: string; applicationId: string }>(
+          sql`select proof_digest as "proofDigest",application_id as "applicationId" from expert_application_promo_confirmations where manager_id=${managerId}::uuid and idempotency_key=${input.idempotencyKey}`,
+        )
+      ).rows[0];
+      if (
+        prior &&
+        (prior.applicationId !== input.applicationId ||
+          prior.proofDigest !== proofDigest)
+      )
+        return fail("card_idempotency_conflict");
+      if (!prior)
         await tx.execute(
-          sql`update expert_onboarding_applications set onboarding_stage='payment_ready',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
+          sql`insert into expert_application_promo_confirmations(application_id,user_id,proof_digest,manager_id,session_hash,idempotency_key) values(${input.applicationId}::uuid,${app.userId}::uuid,${proofDigest},${managerId}::uuid,${input.sessionHash},${input.idempotencyKey}) on conflict(application_id) do update set proof_digest=excluded.proof_digest,manager_id=excluded.manager_id,session_hash=excluded.session_hash,idempotency_key=excluded.idempotency_key,created_at=clock_timestamp()`,
         );
-        return draft.approvedReviewId!;
-      },
-    );
+      if (!prior)
+        await tx.execute(
+          sql`insert into audit_events(actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values('admin',${managerId}::uuid,${input.sessionHash},'expert_card.confirm_promo','expert_onboarding_application',${input.applicationId}::uuid,'applied','application_proof',${`application-promo:${sha(input.idempotencyKey)}`},clock_timestamp(),${sha(proofDigest)})`,
+        );
+      if (draft?.status === "approved")
+        await tx.execute(
+          sql`update expert_onboarding_applications set onboarding_stage='payment_ready',updated_at=clock_timestamp() where id=${input.applicationId}::uuid`,
+        );
+      return {
+        ...(await this.workflow(tx, app.userId, input.applicationId)),
+        ...(draft?.approvedReviewId
+          ? { reviewId: draft.approvedReviewId }
+          : {}),
+        replay: !!prior,
+      };
+    });
   }
   async issueWorkHandoff(raw: ExpertCardEvent) {
     const event = normalizeCardEvent(raw);
@@ -1215,6 +1287,9 @@ export class PostgresExpertCardRepository {
       await tx.execute(
         sql`update expert_card_handoffs set consumed_at=clock_timestamp() where token_digest=${tokenDigest}`,
       );
+      await tx.execute(
+        sql`update expert_application_material_jobs set target_bot_id=${event.botId},target_bot_key=${event.botKey},target_chat_id=${event.chatId} where application_id=${row.applicationId}::uuid and user_id=${row.userId}::uuid and target_bot_id is null and attempt_id is null`,
+      );
       const started = await startKnownRequest(
         tx,
         event,
@@ -1233,14 +1308,32 @@ export class PostgresExpertCardRepository {
   async listDueMaterialJobs(limit = 25): Promise<readonly { jobId: string }[]> {
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)
       fail("card_invalid_event");
-    return this.tx(
+    const applicationJobs = await new PostgresExpertApplicationMaterials(
+      this.db,
+      this.policy.messagingConsentPolicyVersion,
+      this.transport,
+    ).listDue(limit);
+    const legacyJobs = await this.tx(
       async (tx) =>
         (
-          await tx.execute<{ jobId: string }>(
-            sql`select j.id as "jobId" from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join users u on u.id=j.user_id and u.active=true where j.status in ('waiting_content','pending') and j.attempt_id is null and exists(select 1 from expert_card_material_templates t where t.status='approved') order by j.created_at,j.id limit ${limit}`,
+          await tx.execute<{ jobId: string; createdAt: string | Date }>(
+            sql`select j.id as "jobId",j.created_at as "createdAt" from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join users u on u.id=j.user_id and u.active=true where j.status in ('waiting_content','pending') and j.attempt_id is null
+ and d.work_bot_id=${this.policy.workBotId} and d.work_bot_key=${this.policy.workBotKey}
+ and d.messaging_policy_version=${this.policy.messagingConsentPolicyVersion} and expert_card_current_messaging_authority(d.user_id,d.messaging_policy_version)
+ and (select count(*) from channel_identities ci where ci.user_id=d.user_id and ci.provider='telegram' and ci.bot_key=d.work_bot_key and ci.external_id=d.work_chat_id and ci.external_chat_id=d.work_chat_id and ci.status='active')=1
+ and exists(select 1 from expert_onboarding_applications a join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.admission='interview' where a.id=d.application_id and a.user_id=d.user_id and a.verification_status='approved' and a.archived_at is null and a.archive_until_date is null)
+ and exists(select 1 from expert_card_material_templates t where t.status='approved') order by j.created_at,j.id limit ${limit}`,
           )
         ).rows,
     );
+    return [...applicationJobs, ...legacyJobs]
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+          a.jobId.localeCompare(b.jobId),
+      )
+      .slice(0, limit)
+      .map(({ jobId }) => ({ jobId }));
   }
   private async materialJob(tx: ExpertCardTransaction, jobId: string) {
     const initial = (
@@ -1335,6 +1428,18 @@ export class PostgresExpertCardRepository {
       | "unavailable";
   }> {
     if (!id.test(jobId)) fail("card_invalid_event");
+    const applicationJob =
+      (
+        await this.db.execute(
+          sql`select id from expert_application_material_jobs where id=${jobId}::uuid`,
+        )
+      ).rows.length > 0;
+    if (applicationJob)
+      return new PostgresExpertApplicationMaterials(
+        this.db,
+        this.policy.messagingConsentPolicyVersion,
+        this.transport,
+      ).deliver(jobId, options.signal);
     if (options.signal?.aborted) return { kind: "cancelled" };
     if (!this.transport) return { kind: "unavailable" };
     // A committed attempt is quarantine, NOT permission to disclose. Each actual

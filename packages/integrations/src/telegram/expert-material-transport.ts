@@ -33,7 +33,7 @@ const payload = z
     assets: z.array(asset).max(8),
   })
   .strict();
-const inputSchema = z
+const reviewedInputSchema = z
   .object({
     botId: id,
     botKey: key,
@@ -47,12 +47,23 @@ const inputSchema = z
     signal: z.instanceof(AbortSignal),
   })
   .strict();
-export type ExpertMaterialSendInput = Omit<
-  z.input<typeof inputSchema>,
-  "payload"
-> & {
-  payload: { text: string; assets: readonly z.input<typeof asset>[] };
-};
+const applicationInputSchema = reviewedInputSchema
+  .extend({
+    revision: z.literal(0),
+    materialPurpose: z.literal("application_generic"),
+    applicationId: z.uuid(),
+  })
+  .strict()
+  .refine((v) => v.applicationId === v.reviewId);
+const inputSchema = z.union([reviewedInputSchema, applicationInputSchema]);
+type MaterialInput<T> = T extends unknown
+  ? Omit<T, "payload"> & {
+      payload: { text: string; assets: readonly z.input<typeof asset>[] };
+    }
+  : never;
+export type ExpertMaterialSendInput = MaterialInput<
+  z.input<typeof inputSchema>
+>;
 export interface ExpertMaterialReceipt {
   messageIds: readonly string[];
   botId: string;
@@ -188,7 +199,17 @@ export function createExpertMaterialTransport(options: {
       const parsed = inputSchema.safeParse(raw);
       if (!parsed.success) throw new Error("card_material_request_invalid");
       const input = parsed.data;
-      const bodyDigest = `sha256:${createHash("sha256").update(JSON.stringify(input.payload)).digest("hex")}`;
+      const generic =
+        "materialPurpose" in input &&
+        input.materialPurpose === "application_generic";
+      const digestContext = generic
+        ? {
+            purpose: input.materialPurpose,
+            applicationId: input.applicationId,
+            payload: input.payload,
+          }
+        : input.payload;
+      const bodyDigest = `sha256:${createHash("sha256").update(JSON.stringify(digestContext)).digest("hex")}`;
       if (
         input.botId !== botId ||
         input.botKey !== botKey ||
@@ -236,7 +257,9 @@ export function createExpertMaterialTransport(options: {
           headers: { "content-type": "application/json" },
           body: { chat_id: input.chatId, text: input.payload.text },
           context: {
-            idempotencyKey: `material:${input.reviewId}:${input.contentVersion}:${input.payloadDigest}`,
+            idempotencyKey: generic
+              ? `application-material:${input.applicationId}:${input.contentVersion}:${input.payloadDigest}`
+              : `material:${input.reviewId}:${input.contentVersion}:${input.payloadDigest}`,
             disableRequestLogging: true,
           },
         });

@@ -86,6 +86,10 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             chat_id: chatId,
             text: result.text,
             protect_content: true,
+            reply_markup: {
+              keyboard: [[{ text: "Мой актуальный тариф" }]],
+              resize_keyboard: true,
+            },
           };
         if (result.status === "unavailable" || result.status === "disabled")
           return reply

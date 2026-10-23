@@ -48,3 +48,8 @@ export {
 export * from "./expert-card-materials.js";
 
 export * from "./expert-residency-lifecycle.js";
+
+export {
+  createExpertPersonalOfferRunner,
+  type ExpertCardMainCheckout,
+} from "@ii-tonya/application";

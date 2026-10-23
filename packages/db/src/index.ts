@@ -364,3 +364,11 @@ export * from "./repositories/expert-onboarding-main-payment-repository.js";
 export * from "./repositories/expert-residency-lifecycle-repository.js";
 
 export * from "./repositories/client-bot-account-read-repository.js";
+
+export * from "./repositories/expert-manager-telegram-repository.js";
+
+export * from "./repositories/expert-personal-offer-repository.js";
+
+export * from "./repositories/yookassa-payment-purpose-repository.js";
+
+export * from "./repositories/expert-offer-v2.js";

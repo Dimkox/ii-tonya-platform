@@ -1,3 +1,4 @@
+import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/expert-offer-v2.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { sql } from "drizzle-orm";
@@ -69,8 +70,28 @@ async function application() {
   await database.db.execute(
     sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram',${telegramUserId},${scope.botKey},${telegramUserId},'active')`,
   );
-  await seedClientConsent(database.db, userId, "client_messaging");
+  const consent = await seedClientConsent(
+    database.db,
+    userId,
+    "client_messaging",
+  );
+  await database.db.execute(
+    sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,presentation_id,policy_version,status) select ${userId}::uuid,ci.id,${scope.botId},c.presentation_id,'client-messaging-v1','granted' from channel_identities ci join consents c on c.id=${consent.decisionId}::uuid where ci.user_id=${userId}::uuid and ci.provider='telegram' and ci.bot_key=${scope.botKey} and ci.external_id=${scope.telegramUserId} and ci.external_chat_id=${scope.chatId} and ci.status='active' on conflict(user_id) do nothing`,
+  );
   await promo.register(request(scope));
+  const profile = await promo.saveProfile({
+    ...request(scope),
+    cityCode: "kazan",
+    millionCity: false,
+    serviceFormat: "offline",
+    ticketMinor: "300000",
+    participantKind: "expert",
+  });
+  await verifyExpertOfferProfile(database.db, {
+    sessionHash: support.sessionHash,
+    userId,
+    revision: profile.revision,
+  });
   const quote = await promo.createQuote({
     ...request(scope),
     tariffVersionId: tariffId,

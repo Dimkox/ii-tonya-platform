@@ -1,4 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
+import { saveExpertOfferProfileInTransaction } from "./expert-offer-v2.js";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { PostgresExpertCampaignQuoteRepository } from "./expert-campaign-quote-repository.js";
 import { PostgresConsentEvidenceRepository } from "./consent-evidence-repository.js";
@@ -100,7 +101,13 @@ export class PostgresExpertPromoRepository {
     input: ExpertPromoCommand,
     userId: string,
     operation:
-      "register" | "application" | "quote" | "enroll" | "consent" | "tariffs",
+      | "register"
+      | "application"
+      | "quote"
+      | "enroll"
+      | "consent"
+      | "tariffs"
+      | "profile",
   ) {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`promo-request:${input.botId}:${input.requestKey}`},0))`,
@@ -244,9 +251,20 @@ export class PostgresExpertPromoRepository {
           )
         ).rows[0]!.count;
         if (count >= 2) {
-          await tx.execute(
-            sql`insert into expert_promo_guide_work(user_id) values(${referrerId}::uuid) on conflict do nothing`,
-          );
+          const created = (
+            await tx.execute<{ userId: string }>(
+              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${referrerId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
+            )
+          ).rows[0];
+          if (created) {
+            const eventId = randomUUID();
+            await tx.execute(
+              sql`insert into expert_promo_ready_logs(id,event) values(${eventId}::uuid,'Ready to send')`,
+            );
+            await tx.execute(
+              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${referrerId}::uuid`,
+            );
+          }
           await tx.execute(
             sql`insert into expert_promo_bonus_indications(user_id) values(${referrerId}::uuid) on conflict do nothing`,
           );
@@ -277,6 +295,37 @@ export class PostgresExpertPromoRepository {
     });
   }
 
+  async saveProfile(
+    raw: ExpertPromoCommand & {
+      cityCode: string;
+      millionCity: boolean;
+      serviceFormat: "online_only" | "offline" | "hybrid";
+      ticketMinor: string;
+      participantKind: "expert" | "space";
+    },
+  ) {
+    const input = command(raw);
+    const qualifications = {
+      cityCode: raw.cityCode,
+      millionCity: raw.millionCity,
+      serviceFormat: raw.serviceFormat,
+      ticketMinor: raw.ticketMinor,
+      participantKind: raw.participantKind,
+    };
+    return this.db.transaction(async (tx) => {
+      const userId = await this.identity(tx, input);
+      if (!userId) return fail("promo_identity_unavailable");
+      const replay = await this.replay(tx, input, userId, "profile");
+      const profile = await saveExpertOfferProfileInTransaction(tx, {
+        ...qualifications,
+        userId,
+        idempotencyKey: `promo:${input.botId}:${input.requestKey}`,
+      });
+      if (!replay) await this.saveRequest(tx, input, userId, "profile");
+      return { ...profile, replay };
+    });
+  }
+
   async createQuote(
     raw: ExpertPromoCommand & { tariffVersionId: string; termMonths: 1 | 3 },
   ) {
@@ -294,7 +343,7 @@ export class PostgresExpertPromoRepository {
       const replay = await this.replay(tx, input, userId, "quote");
       const quote = await new PostgresExpertCampaignQuoteRepository(
         this.db,
-      ).createQuoteInTransaction(tx, {
+      ).createCurrentQuoteInTransaction(tx, {
         userId,
         tariffVersionId,
         termMonths,

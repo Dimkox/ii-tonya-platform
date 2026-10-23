@@ -44,7 +44,7 @@ export function createExpertCampaignComposition(deps: {
       environmentEnabled: deps.billingEnabled,
       ownerUserId: (id) => reads.ownerUserId(id),
       listActiveTariffs: (input) => reads.listActiveTariffs(input),
-      createQuote: (input) => quotes.createQuote(input),
+      createQuote: (input) => quotes.createCurrentQuote(input),
       createCheckoutOrderWithReceipt: (input) =>
         orders.createCheckoutOrderWithReceipt(input),
       ...(deps.checkoutProvider

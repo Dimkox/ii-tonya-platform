@@ -80,3 +80,16 @@ it("requires a dedicated webhook secret separate from the ordinary client channe
     }),
   ).toThrow("expert_applicant_bot_scope_conflict");
 });
+it("accepts an optional dedicated promo delivery token only for its exact configured bot", () => {
+  const botToken = `123456:${"synthetic_".repeat(4)}`;
+  expect(
+    loadEnv({ ...enabled, EXPERT_PROMO_TELEGRAM_BOT_TOKEN: botToken })
+      .expertApplicant?.botToken,
+  ).toBe(botToken);
+  expect(() =>
+    loadEnv({
+      ...enabled,
+      EXPERT_PROMO_TELEGRAM_BOT_TOKEN: `654321:${"synthetic_".repeat(4)}`,
+    }),
+  ).toThrow("expert_applicant_configuration_required");
+});

@@ -13,6 +13,7 @@ export interface WorkerCycleReport {
   readonly bookingNotifications?: unknown;
   readonly expertCardMaterials?: unknown;
   readonly expertResidencyLifecycle?: unknown;
+  readonly expertPersonalOffers?: unknown;
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
@@ -54,6 +55,10 @@ export interface WorkerRuntimeDependencies {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
+  readonly expertPersonalOffers?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly expertResidencyLifecycle?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -87,6 +92,10 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
   readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertPersonalOffers?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -213,6 +222,9 @@ export function createWorkerRuntime(
         await deps.expertTelegramCheckoutCleanup();
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
+      const expertPersonalOffers = acceptingClaims
+        ? await deps.expertPersonalOffers?.runOnce()
+        : undefined;
       const expertResidencyLifecycle = acceptingClaims
         ? await deps.expertResidencyLifecycle?.runOnce()
         : undefined;
@@ -245,6 +257,7 @@ export function createWorkerRuntime(
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
         ...(expertResidencyLifecycle === undefined
           ? {}
           : { expertResidencyLifecycle }),
@@ -278,6 +291,7 @@ export function createWorkerRuntime(
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
     deps.expertCardMaterials?.stopAccepting();
+    deps.expertPersonalOffers?.stopAccepting();
     deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
     closePromise = (async () => {
@@ -337,6 +351,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.expertPersonalOffers === undefined
+      ? {}
+      : { expertPersonalOffers: deps.expertPersonalOffers }),
     ...(deps.expertResidencyLifecycle === undefined
       ? {}
       : { expertResidencyLifecycle: deps.expertResidencyLifecycle }),

@@ -1,5 +1,7 @@
+import { expertOfferSchedules } from "./expert-offer-corrections.js";
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   foreignKey,
@@ -27,6 +29,10 @@ export const expertCardMainAcceptances = pgTable(
   "expert_card_main_acceptances",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    acceptanceSource: text("acceptance_source").notNull().default("explicit"),
+    offerScheduleId: uuid("offer_schedule_id").references(
+      (): AnyPgColumn => expertOfferSchedules.id,
+    ),
     applicationId: uuid("application_id").references(
       () => expertOnboardingApplications.id,
       { onDelete: "set null" },
@@ -66,6 +72,10 @@ export const expertCardMainAcceptances = pgTable(
       t.userId,
       t.expertId,
       t.quoteId,
+    ),
+    check(
+      "expert_card_acceptance_source_valid",
+      sql`(acceptance_source='explicit' AND offer_schedule_id IS NULL) OR (acceptance_source='schedule' AND offer_schedule_id IS NOT NULL)`,
     ),
     check("expert_card_main_acceptances_revision_check", sql`revision>0`),
     check(

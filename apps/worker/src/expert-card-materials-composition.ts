@@ -35,12 +35,37 @@ export function createExpertCardMaterialsLifecycle(
   if (typeof options.createRepository !== "function")
     throw new Error("expert_card_material_capability_required");
   const settings = config.expertCard!;
-  const transport = createExpertMaterialTransport({
+  const workTransport = createExpertMaterialTransport({
     token: settings.workBotToken!,
     botId: settings.workBotId,
     botKey: settings.workBotKey,
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
+  const promo = config.expertApplicant;
+  const promoTransport = promo?.botToken
+    ? createExpertMaterialTransport({
+        token: promo.botToken,
+        botId: promo.botId,
+        botKey: promo.botKey,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+      })
+    : undefined;
+  const transport: ExpertMaterialTransport = {
+    send(request) {
+      if (
+        request.botId === settings.workBotId &&
+        request.botKey === settings.workBotKey
+      )
+        return workTransport.send(request);
+      if (
+        promoTransport &&
+        request.botId === promo!.botId &&
+        request.botKey === promo!.botKey
+      )
+        return promoTransport.send(request);
+      return Promise.reject(new Error("expert_material_bot_scope_unavailable"));
+    },
+  };
   const repository = options.createRepository(transport);
   return createExpertCardMaterialsRunner({
     enabled: true,

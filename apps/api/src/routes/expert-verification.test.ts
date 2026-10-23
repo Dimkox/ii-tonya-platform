@@ -161,3 +161,26 @@ it("marks protected manager contact responses no-store", async () => {
   expect(r.headers["cache-control"]).toBe("no-store");
   await f.app.close();
 });
+it("profile reverification rejects caller user IDs before invoking staff authority", async () => {
+  const app = Fastify({ logger: false });
+  const reverifyProfile = vi.fn();
+  await app.register(expertVerificationRoutes, {
+    enabled: true,
+    service: {
+      list: vi.fn(),
+      detail: vi.fn(),
+      decide: vi.fn(),
+      checkout: vi.fn(),
+      reverifyProfile,
+    },
+  });
+  const result = await app.inject({
+    method: "POST",
+    url: `/v1/admin/expert-verification/${id}/profile-verification`,
+    headers: { authorization: `Bearer ${"a".repeat(24)}` },
+    payload: { revision: 2, userId: id },
+  });
+  expect(result.statusCode).toBe(400);
+  expect(reverifyProfile).not.toHaveBeenCalled();
+  await app.close();
+});

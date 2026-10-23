@@ -49,3 +49,7 @@ export * from "./expert-card-admin-service.js";
 export * from "./expert-residency-lifecycle-service.js";
 
 export * from "./client-bot-account-read-service.js";
+
+export * from "./expert-manager-telegram-service.js";
+
+export * from "./expert-personal-offer-service.js";

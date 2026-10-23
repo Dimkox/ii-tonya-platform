@@ -12,9 +12,12 @@ import {
 type Client = Pick<
   ExpertVerificationClient,
   "list" | "detail" | "decide" | "recover" | "clear"
-> & { readonly cards?: ExpertCardAdminClient };
+> &
+  Partial<Pick<ExpertVerificationClient, "reverifyProfile">> & {
+    readonly cards?: ExpertCardAdminClient;
+  };
 export function renderExpertVerificationPage(): string {
-  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section>${renderExpertCardReview()}</main>`;
+  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><button type="button" data-verification-profile disabled>Подтвердить текущие параметры тарифа</button><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section>${renderExpertCardReview()}</main>`;
 }
 export function bindExpertVerificationActions(
   root: HTMLElement,
@@ -32,6 +35,7 @@ export function bindExpertVerificationActions(
     status = el("status"),
     queue = el("queue"),
     detail = el("detail"),
+    profileButton = el<HTMLButtonElement>("profile"),
     approve = el<HTMLButtonElement>("approve"),
     reject = el<HTMLButtonElement>("reject"),
     reason = el<HTMLSelectElement>("reason"),
@@ -65,12 +69,20 @@ export function bindExpertVerificationActions(
       !active ||
       busy ||
       selected?.status !== "pending" ||
+      (!!selected.profile && !selected.profile.verified) ||
       (!!item && item.decision !== "approved");
     reject.disabled =
       !active ||
       busy ||
       selected?.status !== "pending" ||
       (!!item && item.decision !== "rejected");
+    if (profileButton)
+      profileButton.disabled =
+        !active ||
+        busy ||
+        !selected?.profile ||
+        selected.profile.verified ||
+        !client?.reverifyProfile;
     reason.disabled = reject.disabled || !!item;
     invoiceId =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
@@ -198,6 +210,11 @@ export function bindExpertVerificationActions(
       for (const contact of item.contact)
         text(detail, `${contact.provider}: ${contact.externalId}`);
       text(detail, item.questionnaire.contentSlot);
+      if (item.profile)
+        text(
+          detail,
+          `Параметры тарифа, версия ${item.profile.revision}: город ${item.profile.cityCode}, миллионник ${item.profile.millionCity ? "да" : "нет"}, формат ${item.profile.serviceFormat}, средний чек ${item.profile.ticketMinor} коп. ${item.profile.verified ? "Подтверждены." : "Требуют подтверждения сотрудником."}`,
+        );
       status.textContent = "Заявка загружена. Решение принимает сотрудник.";
     } catch (error) {
       if (mounted && epoch === generation) failed(error);
@@ -276,6 +293,45 @@ export function bindExpertVerificationActions(
     controls();
     void load();
   };
+  if (profileButton)
+    profileButton.onclick = () => {
+      if (!client?.reverifyProfile || busy || !selected?.profile || !mounted)
+        return;
+      const current = client,
+        epoch = generation,
+        id = selected.applicationId,
+        revision = selected.profile.revision;
+      busy = true;
+      controls();
+      status.textContent = "Подтверждаем показанную версию параметров…";
+      void current.reverifyProfile!(id, revision)
+        .then(
+          () => {
+            if (
+              mounted &&
+              generation === epoch &&
+              selected?.applicationId === id &&
+              selected.profile?.revision === revision
+            ) {
+              selected = {
+                ...selected,
+                profile: { ...selected.profile, verified: true },
+              };
+              status.textContent =
+                "Текущие параметры подтверждены. Новый счёт за онбординг не создаётся.";
+            }
+          },
+          (error) => {
+            if (mounted && generation === epoch) failed(error);
+          },
+        )
+        .finally(() => {
+          if (mounted && generation === epoch) {
+            busy = false;
+            controls();
+          }
+        });
+    };
   logout.onclick = end;
   refresh.onclick = () => void load();
   approve.onclick = () => void decide("approved");
@@ -325,6 +381,7 @@ export function bindExpertVerificationActions(
     cardReview?.dispose();
     win?.removeEventListener("pagehide", end);
     invoice.oninput = null;
+    if (profileButton) profileButton.onclick = null;
     connect.onclick =
       logout.onclick =
       refresh.onclick =

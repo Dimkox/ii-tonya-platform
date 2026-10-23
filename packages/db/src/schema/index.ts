@@ -28,3 +28,5 @@ export * from "./expert-cards.js";
 export * from "./expert-card-payments.js";
 
 export * from "./expert-residency-lifecycle.js";
+
+export * from "./expert-offer-corrections.js";

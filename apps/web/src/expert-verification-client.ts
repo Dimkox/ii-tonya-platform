@@ -16,6 +16,14 @@ export interface VerificationDetail extends Omit<
   "maskedContact"
 > {
   userId: string;
+  profile?: {
+    revision: number;
+    cityCode: string;
+    millionCity: boolean;
+    serviceFormat: "online_only" | "offline" | "hybrid";
+    ticketMinor: string;
+    verified: boolean;
+  } | null;
   contact: { provider: "telegram"; externalId: string }[];
   questionnaire: {
     status: "waiting_content";
@@ -183,6 +191,24 @@ export class ExpertVerificationClient {
       v.questionnaire.contentSlot !== "TODO: Wait for Content Spec"
     )
       return invalid();
+    if (v.profile !== undefined && v.profile !== null) {
+      const p = v.profile;
+      if (
+        !object(p) ||
+        !Number.isSafeInteger(p.revision) ||
+        Number(p.revision) < 1 ||
+        typeof p.cityCode !== "string" ||
+        p.cityCode.length > 100 ||
+        typeof p.millionCity !== "boolean" ||
+        !["online_only", "offline", "hybrid"].includes(
+          String(p.serviceFormat),
+        ) ||
+        typeof p.ticketMinor !== "string" ||
+        !/^(?:0|[1-9]\d{0,18})$/u.test(p.ticketMinor) ||
+        typeof p.verified !== "boolean"
+      )
+        return invalid();
+    }
     return v as unknown as VerificationDetail;
   }
   async decide(
@@ -219,6 +245,20 @@ export class ExpertVerificationClient {
       replay: v.replay,
       ...(v.payment === undefined ? {} : { payment: payment(v.payment) }),
     };
+  }
+  async reverifyProfile(
+    applicationId: string,
+    revision: number,
+  ): Promise<void> {
+    if (!uuid(applicationId) || !Number.isSafeInteger(revision) || revision < 1)
+      return invalid();
+    const result = await this.request(
+      `/${applicationId}/profile-verification`,
+      { revision },
+      true,
+    );
+    if (result.applicationId !== applicationId || result.revision !== revision)
+      return invalid();
   }
   async recover(invoiceId: string): Promise<VerificationPayment> {
     if (!uuid(invoiceId)) return invalid();

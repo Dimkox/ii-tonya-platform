@@ -1,4 +1,8 @@
 import {
+  beginScheduledMainCheckout,
+  scheduledMainInput,
+} from "./expert-scheduled-main-checkout.js";
+import {
   parseMainCardCommand,
   CardMainPaymentError,
   type MainCardCheckoutCommand,
@@ -108,6 +112,17 @@ export class PostgresExpertCampaignOrderRepository {
       throw new CardMainPaymentError("card_main_storage_unavailable");
     return { ...order, revision: order.revision, replay: order.replay };
   }
+  async createScheduledCheckoutOrder(
+    scheduleId: string,
+    quoteId: string,
+    policy: {
+      providerMode: "test" | "live";
+      messagingConsentPolicyVersion: string;
+    },
+  ) {
+    const input = scheduledMainInput(scheduleId, quoteId);
+    return this.createOrder(null, undefined, undefined, { ...input, policy });
+  }
   async createCheckoutOrderWithReceipt(
     input: CreateExpertCampaignOrder & { receiptContactId: string },
   ): Promise<ExpertCampaignOrder> {
@@ -133,6 +148,14 @@ export class PostgresExpertCampaignOrderRepository {
         messagingConsentPolicyVersion: string;
       };
     },
+    scheduled?: {
+      scheduleId: string;
+      quoteId: string;
+      policy: {
+        providerMode: "test" | "live";
+        messagingConsentPolicyVersion: string;
+      };
+    },
   ): Promise<ExpertCampaignOrder & { revision?: number; replay?: boolean }> {
     // Only this branch retries lock/deadlock failures. Every attempt owns a new
     // transaction, snapshot and all locks, including implicit FK row locks.
@@ -147,6 +170,12 @@ export class PostgresExpertCampaignOrderRepository {
                 tx,
                 main.input,
                 main.policy,
+              );
+            if (scheduled)
+              mainAdmission = await beginScheduledMainCheckout(
+                tx,
+                scheduled,
+                scheduled.policy,
               );
             const command = mainAdmission
               ? {
@@ -248,7 +277,8 @@ export class PostgresExpertCampaignOrderRepository {
                 prior.status = "expired";
               if (mainAdmission) {
                 await assertMainCardPriorOrder(tx, mainAdmission, prior.id);
-                await finishMainCardCheckout(tx, mainAdmission, prior.id);
+                if (!scheduled)
+                  await finishMainCardCheckout(tx, mainAdmission, prior.id);
                 return {
                   ...(await hydrate(tx, prior)),
                   revision: mainAdmission.gate.revision,
@@ -264,12 +294,19 @@ export class PostgresExpertCampaignOrderRepository {
             ).rows[0];
             const quote = (
               await tx.execute<QuoteRow>(
-                sql`select id,user_id as "userId",tariff_version_id as "tariffVersionId",expires_at as "expiresAt",quoted_at as "quotedAt",term_months as "termMonths",duration_seconds as "durationSeconds",price_minor::text as "priceMinor",currency,display_name as "displayName",credit_cap_bps as "creditCapBps",individual_services_enabled as "individualServicesEnabled",group_event_limit as "groupEventLimit",statistics_level as "statisticsLevel",support_priority as "supportPriority" from expert_campaign_quotes where id=${command.quoteId}::uuid for share`,
+                sql`select rule_version as "ruleVersion",id,user_id as "userId",tariff_version_id as "tariffVersionId",expires_at as "expiresAt",quoted_at as "quotedAt",term_months as "termMonths",duration_seconds as "durationSeconds",price_minor::text as "priceMinor",currency,display_name as "displayName",credit_cap_bps as "creditCapBps",individual_services_enabled as "individualServicesEnabled",group_event_limit as "groupEventLimit",statistics_level as "statisticsLevel",support_priority as "supportPriority" from expert_campaign_quotes where id=${command.quoteId}::uuid for share`,
               )
             ).rows[0];
             if (!quote || quote.userId !== command.userId)
               throw new ExpertCampaignOrderError(
                 "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",
+              );
+            if (
+              quote.ruleVersion === "expert_energy_start_v2" &&
+              !mainAdmission
+            )
+              throw new ExpertCampaignOrderError(
+                "EXPERT_CAMPAIGN_OWNER_INELIGIBLE",
               );
             if (used) throw new ExpertCampaignOrderError("QUOTE_ALREADY_USED");
             if (receiptContactId !== undefined)
@@ -391,7 +428,8 @@ export class PostgresExpertCampaignOrderRepository {
             if (!row)
               throw new ExpertCampaignOrderError("EXPERT_CAMPAIGN_STORAGE");
             if (mainAdmission) {
-              await finishMainCardCheckout(tx, mainAdmission, row.id);
+              if (!scheduled)
+                await finishMainCardCheckout(tx, mainAdmission, row.id);
               return {
                 ...(await hydrate(tx, row)),
                 revision: mainAdmission.gate.revision,
@@ -493,6 +531,7 @@ type QuoteRow = Pick<
   userId: string;
   expiresAt: string;
   quotedAt: string;
+  ruleVersion: string;
 } & Record<string, unknown>;
 const orderColumns = sql`id,expert_id as "expertId",campaign_quote_id as "quoteId",tariff_version_id as "tariffVersionId",campaign_term_months as "termMonths",snapshot_display_name as "displayName",price_minor::text as "priceMinor",credit_minor::text as "creditMinor",cash_minor::text as "cashMinor",currency,duration_seconds as "durationSeconds",commercial_policy_version as "commercialPolicyVersion",credit_cap_bps as "creditCapBps",individual_services_enabled as "individualServicesEnabled",group_event_limit as "groupEventLimit",statistics_level as "statisticsLevel",support_priority as "supportPriority",status,payment_deadline as "paymentDeadline",provider_deadline as "providerDeadline",created_at as "createdAt"`;
 async function hydrate(

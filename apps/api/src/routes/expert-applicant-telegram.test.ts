@@ -40,6 +40,10 @@ it("authenticates the separate promo route and derives identity", async () => {
     chat_id: "456",
     text: "synthetic-safe-reply",
     protect_content: true,
+    reply_markup: {
+      keyboard: [[{ text: "Мой актуальный тариф" }]],
+      resize_keyboard: true,
+    },
   });
   expect(f.handle).toHaveBeenCalledWith({
     botId: "123",

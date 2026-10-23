@@ -55,6 +55,11 @@ export function createExpertVerificationService(deps: {
   enabled: boolean;
   repository: ExpertVerificationRepository;
   checkout?: ExpertVerificationCheckout;
+  verifyProfile?: (input: {
+    sessionHash: string;
+    userId: string;
+    revision: number;
+  }) => Promise<unknown>;
 }) {
   const authorize = (sessionHash: string): Failure | undefined =>
     !deps.enabled
@@ -90,6 +95,39 @@ export function createExpertVerificationService(deps: {
         return item
           ? { kind: "ok" as const, item }
           : { kind: "not_found" as const };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async reverifyProfile(
+      sessionHash: string,
+      applicationId: string,
+      revision: number,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(applicationId) ||
+        !Number.isSafeInteger(revision) ||
+        revision < 1
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.verifyProfile) return { kind: "unavailable" } as const;
+      try {
+        const item = (await deps.repository.applicationDetail(
+          sessionHash,
+          applicationId,
+        )) as { userId?: unknown; profile?: { revision?: unknown } } | null;
+        if (!item || typeof item.userId !== "string" || !uuid.test(item.userId))
+          return { kind: "not_found" } as const;
+        if (item.profile?.revision !== revision)
+          return { kind: "invalid" } as const;
+        await deps.verifyProfile({
+          sessionHash,
+          userId: item.userId,
+          revision,
+        });
+        return { kind: "ok", applicationId, revision } as const;
       } catch (e) {
         return safeFailure(e);
       }

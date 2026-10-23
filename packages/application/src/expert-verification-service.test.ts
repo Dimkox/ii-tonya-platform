@@ -251,3 +251,64 @@ it("rejects confirmation URLs outside the approved provider hosts", async () => 
     kind: "unavailable",
   });
 });
+
+it("reverifies only the owned application's displayed current revision without repeating decision or invoice", async () => {
+  const applicationId = "12345678-1234-4234-8234-123456789012",
+    userId = "12345678-1234-4234-8234-123456789013",
+    sessionHash = `sha256:${"a".repeat(64)}`;
+  const repository = {
+    listQueue: vi.fn(),
+    applicationDetail: vi
+      .fn()
+      .mockResolvedValue({ userId, profile: { revision: 2 } }),
+    decide: vi.fn(),
+    invoiceForManager: vi.fn(),
+  };
+  const verifyProfile = vi.fn().mockResolvedValue({ revision: 2 });
+  const checkout = { createCheckout: vi.fn(), recoverCheckout: vi.fn() };
+  const service = createExpertVerificationService({
+    enabled: true,
+    repository,
+    verifyProfile,
+    checkout,
+  });
+  expect(await service.reverifyProfile(sessionHash, applicationId, 1)).toEqual({
+    kind: "invalid",
+  });
+  expect(verifyProfile).not.toHaveBeenCalled();
+  expect(await service.reverifyProfile(sessionHash, applicationId, 2)).toEqual({
+    kind: "ok",
+    applicationId,
+    revision: 2,
+  });
+  expect(verifyProfile).toHaveBeenCalledWith({
+    sessionHash,
+    userId,
+    revision: 2,
+  });
+  expect(repository.decide).not.toHaveBeenCalled();
+  expect(checkout.createCheckout).not.toHaveBeenCalled();
+});
+it("rejects stale-MFA profile reverification from original authority", async () => {
+  const sessionHash = `sha256:${"a".repeat(64)}`,
+    applicationId = "12345678-1234-4234-8234-123456789012";
+  const repository = {
+    listQueue: vi.fn(),
+    applicationDetail: vi
+      .fn()
+      .mockResolvedValue({ userId: applicationId, profile: { revision: 2 } }),
+    decide: vi.fn(),
+    invoiceForManager: vi.fn(),
+  };
+  const service = createExpertVerificationService({
+    enabled: true,
+    repository,
+    verifyProfile: async () => {
+      throw new Error("verification_forbidden");
+    },
+  });
+  expect(await service.reverifyProfile(sessionHash, applicationId, 2)).toEqual({
+    kind: "forbidden",
+  });
+  expect(repository.decide).not.toHaveBeenCalled();
+});

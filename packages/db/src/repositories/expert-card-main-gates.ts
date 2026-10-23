@@ -112,6 +112,14 @@ export async function beginMainCardCheckout(
   ).rows[0];
   if (!acceptance || acceptance.publicDigest !== gate.publicDigest)
     fail("card_main_acceptance_required");
+  const facts =
+    acceptance &&
+    (
+      await tx.execute<{ valid: boolean }>(
+        sql`select expert_campaign_current_profile_valid(${request.userId}::uuid,${acceptance.quoteId}::uuid) as valid`,
+      )
+    ).rows[0];
+  if (facts?.valid !== true) fail("card_main_current_profile_required");
   return {
     request,
     acceptance: acceptance!,
@@ -161,7 +169,12 @@ export interface MainCardAdmission {
 }
 const admissions = new WeakMap<
   object,
-  { tx: ExpertCardTransaction; gate: CardActivationGate; expertId: string }
+  {
+    tx: ExpertCardTransaction;
+    gate: CardActivationGate;
+    expertId: string;
+    providerEventId: string;
+  }
 >();
 /** Only called after canonical verification and payment/expiry checks. No generic
  * activation callback or caller-supplied predicate is accepted. */
@@ -190,8 +203,9 @@ export async function prepareMainCardSettlement(
       revision: number;
       publicDigest: string;
       mode: "test" | "live";
+      quoteId: string;
     }>(
-      sql`select user_id as "userId",application_id as "applicationId",review_id as "reviewId",revision,public_digest as "publicDigest",provider_mode as mode from expert_card_main_orders where order_id=${order.id}::uuid and expert_id=${order.expertId}::uuid and purpose='main_residency' for update`,
+      sql`select quote_id as "quoteId",user_id as "userId",application_id as "applicationId",review_id as "reviewId",revision,public_digest as "publicDigest",provider_mode as mode from expert_card_main_orders where order_id=${order.id}::uuid and expert_id=${order.expertId}::uuid and purpose='main_residency' for update`,
     )
   ).rows[0];
   if (!binding || binding.userId !== subject.userId)
@@ -221,6 +235,12 @@ export async function prepareMainCardSettlement(
       ...(expired !== false ? { expired: true } : {}),
     });
   };
+  const currentFacts = (
+    await tx.execute<{ valid: boolean }>(
+      sql`select expert_campaign_current_profile_valid(${binding.userId}::uuid,${binding.quoteId}::uuid) as valid`,
+    )
+  ).rows[0];
+  if (currentFacts?.valid !== true) return blocked();
   const lifecycle = await lockResidencyLifecycle(tx, binding.userId);
   if (lifecycle.paused) return blocked();
   if (!binding.applicationId || !binding.reviewId) return blocked();
@@ -305,7 +325,15 @@ export async function prepareMainCardSettlement(
     await tx.execute(
       sql`update expert_residency_lifecycle set status='payment_required' where user_id=${binding.userId}::uuid and status<>'paused'`,
     );
-    return blocked();
+    const futureAdmission = await blocked();
+    if (!futureAdmission.expired)
+      admissions.set(futureAdmission, {
+        tx,
+        gate,
+        expertId: order.expertId,
+        providerEventId: canonical!.id,
+      });
+    return futureAdmission;
   }
   const enabled = (
     await tx.execute<{ id: string }>(
@@ -345,16 +373,32 @@ export async function prepareMainCardSettlement(
     }
   }
   const admission = Object.freeze({ orderId: order.id, admitted: true });
-  admissions.set(admission, { tx, gate, expertId: order.expertId });
+  admissions.set(admission, {
+    tx,
+    gate,
+    expertId: order.expertId,
+    providerEventId: canonical!.id,
+  });
   return admission;
 }
 export async function publishSettledMainCard(
   tx: ExpertCardTransaction,
   admission: MainCardAdmission | null,
 ) {
-  if (!admission?.admitted) return;
+  if (!admission) return;
   const held = admissions.get(admission);
-  if (!held || held.tx !== tx) return fail("card_main_forbidden");
+  if (!held) {
+    if (!admission.admitted) return;
+    return fail("card_main_forbidden");
+  }
+  if (held.tx !== tx) return fail("card_main_forbidden");
+  // Admission is recorded once, in the verified settlement transaction. A later
+  // profile change cannot mint this fact or revoke an already admitted period.
+  await tx.execute(sql`insert into expert_main_activation_admissions(order_id,user_id,expert_id,quote_id,profile_revision,application_audit_id,review_audit_id,public_digest,provider_event_id)
+    select m.order_id,m.user_id,m.expert_id,m.quote_id,q.profile_revision,m.application_audit_id,m.review_audit_id,m.public_digest,${held.providerEventId}::uuid
+    from expert_card_main_orders m join expert_campaign_quotes q on q.id=m.quote_id where m.order_id=${admission.orderId}::uuid and m.user_id=${held.gate.userId}::uuid
+    on conflict(order_id) do nothing`);
+  if (!admission.admitted) return;
   await tx.execute(
     sql`insert into expert_residency_lifecycle(user_id,expert_id,status) values(${held.gate.userId}::uuid,${held.expertId}::uuid,'payment_required') on conflict(user_id) do nothing`,
   );

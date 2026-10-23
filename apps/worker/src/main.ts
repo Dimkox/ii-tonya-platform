@@ -1,4 +1,16 @@
 import {
+  createExpertPersonalOfferRunner,
+  type ExpertCardMainCheckout,
+} from "@ii-tonya/worker";
+import {
+  PostgresExpertPersonalOfferRepository,
+  PostgresExpertOnboardingMainPaymentRepository,
+} from "@ii-tonya/db";
+import {
+  createPersonalOfferNoticeTransport,
+  assertPersonalOfferNoticeConfig,
+} from "./expert-personal-offer-composition.js";
+import {
   assertExpertResidencyLifecycleWorkerConfig,
   createExpertResidencyLifecycleWorker,
 } from "./expert-residency-lifecycle-composition.js";
@@ -126,6 +138,7 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly expertPersonalOfferCheckout?: ExpertCardMainCheckout;
   readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly expertCardMaterialFetch?: typeof globalThis.fetch;
   readonly expertResidencyNoticeFetch?: typeof globalThis.fetch;
@@ -382,6 +395,7 @@ export function createProductionWorkerRuntimeFactory(
   return {
     async create(config) {
       assertExpertResidencyLifecycleWorkerConfig(config);
+      assertPersonalOfferNoticeConfig(config);
       assertExpertCardMaterialsWorkerConfig(config);
       validateYooKassaWorkerConfig(config);
       const clientEnabled = config.features.b2TelegramDispatch === true;
@@ -569,6 +583,71 @@ export function createProductionWorkerRuntimeFactory(
             : { fetch: deps.expertResidencyNoticeFetch }),
         },
       );
+      const expertPersonalOffers =
+        config.features.expertResidencyLifecycle === true
+          ? (() => {
+              const work = config.expertCard!;
+              const repository = new PostgresExpertPersonalOfferRepository(db, {
+                workBotId: work.workBotId,
+                workBotKey: work.workBotKey,
+                ...(config.expertApplicant
+                  ? {
+                      promoBotId: config.expertApplicant.botId,
+                      promoBotKey: config.expertApplicant.botKey,
+                      promoConsentPolicyVersion:
+                        config.expertApplicant.messagingConsentPolicyVersion,
+                    }
+                  : {}),
+                messagingConsentPolicyVersion:
+                  work.messagingConsentPolicyVersion,
+                ...(config.features.expertResidencyNoticeDelivery === true
+                  ? {
+                      noticeTransport: createPersonalOfferNoticeTransport(
+                        config,
+                        deps.expertResidencyNoticeFetch,
+                      ),
+                    }
+                  : {}),
+              });
+              const financial =
+                new PostgresExpertOnboardingMainPaymentRepository(db, {
+                  providerMode: work.paymentMode,
+                  messagingConsentPolicyVersion:
+                    work.messagingConsentPolicyVersion,
+                });
+              const runner = createExpertPersonalOfferRunner({
+                enabled: true,
+                repository,
+                financial,
+                ...(deps.expertPersonalOfferCheckout
+                  ? { mainCheckout: deps.expertPersonalOfferCheckout }
+                  : {}),
+              });
+              const abort = new AbortController();
+              return {
+                async runOnce() {
+                  const offers = await runner.runOnce();
+                  let delivered = 0;
+                  if (config.features.expertResidencyNoticeDelivery === true)
+                    for (const n of await repository.listDueNotices(10)) {
+                      if (
+                        (
+                          await repository.deliverNotice(n.noticeId, {
+                            signal: abort.signal,
+                          })
+                        ).kind === "delivered"
+                      )
+                        delivered++;
+                    }
+                  return { offers, delivered };
+                },
+                stopAccepting() {
+                  abort.abort();
+                  runner.stopAccepting();
+                },
+              };
+            })()
+          : undefined;
       const bookingHandoffRevocations =
         new PostgresBookingHandoffRevocationRepository(db);
       return createProductionWorkerRuntime({
@@ -576,6 +655,7 @@ export function createProductionWorkerRuntimeFactory(
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
         ...(expertResidencyLifecycle === undefined
           ? {}
           : { expertResidencyLifecycle }),

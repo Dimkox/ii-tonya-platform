@@ -132,3 +132,11 @@ root export is a privileged minting capability reserved for sandbox composition/
 
 Cross-task gate: SBX-TST-009 sandbox-container checkout-to-refund smoke is owned by
 Task 6. Task 5 cannot be marked complete until that exact built-container evidence passes.
+
+
+## Residency offer corrections — 2026-10-23
+
+- Branch: `codex/phase1-owner-plan-20261023`; frozen [correction contract](../../docs/superpowers/implementation-artifacts/spec-residency-offer-corrections.md).
+- Additive pricing/profile/offer lifecycle, parallel materials, trusted manager Telegram and actual catalogue/booking archive admission implemented locally. V1 financial/source history remains frozen.
+- Focused behavior and independent review completed; [consolidated evidence](../../docs/test-evidence/residency-offer-corrections-2026-10-23.md) preserves failures, remediations, exact inventories and compatibility limits.
+- Local clean-commit coordinator gate is pending. No push, deployment, provider activation or production readiness is authorized or claimed.

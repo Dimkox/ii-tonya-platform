@@ -183,6 +183,9 @@ export function createExpertCardService(deps: {
   promoScope?: { botId: string; botKey: string };
   repository: ExpertCardRepository;
   financial: ExpertCardFinancial;
+  personalOffers?: {
+    read(scope: ExpertCardScope): Promise<{ text: string } | null>;
+  };
 }) {
   const reply = (text: string): ExpertCardReply => ({
     status: "handled",
@@ -199,7 +202,12 @@ export function createExpertCardService(deps: {
       input: ExpertCardScope & { updateId: number | string; text: string },
     ): Promise<ExpertCardReply> {
       if (!deps.enabled) return { status: "disabled" };
-      if (input.text !== "/work_handoff") return { status: "unhandled" };
+      if (
+        input.text !== "/work_handoff" &&
+        input.text !== "/materials" &&
+        !proofCommand.test(input.text)
+      )
+        return { status: "unhandled" };
       const updateId = String(input.updateId),
         s = scope(input);
       if (
@@ -212,6 +220,34 @@ export function createExpertCardService(deps: {
       )
         return { status: "rejected" };
       try {
+        if (input.text === "/materials") {
+          const current = await deps.repository.getWorkflow(s);
+          if (!current) return { status: "unavailable" };
+          return reply(
+            current.materialStatus === "waiting_content"
+              ? "AWAITING_MATERIALS. Ваши материалы для рассылки будут доступны в ближайшее время"
+              : `Материалы: ${current.materialStatus}`,
+          );
+        }
+        const proof = proofCommand.exec(input.text);
+        if (proof) {
+          const reference = proof[2] && safeExpertCardProofLink(proof[2]);
+          if (!reference) return { status: "rejected" };
+          const result = await deps.repository.submitPromoProof({
+            ...s,
+            requestKey: `${s.botId}:${updateId}`,
+            requestDigest: createHash("sha256")
+              .update(JSON.stringify({ ...s, updateId, text: input.text }))
+              .digest("hex"),
+            expectedRevision: Number(proof[1]),
+            proof: { kind: "link", reference },
+          });
+          return result.replay
+            ? { status: "duplicate" }
+            : reply(
+                "Подтверждение публикации сохранено для проверки менеджером.",
+              );
+        }
         const result = await deps.repository.issueWorkHandoff({
           ...s,
           requestKey: `${s.botId}:${updateId}`,
@@ -289,21 +325,25 @@ export function createExpertCardService(deps: {
           });
           if (redeemed.kind === "duplicate") return { status: "duplicate" };
           return reply(
-            "Рабочий бот подключён. Интервью: отправляйте текст, фото или документ. /card — состояние; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку. TODO: Wait for Content Spec",
+            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: отправляйте текст, фото или документ. /card — состояние; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку. TODO: Wait for Prompt Spec",
           );
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice)(?:\s|$)/u.test(
+          !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff)(?:\s|$)/u.test(
             text,
           )
         )
           return { status: "unhandled" };
+        if (text === "/my_tariff" || text === "Мой актуальный тариф") {
+          const offer = await deps.personalOffers?.read(s);
+          return offer ? reply(offer.text) : { status: "unavailable" };
+        }
         const current = await deps.repository.getWorkflow(s);
         if (!current) return { status: "unhandled" };
         if (text === "/card")
           return reply(
-            `Карточка: ${current.status}; ревизия ${current.revision}; записей ${current.entryCount}. Материалы: ${current.materialStatus}. ${current.materialStatus === "waiting_content" ? "TODO: Wait for Content Spec" : ""}`.trim(),
+            `Карточка: ${current.status}; ревизия ${current.revision}; записей ${current.entryCount}. Материалы: ${current.materialStatus}. Мой актуальный тариф: /my_tariff. ${current.materialStatus === "waiting_content" ? "AWAITING_MATERIALS. Ваши материалы для рассылки будут доступны в ближайшее время" : ""}`.trim(),
           );
         const submit = submitCommand.exec(text);
         if (submit) {

@@ -110,3 +110,17 @@ it.each([
     ).rejects.toThrow("verification_invalid_response");
   },
 );
+it("reverifies exactly the displayed revision on the owned application endpoint", async () => {
+  const fetcher = vi.fn(async () =>
+    response({ kind: "ok", applicationId: id, revision: 3 }),
+  );
+  const client = new ExpertVerificationClient(token, fetcher);
+  await client.reverifyProfile(id, 3);
+  expect(fetcher).toHaveBeenCalledWith(
+    `/v1/admin/expert-verification/${id}/profile-verification`,
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ revision: 3 }),
+    }),
+  );
+});

@@ -3,7 +3,11 @@ import {
   assertExpertApplicantConfig,
   type RuntimeConfig,
 } from "@ii-tonya/config";
-import { PostgresExpertPromoRepository, type DrizzleDb } from "@ii-tonya/db";
+import {
+  PostgresExpertPromoRepository,
+  PostgresExpertPersonalOfferRepository,
+  type DrizzleDb,
+} from "@ii-tonya/db";
 import type { ExpertApplicantTelegramCapability } from "./routes/expert-applicant-telegram.js";
 export function assertExpertApplicantCapability(
   config: RuntimeConfig,
@@ -34,6 +38,14 @@ export function createExpertApplicantComposition(
     webhookSecret: scope.webhookSecret,
     service: createExpertApplicantService({
       enabled: true,
+      personalOffers: new PostgresExpertPersonalOfferRepository(db, {
+        workBotId: config.expertCard?.workBotId ?? "unconfigured",
+        workBotKey: config.expertCard?.workBotKey ?? "unconfigured",
+        promoBotId: scope.botId,
+        promoBotKey: scope.botKey,
+        promoConsentPolicyVersion: scope.messagingConsentPolicyVersion,
+        messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
+      }),
       repository: new PostgresExpertPromoRepository(db, {
         messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
       }),

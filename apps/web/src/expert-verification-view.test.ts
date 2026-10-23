@@ -61,6 +61,7 @@ function setup() {
     "status",
     "queue",
     "detail",
+    "profile",
     "approve",
     "reject",
     "reason",
@@ -88,6 +89,7 @@ function setup() {
       payment: { status: "waiting_configuration" as const },
     })),
     recover: vi.fn(async () => ({ status: "pending" as const })),
+    reverifyProfile: vi.fn(async () => undefined),
     clear: vi.fn(),
   };
   const createClient = vi.fn(() => client);
@@ -245,4 +247,40 @@ it("recovers an existing invoice after an uncertain decision and fresh session w
   expect(f.client.recover).toHaveBeenCalledWith(id);
   expect(f.client.decide).toHaveBeenCalledTimes(1);
   expect(f.createClient).toHaveBeenCalledTimes(2);
+});
+
+it("reverifies a changed approved profile without repeating approval or fee checkout", async () => {
+  const f = setup();
+  f.client.detail.mockResolvedValueOnce({
+    ...detail,
+    status: "approved",
+    profile: {
+      revision: 3,
+      cityCode: "kazan",
+      millionCity: true,
+      serviceFormat: "hybrid",
+      ticketMinor: "200000",
+      verified: false,
+    },
+  });
+  f.get("token").value = "synthetic-session-token-1234567890";
+  f.get("connect").click();
+  await flush();
+  f.get("queue").children[0]!.click();
+  await flush();
+  expect(f.get("profile").disabled).toBe(false);
+  expect(f.get("approve").disabled).toBe(true);
+  expect(
+    f
+      .get("detail")
+      .children.map((n) => n.textContent)
+      .join(" "),
+  ).toContain("kazan");
+  f.get("profile").click();
+  await flush();
+  expect(f.client.reverifyProfile).toHaveBeenCalledWith(id, 3);
+  expect(f.client.decide).not.toHaveBeenCalled();
+  expect(f.client.recover).not.toHaveBeenCalled();
+  expect(f.get("profile").disabled).toBe(true);
+  f.dispose();
 });

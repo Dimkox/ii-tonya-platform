@@ -1,3 +1,4 @@
+import { expertPromoReadyLogs } from "./expert-offer-corrections.js";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -71,36 +72,44 @@ export const expertPromoRequests = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.botId, t.requestKey] }),
-    check("expert_promo_bot_id", sql`${t.botId} ~ '^[1-9][0-9]{0,19}$'`),
+    check(
+      "expert_promo_bot_id",
+      sql.raw("bot_id ~ '^[1-9][0-9]{0,19}$'::text"),
+    ),
     check(
       "expert_promo_request_digest",
-      sql`${t.requestDigest} ~ '^[0-9a-f]{64}$'`,
+      sql.raw("request_digest ~ '^[0-9a-f]{64}$'::text"),
     ),
     check(
       "expert_promo_request_key",
-      sql`length(${t.requestKey}) BETWEEN 1 AND 200`,
+      sql.raw("length(request_key) >= 1 AND length(request_key) <= 200"),
     ),
     check(
       "expert_promo_request_erasure",
-      sql`(${t.userId} IS NOT NULL AND ${t.requestDigest} IS NOT NULL AND ${t.erasedAt} IS NULL) OR (${t.userId} IS NULL AND ${t.requestDigest} IS NULL AND ${t.erasedAt} IS NOT NULL)`,
+      sql.raw(
+        "user_id IS NOT NULL AND request_digest IS NOT NULL AND erased_at IS NULL OR user_id IS NULL AND request_digest IS NULL AND erased_at IS NOT NULL",
+      ),
     ),
     check(
       "expert_promo_request_operation",
-      sql`${t.operation} IN ('register','application','quote','enroll','consent','tariffs')`,
+      sql.raw(
+        "operation = ANY (ARRAY['register'::text, 'application'::text, 'quote'::text, 'enroll'::text, 'consent'::text, 'tariffs'::text, 'profile'::text])",
+      ),
     ),
   ],
 );
 export const expertPromoGuideWork = pgTable(
   "expert_promo_guide_work",
   {
+    readyLogEventId: uuid("ready_log_event_id")
+      .unique()
+      .references(() => expertPromoReadyLogs.id),
     userId: owner(),
     status: text("status")
       .$type<"waiting_content" | "pending" | "delivered" | "cancelled">()
       .notNull()
       .default("waiting_content"),
-    contentSlot: text("content_slot")
-      .notNull()
-      .default("TODO: Wait for Content Spec"),
+    contentSlot: text("content_slot").notNull().default("TODO: Wait for PDF"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     deliveryReceipt: text("delivery_receipt"),
     createdAt: createdAt(),

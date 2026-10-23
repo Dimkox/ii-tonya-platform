@@ -1,3 +1,5 @@
+import { PostgresYooKassaPaymentPurposeRepository } from "@ii-tonya/db";
+import { createExpertManagerTelegramComposition } from "./expert-manager-telegram-composition.js";
 import { createClientBotAccountComposition } from "./client-bot-account-composition.js";
 import { assertClientAccountQueriesConfig } from "@ii-tonya/config";
 import {
@@ -149,6 +151,10 @@ export const createDefaultLifecycle = (
   options: {
     expertResidencyLifecycle?: ExpertResidencyLifecycleCompositionOptions;
     expertCard?: ExpertCardCompositionOptions;
+    expertManagerTelegram?: Omit<
+      Parameters<typeof createExpertManagerTelegramComposition>[1],
+      "verification"
+    >;
     expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
     yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
     expertCodeSecretResolver?: {
@@ -577,6 +583,18 @@ export const createDefaultLifecycle = (
       config,
       options.expertVerificationPayments,
     );
+    if (
+      options.expertManagerTelegram?.enabled &&
+      (!expertVerification || config.features.expertVerification !== true)
+    )
+      throw new Error("manager_telegram_verification_required");
+    const expertManagerTelegram =
+      options.expertManagerTelegram && expertVerification
+        ? createExpertManagerTelegramComposition(db, {
+            ...options.expertManagerTelegram,
+            verification: expertVerification,
+          })
+        : undefined;
     const expertResidencyLifecycle = createExpertResidencyLifecycleComposition(
       db,
       config,
@@ -587,6 +605,17 @@ export const createDefaultLifecycle = (
       config,
       options.expertCard,
     );
+    let expertAiIngress = options.expertAiComposition?.ingress;
+    if (config.features.expertAiIngress === true && expertCard) {
+      if (
+        !expertCard.personalOfferReads ||
+        !expertAiIngress?.withPersonalOffers
+      )
+        throw new Error("expert_ai_personal_offer_capability_required");
+      expertAiIngress = expertAiIngress.withPersonalOffers(
+        expertCard.personalOfferReads,
+      );
+    }
     const originalExpertApplicantTelegram = createExpertApplicantComposition(
       db,
       config,
@@ -646,6 +675,7 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertManagerTelegram ? { expertManagerTelegram } : {}),
       ...(clientAccountQueries ? { clientAccountQueries } : {}),
       ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
       ...(expertCard ? { expertCard } : {}),
@@ -655,6 +685,11 @@ export const createDefaultLifecycle = (
         ? {
             yookassaWebhook: {
               ...options.yookassaWebhook,
+              resolvePurpose: (providerObjectId, event) =>
+                new PostgresYooKassaPaymentPurposeRepository(db).resolvePurpose(
+                  providerObjectId,
+                  event,
+                ),
               ...(expertVerification?.onboardingWebhook
                 ? { onboarding: expertVerification.onboardingWebhook }
                 : {}),
@@ -829,7 +864,7 @@ export const createDefaultLifecycle = (
       ...(options.expertAiComposition === undefined
         ? {}
         : {
-            expertAiIngress: options.expertAiComposition.ingress,
+            expertAiIngress: expertAiIngress!,
             expertAiPrincipal: options.expertAiComposition.principals,
             expertAiRequests: new PostgresExpertAiRequestReceiptStore(db),
             ...(options.expertAiComposition.telegramPrincipals === undefined

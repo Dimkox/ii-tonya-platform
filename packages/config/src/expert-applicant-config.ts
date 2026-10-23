@@ -1,4 +1,5 @@
 export interface ExpertApplicantConfig {
+  botToken?: string;
   botId: string;
   botKey: string;
   webhookSecret: string;
@@ -34,6 +35,12 @@ export function assertExpertApplicantConfig(config: ScopeConfig): void {
   const promo = config.expertApplicant;
   if (!valid(promo)) throw new Error("expert_applicant_configuration_required");
   if (
+    promo.botToken !== undefined &&
+    (!exact(/^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u, promo.botToken) ||
+      promo.botToken.split(":")[0] !== promo.botId)
+  )
+    throw new Error("expert_applicant_configuration_required");
+  if (
     [
       config.clientTelegramBotToken?.split(":")[0],
       config.expertSession?.botToken.split(":")[0],
@@ -53,6 +60,9 @@ export function readExpertApplicantConfig(
     throw new Error("expert_applicant_configuration_invalid");
   if (enabled !== "true") return undefined;
   const config = {
+    ...(source.EXPERT_PROMO_TELEGRAM_BOT_TOKEN
+      ? { botToken: source.EXPERT_PROMO_TELEGRAM_BOT_TOKEN }
+      : {}),
     botId: source.EXPERT_PROMO_TELEGRAM_BOT_ID ?? "",
     botKey: source.EXPERT_PROMO_TELEGRAM_BOT_KEY ?? "",
     webhookSecret: source.EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET ?? "",

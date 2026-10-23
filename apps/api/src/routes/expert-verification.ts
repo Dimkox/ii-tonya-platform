@@ -24,7 +24,8 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
   service?: Pick<
     ExpertVerificationService,
     "list" | "detail" | "decide" | "checkout"
-  >;
+  > &
+    Partial<Pick<ExpertVerificationService, "reverifyProfile">>;
 }> = async (app, deps) => {
   if (!deps.enabled) return;
   const service = deps.service;
@@ -93,6 +94,33 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
       const result = await service.checkout(
         session(req.headers.authorization)!,
         req.params.invoiceId,
+      );
+      return result.kind === "ok"
+        ? result
+        : reply.code(code(result.kind)).send({ error: result.kind });
+    },
+  );
+  app.post<{ Params: { applicationId: string }; Body: unknown }>(
+    "/v1/admin/expert-verification/:applicationId/profile-verification",
+    { bodyLimit: 1024 },
+    async (req, reply) => {
+      const b = req.body as Record<string, unknown> | null;
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !b ||
+        typeof b !== "object" ||
+        Array.isArray(b) ||
+        Object.keys(b).join(",") !== "revision" ||
+        !Number.isSafeInteger(b.revision) ||
+        Number(b.revision) < 1
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!service.reverifyProfile)
+        return reply.code(503).send({ error: "unavailable" });
+      const result = await service.reverifyProfile(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        Number(b.revision),
       );
       return result.kind === "ok"
         ? result

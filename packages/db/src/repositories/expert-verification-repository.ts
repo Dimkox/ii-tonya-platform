@@ -1,3 +1,4 @@
+import { enqueueApplicationMaterials } from "./expert-application-materials.js";
 import {
   lockExpertManagerAuthority,
   ExpertManagerAuthorityError,
@@ -146,7 +147,7 @@ export class PostgresExpertVerificationRepository {
           priceMinor: string;
           currency: "RUB";
         }>(
-          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",q.term_months as "termMonths",q.price_minor::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.verification_status='pending' order by a.created_at,a.id limit ${limit}`,
+          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",q.term_months as "termMonths",q.price_minor::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.verification_status='pending' or (a.verification_status='approved' and exists(select 1 from expert_offer_profiles p where p.user_id=a.user_id and p.revision=(select max(revision) from expert_offer_profiles where user_id=a.user_id) and not exists(select 1 from expert_offer_profile_verifications pv where pv.user_id=p.user_id and pv.profile_revision=p.revision))) order by a.created_at,a.id limit ${limit}`,
         )
       ).rows;
     });
@@ -182,9 +183,22 @@ export class PostgresExpertVerificationRepository {
           sql`select provider,external_id as "externalId" from channel_identities where user_id=${row.userId}::uuid and provider='telegram' and status='active' order by id limit 5`,
         )
       ).rows;
+      const profile = (
+        await tx.execute<{
+          revision: number;
+          cityCode: string;
+          millionCity: boolean;
+          serviceFormat: "online_only" | "offline" | "hybrid";
+          ticketMinor: string;
+          verified: boolean;
+        }>(
+          sql`select p.revision,p.city_code as "cityCode",p.million_city as "millionCity",p.service_format as "serviceFormat",p.ticket_minor::text as "ticketMinor",exists(select 1 from expert_offer_profile_verifications v where v.user_id=p.user_id and v.profile_revision=p.revision) as verified from expert_offer_profiles p where p.user_id=${row.userId}::uuid order by p.revision desc limit 1`,
+        )
+      ).rows[0];
       return {
         ...row,
         contact,
+        profile: profile ?? null,
         questionnaire: {
           status: "waiting_content" as const,
           contentSlot: "TODO: Wait for Content Spec" as const,
@@ -537,6 +551,13 @@ export class PostgresExpertVerificationRepository {
           sql`update expert_onboarding_payment_operations set status='succeeded' where id=${proof.operationId}::uuid`,
         );
         if (reason === "payment_verified") {
+          if (!stored.applicationId)
+            return fail("verification_application_unavailable");
+          await enqueueApplicationMaterials(
+            tx,
+            stored.applicationId,
+            proof.userId,
+          );
           await tx.execute(
             sql`update expert_onboarding_applications set onboarding_stage='interview',updated_at=clock_timestamp() where id=${stored.applicationId}::uuid`,
           );

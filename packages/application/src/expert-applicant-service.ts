@@ -1,3 +1,7 @@
+import {
+  renderPersonalOffer,
+  type PersonalOfferView,
+} from "./expert-personal-offer-service.js";
 import { createHash } from "node:crypto";
 
 export type ExpertApplicantScope = {
@@ -11,6 +15,15 @@ type Command = ExpertApplicantScope & {
   requestDigest: string;
 };
 export interface ExpertApplicantRepository {
+  saveProfile?(
+    input: Command & {
+      cityCode: string;
+      millionCity: boolean;
+      serviceFormat: "online_only" | "offline" | "hybrid";
+      ticketMinor: string;
+      participantKind: "expert" | "space";
+    },
+  ): Promise<{ revision: number; replay: boolean }>;
   beginEnrollment(input: Command & { refCode?: string }): Promise<
     | { kind: "ready" | "waiting_content" | "consent_pending" }
     | {
@@ -41,9 +54,7 @@ export interface ExpertApplicantRepository {
       "none" | "waiting_content" | "pending" | "delivered" | "cancelled";
     replay: boolean;
   }>;
-  listTariffs(
-    input: Command,
-  ): Promise<{
+  listTariffs(input: Command): Promise<{
     tariffs: { id: string; displayName: string }[];
     replay: boolean;
   }>;
@@ -78,6 +89,11 @@ const apply = new RegExp(`^/apply (${uuid})$`, "u");
 export function createExpertApplicantService(deps: {
   enabled: boolean;
   repository: ExpertApplicantRepository;
+  personalOffers?: {
+    readPromoIdentity(
+      scope: ExpertApplicantScope,
+    ): Promise<PersonalOfferView | null>;
+  };
 }) {
   return {
     async handle(
@@ -105,6 +121,37 @@ export function createExpertApplicantService(deps: {
         requestDigest: digest,
       });
       try {
+        if (
+          input.text === "Мой актуальный тариф" ||
+          input.text === "/my_tariff"
+        ) {
+          const offer = await deps.personalOffers?.readPromoIdentity(scope);
+          return offer
+            ? { status: "handled", text: renderPersonalOffer(offer) }
+            : { status: "unavailable" };
+        }
+        const profile =
+          /^\/profile ([a-zA-Z0-9_-]{1,100}) (0|1) (online_only|offline|hybrid) ([0-9]{1,18}) (expert|space)$/u.exec(
+            input.text,
+          );
+        if (profile) {
+          if (!deps.repository.saveProfile) return { status: "unavailable" };
+          const result = await deps.repository.saveProfile({
+            ...command(),
+            cityCode: profile[1]!,
+            millionCity: profile[2] === "1",
+            serviceFormat: profile[3] as "online_only" | "offline" | "hybrid",
+            ticketMinor: profile[4]!,
+            participantKind: profile[5] as "expert" | "space",
+          });
+          return result.replay
+            ? { status: "duplicate" }
+            : {
+                status: "handled",
+                text: `Квалификация ревизии ${result.revision} сохранена для проверки менеджером.`,
+              };
+        }
+        if (input.text.startsWith("/profile")) return { status: "rejected" };
         const start = /^\/start(?: (promo_[A-Za-z0-9_-]{8,48}))?$/u.exec(
           input.text,
         );
@@ -114,14 +161,14 @@ export function createExpertApplicantService(deps: {
             ...(start[1] ? { refCode: start[1] } : {}),
           });
           if (enrollment.kind === "waiting_content")
-            return { status: "handled", text: "TODO: Wait for Content Spec" };
+            return { status: "handled", text: "TODO: Wait for Prompt Spec" };
           if (enrollment.kind === "consent_pending")
             return { status: "duplicate" };
           if (enrollment.kind === "consent_required") {
             const text = `${enrollment.document.title}\n${enrollment.document.body}\nСогласиться: /consent ${enrollment.token} granted\nОтказаться: /consent ${enrollment.token} denied`;
             // Preserve the complete approved notice. Never truncate legal text.
             if (text.length > 4096)
-              return { status: "handled", text: "TODO: Wait for Content Spec" };
+              return { status: "handled", text: "TODO: Wait for Prompt Spec" };
             return { status: "handled", text };
           }
           const result = await deps.repository.register({
@@ -131,7 +178,7 @@ export function createExpertApplicantService(deps: {
           if (result.replay) return { status: "duplicate" };
           const guide =
             result.guideStatus === "waiting_content"
-              ? "Гайд ожидает подготовки материала."
+              ? "TODO: Wait for PDF"
               : result.guideStatus === "delivered"
                 ? "Доставка гайда подтверждена."
                 : "";
@@ -201,7 +248,7 @@ export function createExpertApplicantService(deps: {
           if (result.replay) return { status: "duplicate" };
           return {
             status: "handled",
-            text: `Заявка ${result.applicationId} ожидает проверки менеджером. TODO: Wait for Content Spec`,
+            text: `Заявка ${result.applicationId} ожидает проверки менеджером. TODO: Wait for Prompt Spec`,
           };
         }
         return {

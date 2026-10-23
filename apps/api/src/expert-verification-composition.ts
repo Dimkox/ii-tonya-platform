@@ -13,6 +13,7 @@ import {
 } from "@ii-tonya/config";
 import {
   PostgresExpertVerificationRepository,
+  PostgresExpertCampaignQuoteRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
 type ServiceDependencies = Parameters<
@@ -115,6 +116,8 @@ export function createExpertVerificationComposition(
     service: createExpertVerificationService({
       enabled: config.features.expertVerification === true,
       repository,
+      verifyProfile: (input) =>
+        new PostgresExpertCampaignQuoteRepository(db).verifyProfile(input),
       ...(settings.checkoutEnabled && payment?.checkout
         ? { checkout: payment.checkout }
         : {}),

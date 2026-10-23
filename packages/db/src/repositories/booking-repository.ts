@@ -7,6 +7,7 @@ import {
   type ReservationStatus,
 } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
+import { currentExpertResidencyVisibleSql } from "./catalog-repository.js";
 import { currentConsentSatisfiedSql } from "./consent-current.js";
 import {
   captureBookingNotificationContext,
@@ -531,6 +532,7 @@ export class PostgresBookingRepository {
       join experts e on e.id = es.expert_id
       where e.active
         and e.verified
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
         and es.active
         and es.code is not null
         and es.language is not null
@@ -1272,7 +1274,7 @@ export class PostgresBookingRepository {
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
         s.capacity,
-        e.active as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from slots s
@@ -1526,7 +1528,7 @@ export class PostgresBookingRepository {
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
         s.capacity,
-        e.active as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from reservations r
@@ -1576,6 +1578,7 @@ export class PostgresBookingRepository {
             and s.observed_at <= ${command.now}
             and e.active = true
             and e.verified = true
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
             and es.active = true
           returning r.id as "reservationId", r.status, r.version
         `)

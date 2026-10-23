@@ -300,6 +300,14 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
       id: tariff,
       displayName: "Про",
     });
+    await repo.saveProfile({
+      ...command(owner),
+      cityCode: "kazan",
+      millionCity: false,
+      serviceFormat: "offline",
+      ticketMinor: "300000",
+      participantKind: "expert",
+    });
     const input = {
       ...command(owner),
       tariffVersionId: tariff,

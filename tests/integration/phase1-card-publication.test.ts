@@ -1,3 +1,4 @@
+import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/expert-offer-v2.js";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { PostgresExpertReferralControlRepository } from "../../packages/db/src/repositories/expert-referral-control-repository.js";
@@ -187,8 +188,28 @@ async function onboarding(refCode?: string, existing?: ExistingActor) {
     await database.db.execute(
       sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram',${telegramUserId},${scope.botKey},${telegramUserId},'active')`,
     );
-  await seedClientConsent(database.db, userId, "client_messaging");
+  const consent = await seedClientConsent(
+    database.db,
+    userId,
+    "client_messaging",
+  );
+  await database.db.execute(
+    sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,presentation_id,policy_version,status) select ${userId}::uuid,ci.id,${scope.botId},c.presentation_id,'client-messaging-v1','granted' from channel_identities ci join consents c on c.id=${consent.decisionId}::uuid where ci.user_id=${userId}::uuid and ci.provider='telegram' and ci.bot_key=${scope.botKey} and ci.external_id=${scope.telegramUserId} and ci.external_chat_id=${scope.chatId} and ci.status='active' on conflict(user_id) do nothing`,
+  );
   await promo.register({ ...event(scope), ...(refCode ? { refCode } : {}) });
+  const profile = await promo.saveProfile({
+    ...event(scope),
+    cityCode: "kazan",
+    millionCity: false,
+    serviceFormat: "offline",
+    ticketMinor: "300000",
+    participantKind: "expert",
+  });
+  await verifyExpertOfferProfile(database.db, {
+    sessionHash: manager.sessionHash,
+    userId,
+    revision: profile.revision,
+  });
   const quote = await promo.createQuote({
     ...event(scope),
     tariffVersionId: tariffId,
@@ -928,28 +949,42 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
     });
     transportCalls = [];
     transportFailure = false;
-    const transport = createExpertMaterialTransport({
-      token: "818181:synthetic_fixture_material_token",
-      botId: work.botId,
-      botKey: work.botKey,
-      fetch: async (url, init) => {
-        transportCalls.push(String(url));
-        if (transportFailure && transportCalls.length === 2)
-          throw new Error("synthetic_lost_response");
-        const body = JSON.parse(String(init?.body)) as { chat_id: string };
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            result: {
-              message_id: ++messageSequence,
-              from: { id: Number(work.botId), is_bot: true },
-              chat: { id: Number(body.chat_id), type: "private" },
-            },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
+    const transportFor = (bot: { botId: string; botKey: string }) =>
+      createExpertMaterialTransport({
+        token: `${bot.botId}:synthetic_fixture_material_token`,
+        botId: bot.botId,
+        botKey: bot.botKey,
+        fetch: async (url, init) => {
+          transportCalls.push(String(url));
+          if (transportFailure && transportCalls.length === 2)
+            throw new Error("synthetic_lost_response");
+          const body = JSON.parse(String(init?.body)) as { chat_id: string };
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: {
+                message_id: ++messageSequence,
+                from: { id: Number(bot.botId), is_bot: true },
+                chat: { id: Number(body.chat_id), type: "private" },
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        },
+      });
+    const transport = {
+      send: (
+        input: Parameters<
+          ReturnType<typeof createExpertMaterialTransport>["send"]
+        >[0],
+      ) => {
+        const bot =
+          input.botId === promoScope.botId && input.botKey === promoScope.botKey
+            ? promoScope
+            : work;
+        return transportFor(bot).send(input);
       },
-    });
+    };
     cards = new PostgresExpertCardRepository(database.db, {
       workBotId: work.botId,
       workBotKey: work.botKey,
@@ -1042,7 +1077,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
             expect(
               (
                 await database.db.execute(
-                  sql`select (select count(*)::int from experts_published where user_id=${f.userId}::uuid) as published,(select count(*)::int from expert_card_entries where user_id=${f.userId}::uuid) as entries,(select count(*)::int from expert_card_promo_proofs where user_id=${f.userId}::uuid) as proofs,(select count(*)::int from expert_card_reviews where user_id=${f.userId}::uuid) as reviews`,
+                  sql`select (select count(*)::int from experts_published where user_id=${f.userId}::uuid) as published,(select count(*)::int from expert_card_entries where user_id=${f.userId}::uuid) as entries,(select count(*)::int from expert_application_promo_proofs where user_id=${f.userId}::uuid) as proofs,(select count(*)::int from expert_card_reviews where user_id=${f.userId}::uuid) as reviews`,
                 )
               ).rows[0],
             ).toEqual({ published: 0, entries: 0, proofs: 0, reviews: 0 });
@@ -1165,7 +1200,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
     beforeEach(async () => {
       fixture = await materialDeliveryFixture();
     });
-    it("requires approved real materials and manager promo confirmation, quarantining unknown send without retry", async () => {
+    it("requires manager proof confirmation and quarantines unknown materials without blocking that confirmation", async () => {
       const { f } = fixture;
       const runner = createExpertCardMaterialsRunner({
         enabled: true,
@@ -1196,6 +1231,32 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
           idempotencyKey: randomUUID(),
         }),
       ).rejects.toThrow();
+      await cards.submitPromoProof({
+        ...event(f.workScope),
+        expectedRevision: f.revision,
+        proof: {
+          kind: "link",
+          reference: "https://example.com/independent-announcement",
+        },
+      });
+      expect(
+        await cards.confirmPromo({
+          sessionHash: manager.sessionHash,
+          applicationId: f.applicationId,
+          expectedRevision: f.revision,
+          idempotencyKey: randomUUID(),
+        }),
+      ).toMatchObject({
+        promoConfirmed: true,
+        materialStatus: "unknown_outcome",
+      });
+      expect(
+        (
+          await database.db.execute(
+            sql`select delivery_receipt from expert_application_material_jobs where application_id=${f.applicationId}::uuid`,
+          )
+        ).rows[0],
+      ).toEqual({ delivery_receipt: null });
     });
   });
   describe("private public-card references", () => {
@@ -1276,7 +1337,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
         expect(
           (
             await database.db.execute(
-              sql`select count(*)::int n from expert_card_promo_proofs where user_id=${f.userId}::uuid`,
+              sql`select count(*)::int n from expert_application_promo_proofs where user_id=${f.userId}::uuid`,
             )
           ).rows[0]?.n,
         ).toBe(0);
@@ -1327,7 +1388,7 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
       ).rejects.toThrow();
       await expect(
         database.db.execute(
-          sql`update expert_card_material_jobs set status='delivered',delivery_receipt='{}'::jsonb,delivered_at=clock_timestamp(),attempt_id=gen_random_uuid(),attempt_started_at=clock_timestamp() where review_id=${review.id}::uuid`,
+          sql`update expert_application_material_jobs set status='delivered',delivery_receipt='{}'::jsonb,delivered_at=clock_timestamp(),attempt_id=gen_random_uuid(),attempt_started_at=clock_timestamp() where application_id=${f.applicationId}::uuid`,
         ),
       ).rejects.toThrow();
       await expect(

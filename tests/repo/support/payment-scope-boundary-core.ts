@@ -96,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0056_residency_offer_corrections.sql",
   "packages/db/migrations/0055_expert_residency_lifecycle.sql",
   "packages/db/migrations/0054_expert_card_publication.sql",
   "packages/db/migrations/0053_expert_verification_onboarding.sql",
@@ -127,6 +128,22 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // Exact correction inventory; docs/spec/residency-offer-corrections-guard-registration.md.
+  "expert_application_material_jobs",
+  "expert_application_promo_confirmations",
+  "expert_application_promo_proofs",
+  "expert_main_activation_admissions",
+  "expert_manager_telegram_callbacks",
+  "expert_manager_telegram_notifications",
+  "expert_manager_telegram_pairings",
+  "expert_offer_profile_verifications",
+  "expert_offer_profiles",
+  "expert_offer_schedules",
+  "expert_personal_offer_notices",
+  "expert_personal_offer_state",
+  "expert_promo_ready_logs",
+  "expert_space_tariff_approvals",
+
   // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
   "expert_residency_lifecycle",
   "expert_residency_renewal_bills",
@@ -237,6 +254,11 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  // Protected profile recovery and paired scoped manager transport.
+  "/v1/admin/expert-verification/:applicationId/profile-verification",
+  "/v1/admin/expert-verification/telegram-pairing",
+  "/v1/webhooks/telegram/expert-manager/:botKey",
+
   "/v1/admin/expert-cards",
   "/v1/admin/expert-cards/:applicationId",
   "/v1/admin/expert-cards/:applicationId/public-card",
@@ -332,7 +354,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "857ba70d19d695f08a7bd6b8e0a497a078525a6caa118a729bfc082b455e672b",
+    "2bdb7122cf60ccf4f5d822d9b71c15584c2fe76c2f7745c9ac8c67cf74450867",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -738,6 +760,20 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // Reviewed additive v2 SQL, PG-derived supported snapshot and exact catalogue.
+  [
+    "packages/db/migrations/0056_residency_offer_corrections.sql",
+    "6605ab63ddf5ac31f7b49e5d45c93e96118e731cf9aa1a6c6d287ef1d6f01c1b",
+  ],
+  [
+    "packages/db/migrations/meta/0056_snapshot.json",
+    "b22ff021153b6a85fce4dad523921edba378be4ca518ffeb8d26c3811c0c5ec5",
+  ],
+  [
+    "packages/db/migrations/state/0056_offer_sql_objects.json",
+    "1b785221149f28bcff758f1829ec909ef385fbab2580ea11f61753933b61709d",
+  ],
+
   // BlockD actual full-chain replay; docs/spec/phase1-block-d-guard-registration.md.
   [
     "packages/db/migrations/0055_expert_residency_lifecycle.sql",
@@ -1181,7 +1217,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "64fb1f05732a4f17de1f9ea14ac1aba17cb17df1b93167e9470c5037637efa58",
+    "407098daea3b91c6e6fd622d344d2e0c395bfb31f8cef894d9c95a7fb46a2a0d",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1261,10 +1297,26 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "64fb1f05732a4f17de1f9ea14ac1aba17cb17df1b93167e9470c5037637efa58",
+    "407098daea3b91c6e6fd622d344d2e0c395bfb31f8cef894d9c95a7fb46a2a0d",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // Exact correction inventory; docs/spec/residency-offer-corrections-guard-registration.md.
+  "expert_application_material_jobs",
+  "expert_application_promo_confirmations",
+  "expert_application_promo_proofs",
+  "expert_main_activation_admissions",
+  "expert_manager_telegram_callbacks",
+  "expert_manager_telegram_notifications",
+  "expert_manager_telegram_pairings",
+  "expert_offer_profile_verifications",
+  "expert_offer_profiles",
+  "expert_offer_schedules",
+  "expert_personal_offer_notices",
+  "expert_personal_offer_state",
+  "expert_promo_ready_logs",
+  "expert_space_tariff_approvals",
+
   // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
   "expert_residency_lifecycle",
   "expert_residency_renewal_bills",
@@ -1390,7 +1442,8 @@ const paymentApplicationIdentifier =
   /^(?:Payment\w*Consumer|\w*PaymentConsumer|grant\w*Entitlement\w*Payment|grant\w*Payment\w*Entitlement|Payment\w*EntitlementGrant|(?:Payment|Checkout|Refund)\w*Routes?)$/iu;
 const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
-const expertResidencyRoute = /^\/v1\/(?:admin\/)?expert(?:-|\/)/u;
+const expertResidencyRoute =
+  /^\/v1\/(?:(?:admin\/)?expert(?:-|\/)|webhooks\/telegram\/expert(?:-|\/))/u;
 const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =

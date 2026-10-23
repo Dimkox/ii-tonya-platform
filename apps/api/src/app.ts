@@ -1,4 +1,8 @@
 import {
+  expertManagerTelegramRoutes,
+  type ExpertManagerTelegramCapability,
+} from "./routes/expert-manager-telegram.js";
+import {
   assertClientBotAccountCapability,
   type ClientBotAccountCapability,
 } from "./client-bot-account-composition.js";
@@ -128,6 +132,7 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertManagerTelegram?: ExpertManagerTelegramCapability;
   clientAccountQueries?: ClientBotAccountCapability;
   expertResidencyLifecycle?: ExpertResidencyLifecycleCapability;
   expertCard?: ExpertCardCapability;
@@ -643,6 +648,37 @@ export async function buildApp(
   await app.register(expertCardAdminRoutes, {
     enabled: deps.config.features.expertCard === true,
     ...(deps.expertCard ? { service: deps.expertCard.admin } : {}),
+  });
+  if (deps.expertManagerTelegram) {
+    const manager = deps.expertManagerTelegram.service;
+    let managerTimer: ReturnType<typeof setInterval> | undefined;
+    let managerRunning = false;
+    const drainManager = async () => {
+      if (managerRunning) return;
+      managerRunning = true;
+      try {
+        await manager.tick();
+      } catch {
+        /* retain durable pending/quarantined work */
+      } finally {
+        managerRunning = false;
+      }
+    };
+    app.addHook("onReady", async () => {
+      await drainManager();
+      managerTimer = setInterval(() => {
+        void drainManager();
+      }, 15 * 60_000);
+      managerTimer.unref();
+    });
+    app.addHook("onClose", async () => {
+      if (managerTimer) clearInterval(managerTimer);
+    });
+  }
+  await app.register(expertManagerTelegramRoutes, {
+    ...(deps.expertManagerTelegram
+      ? { capability: deps.expertManagerTelegram }
+      : {}),
   });
   await app.register(expertVerificationRoutes, {
     enabled: deps.config.features.expertVerification === true,

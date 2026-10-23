@@ -2,9 +2,9 @@
 title: Correct the paid residency funnel and automatic personal offer lifecycle
 type: feature
 created: 2026-10-23
-status: in-progress
+status: in-review
 baseline_commit: 0d004a71689393f65605703193e728ebdfa44057
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -124,15 +124,15 @@ record runs and diagnose failures before reruns, no blanket old-suite repetition
 
 ## Tasks & Acceptance
 
-- [ ] Domain v2 calculator + focused boundary/floor/kopeck/space tests; working
+- [x] Domain v2 calculator + focused boundary/floor/kopeck/space tests; working
       demo/work prompt copies and shared runtime instructions. Report this first.
-- [ ] Versioned profiles/first offers/quotes and immutable schedule evidence;
+- [x] Versioned profiles/first offers/quotes and immutable schedule evidence;
       hand-authored SQL+journal+supported metadata, no drizzle-kit generate.
-- [ ] Purpose-separated fee/main callbacks, parallel application materials/proof,
+- [x] Purpose-separated fee/main callbacks, parallel application materials/proof,
       exact placeholders/logging, trusted Telegram manager actions and archive filters.
-- [ ] Actual bot menu and15min worker, reminders, expiry/automatic link recovery;
+- [x] Actual bot menu and15min worker, reminders, expiry/automatic link recovery;
       reuse canonical checkout/GET/erasure/custody and notification quarantine.
-- [ ] Focused TDD, new integrated tests with heavy setup in bounded hooks, relevant
+- [x] Focused TDD, new integrated tests with heavy setup in bounded hooks, relevant
       types/build/lint/format/diff, exact repo guard inventories, independent review.
       Commit tested blocks locally; preserve failed logs and final coverage evidence.
 
@@ -149,3 +149,16 @@ TDD and review steps, without another design/permission cycle already waived by
 the owner. Independent work may run only within this correction block. The lead
 may resolve ordinary implementation choices from the source and these invariants;
 report actual conflicts instead of weakening financial/security authority.
+
+### Local implementation checkpoint
+
+All implementation tasks and focused matrix checks are complete locally. Final
+new PostgreSQL files passed activation admission3/3 and personal offers10/10;
+scheduled finance4/4, materials8/8, archive3/3, manager5/5, late money2/2 and future
+admission1/1 passed. Calculator64/64, prompt31/31 and ingress12/12 are preserved.
+Builds, complete types and scoped lint pass. Independent financial and materials
+review findings are remediated; historical V1 compatibility retains its explicit
+provenance and dynamic-gate boundary. See the consolidated local evidence.
+
+Status remains `in-review` pending the coordinator's exact clean-commit branch
+gate. No push, provider activation or release authority follows from this state.

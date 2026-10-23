@@ -1,6 +1,7 @@
 import type { ExpertCardLegacyReplayRead } from "./expert-card-telegram-ingress.js";
 import {
   createExpertCardService,
+  renderPersonalOffer,
   createExpertCardAdminService,
   type ExpertCardService,
   type ExpertCardAdminService,
@@ -9,11 +10,13 @@ import {
 import { assertExpertCardConfig, type RuntimeConfig } from "@ii-tonya/config";
 import {
   PostgresExpertCardRepository,
+  PostgresExpertPersonalOfferRepository,
   PostgresExpertOnboardingMainPaymentRepository,
   type DrizzleDb,
   sql,
 } from "@ii-tonya/db";
 export interface ExpertCardCapability {
+  personalOfferReads?: Pick<PostgresExpertPersonalOfferRepository, "readOwned">;
   legacyReplay: ExpertCardLegacyReplayRead;
   mainCheckoutEnabled: boolean;
   mainCheckout?: ExpertCardMainCheckout;
@@ -82,6 +85,19 @@ export function createExpertCardComposition(
     providerMode: settings.paymentMode,
   });
   return {
+    personalOfferReads: new PostgresExpertPersonalOfferRepository(db, {
+      workBotId: settings.workBotId,
+      workBotKey: settings.workBotKey,
+      ...(config.expertApplicant
+        ? {
+            promoBotId: config.expertApplicant.botId,
+            promoBotKey: config.expertApplicant.botKey,
+            promoConsentPolicyVersion:
+              config.expertApplicant.messagingConsentPolicyVersion,
+          }
+        : {}),
+      messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
+    }),
     workBotId: settings.workBotId,
     workBotKey: settings.workBotKey,
     workBotUsername: settings.workBotUsername,
@@ -109,6 +125,25 @@ export function createExpertCardComposition(
             },
           }
         : {}),
+      personalOffers: {
+        async read(scope) {
+          const offer = await new PostgresExpertPersonalOfferRepository(db, {
+            workBotId: settings.workBotId,
+            workBotKey: settings.workBotKey,
+            ...(config.expertApplicant
+              ? {
+                  promoBotId: config.expertApplicant.botId,
+                  promoBotKey: config.expertApplicant.botKey,
+                  promoConsentPolicyVersion:
+                    config.expertApplicant.messagingConsentPolicyVersion,
+                }
+              : {}),
+            messagingConsentPolicyVersion:
+              settings.messagingConsentPolicyVersion,
+          }).read(scope);
+          return offer ? { text: renderPersonalOffer(offer) } : null;
+        },
+      },
       repository,
       financial,
     }),
