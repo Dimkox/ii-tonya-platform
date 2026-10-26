@@ -22,6 +22,18 @@ root verified the actual missing guards directly. The current code already uses
 calendar months;R5 is a real verification gap, not a claim of a known wrong deadline.
 The existing tests' filtered counts and retained failures remain honestly recorded.
 
+R1 closure also retains historical reachability after eligible soft reapplication:
+the old form becomes noncurrent while its dispatched/unknown message can remain.
+`closeUnknown` currently calls the current-only `source()` selector. Restoring a queue
+row alone cannot close that case. Preserve fresh manager/current consent and genuine
+historical ownership for a non-sending audited resolution; do not reactivate the old
+form or claim delivery. This is the same inaccessible-recovery failure mode.
+
+R1 also requires bounded queue navigation: merely including unresolved terminal
+notices under the old fixed LIMIT50 leaves later cases unreachable when the first50
+remain pending with delivery disabled. Implementer is adding keyset navigation and
+an actual browser witness beyond50 entries; current authority/status filters remain.
+
 Root routes the corrections as one bounded batch to the original implementer. Keep
 all passing versioned forms, immutable financial source, fixed fee/capture authority,
 exact message bytes, privacy cleanup, unknown-send quarantine, source templates and
