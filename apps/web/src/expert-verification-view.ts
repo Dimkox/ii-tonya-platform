@@ -20,12 +20,81 @@ type Client = Pick<
       | "previewReview"
       | "confirmReview"
       | "closeUnknownReview"
+      | "privateEvidence"
+      | "privateDocumentLink"
+      | "privateRecovery"
     >
   > & {
     readonly cards?: ExpertCardAdminClient;
   };
+const privateLabels: Record<string, string> = {
+  brief: "Бриф",
+  education: "Образование",
+  propertyEvidence: "Помещение",
+  tourMedia: "Фото и видео",
+  licence: "Лицензия",
+  followup: "Дополнительный файл",
+  allocated: "Ожидает обработки",
+  inflight: "Обрабатывается",
+  unknown: "Результат неизвестен",
+  verified: "Файл сохранён",
+  unavailable: "Недоступен — нужна ручная проверка",
+  MATCH: "Специальность совпадает",
+  MISMATCH: "Специальность отличается",
+  NO_DOCUMENT: "Документ не предоставлен",
+  UNKNOWN: "Результат неизвестен",
+};
+const privateRecord = (v: unknown): Record<string, unknown> =>
+  v && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : {};
+function documentObservation(value: unknown) {
+  const o = privateRecord(value);
+  return [
+    privateLabels[String(o.result)] ?? "Нужна ручная проверка",
+    ...(
+      [
+        ["institution", "Учебное заведение"],
+        ["specialty", "Специальность"],
+        ["year", "Год"],
+      ] as const
+    ).flatMap(([k, label]) =>
+      o[k] !== null && o[k] !== undefined ? [`${label}: ${String(o[k])}`] : [],
+    ),
+    "Подлинность и лицензии оценивает сотрудник.",
+  ].join(". ");
+}
+function privateEvidenceLines(value: unknown) {
+  const e = privateRecord(value),
+    r = privateRecord(e.result),
+    lines = [
+      e.current === false
+        ? "Наблюдения устарели. Ожидается обновление; не используйте их как текущие."
+        : "Наблюдения помогают ручной проверке. Оценка качества не настроена.",
+    ];
+  if (!r.social) return [...lines, "Проверка ещё не завершена."];
+  if (r.education === "NO_DOCUMENT")
+    lines.push("Документ об образовании не предоставлен.");
+  for (const raw of Array.isArray(r.social) ? r.social.slice(0, 10) : []) {
+    const o = privateRecord(raw);
+    lines.push(
+      `${String(o.profile ?? "Профиль")}: ${o.coverage === "complete_latest" ? "получены последние публикации" : o.coverage === "partial" ? "частичные наблюдения" : "данные недоступны"}. ${o.source === "telegram_public_preview" ? "Неофициальный публичный просмотр. " : ""}${o.activity === "INACTIVE" ? "Последняя публикация более 30 дней назад." : o.activity === "ACTIVE" ? "Есть недавняя публикация." : "Активность неизвестна."} Проверено: ${String(o.observedAt ?? "неизвестно")}. Действительно до: ${String(o.expiresAt ?? "неизвестно")}.`,
+    );
+    for (const rawPost of Array.isArray(o.posts) ? o.posts.slice(0, 5) : []) {
+      const post = privateRecord(rawPost);
+      lines.push(
+        `Публикация ${String(post.publishedAt ?? "без даты")}: ${post.hasMedia ? "есть фото или видео" : "без наблюдаемого медиа"}; комментарии: ${post.comments === null ? "неизвестно" : String(post.comments ?? "неизвестно")}.`,
+      );
+    }
+  }
+  return lines;
+}
+function recoveryText(value: unknown) {
+  const r = privateRecord(value);
+  return `Файл ${String(r.id ?? "")}: ${r.deleteState === "unknown" ? "удаление не подтверждено" : "ожидает удаления"}. Попыток сверки: ${String(r.attempts ?? 0)}.`;
+}
 export function renderExpertVerificationPage(): string {
-  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><button type="button" data-verification-profile disabled>Подтвердить текущие параметры тарифа</button><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section>${renderExpertCardReview()}</main>`;
+  return `<main class="section" aria-labelledby="verification-title"><h1 id="verification-title">Проверка заявок экспертов</h1><p>Внутренний интерфейс сотрудников. Требуется действующий административный сеанс с актуальной MFA.</p><label>Токен существующего сеанса <input data-verification-token type="password" autocomplete="off" spellcheck="false" maxlength="512"></label><button type="button" data-verification-connect>Открыть очередь</button><button type="button" data-verification-logout disabled>Завершить сеанс</button><button type="button" data-verification-refresh disabled>Обновить очередь</button><button type="button" data-verification-private-recovery>Незавершённое удаление файлов</button><p data-verification-status role="status" aria-live="polite">Введите токен административного сеанса.</p><section aria-label="Очередь заявок" data-verification-queue></section><section aria-label="Защищённая заявка" data-verification-detail></section><button type="button" data-verification-profile disabled>Подтвердить текущие параметры тарифа</button><div><label>Причина отказа <select data-verification-reason disabled><option value="credentials_incomplete">Недостаточно подтверждений</option><option value="outside_scope">Не соответствует условиям</option><option value="owner_requested">По запросу заявителя</option></select></label><button type="button" data-verification-approve disabled>Согласовано</button><button type="button" data-verification-reject disabled>Отказано</button></div><label>Номер существующего счёта (для восстановления) <input data-verification-invoice type="text" autocomplete="off" spellcheck="false" maxlength="36" disabled></label><button type="button" data-verification-recover disabled>Проверить / восстановить ссылку на оплату</button><section data-verification-payment aria-label="Счёт за онбординг"></section>${renderExpertCardReview()}</main>`;
 }
 export function bindExpertVerificationActions(
   root: HTMLElement,
@@ -243,6 +312,129 @@ export function bindExpertVerificationActions(
           detail,
           `Анкета v${item.questionnaire.formVersion}, ревизия ${item.questionnaire.revision}. Состояние: ${item.questionnaire.lifecycle}. Проверки документов и соцсетей: неизвестно, требуется ручная оценка.`,
         );
+        if (current.privateEvidence) {
+          let documentsAfter: string | undefined;
+          const evidenceButton = doc.createElement("button");
+          evidenceButton.textContent = "Документы и наблюдения";
+          detail.append(evidenceButton);
+          evidenceButton.onclick = async () => {
+            evidenceButton.disabled = true;
+            try {
+              const evidence = await current.privateEvidence!(
+                item.applicationId,
+                documentsAfter,
+              );
+              if (!mounted || epoch !== generation) return;
+              documentsAfter =
+                evidence.documents.length === 30
+                  ? evidence.documents.at(-1)?.id
+                  : undefined;
+              evidenceButton.textContent = documentsAfter
+                ? "Следующие документы"
+                : "Обновить документы и наблюдения";
+              for (const line of privateEvidenceLines(evidence.evidence))
+                text(detail, line);
+              for (const document of evidence.documents) {
+                text(
+                  detail,
+                  `${privateLabels[document.purpose] ?? "Документ"}: ${privateLabels[document.state] ?? "Результат неизвестен"}. ${documentObservation(document.observation)}`,
+                );
+                if (document.state === "unknown" && current.privateRecovery) {
+                  const reconcile = doc.createElement("button");
+                  reconcile.textContent = "Сверить неизвестную загрузку";
+                  detail.append(reconcile);
+                  reconcile.onclick = async () => {
+                    try {
+                      await current.privateRecovery!(document.id);
+                      reconcile.disabled = true;
+                    } catch (error) {
+                      failed(error);
+                    }
+                  };
+                }
+                if (
+                  document.state === "verified" &&
+                  current.privateDocumentLink
+                ) {
+                  const button = doc.createElement("button");
+                  button.textContent = "Открыть документ на 120 секунд";
+                  detail.append(button);
+                  button.onclick = async () => {
+                    button.disabled = true;
+                    try {
+                      const url = await current.privateDocumentLink!(
+                        item.applicationId,
+                        document.id,
+                      );
+                      if (!mounted || epoch !== generation) return;
+                      const link = doc.createElement("a");
+                      link.href = url;
+                      link.target = "_blank";
+                      link.rel = "noopener noreferrer";
+                      link.textContent =
+                        "Скачать документ (ссылка действует 120 секунд)";
+                      detail.append(link);
+                      setTimeout(() => link.remove(), 120000);
+                    } catch (error) {
+                      failed(error);
+                    } finally {
+                      button.disabled = false;
+                    }
+                  };
+                }
+              }
+            } catch (error) {
+              failed(error);
+            } finally {
+              evidenceButton.disabled = false;
+            }
+          };
+        }
+        if (current.privateRecovery) {
+          let recoveryAfter: string | undefined;
+          const recoveryButton = doc.createElement("button");
+          recoveryButton.textContent = "Незавершённое удаление файлов";
+          detail.append(recoveryButton);
+          recoveryButton.onclick = async () => {
+            try {
+              const rows = await current.privateRecovery!(
+                undefined,
+                recoveryAfter,
+              );
+              recoveryAfter =
+                Array.isArray(rows) && rows.length === 50
+                  ? String(rows.at(-1)?.id)
+                  : undefined;
+              recoveryButton.textContent = recoveryAfter
+                ? "Следующие незавершённые удаления"
+                : "Обновить незавершённые удаления";
+              if (!mounted || epoch !== generation) return;
+              if (Array.isArray(rows))
+                for (const row of rows) {
+                  text(detail, recoveryText(row));
+                  if (
+                    row &&
+                    typeof row === "object" &&
+                    typeof row.id === "string"
+                  ) {
+                    const retry = doc.createElement("button");
+                    retry.textContent = "Повторить сверку удаления";
+                    detail.append(retry);
+                    retry.onclick = async () => {
+                      try {
+                        await current.privateRecovery!(row.id);
+                        retry.disabled = true;
+                      } catch (error) {
+                        failed(error);
+                      }
+                    };
+                  }
+                }
+            } catch (error) {
+              failed(error);
+            }
+          };
+        }
         for (const [field, value] of Object.entries(item.questionnaire.draft))
           text(
             detail,
@@ -513,7 +705,54 @@ export function bindExpertVerificationActions(
       }
     }
   }
+  const globalRecovery = root.querySelector<HTMLButtonElement>(
+    "[data-verification-private-recovery]",
+  );
+  if (globalRecovery)
+    globalRecovery.onclick = async () => {
+      if (!client?.privateRecovery || busy || !mounted) return;
+      const current = client,
+        epoch = generation;
+      globalRecovery.disabled = true;
+      try {
+        const after = globalRecovery.dataset.after;
+        const rows = await current.privateRecovery!(undefined, after);
+        if (!mounted || epoch !== generation) return;
+        const next =
+          Array.isArray(rows) && rows.length === 50
+            ? String(rows.at(-1)?.id)
+            : undefined;
+        if (next) globalRecovery.dataset.after = next;
+        else delete globalRecovery.dataset.after;
+        globalRecovery.textContent = next
+          ? "Следующие незавершённые удаления"
+          : "Незавершённое удаление файлов";
+        clearDetail();
+        if (Array.isArray(rows))
+          for (const row of rows) {
+            text(detail, recoveryText(row));
+            if (row && typeof row === "object" && typeof row.id === "string") {
+              const retry = doc.createElement("button");
+              retry.textContent = "Повторить сверку удаления";
+              detail.append(retry);
+              retry.onclick = async () => {
+                try {
+                  await current.privateRecovery!(row.id);
+                  retry.disabled = true;
+                } catch (error) {
+                  failed(error);
+                }
+              };
+            }
+          }
+      } catch (error) {
+        failed(error);
+      } finally {
+        globalRecovery.disabled = false;
+      }
+    };
   connect.onclick = () => {
+    if (globalRecovery) delete globalRecovery.dataset.after;
     if (busy || !mounted) return;
     const value = token.value;
     end();

@@ -125,3 +125,19 @@ def test_equivalent_external_relationship_attributes(attribute,encoding):
                 data=xml.encode(encoding)
             updated.writestr(item,data)
     assert extract(target.getvalue(),"docx") is None
+
+
+@pytest.mark.skipif(not __import__("os").environ.get("II_TONYA_OCR_TEST_MODELS"), reason="optional pinned OCR model fixture absent")
+def test_real_cyrillic_scan_ocr():
+    document=pymupdf.open();page=document.new_page(width=600,height=400)
+    font=pymupdf.Font(fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+    writer=pymupdf.TextWriter(page.rect)
+    writer.append((30,70),'Специальность: Психолог',font=font,fontsize=24)
+    writer.append((30,120),'Учебное заведение: Университет',font=font,fontsize=24)
+    writer.append((30,170),'Год: 2020',font=font,fontsize=24)
+    writer.write_text(page)
+    pix=page.get_pixmap(dpi=150)
+    scanned=pymupdf.open();scan=scanned.new_page(width=600,height=400)
+    scan.insert_image(scan.rect,stream=pix.tobytes('png'))
+    result=extract(scanned.tobytes(),'pdf',ocr=True,tessdata=__import__('os').environ['II_TONYA_OCR_TEST_MODELS'])
+    assert result and 'Психолог' in result['content'] and '2020' in result['content']

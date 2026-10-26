@@ -449,6 +449,13 @@
       "when": 1793044801000,
       "tag": "0063_resident_verification_review_corrections",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1793044801001,
+      "tag": "0064_resident_private_jobs",
+      "breakpoints": true
     }
   ]
 }

@@ -123,6 +123,7 @@ const HAND_SQL_FUNCTIONS = [
   "protect_expert_residency_renewal_bill",
   "protect_payer_receipt_binding",
   "protect_payer_receipt_contact",
+  "protect_resident_object_key",
   "reject_append_only_change",
   "reject_expert_referral_admin_result_mutation",
   "reject_partner_commerce_mutation",
@@ -133,6 +134,7 @@ const HAND_SQL_FUNCTIONS = [
   "resident_card_proposal_change_guard",
   "resident_card_review_safety_guard",
   "resident_financial_attempt_source",
+  "resident_private_erasure_completion",
   "resident_reapply_deadline",
   "resident_reapply_eligible",
   "resident_review_event_source",
@@ -159,6 +161,7 @@ const HAND_SQL_FUNCTIONS = [
   "resident_verification_stage_projection",
   "resident_verification_version_valid",
   "resident_verification_write_guard",
+  "retain_resident_private_deletion",
   "validate_and_consume_selarti_budget_approval",
   "validate_test_expert_campaign_prompt",
   "validate_test_expert_campaign_transition",
@@ -298,6 +301,9 @@ const HAND_SQL_TRIGGERS = [
   "resident_card_review_safety",
   "resident_financial_attempt_source",
   "resident_message_templates_immutable",
+  "resident_object_key_immutable",
+  "resident_private_erasure_completion_guard",
+  "resident_private_objects_erase",
   "resident_review_event_source",
   "resident_review_events_immutable",
   "resident_review_previews_immutable",
@@ -395,7 +401,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(63);
+    expect(newest).toBe(64);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -510,7 +516,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0062 adds seven versioned review, custody and audit relations.
-    expect(declared.size).toBe(204);
+    // 0064 adds five private custody, evidence, cache and key-recovery relations.
+    expect(declared.size).toBe(209);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  createPrivateObjectStore,
   YooKassaOnboardingPaymentVerifier,
   YooKassaOnboardingWebhookCapability,
   type YooKassaClient,
@@ -14,6 +15,7 @@ import {
 import {
   PostgresExpertVerificationRepository,
   PostgresResidentReviewRepository,
+  PostgresResidentPrivateJobsRepository,
   PostgresHeldOnboardingCheckout,
   PostgresExpertCampaignQuoteRepository,
   type DrizzleDb,
@@ -101,6 +103,15 @@ export function createExpertVerificationComposition(
       !settings.paymentVerificationEnabled)
   )
     return undefined;
+  const privateRepository = config.features.residentPrivateJobs
+    ? new PostgresResidentPrivateJobsRepository(db, settings)
+    : undefined;
+  const privateStore =
+    privateRepository && config.privateVerification
+      ? createPrivateObjectStore(config.privateVerification)
+      : undefined;
+  if (privateRepository && !privateStore)
+    throw Error("resident_private_capability_required");
   const repository = new PostgresExpertVerificationRepository(db, {
     providerMode: settings.paymentMode,
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
@@ -135,6 +146,37 @@ export function createExpertVerificationComposition(
     ...(onboardingWebhook ? { onboardingWebhook } : {}),
     ...(heldCheckout ? { heldCheckout } : {}),
     service: createExpertVerificationService({
+      ...(privateRepository && privateStore
+        ? {
+            privateEvidence: {
+              async detail(
+                session: string,
+                applicationId: string,
+                after?: string,
+              ) {
+                return {
+                  documents: await privateRepository.managerObjects(
+                    session,
+                    applicationId,
+                    after,
+                  ),
+                  evidence: await privateRepository.managerEvidence(
+                    session,
+                    applicationId,
+                  ),
+                };
+              },
+              link: (session: string, applicationId: string, id: string) =>
+                privateRepository.managerLink(session, applicationId, id, (p) =>
+                  privateStore.presign(p),
+                ),
+              recoveryList: (session: string, after?: string) =>
+                privateRepository.recoveryList(session, after),
+              requestRecovery: (session: string, id: string) =>
+                privateRepository.requestRecovery(session, id),
+            },
+          }
+        : {}),
       review: new PostgresResidentReviewRepository(db, {
         providerMode: settings.paymentMode,
         messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,

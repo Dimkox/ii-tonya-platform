@@ -173,6 +173,81 @@ export class ExpertVerificationClient {
     if (!object(value) || value.kind !== "ok") return invalid();
     return value;
   }
+  async privateEvidence(
+    id: string,
+    after?: string,
+  ): Promise<{
+    documents: {
+      id: string;
+      purpose: string;
+      state: string;
+      observation: unknown;
+    }[];
+    evidence: unknown;
+  }> {
+    if (!uuid(id) || (after !== undefined && !uuid(after))) return invalid();
+    const v = await this.request(
+        `/${id}/private-evidence${after ? `?after=${after}` : ""}`,
+      ),
+      item = v.item;
+    if (
+      !object(item) ||
+      !Array.isArray(item.documents) ||
+      item.documents.length > 30 ||
+      !item.documents.every(
+        (d) =>
+          object(d) &&
+          uuid(d.id) &&
+          typeof d.purpose === "string" &&
+          typeof d.state === "string",
+      )
+    )
+      return invalid();
+    return item as {
+      documents: {
+        id: string;
+        purpose: string;
+        state: string;
+        observation: unknown;
+      }[];
+      evidence: unknown;
+    };
+  }
+  async privateDocumentLink(
+    applicationId: string,
+    id: string,
+  ): Promise<string> {
+    if (!uuid(applicationId) || !uuid(id)) return invalid();
+    const v = await this.request(
+        `/${applicationId}/documents/${id}/link`,
+        undefined,
+        true,
+      ),
+      item = v.item;
+    if (
+      !object(item) ||
+      typeof item.url !== "string" ||
+      item.expiresIn !== 120 ||
+      item.bearerUntilExpiry !== true
+    )
+      return invalid();
+    const u = new URL(item.url);
+    if (u.protocol !== "https:" || u.username || u.password) return invalid();
+    return item.url;
+  }
+  async privateRecovery(id?: string, after?: string): Promise<unknown> {
+    if (
+      (id !== undefined && !uuid(id)) ||
+      (after !== undefined && !uuid(after))
+    )
+      return invalid();
+    const v = await this.request(
+      `/private-recovery${id ? `/${id}` : after ? `?after=${after}` : ""}`,
+      undefined,
+      id !== undefined,
+    );
+    return v.item;
+  }
   async list(afterApplication?: string): Promise<VerificationEntry[]> {
     if (afterApplication !== undefined && !uuid(afterApplication))
       return invalid();

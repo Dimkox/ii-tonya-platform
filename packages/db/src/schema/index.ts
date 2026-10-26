@@ -40,3 +40,5 @@ export * from "./expert-separated-sales.js";
 export * from "./resident-content-safety.js";
 
 export * from "./resident-review.js";
+
+export * from "./resident-private-jobs.js";

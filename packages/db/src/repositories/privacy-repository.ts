@@ -1,3 +1,4 @@
+import { privateObjectErasureSubjectKey } from "./resident-private-erasure.js";
 import { lockBookingNotificationSubjects } from "./booking-notification-authority.js";
 import {
   eraseBookingNotificationRecipients,
@@ -261,6 +262,13 @@ async function requireCompletedErasureWork(
     where deletion_job_id=${jobId}::uuid order by processor for update
   `)
   ).rows;
+  const privateObjects = (
+    await tx.execute(
+      sql`select d.custody_id from resident_object_deletions d left join privacy_deletion_jobs related on related.id=d.deletion_job_id join privacy_deletion_jobs current_job on current_job.id=${jobId}::uuid where d.delete_state<>'verified' and (related.user_id=current_job.user_id or d.subject_erasure_key=encode(digest('resident-private:'||current_job.user_id::text,'sha256'),'hex')) for update of d`,
+    )
+  ).rows;
+  if (privateObjects.length)
+    throw new Error("Private object erasure is incomplete");
   const bookings = (
     await tx.execute<{ phase: string }>(sql`
     select phase from client_booking_erasure_work where deletion_job_id=${jobId}::uuid for update
@@ -945,6 +953,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           ).rows,
           "privacy deletion job",
         );
+        // Bind prior consent-withdrawal tombstones as well as still-attached objects.
+        await tx.execute(
+          sql`update resident_object_deletions set deletion_job_id=${job.id}::uuid,subject_erasure_key=null where subject_erasure_key=${privateObjectErasureSubjectKey(command.targetUserId)} and deletion_job_id is null`,
+        );
         await tx.execute(sql`
         insert into client_booking_erasure_work (deletion_job_id,phase)
         values (${job.id}::uuid,'cancel_active')
@@ -1130,6 +1142,8 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     status: ErasureJob["status"],
   ): Promise<ErasureJob> {
     const job = await loadBackupJob(tx, jobId, true);
+    if (status === "processor_complete" || status === "backup_verified")
+      await requireCompletedErasureWork(tx, jobId);
     if (status === "backup_verified") {
       const activePolicy =
         this.options.privacyMutationCapability?.activeBackupPolicyVersion;
@@ -1211,8 +1225,12 @@ export class PostgresPrivacyWorkflowRepository {
       await tx.execute(sql`set local statement_timeout='2000ms'`);
       await tx.execute(sql`set local lock_timeout='1000ms'`);
       const row = await loadBackupJob(tx, jobId, true);
-      if (row.status === "backup_verified") {
+      if (
+        row.status === "processor_complete" ||
+        row.status === "backup_verified"
+      )
         await requireCompletedErasureWork(tx, jobId);
+      if (row.status === "backup_verified") {
         await requirePersistedBackupProof(tx, row);
       }
       return backupJobState(row);

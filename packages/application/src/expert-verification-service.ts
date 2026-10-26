@@ -60,6 +60,16 @@ const safeFailure = (e: unknown): Failure => ({
 });
 export function createExpertVerificationService(deps: {
   enabled: boolean;
+  privateEvidence?: {
+    detail(
+      session: string,
+      applicationId: string,
+      after?: string,
+    ): Promise<unknown>;
+    link(session: string, applicationId: string, id: string): Promise<unknown>;
+    recoveryList(session: string, after?: string): Promise<unknown>;
+    requestRecovery(session: string, id: string): Promise<unknown>;
+  };
   review?: {
     closeUnknown(
       session: string,
@@ -105,6 +115,71 @@ export function createExpertVerificationService(deps: {
         ? { kind: "forbidden" }
         : undefined;
   return {
+    async privateEvidence(
+      sessionHash: string,
+      applicationId: string,
+      after?: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(applicationId) ||
+        (after !== undefined && !uuid.test(after))
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.privateEvidence.detail(
+            sessionHash,
+            applicationId,
+            after,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async privateDocumentLink(
+      sessionHash: string,
+      applicationId: string,
+      id: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!uuid.test(applicationId) || !uuid.test(id))
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.privateEvidence.link(sessionHash, applicationId, id),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async privateRecovery(sessionHash: string, id?: string, after?: string) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        (id !== undefined && !uuid.test(id)) ||
+        (after !== undefined && !uuid.test(after))
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: id
+            ? await deps.privateEvidence.requestRecovery(sessionHash, id)
+            : await deps.privateEvidence.recoveryList(sessionHash, after),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
     async closeUnknownReview(
       sessionHash: string,
       applicationId: string,

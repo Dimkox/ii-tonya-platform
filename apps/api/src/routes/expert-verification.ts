@@ -33,6 +33,9 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
         | "previewReview"
         | "confirmReview"
         | "closeUnknownReview"
+        | "privateEvidence"
+        | "privateDocumentLink"
+        | "privateRecovery"
       >
     >;
 }> = async (app, deps) => {
@@ -62,6 +65,87 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
       .code(status < 500 ? 400 : 503)
       .send({ error: "verification_unavailable" });
   });
+  app.get<{ Querystring: { after?: string } }>(
+    "/v1/admin/expert-verification/private-recovery",
+    async (req, reply) => {
+      if (
+        Object.keys(req.query).some((k) => k !== "after") ||
+        (req.query.after !== undefined && !uuid.test(req.query.after))
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      const result = await service.privateRecovery?.(
+        session(req.headers.authorization)!,
+        undefined,
+        req.query.after,
+      );
+      return result?.kind === "ok"
+        ? result
+        : reply
+            .code(result ? code(result.kind) : 503)
+            .send({ error: result?.kind ?? "unavailable" });
+    },
+  );
+  app.post<{ Params: { custodyId: string } }>(
+    "/v1/admin/expert-verification/private-recovery/:custodyId",
+    async (req, reply) => {
+      if (!uuid.test(req.params.custodyId) || req.body !== undefined)
+        return reply.code(400).send({ error: "invalid_request" });
+      const result = await service.privateRecovery?.(
+        session(req.headers.authorization)!,
+        req.params.custodyId,
+      );
+      return result?.kind === "ok"
+        ? result
+        : reply
+            .code(result ? code(result.kind) : 503)
+            .send({ error: result?.kind ?? "unavailable" });
+    },
+  );
+  app.get<{
+    Params: { applicationId: string };
+    Querystring: { after?: string };
+  }>(
+    "/v1/admin/expert-verification/:applicationId/private-evidence",
+    async (req, reply) => {
+      if (
+        !uuid.test(req.params.applicationId) ||
+        Object.keys(req.query).some((k) => k !== "after") ||
+        (req.query.after !== undefined && !uuid.test(req.query.after))
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      const result = await service.privateEvidence?.(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        req.query.after,
+      );
+      return result?.kind === "ok"
+        ? result
+        : reply
+            .code(result ? code(result.kind) : 503)
+            .send({ error: result?.kind ?? "unavailable" });
+    },
+  );
+  app.post<{ Params: { applicationId: string; custodyId: string } }>(
+    "/v1/admin/expert-verification/:applicationId/documents/:custodyId/link",
+    async (req, reply) => {
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !uuid.test(req.params.custodyId) ||
+        req.body !== undefined
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      const result = await service.privateDocumentLink?.(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        req.params.custodyId,
+      );
+      return result?.kind === "ok"
+        ? result
+        : reply
+            .code(result ? code(result.kind) : 503)
+            .send({ error: result?.kind ?? "unavailable" });
+    },
+  );
   app.get<{ Querystring: { limit?: string; afterApplication?: string } }>(
     "/v1/admin/expert-verification",
     async (req, reply) => {

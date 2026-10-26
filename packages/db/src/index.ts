@@ -386,3 +386,5 @@ export {
 } from "./repositories/expert-sales-scheduler.js";
 
 export * from "./repositories/resident-review-repository.js";
+
+export * from "./repositories/resident-private-jobs-repository.js";

@@ -1,0 +1,7 @@
+{
+  "source": "https://t.me/s/telegram",
+  "capturedAt": "2026-10-26",
+  "sourceSha256": "31862086e77a60c4dbed28e0cad151f9d1ba3b75efafc84144ede40a7b8e5644",
+  "sanitization": "Only data-post, time datetime and exact media/avatar CSS markers retained. All text, links, styles, scripts and media removed. Public unofficial partial coverage.",
+  "fixtureSha256": "581bba6b3af19ad2fdbffae8fdb73ef649ea94242093874822b0fbef046c68ed"
+}

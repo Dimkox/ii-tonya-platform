@@ -355,12 +355,42 @@ export function createResidentVerificationService(deps: {
   salesFirst?: boolean;
   repository: ResidentFormRepository;
   policy?: ResidentPolicy;
+  privateDocuments?: {
+    addBrief(
+      scope: ExpertApplicantScope,
+      applicationId: string,
+      revision: number,
+      reference: ResidentDocument,
+    ): Promise<{ id: string }>;
+    briefStatus(
+      scope: ExpertApplicantScope,
+      applicationId: string,
+    ): Promise<Record<string, unknown>[]>;
+    confirmBrief(
+      scope: ExpertApplicantScope,
+      applicationId: string,
+      id: string,
+      revision: number,
+    ): Promise<unknown>;
+  };
 }) {
   const render = (
     s: ResidentFormSnapshot,
     policy: ResidentPolicy,
     field?: ResidentField | null,
-  ) => renderForm(deps.salesFirst === true, s, policy, field);
+  ) => {
+    const reply = renderForm(deps.salesFirst === true, s, policy, field);
+    return deps.privateDocuments &&
+      s.status === "PENDING_DOCS" &&
+      reply.status === "handled"
+      ? {
+          ...reply,
+          text:
+            reply.text +
+            "\nУ меня есть резюме/презентация: прикрепите PDF/DOCX с подписью /brief.",
+        }
+      : reply;
+  };
   return {
     async handle(
       input: ResidentFormInput,
@@ -413,6 +443,60 @@ export function createResidentVerificationService(deps: {
           /^\/start promo_/u.test(input.text)
         )
           return render(s, policy);
+        if (
+          deps.privateDocuments &&
+          s.formVersion === 2 &&
+          input.text.startsWith("/brief")
+        ) {
+          if (input.text === "/brief" && input.media) {
+            await deps.privateDocuments.addBrief(
+              input,
+              s.id,
+              s.revision,
+              input.media,
+            );
+            return corrective(
+              "Файл принят для приватной обработки. Проверьте результат командой /brief_status. До вашего подтверждения ответы не изменятся.",
+            );
+          }
+          if (input.text === "/brief_status") {
+            const rows = await deps.privateDocuments.briefStatus(input, s.id),
+              row = rows[0];
+            if (
+              row?.state === "verified" &&
+              row.proposal &&
+              Object.keys(row.proposal as object).length
+            )
+              return corrective(
+                "Я извлек эти данные. Верно ли? " +
+                  JSON.stringify(row.proposal).slice(0, 2500) +
+                  `\nДля подтверждения: /brief_confirm ${String(row.id)} ${String(row.revision)}. Для исправления используйте обычные вопросы анкеты.`,
+              );
+            if (row && ["allocated", "inflight"].includes(String(row.state)))
+              return corrective(
+                "Файл ещё обрабатывается. Повторите /brief_status позже или продолжите обычные вопросы.",
+              );
+            return corrective(
+              "Не удалось прочитать файл автоматически. Пожалуйста, ответьте на стандартные вопросы вручную.",
+            );
+          }
+          const confirmation =
+            /^\/brief_confirm ([0-9a-f-]{36}) ([0-9]{1,10})$/u.exec(input.text);
+          if (confirmation) {
+            await deps.privateDocuments.confirmBrief(
+              input,
+              s.id,
+              confirmation[1]!,
+              Number(confirmation[2]),
+            );
+            return corrective(
+              "Подтверждённые ответы сохранены. Отправьте /verification, чтобы продолжить.",
+            );
+          }
+          return corrective(
+            "Прикрепите PDF/DOCX резюме или презентации с подписью /brief. Поля появятся только после вашего подтверждения.",
+          );
+        }
         const editMenu = (): ExpertApplicantReply => ({
           status: "handled",
           text: "Какой ответ исправить?",

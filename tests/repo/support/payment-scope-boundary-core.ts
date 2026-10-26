@@ -101,6 +101,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0061_resident_content_safety.sql",
   "packages/db/migrations/0062_resident_verification_messages.sql",
   "packages/db/migrations/0063_resident_verification_review_corrections.sql",
+  "packages/db/migrations/0064_resident_private_jobs.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -170,12 +171,17 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "residents_applications",
   "resident_message_templates",
   "resident_review_previews",
+  "resident_object_deletions",
+  "resident_private_objects",
   "resident_review_events",
+  "resident_document_access_audit",
+  "resident_evidence_jobs",
   "resident_information_requests",
   "resident_check_generations",
   "resident_review_messages",
   "resident_review_recoveries",
   "resident_verification_cohorts",
+  "resident_social_observations",
   "resident_verification_application_updates",
   "resident_verification_check_work",
   "resident_verification_requests",
@@ -306,6 +312,11 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-verification/private-recovery",
+  "/v1/admin/expert-verification/private-recovery/:custodyId",
+  "/v1/admin/expert-verification/:applicationId/private-evidence",
+  "/v1/admin/expert-verification/:applicationId/documents/:custodyId/link",
+
   // Protected profile recovery and paired scoped manager transport.
   "/v1/admin/expert-verification/:applicationId/profile-verification",
   "/v1/admin/expert-verification/telegram-pairing",
@@ -346,6 +357,10 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "RESIDENT_PRIVATE_JOBS_ENABLED",
+  "PRIVATE_OCR_ENABLED",
+  "PRIVATE_TELEGRAM_PREVIEW_ENABLED",
+
   "EXPERT_SEPARATED_SALES_ENABLED",
   "EXPERT_ONBOARDING_HELD_ENABLED",
   "EXPERT_DRAFT_TAGS_ENABLED",
@@ -514,7 +529,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/integrations/package.json",
-    "b00abc613aee38b56847c04ca0dc3b324c80ce59b67c6bed22bf45256d3124a3",
+    "37a9cc6e97ad7e6e56b7476741e97ec209d37535a3f88c43b2eb8703f05a4e57",
   ],
   [
     "packages/observability/package.json",
@@ -775,7 +790,12 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ["packages/domain/package.json", new Set(["fast-check"])],
   [
     "packages/integrations/package.json",
-    new Set(["@ii-tonya/contracts", "zod"]),
+    new Set([
+      "@ii-tonya/contracts",
+      "zod",
+      "@aws-sdk/client-s3",
+      "@aws-sdk/s3-request-presigner",
+    ]),
   ],
   [
     "packages/observability/package.json",
@@ -815,6 +835,8 @@ const approvedDependencySpecifiers = new Map([
   ["@ii-tonya/observability", "workspace:*"],
   ["@ii-tonya/sandbox-payments", "workspace:*"],
   ["@ii-tonya/worker", "workspace:*"],
+  ["@aws-sdk/client-s3", "3.1157.0"],
+  ["@aws-sdk/s3-request-presigner", "3.1157.0"],
   ["@opentelemetry/api", "^1.9.0"],
   ["@opentelemetry/sdk-node", "^0.221.0"],
   ["@testcontainers/postgresql", "^10.28.0"],
@@ -840,6 +862,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0064_resident_private_jobs.sql",
+    "9d792a30d7044cd7a3a9a49091266bb9fd2bc4fe2968809cf67175ffb6c94ab3",
+  ],
+  [
+    "packages/db/migrations/meta/0064_snapshot.json",
+    "651975b80ba7f4a7b43ed70643c756ad944668e4099e5ecfe1258fa45e22858a",
+  ],
+  [
+    "packages/db/migrations/state/0064_sql_objects.json",
+    "2967be9de10c11e299ea9a4c316d826e6041c17ba4c2a0dc016329ca733f6b16",
+  ],
+  [
+    "packages/db/migrations/state/0064_manifest.json",
+    "f00c4aa05958039ed6b0367602be094660ae90c8782107138be10b686adba9af",
+  ],
+
   [
     "packages/db/migrations/0063_resident_verification_review_corrections.sql",
     "a68c5513b4ee341950e6e39eae2c81ff6004b02ba2f1df689a7cc9a41f4e042a",

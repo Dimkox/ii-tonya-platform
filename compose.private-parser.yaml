@@ -1,0 +1,19 @@
+# Optional dedicated runtime; activation and worker socket mount are a deployment gate.
+# Host socket directory must be owned by UID1000, mode0700, mounted into Node read-only.
+services:
+  private-parser:
+    image: ii-tonya-private-parser:1
+    user: "1000:1000"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    memswap_limit: 384m
+    pids_limit: 16
+    cpus: 1
+    tmpfs:
+      - /tmp:size=8m,mode=1777,noexec,nosuid
+    volumes:
+      - ${PRIVATE_PARSER_SOCKET_DIR:?required}:/run/private-parser
+    restart: "no"

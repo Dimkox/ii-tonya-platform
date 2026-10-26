@@ -1,4 +1,5 @@
 """Private stdin-only parser. No document paths, URLs, logging or network I/O."""
+import hashlib
 import io
 import json
 import resource
@@ -9,7 +10,20 @@ MAX_INPUT = 5 * 1024 * 1024
 MAX_OUTPUT = 64000
 
 
-def extract(data, kind):
+def extract(data, kind, ocr=False, tessdata="/models"):
+    source = kind
+    if ocr:
+        for name, expected in [("rus", "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225"), ("eng", "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2")]:
+            with open(tessdata+"/"+name+".traineddata", "rb") as model:
+                if hashlib.sha256(model.read(5000000)).hexdigest() != expected:
+                    return None
+    if kind in ("jpeg", "png"):
+        import pymupdf
+        with pymupdf.open(stream=data, filetype=kind) as image:
+            if image[0].rect.width * image[0].rect.height > 4000000:
+                return None
+            data = image.convert_to_pdf()
+        kind = "pdf"
     if not data or len(data) > MAX_INPUT:
         return None
     if kind == "pdf":
@@ -19,8 +33,19 @@ def extract(data, kind):
                 return None
             parts = []
             total = 0
+            ocr_pages = 0
+            pixels = 0
             for page in document:
                 text = page.get_text()
+                if len(text.strip()) < 50 and ocr:
+                    ocr_pages += 1
+                    page_pixels = int(page.rect.width * 150/72) * int(page.rect.height * 150/72)
+                    pixels += page_pixels
+                    if ocr_pages > 5 or page_pixels > 4000000 or pixels > 16000000:
+                        return None
+                    text = page.get_text(textpage=page.get_textpage_ocr(language="rus+eng", dpi=150, full=True, tessdata=tessdata))
+                    if len(text.strip()) < 50:
+                        return None
                 total += len(text.encode("utf-8"))
                 if total > MAX_OUTPUT:
                     return None
@@ -62,7 +87,7 @@ def extract(data, kind):
     text = text.strip()
     if len(text) < 50 or len(text.encode("utf-8")) > MAX_OUTPUT:
         return None
-    return {"source": kind, "content": text}
+    return {"source": source, "content": text}
 
 
 def main():
@@ -73,7 +98,8 @@ def main():
     resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
     try:
         data = sys.stdin.buffer.read(MAX_INPUT + 1)
-        result = extract(data, sys.argv[1] if len(sys.argv) == 2 else "")
+        kind = sys.argv[1] if len(sys.argv) in (2, 3) else ""
+        result = extract(data, kind, ocr=True) if len(sys.argv) == 3 and sys.argv[2] == "ocr" else extract(data, kind)
         sys.stdout.write(json.dumps(result, ensure_ascii=True))
     except Exception:
         sys.stdout.write("null")

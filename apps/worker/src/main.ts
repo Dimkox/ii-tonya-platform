@@ -1,3 +1,4 @@
+import { createResidentPrivateJobsLifecycle } from "./resident-private-jobs-composition.js";
 import { createResidentReviewNotificationLifecycle } from "./resident-review-notification-composition.js";
 import { createSeparatedSalesRunner } from "./expert-separated-sales-composition.js";
 import { createResidentWorkspaceNotificationLifecycle } from "./resident-workspace-notification-composition.js";
@@ -559,6 +560,10 @@ export function createProductionWorkerRuntimeFactory(
         config,
         db,
       );
+      const residentPrivateJobs = createResidentPrivateJobsLifecycle(
+        config,
+        db,
+      );
       const residentReviewNotifications =
         createResidentReviewNotificationLifecycle(config, db);
       const residentWorkspaceNotifications =
@@ -675,6 +680,7 @@ export function createProductionWorkerRuntimeFactory(
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentPrivateJobs ? { residentPrivateJobs } : {}),
         ...(residentReviewNotifications ? { residentReviewNotifications } : {}),
         ...(residentWorkspaceNotifications
           ? { residentWorkspaceNotifications }

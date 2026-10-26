@@ -14,6 +14,7 @@ export interface WorkerCycleReport {
   readonly expertCardMaterials?: unknown;
   readonly residentWorkspaceNotifications?: unknown;
   readonly residentReviewNotifications?: unknown;
+  readonly residentPrivateJobs?: unknown;
   readonly expertResidencyLifecycle?: unknown;
   readonly expertPersonalOffers?: unknown;
   readonly expertSeparatedSales?: unknown;
@@ -54,6 +55,10 @@ interface BookingNotificationLifecycle {
 export interface WorkerRuntimeDependencies {
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentPrivateJobs?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly residentReviewNotifications?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -106,6 +111,10 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentPrivateJobs?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly residentReviewNotifications?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -271,6 +280,9 @@ export function createWorkerRuntime(
       const bookingNotifications = acceptingClaims
         ? await deps.bookingNotifications?.runOnce()
         : undefined;
+      const residentPrivateJobs = acceptingClaims
+        ? await deps.residentPrivateJobs?.runOnce()
+        : undefined;
       const residentReviewNotifications = acceptingClaims
         ? await deps.residentReviewNotifications?.runOnce()
         : undefined;
@@ -293,6 +305,7 @@ export function createWorkerRuntime(
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentPrivateJobs === undefined ? {} : { residentPrivateJobs }),
         ...(residentReviewNotifications === undefined
           ? {}
           : { residentReviewNotifications }),
@@ -334,6 +347,7 @@ export function createWorkerRuntime(
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
     deps.expertCardMaterials?.stopAccepting();
+    deps.residentPrivateJobs?.stopAccepting();
     deps.residentReviewNotifications?.stopAccepting();
     deps.residentWorkspaceNotifications?.stopAccepting();
     deps.expertSeparatedSales?.stopAccepting();
@@ -397,6 +411,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.residentPrivateJobs
+      ? { residentPrivateJobs: deps.residentPrivateJobs }
+      : {}),
     ...(deps.residentReviewNotifications
       ? { residentReviewNotifications: deps.residentReviewNotifications }
       : {}),

@@ -415,6 +415,18 @@ export type RuntimeConfig = {
   clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
+  privateVerification?: {
+    bucket: string;
+    region: string;
+    endpoint: string;
+    credentials: { accessKeyId: string; secretAccessKey: string };
+    dedicatedNonVersionedVerified: boolean;
+    parserSocket?: string;
+    ocr: boolean;
+    telegramPreview: boolean;
+    vkToken?: string;
+    vkTokenKind?: "user" | "service";
+  };
   expertVerification?: ExpertVerificationConfig;
   expertCard?: ExpertCardConfig;
   expertResidencyLifecycle?: ExpertResidencyLifecycleConfig;
@@ -473,6 +485,7 @@ export type RuntimeConfig = {
     expertDraftTags?: boolean;
     residentWorkspaceNotifications?: boolean;
     residentReviewNotifications?: boolean;
+    residentPrivateJobs?: boolean;
     expertResidencyLifecycle?: boolean;
     expertResidencyLifecycleCommands?: boolean;
     expertResidencyNoticeDelivery?: boolean;
@@ -906,6 +919,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
+    ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+      ? { privateVerification: privateVerificationConfig(source) }
+      : {}),
     features: {
       ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
       ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
@@ -917,6 +933,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
       ...(source.EXPERT_DRAFT_TAGS_ENABLED === "true"
         ? { expertDraftTags: true }
+        : {}),
+      ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+        ? { residentPrivateJobs: true }
         : {}),
       ...(source.RESIDENT_REVIEW_NOTIFICATIONS_ENABLED === "true"
         ? { residentReviewNotifications: true }
@@ -1026,4 +1045,38 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   assertExpertResidencyLifecycleConfig(config);
   assertClientNavigationConfig(config);
   return config;
+}
+
+function privateVerificationConfig(
+  source: Record<string, string | undefined>,
+): NonNullable<RuntimeConfig["privateVerification"]> {
+  const required = (key: string) => {
+    const value = source[key];
+    if (!value) throw Error("resident_private_configuration_required");
+    return value;
+  };
+  if (source.PRIVATE_BUCKET_NON_VERSIONED_VERIFIED !== "true")
+    throw Error("resident_private_non_versioned_required");
+  const token = source.PRIVATE_VK_TOKEN,
+    kind = source.PRIVATE_VK_TOKEN_KIND;
+  if (token && kind !== "user" && kind !== "service")
+    throw Error("resident_private_vk_capability_required");
+  return {
+    bucket: required("PRIVATE_BUCKET"),
+    region: required("PRIVATE_REGION"),
+    endpoint: required("PRIVATE_ENDPOINT"),
+    credentials: {
+      accessKeyId: required("PRIVATE_ACCESS_KEY_ID"),
+      secretAccessKey: required("PRIVATE_SECRET_ACCESS_KEY"),
+    },
+    dedicatedNonVersionedVerified: true,
+    ocr: source.PRIVATE_OCR_ENABLED === "true",
+    telegramPreview: source.PRIVATE_TELEGRAM_PREVIEW_ENABLED === "true",
+    ...(source.PRIVATE_PARSER_SOCKET
+      ? { parserSocket: source.PRIVATE_PARSER_SOCKET }
+      : {}),
+    ...(token
+      ? { vkToken: token, vkTokenKind: kind as "user" | "service" }
+      : {}),
+  };
 }

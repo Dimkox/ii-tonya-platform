@@ -324,3 +324,7 @@ export {
 } from "./yookassa/held-onboarding.js";
 
 export * from "./telegram/resident-review-notification-transport.js";
+
+export * from "./documents/private-verification.js";
+export * from "./documents/verification-extraction.js";
+export * from "./documents/isolated-document-parser.js";

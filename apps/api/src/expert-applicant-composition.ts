@@ -12,6 +12,7 @@ import {
   PostgresExpertPromoRepository,
   PostgresExpertSeparatedSalesRepository,
   PostgresResidentVerificationRepository,
+  PostgresResidentPrivateJobsRepository,
   PostgresExpertPersonalOfferRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -59,6 +60,9 @@ export function createExpertApplicantComposition(
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
   const sales = new PostgresExpertSeparatedSalesRepository(db, scope);
+  const privateDocuments = config.features.residentPrivateJobs
+    ? new PostgresResidentPrivateJobsRepository(db, scope)
+    : undefined;
   return {
     separatedSalesEnabled: config.features.expertSeparatedSales === true,
     verificationFormEnabled: config.features.expertVerificationForm === true,
@@ -85,6 +89,7 @@ export function createExpertApplicantComposition(
                 ? { checkout: capabilities.checkout }
                 : {}),
               form: createResidentVerificationService({
+                ...(privateDocuments ? { privateDocuments } : {}),
                 enabled: true,
                 salesFirst: true,
                 repository: new PostgresResidentVerificationRepository(
@@ -98,6 +103,7 @@ export function createExpertApplicantComposition(
       ...(config.features.expertVerificationForm === true
         ? {
             verificationForm: createResidentVerificationService({
+              ...(privateDocuments ? { privateDocuments } : {}),
               enabled: true,
               repository: new PostgresResidentVerificationRepository(db, {
                 botId: scope.botId,
