@@ -13,7 +13,16 @@ export type ExpertCardEntry =
   | { kind: "text"; text: string }
   | { kind: "photo" | "document"; reference: string };
 export type ExpertCardContent = ExpertCardEntry & { caption?: string };
-export interface ExpertCardWorkflow {
+export interface CardSafetyResult {
+  safetyBlocked?: boolean;
+  safetyIssues?: readonly {
+    field: string;
+    ruleId: string | null;
+    severity: "BLOCKER" | "WARNING";
+    reason: string;
+  }[];
+}
+export interface ExpertCardWorkflow extends CardSafetyResult {
   applicationId: string;
   draftId: string | null;
   revision: number;
@@ -37,12 +46,22 @@ export interface DraftTagPage {
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
+  readOwnAnswers?(
+    scope: ExpertCardScope,
+  ): Promise<{ revision: number; fields: Record<string, string> }>;
+  correctEntry?(
+    input: ExpertCardEvent & {
+      expectedRevision: number;
+      entryId: string;
+      text: string;
+    },
+  ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   completeDocumentImport?(
     input: ExpertCardEvent & {
       expectedRevision: number;
       proposal: { source: "pdf" | "docx"; content: string } | null;
     },
-  ): Promise<boolean>;
+  ): Promise<boolean | "manual_fallback">;
   getDraftTags?(scope: ExpertCardScope, page?: number): Promise<DraftTagPage>;
   toggleDraftTag?(
     input: ExpertCardEvent & { expectedRevision: number; tagId: string },
@@ -169,6 +188,10 @@ const quoteCommand = new RegExp(
 );
 const acceptCommand = new RegExp(`^/main_accept (${uuid}) ${revision}$`, "u");
 const invoiceCommand = new RegExp(`^/main_invoice ${revision}$`, "u");
+const correctCommand = new RegExp(
+  `^/card_correct ${revision} (${uuid}) ([\\s\\S]+)$`,
+  "u",
+);
 const submitCommand = new RegExp(`^/card_submit ${revision}$`, "u");
 const proofCommand = new RegExp(
   `^/promo_proof ${revision}(?: (\\S{1,2048}))?$`,
@@ -232,6 +255,19 @@ export function createExpertCardService(deps: {
     status: "handled",
     text,
   });
+  const safetyReply = (
+    result: CardSafetyResult,
+  ): ExpertCardReply | undefined =>
+    result.safetyBlocked
+      ? reply(
+          `Не удалось сохранить: ${
+            result.safetyIssues
+              ?.slice(0, 3)
+              .map((i) => `${i.field}: ${i.reason.slice(0, 500)}`)
+              .join(" ") ?? "Проверка содержимого недоступна."
+          } Исправьте текст. /card_answers — ответы и команда исправления.`,
+        )
+      : undefined;
   const scope = (input: ExpertCardScope) => ({
     botId: input.botId,
     botKey: input.botKey,
@@ -381,6 +417,8 @@ export function createExpertCardService(deps: {
                 expectedRevision: Number(callback[2]),
                 tagId: callback[4],
               });
+              const blocked = safetyReply(result);
+              if (blocked) return { ...blocked, tagCallbackAuthorized: true };
               if (result.replay)
                 return { status: "duplicate", tagCallbackAuthorized: true };
             } else {
@@ -433,12 +471,12 @@ export function createExpertCardService(deps: {
           });
           if (redeemed.kind === "duplicate") return { status: "duplicate" };
           return reply(
-            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: отправляйте текст, фото или документ. /card — состояние; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку. TODO: Wait for Prompt Spec",
+            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: отправляйте текст, фото или документ. /card — состояние; /card_answers — ответы и исправления; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку. TODO: Wait for Prompt Spec",
           );
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
+          !/^\/(?:card|card_answers|card_correct|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -449,6 +487,40 @@ export function createExpertCardService(deps: {
         }
         const current = await deps.repository.getWorkflow(s);
         if (!current) return { status: "unhandled" };
+        const answerPage = /^\/card_answers(?: (0|[1-9][0-9]?))?$/u.exec(text);
+        if (answerPage && deps.repository.readOwnAnswers) {
+          const answers = await deps.repository.readOwnAnswers(s);
+          const lines = Object.entries(answers.fields).filter(([key]) =>
+            key.startsWith("entry:"),
+          );
+          const pages = Math.max(1, Math.ceil(lines.length / 8));
+          const page = Math.min(Number(answerPage[1] ?? 0), pages - 1);
+          return reply(
+            `Ревизия ${answers.revision}. Страница ${page + 1}/${pages}. Исправление: /card_correct ${answers.revision} ID новый текст\n${lines
+              .slice(page * 8, page * 8 + 8)
+              .map(([key, value]) => `${key.slice(6)}: ${value.slice(0, 80)}`)
+              .join(
+                "\n",
+              )}\n${page + 1 < pages ? `/card_answers ${page + 1} — следующие ответы` : ""}`,
+          );
+        }
+        const correction = correctCommand.exec(text);
+        if (correction && deps.repository.correctEntry) {
+          const result = await deps.repository.correctEntry({
+            ...event,
+            expectedRevision: Number(correction[1]),
+            entryId: correction[2]!,
+            text: correction[3]!,
+          });
+          return (
+            safetyReply(result) ??
+            (result.replay
+              ? { status: "duplicate" }
+              : reply(
+                  `Ответ исправлен. История сохранена. Ревизия ${result.revision}.`,
+                ))
+          );
+        }
         if (text === "/card")
           return reply(
             `Карточка: ${current.status}; ревизия ${current.revision}; записей ${current.entryCount}. Материалы: ${current.materialStatus}. Мой актуальный тариф: /my_tariff. ${current.materialStatus === "waiting_content" ? "AWAITING_MATERIALS. Ваши материалы для рассылки будут доступны в ближайшее время" : ""}`.trim(),
@@ -459,6 +531,8 @@ export function createExpertCardService(deps: {
             ...event,
             expectedRevision: Number(submit[1]),
           });
+          const blocked = safetyReply(result);
+          if (blocked) return blocked;
           if (result.replay) return { status: "duplicate" };
           return reply(
             `Карточка ревизии ${result.revision} передана менеджеру.`,
@@ -603,6 +677,8 @@ export function createExpertCardService(deps: {
           expectedRevision: current.revision,
           entry,
         });
+        const blocked = safetyReply(result);
+        if (blocked) return blocked;
         if (result.replay) return { status: "duplicate" };
         if (content.kind === "document") {
           let proposal: { source: "pdf" | "docx"; content: string } | null =

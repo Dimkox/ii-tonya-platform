@@ -15,6 +15,19 @@ export interface ExpertCardWorkflow {
   promoConfirmed: boolean;
 }
 export interface ExpertCardDraft extends ExpertCardWorkflow {
+  effectiveFields?: Record<string, string>;
+  safety?: {
+    policyId: string;
+    revision: number;
+    digest: string;
+    blocked: boolean;
+    issues: {
+      field: string;
+      ruleId: string | null;
+      severity: "BLOCKER" | "WARNING";
+      reason: string;
+    }[];
+  };
   entries: {
     id: string;
     kind: "text" | "photo" | "document";
@@ -55,7 +68,10 @@ export interface ExpertCardAdminClient {
   ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   review(
     id: string,
-    input: CardRevisionCommand & { action: "approve" | "return_changes" },
+    input: CardRevisionCommand & {
+      action: "approve" | "return_changes";
+      warningAcknowledgment?: string;
+    },
   ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   confirmPromo(
     id: string,
@@ -203,6 +219,34 @@ function draft(v: unknown): v is ExpertCardDraft {
     )
   )
     return false;
+  if (
+    v.effectiveFields !== undefined &&
+    (!obj(v.effectiveFields) ||
+      Object.keys(v.effectiveFields).length > 125 ||
+      !Object.values(v.effectiveFields).every(
+        (x) => typeof x === "string" && x.length <= 64000,
+      ))
+  )
+    return false;
+  if (
+    v.safety !== undefined &&
+    (!obj(v.safety) ||
+      !uuid(v.safety.policyId) ||
+      v.safety.revision !== v.revision ||
+      typeof v.safety.digest !== "string" ||
+      !/^[0-9a-f]{64}$/u.test(v.safety.digest) ||
+      typeof v.safety.blocked !== "boolean" ||
+      !Array.isArray(v.safety.issues) ||
+      !v.safety.issues.every(
+        (i) =>
+          obj(i) &&
+          text(i.field, 100) &&
+          (i.ruleId === null || uuid(i.ruleId)) &&
+          ["BLOCKER", "WARNING"].includes(String(i.severity)) &&
+          text(i.reason, 1000),
+      ))
+  )
+    return false;
   const m = v.materials;
   return (
     m === null ||
@@ -245,6 +289,13 @@ export function createExpertCardClient(
       snapshot.publicCard = { ...snapshot.publicCard };
     const value = await request(`/${id}/${route}`, snapshot),
       v = value.item;
+    if (obj(v) && v.safetyBlocked === true && Array.isArray(v.safetyIssues)) {
+      const reasons = v.safetyIssues
+        .filter((i) => obj(i) && text(i.field, 100) && text(i.reason, 1000))
+        .map((i) => `${i.field}: ${i.reason}`)
+        .join(" ");
+      throw new Error(`card_safety_blocked:${reasons}`);
+    }
     if (
       !workflow(v) ||
       !obj(v) ||
@@ -280,7 +331,18 @@ export function createExpertCardClient(
       return mutation(id, "public-card", input);
     },
     async review(id, input) {
-      command(id, input, "action,expectedRevision,idempotencyKey");
+      command(
+        id,
+        input,
+        input.warningAcknowledgment === undefined
+          ? "action,expectedRevision,idempotencyKey"
+          : "action,expectedRevision,idempotencyKey,warningAcknowledgment",
+      );
+      if (
+        input.warningAcknowledgment !== undefined &&
+        !/^[0-9a-f]{64}$/u.test(input.warningAcknowledgment)
+      )
+        return invalid();
       if (input.action !== "approve" && input.action !== "return_changes")
         return invalid();
       return mutation(id, "review", input);

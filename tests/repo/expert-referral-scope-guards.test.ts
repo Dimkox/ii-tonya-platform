@@ -50,6 +50,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0058_residency_core_stabilization.sql",
       "packages/db/migrations/0059_residency_separated_sales.sql",
       "packages/db/migrations/0060_separated_sales_review_corrections.sql",
+      "packages/db/migrations/0061_resident_content_safety.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -160,6 +161,7 @@ describe("expert residency referral scope boundary", () => {
       "expert_verification_decisions",
       "expert_verification_work",
       "experts_published",
+      "forbidden_patterns",
       "hashtags_db",
       "hashtags_taxonomy",
       "organization_profiles",
@@ -172,6 +174,10 @@ describe("expert residency referral scope boundary", () => {
       "planerka_booking_operations",
       "planerka_legacy_booking_reviews",
       "planerka_service_mappings",
+      "resident_card_corrections",
+      "resident_safety_active",
+      "resident_safety_outcomes",
+      "resident_safety_policies",
       "resident_sales_application",
       "resident_verification_application_updates",
       "resident_verification_check_work",
@@ -179,6 +185,7 @@ describe("expert residency referral scope boundary", () => {
       "resident_verification_requests",
       "resident_workspace_access",
       "residents_applications",
+      "security_logs",
       "selarti_actual_usage_facts",
       "selarti_budget_alerts",
       "selarti_budget_policies",
@@ -297,6 +304,21 @@ describe("expert residency referral scope boundary", () => {
   });
 
   it.each([
+    [
+      "adjacent safety bypass relation",
+      "packages/db/src/schema/resident-content-safety.ts",
+      'export const records = pgTable("resident_safety_bypass", {});',
+    ],
+    [
+      "adjacent registry relation",
+      "packages/db/src/schema/resident-content-safety.ts",
+      'export const records = pgTable("forbidden_pattern_overrides", {});',
+    ],
+    [
+      "incident payload relation",
+      "packages/db/src/schema/resident-content-safety.ts",
+      'export const records = pgTable("security_log_payloads", {});',
+    ],
     [
       "unreviewed relation",
       "packages/db/src/schema/expert-referrals.ts",

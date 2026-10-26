@@ -428,6 +428,13 @@
       "when": 1793041200000,
       "tag": "0060_separated_sales_review_corrections",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793041200001,
+      "tag": "0061_resident_content_safety",
+      "breakpoints": true
     }
   ]
 }

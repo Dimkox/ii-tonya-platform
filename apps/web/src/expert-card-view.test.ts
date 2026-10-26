@@ -48,6 +48,8 @@ class E {
   textContent = "";
   value = "";
   disabled = false;
+  checked = false;
+  onchange: (() => void) | null = null;
   hidden = false;
   type = "";
   innerHTML = "";
@@ -79,6 +81,7 @@ function setup() {
     "approve",
     "return",
     "promo",
+    "warning-ack",
   ];
   const nodes = new Map(names.map((n) => [n, new E()]));
   const root = {
@@ -300,4 +303,75 @@ it("returns the current revision for changes through the actual staff control", 
     idempotencyKey: "synthetic-key-1",
   });
   expect(f.get("approve").disabled).toBe(true);
+});
+
+it("requires visible current-warning acknowledgment and sends the displayed content digest", async () => {
+  const f = setup();
+  const sensitive = {
+    ...draft,
+    effectiveFields: { "entry:current": "#приворот" },
+    safety: {
+      policyId: id,
+      revision: 3,
+      digest: "a".repeat(64),
+      blocked: false,
+      issues: [
+        {
+          field: "entry:current",
+          ruleId: id,
+          severity: "WARNING" as const,
+          reason: "Личное рассмотрение",
+        },
+      ],
+    },
+  };
+  f.port.read.mockResolvedValue(sensitive);
+  await select(f);
+  expect(
+    f
+      .get("detail")
+      .children.map((n) => n.textContent)
+      .join(" "),
+  ).toContain("#приворот");
+  expect(f.get("approve").disabled).toBe(true);
+  f.get("warning-ack").checked = true;
+  f.get("warning-ack").onchange?.();
+  expect(f.get("approve").disabled).toBe(false);
+  f.get("approve").click();
+  await flush();
+  expect(f.port.review).toHaveBeenCalledWith(
+    id,
+    expect.objectContaining({ warningAcknowledgment: "a".repeat(64) }),
+  );
+  expect(f.get("warning-ack").checked).toBe(false);
+});
+it("lets the manager return an approved card whose current policy blocks its content", async () => {
+  const f = setup();
+  f.port.read.mockResolvedValue({
+    ...draft,
+    status: "approved",
+    approvedReviewId: reviewId,
+    safety: {
+      policyId: id,
+      revision: 3,
+      digest: "b".repeat(64),
+      blocked: true,
+      issues: [
+        {
+          field: "entry:current",
+          ruleId: id,
+          severity: "BLOCKER",
+          reason: "Исправьте ответ",
+        },
+      ],
+    },
+  });
+  await select(f);
+  expect(f.get("return").disabled).toBe(false);
+  f.get("return").click();
+  await flush();
+  expect(f.port.review).toHaveBeenCalledWith(
+    id,
+    expect.objectContaining({ action: "return_changes" }),
+  );
 });

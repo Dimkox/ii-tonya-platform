@@ -20,7 +20,10 @@ export interface ExpertCardAdminRepository {
     input: Command & { publicCard: PublicExpertCard },
   ): Promise<unknown>;
   reviewCard(
-    input: Command & { action: "approve" | "return_changes" },
+    input: Command & {
+      action: "approve" | "return_changes";
+      warningAcknowledgment?: string;
+    },
   ): Promise<unknown>;
   confirmPromo(input: Command): Promise<unknown>;
 }
@@ -170,11 +173,23 @@ export function createExpertCardAdminService(deps: {
       sessionHash: string,
       input: Omit<Command, "sessionHash"> & {
         action: "approve" | "return_changes";
+        warningAcknowledgment?: string;
       },
     ) {
       const denied = authorize(sessionHash);
       if (denied) return denied;
-      const base = command(sessionHash, input, ["action"]);
+      const base = command(sessionHash, input, [
+        "action",
+        ...(input.warningAcknowledgment === undefined
+          ? []
+          : ["warningAcknowledgment"]),
+      ]);
+      if (
+        input.warningAcknowledgment !== undefined &&
+        (typeof input.warningAcknowledgment !== "string" ||
+          !/^[0-9a-f]{64}$/u.test(input.warningAcknowledgment))
+      )
+        return { kind: "invalid" as const };
       if (!base || !["approve", "return_changes"].includes(input.action))
         return { kind: "invalid" as const };
       try {
@@ -183,6 +198,9 @@ export function createExpertCardAdminService(deps: {
           item: await deps.repository.reviewCard({
             ...base,
             action: input.action,
+            ...(input.warningAcknowledgment === undefined
+              ? {}
+              : { warningAcknowledgment: input.warningAcknowledgment }),
           }),
         };
       } catch (e) {

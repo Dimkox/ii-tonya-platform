@@ -78,6 +78,7 @@ const HAND_SQL_FUNCTIONS = [
   "erase_expert_sales_subject",
   "erase_resident_verification_subject",
   "expert_campaign_current_profile_valid",
+  "expert_card_activation_gate_before_safety",
   "expert_card_activation_gate_valid",
   "expert_card_current_messaging_authority",
   "expert_card_delivery_receipt_valid",
@@ -127,6 +128,18 @@ const HAND_SQL_FUNCTIONS = [
   "reject_partner_commerce_mutation",
   "reject_selarti_budget_policy_mutation",
   "reject_test_expert_immutable_mutation",
+  "resident_card_correction_guard",
+  "resident_card_effective_fields",
+  "resident_card_review_safety_guard",
+  "resident_safety_activation_guard",
+  "resident_safety_assess",
+  "resident_safety_compile",
+  "resident_safety_matches",
+  "resident_safety_matches_normalized",
+  "resident_safety_normalize",
+  "resident_safety_policy_guard",
+  "resident_safety_publish",
+  "resident_safety_subject_guard",
   "resident_verification_consent_cleanup",
   "resident_verification_draft_valid",
   "resident_verification_followup_valid",
@@ -267,12 +280,22 @@ const HAND_SQL_TRIGGERS = [
   "planerka_reservation_transition_guard",
   "prompt_versions_append_only",
   "reconciliation_mismatches_append_only",
+  "resident_card_correction_source",
+  "resident_card_corrections_immutable",
+  "resident_card_review_safety",
+  "resident_safety_active_valid",
+  "resident_safety_log_subject",
+  "resident_safety_outcome_subject",
+  "resident_safety_outcomes_immutable",
+  "resident_safety_policy_immutable",
+  "resident_safety_rules_immutable",
   "resident_verification_anchor_guard",
   "resident_verification_consent_cleanup",
   "resident_verification_quote_guard",
   "resident_verification_stage_projection",
   "resident_verification_write_guard",
   "safety_incidents_append_only",
+  "security_logs_immutable",
   "selarti_budget_policy_approval",
   "selarti_budget_policy_immutable",
   "selarti_budget_policy_no_overlap",
@@ -348,7 +371,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(60);
+    expect(newest).toBe(61);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -463,7 +486,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0060 adds the scoped immutable operator recovery audit.
-    expect(declared.size).toBe(189);
+    // 0061 adds six private content-safety relations.
+    expect(declared.size).toBe(195);
   });
 });

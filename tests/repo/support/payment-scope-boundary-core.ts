@@ -98,6 +98,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
+  "packages/db/migrations/0061_resident_content_safety.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -133,6 +134,13 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "forbidden_patterns",
+  "resident_card_corrections",
+  "resident_safety_active",
+  "resident_safety_outcomes",
+  "resident_safety_policies",
+  "security_logs",
+
   "expert_sales_operator_recoveries",
   "expert_sales_bases",
   "expert_sales_choices",
@@ -814,6 +822,23 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0061_resident_content_safety.sql",
+    "e019262bcab01050ae4e56f039dbdb010608efe864abffdcab39899093245b97",
+  ],
+  [
+    "packages/db/migrations/meta/0061_snapshot.json",
+    "53d4caa08e56f3ffdef43efe3d1e3e6a94b676bf25711cea701e0da6ad183494",
+  ],
+  [
+    "packages/db/migrations/state/0061_sql_objects.json",
+    "0a1f894c3d8c00070bfd56cd9af818aff818e98bf81820ab7f670a1e50706010",
+  ],
+  [
+    "packages/db/migrations/state/0061_manifest.json",
+    "5bbfd1b82b0451dd6e158c8e87b1974d349a6a072e2fdac8353031ea83c2682a",
+  ],
+
+  [
     "packages/db/migrations/0060_separated_sales_review_corrections.sql",
     "4b9f5b78690f8eb7bd59d7d1d2f8f51fd73b3ae50ac2e99bd28767cff4f43933",
   ],
@@ -1331,7 +1356,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "079331617810590cfbd52db2c0bbc1098162b3dfc09e9d469e6b6c023cce8e02",
+    "5826dab6c2783bba14481d67828affc4645851b214c581cc4e862a1176c234cd",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1411,7 +1436,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "079331617810590cfbd52db2c0bbc1098162b3dfc09e9d469e6b6c023cce8e02",
+    "5826dab6c2783bba14481d67828affc4645851b214c581cc4e862a1176c234cd",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

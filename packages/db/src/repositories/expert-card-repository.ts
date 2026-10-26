@@ -1,3 +1,10 @@
+import {
+  assessResidentContent,
+  residentSafetyFields,
+  recordResidentSafety,
+  residentSafetyOutcome,
+  type ResidentSafetyAssessment,
+} from "./resident-content-safety.js";
 import { issueOwnedWorkHandoff } from "./resident-workspace-repository.js";
 import {
   PostgresExpertApplicationMaterials,
@@ -714,7 +721,10 @@ export class PostgresExpertCardRepository {
     raw: ExpertCardEvent,
     operation: Operation,
     semantic: unknown,
-    action: (tx: ExpertCardTransaction, draft: DraftRow) => Promise<void>,
+    action: (
+      tx: ExpertCardTransaction,
+      draft: DraftRow,
+    ) => Promise<void | ResidentSafetyAssessment>,
   ) {
     const event = normalizeCardEvent(raw);
     if (!this.work(event)) fail("card_forbidden");
@@ -734,13 +744,31 @@ export class PostgresExpertCardRepository {
         return {
           ...(await this.workflow(tx, started.userId, app.applicationId)),
           replay: true,
+          ...(await residentSafetyOutcome(
+            tx,
+            started.userId,
+            `owner:${event.requestKey}`,
+          )),
         };
       const draft = await this.ensureDraft(tx, started.userId, event);
-      await action(tx, draft);
+      const assessment = await action(tx, draft);
+      if (assessment)
+        await recordResidentSafety(
+          tx,
+          draft,
+          `owner:${event.requestKey}`,
+          assessment,
+        );
       await finishCardRequest(tx, started, draft.id);
       return {
         ...(await this.workflow(tx, started.userId, app.applicationId)),
         replay: false,
+        ...(assessment
+          ? {
+              safetyBlocked: assessment.blocked,
+              safetyIssues: assessment.issues,
+            }
+          : {}),
       };
     });
   }
@@ -761,6 +789,17 @@ export class PostgresExpertCardRepository {
         )
       ).rows[0]!.n;
       if (count >= 100) fail("card_state_conflict");
+      const fields = await residentSafetyFields(tx, draft.id);
+      delete fields.document_proposal;
+      for (const key of Object.keys(fields))
+        if (key.startsWith("public:")) delete fields[key];
+      if (entry.kind === "text") fields["entry:new"] = entry.text;
+      const assessment = await assessResidentContent(
+        tx,
+        fields,
+        draft.revision + 1,
+      );
+      if (assessment.blocked) return assessment;
       await tx.execute(
         sql`insert into expert_card_entries(draft_id,user_id,revision,kind,text_content,media_reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision + 1},${entry.kind},${entry.kind === "text" ? entry.text : null},${entry.kind === "text" ? null : entry.reference})`,
       );
@@ -768,7 +807,73 @@ export class PostgresExpertCardRepository {
         sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode='INTERVIEW',document_proposal=null,document_import_revision=null,public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
       );
       await this.invalidateJobs(tx, draft.id);
+      return assessment;
     });
+  }
+  async readOwnAnswers(scope: ExpertPromoScope) {
+    if (!this.work(scope)) fail("card_forbidden");
+    return this.tx(async (tx) => {
+      const identity = await owner(
+        tx,
+        scope,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return fail("card_forbidden");
+      const draft = await this.ensureDraft(tx, identity.userId, scope);
+      return {
+        revision: draft.revision,
+        fields: await residentSafetyFields(tx, draft.id),
+      };
+    });
+  }
+  async correctEntry(
+    raw: ExpertCardEvent & {
+      expectedRevision: number;
+      entryId: string;
+      text: string;
+    },
+  ) {
+    const entry = decodeCardEntry({ kind: "text", text: raw.text });
+    if (entry.kind !== "text" || !id.test(raw.entryId))
+      return fail("card_invalid_entry");
+    this.revision(raw.expectedRevision);
+    return this.ownerAction(
+      raw,
+      "entry",
+      {
+        correction: raw.entryId,
+        text: entry.text,
+        revision: raw.expectedRevision,
+      },
+      async (tx, draft) => {
+        if (draft.revision !== raw.expectedRevision)
+          fail("card_revision_conflict");
+        if (!["collecting", "changes_requested"].includes(draft.status))
+          fail("card_state_conflict");
+        const fields = await residentSafetyFields(tx, draft.id);
+        if (!(`entry:${raw.entryId}` in fields)) fail("card_invalid_entry");
+        fields[`entry:${raw.entryId}`] = entry.text;
+        delete fields.document_proposal;
+        for (const key of Object.keys(fields))
+          if (key.startsWith("public:")) delete fields[key];
+        // Permit incremental repair of other legacy blocked fields: the replacement
+        // itself must pass; submission will reassess all effective fields together.
+        const assessment = await assessResidentContent(
+          tx,
+          { [`entry:${raw.entryId}`]: entry.text },
+          draft.revision + 1,
+        );
+        if (assessment.blocked) return assessment;
+        await tx.execute(
+          sql`insert into resident_card_corrections(draft_id,user_id,entry_id,revision,text_content) values(${draft.id}::uuid,${draft.userId}::uuid,${raw.entryId}::uuid,${draft.revision + 1},${entry.text})`,
+        );
+        await tx.execute(
+          sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode='INTERVIEW',document_proposal=null,document_import_revision=null,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        );
+        await this.invalidateJobs(tx, draft.id);
+        return assessment;
+      },
+    );
   }
   async completeDocumentImport(
     raw: ExpertCardEvent & {
@@ -818,15 +923,36 @@ export class PostgresExpertCardRepository {
           sql`select document_import_revision as revision,document_proposal as proposal from expert_card_drafts where id=${draft.id}::uuid`,
         )
       ).rows[0]!;
-      if (previous.revision !== null)
+      if (previous.revision !== null) {
+        const outcome = await residentSafetyOutcome(
+          tx,
+          draft.userId,
+          `import:${event.requestKey}`,
+        );
+        if (outcome.safetyBlocked) return "manual_fallback" as const;
         return (
           previous.revision === expected &&
           canonical(previous.proposal) === canonical(proposal)
         );
-      await tx.execute(
-        sql`update expert_card_drafts set document_import_revision=${expected},input_mode=${proposal ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${proposal ? JSON.stringify(proposal) : null}::jsonb,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+      }
+      const fields = await residentSafetyFields(tx, draft.id);
+      if (proposal) fields.document_proposal = proposal.content;
+      const assessment = await assessResidentContent(
+        tx,
+        fields,
+        draft.revision,
       );
-      return true;
+      await recordResidentSafety(
+        tx,
+        draft,
+        `import:${event.requestKey}`,
+        assessment,
+      );
+      const accepted = assessment.blocked ? null : proposal;
+      await tx.execute(
+        sql`update expert_card_drafts set document_import_revision=${expected},input_mode=${accepted ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${accepted ? JSON.stringify(accepted) : null}::jsonb,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+      );
+      return assessment.blocked ? ("manual_fallback" as const) : true;
     });
   }
   async getDraftTags(scope: ExpertPromoScope, page = 0) {
@@ -895,6 +1021,25 @@ export class PostgresExpertCardRepository {
           )
         ).rows;
         if (tag.length !== 1) fail("card_invalid_tags");
+        const fields = await residentSafetyFields(tx, draft.id);
+        const selectedBefore = `tag:${tagId}` in fields;
+        if (selectedBefore) delete fields[`tag:${tagId}`];
+        else {
+          const value = (
+            await tx.execute<{ value: string }>(
+              sql`select tag_value||' '||display_label as value from hashtags_db where id=${tagId}::uuid`,
+            )
+          ).rows[0]!.value;
+          fields[`tag:${tagId}`] = value;
+        }
+        for (const key of Object.keys(fields))
+          if (key.startsWith("public:")) delete fields[key];
+        const assessment = await assessResidentContent(
+          tx,
+          selectedBefore ? {} : fields,
+          draft.revision + 1,
+        );
+        if (assessment.blocked) return assessment;
         const selected = (
           await tx.execute(
             sql`delete from expert_card_draft_tags where draft_id=${draft.id}::uuid and tag_id=${tagId}::uuid returning tag_id`,
@@ -910,6 +1055,7 @@ export class PostgresExpertCardRepository {
           sql`update expert_card_drafts set revision=revision+1,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
         );
         await this.invalidateJobs(tx, draft.id);
+        return assessment;
       },
     );
   }
@@ -931,12 +1077,19 @@ export class PostgresExpertCardRepository {
           )
         ).rows[0]!.n;
         if (count < 1) fail("card_state_conflict");
+        const assessment = await assessResidentContent(
+          tx,
+          await residentSafetyFields(tx, draft.id),
+          draft.revision,
+        );
+        if (assessment.blocked) return assessment;
         await tx.execute(
           sql`update expert_card_drafts set status='manager_review',updated_at=clock_timestamp() where id=${draft.id}::uuid`,
         );
         await tx.execute(
           sql`update expert_onboarding_applications set onboarding_stage='manager_review',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid`,
         );
+        return assessment;
       },
     );
   }
@@ -1063,6 +1216,12 @@ export class PostgresExpertCardRepository {
       return {
         ...(await this.workflow(tx, draft.userId, draft.applicationId)),
         entries,
+        effectiveFields: await residentSafetyFields(tx, draft.id),
+        safety: await assessResidentContent(
+          tx,
+          await residentSafetyFields(tx, draft.id),
+          draft.revision,
+        ),
         publicCard: draft.publicCard,
         approvedReviewId: draft.approvedReviewId,
         materials,
@@ -1078,7 +1237,7 @@ export class PostgresExpertCardRepository {
       tx: ExpertCardTransaction,
       draft: DraftRow,
       managerId: string,
-    ) => Promise<string | undefined>,
+    ) => Promise<string | undefined | ResidentSafetyAssessment>,
   ) {
     this.revision(input.expectedRevision);
     if (
@@ -1138,21 +1297,43 @@ export class PostgresExpertCardRepository {
         return {
           ...(await this.workflow(tx, draft.userId, draft.applicationId)),
           ...(prior.resultId ? { reviewId: prior.resultId } : {}),
+          ...(await residentSafetyOutcome(
+            tx,
+            draft.userId,
+            `staff:${managerId}:${input.idempotencyKey}`,
+          )),
           replay: true,
         };
       }
       if (draft.revision !== input.expectedRevision)
         fail("card_revision_conflict");
-      const resultId = await action(tx, draft, managerId);
+      const actionResult = await action(tx, draft, managerId);
+      const assessment =
+        typeof actionResult === "object" ? actionResult : undefined;
+      const resultId =
+        typeof actionResult === "string" ? actionResult : undefined;
+      if (assessment)
+        await recordResidentSafety(
+          tx,
+          draft,
+          `staff:${managerId}:${input.idempotencyKey}`,
+          assessment,
+        );
       await tx.execute(
         sql`insert into expert_card_staff_actions(manager_id,idempotency_key,draft_id,operation,semantic_digest,result_id) values(${managerId}::uuid,${input.idempotencyKey},${draft.id}::uuid,${operation},${semantic},${resultId ?? null}::uuid)`,
       );
       await tx.execute(
-        sql`insert into audit_events(actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values('admin',${managerId}::uuid,${input.sessionHash},${`expert_card.${operation}`},'expert_card_draft',${draft.id}::uuid,'applied','card_review',${`card:${semantic}`},clock_timestamp(),${semantic})`,
+        sql`insert into audit_events(actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values('admin',${managerId}::uuid,${input.sessionHash},${`expert_card.${operation}`},'expert_card_draft',${draft.id}::uuid,${assessment?.blocked ? "rejected" : "applied"},'card_review',${`card:${semantic}`},clock_timestamp(),${semantic})`,
       );
       return {
         ...(await this.workflow(tx, draft.userId, draft.applicationId)),
         ...(resultId ? { reviewId: resultId } : {}),
+        ...(assessment
+          ? {
+              safetyBlocked: assessment.blocked,
+              safetyIssues: assessment.issues,
+            }
+          : {}),
         replay: false,
       };
     });
@@ -1171,24 +1352,42 @@ export class PostgresExpertCardRepository {
           )
         )
           fail("card_state_conflict");
+        const fields = await residentSafetyFields(tx, draft.id);
+        for (const [key, value] of Object.entries(publicCard))
+          fields[`public:${key}`] = value;
+        const assessment = await assessResidentContent(
+          tx,
+          fields,
+          draft.revision + 1,
+        );
+        if (assessment.blocked) return assessment;
         await tx.execute(
           sql`update expert_card_drafts set public_payload=${JSON.stringify(publicCard)}::jsonb,revision=revision+1,status='manager_review',approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
         );
         await this.invalidateJobs(tx, draft.id);
-        return undefined;
+        return assessment;
       },
     );
   }
   async reviewCard(
-    raw: StaffCommand & { action: "approve" | "return_changes" },
+    raw: StaffCommand & {
+      action: "approve" | "return_changes";
+      warningAcknowledgment?: string;
+    },
   ) {
     const input = { ...raw };
     if (input.action !== "approve" && input.action !== "return_changes")
       fail("card_invalid_event");
+    if (
+      input.warningAcknowledgment !== undefined &&
+      (typeof input.warningAcknowledgment !== "string" ||
+        !/^[0-9a-f]{64}$/u.test(input.warningAcknowledgment))
+    )
+      fail("card_invalid_event");
     return this.staffAction(
       input,
       input.action,
-      null,
+      { warningAcknowledgment: input.warningAcknowledgment ?? null },
       async (tx, draft, managerId) => {
         if (
           !["manager_review", "approved"].includes(draft.status) ||
@@ -1197,9 +1396,28 @@ export class PostgresExpertCardRepository {
         )
           fail("card_state_conflict");
         if (draft.publicCard) decodeProfessionalCard(draft.publicCard);
+        if (input.action === "approve") {
+          const assessment = await assessResidentContent(
+            tx,
+            await residentSafetyFields(tx, draft.id),
+            draft.revision,
+          );
+          if (
+            assessment.blocked ||
+            (assessment.issues.length &&
+              input.warningAcknowledgment !== assessment.digest)
+          )
+            return { ...assessment, blocked: true };
+          await recordResidentSafety(
+            tx,
+            draft,
+            `staff:${managerId}:${input.idempotencyKey}`,
+            assessment,
+          );
+        }
         const review = (
           await tx.execute<{ id: string }>(
-            sql`insert into expert_card_reviews(draft_id,user_id,revision,action,public_payload,public_digest,manager_id,manager_session_hash) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision},${input.action},${input.action === "approve" ? JSON.stringify(draft.publicCard) : null}::jsonb,${input.action === "approve" ? sql`'sha256:'||encode(digest(${JSON.stringify(draft.publicCard)}::jsonb::text,'sha256'),'hex')` : sql`null`},${managerId}::uuid,${input.sessionHash}) returning id`,
+            sql`insert into expert_card_reviews(draft_id,user_id,revision,action,public_payload,public_digest,manager_id,manager_session_hash,warning_acknowledgment) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision},${input.action},${input.action === "approve" ? JSON.stringify(draft.publicCard) : null}::jsonb,${input.action === "approve" ? sql`'sha256:'||encode(digest(${JSON.stringify(draft.publicCard)}::jsonb::text,'sha256'),'hex')` : sql`null`},${managerId}::uuid,${input.sessionHash},${input.warningAcknowledgment ?? null}) returning id`,
           )
         ).rows[0]!;
         if (input.action === "approve") {

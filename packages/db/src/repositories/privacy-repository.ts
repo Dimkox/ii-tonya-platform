@@ -991,6 +991,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           sql`update expert_card_requests set user_id=null,request_digest=null,semantic_digest=null,result_id=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
+          sql`delete from resident_safety_outcomes where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
           sql`delete from expert_card_drafts where user_id=${command.targetUserId}::uuid`,
         );
         // Preserve immutable onboarding financial facts and audit UUIDs. Nullable

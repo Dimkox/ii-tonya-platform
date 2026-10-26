@@ -132,7 +132,12 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
     async (req, reply) => {
       if (
         !uuid.test(req.params.applicationId) ||
-        !mutation(req.body, ["action"]) ||
+        !mutation(req.body, [
+          "action",
+          ...(object(req.body) && req.body.warningAcknowledgment !== undefined
+            ? ["warningAcknowledgment"]
+            : []),
+        ]) ||
         !object(req.body) ||
         (req.body.action !== "approve" && req.body.action !== "return_changes")
       )
@@ -141,6 +146,7 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
         expectedRevision: number;
         idempotencyKey: string;
         action: "approve" | "return_changes";
+        warningAcknowledgment?: string;
       };
       const result = await service.review(session(req.headers.authorization)!, {
         applicationId: req.params.applicationId,

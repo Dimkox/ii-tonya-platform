@@ -130,6 +130,8 @@ export const expertCardReviews = pgTable(
     action: text("action").notNull(),
     publicPayload: jsonb("public_payload").$type<ProfessionalCard>(),
     publicDigest: text("public_digest"),
+    safetyProof: jsonb("safety_proof"),
+    warningAcknowledgment: text("warning_acknowledgment"),
     managerId: uuid("manager_id")
       .notNull()
       .references(() => users.id),
