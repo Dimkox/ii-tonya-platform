@@ -2,7 +2,7 @@
 title: Complete versioned resident verification and truthful manager communications
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 53df4d2fbbe09038bde2298e4642cee4247fbe2b
 review_loop_iteration: 0
 context:
@@ -135,10 +135,10 @@ second stack/client cabinet/Kanban, or enable external integrations.
 
 ## Tasks & Acceptance
 
-- [ ] Hand0062 migration/journal/schema/state: versioned forms, attempts, source-aware manager lifecycle, requests/answers/check generations, template/preview/message custody and privacy/audit guards.
-- [ ] Actual bot v2 fields, v1 continuation, bounded media/callbacks and reapplication; real submitted manager detail/actions/editor with old callback bypass denied.
-- [ ] Five truthful template slots, immutable send decisions and normal bounded worker delivery; fixed3000 sales approval/capture remains authoritative.
-- [ ] RED/GREEN real Fastify/PG/browser/worker acceptance, migration upgrade and focused legacy sales/privacy compatibility; exact metadata/negative inventory probes, builds/types/lint and retained evidence.
+- [x] Hand0062 migration/journal/schema/state: versioned forms, attempts, source-aware manager lifecycle, requests/answers/check generations, template/preview/message custody and privacy/audit guards.
+- [x] Actual bot v2 fields, v1 continuation, bounded media/callbacks and reapplication; real submitted manager detail/actions/editor with old callback bypass denied.
+- [x] Five truthful template slots, immutable send decisions and normal bounded worker delivery; fixed3000 sales approval/capture remains authoritative.
+- [x] RED/GREEN real Fastify/PG/browser/worker acceptance, migration upgrade and focused legacy sales/privacy compatibility; exact metadata/negative inventory probes, builds/types/lint and retained evidence.
 
 Cover every matrix row with executed tests. Include January31/leap-year/exact boundary;
 all six roles and mixed roles; no-status callback at large revision; v1 resume without

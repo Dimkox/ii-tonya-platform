@@ -84,3 +84,60 @@ is corrected alongside the original current-form uniqueness, not by resetting hi
 Root prepared `spec-verification-private-jobs.md` as a draft only. No S2b source or
 shared tests run concurrently; its baseline/Code Map await accepted S2a generation
 contracts. Preparation is not a claim that file custody, OCR or social readers exist.
+
+## Actual browser and normal worker evidence
+
+Root read `browser-diagnostic.log`: the queue failed before any HTTP request
+(`calls:[]`). Implementer traced the browser-only failure to calling the stored
+native fetch with a client-object receiver. `browser-fixed-fetch.log` now records
+real Chromium queue/detail, escaped private text, disabled legacy actions, exact
+preview and503 confirmation retry with unchanged hash, five requests. Default fetch
+is invoked through a closure; no test-only bypass of the browser path is claimed.
+
+Root read `pg-worker.log`:12/12 pass at20:58UTC, including ordinary bounded worker
+composition, default-off behavior and exact approved notice. `pg-legacy.log`:32/32
+separated-sales scenarios pass at20:58UTC, preserving existing expiry/capture/recovery
+and supplied-form financial authority. The first old-unit batch retained106pass/2
+changed-version/shortcode fixture failures; final focused corrections and the actual
+new manager API flow still require implementer evidence before review.
+
+## Composed API and focused compatibility
+
+Root read `api-composition-fixed.log`:4/4 passed at20:59UTC, actual private ingress
+through form/manager/fixed fee, genuine quarter lock, gated main invoice and renewal.
+`compatibility-units.log`:17/17 passed; `client-fetch-units.log`:13/13 passed.
+The retained `upgrade-historical-fixed.log` at21:01UTC is STILL FAILED despite its
+filename (undefined vs expected source identity). Do not count it as upgrade
+acceptance. Implementer owns diagnosis and a concrete correction/witness before
+the independent review handoff. The earlier two-row reconstruction observation
+does not substitute for that fuller historical lifecycle upgrade scenario.
+
+`upgrade-historical-capture.log` subsequently passes1/1 at21:02UTC, explicitly
+covering pending/submitted/approved/paid v1 history and preserved frozen/financial
+facts. The failed intermediate outputs remain retained. `repo-inventories.log`
+currently records151pass/4fail in four files: exact new-route/source-hash/state
+registrations remain to be corrected and verified. Guard failures are not waived;
+they require literal approved additions, preserved negative probes and final checks.
+
+## Committed implementation handoff
+
+Implementer stopped source edits/commands at
+`27d4851c73aebd79b3c59040194f92f0a9d33509` (53files). Root read the complete
+implementation evidence and matrix mapping. Final boundary/metadata139/139 and actual
+Chromium pass; API4/4, legacy32/32, upgrade1/1 and the16 PG cases have executed
+witnesses, with selected/filtered counts recorded rather than summed as a new batch.
+Types/lint exited0; empty stdout is supported by implementer command status, not
+inferred from log size. Optional licence source correction passed its final selected
+case; the earlier misleadingly named green log remains failed and retained.
+
+The actual all-role SQL witness found a null-MIME parity gap and now rejects it.
+The complete SQL catalogue exceeded the unchanged1MiB inspection ceiling when
+pretty-printed; compact JSON preserves all objects at883961bytes. Exact hashes and
+negative tests remain active. Browser harness is registered by the existing exact
+hash mechanism. No test/size/feature guard was weakened.
+
+Root archives raw development logs under `final-verification-messages-2026-10-26/`
+with SHA256 manifest and marks the spec in-review. Independent exact-snapshot
+review, possible concrete corrective batch and canonical final gate remain pending.
+S2b preparation has only documented candidate dependencies, verified model bytes
+and public-page structure; it is still a draft, not concurrent runtime work.

@@ -154,3 +154,50 @@ Official fast OCR model repository: https://github.com/tesseract-ocr/tessdata_fa
 when assembling the optional runtime; this read-only check did not download/install
 models or prove recognition quality. No source, lockfile, environment or live state
 changed during preparation.
+
+## Genuine public-preview observation (not a completed adapter)
+
+Root read the official public channel preview at https://t.me/s/telegram on2026-10-26.
+One bounded no-redirect anonymous GET returned127695bytes, SHA256
+`31862086e77a60c4dbed28e0cad151f9d1ba3b75efafc84144ede40a7b8e5644`.
+Temporary research files are `/tmp/residency-public-telegram-preview-20261026/`
+(`public-source.html`, `observations.json`). No account/session, message send,
+media download or production/provider configuration was involved.
+
+The captured markup has20 data-post elements; the last five are telegram/456–460,
+with time datetime attributes on2026-08-26. Video/photo wrapper classes appear in
+some posts; `tgme_widget_message_user_photo` is the author avatar and MUST NOT count
+as post media. No reply/comment-class elements were observed. This is not proof of
+zero comments, complete history or profile inactivity. The source contains a
+VIEW IN TELEGRAM fallback, reinforcing partial coverage. A future parser fixture
+must remove bodies/third-party URLs/scripts while retaining source provenance and
+actual structural markers; these temporary research observations alone are not
+executed adapter acceptance or a stable official API contract.
+
+## OCR model provenance prepared without executing OCR
+
+Connected GitHub read confirmed tessdata_fast main at
+`87416418657359cb625c412a48b6e1d6d41c29bd`. The official README states that these
+integer models support the LSTM engine in Tesseract4/5, not legacy modes0/2.
+Two bounded anonymous downloads from that immutable revision are retained under
+`/tmp/residency-ocr-assets-20261026/` with `manifest.json`:
+
+| Model           | Bytes   | SHA256                                                           |
+| --------------- | ------- | ---------------------------------------------------------------- |
+| rus.traineddata | 3861738 | e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225 |
+| eng.traineddata | 4113088 | 7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2 |
+
+Source prefix:
+https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/
+No model binaries are added to Git, no package/runtime is installed, and no OCR or
+sandbox acceptance is claimed. The S2b build may reuse these verified local assets
+or download the same immutable bytes at build time; runtime downloads remain denied.
+
+The pinned1.26.7 installation source's integrated-OCR section states that PyMuPDF
+already contains OCR logic and additionally needs Tesseract language data with an
+explicit tessdata path. Its earlier general-dependencies paragraph uses broader
+installation wording. Therefore absence of a `tesseract` executable alone must not
+be treated as proof that the wheel cannot perform integrated OCR: verify the actual
+pinned wheel with these assets inside the isolated runtime before adding another
+executable dependency. This is a dependency-selection inference, not an executed
+OCR claim. Source: the installation.rst link above, integrated-OCR section.
