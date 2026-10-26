@@ -213,3 +213,42 @@ Behavioral RED, focused GREEN and relevant old-path/actual upgrade evidence; pre
 failures and distinguish skipped cases. Build changed packages before dist consumers.
 No unchanged broad repeats or repeat-helper count>3. Root runs independent review
 and final canonical gate. No hosted CI exists; local tests are not live-release proof.
+
+## Suggested Review Order
+
+**Entry and authority**
+
+- Connect actual manager decisions to the existing sales and review services.
+  [expert-verification-service.ts:61](../../../packages/application/src/expert-verification-service.ts#L61)
+
+- Bind exact previews, fresh authority, immutable decisions and the fixed fee.
+  [resident-review-repository.ts:99](../../../packages/db/src/repositories/resident-review-repository.ts#L99)
+
+**Applicant and lifecycle**
+
+- Preserve versioned forms and route actual completion/reapplication commands.
+  [resident-verification-service.ts:353](../../../packages/application/src/resident-verification-service.ts#L353)
+
+- Compute calendar deadlines from real DB time without changing historical migration0062.
+  [0063_resident_verification_review_corrections.sql:1](../../../packages/db/migrations/0063_resident_verification_review_corrections.sql#L1)
+
+**Recovery and bounded reads**
+
+- Keep unresolved terminal cases discoverable through bounded queue and detail navigation.
+  [expert-verification-repository.ts:137](../../../packages/db/src/repositories/expert-verification-repository.ts#L137)
+
+- Resolve ambiguity without resending and isolate overdue subjects.
+  [resident-review-repository.ts:232](../../../packages/db/src/repositories/resident-review-repository.ts#L232)
+
+**Review and delivery**
+
+- Fence delayed previews against current editor state.
+  [expert-verification-view.ts:322](../../../apps/web/src/expert-verification-view.ts#L322)
+
+- Recheck current authority before original-channel disclosure and quarantine ambiguity.
+  [resident-review-repository.ts:343](../../../packages/db/src/repositories/resident-review-repository.ts#L343)
+
+**Supporting evidence**
+
+- Exercise production calendar semantics and real applicant commands.
+  [resident-verification-remediation.test.ts:387](../../../tests/integration/resident-verification-remediation.test.ts#L387)

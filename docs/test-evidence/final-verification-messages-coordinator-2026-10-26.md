@@ -141,3 +141,19 @@ with SHA256 manifest and marks the spec in-review. Independent exact-snapshot
 review, possible concrete corrective batch and canonical final gate remain pending.
 S2b preparation has only documented candidate dependencies, verified model bytes
 and public-page structure; it is still a draft, not concurrent runtime work.
+
+## Corrective acceptance
+
+One bounded R1–R6 batch committed at3baaf003, followed by64 hashed log/status archives
+at26542bdb. Root inspected actual browser, PG16/16 and financial/API4/4 regressions;
+final route13/13, client14/14, view9/9, inventory169/169 and staged scope130/130.
+Explicit final exit-status evidence records tests/API/web/worker types and lint0.
+Additive0063 preserves0062; final state204tables/129functions/180triggers/
+1373constraints/516indexes/2extensions,64migrations. Actual calendar mutation
+to30days fails; the correct production helper/event witness passes. Public applicant
+commands exposed and fixed early-reapply503. Queue/history are bounded and navigable.
+
+All three original reviewers accepted only their assigned closure claims at3baaf003.
+Root confirmed active mandatory pre-push hook and parent DraftPR112 still OPEN at
+53df4d2f. Canonical full gate is next; no full gate or push for this block has yet
+been claimed. Refund policy remains pending/manual and S2b remains the next block.
