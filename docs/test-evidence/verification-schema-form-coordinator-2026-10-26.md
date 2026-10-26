@@ -136,3 +136,23 @@ The final gate will invoke the canonical pnpm verify:gate script unchanged. A
 read-only observer retains the opened tests/repo log before temporary cleanup,
 so failures cannot lose their details as in the previous increment. Supported
 Vitest thread/fork limits1 reduce contention; no deadline or test is disabled.
+
+## First final gate and exact parity correction
+
+Canonical full gate atf90e3024ae586325610c6db1d75ac41118d0011b exited1.
+All six static/type checks passed; tests/repo passed557 and failed one stale
+expected constraint in db-schema-parity.test.ts. The new composite ownership FK
+requires channel_identity_resident_owner UNIQUE(id,user_id), already present in
+migration57, Drizzle, snapshot and the actual PostgreSQL catalogue. The old test
+expected no named uniques on channel_identities.
+
+Root changed only that exact expected-name array, preserving both existing partial
+unique indexes and every other assertion. The implementation owner independently
+reviewed SQL/schema/catalogue correspondence read-only and returned PASS. Focused
+db-schema-parity tests12/12 passed; lint, format and whitespace passed. No runtime
+source, migration, metadata or PostgreSQL rerun was necessary.
+
+Failed gate log: /tmp/verification-form-final-gate-1793017264392745111.log.
+Complete retained repository failure: /tmp/verification-form-final-repo-1793017264392745111.log.
+Focused green: /tmp/verification-form-schema-parity-green.log. This is a diagnosed
+exact-inventory correction, not an assertion bypass or unexplained timing retry.
