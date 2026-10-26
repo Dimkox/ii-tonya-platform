@@ -99,6 +99,10 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sa
 
 ### S1 — Blocking content safety (current)
 
+Contract: `docs/superpowers/implementation-artifacts/spec-resident-content-safety.md`.
+Implementation is in progress on `codex/residency-content-safety-20261026`;
+independent review and delivery remain outstanding.
+
 - [ ] Versioned active forbidden-pattern registry, at least20 effective rules,
       BLOCKER/WARNING semantics, tags filtering, incident hashes and guarded reload.
 - [ ] Unicode-aware matching: the supplied ASCII word-boundary examples do not
