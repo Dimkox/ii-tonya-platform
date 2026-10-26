@@ -1,3 +1,24 @@
+# Verification/messages review correction active — 2026-10-26
+
+Same isolated worktree .worktrees/phase1-owner-plan-20261023, active branch
+codex/residency-verification-messages-20261026. Implementation27d4851c and evidence
+977c1b65 received three independent read-only reviews. Root accepted six concrete
+findings in final-verification-messages-review-2026-10-26.md; triage a3c91dd8.
+Original implementer owns one bounded correction batch: reachable terminal delivery
+recovery, bounded history pages, non-poisoning blocked-identity expiry, asynchronous
+editor fencing, production calendar witnesses and real applicant command witnesses.
+Use additive0063 if SQL changes; preserve0062. No destructive rederive/new review quota.
+Reviewers are idle until assigned closure at the corrective SHA. Root owns final
+gate/push/PR; none has run for this S2a block yet. Runtime remains default-off.
+
+Original96 logs are archived with hashes under docs/test-evidence/
+final-verification-messages-2026-10-26; remediation logs use .superpowers/sdd/
+verification-messages-remediation-20261026. One existing protected PG17.5 cluster,
+no competing commands. Refund policy question remains pending/manual; do not reask.
+S2b draft/private-jobs preparation exists, with verified temporary OCR assets/public
+preview evidence, but is not started. Continue the complete owner package after S2a.
+BMad already rendered once; owner autonomy and bounded-run/split override persist.
+
 # Content safety delivered; final verification/messages next — 2026-10-26
 
 Draft PR112 OPEN at53df4d2fbbe09038bde2298e4642cee4247fbe2b:
