@@ -108,3 +108,18 @@ a tag-label change, corrupted policy engine/program denial, lock exhaustion and
 removal of legacy forbidden selections. These supersede the initial9-case count.
 No final source acceptance yet: metadata/static verification and independent review
 are still required before the mandatory delivery gate.
+
+## Independent review candidate
+
+Candidate `a882d5621bb0a0912376b71f8d5c432f9e52c9a8` is locally committed. Root
+launched all three fresh context-free review layers before collecting any findings;
+reviewers are read-only and may not run tests or edit source. Contract status is
+in-review. Final UI includes12/12 with approved-card return recovery; client10/10,
+publication20/20 and the focused matrix12/12 remain the reported candidate evidence.
+
+Root losslessly archived all33 retained implementation logs, including failures,
+under `resident-content-safety-2026-10-26/logs`. The adjacent manifest records
+original and archive byte lengths/SHA256 values. These are the same bytes inspected
+locally, not rerun or rewritten output. Empty type/lint output remains empty and
+does not alone establish process exit status; implementation command completion is
+reported separately, and the final canonical gate remains outstanding.

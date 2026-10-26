@@ -2,9 +2,9 @@
 title: Guard resident content with bounded rules and human warning review
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 1ac2091735836fe2a07ed0e8d95bd749f5617e80
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -135,6 +135,14 @@ A source-derived35-rule inventory can split existing compound categories. Preser
 explicit five insults only; no invented broad abusive vocabulary.
 
 ## Spec Change Log
+
+- Review iteration1: preserve working bounded matching, owner/finance/privacy gates,
+  committed outcomes and correction history. Close concrete R1–R5 findings in
+  `docs/test-evidence/resident-content-safety-review-2026-10-26.md`: authorized
+  underlying policy transitions and nonresurrecting rollback, proposal recovery
+  at the raw-entry cap, non-swallowing fault assertions, actual browser refusal
+  coverage and known-refusal UI recovery without weakening unknown-send retries.
+  Owner autonomy overrides routine re-derivation/approval loops; one corrective batch.
 
 ## Execution & Verification
 
