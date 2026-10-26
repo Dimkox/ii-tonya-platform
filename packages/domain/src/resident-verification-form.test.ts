@@ -146,3 +146,14 @@ it("remediation: bounds cumulative serialized multilingual document captions", (
   );
   expect(first.propertyEvidence).toBeUndefined();
 });
+it("closure: rejects a Unicode URL expanding past500 normalized characters without changing the draft", () => {
+  const value = "https://example.com/" + "я".repeat(100);
+  expect(value.length).toBeLessThan(500);
+  expect(new URL(value).href).toHaveLength(620);
+  const draft = { socialLinks: ["https://example.com/saved"], city: "Казань" };
+  const before = structuredClone(draft);
+  expect(() => applyResidentPatch(draft, { socialLinks: [value] })).toThrow(
+    "resident_patch_invalid",
+  );
+  expect(draft).toEqual(before);
+});

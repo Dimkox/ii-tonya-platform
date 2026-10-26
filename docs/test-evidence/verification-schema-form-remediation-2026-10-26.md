@@ -80,3 +80,34 @@ Final affected application build for promo compatibility:
 `/tmp/verification-remediation-promo-compat-build.log`; affected API build for the
 permanent decoder responses: `/tmp/verification-remediation-decoder-api-build.log`.
 No unrelated package rebuild or broad PostgreSQL rerun followed these corrections.
+
+## Two-finding closure correction
+
+Base89b8ae3de8161401b73e6445ce89124166644783. Only the two outstanding
+blind/edge closure findings changed:
+
+- Normalized URL href is now checked against500characters before returning a
+  validated social URL. The exact supplied Unicode input expands to620characters
+  (the initial619-character fixture expectation was corrected). The verified
+  baseline probe fails without the guard, and the final domain suite passes13/13
+  in `/tmp/verification-closure-domain-final.log`. The service regression preserves
+  the previous draft/revision and returns the ordinary permanent correction.
+- EXPERT confirmation includes the applicant's average check, using only BigInt
+  ruble/kopeck formatting and grouping.1500050renders as15 000,50 ₽, labeled
+  «Ваш средний чек услуг» and «не цена подписки». Zero and the maximum declared
+  input remain exact; summary stays bounded and excludes private file IDs.
+  Service suite16/16 passes in `/tmp/verification-closure-service-green.log`.
+
+RED evidence is retained in `/tmp/verification-closure-domain-red-verified.log`
+(one absent-guard failure) and `/tmp/verification-closure-service-red.log`
+(four failures before implementation). The initial counter-assertion failures
+remain preserved separately; no validation or runtime assertion was weakened.
+Affected domain/application builds and package typechecks pass in
+`/tmp/verification-closure-domain-build.log`,
+`/tmp/verification-closure-app-build.log` and
+`/tmp/verification-closure-package-types.log`. Focused lint passes in
+`/tmp/verification-closure-eslint.log`.
+No SQL, metadata, provider state or broad PostgreSQL coverage was changed/repeated.
+Full tests typecheck also passes in `/tmp/verification-closure-test-types.log`;
+final formatting/lint logs are `/tmp/verification-closure-format-final.log` and
+`/tmp/verification-closure-eslint-final.log`. Whitespace checks pass.

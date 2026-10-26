@@ -127,6 +127,10 @@ function rolePatch(
       : {}),
   };
 }
+function applicantAverageCheck(minor: string): string {
+  const amount = BigInt(minor);
+  return `${(amount / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/gu, " ")},${(amount % 100n).toString().padStart(2, "0")} ₽`;
+}
 function summary(draft: ResidentDraft): string {
   const short = (v: string | undefined, n = 120) =>
     (v ?? "—").replace(/\s+/gu, " ").slice(0, n);
@@ -138,6 +142,11 @@ function summary(draft: ResidentDraft): string {
     `Мотивация: ${short(draft.motivation, 160)}${(draft.motivation?.length ?? 0) > 160 ? "…" : ""}`,
     ...(draft.specialization
       ? [`Специализация: ${short(draft.specialization)}.`]
+      : []),
+    ...(draft.roles?.includes("EXPERT") && draft.averageCheckMinor !== undefined
+      ? [
+          `Ваш средний чек услуг: ${applicantAverageCheck(draft.averageCheckMinor)} (не цена подписки).`,
+        ]
       : []),
     `Образование: ${draft.education?.length ?? 0}. Документы о помещении: ${draft.propertyEvidence?.length ?? 0}.`,
     ...(draft.capacity

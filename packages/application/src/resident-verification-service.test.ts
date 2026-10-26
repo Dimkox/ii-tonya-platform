@@ -392,3 +392,58 @@ it("remediation: Russian choice labels preserve canonical callback enum values",
   expect(JSON.stringify(taxReply)).toContain("Самозанятый");
   expect(JSON.stringify(taxReply)).toContain(":t:SELF_EMPLOYED");
 });
+it("closure: Unicode URL expansion is a permanent correction and preserves the saved draft", async () => {
+  const f = fixture({
+    currentField: "socialLinks",
+    draft: { socialLinks: ["https://example.com/saved"], city: "Казань" },
+  });
+  const before = structuredClone(f.snapshot());
+  const response = await f.service.handle({
+    ...scope,
+    updateId: 960,
+    text: "https://example.com/" + "я".repeat(100),
+  });
+  expect(response?.status).toBe("handled");
+  expect(response?.text).toContain("не изменены");
+  expect(f.snapshot()).toEqual(before);
+});
+it.each([
+  ["1500050", "15 000,50 ₽"],
+  ["999999999999", "9 999 999 999,99 ₽"],
+  ["0", "0,00 ₽"],
+])(
+  "closure: confirmation shows applicant average check %s with integer-safe formatting",
+  async (averageCheckMinor, formatted) => {
+    const f = fixture({
+      draft: {
+        roles: ["EXPERT"],
+        primaryRole: "EXPERT",
+        category: "BASIC",
+        tax: "SELF_EMPLOYED",
+        city: "Москва",
+        socialLinks: ["https://example.com/me"],
+        motivation: "я".repeat(3000),
+        specialization: "Практика",
+        averageCheckMinor,
+        education: [
+          {
+            kind: "document",
+            fileId: "private_never_show",
+            mimeType: null,
+            size: null,
+          },
+        ],
+      },
+    });
+    const response = await f.service.handle({
+      ...scope,
+      updateId: 961,
+      text: "/verification",
+    });
+    expect(response?.status).toBe("handled");
+    expect(response?.text).toContain(`Ваш средний чек услуг: ${formatted}`);
+    expect(response?.text).toContain("не цена подписки");
+    expect(response?.text?.length).toBeLessThan(2000);
+    expect(response?.text).not.toContain("private_never_show");
+  },
+);

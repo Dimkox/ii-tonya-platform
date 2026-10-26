@@ -69,6 +69,7 @@ export function normalizeResidentSocialUrl(value: string): string {
     return fail();
   }
   if (
+    url.href.length > 500 ||
     url.protocol !== "https:" ||
     url.username ||
     url.password ||
