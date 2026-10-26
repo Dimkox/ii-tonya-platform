@@ -2,7 +2,7 @@
 title: Separate base sales and freeze residency terms on verified onboarding payment
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 66cb3fd5d2bf18ce3da29d3cca17cbe39ab8aa7b
 review_loop_iteration: 0
 context:
@@ -191,3 +191,17 @@ and period. New provider and sales flags remain off by default.
 Implementation handoff evidence: `docs/test-evidence/residency-separated-sales-implementation-2026-10-26.md`.
 Independent review and final exact-commit gate remain coordinator-owned; status stays
 in-progress until those complete.
+
+
+### Review remediation execution note — 2026-10-26
+
+R1–R14 are implemented as an additive correction to the same frozen intent.
+Private applicant receipt capture reuses encrypted finite-retention custody;
+submission proof uses the frozen draft digest/time, and unchanged quality approval
+survives supplemental answers and explicit period reselection. Audited fresh-MFA
+operator GET recovery handles unknown creates. Notice preparation, current-choice
+binding, replacement deduplication and exact price/deadline rendering are separate
+from uncertain sends. Runtime form copy is sales-first only for the v3 cohort.
+Migration0060 preserves0059 historical state; real erased forms cascade their
+bridge and do not regain submission proof. Status remains in-review pending the
+coordinator's bounded closure. See remediation evidence for raw failures and checks.

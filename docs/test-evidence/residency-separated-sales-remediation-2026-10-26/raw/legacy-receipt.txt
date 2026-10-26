@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/payer-receipt-capture.test.ts (8 tests | 4 skipped) 2285ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 4 skipped (8)
+   Start at  18:44:03
+   Duration  7.78s (transform 2.68s, setup 0ms, collect 5.01s, tests 2.28s, environment 0ms, prepare 149ms)
+
+
+[END OF RAW CAPTURE]

@@ -15,6 +15,7 @@ const scope = {
 function fixture(
   initial: Partial<ResidentFormSnapshot> = {},
   policy?: ResidentPolicy,
+  salesFirst = false,
 ) {
   const s: ResidentFormSnapshot = {
     id: "00000000-0000-4000-8000-000000000001",
@@ -52,6 +53,7 @@ function fixture(
   return {
     service: createResidentVerificationService({
       enabled: true,
+      salesFirst,
       repository,
       ...(policy ? { policy } : {}),
     }),
@@ -447,3 +449,14 @@ it.each([
     expect(response?.text).not.toContain("private_never_show");
   },
 );
+
+it("sales-first tariff help retains the selected conditions while legacy form remains pre-price", async () => {
+  const current = await fixture({}, undefined, true).service.handle({
+    ...scope,
+    text: "/tariffs",
+  });
+  expect(JSON.stringify(current)).toContain("/my_tariff");
+  expect(JSON.stringify(current)).not.toContain("Тарифы появятся");
+  const legacy = await fixture().service.handle({ ...scope, text: "/tariffs" });
+  expect(JSON.stringify(legacy)).toContain("Тарифы появятся");
+});

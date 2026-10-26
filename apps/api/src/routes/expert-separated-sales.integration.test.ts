@@ -41,10 +41,25 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
   });
+  const { createPayerReceiptVault } = await import("@ii-tonya/integrations");
+  const vault = createPayerReceiptVault({
+    activeKeyId: "fixture",
+    keys: new Map([["fixture", new Uint8Array(32).fill(7)]]),
+  });
+  let activeCheckout:
+    import("@ii-tonya/db").PostgresHeldOnboardingCheckout | undefined;
   const app = Fastify({ logger: false });
   await app.register(expertApplicantTelegramRoutes, {
     enabled: true,
-    capability: createExpertApplicantComposition(database.db, config)!,
+    capability: createExpertApplicantComposition(database.db, config, {
+      receipt: { vault, retentionDays: 30 },
+      checkout: {
+        recoverCheckout: (input) =>
+          activeCheckout
+            ? activeCheckout.recoverCheckout(input)
+            : Promise.resolve({ kind: "unavailable" }),
+      },
+    })!,
   });
   let update = 1;
   const send = async (text: string, callback?: string) => {
@@ -140,6 +155,20 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     const ready = await send("/set averageCheckMinor 300000");
     const submitted = await click(ready, ":submit");
     expect(submitted.text).toContain("Анкета получена");
+    expect(submitted.text).not.toContain("цены ещё не доступны");
+    const beforeApproval = await send("", "st:current");
+    expect(beforeApproval.text).toContain("осталось");
+    expect(beforeApproval.text).not.toContain("https://yookassa");
+    const captured = await send("/receipt synthetic@example.com");
+    expect(captured.text).toContain("Адрес для чека сохранён");
+    expect(JSON.stringify(captured)).not.toContain("synthetic@example.com");
+    expect(
+      (
+        await database.db.execute(
+          sql`select ciphertext from payer_receipt_contacts`,
+        )
+      ).rows[0]?.ciphertext,
+    ).toBeTruthy();
     const bridge = (
       await database.db.execute<{ id: string }>(
         sql`select application_id id from expert_sales_form_bridges`,
@@ -188,9 +217,6 @@ it("normal private ingress shows base, separate positive/promo/period, real form
         )
       ).rows[0]?.n,
     ).toBe(0);
-    const { createPayerReceiptVault } = await import("@ii-tonya/integrations");
-    const { PostgresPayerReceiptContactRepository } =
-      await import("../../../../packages/db/src/repositories/payer-receipt-contact-repository.js");
     const { PostgresHeldOnboardingCheckout } =
       await import("../../../../packages/db/src/repositories/expert-held-onboarding-repository.js");
     const { startHeldOnboardingLocal } =
@@ -206,20 +232,6 @@ it("normal private ingress shows base, separate positive/promo/period, real form
           sql`select i.user_id as "userId",b.quote_id as "quoteId",o.id as "operationId" from expert_onboarding_invoices i join expert_sales_form_bridges b on b.application_id=i.application_id join expert_onboarding_payment_operations o on o.invoice_id=i.id where i.id=${decision.invoiceId}::uuid`,
         )
       ).rows[0]!;
-      const vault = createPayerReceiptVault({
-        activeKeyId: "fixture",
-        keys: new Map([["fixture", new Uint8Array(32).fill(7)]]),
-      });
-      await new PostgresPayerReceiptContactRepository(
-        database.db,
-        vault,
-        30,
-      ).capture({
-        userId: source.userId,
-        quoteId: source.quoteId,
-        email: "synthetic@example.com",
-        idempotencyKey: randomUUID(),
-      });
       const checkout = new PostgresHeldOnboardingCheckout(database.db, {
         enabled: true,
         client: local.client,
@@ -231,6 +243,12 @@ it("normal private ingress shows base, separate positive/promo/period, real form
         vatCode: 1,
         mode: "test",
       });
+      activeCheckout = checkout;
+      const currentTariff = await send("", "st:current");
+      expect(currentTariff.text).toContain("15284,70 ₽");
+      expect(currentTariff.text).toContain("Срок:");
+      expect(currentTariff.text).toContain("осталось");
+      expect(currentTariff.text).toContain("3000 ₽: https://yookassa.ru/");
       const ready = await checkout.recoverCheckout({
         invoiceId: decision.invoiceId!,
         operationId: source.operationId,

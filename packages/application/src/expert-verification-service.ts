@@ -56,7 +56,14 @@ export function createExpertVerificationService(deps: {
   enabled: boolean;
   repository: ExpertVerificationRepository;
   checkout?: ExpertVerificationCheckout;
-  heldCheckout?: ExpertVerificationCheckout;
+  heldCheckout?: ExpertVerificationCheckout & {
+    recoverProviderObject?(
+      sessionHash: string,
+      invoiceId: string,
+      paymentId: string,
+      requestKey: string,
+    ): Promise<unknown>;
+  };
   verifyProfile?: (input: {
     sessionHash: string;
     userId: string;
@@ -70,6 +77,34 @@ export function createExpertVerificationService(deps: {
         ? { kind: "forbidden" }
         : undefined;
   return {
+    async recoverHeld(
+      sessionHash: string,
+      invoiceId: string,
+      providerObjectId: string,
+      idempotencyKey: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(invoiceId) ||
+        !/^[A-Za-z0-9_-]{1,64}$/u.test(providerObjectId) ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(idempotencyKey)
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.heldCheckout?.recoverProviderObject)
+        return { kind: "unavailable" } as const;
+      try {
+        await deps.heldCheckout.recoverProviderObject(
+          sessionHash,
+          invoiceId,
+          providerObjectId,
+          idempotencyKey,
+        );
+        return { kind: "ok" } as const;
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
     async list(sessionHash: string, input: { limit?: number }) {
       const denied = authorize(sessionHash);
       if (denied) return denied;

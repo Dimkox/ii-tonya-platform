@@ -1,3 +1,4 @@
+import { refreshSeparatedSalesSelection } from "./expert-separated-sales-repository.js";
 import { activateResidentWorkspaceInTransaction } from "./resident-workspace-repository.js";
 import {
   lockExpertManagerAuthority,
@@ -284,6 +285,7 @@ export class PostgresExpertVerificationRepository {
       }
       if (application!.status !== "pending")
         fail("verification_application_unavailable");
+      await refreshSeparatedSalesSelection(tx, application!.userId);
       const decision = (
         await tx.execute<{ id: string }>(
           sql`insert into expert_verification_decisions(application_id,application_audit_id,user_id,manager_id,manager_session_hash,decision,reason_code,idempotency_key) values(${input.applicationId}::uuid,${input.applicationId}::uuid,${application!.userId}::uuid,${managerId}::uuid,${input.sessionHash},${input.decision},${input.reasonCode},${input.idempotencyKey}) returning id`,
@@ -298,7 +300,7 @@ export class PostgresExpertVerificationRepository {
         ).rows[0]!;
         invoiceId = invoice.id;
         await tx.execute(
-          sql`insert into expert_sales_fee_attempts(invoice_id,user_id,selection_id,expires_at) select ${invoice.id}::uuid,b.user_id,s.id,least(s.offer_expiry_date,clock_timestamp()+interval '24 hours') from expert_sales_form_bridges b join expert_sales_selections original on original.id=b.selection_id join lateral(select current.* from expert_sales_selections current where current.base_id=original.base_id and current.choice_id=original.choice_id order by current.selected_at desc,current.id desc limit 1) s on true where b.application_id=${input.applicationId}::uuid`,
+          sql`insert into expert_sales_fee_attempts(invoice_id,user_id,selection_id,expires_at) select ${invoice.id}::uuid,b.user_id,s.id,least(s.offer_expiry_date,clock_timestamp()+interval '24 hours') from expert_sales_form_bridges b join expert_sales_selections original on original.id=b.selection_id join lateral(select current.* from expert_sales_selections current where current.base_id=original.base_id order by current.selected_at desc,current.id desc limit 1) s on true where b.application_id=${input.applicationId}::uuid`,
         );
         await tx.execute(
           sql`insert into expert_onboarding_payment_operations(invoice_id,application_audit_id,user_id,provider_mode) values(${invoice.id}::uuid,${input.applicationId}::uuid,${application!.userId}::uuid,${this.policy.providerMode})`,
@@ -570,7 +572,7 @@ export class PostgresExpertVerificationRepository {
           captureProven: boolean;
           applicationCurrent: boolean;
         }>(
-          sql`select exists(select 1 from expert_sales_form_bridges b join residents_applications form on form.id=b.form_id and form.user_id=b.user_id and form.revision=b.submitted_revision and form.submitted_at is not null join expert_sales_bases base on base.user_id=b.user_id and base.consent_version is not null where b.user_id=a.user_id) as "applicationCurrent",a.selection_id as "selectionId",${proof.capturedAt}::timestamptz>=a.expires_at as expired,l.invoice_id as winner,exists(select 1 from expert_sales_provider_requests r join expert_sales_provider_observations o on o.invoice_id=r.invoice_id and o.provider_object_id=r.provider_object_id and o.status='waiting_for_capture' and o.observed_at<=r.dispatched_at where r.invoice_id=a.invoice_id and r.kind='capture' and r.status in('dispatched','observed') and r.dispatched_at<a.expires_at and r.dispatched_at<=${proof.capturedAt}::timestamptz) as "captureProven" from expert_sales_fee_attempts a left join expert_sales_paid_locks l on l.user_id=a.user_id where a.invoice_id=${proof.invoiceId}::uuid`,
+          sql`select exists(select 1 from expert_sales_form_bridges b join residents_applications form on form.id=b.form_id and form.user_id=b.user_id and expert_sales_form_valid(b.application_id,b.user_id) and form.submitted_at is not null join expert_sales_bases base on base.user_id=b.user_id and base.consent_version is not null where b.user_id=a.user_id) as "applicationCurrent",a.selection_id as "selectionId",${proof.capturedAt}::timestamptz>=a.expires_at as expired,l.invoice_id as winner,exists(select 1 from expert_sales_provider_requests r join expert_sales_provider_observations o on o.invoice_id=r.invoice_id and o.provider_object_id=r.provider_object_id and o.status='waiting_for_capture' and o.observed_at<=r.dispatched_at where r.invoice_id=a.invoice_id and r.kind='capture' and r.status in('dispatched','observed') and r.dispatched_at<a.expires_at and r.dispatched_at<=${proof.capturedAt}::timestamptz) as "captureProven" from expert_sales_fee_attempts a left join expert_sales_paid_locks l on l.user_id=a.user_id where a.invoice_id=${proof.invoiceId}::uuid`,
         )
       ).rows[0];
       if (reason === "payment_verified" && salesAttempt) {

@@ -25,7 +25,7 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
     ExpertVerificationService,
     "list" | "detail" | "decide" | "checkout"
   > &
-    Partial<Pick<ExpertVerificationService, "reverifyProfile">>;
+    Partial<Pick<ExpertVerificationService, "reverifyProfile" | "recoverHeld">>;
 }> = async (app, deps) => {
   if (!deps.enabled) return;
   const service = deps.service;
@@ -79,6 +79,34 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
       const result = await service.detail(
         session(req.headers.authorization)!,
         req.params.applicationId,
+      );
+      return result.kind === "ok"
+        ? result
+        : reply.code(code(result.kind)).send({ error: result.kind });
+    },
+  );
+  app.post<{ Params: { invoiceId: string }; Body: unknown }>(
+    "/v1/admin/expert-verification/invoices/:invoiceId/recover",
+    { bodyLimit: 1024 },
+    async (req, reply) => {
+      const b = req.body as Record<string, unknown> | null;
+      if (
+        !uuid.test(req.params.invoiceId) ||
+        !b ||
+        typeof b !== "object" ||
+        Array.isArray(b) ||
+        Object.keys(b).sort().join(",") !== "idempotencyKey,providerObjectId" ||
+        typeof b.providerObjectId !== "string" ||
+        typeof b.idempotencyKey !== "string"
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!service.recoverHeld)
+        return reply.code(503).send({ error: "unavailable" });
+      const result = await service.recoverHeld(
+        session(req.headers.authorization)!,
+        req.params.invoiceId,
+        b.providerObjectId,
+        b.idempotencyKey,
       );
       return result.kind === "ok"
         ? result

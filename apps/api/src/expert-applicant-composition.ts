@@ -1,3 +1,4 @@
+import type { PayerReceiptVault } from "@ii-tonya/integrations";
 import {
   createResidentVerificationService,
   createExpertSeparatedSalesService,
@@ -47,10 +48,17 @@ export function assertExpertApplicantCapability(
 export function createExpertApplicantComposition(
   db: DrizzleDb,
   config: RuntimeConfig,
+  capabilities?: {
+    receipt?: { vault: PayerReceiptVault; retentionDays: number };
+    checkout?: Parameters<
+      typeof createExpertSeparatedSalesService
+    >[0]["checkout"];
+  },
 ): ExpertApplicantTelegramCapability | undefined {
   assertExpertApplicantConfig(config);
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
+  const sales = new PostgresExpertSeparatedSalesRepository(db, scope);
   return {
     separatedSalesEnabled: config.features.expertSeparatedSales === true,
     verificationFormEnabled: config.features.expertVerificationForm === true,
@@ -62,9 +70,23 @@ export function createExpertApplicantComposition(
       ...(config.features.expertSeparatedSales === true
         ? {
             separatedSales: createExpertSeparatedSalesService({
-              repository: new PostgresExpertSeparatedSalesRepository(db, scope),
+              repository: sales,
+              ...(capabilities?.receipt
+                ? {
+                    captureReceipt: (input) =>
+                      sales.captureReceipt(
+                        input,
+                        capabilities.receipt!.vault,
+                        capabilities.receipt!.retentionDays,
+                      ),
+                  }
+                : {}),
+              ...(capabilities?.checkout
+                ? { checkout: capabilities.checkout }
+                : {}),
               form: createResidentVerificationService({
                 enabled: true,
+                salesFirst: true,
                 repository: new PostgresResidentVerificationRepository(
                   db,
                   scope,

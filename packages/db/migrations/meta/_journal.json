@@ -421,6 +421,13 @@
       "when": 1793030400000,
       "tag": "0059_residency_separated_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793041200000,
+      "tag": "0060_separated_sales_review_corrections",
+      "breakpoints": true
     }
   ]
 }

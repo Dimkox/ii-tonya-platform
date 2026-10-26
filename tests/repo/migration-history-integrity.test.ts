@@ -98,12 +98,15 @@ const HAND_SQL_FUNCTIONS = [
   "expert_sales_base_source",
   "expert_sales_bridge_source",
   "expert_sales_choice_source",
+  "expert_sales_form_valid",
   "expert_sales_invoice_source",
+  "expert_sales_operator_recovery_source",
   "expert_sales_paid_lock_source",
   "expert_sales_privacy_cleanup",
   "expert_sales_privacy_guard",
   "expert_sales_provider_request_guard",
   "expert_sales_quote_source",
+  "expert_sales_receipt_authority",
   "expert_sales_selection_source",
   "hashtags_synonyms_valid",
   "lock_and_reject_selarti_budget_policy_overlap",
@@ -235,6 +238,8 @@ const HAND_SQL_TRIGGERS = [
   "expert_sales_identity_revocation",
   "expert_sales_invoice_source",
   "expert_sales_observation_immutable",
+  "expert_sales_operator_recovery_immutable",
+  "expert_sales_operator_recovery_source",
   "expert_sales_paid_lock_immutable",
   "expert_sales_paid_lock_source",
   "expert_sales_provider_request_guard",
@@ -343,7 +348,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(59);
+    expect(newest).toBe(60);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -458,7 +463,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0059 adds twelve scoped sales, custody, recovery and privacy relations.
-    expect(declared.size).toBe(188);
+    // 0060 adds the scoped immutable operator recovery audit.
+    expect(declared.size).toBe(189);
   });
 });

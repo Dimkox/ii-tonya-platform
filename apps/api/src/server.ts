@@ -616,9 +616,25 @@ export const createDefaultLifecycle = (
         expertCard.personalOfferReads,
       );
     }
+    const applicantReceipt = config.features.expertSeparatedSales
+      ? createPayerReceiptComposition(db, config)
+      : undefined;
     const originalExpertApplicantTelegram = createExpertApplicantComposition(
       db,
       config,
+      {
+        ...(applicantReceipt && config.payerReceipt
+          ? {
+              receipt: {
+                vault: applicantReceipt.vault,
+                retentionDays: config.payerReceipt.retentionDays,
+              },
+            }
+          : {}),
+        ...(expertVerification?.heldCheckout
+          ? { checkout: expertVerification.heldCheckout }
+          : {}),
+      },
     );
     const expertApplicantTelegram =
       originalExpertApplicantTelegram && expertCard

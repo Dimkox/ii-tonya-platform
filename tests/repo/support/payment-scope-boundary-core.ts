@@ -97,6 +97,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -132,6 +133,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "expert_sales_operator_recoveries",
   "expert_sales_bases",
   "expert_sales_choices",
   "expert_sales_selections",
@@ -298,6 +300,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/admin/expert-verification",
   "/v1/admin/expert-verification/:applicationId",
   "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
+  "/v1/admin/expert-verification/invoices/:invoiceId/recover",
   "/v1/admin/expert-verification/:applicationId/decision",
   "/v1/webhooks/telegram/expert-promo/:botKey",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
@@ -811,6 +814,23 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0060_separated_sales_review_corrections.sql",
+    "fd2dc2cd3de31d9ffc6b375eb9d128b6db089dc4d71ff1c5a08dbf23cb7fa4ce",
+  ],
+  [
+    "packages/db/migrations/meta/0060_snapshot.json",
+    "06ebff85fe3908e80c5e1e6eb7e663f0edbb7be480e3f51476baf13fab3d3f3a",
+  ],
+  [
+    "packages/db/migrations/state/0060_sql_objects.json",
+    "fc9fdaca9ba3bf7b9772265cd095d29f15af01338f3a0b58edda3491537175d2",
+  ],
+  [
+    "packages/db/migrations/state/0060_manifest.json",
+    "3080f5531929409cfd09f587c587e6f5107e57155cb39b3cac99d3fd3038f2f3",
+  ],
+
+  [
     "packages/db/migrations/state/0059_sql_objects.json",
     "25d1c71c3a0ad26a24c0ed538662792d54b4136527e6b4cf9773003aebec6353",
   ],
@@ -1311,7 +1331,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "17a83068493f191ad03e6f0dc40170679baf21a2e6ac0c7223a77a8b8e965b7b",
+    "079331617810590cfbd52db2c0bbc1098162b3dfc09e9d469e6b6c023cce8e02",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1391,7 +1411,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "17a83068493f191ad03e6f0dc40170679baf21a2e6ac0c7223a77a8b8e965b7b",
+    "079331617810590cfbd52db2c0bbc1098162b3dfc09e9d469e6b6c023cce8e02",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

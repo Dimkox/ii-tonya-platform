@@ -40,3 +40,21 @@ campaign tombstones and necessary financial bindings when issued records exist.
 Deleting the original submitted form also blocks delayed money from readmitting
 the applicant. No provider activation, deployment, live money or prompt activation
 is authorized by this development change.
+
+Review corrections add only migration `0060_separated_sales_review_corrections.sql`,
+its exact `0060_snapshot.json`, `0060_sql_objects.json`, and `0060_manifest.json`,
+and relation `expert_sales_operator_recoveries`. The new manager route is
+`POST /v1/admin/expert-verification/invoices/:invoiceId/recover`; the existing
+finite session/MFA authority is checked both before and after the authoritative
+GET. The audit binds the manager, session, invoice, provider object, request key,
+status and GET evidence digest. It cannot authorize another create POST.
+
+The private applicant `/receipt` command uses the existing encrypted receipt
+store and configured finite retention. Only a v3 bridge with its unchanged
+submitted form and current owner/consent can outlive the original operational
+quote deadline for receipt custody. Legacy quote expiry rules remain intact.
+Frozen submission digest/time are separate from supplemental answer revisions.
+Actual 0059 form deletion cascades the bridge; upgrade evidence does not invent
+historical submission proof. Notice preparation is leased and retryable before a
+Telegram send; persisted dispatched remains uncertain and is never blindly resent.
+Notices bind the producing selection, choice revision and replacement invoice.

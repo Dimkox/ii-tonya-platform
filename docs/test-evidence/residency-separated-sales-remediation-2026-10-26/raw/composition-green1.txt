@@ -1,0 +1,36 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ apps/api/src/routes/expert-separated-sales.integration.test.ts (4 tests | 1 failed | 3 skipped) 2701ms
+   × normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee 954ms
+     → expected 'Ответ не подошёл. Сохранённые ответы …' to contain 'Адрес для чека сохранён'
+   ↓ authoritative fee success locks only selected quarter; later quote sources preserve terms and wrong periods are denied
+   ↓ paid selected terms feed the real gated main invoice and never bypass card/promo admission
+   ↓ automatic bill and explicit renewal preserve the locked quarter after the original tariff closes
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/api/src/routes/expert-separated-sales.integration.test.ts > normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee
+AssertionError: expected 'Ответ не подошёл. Сохранённые ответы …' to contain 'Адрес для чека сохранён'
+
+Expected: "Адрес для чека сохранён"
+Received: "Ответ не подошёл. Сохранённые ответы не изменены. Отправьте /verification, чтобы продолжить, или /edit для исправления."
+
+ ❯ apps/api/src/routes/expert-separated-sales.integration.test.ts:146:27
+    144|     expect(submitted.text).toContain("Анкета получена");
+    145|     const captured=await send("/receipt synthetic@example.com");
+    146|     expect(captured.text).toContain("Адрес для чека сохранён");
+       |                           ^
+    147|     expect(JSON.stringify(captured)).not.toContain("synthetic@example.…
+    148|     expect((await database.db.execute(sql`select ciphertext from payer…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  18:35:39
+   Duration  6.97s (transform 1.91s, setup 0ms, collect 3.78s, tests 2.70s, environment 0ms, prepare 98ms)
+
+
+[END OF RAW CAPTURE]

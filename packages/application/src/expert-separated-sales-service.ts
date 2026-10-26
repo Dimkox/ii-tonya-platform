@@ -16,6 +16,10 @@ export interface SeparatedSalesSnapshot {
   selectedTotalMinor: string | null;
   termMonths: 1 | 3 | null;
   expiresAt: string | null;
+  remainingSeconds?: number;
+  invoiceId?: string;
+  operationId?: string;
+  submitted?: boolean;
   standardOnly: boolean;
   replay: boolean;
   tariffs?: { id: string; name: string }[];
@@ -36,6 +40,20 @@ const rub = (value: string) =>
   `${BigInt(value) / 100n}${BigInt(value) % 100n ? "," + (BigInt(value) % 100n).toString().padStart(2, "0") : ""} ₽`;
 export function createExpertSeparatedSalesService(deps: {
   repository: SeparatedSalesRepository;
+  captureReceipt?: (
+    input: Parameters<SeparatedSalesRepository["transition"]>[0] & {
+      email: string;
+    },
+  ) => Promise<unknown>;
+  checkout?: {
+    recoverCheckout(input: {
+      invoiceId: string;
+      operationId: string;
+    }): Promise<
+      | { kind: "ready"; url: string; paymentId: string }
+      | { kind: "pending" | "unavailable" }
+    >;
+  };
   form: {
     handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
   };
@@ -54,10 +72,11 @@ export function createExpertSeparatedSalesService(deps: {
         input.callbackData &&
         !tariff &&
         !choice &&
-        !input.callbackData.startsWith("rv:")
+        !input.callbackData.startsWith("rv:") &&
+        input.callbackData !== "st:current"
       )
         return { status: "rejected" };
-      const snapshot = await deps.repository.transition({
+      const command = {
         ...input,
         requestKey: `${input.botId}:${input.updateId}`,
         requestDigest: createHash("sha256")
@@ -78,7 +97,8 @@ export function createExpertSeparatedSalesService(deps: {
                 "positive" | "promo" | "base" | "month" | "quarter",
             }
           : {}),
-      });
+      };
+      const snapshot = await deps.repository.transition(command);
       if (!snapshot) return null;
       if (snapshot.replay) return { status: "duplicate" };
       const button = (text: string, action: string) => ({
@@ -141,10 +161,55 @@ export function createExpertSeparatedSalesService(deps: {
               : []),
           ],
         );
-      if (input.text === "/my_tariff" || input.text === "Мой актуальный тариф")
-        return reply(
-          `Выбрано: ${rub(snapshot.selectedTotalMinor!)} за ${snapshot.termMonths} мес. Постоянная цена ещё не зафиксирована: требуется одобрение менеджера и подтверждённая оплата онбординга в срок.`,
-        );
+      if (/^\/receipt(?: |$)/u.test(input.text)) {
+        if (!snapshot.submitted)
+          return reply("Сначала отправьте анкету: /verification.");
+        const email = /^\/receipt ([^\s]+)$/u.exec(input.text)?.[1];
+        if (!email || !deps.captureReceipt)
+          return reply(
+            "Для электронного чека нужен email: /receipt адрес. Сохранение адреса сейчас недоступно либо адрес не указан.",
+          );
+        try {
+          await deps.captureReceipt({ ...command, email });
+          return reply(
+            "Адрес для чека сохранён. Мой актуальный тариф: /my_tariff.",
+            [[{ text: "Мой актуальный тариф", callback_data: "st:current" }]],
+          );
+        } catch {
+          return reply(
+            "Адрес для чека не сохранён. Проверьте адрес и повторите /receipt.",
+          );
+        }
+      }
+      if (
+        input.text === "/my_tariff" ||
+        input.text === "Мой актуальный тариф" ||
+        input.callbackData === "st:current"
+      ) {
+        let text = `Актуальные условия: ${rub(snapshot.selectedTotalMinor!)} за ${snapshot.termMonths} мес. Срок: ${snapshot.expiresAt}; осталось ${snapshot.remainingSeconds ?? 0} с. Постоянная цена фиксируется подтверждённой оплатой онбординга в срок.`;
+        if (snapshot.invoiceId && snapshot.operationId && deps.checkout) {
+          try {
+            const payment = await deps.checkout.recoverCheckout({
+              invoiceId: snapshot.invoiceId,
+              operationId: snapshot.operationId,
+            });
+            const current = await deps.repository.transition(command);
+            if (
+              payment.kind === "ready" &&
+              current?.invoiceId === snapshot.invoiceId &&
+              (current.remainingSeconds ?? 0) > 0
+            )
+              text += ` Отдельный взнос за онбординг 3000 ₽: ${payment.url}`;
+            else text += " Ссылка на оплату пока недоступна.";
+          } catch {
+            text +=
+              " Для подготовки оплаты укажите адрес чека: /receipt адрес.";
+          }
+        } else text += " Счёт за онбординг появится после одобрения менеджера.";
+        return reply(text, [
+          [{ text: "Мой актуальный тариф", callback_data: "st:current" }],
+        ]);
+      }
       if (choice) {
         const next = { ...input, text: "/verification" };
         delete next.callbackData;

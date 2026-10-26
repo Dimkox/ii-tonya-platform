@@ -11,6 +11,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
+import { adminSessions } from "./audit.js";
 import { expertResidencyTariffVersions } from "./expert-residency.js";
 import {
   expertOnboardingInvoices,
@@ -106,6 +107,8 @@ export const expertSalesFormBridges = pgTable("expert_sales_form_bridges", {
   formId: uuid("form_id").notNull().unique(),
   userId: uuid("user_id").notNull(),
   submittedRevision: integer("submitted_revision").notNull(),
+  submittedDigest: text("submitted_digest"),
+  submittedAt: instant("submitted_at"),
   selectionId: uuid("selection_id").notNull(),
   quoteId: uuid("quote_id").notNull(),
 });
@@ -180,24 +183,23 @@ export const expertSalesProviderObservations = pgTable(
       .notNull()
       .default(sql`clock_timestamp()`),
   },
-  (t) => [unique().on(t.invoiceId, t.evidenceDigest)],
 );
-export const expertSalesNotices = pgTable(
-  "expert_sales_notices",
-  {
-    id: id(),
-    baseId: uuid("base_id")
-      .notNull()
-      .references(() => expertSalesBases.id),
-    stageAt: instant("stage_at").notNull(),
-    kind: text("kind").notNull(),
-    status: text("status").notNull().default("pending"),
-    attemptId: uuid("attempt_id"),
-    receipt: jsonb("receipt"),
-    createdAt: created(),
-  },
-  (t) => [unique().on(t.baseId, t.stageAt, t.kind)],
-);
+export const expertSalesNotices = pgTable("expert_sales_notices", {
+  id: id(),
+  baseId: uuid("base_id")
+    .notNull()
+    .references(() => expertSalesBases.id),
+  selectionId: uuid("selection_id").references(() => expertSalesSelections.id),
+  invoiceId: uuid("invoice_id").references(() => expertOnboardingInvoices.id),
+  choiceRevision: integer("choice_revision"),
+  preparedUntil: instant("prepared_until"),
+  stageAt: instant("stage_at").notNull(),
+  kind: text("kind").notNull(),
+  status: text("status").notNull().default("pending"),
+  attemptId: uuid("attempt_id"),
+  receipt: jsonb("receipt"),
+  createdAt: created(),
+});
 export const expertSalesErasedCohorts = pgTable("expert_sales_erased_cohorts", {
   userId: uuid("user_id")
     .primaryKey()
@@ -214,3 +216,28 @@ export const expertSalesTicks = pgTable("expert_sales_ticks", {
     .notNull()
     .default(sql`'-infinity'::timestamptz`),
 });
+
+export const expertSalesOperatorRecoveries = pgTable(
+  "expert_sales_operator_recoveries",
+  {
+    id: id(),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => expertSalesFeeAttempts.invoiceId),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    managerId: uuid("manager_id")
+      .notNull()
+      .references(() => users.id),
+    sessionHash: text("session_hash")
+      .notNull()
+      .references(() => adminSessions.sessionIdHash),
+    requestKey: text("request_key").notNull(),
+    providerObjectId: text("provider_object_id").notNull(),
+    observedStatus: text("observed_status").notNull(),
+    evidenceDigest: text("evidence_digest").notNull(),
+    createdAt: created(),
+  },
+  (t) => [unique().on(t.managerId, t.requestKey)],
+);

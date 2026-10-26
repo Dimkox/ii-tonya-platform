@@ -156,7 +156,8 @@ function summary(draft: ResidentDraft): string {
       : []),
   ].join("\n");
 }
-function render(
+function renderForm(
+  salesFirst: boolean,
   s: ResidentFormSnapshot,
   policy: ResidentPolicy,
   field: ResidentField | null = s.currentField ??
@@ -165,8 +166,16 @@ function render(
   if (s.status !== "PENDING_DOCS")
     return {
       status: "handled",
-      replyMarkup: { remove_keyboard: true },
-      text: "Анкета получена. Дополнения можно прислать ответным сообщением. Автоматические проверки и загрузка документов ожидают обработки; результаты пока не подтверждены. Решение менеджера и цены ещё не доступны.",
+      replyMarkup: salesFirst
+        ? {
+            inline_keyboard: [
+              [{ text: "Мой актуальный тариф", callback_data: "st:current" }],
+            ],
+          }
+        : { remove_keyboard: true },
+      text: salesFirst
+        ? "Анкета получена. Выбранные условия доступны в /my_tariff. Менеджер проверит анкету; после одобрения отдельно выставляется взнос за онбординг 3000 ₽. Для электронного чека отправьте /receipt и ваш email. Дополнения можно прислать ответным сообщением."
+        : "Анкета получена. Дополнения можно прислать ответным сообщением. Автоматические проверки и загрузка документов ожидают обработки; результаты пока не подтверждены. Решение менеджера и цены ещё не доступны.",
     };
   const callback = (action: string) => `rv:${s.id}:${s.revision}:${action}`;
   const button = (text: string, action: string) => ({
@@ -236,11 +245,15 @@ function render(
         ? [[button("Добавить образование", "e:d")]]
         : []),
     ];
+  if (salesFirst)
+    keyboard.push([
+      { text: "Мой актуальный тариф", callback_data: "st:current" },
+    ]);
   return {
     status: "handled",
     text: field
       ? `${field === "education" && policy.education === "required" ? "Пришлите документ об образовании (PDF/JPEG/PNG до 20 МБ): это требование действующей версии анкеты, документ будет проверен отдельно." : labels[field]}\nАнкета сохранена (ревизия ${s.revision}). /verification — продолжить; /roles — изменить роли; /edit — исправить ответы.`
-      : `${summary(s.draft)}\n\nОбязательные ответы сохранены. ${s.draft.roles?.includes("EXPERT") ? "Можно добавить образование или отправить анкету." : "Можно отправить анкету."} Критерии категории ещё готовятся. Проверка не означает одобрение; тарифы будут доступны после отдельного решения.`,
+      : `${summary(s.draft)}\n\nОбязательные ответы сохранены. ${s.draft.roles?.includes("EXPERT") ? "Можно добавить образование или отправить анкету." : "Можно отправить анкету."} Критерии категории ещё готовятся. ${salesFirst ? "Проверка анкеты не меняет выбранные условия. Постоянная цена фиксируется только подтверждённой оплатой онбординга в срок." : "Проверка не означает одобрение; тарифы будут доступны после отдельного решения."}`,
     ...(keyboard.length
       ? { replyMarkup: { inline_keyboard: keyboard } }
       : { replyMarkup: { remove_keyboard: true as const } }),
@@ -268,9 +281,15 @@ function textPatch(field: ResidentField, text: string): unknown {
 }
 export function createResidentVerificationService(deps: {
   enabled: boolean;
+  salesFirst?: boolean;
   repository: ResidentFormRepository;
   policy?: ResidentPolicy;
 }) {
+  const render = (
+    s: ResidentFormSnapshot,
+    policy: ResidentPolicy,
+    field?: ResidentField | null,
+  ) => renderForm(deps.salesFirst === true, s, policy, field);
   return {
     async handle(
       input: ResidentFormInput,
@@ -343,7 +362,9 @@ export function createResidentVerificationService(deps: {
         )
           return {
             status: "handled",
-            text: "Сначала заполните анкету: /verification. Тарифы появятся после отдельного решения по проверке.",
+            text: deps.salesFirst
+              ? "Выбранные условия и срок доступны в /my_tariff. Продолжить анкету: /verification."
+              : "Сначала заполните анкету: /verification. Тарифы появятся после отдельного решения по проверке.",
           };
         let patch: unknown;
         let followupAnswer: string | undefined;

@@ -1,0 +1,31 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-sales-upgrade.test.ts (1 test | 1 failed) 1332ms
+   × 0060 upgrades actual 0059 submitted plus followup and erased bridges without fabricating proof 1330ms
+     → expected 1 to be 2 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-sales-upgrade.test.ts > 0060 upgrades actual 0059 submitted plus followup and erased bridges without fabricating proof
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ tests/integration/expert-sales-upgrade.test.ts:30:108
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  18:39:33
+   Duration  3.90s (transform 831ms, setup 0ms, collect 2.12s, tests 1.33s, environment 0ms, prepare 125ms)
+
+
+[END OF RAW CAPTURE]

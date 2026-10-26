@@ -88,6 +88,8 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           Buffer.byteLength(callback.data) > 64 ||
           !(
             callback.data.startsWith("rv:") ||
+            (c.separatedSalesEnabled === true &&
+              callback.data === "st:current") ||
             (c.separatedSalesEnabled && /^(ss|sb):/u.test(callback.data))
           )
         )

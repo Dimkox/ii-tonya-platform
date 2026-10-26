@@ -1,0 +1,294 @@
+{
+  "localRawDirectory": ".superpowers/sdd/separated-sales-review-20261026",
+  "artifacts": [
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/api-types1.txt",
+      "sha256": "b0eb52253af4b5cbb677e6a8e8a3cca0bc05c83496db8a1150c67b3a320e7d18",
+      "bytes": 154,
+      "captureBytes": 132,
+      "captureSha256": "2e59bd6115ad3d3b8fa536ba147207feae48a422cbf2e095ea1afc08ac181900"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/api-types2.txt",
+      "sha256": "1fcc7d3a5e7b41b567ea7842da8f75f5991c692292473c5005dcd1da35a751f2",
+      "bytes": 37,
+      "captureBytes": 15,
+      "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/application-build1.txt",
+      "sha256": "4fa9a0c6bb322636428ec932b9780ccc60ed67729a616ff63a81099c231e3a2e",
+      "bytes": 403,
+      "captureBytes": 381,
+      "captureSha256": "5b12d949654e49c90f5859d7ac553b28069c32c7e20f7f3579c67fdbe20ffa0b"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/application-build2.txt",
+      "sha256": "253fa0710256b07bc1e8519cdae2201da4ef542ba121d4a0b10ee88c50f5a474",
+      "bytes": 403,
+      "captureBytes": 381,
+      "captureSha256": "cfd8ec948ccd4a3830f1a6b502e26c21ddc49ec5bf4d92a1b871499b3788952d"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/application-final.txt",
+      "sha256": "7a526c2911e11946d09898cf470b66b2067ace24e7bb3e2467d7ed2b5dbed483",
+      "bytes": 403,
+      "captureBytes": 381,
+      "captureSha256": "8528df2799a704fc9c31df1b76489ad3da922941e371a444185886c6c91a20ee"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/boundaries.txt",
+      "sha256": "b63fda46540ca2463f3d7ee15df765b6e2e55be56c17c5ceecd085bbcdce8ad3",
+      "bytes": 24782,
+      "captureBytes": 18283,
+      "captureSha256": "712b97f7caaaadd29f4dd75434d518fa4beb66934951cff004b41fc9259f30eb",
+      "encoding": "base64"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/boundary-final.txt",
+      "sha256": "cb2c3f7996aa56e0f6cd97d993804da1106028aefc58f75e9e9395438127e44a",
+      "bytes": 391,
+      "captureBytes": 369,
+      "captureSha256": "b74f5b6b8fd487d4d647c5e61dae825d1e56a5e898f5de77edc1c2e54bde0a25"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/composition-final1.txt",
+      "sha256": "e20ae8452823daf1829e82091ab9339831ef0402e6d0e604709f694618dfc2d5",
+      "bytes": 741,
+      "captureBytes": 719,
+      "captureSha256": "b7ca9ca21af9d00667a9ea016ea85b17f68c026100ca72c2cac70e4de6d23446"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/composition-green1.txt",
+      "sha256": "fa908c3a9456fe0f196eeac63d049a361bf6a85f92607d6d83cb9af3353c8aed",
+      "bytes": 2309,
+      "captureBytes": 2287,
+      "captureSha256": "658352910e53b11043e0259ba0910152898a52a65da612517612f479beed676d"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/db-build1.txt",
+      "sha256": "f76ef9ba074a1c5227d6eb8c00faa14aeb61e7827666f0e66a2da646df5e979d",
+      "bytes": 401,
+      "captureBytes": 379,
+      "captureSha256": "685b4ed3798661aa106fd6e0d215b8316e97c30c25cc3945ac0b1fadaa73481f"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/db-build2.txt",
+      "sha256": "f74da737581112feeb48d47e6ec55ac1b0d9efd27da93c5282cd9f0272819162",
+      "bytes": 401,
+      "captureBytes": 379,
+      "captureSha256": "3342a756b172b90e61ea3ffb42a34c8f3ab5c98931ea057caec10d05d962438c"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/diff-check-final.txt",
+      "sha256": "53eee548ced260ce25d5e2819932756576d2e6aa1e906397047e3d562a850ddd",
+      "bytes": 46,
+      "captureBytes": 24,
+      "captureSha256": "bbee93ad3bf0892b2b27d80bf52bd5626ceb26dfae55122100808052926c46f8"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/form-copy-final.txt",
+      "sha256": "b3ce1a483ae8942789d4e5092e844c37b27ea7f5ff4d7ae49119e5dbad5f281f",
+      "bytes": 400,
+      "captureBytes": 378,
+      "captureSha256": "2c11d01cac03ff8e5a8870f19e64fddf7764d58e7c39cc893e11ab148e91da1e"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/form-copy-red.txt",
+      "sha256": "4611da3d690543ed57a1ea0225185717934c4ff0763114e1c0627be0b716610e",
+      "bytes": 2748,
+      "captureBytes": 2726,
+      "captureSha256": "36102a0464348c198becdebc75d0c937739b8f55678f3e51dbda8eb7e5297f59"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/format-final.txt",
+      "sha256": "7c0100bd88f2ca7fae92b2c5efe2327e9e5e6274640cdd135a7cfb6b8eb14fe6",
+      "bytes": 1600,
+      "captureBytes": 1578,
+      "captureSha256": "3e1f0198fedaf45bf7fd21e382c2a7640f848013e3623157263749bb7f067999"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/format1.txt",
+      "sha256": "7d47c7f22fc325b7ec926ce8304c0d0e643dbd514d5aed37502a2ea3d4862f4b",
+      "bytes": 1113,
+      "captureBytes": 1091,
+      "captureSha256": "750678edd3fa58d63369db1ca9af89242b3f97a1f6e3413bea459774923635d3"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/format2.txt",
+      "sha256": "74b2efe3478e9a4dd6106168fce89f73b145e43f60139e93cf187939b6f50305",
+      "bytes": 1519,
+      "captureBytes": 1497,
+      "captureSha256": "2337fa6ceda3baaf2a9ae80dac4c3a008a86ad7cb78e15c01421e0bca6c590c7"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/introspection.txt",
+      "sha256": "59528247aeefe5303e0031eb59fbb9adff8a9114b78131188a0d4d95cbdc68d9",
+      "bytes": 227012,
+      "captureBytes": 226990,
+      "captureSha256": "9b37b8712a868dfb59c992ed0d22b547dd38a997b57f6e461286065d9b748b24"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/legacy-form.txt",
+      "sha256": "87abd11004c22be96558b0a985f8959f0b4f5051bc89eefe9f78db673a50ca2f",
+      "bytes": 400,
+      "captureBytes": 378,
+      "captureSha256": "009bd0557b8d12933aa24b54602ed7c1dc7d97663d3f96a69afdd3838830b1a7"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/legacy-receipt.txt",
+      "sha256": "aa6e62bebee3bb3d05d12f7b0ebcb064a63ce6000b6068ac0a7ae3489e231dd0",
+      "bytes": 410,
+      "captureBytes": 388,
+      "captureSha256": "47101e193ab9f7c0a8f68eb85894c52cd555e52ffb4069053fe8d8a4a6452bd0"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/lint-final.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/lint1.txt",
+      "sha256": "6f7f64db6943e3ecb1bb06ac0091adc104ae501299645c7a84d49d6e1d760b9d",
+      "bytes": 357,
+      "captureBytes": 335,
+      "captureSha256": "421c4e4ac99287e4ffc3bd870a6937de28b850f4871d8eaee2a44802438cf387"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/migration-history-final.txt",
+      "sha256": "2888607b3e5140a9beb33fd3854615e82ad9469cf59a87857897febd3e9d6b1f",
+      "bytes": 2749,
+      "captureBytes": 2727,
+      "captureSha256": "5c3f64462325f2acfe5b7bc4c84da1daabe1788bfa157156682844d845744f79"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/migration-history-final2.txt",
+      "sha256": "d9d0b6c454618f8c9e307e165b724f49f22cc81a3f3d5f7056fb41a247bf1853",
+      "bytes": 380,
+      "captureBytes": 358,
+      "captureSha256": "77acb338bfe7200804aa5faee192759c0db1f0cb8890642ad178d2ba1b27c338"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r1-normal-receipt-red.txt",
+      "sha256": "7c83ee65ac8e0b04df16b1efaba6f91cb4e8ec7231901378b009687e5188252c",
+      "bytes": 2310,
+      "captureBytes": 2288,
+      "captureSha256": "0a63dcac7b0218767d4db21ca7ed4d39f2acc684a04c62bb1a4b97a2beae5b40"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/reconstruction.txt",
+      "sha256": "0e8b9bf6104fd1bf92baf74e800210f354594b67955c9cbf3ad94fdb43eb6995",
+      "bytes": 247,
+      "captureBytes": 225,
+      "captureSha256": "775c17be6bded887c0e20b7221aff32690b65c6ee29efa95a058e53610afc800"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/review-state1.txt",
+      "sha256": "a781d7a8cba8464d178ef66d8a844331a019379fb2907519bdc609c002fd8d70",
+      "bytes": 8009,
+      "captureBytes": 7987,
+      "captureSha256": "009c49c48f16b5bd4ec32193bc02aead112a6e4d95e8a23250e32e9746b91102"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/scheduler-green1.txt",
+      "sha256": "3ff8c032737858b76cf9765f2ce10c16e4f5e4e9fd0edea27fd2bdff91a40b26",
+      "bytes": 7838,
+      "captureBytes": 5741,
+      "captureSha256": "6ad7b3ed7f190329ff2e68cfe08c320faf8e5f71b62e8af42ab4e8bd455fb57a",
+      "encoding": "base64"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/scheduler-green2.txt",
+      "sha256": "9e99f94080ca776a3c1284ce8512059ee7edff9ea3539f19ea0a621b09ba7954",
+      "bytes": 6615,
+      "captureBytes": 6593,
+      "captureSha256": "dc1f1a78b931c41997ff6592c4e0f79d6e1f35c2b6ea349a0400cf8305ec1949"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/scheduler-red.txt",
+      "sha256": "131ae0c3b91e307d0312347e62a2422d3eb94ea2efe8bdcb61e2917588b9a7a0",
+      "bytes": 12176,
+      "captureBytes": 12154,
+      "captureSha256": "963f847e3dcd429ff35418044472907e5928f68468fc5c63837b049059acff7d"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/scope-final.txt",
+      "sha256": "d105903f9553603264d5cc6373f4823ba3f02f09cf9e3ef9cceed438b1c9d36d",
+      "bytes": 556,
+      "captureBytes": 534,
+      "captureSha256": "c18670c248fc3ef60c15f372c09c129bf2cd8f621891c96b0f82a636ed03e2a2"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/state-final1.txt",
+      "sha256": "37e702db0891f0fd2384726b88e37d733ee94214a083c76cb36b9fd1d75fbeb2",
+      "bytes": 2220,
+      "captureBytes": 2198,
+      "captureSha256": "8da3f42e609773be0a83ea9aaeab5b1caff7895b2ab4058ff984daa4a5ec83cb"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/submission-green1.txt",
+      "sha256": "b3e5e3a549ae9ef90fc58b344c779d3fe4c584d1450fd2e7c94c24325df36ff8",
+      "bytes": 620,
+      "captureBytes": 598,
+      "captureSha256": "5ce927594820402381f7214389a5a6afb1b1bb7b72b9b3e94be9fc7e2f89d75e"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/submission-red.txt",
+      "sha256": "23e4ba60295423ef1ce2f654b38a5a6153900c4ae3f1da72ab8320471800b714",
+      "bytes": 9595,
+      "captureBytes": 9573,
+      "captureSha256": "cdf45fae960abbeb0ac4e19f24f5f993fefdb18d46113534486b75f7db966874"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/tests-types-final.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/tests-types1.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/upgrade-final.txt",
+      "sha256": "f90a163576351fbcf409fca6a08be830834332652039d605b8c0014aa1b46569",
+      "bytes": 493,
+      "captureBytes": 471,
+      "captureSha256": "406ce224fc9ccf13b2057bdead46d6d679681b62075a9d1d7ecdfb191c7b29da"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/upgrade1.txt",
+      "sha256": "9cb85da67fd7b8113ab596376dbbc12a6f0a92e33fb8e089a99c628dbe93f7d3",
+      "bytes": 997,
+      "captureBytes": 975,
+      "captureSha256": "c1b61f5befb1e8223e4d1075944d8efd7f6295cd6c76f17c91ae27be278ae986"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/upgrade2.txt",
+      "sha256": "a18fdadcd80f58aa8f52bf9653059c78bc7570311ebeb5dd54ad8989c475b516",
+      "bytes": 998,
+      "captureBytes": 976,
+      "captureSha256": "c146c6a4469909b419d671ad611c54660252e1462f5ea673c1ecac24a72bfcc5"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/upgrade3.txt",
+      "sha256": "2d86b2173bfc9acdc90f46bd55641a7021de9cd31ce50fe079cac02cb72ea567",
+      "bytes": 1452,
+      "captureBytes": 1430,
+      "captureSha256": "76c2d0f6a99c1f9dc7016c9ae9b976cf47f684a8018a72f15e03e58135f1b963"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/worker-types.txt",
+      "sha256": "1fcc7d3a5e7b41b567ea7842da8f75f5991c692292473c5005dcd1da35a751f2",
+      "bytes": 37,
+      "captureBytes": 15,
+      "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    }
+  ]
+}

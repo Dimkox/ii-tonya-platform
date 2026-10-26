@@ -1,3 +1,5 @@
+import type { PayerReceiptVault } from "@ii-tonya/integrations";
+import { PostgresPayerReceiptContactRepository } from "./payer-receipt-contact-repository.js";
 import { sql } from "drizzle-orm";
 import {
   calculateExpertBasePrice,
@@ -21,6 +23,10 @@ export interface SeparatedSalesView {
   selectedTotalMinor: string | null;
   termMonths: 1 | 3 | null;
   expiresAt: string | null;
+  remainingSeconds?: number;
+  invoiceId?: string;
+  operationId?: string;
+  submitted?: boolean;
   standardOnly: boolean;
   replay: boolean;
   tariffs?: { id: string; name: string }[];
@@ -35,6 +41,57 @@ export class PostgresExpertSeparatedSalesRepository {
       messagingConsentPolicyVersion: string;
     },
   ) {}
+  async captureReceipt(
+    input: ExpertPromoCommand & { email: string },
+    vault: PayerReceiptVault,
+    retentionDays: number,
+  ) {
+    if (
+      input.botId !== this.policy.botId ||
+      input.botKey !== this.policy.botKey ||
+      input.chatId !== input.telegramUserId
+    )
+      throw new Error("expert_sales_identity");
+    return this.db.transaction(async (tx) => {
+      const rows = (
+        await tx.execute<{ userId: string }>(
+          sql`select user_id as "userId" from channel_identities where provider='telegram' and bot_key=${input.botKey} and external_id=${input.telegramUserId} and external_chat_id=${input.chatId} and status='active' limit 2`,
+        )
+      ).rows;
+      if (rows.length !== 1) throw new Error("expert_sales_identity");
+      const userId = rows[0]!.userId;
+      await lockClientConsentSubject(tx, userId);
+      if (
+        !(await captureClientConsentAuthority(tx, {
+          subjectId: userId,
+          botKey: input.botKey,
+          chatId: input.chatId,
+          externalUserId: input.telegramUserId,
+          messagingPolicyVersion: this.policy.messagingConsentPolicyVersion,
+        }))
+      )
+        throw new Error("expert_sales_identity");
+      const b = (
+        await tx.execute<{ quote: string }>(
+          sql`select quote_id quote from expert_sales_form_bridges where user_id=${userId}::uuid and expert_sales_receipt_authority(quote_id,user_id)`,
+        )
+      ).rows[0];
+      if (!b) throw new Error("expert_sales_receipt_unavailable");
+      return new PostgresPayerReceiptContactRepository(
+        this.db,
+        vault,
+        retentionDays,
+      ).capture(
+        {
+          userId,
+          quoteId: b.quote,
+          email: input.email,
+          idempotencyKey: input.requestKey,
+        },
+        tx,
+      );
+    });
+  }
   async transition(
     input: ExpertPromoCommand & {
       tariffVersionId?: string;
@@ -216,6 +273,8 @@ export class PostgresExpertSeparatedSalesRepository {
       }
       if (input.action === "month" || input.action === "quarter")
         await issueSeparatedSalesFeeAttempt(tx, userId);
+      await refreshSeparatedSalesSelection(tx, userId);
+      await cancelSupersededSalesNotices(tx, userId);
       const selected = (
         await tx.execute<{
           total: string;
@@ -256,7 +315,32 @@ export class PostgresExpertSeparatedSalesRepository {
             termMonths: 1,
           })
         : null;
+      const invoice = (
+        await tx.execute<{ id: string; operation: string; expiry: string }>(
+          sql`select i.id,o.id operation,a.expires_at::text expiry from expert_onboarding_invoices i join expert_sales_fee_attempts a on a.invoice_id=i.id join expert_onboarding_payment_operations o on o.invoice_id=i.id where i.user_id=${userId}::uuid and i.status='pending' and a.expires_at>clock_timestamp() and expert_sales_form_valid(i.application_id,i.user_id) order by sales_attempt_number desc limit 1`,
+        )
+      ).rows[0];
+      const deadline =
+        invoice?.expiry ??
+        (selected && Date.parse(selected.expiry) > now
+          ? selected.expiry
+          : shown?.nextStageAtMs
+            ? new Date(shown.nextStageAtMs).toISOString()
+            : null);
+      const submitted =
+        (
+          await tx.execute(
+            sql`select 1 from expert_sales_form_bridges where user_id=${userId}::uuid and expert_sales_form_valid(application_id,user_id)`,
+          )
+        ).rows.length > 0;
       return {
+        ...(invoice
+          ? { invoiceId: invoice.id, operationId: invoice.operation }
+          : {}),
+        submitted,
+        remainingSeconds: deadline
+          ? Math.max(0, Math.floor((Date.parse(deadline) - now) / 1000))
+          : 0,
         id: b.id,
         revision: c?.revision ?? 0,
         baseMonthlyMinor: b.amount,
@@ -284,9 +368,7 @@ export class PostgresExpertSeparatedSalesRepository {
               )?.toString() ?? null)
             : null),
         termMonths: lock?.term ?? selected?.term ?? null,
-        expiresAt: shown?.nextStageAtMs
-          ? new Date(shown.nextStageAtMs).toISOString()
-          : null,
+        expiresAt: deadline,
         standardOnly,
         replay,
       };
@@ -335,6 +417,7 @@ export async function bridgeSeparatedSalesForm(
     ).rows.length
   )
     return;
+  await refreshSeparatedSalesSelection(tx, userId);
   const selection = (
     await tx.execute<{ id: string }>(
       sql`select id from expert_sales_selections where user_id=${userId}::uuid order by selected_at desc limit 1`,
@@ -361,6 +444,7 @@ export async function bridgeSeparatedSalesForm(
 
 /** A changed period reuses the existing quality approval of the same frozen form. */
 export async function issueSeparatedSalesFeeAttempt(tx: Tx, userId: string) {
+  if (await hasUnresolvedSalesRequest(tx, userId)) return;
   const source = (
     await tx.execute<{
       selectionId: string;
@@ -370,7 +454,7 @@ export async function issueSeparatedSalesFeeAttempt(tx: Tx, userId: string) {
       mode: string;
       number: number;
     }>(
-      sql`select selected.id as "selectionId",selected.offer_expiry_date::text expiry,d.id as "decisionId",b.application_id as "applicationId",prior.provider_mode mode,prior.sales_attempt_number+1 as number from expert_sales_form_bridges b join residents_applications f on f.id=b.form_id and f.user_id=b.user_id and f.revision=b.submitted_revision and f.submitted_at is not null join expert_onboarding_applications app on app.id=b.application_id and app.verification_status='approved' join expert_verification_decisions d on d.application_id=app.id and d.decision='approved' join lateral(select s.* from expert_sales_selections s where s.user_id=b.user_id order by selected_at desc,id desc limit 1) selected on true join lateral(select i.* from expert_onboarding_invoices i where i.decision_id=d.id order by sales_attempt_number desc limit 1) prior on true where b.user_id=${userId}::uuid and selected.offer_expiry_date>clock_timestamp() and not exists(select 1 from expert_sales_fee_attempts a where a.selection_id=selected.id) and not exists(select 1 from expert_sales_paid_locks where user_id=b.user_id)`,
+      sql`select selected.id as "selectionId",selected.offer_expiry_date::text expiry,d.id as "decisionId",b.application_id as "applicationId",prior.provider_mode mode,prior.sales_attempt_number+1 as number from expert_sales_form_bridges b join residents_applications f on f.id=b.form_id and f.user_id=b.user_id and expert_sales_form_valid(b.application_id,b.user_id) and f.submitted_at is not null join expert_onboarding_applications app on app.id=b.application_id and app.verification_status='approved' join expert_verification_decisions d on d.application_id=app.id and d.decision='approved' join lateral(select s.* from expert_sales_selections s where s.user_id=b.user_id order by selected_at desc,id desc limit 1) selected on true join lateral(select i.* from expert_onboarding_invoices i where i.decision_id=d.id order by sales_attempt_number desc limit 1) prior on true where b.user_id=${userId}::uuid and selected.offer_expiry_date>clock_timestamp() and not exists(select 1 from expert_sales_fee_attempts a where a.selection_id=selected.id) and not exists(select 1 from expert_sales_paid_locks where user_id=b.user_id)`,
     )
   ).rows[0];
   if (!source) return;
@@ -385,7 +469,98 @@ export async function issueSeparatedSalesFeeAttempt(tx: Tx, userId: string) {
   await tx.execute(
     sql`insert into expert_onboarding_payment_operations(invoice_id,application_audit_id,user_id,provider_mode) values(${invoice.id}::uuid,${source.applicationId}::uuid,${userId}::uuid,${source.mode})`,
   );
-  await tx.execute(
-    sql`insert into expert_sales_notices(base_id,stage_at,kind) select base_id,selected_at,'refresh' from expert_sales_selections where id=${source.selectionId}::uuid on conflict do nothing`,
+  await queueSalesNotice(
+    tx,
+    userId,
+    "refresh",
+    source.selectionId,
+    source.expiry,
+    invoice.id,
   );
+  return invoice.id;
+}
+
+export async function hasUnresolvedSalesRequest(tx: Tx, userId: string) {
+  return (
+    (
+      await tx.execute(
+        sql`select 1 from expert_sales_provider_requests r join expert_onboarding_invoices i on i.id=r.invoice_id where i.user_id=${userId}::uuid and r.status='dispatched' limit 1`,
+      )
+    ).rows.length > 0
+  );
+}
+export async function cancelSupersededSalesNotices(tx: Tx, userId: string) {
+  await tx.execute(
+    sql`update expert_sales_notices n set status='cancelled',receipt=null from expert_sales_bases b where n.base_id=b.id and b.user_id=${userId}::uuid and n.status in('pending','preparing') and (n.choice_revision is distinct from (select max(revision) from expert_sales_choices where base_id=b.id) or n.selection_id is distinct from (select id from expert_sales_selections where base_id=b.id order by selected_at desc,id desc limit 1))`,
+  );
+}
+export async function queueSalesNotice(
+  tx: Tx,
+  userId: string,
+  kind: "refresh" | "reselect" | "24h" | "3h",
+  selectionId: string | null,
+  deadline: string,
+  invoiceId?: string,
+) {
+  await cancelSupersededSalesNotices(tx, userId);
+  await tx.execute(
+    sql`insert into expert_sales_notices(base_id,stage_at,kind,selection_id,invoice_id,choice_revision) select id,${deadline}::timestamptz,${kind},${selectionId}::uuid,${invoiceId ?? null}::uuid,(select max(revision) from expert_sales_choices where base_id=b.id) from expert_sales_bases b where user_id=${userId}::uuid on conflict do nothing`,
+  );
+}
+export async function refreshSeparatedSalesSelection(
+  tx: Tx,
+  userId: string,
+  checkoutExpired = false,
+) {
+  if (await hasUnresolvedSalesRequest(tx, userId)) return;
+  const row = (
+    await tx.execute<{
+      id: string;
+      base: string;
+      choice: string;
+      promo: boolean;
+      term: 1 | 3;
+      expiry: string;
+      amount: string;
+      first: string;
+      kind: "expert" | "space";
+      now: string;
+    }>(
+      sql`select s.id,s.base_id base,s.choice_id choice,s.promo_accepted_flag promo,s.term_months term,s.offer_expiry_date::text expiry,b.base_tariff_amount::text amount,b.base_offer_shown_at::text first,b.participant_kind kind,floor(extract(epoch from clock_timestamp())*1000)::text now from expert_sales_bases b join lateral(select s.* from expert_sales_selections s where s.base_id=b.id order by s.selected_at desc,s.id desc limit 1) s on true where b.user_id=${userId}::uuid and b.consent_version is not null and not exists(select 1 from expert_sales_paid_locks where user_id=b.user_id)`,
+    )
+  ).rows[0];
+  if (!row) return;
+  checkoutExpired ||=
+    (
+      await tx.execute(
+        sql`select 1 from expert_sales_fee_attempts a join expert_onboarding_invoices i on i.id=a.invoice_id where i.user_id=${userId}::uuid and a.expires_at<=clock_timestamp() and i.sales_attempt_number=(select max(sales_attempt_number) from expert_onboarding_invoices where user_id=i.user_id)`,
+      )
+    ).rows.length > 0;
+  if (!checkoutExpired && Date.parse(row.expiry) > Number(row.now)) return;
+  const terms = calculateSeparatedSalesTerms({
+    baseMonthlyMinor: BigInt(row.amount),
+    participantKind: row.kind,
+    firstOfferAtMs: Date.parse(row.first),
+    quotedAtMs: Number(row.now),
+    promotion: row.promo,
+    termMonths: 1,
+  });
+  if (row.term === 3 && terms.packagePriceMinor === null) {
+    await queueSalesNotice(tx, userId, "reselect", row.id, row.expiry);
+    return;
+  }
+  const selection = (
+    await tx.execute<{ id: string; expiry: string }>(
+      sql`insert into expert_sales_selections(base_id,user_id,choice_id,promo_accepted_flag,term_months,monthly_price_minor,package_price_minor,selected_total_minor,energy_discount_bps,package_discount_bps,offer_expiry_date) values(${row.base}::uuid,${userId}::uuid,${row.choice}::uuid,${row.promo},${row.term},${terms.monthlyPriceMinor.toString()}::bigint,${terms.packagePriceMinor?.toString() ?? null}::bigint,${(row.term === 1 ? terms.monthlyPriceMinor : terms.packagePriceMinor!).toString()}::bigint,${terms.energyDiscountBps},${terms.packageDiscountBps},clock_timestamp()+interval '24 hours') returning id,offer_expiry_date::text expiry`,
+    )
+  ).rows[0]!;
+  const invoice = await issueSeparatedSalesFeeAttempt(tx, userId);
+  if (!invoice)
+    await queueSalesNotice(
+      tx,
+      userId,
+      "refresh",
+      selection.id,
+      selection.expiry,
+    );
 }

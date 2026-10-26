@@ -98,9 +98,12 @@ function requiredId(
   return id;
 }
 
-export async function startExpertReferralTestDatabase(): Promise<ExpertReferralTestDatabase> {
+export async function startExpertReferralTestDatabase(
+  replay?: (db: TestDatabase["db"]) => Promise<void>,
+): Promise<ExpertReferralTestDatabase> {
   const base = await startTestPostgres();
-  await base.migrate();
+  if (replay) await replay(base.db);
+  else await base.migrate();
 
   const ensureAdminSession = async (
     adminId: string,

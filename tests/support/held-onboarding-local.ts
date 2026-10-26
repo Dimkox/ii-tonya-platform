@@ -17,6 +17,8 @@ export async function startHeldOnboardingLocal(paymentId = "sales_payment_1") {
   let metadata: Record<string, string> = {};
   let captureAt: string | undefined;
   let dropCreate = false;
+  let dropCapture: "succeeded" | "canceled" | null = null;
+  let dropCancel = false;
   const createdAt = new Date().toISOString();
   const server = createServer(async (req, res) => {
     let raw = "";
@@ -31,10 +33,20 @@ export async function startHeldOnboardingLocal(paymentId = "sales_payment_1") {
       }
     }
     if (req.url?.endsWith("/capture")) {
-      state = "succeeded";
-      captureAt = new Date().toISOString();
+      state = dropCapture ?? "succeeded";
+      if (state === "succeeded") captureAt = new Date().toISOString();
+      if (dropCapture) {
+        req.socket.destroy();
+        return;
+      }
     }
-    if (req.url?.endsWith("/cancel")) state = "canceled";
+    if (req.url?.endsWith("/cancel")) {
+      state = "canceled";
+      if (dropCancel) {
+        req.socket.destroy();
+        return;
+      }
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
@@ -110,6 +122,12 @@ export async function startHeldOnboardingLocal(paymentId = "sales_payment_1") {
     requests,
     waiting() {
       state = "waiting_for_capture";
+    },
+    dropCapture(terminal: "succeeded" | "canceled" = "succeeded") {
+      dropCapture = terminal;
+    },
+    dropCancel() {
+      dropCancel = true;
     },
     dropCreate() {
       dropCreate = true;

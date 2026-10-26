@@ -105,3 +105,47 @@ it("keeps v3 prompt activation disabled and its source digest exact", () => {
   for (const asset of manifest.assets)
     expect(asset.sha256).toBe(digest(asset.path));
 });
+
+it("pins the additive review migration and reconstructed state without widening adjacent paths", () => {
+  const manifest = JSON.parse(
+    readFileSync(`${root}/state/0060_manifest.json`, "utf8"),
+  );
+  expect(manifest.databaseVersion).toBe("170005");
+  expect(manifest.generatePermitted).toBe(false);
+  expect(manifest.migrations.at(-1)).toMatchObject({
+    idx: 60,
+    sha256: digest(`${root}/0060_separated_sales_review_corrections.sql`),
+  });
+  expect(manifest.snapshotSha256).toBe(
+    digest(`${root}/meta/0060_snapshot.json`),
+  );
+  expect(manifest.sqlObjectsSha256).toBe(
+    digest(`${root}/state/0060_sql_objects.json`),
+  );
+  const snapshot = JSON.parse(
+    readFileSync(`${root}/meta/0060_snapshot.json`, "utf8"),
+  );
+  expect(snapshot.prevId).toBe(
+    JSON.parse(readFileSync(`${root}/meta/0059_snapshot.json`, "utf8")).id,
+  );
+  for (const file of [
+    "0060_separated_sales_review_corrections.sql",
+    "meta/0060_snapshot.json",
+    "state/0060_sql_objects.json",
+    "state/0060_manifest.json",
+  ]) {
+    const path = `${root}/${file}`,
+      content = readFileSync(path, "utf8");
+    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+    expect(
+      classifyApprovedTrackedScopeContent({ path, content: content + "\n" }),
+    ).not.toEqual([]);
+  }
+  expect(
+    classifyPaymentScopeProbe({
+      path: "packages/db/src/schema/adjacent-recovery.ts",
+      content:
+        'import {pgTable,uuid} from "drizzle-orm/pg-core";export const x=pgTable("expert_sales_operator_recoveries_extra",{id:uuid("id")});',
+    }),
+  ).not.toEqual([]);
+});

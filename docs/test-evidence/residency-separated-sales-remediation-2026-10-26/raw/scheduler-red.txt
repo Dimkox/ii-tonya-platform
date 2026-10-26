@@ -1,0 +1,122 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (22 tests | 3 failed | 19 skipped) 3351ms
+   ↓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU
+   ↓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII
+   ↓ expired waiting payment is GET-verified and canceled, never captured
+   ↓ unknown create never becomes a second POST and recovers only through actual GET identity
+   ↓ deletion during pre-send decryption cancels actual first disclosure
+   ↓ proven late money remains immutable recovery work without price lock or interview
+   ↓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval
+   ↓ lost quarter requires explicit monthly choice and reuses the same quality approval
+   ↓ day10 silence stays base-only; explicit base selection remains monthly and unlocked
+   ↓ 24h reminders have one durable scoped receipt and revoked owners receive nothing
+   ↓ an explicit unpaid intake transition preserves the original form and enters separated sales
+   ↓ on-time capture reported after checkout expiry still locks its original bound terms
+   ↓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII
+   ↓ checkout TTL refreshes before the commercial stage without repricing or a new manager decision
+   ↓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant
+   ↓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery
+   ↓ review R3 supplemental answers preserve the submitted approval and capture authority
+   ↓ review R4 quarter to month before first manager approval uses the new explicit period
+   ↓ review R5 expired monthly selection refreshes inside the real form submit transaction
+   × review R7 unresolved owner does not abort the scheduler batch 764ms
+     → promise rejected "Error: Failed query: insert into expert_o… { …(2) }" instead of resolving
+   × review R9 preparation failure retries definitely unsent notice 354ms
+     → Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 970f5e82-91a5-48e5-b529-ed3da1056027,970f5e82-91a5-48e5-b529-ed3da1056027,e354ee07-2eac-4589-81c2-17b2cc2fa7da,0b039567-fb60-4f07-b40f-b1fb3c44eb98,test,2
+   × review R10 R11 reselection cancels superseded notices and queues one replacement 419ms
+     → Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 970f5e82-91a5-48e5-b529-ed3da1056027,970f5e82-91a5-48e5-b529-ed3da1056027,e354ee07-2eac-4589-81c2-17b2cc2fa7da,0b039567-fb60-4f07-b40f-b1fb3c44eb98,test,2
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R7 unresolved owner does not abort the scheduler batch
+AssertionError: promise rejected "Error: Failed query: insert into expert_o… { …(2) }" instead of resolving
+ ❯ tests/integration/expert-separated-sales-state.test.ts:855:351
+
+
+Caused by: Error: Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 970f5e82-91a5-48e5-b529-ed3da1056027,970f5e82-91a5-48e5-b529-ed3da1056027,e354ee07-2eac-4589-81c2-17b2cc2fa7da,0b039567-fb60-4f07-b40f-b1fb3c44eb98,test,2
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:855:287
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { query: 'insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id', params: [ '970f5e82-91a5-48e5-b529-ed3da1056027', '970f5e82-91a5-48e5-b529-ed3da1056027', 'e354ee07-2eac-4589-81c2-17b2cc2fa7da', '0b039567-fb60-4f07-b40f-b1fb3c44eb98', 'test', 2 ] }
+Caused by: error: expert_sales_invoice_source
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:855:287
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 154, severity: 'ERROR', code: 'P0001', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'PL/pgSQL function expert_sales_invoice_source() line 4 at RAISE', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'exec_stmt_raise' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R9 preparation failure retries definitely unsent notice
+Error: Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 970f5e82-91a5-48e5-b529-ed3da1056027,970f5e82-91a5-48e5-b529-ed3da1056027,e354ee07-2eac-4589-81c2-17b2cc2fa7da,0b039567-fb60-4f07-b40f-b1fb3c44eb98,test,2
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:856:362
+
+Caused by: error: expert_sales_invoice_source
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:856:362
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 154, severity: 'ERROR', code: 'P0001', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'PL/pgSQL function expert_sales_invoice_source() line 4 at RAISE', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'exec_stmt_raise' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R10 R11 reselection cancels superseded notices and queues one replacement
+Error: Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 970f5e82-91a5-48e5-b529-ed3da1056027,970f5e82-91a5-48e5-b529-ed3da1056027,e354ee07-2eac-4589-81c2-17b2cc2fa7da,0b039567-fb60-4f07-b40f-b1fb3c44eb98,test,2
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:857:164
+
+Caused by: error: expert_sales_invoice_source
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+ ❯ packages/db/src/repositories/expert-sales-scheduler.ts:115:13
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresExpertSalesScheduler.refresh packages/db/src/repositories/expert-sales-scheduler.ts:46:7
+ ❯ tests/integration/expert-separated-sales-state.test.ts:857:164
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 154, severity: 'ERROR', code: 'P0001', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'PL/pgSQL function expert_sales_invoice_source() line 4 at RAISE', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'exec_stmt_raise' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 19 skipped (22)
+   Start at  18:32:45
+   Duration  6.85s (transform 1.33s, setup 0ms, collect 3.01s, tests 3.35s, environment 0ms, prepare 119ms)
+
+
+[END OF RAW CAPTURE]

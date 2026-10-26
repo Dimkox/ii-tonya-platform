@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
@@ -103,7 +104,13 @@ async function selection(
     action: term,
   });
 }
-async function approved(term: "month" | "quarter" = "month") {
+async function approved(
+  term: "month" | "quarter" = "month",
+  hooks: {
+    beforeSubmit?: (f: Awaited<ReturnType<typeof owner>>) => Promise<void>;
+    beforeDecision?: (f: Awaited<ReturnType<typeof owner>>) => Promise<void>;
+  } = {},
+) {
   const f = await owner();
   await selection(f, term);
   let form = await f.form.mutate({ ...command(f.scope), action: "start" });
@@ -123,6 +130,7 @@ async function approved(term: "month" | "quarter" = "month") {
       averageCheckMinor: "300000",
     },
   });
+  await hooks.beforeSubmit?.(f);
   await f.form.mutate({
     ...command(f.scope),
     action: "submit",
@@ -137,6 +145,7 @@ async function approved(term: "month" | "quarter" = "month") {
     providerMode: "test",
     messagingConsentPolicyVersion: policy.messagingConsentPolicyVersion,
   });
+  await hooks.beforeDecision?.(f);
   const result = await repo.decide({
     sessionHash: session,
     applicationId: bridge.id,
@@ -328,7 +337,12 @@ it("unknown create never becomes a second POST and recovers only through actual 
       ).kind,
     ).toBe("pending");
     expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(1);
-    await f.checkout.reconcile(f.invoice.id, f.paymentId);
+    await f.checkout.recoverProviderObject(
+      session,
+      f.invoice.id,
+      f.paymentId,
+      randomUUID(),
+    );
     expect(
       (
         await f.checkout.recoverCheckout({
@@ -836,3 +850,606 @@ it("two genuine captures serialize to one lifetime winner and explicit duplicate
     await second?.stop();
   }
 });
+
+it("review R3 supplemental answers preserve the submitted approval and capture authority", async () => {
+  const f = await approved();
+  try {
+    const form = await f.form.mutate({ ...command(f.scope), action: "start" });
+    await f.form.mutate({
+      ...command(f.scope),
+      action: "followup",
+      expectedRevision: form.revision,
+      answer: "Дополнение без изменения отправленной анкеты",
+    });
+    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    f.local.waiting();
+    await f.checkout.reconcile(f.invoice.id);
+    await f.checkout.reconcile(f.invoice.id);
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_sales_paid_locks where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R4 quarter to month before first manager approval uses the new explicit period", async () => {
+  const f = await approved("quarter", {
+    beforeDecision: async (f) => {
+      await ageBase(f.base.id, 169);
+      const read = await f.sales.transition(command(f.scope));
+      await f.sales.transition({
+        ...command(f.scope),
+        baseId: f.base.id,
+        revision: read!.revision,
+        action: "month",
+      });
+    },
+  });
+  try {
+    expect(
+      (
+        await db.db.execute(
+          sql`select s.term_months term from expert_sales_fee_attempts a join expert_sales_selections s on s.id=a.selection_id where a.invoice_id=${f.invoice.id}::uuid`,
+        )
+      ).rows[0]?.term,
+    ).toBe(1);
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R5 expired monthly selection refreshes inside the real form submit transaction", async () => {
+  const f = await approved("month", {
+    beforeSubmit: async (f) => ageBase(f.base.id, 97),
+  });
+  try {
+    expect(
+      (
+        await db.db.execute(
+          sql`select s.energy_discount_bps discount from expert_sales_fee_attempts a join expert_sales_selections s on s.id=a.selection_id where a.invoice_id=${f.invoice.id}::uuid`,
+        )
+      ).rows[0]?.discount,
+    ).toBe(3000);
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R7 unresolved owner does not abort the scheduler batch", async () => {
+  const f = await approved(),
+    g = await approved();
+  try {
+    f.local.dropCreate();
+    await expect(
+      f.checkout.createCheckout({ invoiceId: f.invoice.id }),
+    ).rejects.toThrow();
+    await ageBase(f.base.id, 97);
+    await ageBase(g.base.id, 97);
+    await expire(f.invoice.id);
+    await expire(g.invoice.id);
+    await expect(
+      new PostgresExpertSalesScheduler(db.db).refresh(50),
+    ).resolves.toBeDefined();
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_onboarding_invoices where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_onboarding_invoices where user_id=${g.userId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(2);
+  } finally {
+    await f.local.stop();
+    await g.local.stop();
+  }
+});
+it("review R9 preparation failure retries definitely unsent notice", async () => {
+  const f = await approved();
+  let fail = true,
+    sent = 0;
+  try {
+    await ageBase(f.base.id, 97);
+    await expire(f.invoice.id);
+    const scheduler = new PostgresExpertSalesScheduler(
+      db.db,
+      {
+        async send(i) {
+          sent++;
+          return { ...i, messageId: "123" };
+        },
+      },
+      {
+        async recoverCheckout() {
+          if (fail) throw Error("preparation_failed");
+          return { kind: "pending" };
+        },
+      },
+    );
+    await scheduler.refresh(50);
+    await db.db.execute(
+      sql`update expert_sales_notices n set status='cancelled' from expert_sales_bases b where b.id=n.base_id and b.user_id<>${f.userId}::uuid and n.status='pending'`,
+    );
+    await scheduler.deliver(new AbortController().signal);
+    expect(sent).toBe(0);
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_sales_notices n join expert_sales_bases b on b.id=n.base_id where b.user_id=${f.userId}::uuid and n.status='pending'`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+    fail = false;
+    expect(
+      (await scheduler.deliver(new AbortController().signal)).delivered,
+    ).toBe(1);
+    expect(sent).toBe(1);
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R10 R11 reselection cancels superseded notices and queues one replacement", async () => {
+  const f = await approved("quarter");
+  try {
+    await ageBase(f.base.id, 169);
+    await expire(f.invoice.id);
+    await new PostgresExpertSalesScheduler(db.db).refresh(50);
+    const s = await f.sales.transition(command(f.scope));
+    await f.sales.transition({
+      ...command(f.scope),
+      baseId: f.base.id,
+      revision: s!.revision,
+      action: "month",
+    });
+    const notices = (
+      await db.db.execute(
+        sql`select n.kind,n.status from expert_sales_notices n join expert_sales_bases b on b.id=n.base_id where b.user_id=${f.userId}::uuid`,
+      )
+    ).rows;
+    expect(
+      notices.filter((n) => n.kind === "reselect" && n.status === "pending"),
+    ).toHaveLength(0);
+    expect(
+      notices.filter((n) => n.kind === "refresh" && n.status === "pending"),
+    ).toHaveLength(1);
+  } finally {
+    await f.local.stop();
+  }
+});
+it.each(["succeeded", "canceled"] as const)(
+  "review R8 R13 lost capture ACK resolves authoritative %s without repost",
+  async (terminal) => {
+    const f = await approved();
+    try {
+      await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+      f.local.waiting();
+      f.local.dropCapture(terminal);
+      await expect(f.checkout.reconcile(f.invoice.id)).rejects.toThrow();
+      expect(
+        (
+          await db.db.execute(
+            sql`select status from expert_sales_provider_requests where invoice_id=${f.invoice.id}::uuid and kind='capture'`,
+          )
+        ).rows[0]?.status,
+      ).toBe("dispatched");
+      await f.checkout.reconcile(f.invoice.id);
+      await f.checkout.reconcile(f.invoice.id);
+      expect(
+        f.local.requests.filter((r) => r.path.endsWith("/capture")),
+      ).toHaveLength(1);
+      expect(
+        (
+          await db.db.execute(
+            sql`select status from expert_sales_provider_requests where invoice_id=${f.invoice.id}::uuid and kind='capture'`,
+          )
+        ).rows[0]?.status,
+      ).toBe(terminal === "succeeded" ? "observed" : "cancelled");
+      expect(
+        (
+          await db.db.execute(
+            sql`select count(*)::int n from expert_sales_paid_locks where user_id=${f.userId}::uuid`,
+          )
+        ).rows[0]?.n,
+      ).toBe(terminal === "succeeded" ? 1 : 0);
+      if (terminal === "canceled") {
+        await expire(f.invoice.id);
+        await f.sales.transition(command(f.scope));
+        expect(
+          (
+            await db.db.execute(
+              sql`select count(*)::int n from expert_onboarding_invoices where user_id=${f.userId}::uuid`,
+            )
+          ).rows[0]?.n,
+        ).toBe(2);
+      }
+    } finally {
+      await f.local.stop();
+    }
+  },
+);
+it("review R13 lost cancel ACK is resolved by GET without repost", async () => {
+  const f = await approved();
+  try {
+    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    f.local.waiting();
+    await expire(f.invoice.id);
+    f.local.dropCancel();
+    await expect(f.checkout.reconcile(f.invoice.id)).rejects.toThrow();
+    await f.checkout.reconcile(f.invoice.id);
+    await f.checkout.reconcile(f.invoice.id);
+    expect(
+      f.local.requests.filter((r) => r.path.endsWith("/cancel")),
+    ).toHaveLength(1);
+    expect(
+      (
+        await db.db.execute(
+          sql`select status from expert_sales_provider_requests where invoice_id=${f.invoice.id}::uuid and kind='cancel'`,
+        )
+      ).rows[0]?.status,
+    ).toBe("observed");
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_sales_paid_locks where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(0);
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R2 expired original bridge quote retains finite fiscal custody for later approval and replacement", async () => {
+  const f = await approved("month", {
+    beforeSubmit: async (f) => ageBase(f.base.id, 26),
+    beforeDecision: async (f) => {
+      await db.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`alter table expert_campaign_quotes disable trigger expert_campaign_quotes_append_only`,
+        );
+        await tx.execute(
+          sql`update expert_campaign_quotes set quoted_at=quoted_at-interval '25 hours',expires_at=expires_at-interval '25 hours' where user_id=${f.userId}::uuid`,
+        );
+        await tx.execute(
+          sql`alter table expert_campaign_quotes enable trigger expert_campaign_quotes_append_only`,
+        );
+      });
+    },
+  });
+  try {
+    const receipts = new PostgresPayerReceiptContactRepository(
+      db.db,
+      f.vault,
+      30,
+    );
+    await receipts.redactExpiredBatch(50);
+    expect(
+      (
+        await db.db.execute(
+          sql`select redacted_at from payer_receipt_contacts where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0]?.redacted_at,
+    ).toBeNull();
+    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await expire(f.invoice.id);
+    await f.sales.transition(command(f.scope));
+    const latest = (
+      await db.db.execute<{ id: string }>(
+        sql`select id from expert_onboarding_invoices where user_id=${f.userId}::uuid order by sales_attempt_number desc limit 1`,
+      )
+    ).rows[0]!;
+    expect(latest.id).not.toBe(f.invoice.id);
+    const replacement = await startHeldOnboardingLocal(
+      `replacement_${randomUUID()}`,
+    );
+    try {
+      const checkout = new PostgresHeldOnboardingCheckout(db.db, {
+        enabled: true,
+        client: replacement.client,
+        vault: f.vault,
+        protector: replacement.protector,
+        decryptor: replacement.decryptor,
+        repository: f.repo,
+        returnUrl: "https://example.com/return",
+        vatCode: 1,
+        mode: "test",
+      });
+      await expect(
+        checkout.createCheckout({ invoiceId: latest.id }),
+      ).resolves.toHaveProperty("url");
+    } finally {
+      await replacement.stop();
+    }
+  } finally {
+    await f.local.stop();
+  }
+});
+it("review R6 operational recovery requires fresh manager and records the real GET binding", async () => {
+  const f = await approved();
+  const Fastify = createRequire(
+    new URL("../../apps/api/package.json", import.meta.url),
+  )(
+    "fastify",
+  ) as typeof import("../../apps/api/node_modules/fastify/fastify.js").default;
+  const { expertVerificationRoutes } =
+    await import("../../apps/api/src/routes/expert-verification.js");
+  const { createExpertVerificationService } =
+    await import("../../packages/application/src/expert-verification-service.js");
+  const app = Fastify({ logger: false });
+  try {
+    f.local.dropCreate();
+    await expect(
+      f.checkout.createCheckout({ invoiceId: f.invoice.id }),
+    ).rejects.toThrow();
+    const token = "synthetic_recovery_manager_token_12345",
+      sessionHash = `sha256:${hash(token)}`;
+    await db.db.execute(
+      sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) select ${sessionHash},admin_id,clock_timestamp(),clock_timestamp()+interval '1 hour' from admin_sessions where session_id_hash=${session}`,
+    );
+    await app.register(expertVerificationRoutes, {
+      enabled: true,
+      service: createExpertVerificationService({
+        enabled: true,
+        repository: f.repo,
+        heldCheckout: f.checkout,
+      }),
+    });
+    const payload = {
+        providerObjectId: f.paymentId,
+        idempotencyKey: randomUUID(),
+      },
+      url = `/v1/admin/expert-verification/invoices/${f.invoice.id}/recover`;
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url,
+          headers: {
+            authorization: "Bearer synthetic_foreign_token_123456789",
+          },
+          payload,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url,
+          headers: { authorization: `Bearer ${token}` },
+          payload: { ...payload, providerObjectId: "foreign_payment" },
+        })
+      ).statusCode,
+    ).toBe(503);
+    for (let i = 0; i < 2; i++)
+      expect(
+        (
+          await app.inject({
+            method: "POST",
+            url,
+            headers: { authorization: `Bearer ${token}` },
+            payload,
+          })
+        ).statusCode,
+      ).toBe(200);
+    expect(
+      (
+        await db.db.execute(
+          sql`select count(*)::int n from expert_sales_operator_recoveries where invoice_id=${f.invoice.id}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+    await db.db.execute(
+      sql`update admin_sessions set mfa_verified_at=clock_timestamp()-interval '16 minutes' where session_id_hash=${sessionHash}`,
+    );
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url,
+          headers: { authorization: `Bearer ${token}` },
+          payload,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+  } finally {
+    await app.close();
+    await f.local.stop();
+  }
+});
+it.each(["foreign_bot", "foreign_chat", "matching"] as const)(
+  "review R13 R14 actual worker Telegram parser %s and exact stage amounts",
+  async (mode) => {
+    const f = await owner();
+    await selection(f);
+    await ageBase(f.base.id, 95);
+    await db.db.execute(
+      sql`insert into expert_sales_ticks(base_id,checked_at) select id,clock_timestamp() from expert_sales_bases where id<>${f.base.id}::uuid on conflict(base_id) do update set checked_at=excluded.checked_at`,
+    );
+    await db.db.execute(
+      sql`update expert_sales_notices set status='cancelled' where status='pending'`,
+    );
+    const { createSeparatedSalesRunner } =
+      await import("../../apps/worker/src/expert-separated-sales-composition.js");
+    const { loadEnv } = await import("../../packages/config/src/env.js");
+    const config = loadEnv({
+      DATABASE_URL: "postgresql://synthetic:synthetic@localhost/fixture",
+      ALLOW_INSECURE_LOCAL_DATABASE: "true",
+      EXPERT_APPLICANT_ENABLED: "true",
+      EXPERT_VERIFICATION_FORM_ENABLED: "true",
+      EXPERT_SEPARATED_SALES_ENABLED: "true",
+      EXPERT_PROMO_TELEGRAM_BOT_ID: policy.botId,
+      EXPERT_PROMO_TELEGRAM_BOT_KEY: policy.botKey,
+      EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
+      EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
+        policy.messagingConsentPolicyVersion,
+    });
+    let sent = "";
+    const runner = createSeparatedSalesRunner(
+      db.db,
+      {
+        ...config,
+        features: { ...config.features, expertResidencyNoticeDelivery: true },
+        expertApplicant: {
+          ...config.expertApplicant!,
+          botToken: `${policy.botId}:synthetic_test_token_only`,
+        },
+      },
+      async (_url, init) => {
+        sent = JSON.parse(String(init?.body)).text;
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            result: {
+              message_id: 123,
+              from: {
+                id: mode === "foreign_bot" ? 999 : Number(policy.botId),
+                is_bot: true,
+              },
+              chat: {
+                id: mode === "foreign_chat" ? 999 : Number(f.scope.chatId),
+                type: "private",
+              },
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    )!;
+    try {
+      await runner.runOnce();
+      expect(sent).toContain("5994 ₽");
+      expect(sent).toContain("6993 ₽");
+      expect(sent).toContain("Срок:");
+      expect(sent).toContain("осталось");
+      expect(sent).not.toContain("https://yookassa");
+      expect(
+        (
+          await db.db.execute(
+            sql`select status from expert_sales_notices where base_id=${f.base.id}::uuid and kind='3h'`,
+          )
+        ).rows[0]?.status,
+      ).toBe(mode === "matching" ? "delivered" : "dispatched");
+    } finally {
+      runner.stopAccepting();
+    }
+  },
+);
+it.each(["waiting", "canceled"] as const)(
+  "review R13 normal held composition receives actual HTTP %s webhook",
+  async (terminal) => {
+    const f = await approved();
+    const Fastify = createRequire(
+      new URL("../../apps/api/package.json", import.meta.url),
+    )(
+      "fastify",
+    ) as typeof import("../../apps/api/node_modules/fastify/fastify.js").default;
+    const app = Fastify({ logger: false });
+    try {
+      const { loadEnv } = await import("../../packages/config/src/env.js");
+      const { createExpertVerificationComposition } =
+        await import("../../apps/api/src/expert-verification-composition.js");
+      const { yookassaWebhookRoutes } =
+        await import("../../apps/api/src/routes/yookassa-webhook.js");
+      const { PostgresWebhookInboxRepository } =
+        await import("../../packages/db/src/repositories/webhook-inbox-repository.js");
+      const { PostgresYooKassaPaymentPurposeRepository } =
+        await import("../../packages/db/src/repositories/yookassa-payment-purpose-repository.js");
+      const config = loadEnv({
+        DATABASE_URL: "postgresql://synthetic:synthetic@localhost/fixture",
+        ALLOW_INSECURE_LOCAL_DATABASE: "true",
+        EXPERT_APPLICANT_ENABLED: "true",
+        EXPERT_VERIFICATION_FORM_ENABLED: "true",
+        EXPERT_SEPARATED_SALES_ENABLED: "true",
+        EXPERT_ONBOARDING_HELD_ENABLED: "true",
+        EXPERT_PROMO_TELEGRAM_BOT_ID: policy.botId,
+        EXPERT_PROMO_TELEGRAM_BOT_KEY: policy.botKey,
+        EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET:
+          "synthetic_sales_secret_1234567890",
+        EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
+          policy.messagingConsentPolicyVersion,
+        EXPERT_VERIFICATION_ENABLED: "true",
+        EXPERT_VERIFICATION_CHECKOUT_ENABLED: "true",
+        EXPERT_VERIFICATION_PAYMENT_VERIFICATION_ENABLED: "true",
+        EXPERT_VERIFICATION_PAYMENT_MODE: "test",
+        EXPERT_VERIFICATION_MESSAGING_CONSENT_POLICY_VERSION:
+          policy.messagingConsentPolicyVersion,
+      });
+      const capability = createExpertVerificationComposition(db.db, config, {
+        providerMode: "test",
+        heldOnboarding: {
+          client: f.local.client,
+          vault: f.vault,
+          protector: f.local.protector,
+          decryptor: f.local.decryptor,
+          returnUrl: "https://example.com/return",
+          vatCode: 1,
+        },
+        paymentVerification: {
+          authoritativeGet: true,
+          client: { getPayment: (id) => f.local.client.inspect(id) },
+        },
+      })!;
+      expect(
+        await capability.service.checkout(session, f.invoice.id),
+      ).toMatchObject({ kind: "ok", payment: { status: "ready" } });
+      f.local.waiting();
+      if (terminal === "canceled") {
+        await expire(f.invoice.id);
+        await f.checkout.reconcile(f.invoice.id);
+      }
+      const purposes = new PostgresYooKassaPaymentPurposeRepository(db.db);
+      await yookassaWebhookRoutes(app, {
+        effectivePeerAddress: () => "185.71.76.1",
+        inbox: new PostgresWebhookInboxRepository(db.db),
+        resolvePurpose: (id, event) => purposes.resolvePurpose(id, event),
+        onboarding: capability.onboardingWebhook!,
+        verify: async () => {
+          throw Error("wrong_main_route");
+        },
+        deliver: async () => {
+          throw Error("wrong_main_route");
+        },
+        resolveSucceeded: async () => {
+          throw Error("wrong_main_route");
+        },
+      });
+      const payload = {
+        type: "notification",
+        event:
+          terminal === "waiting"
+            ? "payment.waiting_for_capture"
+            : "payment.canceled",
+        object: { id: f.paymentId, metadata: { purpose: "MAIN_SUBSCRIPTION" } },
+      };
+      for (let n = 0; n < 2; n++) {
+        const res = await app.inject({
+          method: "POST",
+          url: "/v1/webhooks/yookassa",
+          payload,
+        });
+        expect(res.statusCode, res.body).toBe(200);
+      }
+      expect(
+        f.local.requests.filter((r) => r.path.endsWith("/capture")),
+      ).toHaveLength(terminal === "waiting" ? 1 : 0);
+      expect(
+        (
+          await db.db.execute(
+            sql`select status from expert_onboarding_invoices where id=${f.invoice.id}::uuid`,
+          )
+        ).rows[0]?.status,
+      ).toBe(terminal === "waiting" ? "pending" : "cancelled");
+    } finally {
+      await app.close();
+      await f.local.stop();
+    }
+  },
+);

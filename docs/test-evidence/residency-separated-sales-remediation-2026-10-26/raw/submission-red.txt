@@ -1,0 +1,95 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (19 tests | 3 failed | 16 skipped) 2564ms
+   ↓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU
+   ↓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII
+   ↓ expired waiting payment is GET-verified and canceled, never captured
+   ↓ unknown create never becomes a second POST and recovers only through actual GET identity
+   ↓ deletion during pre-send decryption cancels actual first disclosure
+   ↓ proven late money remains immutable recovery work without price lock or interview
+   ↓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval
+   ↓ lost quarter requires explicit monthly choice and reuses the same quality approval
+   ↓ day10 silence stays base-only; explicit base selection remains monthly and unlocked
+   ↓ 24h reminders have one durable scoped receipt and revoked owners receive nothing
+   ↓ an explicit unpaid intake transition preserves the original form and enters separated sales
+   ↓ on-time capture reported after checkout expiry still locks its original bound terms
+   ↓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII
+   ↓ checkout TTL refreshes before the commercial stage without repricing or a new manager decision
+   ↓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant
+   ↓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery
+   × review R3 supplemental answers preserve the submitted approval and capture authority 562ms
+     → expected +0 to be 1 // Object.is equality
+   × review R4 quarter to month before first manager approval uses the new explicit period 259ms
+     → verification_storage_unavailable
+   × review R5 expired monthly selection refreshes inside the real form submit transaction 164ms
+     → Failed query: insert into expert_campaign_quotes(user_id,tariff_version_id,idempotency_key,profile_revision,rule_version,calculation_timestamp,quoted_at,expires_at,term_months,duration_seconds,base_monthly_minor,discounted_monthly_minor,monthly_price_minor,package_price_minor,price_minor,currency,energy_discount_bps,start_discount_bps,floor_applied,display_name,credit_cap_bps,individual_services_enabled,group_event_limit,statistics_level,support_priority,sales_selection_id,paid_lock_invoice_id)
+    select b.user_id,b.tariff_version_id,$1,b.profile_revision,b.policy_version,b.base_offer_shown_at,date_trunc('milliseconds',clock_timestamp()),case when $2::uuid is not null then date_trunc('milliseconds',clock_timestamp())+interval '24 hours' else least(s.offer_expiry_date,date_trunc('milliseconds',clock_timestamp())+interval '24 hours') end,s.term_months,2592000*s.term_months,b.base_tariff_amount,div(b.base_tariff_amount::numeric*(10000-s.energy_discount_bps)+5000,10000),s.monthly_price_minor,s.package_price_minor,s.selected_total_minor,'RUB',s.energy_discount_bps,s.package_discount_bps,case when s.term_months=1 then div(b.base_tariff_amount::numeric*(10000-s.energy_discount_bps)+5000,10000)<500000 else div(b.base_tariff_amount::numeric*3*(10000-s.energy_discount_bps)*(10000-s.package_discount_bps)+50000000,100000000)<1500000 end,t.display_name,t.credit_cap_bps,t.individual_services_enabled,t.group_event_limit,t.statistics_level,t.support_priority,s.id,$3::uuid from expert_sales_selections s join expert_sales_bases b on b.id=s.base_id join expert_residency_tariff_versions t on t.id=b.tariff_version_id where s.id=$4::uuid returning id
+params: sales-form:459e071e-bac5-4842-9fc8-5e37b5346e18:2,,,6b09b65d-6435-4481-8953-7fe4737c0222
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R3 supplemental answers preserve the submitted approval and capture authority
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts:845:133
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R4 quarter to month before first manager approval uses the new explicit period
+ExpertVerificationError: verification_storage_unavailable
+ ❯ PostgresExpertVerificationRepository.transaction packages/db/src/repositories/expert-verification-repository.ts:86:13
+     84|     } catch (error) {
+     85|       if (error instanceof ExpertVerificationError) throw error;
+     86|       throw new ExpertVerificationError("verification_storage_unavaila…
+       |             ^
+     87|     }
+     88|   }
+ ❯ approved tests/integration/expert-separated-sales-state.test.ts:142:18
+ ❯ tests/integration/expert-separated-sales-state.test.ts:849:10
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R5 expired monthly selection refreshes inside the real form submit transaction
+Error: Failed query: insert into expert_campaign_quotes(user_id,tariff_version_id,idempotency_key,profile_revision,rule_version,calculation_timestamp,quoted_at,expires_at,term_months,duration_seconds,base_monthly_minor,discounted_monthly_minor,monthly_price_minor,package_price_minor,price_minor,currency,energy_discount_bps,start_discount_bps,floor_applied,display_name,credit_cap_bps,individual_services_enabled,group_event_limit,statistics_level,support_priority,sales_selection_id,paid_lock_invoice_id)
+    select b.user_id,b.tariff_version_id,$1,b.profile_revision,b.policy_version,b.base_offer_shown_at,date_trunc('milliseconds',clock_timestamp()),case when $2::uuid is not null then date_trunc('milliseconds',clock_timestamp())+interval '24 hours' else least(s.offer_expiry_date,date_trunc('milliseconds',clock_timestamp())+interval '24 hours') end,s.term_months,2592000*s.term_months,b.base_tariff_amount,div(b.base_tariff_amount::numeric*(10000-s.energy_discount_bps)+5000,10000),s.monthly_price_minor,s.package_price_minor,s.selected_total_minor,'RUB',s.energy_discount_bps,s.package_discount_bps,case when s.term_months=1 then div(b.base_tariff_amount::numeric*(10000-s.energy_discount_bps)+5000,10000)<500000 else div(b.base_tariff_amount::numeric*3*(10000-s.energy_discount_bps)*(10000-s.package_discount_bps)+50000000,100000000)<1500000 end,t.display_name,t.credit_cap_bps,t.individual_services_enabled,t.group_event_limit,t.statistics_level,t.support_priority,s.id,$3::uuid from expert_sales_selections s join expert_sales_bases b on b.id=s.base_id join expert_residency_tariff_versions t on t.id=b.tariff_version_id where s.id=$4::uuid returning id
+params: sales-form:459e071e-bac5-4842-9fc8-5e37b5346e18:2,,,6b09b65d-6435-4481-8953-7fe4737c0222
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ createSeparatedSalesQuote packages/db/src/repositories/expert-separated-sales-repository.ts:318:5
+
+ ❯ bridgeSeparatedSalesForm packages/db/src/repositories/expert-separated-sales-repository.ts:344:19
+ ❯ packages/db/src/repositories/resident-verification-repository.ts:247:11
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ approved tests/integration/expert-separated-sales-state.test.ts:127:3
+ ❯ tests/integration/expert-separated-sales-state.test.ts:853:10
+
+Caused by: error: expert_sales_quote_source
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ createSeparatedSalesQuote packages/db/src/repositories/expert-separated-sales-repository.ts:318:5
+ ❯ bridgeSeparatedSalesForm packages/db/src/repositories/expert-separated-sales-repository.ts:344:19
+ ❯ packages/db/src/repositories/resident-verification-repository.ts:247:11
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ approved tests/integration/expert-separated-sales-state.test.ts:127:3
+ ❯ tests/integration/expert-separated-sales-state.test.ts:853:10
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 151, severity: 'ERROR', code: 'P0001', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'PL/pgSQL function expert_sales_quote_source() line 15 at RAISE', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'exec_stmt_raise' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 16 skipped (19)
+   Start at  18:23:52
+   Duration  5.90s (transform 1.32s, setup 0ms, collect 2.88s, tests 2.56s, environment 0ms, prepare 107ms)
+
+
+[END OF RAW CAPTURE]

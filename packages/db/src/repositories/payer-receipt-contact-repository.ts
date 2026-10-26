@@ -75,12 +75,15 @@ export class PostgresPayerReceiptContactRepository {
     private readonly vault?: PayerReceiptVault,
     private readonly retentionDays?: number,
   ) {}
-  async capture(input: {
-    userId: string;
-    quoteId: string;
-    email: string;
-    idempotencyKey: string;
-  }) {
+  async capture(
+    input: {
+      userId: string;
+      quoteId: string;
+      email: string;
+      idempotencyKey: string;
+    },
+    transaction?: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+  ) {
     const { userId, ...request } = input;
     const parsed = payerReceiptCaptureRequestSchema.safeParse(request);
     if (!parsed.success || !/^[0-9a-f-]{36}$/iu.test(userId))
@@ -95,7 +98,9 @@ export class PostgresPayerReceiptContactRepository {
     )
       throw new PayerReceiptError("PAYER_RECEIPT_UNAVAILABLE");
     try {
-      return await this.db.transaction(async (tx) => {
+      const write = async (
+        tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+      ) => {
         await lockClientConsentSubject(tx, userId);
         const user = (
           await tx.execute<{ active: boolean }>(
@@ -132,7 +137,7 @@ export class PostgresPayerReceiptContactRepository {
         if (!bound) {
           const quote = (
             await tx.execute<{ id: string }>(
-              sql`select q.id from expert_campaign_quotes q join expert_residency_tariff_versions t on t.id=q.tariff_version_id where q.id=${parsed.data.quoteId}::uuid and q.user_id=${userId}::uuid and q.quoted_at<=clock_timestamp() and q.expires_at>clock_timestamp() and t.active_from<=clock_timestamp() and t.active_to>clock_timestamp() and not exists(select 1 from expert_residency_orders o where o.campaign_quote_id=q.id) for share of q,t`,
+              sql`select q.id from expert_campaign_quotes q join expert_residency_tariff_versions t on t.id=q.tariff_version_id where q.id=${parsed.data.quoteId}::uuid and q.user_id=${userId}::uuid and (expert_sales_receipt_authority(q.id,q.user_id) or (q.rule_version<>'expert_separated_sales_v3' and q.quoted_at<=clock_timestamp() and q.expires_at>clock_timestamp() and t.active_from<=clock_timestamp() and t.active_to>clock_timestamp())) and not exists(select 1 from expert_residency_orders o where o.campaign_quote_id=q.id) for share of q,t`,
             )
           ).rows[0];
           if (!quote) throw new PayerReceiptError("PAYER_RECEIPT_UNAVAILABLE");
@@ -171,7 +176,10 @@ export class PostgresPayerReceiptContactRepository {
           quoteId: metadata.quoteId,
           expiresAt,
         };
-      });
+      };
+      return transaction
+        ? await write(transaction)
+        : await this.db.transaction(write);
     } catch (e) {
       if (e instanceof PayerReceiptError) throw e;
       throw new PayerReceiptError("PAYER_RECEIPT_UNAVAILABLE");

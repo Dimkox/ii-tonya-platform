@@ -40,6 +40,7 @@ export interface ExpertVerificationCapability {
   checkoutEnabled: boolean;
   paymentVerificationEnabled: boolean;
   onboardingWebhook?: YooKassaOnboardingWebhookCapability;
+  heldCheckout?: PostgresHeldOnboardingCheckout;
 }
 export function assertExpertVerificationPayments(
   config: RuntimeConfig,
@@ -131,6 +132,7 @@ export function createExpertVerificationComposition(
     checkoutEnabled: settings.checkoutEnabled,
     paymentVerificationEnabled: settings.paymentVerificationEnabled,
     ...(onboardingWebhook ? { onboardingWebhook } : {}),
+    ...(heldCheckout ? { heldCheckout } : {}),
     service: createExpertVerificationService({
       enabled: config.features.expertVerification === true,
       repository,
