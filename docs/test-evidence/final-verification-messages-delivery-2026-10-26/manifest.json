@@ -20,6 +20,20 @@
       "bytes": 356,
       "sha256": "6673fa227e819e324bd8149c861d47768f7078b74865efbc2146e23cadbbabdf",
       "archiveSha256": "30c85b3a18fa474deeaa7482d138ef15b4b81388a1225f6f7a43201c44242eae"
+    },
+    {
+      "source": "/tmp/verification-messages-final-gate-1793051891287569007.log",
+      "archive": "verification-messages-final-gate-1793051891287569007.log.gz",
+      "bytes": 491,
+      "sha256": "fd41acad8a310a1586c05ec35e0e89e5220e9e341c46a237f589f44992e77046",
+      "archiveSha256": "e3e849184604b59d430821e73fff03573a645afff90e855d1c210ea9e0618621"
+    },
+    {
+      "source": "/tmp/verification-messages-final-repo-1793051891287569007.log",
+      "archive": "verification-messages-final-repo-1793051891287569007.log.gz",
+      "bytes": 7963,
+      "sha256": "cd8f7595346651543cd5c674c4109fdeabf2fcf08d4dd9a4efcaa293fc8537d4",
+      "archiveSha256": "ee1e5bc536b29f9db5ade8036621f4d67244d1da3399b5165c26885e4c3446af"
     }
   ]
 }

@@ -173,3 +173,16 @@ quote-owner FK, pending queue and all prior checks remain. No runtime/schema cha
 or relaxed assertion. Focused test passes1/1 at21:56UTC. A bounded independent review
 of this guard change and a corrected canonical gate follow; runtime R1–R6 acceptance
 at3baaf003 is unchanged.
+
+## Final development acceptance
+
+Independent gap reviewer accepted the exact schema guard at3c546774 after checking
+its unchanged schema/migration authority and all three retained log hashes. The
+corrected canonical full gate at3c5467746efedf7fdce6721527ba2965eb5c46d0 exited0:
+592/592 repository tests, full tests typecheck, syntax, formatting, evidence,
+changed-file lint and whitespace all passed. Both failed and passing gate logs
+remain hashed in the delivery archive. Runtime acceptance remains3baaf003.
+
+The S2a development contract is done. Root proceeds through the mandatory push
+hook and creates a draft stacked PR; no hosted CI, merge, deployment, provider
+activation or release acceptance is claimed. The next approved increment is S2b.

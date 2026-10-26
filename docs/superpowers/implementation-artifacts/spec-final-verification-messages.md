@@ -2,7 +2,7 @@
 title: Complete versioned resident verification and truthful manager communications
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 53df4d2fbbe09038bde2298e4642cee4247fbe2b
 review_loop_iteration: 1
 context:

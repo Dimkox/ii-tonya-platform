@@ -1,3 +1,20 @@
+# Verification/messages accepted; delivery next — 2026-10-26
+
+Active isolated branch codex/residency-verification-messages-20261026 in
+.worktrees/phase1-owner-plan-20261023. Runtime3baaf003 acceptedR1–R6 by all three
+independent reviewers. Guard-only3c546774 separately accepted; canonical full gate
+at3c5467746efedf7fdce6721527ba2965eb5c46d0 passed592/592 plus tests typecheck and
+all other checks. Failed gate and precise correction remain archived. Spec is done.
+Root now owns mandatory gated push and DraftPR on codex/residency-content-safety-20261026
+(PR112 still open at53df4d2f). No bypass, merge, deployment or live activation.
+
+Continue the entire approved package: S2b private custody/extraction/OCR/social
+jobs is next, then rich onboarding/tags and scheduling/lifecycle. Existing draft and
+preparation need reconciliation with accepted0063; next hand migration0064.
+One existing protected PostgreSQL17.5 cluster, no competing test commands.
+Refund policy remains pending/manual; no repeated question or routine permission loop.
+BMad already rendered once; preserve owner autonomy and bounded-test override.
+
 # Verification/messages review correction active — 2026-10-26
 
 Same isolated worktree .worktrees/phase1-owner-plan-20261023, active branch
