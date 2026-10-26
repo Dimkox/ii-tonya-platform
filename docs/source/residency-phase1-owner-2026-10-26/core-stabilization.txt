@@ -45,12 +45,12 @@
         # Попытка чтения PDF
         doc = fitz.open(stream=file_data, filetype="pdf")
         text = "".join([page.get_text() for page in doc])
-        
+
         if len(text.strip()) < 50: # Слишком короткий текст, вероятно пустой скан
              raise ValueError("InsufficientTextContent")
-             
+
         return {"source": "pdf", "content": text}
-        
+
     except Exception as e:
         logger.warning(f"Parsing failed for user {user_id}: {str(e)}")
         return None # Возвращаем None вместо падения

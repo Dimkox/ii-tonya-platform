@@ -5,7 +5,7 @@ Status: implementation pending. No completion or release claim.
 Baseline: `567e71b4dea4bd2720da452c8049916f9d2b437c` (PR108).
 Branch: `codex/residency-foundation-20261026`, existing isolated worktree.
 
-Seven verbatim owner inputs and SHA256 manifest are preserved in
+Seven whitespace-normalized owner inputs and SHA256 manifest are preserved in
 `docs/source/residency-phase1-owner-2026-10-26`. The final verification document
 supersedes the prior protocol. Root resolved the circular interview/card approval
 prerequisite by separating interview admission from main paid entitlement; an

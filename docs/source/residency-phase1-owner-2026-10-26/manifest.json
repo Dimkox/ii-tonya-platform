@@ -1,6 +1,6 @@
 {
   "received_date": "2026-10-26",
-  "kind": "verbatim_owner_sources",
+  "kind": "owner_sources_whitespace_normalized",
   "precedence": {
     "verification-final": {
       "supersedes": ["verification-protocol-prior"]
@@ -10,44 +10,59 @@
     {
       "module": "verification-final",
       "path": "docs/source/residency-phase1-owner-2026-10-26/verification-final.txt",
-      "sha256": "7e5b51fdc7f8ab68d0850bbad63484de6cc5f00a64a7b11e37c5634980140b1d",
-      "bytes": 16926
+      "original_sha256": "7e5b51fdc7f8ab68d0850bbad63484de6cc5f00a64a7b11e37c5634980140b1d",
+      "original_bytes": 16926,
+      "sha256": "be64cbd16852674e1f06a3338f7951d29333079e7c5aa4cf09b91b90a7beb70c",
+      "bytes": 16703
     },
     {
       "module": "core-stabilization",
       "path": "docs/source/residency-phase1-owner-2026-10-26/core-stabilization.txt",
-      "sha256": "937c55426e92543ba8c52a50c44c2113027f45aeb78cfbb14f50bbe64e8f8e03",
-      "bytes": 8432
+      "original_sha256": "937c55426e92543ba8c52a50c44c2113027f45aeb78cfbb14f50bbe64e8f8e03",
+      "original_bytes": 8432,
+      "sha256": "bdbf8409a66192506d945e550afa97011a21d3263c27b87854720a433081d1b6",
+      "bytes": 8299
     },
     {
       "module": "verification-protocol-prior",
       "path": "docs/source/residency-phase1-owner-2026-10-26/verification-protocol-prior.txt",
-      "sha256": "e9f52c5e8488cc69faf7e440dc88e80bf55e6f669d44e5b1b079adc6a1c30264",
-      "bytes": 13884
+      "original_sha256": "e9f52c5e8488cc69faf7e440dc88e80bf55e6f669d44e5b1b079adc6a1c30264",
+      "original_bytes": 13884,
+      "sha256": "27a52c79c6b4ab9dd9bf0e9c77d5b3e9201283d20417f30bb806f99c1f79f565",
+      "bytes": 13683
     },
     {
       "module": "resident-onboarding",
       "path": "docs/source/residency-phase1-owner-2026-10-26/resident-onboarding.txt",
-      "sha256": "102cc07e418fbae071483e34cb370e66d5886ef49f230a2e75f41393db86818f",
-      "bytes": 22064
+      "original_sha256": "102cc07e418fbae071483e34cb370e66d5886ef49f230a2e75f41393db86818f",
+      "original_bytes": 22064,
+      "sha256": "2713006986a100dd3e1374853b27ba8e9e0d027040ae513b553bda715554952a",
+      "bytes": 21790
     },
     {
       "module": "communication-templates",
       "path": "docs/source/residency-phase1-owner-2026-10-26/communication-templates.txt",
-      "sha256": "b7b93c3bc3375cb9a43e4e6dc1f3fcb6d10a078a9cce0035c0bc6c60e3a7e7f1",
-      "bytes": 12100
+      "original_sha256": "b7b93c3bc3375cb9a43e4e6dc1f3fcb6d10a078a9cce0035c0bc6c60e3a7e7f1",
+      "original_bytes": 12100,
+      "sha256": "2bc3db727fe037a14686f26dbd11c89761e5e9f20b07cca8477d0a46b6452a09",
+      "bytes": 11951
     },
     {
       "module": "hashtaxonomy-v2",
       "path": "docs/source/residency-phase1-owner-2026-10-26/hashtaxonomy-v2.txt",
-      "sha256": "25095561968806b6b68e30da439896984407bcdf6147a86867b89c33d90bc13a",
-      "bytes": 32761
+      "original_sha256": "25095561968806b6b68e30da439896984407bcdf6147a86867b89c33d90bc13a",
+      "original_bytes": 32761,
+      "sha256": "f5211313189e3d3074a761868693796e93bb160c01d87f3d2989bac48b2ab75e",
+      "bytes": 32451
     },
     {
       "module": "content-safety-filter",
       "path": "docs/source/residency-phase1-owner-2026-10-26/content-safety-filter.txt",
-      "sha256": "c8571df1683c9dd67b28d68330c8e7a9c567681890a747c369db0bb1b48d2172",
-      "bytes": 12582
+      "original_sha256": "c8571df1683c9dd67b28d68330c8e7a9c567681890a747c369db0bb1b48d2172",
+      "original_bytes": 12582,
+      "sha256": "612b0cdc3cc8095bcc79c97195bdc60e60cb3cc940b1a5826a20ab942ee45927",
+      "bytes": 12445
     }
-  ]
+  ],
+  "normalization": "UTF-8; CRLF to LF; trailing line whitespace removed. Original attachment SHA256 and byte length retained separately; wording unchanged."
 }

@@ -2,7 +2,7 @@
 
 Branch codex/residency-foundation-20261026 in the existing isolated worktree.
 Baseline 567e71b4dea4bd2720da452c8049916f9d2b437c is the delivered PR108 head.
-Seven new verbatim owner specifications are archived with hashes under
+Seven new whitespace-normalized owner specifications are archived with hashes under
 docs/source/residency-phase1-owner-2026-10-26. Final verification supersedes
 its prior protocol. Ordered package: stabilization, guardrails, final verification
 and communications, onboarding/taxonomy, schedule/lifecycle. Continue authorized

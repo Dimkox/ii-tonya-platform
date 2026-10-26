@@ -166,14 +166,14 @@ stateDiagram-v2
     DRAFT --> MANAGER_REVIEW: Auto-check passed
     MANAGER_REVIEW --> APPROVED_IN_DB: Менеджер одобрил
     MANAGER_REVIEW --> DRAFT: Менеджер вернул на доработку
-    
+
     APPROVED_IN_DB --> PROMO_CONFIRMED: Пользователь подтвердил анонсы
     APPROVED_IN_DB --> SUSPENDED: Нет анонсов > 7 дней (Эскалация)
-    
+
     PROMO_CONFIRMED --> AWAITING_PAYMENT: Генерация счета на тариф
     AWAITING_PAYMENT --> ACTIVE_VISIBLE: Оплата ЮKassa Success
     AWAITING_PAYMENT --> SUSPENDED: Не оплачено > 3 дней
-    
+
     ACTIVE_VISIBLE --> ARCHIVED: Пауза / Непродление
     ACTIVE_VISIBLE --> SUSPENDED: Много отказов / Нарушения
 ```
