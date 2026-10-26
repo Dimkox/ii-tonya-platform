@@ -10,7 +10,8 @@ MAX_INPUT = 5 * 1024 * 1024
 MAX_OUTPUT = 64000
 
 
-def extract(data, kind, ocr=False, tessdata="/models"):
+def extract(data, kind, ocr=False, tessdata="/models", with_coverage=False):
+    complete = True
     source = kind
     if ocr:
         for name, expected in [("rus", "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225"), ("eng", "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2")]:
@@ -37,6 +38,10 @@ def extract(data, kind, ocr=False, tessdata="/models"):
             pixels = 0
             for page in document:
                 text = page.get_text()
+                if page.get_images() and (not ocr or len(text.strip()) >= 50):
+                    complete = False
+                if len(text.strip()) < 50 and not ocr:
+                    complete = False
                 if len(text.strip()) < 50 and ocr:
                     ocr_pages += 1
                     page_pixels = int(page.rect.width * 150/72) * int(page.rect.height * 150/72)
@@ -54,6 +59,8 @@ def extract(data, kind, ocr=False, tessdata="/models"):
     elif kind == "docx":
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             items = archive.infolist()
+            if any(i.filename.startswith("word/media/") for i in items):
+                complete = False
             if len(items) > 256 or sum(i.file_size for i in items) > 20 * 1024 * 1024:
                 return None
             if any(i.flag_bits & 1 or i.file_size > 10 * 1024 * 1024 or
@@ -87,7 +94,10 @@ def extract(data, kind, ocr=False, tessdata="/models"):
     text = text.strip()
     if len(text) < 50 or len(text.encode("utf-8")) > MAX_OUTPUT:
         return None
-    return {"source": source, "content": text}
+    result = {"source": source, "content": text}
+    if with_coverage:
+        result["coverage"] = "complete" if complete else "partial"
+    return result
 
 
 def main():
@@ -98,8 +108,9 @@ def main():
     resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
     try:
         data = sys.stdin.buffer.read(MAX_INPUT + 1)
-        kind = sys.argv[1] if len(sys.argv) in (2, 3) else ""
-        result = extract(data, kind, ocr=True) if len(sys.argv) == 3 and sys.argv[2] == "ocr" else extract(data, kind)
+        args = sys.argv[2:]
+        kind = sys.argv[1] if 2 <= len(sys.argv) <= 4 and set(args) <= {"ocr", "coverage"} else ""
+        result = extract(data, kind) if not args else extract(data, kind, ocr="ocr" in args, with_coverage="coverage" in args)
         sys.stdout.write(json.dumps(result, ensure_ascii=True))
     except Exception:
         sys.stdout.write("null")

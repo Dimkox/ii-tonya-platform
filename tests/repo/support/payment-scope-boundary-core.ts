@@ -102,6 +102,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0062_resident_verification_messages.sql",
   "packages/db/migrations/0063_resident_verification_review_corrections.sql",
   "packages/db/migrations/0064_resident_private_jobs.sql",
+  "packages/db/migrations/0065_resident_private_recovery_fences.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -862,6 +863,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0065_resident_private_recovery_fences.sql",
+    "932d096ed16419f3a25814ccd881d116ff76847f1984fba61557164c0c4d6307",
+  ],
+  [
+    "packages/db/migrations/meta/0065_snapshot.json",
+    "f7874d7bf5025a00589b452088afe364731746fee98d2ff1da0e5fd98eea52f6",
+  ],
+  [
+    "packages/db/migrations/state/0065_sql_objects.json",
+    "0abdb21719f5a63aa8f87ca84a6b46e9be4c5bf5f0fb065562b118fbb492a53f",
+  ],
+  [
+    "packages/db/migrations/state/0065_manifest.json",
+    "724315937a3764631452f1994bfeca6cc5dede6949df0790bd49ae2ce4911caa",
+  ],
+
   [
     "packages/db/migrations/0064_resident_private_jobs.sql",
     "9d792a30d7044cd7a3a9a49091266bb9fd2bc4fe2968809cf67175ffb6c94ab3",

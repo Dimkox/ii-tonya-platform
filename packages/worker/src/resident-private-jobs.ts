@@ -1,3 +1,4 @@
+import { canonicalPrivateProfile } from "@ii-tonya/contracts";
 import { createHash } from "node:crypto";
 import type { PostgresResidentPrivateJobsRepository } from "@ii-tonya/db";
 import {
@@ -41,9 +42,7 @@ export function createResidentPrivateJobsRunner(deps: {
             if (!claim) continue;
             const observations: Record<string, unknown>[] = [];
             for (const rawProfile of claim.socialLinks.slice(0, 10)) {
-              const profile = rawProfile
-                .replace("https://www.vk.com/", "https://vk.com/")
-                .replace(/\/$/u, "");
+              const profile = canonicalPrivateProfile(rawProfile);
               const adapter =
                 deps.social && profile.startsWith("https://vk.com/")
                   ? "vk-wall-v1"
@@ -98,6 +97,7 @@ export function createResidentPrivateJobsRunner(deps: {
         for (const job of await deps.repository.listDocuments()) {
           if (controller.signal.aborted) break;
           let claim;
+          let verifiedSha: string | undefined;
           try {
             claim = await deps.repository.claimDocument(job.id);
             if (!claim) continue;
@@ -144,6 +144,12 @@ export function createResidentPrivateJobsRunner(deps: {
               });
               continue;
             }
+            verifiedSha = sha256;
+            await deps.repository.completeDocument(claim, {
+              kind: "verified",
+              sha256,
+            });
+            result.documents++;
             const type = (
               {
                 "application/pdf": "pdf",
@@ -170,7 +176,7 @@ export function createResidentPrivateJobsRunner(deps: {
                 ? compareEducation(
                     parsed?.content ?? "",
                     claim.draft.specialization,
-                    !!parsed,
+                    parsed?.coverage === "complete",
                   )
                 : {
                     result: "UNKNOWN",
@@ -182,12 +188,23 @@ export function createResidentPrivateJobsRunner(deps: {
               ...(proposal && Object.keys(proposal).length ? { proposal } : {}),
               observation,
             });
-            result.documents++;
           } catch {
             result.failed++;
             if (claim)
               await deps.repository
-                .completeDocument(claim, { kind: "unknown" })
+                .completeDocument(
+                  claim,
+                  verifiedSha
+                    ? {
+                        kind: "verified",
+                        sha256: verifiedSha,
+                        observation: {
+                          result: "UNKNOWN",
+                          reason: "derived_processing_unavailable",
+                        },
+                      }
+                    : { kind: "unknown" },
+                )
                 .catch(() => undefined);
           }
         }
@@ -226,7 +243,9 @@ export function createResidentPrivateJobsRunner(deps: {
         for (const deletion of await deps.repository.listDeletions()) {
           if (controller.signal.aborted) break;
           try {
-            // A successful DELETE is sufficient only for a write known to have settled.
+            const operation = await deps.repository.claimDeletion(deletion.id);
+            if (!operation) continue;
+            // Proof is fenced to the state captured before this DELETE.
             const removed = await deps.store.remove(
               deletion.key,
               controller.signal,
@@ -234,6 +253,7 @@ export function createResidentPrivateJobsRunner(deps: {
             await deps.repository.recordDeletion(
               deletion.id,
               removed === "deleted" ? "absent" : "unknown",
+              operation.token,
             );
             result.deletions++;
           } catch {

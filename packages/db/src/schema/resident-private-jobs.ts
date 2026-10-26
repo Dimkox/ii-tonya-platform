@@ -33,6 +33,12 @@ export const residentObjectDeletions = pgTable(
       .notNull(),
     subjectErasureKey: text("subject_erasure_key"),
     deletionJobId: uuid("deletion_job_id"),
+    deletionToken: uuid("deletion_token"),
+    deletionStartedAt: timestamp("deletion_started_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    deletionWriteState: text("deletion_write_state"),
   },
   (table) => [
     index("resident_object_deletions_job")
@@ -56,6 +62,10 @@ export const residentObjectDeletions = pgTable(
       name: "resident_object_deletions_deletion_job_id_fkey",
     }),
     unique("resident_object_deletions_object_key_key").on(table.objectKey),
+    check(
+      "resident_deletion_operation_complete",
+      sql`((deletion_token IS NULL) AND (deletion_started_at IS NULL) AND (deletion_write_state IS NULL)) OR ((deletion_token IS NOT NULL) AND (deletion_started_at IS NOT NULL) AND (deletion_write_state IS NOT NULL) AND (deletion_write_state = ANY (ARRAY['allocated'::text, 'inflight'::text, 'settled'::text, 'unknown'::text])))`,
+    ),
     check(
       "resident_object_deletions_check",
       sql`object_key = ('custody/'::text || (custody_id)::text)`,

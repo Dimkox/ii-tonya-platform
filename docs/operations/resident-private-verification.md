@@ -57,3 +57,24 @@ chmod 600 /tmp/residency-private-parser-20261026/socket/parser.sock
 ```
 
 Run probes only in the task-owned synthetic environment. Do not apply these temporary permission changes to a deployed helper. No task evidence authorizes live providers, staging, production or feature activation.
+
+## Review corrections: deletion, proposals and extraction coverage
+
+Migration0065 preserves0064 and adds a deletion-operation token, start time and captured write state. Workers claim before DELETE; only the matching operation whose write was already allocated or settled may verify absence. Late results cannot downgrade a newer verified deletion. A one-minute abandoned-operation lease permits bounded recovery; claims consume the existing three-attempt allowance. An authorized manual recovery request fences the old token before restarting attempts.
+
+Custody is persisted immediately after verified PUT/HEAD, before parser or proposal work. Derived errors retain its SHA, download authority and erasure responsibility, with manual review. Proposals obey the domain field bounds (city120, specialty300, other supported text3000 characters) and a complete2500-character JSON preview ceiling. The owner sees every proposed value in the confirmation message; an older oversized proposal is refused for confirmation and falls back to normal questions. Revision and still-empty-field checks remain required.
+
+The isolated parser reports `complete` or `partial` extraction coverage. Mixed text/image PDFs without OCR keep available text but remain partial; only complete extraction can produce MATCH/MISMATCH. DOCX with embedded media and text-bearing PDF pages with unexamined images also remain conservative. Existing direct parser consumers retain the original source/content response. Supported VK/Telegram identities share one canonical cache key through lookup, admission and storage; unsupported URL paths retain their original meaning.
+
+Private manager responses and errors bind to both the session and selected detail generation. Switching applicants, replacing the detail with recovery, or logging out invalidates pending evidence, pagination, link and recovery responses.
+
+Corrective witnesses are in `verification-private-remediation.test.ts`, `private-verification-remediation.test.ts`, `test_coverage.py` and `tests/acceptance/private-verification/browser-remediation.mjs`. The application lifecycle witness uses `createResidentPrivateJobsLifecycle` → `createProductionWorkerRuntime` → `runWorkerLoop` with real pending PostgreSQL state, and checks the disabled composition separately. It does not activate deployment flags.
+
+```sh
+II_TONYA_PRIVATE_PARSER_TEST_SOCKET=/path/to/parser.sock node tests/acceptance/private-verification/run-postgres.mjs correction.log tests/integration/verification-private-remediation.test.ts
+pnpm exec vitest run packages/integrations/src/documents/private-verification-remediation.test.ts
+node tests/acceptance/private-verification/browser-remediation.mjs
+pnpm exec tsx tests/acceptance/private-verification/reconstruct-recovery-state.ts
+```
+
+For a reproducible failure against the reviewed baseline, set `PRIVATE_BROWSER_BASELINE_SHA=54d9eb36` for the browser harness or `PRIVATE_EXTRACTION_BASELINE_SHA=54d9eb36` for `extraction-bounds.mjs`. These read baseline source into an isolated bundle and do not modify working files. A nonzero exit is expected for the baseline. Corrective logs are separate from the original72 artifacts.

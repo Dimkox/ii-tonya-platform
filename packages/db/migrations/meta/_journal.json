@@ -456,6 +456,13 @@
       "when": 1793044801001,
       "tag": "0064_resident_private_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1793056800000,
+      "tag": "0065_resident_private_recovery_fences",
+      "breakpoints": true
     }
   ]
 }

@@ -28,7 +28,7 @@ class Handler(socketserver.StreamRequestHandler):
             data = self.rfile.read(meta['length'])
             if len(data) != meta['length']:
                 return
-            args = [sys.executable, '-I', '/app/helper.py', meta['type']]
+            args = [sys.executable, '-I', '/app/helper.py', meta['type'], 'coverage']
             if meta['ocr']:
                 args.append('ocr')
             result = subprocess.run(args, input=data, capture_output=True, timeout=9, env={'PATH':'/usr/local/bin:/usr/bin:/bin','LANG':'C.UTF-8'})

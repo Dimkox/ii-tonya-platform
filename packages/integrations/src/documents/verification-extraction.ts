@@ -19,7 +19,7 @@ const fields: Record<string, string> = {
 function labelled(content: string) {
   const entries = new Map<string, string | null>();
   for (const line of content.split(/\r?\n/u).slice(0, 1000)) {
-    const m = /^([^:\n]{1,60}):\s*(.{1,1000})$/u.exec(line.trim());
+    const m = /^([^:\n]{1,60}):\s*(.{1,3000})$/u.exec(line.trim());
     if (!m) continue;
     const key = m[1]!.toLocaleLowerCase("ru");
     entries.set(key, entries.has(key) ? null : m[2]!.trim());
@@ -44,8 +44,16 @@ export function proposeVerificationFields(
     if (field === "experienceYears") {
       if (/^(?:[0-9]|[1-9][0-9]|100)$/u.test(value))
         proposal[field] = Number(value);
-    } else if (value.length <= (field === "city" ? 120 : 1000))
+    } else if (
+      value.length <=
+      (field === "city" ? 120 : field === "specialization" ? 300 : 3000)
+    )
       proposal[field] = value;
+    if (
+      JSON.stringify(proposal).length > 2500 ||
+      Buffer.byteLength(JSON.stringify(proposal)) > 16000
+    )
+      delete proposal[field];
   }
   return proposal;
 }

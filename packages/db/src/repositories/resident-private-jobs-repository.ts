@@ -1,3 +1,4 @@
+import { canonicalPrivateProfile } from "@ii-tonya/contracts";
 import { privateObjectErasureSubjectKey } from "./resident-private-erasure.js";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -281,11 +282,21 @@ export class PostgresResidentPrivateJobsRepository {
         }
       }
       const row = (
-        await tx.execute<{ claimToken: string; authority: unknown }>(
-          sql`select claim_token as "claimToken",consent_authority as authority from resident_private_objects where id=${claim.id}::uuid for update`,
+        await tx.execute<{
+          claimToken: string;
+          authority: unknown;
+          state: string;
+          sha256: string | null;
+        }>(
+          sql`select claim_token as "claimToken",consent_authority as authority,state,sha256 from resident_private_objects where id=${claim.id}::uuid for update`,
         )
       ).rows[0];
       if (row && row.claimToken !== claim.claimToken) return;
+      if (
+        row?.state === "verified" &&
+        (result.kind !== "verified" || result.sha256 !== row.sha256)
+      )
+        return;
       await tx.execute(
         sql`update resident_object_deletions set write_state=${result.kind === "unknown" ? "unknown" : "settled"},updated_at=clock_timestamp(),delete_state=case when erased then 'pending' else delete_state end where custody_id=${claim.id}::uuid and claim_token=${claim.claimToken}::uuid and write_state in('inflight','unknown')`,
       );
@@ -335,6 +346,7 @@ export class PostgresResidentPrivateJobsRepository {
       ).rows[0];
       if (
         !p?.proposal ||
+        JSON.stringify(p.proposal).length > 2500 ||
         p.confirmed ||
         p.revision !== revision ||
         f.revision !== revision ||
@@ -378,13 +390,29 @@ export class PostgresResidentPrivateJobsRepository {
   async listDeletions() {
     return (
       await this.db.execute<{ id: string; key: string; writeState: string }>(
-        sql`select custody_id as id,object_key as key,write_state as "writeState" from resident_object_deletions where erased and delete_state in('pending','unknown') and delete_attempts<3 order by updated_at,custody_id limit 5`,
+        sql`select custody_id as id,object_key as key,write_state as "writeState" from resident_object_deletions where erased and delete_state in('pending','unknown') and delete_attempts<3 and (deletion_started_at is null or deletion_started_at<clock_timestamp()-interval '1 minute') order by updated_at,custody_id limit 5`,
       )
     ).rows;
   }
-  async recordDeletion(id: string, outcome: "absent" | "unknown") {
+  async claimDeletion(id: string) {
+    return this.tx(async (tx) => {
+      const token = randomUUID();
+      return (
+        (
+          await tx.execute<{ id: string; key: string; token: string }>(
+            sql`update resident_object_deletions set deletion_token=${token}::uuid,deletion_started_at=clock_timestamp(),deletion_write_state=write_state,delete_attempts=delete_attempts+1 where custody_id=${id}::uuid and erased and delete_state in('pending','unknown') and delete_attempts<3 and (deletion_started_at is null or deletion_started_at<clock_timestamp()-interval '1 minute') returning custody_id as id,object_key as key,deletion_token as token`,
+          )
+        ).rows[0] ?? null
+      );
+    });
+  }
+  async recordDeletion(
+    id: string,
+    outcome: "absent" | "unknown",
+    token: string,
+  ) {
     await this.db.execute(
-      sql`update resident_object_deletions set delete_state=case when ${outcome}='absent' and write_state in('allocated','settled') then 'verified' else 'unknown' end,subject_erasure_key=case when ${outcome}='absent' and write_state in('allocated','settled') then null else subject_erasure_key end,delete_attempts=least(delete_attempts+1,3),updated_at=clock_timestamp() where custody_id=${id}::uuid and erased`,
+      sql`update resident_object_deletions set delete_state=case when ${outcome}='absent' and deletion_write_state in('allocated','settled') and write_state=deletion_write_state then 'verified' else 'unknown' end,subject_erasure_key=case when ${outcome}='absent' and deletion_write_state in('allocated','settled') and write_state=deletion_write_state then null else subject_erasure_key end,deletion_token=null,deletion_started_at=null,deletion_write_state=null,updated_at=clock_timestamp() where custody_id=${id}::uuid and erased and delete_state in('pending','unknown') and deletion_token=${token}::uuid`,
     );
   }
   async recoverStalled() {
@@ -496,7 +524,7 @@ export class PostgresResidentPrivateJobsRepository {
         );
       }
       await tx.execute(
-        sql`update resident_object_deletions set delete_attempts=0,delete_state='pending' where custody_id=${id}::uuid and erased and delete_state<>'verified'`,
+        sql`update resident_object_deletions set delete_attempts=0,delete_state='pending',deletion_token=null,deletion_started_at=null,deletion_write_state=null where custody_id=${id}::uuid and erased and delete_state<>'verified'`,
       );
       await tx.execute(
         sql`insert into resident_document_access_audit(custody_id,manager_id,action) values(${id}::uuid,${managerId}::uuid,'reconcile_requested')`,
@@ -648,7 +676,7 @@ export class PostgresResidentPrivateJobsRepository {
       const f = await this.source(tx, applicationId);
       return (
         await tx.execute<{ observation: Record<string, unknown> }>(
-          sql`select observation from resident_social_observations where user_id=${f.userId}::uuid and profile=${profile} and adapter_version=${adapterVersion} and expires_at>clock_timestamp()`,
+          sql`select observation from resident_social_observations where user_id=${f.userId}::uuid and profile=${canonicalPrivateProfile(profile)} and adapter_version=${adapterVersion} and expires_at>clock_timestamp()`,
         )
       ).rows[0]?.observation;
     });
@@ -699,10 +727,8 @@ export class PostgresResidentPrivateJobsRepository {
         typeof o.profile === "string" &&
         f.submittedDraft?.socialLinks?.some(
           (p) =>
-            p
-              .replace("https://www.vk.com/", "https://vk.com/")
-              .replace(/\/$/u, "")
-              .toLowerCase() === (o.profile as string).toLowerCase(),
+            canonicalPrivateProfile(p) ===
+            canonicalPrivateProfile(o.profile as string),
         ) &&
         typeof o.adapterVersion === "string" &&
         ["manual-v1", "vk-wall-v1", "telegram-preview-v1"].includes(
@@ -745,6 +771,8 @@ export class PostgresResidentPrivateJobsRepository {
       if (observations.some((o) => !valid(o)))
         throw Error("private_observation_invalid");
       for (const o of observations) {
+        if (typeof o.profile === "string")
+          o.profile = canonicalPrivateProfile(o.profile);
         if (
           typeof o.profile !== "string" ||
           typeof o.adapterVersion !== "string" ||
@@ -752,10 +780,8 @@ export class PostgresResidentPrivateJobsRepository {
           typeof o.expiresAt !== "string" ||
           !f.submittedDraft?.socialLinks?.some(
             (p) =>
-              p
-                .replace("https://www.vk.com/", "https://vk.com/")
-                .replace(/\/$/u, "")
-                .toLowerCase() === (o.profile as string).toLowerCase(),
+              canonicalPrivateProfile(p) ===
+              canonicalPrivateProfile(o.profile as string),
           ) ||
           Date.parse(o.expiresAt) - Date.parse(o.observedAt) !== 86400000
         )

@@ -104,7 +104,11 @@ describe("private custody PostgreSQL fences", () => {
       write_state: "unknown",
       delete_state: "pending",
     });
-    await r.recordDeletion(c.id, "absent");
+    await r.recordDeletion(
+      c.id,
+      "absent",
+      (await r.claimDeletion(c.id))!.token,
+    );
     expect(
       (
         await database.db.execute(
@@ -126,7 +130,11 @@ describe("private custody PostgreSQL fences", () => {
     await database.db.execute(
       sql`delete from residents_applications where id=${a.form.id}::uuid`,
     );
-    await r.recordDeletion(c.id, "absent");
+    await r.recordDeletion(
+      c.id,
+      "absent",
+      (await r.claimDeletion(c.id))!.token,
+    );
     const row = (
       await database.db.execute(
         sql`select * from resident_object_deletions where custody_id=${c.id}::uuid`,

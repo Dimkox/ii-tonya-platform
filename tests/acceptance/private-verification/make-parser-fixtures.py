@@ -10,3 +10,5 @@ writer.write_text(page);out.joinpath('text.pdf').write_bytes(pdf.tobytes())
 pix=page.get_pixmap(dpi=150);out.joinpath('scan.png').write_bytes(pix.tobytes('png'))
 scan=pymupdf.open();p=scan.new_page(width=600,height=400);p.insert_image(p.rect,stream=pix.tobytes('png'));out.joinpath('scan.pdf').write_bytes(scan.tobytes())
 doc=Document();doc.add_paragraph('Город: Казань\nСпециализация: Психолог\nМетоды: Консультации\nОпыт: 12');b=io.BytesIO();doc.save(b);out.joinpath('brief.docx').write_bytes(b.getvalue())
+
+mixed=pymupdf.open();mixed.insert_pdf(pdf);mixed.insert_pdf(scan);out.joinpath("mixed.pdf").write_bytes(mixed.tobytes())

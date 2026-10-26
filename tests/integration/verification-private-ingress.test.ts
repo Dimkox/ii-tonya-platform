@@ -410,11 +410,19 @@ for (const withdrawalFirst of [false, true])
       expect((await privacy.startErasureAtomically(command)).status).toBe(
         "pending",
       );
-      await f.privateJobs.recordDeletion(custody, "unknown");
+      await f.privateJobs.recordDeletion(
+        custody,
+        "unknown",
+        (await f.privateJobs.claimDeletion(custody))!.token,
+      );
       await expect(
         workflow.completeProcessors(receipt.jobId, schedule),
       ).rejects.toThrow("Private object erasure is incomplete");
-      await f.privateJobs.recordDeletion(custody, "absent");
+      await f.privateJobs.recordDeletion(
+        custody,
+        "absent",
+        (await f.privateJobs.claimDeletion(custody))!.token,
+      );
       await workflow.completeProcessors(receipt.jobId, schedule);
       expect((await workflow.getJob(receipt.jobId))?.status).toBe(
         "processor_complete",
@@ -583,7 +591,11 @@ it("real SDK late PUT after DELETE and HEAD404 retains responsibility without re
     expect((await store.head(proof, new AbortController().signal)).kind).toBe(
       "absent",
     );
-    await f.privateJobs.recordDeletion(id, "absent");
+    await f.privateJobs.recordDeletion(
+      id,
+      "absent",
+      (await f.privateJobs.claimDeletion(id))!.token,
+    );
     expect(
       (
         await database.db.execute(
@@ -612,7 +624,11 @@ it("real SDK late PUT after DELETE and HEAD404 retains responsibility without re
     expect((await store.head(proof, new AbortController().signal)).kind).toBe(
       "absent",
     );
-    await f.privateJobs.recordDeletion(id, "absent");
+    await f.privateJobs.recordDeletion(
+      id,
+      "absent",
+      (await f.privateJobs.claimDeletion(id))!.token,
+    );
     expect(
       (
         await database.db.execute(

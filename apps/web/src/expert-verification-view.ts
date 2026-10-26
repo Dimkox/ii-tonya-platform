@@ -134,9 +134,14 @@ export function bindExpertVerificationActions(
     invoiceId: string | undefined,
     busy = false,
     generation = 0,
+    detailGeneration = 0,
     mounted = true;
   function controls() {
     const active = !!client;
+    const recoveryControl = root.querySelector<HTMLButtonElement>(
+      "[data-verification-private-recovery]",
+    );
+    if (recoveryControl) recoveryControl.disabled = busy || !active;
     connect.disabled = busy;
     token.disabled = busy;
     logout.disabled = !active;
@@ -176,6 +181,7 @@ export function bindExpertVerificationActions(
     cardReview?.sync();
   }
   function clearDetail() {
+    detailGeneration++;
     selected = undefined;
     invoiceId = undefined;
     invoice.value = "";
@@ -292,11 +298,14 @@ export function bindExpertVerificationActions(
       epoch = generation;
     busy = true;
     clearDetail();
+    const detailEpoch = detailGeneration;
+    const currentDetail = () =>
+      mounted && epoch === generation && detailEpoch === detailGeneration;
     status.textContent = "Загружаем защищённые данные…";
     controls();
     try {
       const item = await current.detail(id, historyCursor);
-      if (!mounted || epoch !== generation) return;
+      if (!currentDetail()) return;
       selected = item;
       text(detail, `Заявка ${item.applicationId}: ${item.status}`);
       text(
@@ -324,7 +333,7 @@ export function bindExpertVerificationActions(
                 item.applicationId,
                 documentsAfter,
               );
-              if (!mounted || epoch !== generation) return;
+              if (!currentDetail()) return;
               documentsAfter =
                 evidence.documents.length === 30
                   ? evidence.documents.at(-1)?.id
@@ -348,7 +357,7 @@ export function bindExpertVerificationActions(
                       await current.privateRecovery!(document.id);
                       reconcile.disabled = true;
                     } catch (error) {
-                      failed(error);
+                      if (currentDetail()) failed(error);
                     }
                   };
                 }
@@ -366,7 +375,7 @@ export function bindExpertVerificationActions(
                         item.applicationId,
                         document.id,
                       );
-                      if (!mounted || epoch !== generation) return;
+                      if (!currentDetail()) return;
                       const link = doc.createElement("a");
                       link.href = url;
                       link.target = "_blank";
@@ -376,7 +385,7 @@ export function bindExpertVerificationActions(
                       detail.append(link);
                       setTimeout(() => link.remove(), 120000);
                     } catch (error) {
-                      failed(error);
+                      if (currentDetail()) failed(error);
                     } finally {
                       button.disabled = false;
                     }
@@ -384,7 +393,7 @@ export function bindExpertVerificationActions(
                 }
               }
             } catch (error) {
-              failed(error);
+              if (currentDetail()) failed(error);
             } finally {
               evidenceButton.disabled = false;
             }
@@ -401,6 +410,7 @@ export function bindExpertVerificationActions(
                 undefined,
                 recoveryAfter,
               );
+              if (!currentDetail()) return;
               recoveryAfter =
                 Array.isArray(rows) && rows.length === 50
                   ? String(rows.at(-1)?.id)
@@ -408,7 +418,7 @@ export function bindExpertVerificationActions(
               recoveryButton.textContent = recoveryAfter
                 ? "Следующие незавершённые удаления"
                 : "Обновить незавершённые удаления";
-              if (!mounted || epoch !== generation) return;
+              if (!currentDetail()) return;
               if (Array.isArray(rows))
                 for (const row of rows) {
                   text(detail, recoveryText(row));
@@ -425,13 +435,13 @@ export function bindExpertVerificationActions(
                         await current.privateRecovery!(row.id);
                         retry.disabled = true;
                       } catch (error) {
-                        failed(error);
+                        if (currentDetail()) failed(error);
                       }
                     };
                   }
                 }
             } catch (error) {
-              failed(error);
+              if (currentDetail()) failed(error);
             }
           };
         }
@@ -457,7 +467,7 @@ export function bindExpertVerificationActions(
                   item.applicationId,
                   message.eventId,
                 );
-                if (mounted && epoch === generation) {
+                if (currentDetail()) {
                   close.remove();
                   status.textContent =
                     "Неопределённая доставка закрыта без повторной отправки.";
@@ -503,9 +513,9 @@ export function bindExpertVerificationActions(
         );
       status.textContent = "Заявка загружена. Решение принимает сотрудник.";
     } catch (error) {
-      if (mounted && epoch === generation) failed(error);
+      if (currentDetail()) failed(error);
     } finally {
-      if (mounted && epoch === generation) {
+      if (currentDetail()) {
         busy = false;
         controls();
       }
@@ -713,11 +723,15 @@ export function bindExpertVerificationActions(
       if (!client?.privateRecovery || busy || !mounted) return;
       const current = client,
         epoch = generation;
+      clearDetail();
+      const detailEpoch = detailGeneration;
+      const currentDetail = () =>
+        mounted && epoch === generation && detailEpoch === detailGeneration;
       globalRecovery.disabled = true;
       try {
         const after = globalRecovery.dataset.after;
         const rows = await current.privateRecovery!(undefined, after);
-        if (!mounted || epoch !== generation) return;
+        if (!currentDetail()) return;
         const next =
           Array.isArray(rows) && rows.length === 50
             ? String(rows.at(-1)?.id)
@@ -727,7 +741,7 @@ export function bindExpertVerificationActions(
         globalRecovery.textContent = next
           ? "Следующие незавершённые удаления"
           : "Незавершённое удаление файлов";
-        clearDetail();
+
         if (Array.isArray(rows))
           for (const row of rows) {
             text(detail, recoveryText(row));
@@ -740,15 +754,15 @@ export function bindExpertVerificationActions(
                   await current.privateRecovery!(row.id);
                   retry.disabled = true;
                 } catch (error) {
-                  failed(error);
+                  if (currentDetail()) failed(error);
                 }
               };
             }
           }
       } catch (error) {
-        failed(error);
+        if (currentDetail()) failed(error);
       } finally {
-        globalRecovery.disabled = false;
+        if (currentDetail()) globalRecovery.disabled = false;
       }
     };
   connect.onclick = () => {

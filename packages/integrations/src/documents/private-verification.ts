@@ -1,3 +1,4 @@
+import { canonicalPrivateProfile } from "@ii-tonya/contracts";
 import { createHash } from "node:crypto";
 import {
   S3Client,
@@ -404,6 +405,7 @@ export function createVkWallReader(options: {
       now: Date,
       signal: AbortSignal,
     ): Promise<SocialObservation> {
+      profile = canonicalPrivateProfile(profile);
       const match =
         /^https:\/\/(?:www\.)?vk\.com\/(id|club|public)([1-9]\d{0,18})\/?$/u.exec(
           profile,
@@ -527,6 +529,7 @@ export function createTelegramPreviewReader(
       now: Date,
       signal: AbortSignal,
     ): Promise<SocialObservation> {
+      profile = canonicalPrivateProfile(profile);
       const match = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{4,31})\/?$/u.exec(
         profile,
       );

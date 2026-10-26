@@ -465,11 +465,12 @@ export function createResidentVerificationService(deps: {
             if (
               row?.state === "verified" &&
               row.proposal &&
-              Object.keys(row.proposal as object).length
+              Object.keys(row.proposal as object).length &&
+              JSON.stringify(row.proposal).length <= 2500
             )
               return corrective(
                 "Я извлек эти данные. Верно ли? " +
-                  JSON.stringify(row.proposal).slice(0, 2500) +
+                  JSON.stringify(row.proposal) +
                   `\nДля подтверждения: /brief_confirm ${String(row.id)} ${String(row.revision)}. Для исправления используйте обычные вопросы анкеты.`,
               );
             if (row && ["allocated", "inflight"].includes(String(row.state)))
@@ -790,6 +791,7 @@ export function createResidentVerificationService(deps: {
           error instanceof Error &&
           [
             "resident_revision_conflict",
+            "private_proposal_stale",
             "resident_submission_frozen",
             "resident_followup_unavailable",
             "resident_reapply_unavailable",
