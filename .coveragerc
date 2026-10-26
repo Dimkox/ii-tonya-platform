@@ -1,12 +1,12 @@
 [run]
 branch = True
 source =
-    .grok-stack/adaptive_grok
+    .getzilla/getzilla
     scripts
 omit =
     tests/*
     */__pycache__/*
-    .grok-stack/runtime/*
+    .getzilla/runtime/*
     engineering/*
 
 [report]

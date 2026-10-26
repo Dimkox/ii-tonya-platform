@@ -1,0 +1,83 @@
+import os
+import pickle
+import shlex
+import subprocess
+import sys
+
+import flask
+import requests
+import yaml
+from flask import request
+
+app = flask.Flask(__name__)
+
+
+@app.route('/user')
+def user(cursor):
+    name = flask.request.args.get('name')
+    # ruleid: getzilla.python.sql-injection
+    cursor.execute(f"SELECT * FROM users WHERE name = '{name}'")
+    # ok: getzilla.python.sql-injection
+    cursor.execute("SELECT * FROM users WHERE name = %s", (name,))
+    user_id = int(flask.request.args.get('id'))
+    # ok: getzilla.python.sql-injection
+    cursor.execute("SELECT * FROM users WHERE id = %d" % user_id)
+
+
+def helper(command):
+    # ruleid: getzilla.python.command-injection
+    os.system(command)
+
+
+@app.route('/run')
+def run():
+    target = flask.request.args.get('host')
+    helper("ping -c 1 " + target)
+    # ruleid: getzilla.python.command-injection
+    subprocess.run("nslookup " + target, shell=True)
+    # ok: getzilla.python.command-injection
+    subprocess.run(["nslookup", target])
+    # ok: getzilla.python.command-injection
+    subprocess.run("nslookup " + shlex.quote(target), shell=True)
+
+
+@app.route('/calc')
+def calc():
+    expression = flask.request.form['expr']
+    # ruleid: getzilla.python.code-injection
+    return str(eval(expression))
+
+
+@app.route('/file')
+def read_file():
+    name = flask.request.args.get('name')
+    # ruleid: getzilla.python.path-traversal
+    with open('/srv/files/' + name) as handle:
+        data = handle.read()
+    # ok: getzilla.python.path-traversal
+    with open('/srv/files/' + os.path.basename(name)) as handle:
+        data += handle.read()
+    return data
+
+
+@app.route('/fetch')
+def fetch():
+    url = flask.request.args.get('url')
+    # ruleid: getzilla.python.ssrf
+    return requests.get(url).text
+
+
+def load(blob, text):
+    # ruleid: getzilla.python.unsafe-deserialization
+    pickle.loads(blob)
+    # ruleid: getzilla.python.unsafe-deserialization
+    yaml.load(text)
+    # ok: getzilla.python.unsafe-deserialization
+    yaml.load(text, Loader=yaml.SafeLoader)
+    # ok: getzilla.python.unsafe-deserialization
+    yaml.safe_load(text)
+
+
+def cli():
+    # ruleid: getzilla.python.command-injection
+    os.system("echo " + sys.argv[1])

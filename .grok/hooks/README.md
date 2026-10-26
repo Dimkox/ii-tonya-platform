@@ -8,7 +8,7 @@ Project hooks need `/hooks-trust` in the Grok TUI.
 - **Stop**: evidence gaps are **warnings only**, never block the agent
 
 Hard lockouts (exit 2 / infinite stop loops) are intentional bugs — fixed in 2.0.4.
-Older `adaptive.json` files call `python3 pre_tool_use.py` from the project root. Root shims dispatch into `.grok/hooks/` or fail-open so a `git pull` cannot freeze the agent.
+Canonical source hooks live in `.grok/hooks/`. For older `adaptive.json` files that call `python3 pre_tool_use.py` from a consumer project root, the installer generates nine compatibility aliases from `.getzilla/templates/hook_root_shim.py`; these aliases dispatch to canonical hooks or preserve the fail-open JSON fallback. Generated consumer aliases are not tracked source-root files.
 
 ## Disable all hooks
 
@@ -21,6 +21,10 @@ mv .grok/hooks .grok/hooks.disabled
 
 Then restart `grok`.
 
+## Local child lifecycle
+
+SubagentStart records a known child ID and returns its generation, route and task identity. Pre/PostToolUse record closed activity only for that explicit child and generation; activity does not mean useful progress. SubagentStop remains empty and cannot clear an interrupted or resumed owner through an unversioned event. Use `python3 scripts/getzilla_agent.py` for heartbeat, checkpoints, finite watchdog polling and matching control ACKs. The controller must observe native interruption before recording interrupt-ack and same-task resume. The CLI records local intent and observations; it does not control the native harness. See `engineering/runbooks/local-agent-watchdog.md` in the source repository for the complete recovery sequence.
+
 ## Policy still enforced when healthy
 
-Secrets (`.env`, keys), destructive shell (`rm -rf /`, `git push --force`), Bitrix core paths, and real side-effect invocations (`git push`, `gh pr merge`, `docker push`, `npm publish`, `gh release create`) remain blocked by `policy.py` when the stack imports cleanly. Bare words in file paths or `echo`/`cat` arguments are not side-effects.
+Secrets (`.env`, keys), destructive shell (`rm -rf /`, `git push --force`), Bitrix core paths, and real side-effect invocations (`git push`, `gh pr merge`, `docker push`, `npm publish`, `gh release create`) remain blocked by `policy.py` when the stack imports cleanly. Bare words in file paths or `echo`/`cat` arguments are not side-effects. Side-effect invocations are matched after normalizing global options (`gh -R/--repo`, `git -C/-c/--no-pager`, `docker --context`, `npm --registry`) and equivalent spellings (`git send-pack`, `docker image push`, `gh api --method=VERB`); `gh pr review` needs an exact external-write grant for `github-pull-request-review`. A shell command that names a secret path (under any quoting, `sh -c` nesting, `rev:path`, `@path` or `--opt=path` form, or a glob that matches one) is denied like a Read of that path; variables are not expanded. `rm` with any recursive flag spelling or `--no-preserve-root` on `/`, an absolute path, `~`, `$HOME`, `.` or `*` is destructive.

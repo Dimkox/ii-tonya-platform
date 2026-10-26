@@ -1,0 +1,25 @@
+{
+  "schema_version": "cost-providers-v1",
+  "note": "Paid APIs Getzilla recognises in code and workflows. Hosts match the host of a URL literal; python_modules match import roots; n8n node types are paid nodes in exported workflows.",
+  "hosts": [
+    "api.openai.com", "openrouter.ai", "api.anthropic.com", "api.replicate.com", "replicate.com",
+    "api.elevenlabs.io", "api.stability.ai", "api.dev.runwayml.com", "api.runwayml.com", "api.klingai.com",
+    "klingai.com", "api-singapore.klingai.com", "fal.run", "queue.fal.run", "api.together.xyz",
+    "generativelanguage.googleapis.com", "api.deepseek.com", "api.mistral.ai", "api.groq.com",
+    "api.lumalabs.ai", "api.ideogram.ai", "api.heygen.com", "api.suno.ai", "cloud.leonardo.ai",
+    "api.midjourney.com", "aiplatform.googleapis.com", "api.x.ai"
+  ],
+  "python_modules": [
+    "openai", "anthropic", "replicate", "elevenlabs", "stability_sdk", "fal_client", "together", "groq",
+    "mistralai", "google.generativeai", "google.genai", "runwayml", "lumaai", "litellm", "xai_sdk"
+  ],
+  "python_scheduler_modules": ["schedule", "apscheduler", "celery.schedules", "croniter", "rq_scheduler", "huey"],
+  "n8n_node_types": [
+    "@n8n/n8n-nodes-langchain.openAi", "@n8n/n8n-nodes-langchain.lmChatOpenAi", "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+    "@n8n/n8n-nodes-langchain.lmChatGoogleGemini", "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+    "@n8n/n8n-nodes-langchain.anthropic", "n8n-nodes-base.openAi"
+  ],
+  "n8n_bounded_loop_types": ["n8n-nodes-base.splitInBatches"],
+  "n8n_counter_markers": ["$runIndex", "runIndex", "$itemIndex", "attempt", "iteration", "maxIterations", "max_iterations"],
+  "run_commands": ["n8n execute", "n8n execute-workflow", "n8n workflow:execute"]
+}

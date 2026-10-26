@@ -1,0 +1,7 @@
+# Local Core test tooling; no root project marker and no runtime auto-install.
+pytest==9.1.1
+pytest-xdist==3.8.0
+pytest-cov==7.1.0
+coverage==7.15.4
+# Draft 2020-12 validation of the versioned attestation contracts in Core tests.
+jsonschema==4.26.0

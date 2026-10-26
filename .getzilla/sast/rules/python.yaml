@@ -1,0 +1,109 @@
+rules:
+  - id: getzilla.python.sql-injection
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: Untrusted input reaches a SQL string. Pass values as query parameters instead of formatting them into the statement.
+    metadata: {cwe: "CWE-89", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: &python-web-sources
+      - pattern-either:
+          - pattern: flask.request.$ATTR
+          - pattern: flask.request.$ATTR.get(...)
+          - pattern: flask.request.$ATTR[...]
+          - pattern: flask.request.get_json(...)
+          - pattern: request.GET.get(...)
+          - pattern: request.POST.get(...)
+          - pattern: request.GET[...]
+          - pattern: request.POST[...]
+          - pattern: request.query_params.get(...)
+          - pattern: request.path_params[...]
+          - pattern: input(...)
+          - pattern: sys.argv
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $CUR.execute($Q, ...)
+              - pattern: $CUR.executemany($Q, ...)
+              - pattern: $CUR.executescript($Q)
+              - pattern: $DB.raw($Q, ...)
+              - pattern: sqlalchemy.text($Q)
+          - focus-metavariable: $Q
+    pattern-sanitizers:
+      - pattern: int(...)
+      - pattern: float(...)
+  - id: getzilla.python.command-injection
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: Untrusted input reaches a shell command. Pass an argument list without shell=True.
+    metadata: {cwe: "CWE-78", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *python-web-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: os.system($C)
+              - pattern: os.popen($C, ...)
+              - pattern: subprocess.$F($C, ..., shell=True, ...)
+          - focus-metavariable: $C
+    pattern-sanitizers:
+      - pattern: shlex.quote(...)
+  - id: getzilla.python.code-injection
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: Untrusted input is evaluated as code.
+    metadata: {cwe: "CWE-95", owasp: "A03:2021", confidence: HIGH}
+    pattern-sources: *python-web-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+  - id: getzilla.python.path-traversal
+    mode: taint
+    languages: [python]
+    severity: WARNING
+    message: Untrusted input chooses a file path. Resolve it under a fixed base directory and reject anything outside it.
+    metadata: {cwe: "CWE-22", owasp: "A01:2021", confidence: MEDIUM}
+    pattern-sources: *python-web-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: open($P, ...)
+              - pattern: flask.send_file($P, ...)
+              - pattern: os.remove($P)
+              - pattern: shutil.rmtree($P, ...)
+          - focus-metavariable: $P
+    pattern-sanitizers:
+      - pattern: werkzeug.utils.secure_filename(...)
+      - pattern: os.path.basename(...)
+  - id: getzilla.python.ssrf
+    mode: taint
+    languages: [python]
+    severity: WARNING
+    message: Untrusted input chooses the URL of a server-side request. Allow-list hosts before fetching.
+    metadata: {cwe: "CWE-918", owasp: "A10:2021", confidence: MEDIUM}
+    pattern-sources: *python-web-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.$M($U, ...)
+              - pattern: httpx.$M($U, ...)
+              - pattern: urllib.request.urlopen($U, ...)
+          - metavariable-regex:
+              metavariable: $M
+              regex: ^(get|post|put|patch|delete|head|request)$
+          - focus-metavariable: $U
+  - id: getzilla.python.unsafe-deserialization
+    languages: [python]
+    severity: ERROR
+    message: Deserializing data this way can run arbitrary code. Use json, or yaml.safe_load.
+    metadata: {cwe: "CWE-502", owasp: "A08:2021", confidence: HIGH}
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: marshal.loads(...)
+      - pattern: shelve.open(...)
+      - patterns:
+          - pattern: yaml.load(...)
+          - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
