@@ -2,7 +2,8 @@
 title: Private verification documents and bounded evidence jobs
 type: feature
 created: 2026-10-26
-status: draft
+status: in-progress
+baseline_commit: f11d5d906acf6e1983fe36739981e31a847207ce
 review_loop_iteration: 0
 context:
   - AGENTS.md
@@ -119,15 +120,23 @@ rewritten historical migrations, weakened tests/flags or live-environment copyin
 
 ## Code Map
 
-Planning references are distilled in `verification-private-jobs-preparation.md`.
-Before implementation, resolve exact accepted S2a paths and generation contracts,
-record the delivered baseline SHA and replace this paragraph with the verified map.
-Do not launch implementation against an uncommitted S2a snapshot.
+Verified against accepted S2a runtime3baaf003 and guard3c546774, delivered baseline
+recorded in frontmatter. The0063 corrections preserve generation schema and add
+real calendar helpers/identity guards. Preserve bounded history navigation,
+terminal recovery and per-subject expiry isolation. No submitted snapshot mutation.
 
-Existing stable components to reuse: integrations/documents/safe-document-parser.ts,
-its Python helper/tests, application/expert-card-service.ts, DB completion and
-consent locks, worker/expert-card-materials.ts and explicit/trigger erasure paths.
-The current Node-only256MiB runtime does not prove OCR isolation or capacity.
+- packages/domain/src/resident-verification-form.ts: ResidentDocument is {kind photo/document/video,fileId,mimeType,size,caption?}; actual fields education/propertyEvidence/tourMedia/licence. Draft max64KB and SQL max100KB; URLs are validated syntactically, not fetch-authorized. No dedicated resume/brief slot currently exists. Add explicit bounded brief intake/proposals instead of disguising a resume as a diploma or overloading whichever question cursor is active.
+- packages/application/src/resident-verification-service.ts + apps/api/src/routes/expert-applicant-telegram.ts: actual private v2 bot surface. Draft parsing is revision-bound before submit; post-submit checks consume immutable submitted_draft/submitted_revision and numbered followups. All proposed fields require owner confirmation; no financial/status fields from extraction.
+- packages/db/src/schema/resident-review.ts: resident_check_generations PK(application_id,generation), submitted_revision, supplement_revision, request_id, status pending/manual_review/cancelled. Generation0 pending forms and generation1+ submitted checks are distinct. Snapshot followups at the generation watermark; no unrestricted reread of future amendments.
+- packages/db/src/schema/resident-verification.ts: old resident_verification_check_work deliberately constrains education_result=unknown, social_result=pending, upload_state=pending_upload. Evolve or explicitly project into the versioned jobs; do not report new fields without real source or bypass these constraints. Existing immutable facts/current attempt must remain intact.
+- packages/db/src/repositories/resident-verification-repository.ts: normal mutate/current-owner/idempotency; after submit inserts legacy check-work and bridge. S2a correction adds actual public-command witnesses. Current checks are advisory; late external completion cannot revoke a human/financial decision or reopen an obsolete attempt.
+- packages/db/src/repositories/expert-verification-repository.ts + apps/web/src/expert-verification-client.ts and expert-verification-view.ts: existing protected detail/UI currently states docs/socials unknown. Consume proof-labelled observations and issue manager links through fresh protected grant; reuse upcoming bounded history API, not another admin stack.
+- packages/integrations/src/documents/safe-document-parser.ts: bounded optional child adapter; 5MiB input,5s default/10s max, one active child, sanitized environment, no filename/URL,64KB content/90KB JSON. Spawn reads binary stdin and validates output. Default helper URL resolves from built package to packages/integrations/parser/helper.py (not src/documents/parser).
+- packages/integrations/parser/helper.py and test_helper.py: existing text-only PyMuPDF1.26.7/DOCX/lxml safety,40 pages, ZIP/XML guards, no filesystem/network isolation proof from rlimits. Add OCR without dropping these guards. Language models already hash-verified in /tmp/residency-ocr-assets-20261026. Pinned wheel integrated OCR must be tried with explicit model path in an isolated runtime before adding an unnecessary executable.
+- packages/application/src/expert-card-service.ts: existing later-card document read/parser capability, manual preserved upload and explicit proposal correction. Reuse safe integration mechanics; do not pretend its raw narrative proposal is a typed verification form.
+- packages/worker/src/expert-card-materials.ts: bounded one-active-cycle runner, per-job errors, abort on stop, repository durable claims. apps/worker/src/runtime.ts and main.ts compose actual lifecycles. New private-check jobs should reuse these lifecycle principles with honest result kinds, not pretend social/OCR checks sent a material.
+- packages/db/src/repositories/privacy-repository.ts: explicit erasure deletes residents_applications and tombstones resident_verification_requests.0057 erase_resident_verification_subject handles consent withdrawal,0062 extends review-data deletion. New private custody rows can cascade, but allocated object deletion responsibilities MUST survive subject/form deletion. Plan a nonpersonal object-key tombstone/outbox before any external PUT.
+- Current parser production image is Node-only256MiB. Separately proved isolated OCR runtime is still a deployment dependency; do not let normal Node worker invoke Docker socket. One existing task PG17.5 remains, and future OCR sandbox is a separate bounded helper, not an extra database.
 
 ## Tasks & Acceptance
 
@@ -147,9 +156,20 @@ The current Node-only256MiB runtime does not prove OCR isolation or capacity.
 
 ## Design Notes
 
-This draft captures approved scope while S2a implementation owns shared source.
-It is not ready-for-dev and authorizes no concurrent edits. Reconcile actual source
-seams and pin dependency/model choices before the sequential S2b implementation.
+This sequential block follows accepted S2a. Use exact AWS SDK pins3.1157.0 for
+client-s3 and s3-request-presigner; preparation records both registry integrity values.
+Use PyMuPDF1.26.7 and tessdata_fast87416418657359cb625c412a48b6e1d6d41c29bd
+rus/eng bytes with the preparation's exact hashes; no model binaries committed.
+The current256MiB Node deployment is not permission to co-locate a384MiB parser.
+Prove a separate isolated helper and actual orchestrator-to-helper contract without
+mounting Docker socket or enabling production. Explicit authenticated local helper
+transport may be added if needed; it must preserve the no-network parsing sandbox.
+A test-only container runner is not a completed normal production composition.
+Read-only filesystem permits bounded tmpfs only where necessary; never ordinary
+persistent temporary storage. Recovery/manual routes must be accessible in the
+existing manager interface, including unknown upload/delete states after erasure.
+If a code-map detail differs, inspect the actual accepted code before adapting;
+never weaken financial, privacy or feature gates to fit these planning notes.
 The preparation document cites primary provider/library limitations and recovery
 semantics; do not infer unsupported provider capabilities from generic mocks.
 
@@ -171,3 +191,32 @@ exact state reconstruction; never drizzle generate. Retain RED/GREEN logs, build
 changed packages before consumers, relevant types/lint and diff checks. No unchanged
 broad repeats or repeat helper above3. Root owns final review/gate/push/PR; no hosted
 CI exists and local verification is not provider/staging/production release proof.
+
+## Execution ownership and local resources
+
+One fresh implementer owns source/tests/migrations, dependency manifests/lockfile,
+optional parser runtime artifacts, operations runbook and implementation evidence.
+Root owns this spec, AGENT-STATUS, master/coordinator/review evidence, final gate and
+push/PR. Implementer may mark task checkboxes and report evidence but must not
+rewrite frozen requirements or run another lead/descendants. BMad already rendered;
+no rerender, earlier-block restart, routine approval or run-count/splitting loop.
+Work only in /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+on codex/residency-private-verification-jobs-20261026. Capture identity and run
+pwsh -File scripts/check-development-environment.ps1 -RequireDocker before edits.
+
+Use ONE existing task-owned PG17.5 project ii-tonya-verification-form-20261026,
+loopback55483; protected0600 /tmp/verification-form-20261026.compose.json supplies
+credentials only in child process memory. Never print URL/config/environment. No
+new DB cluster or stale Docker Config.Env credentials. Serialize PG/metadata/builds.
+Next hand migration0064; preserve0062/0063 bytes, journal contiguous, reconstruct
+exact state and all literal inventories. Compact full SQL catalogue stays below
+unchanged1MiB ceiling; never format it as indented JSON. New table/function/trigger
+counts must come from actual PostgreSQL, not guessed old counts.
+
+Retain RED/GREEN/status under .superpowers/sdd/verification-private-jobs-20261026/;
+write docs/test-evidence/verification-private-jobs-2026-10-26.md with exact commands,
+exit statuses, matrix-to-tests and skipped counts. Empty stdout alone is not proof.
+Do not run final full gate/push; root owns them after independent review. Commit
+reviewable source/tests/evidence locally and report exact SHA when implementation
+and focused verification finish. No remaining incomplete criterion may be called
+complete merely because a default-off capability returns unavailable.

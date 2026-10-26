@@ -39,6 +39,14 @@ The sections below retain the earlier package decomposition for traceability.
 Where they conflict with this addendum, this addendum controls. Root will write
 bounded new sales/other contracts against the accepted stabilization source.
 
+## Current sequential continuation
+
+S2a final verification/messages is delivered in [Draft PR113](https://github.com/Dimkox/ii-tonya-platform/pull/113)
+atf11d5d906acf6e1983fe36739981e31a847207ce. All six independent findings closed;
+full/push592/592. S2b private custody/extraction/OCR/social evidence jobs follows
+on codex/residency-private-verification-jobs-20261026, contract spec-verification-private-jobs.md.
+S3 rich onboarding/local tags and S4 dynamic slots/lifecycle remain afterwards.
+
 ## Owner sources and precedence
 
 All seven supplied documents are preserved with CRLF and trailing whitespace normalized under

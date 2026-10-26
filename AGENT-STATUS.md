@@ -1,3 +1,23 @@
+# Verification/messages delivered; private verification jobs active — 2026-10-26
+
+Draft PR113 OPEN atf11d5d906acf6e1983fe36739981e31a847207ce:
+https://github.com/Dimkox/ii-tonya-platform/pull/113
+Base codex/residency-content-safety-20261026 at53df4d2f (PR112).
+Runtime3baaf003 independently acceptedR1–R6; guard3c546774 separately accepted.
+Canonical full and mandatory push gates passed592/592; types, PG16/API4/legacy32/
+upgrade1 and actual Chromium evidence retained. No source work remains for S2a.
+
+Active branch codex/residency-private-verification-jobs-20261026 uses the SAME
+isolated .worktrees/phase1-owner-plan-20261023 directory. S2b contract:
+docs/superpowers/implementation-artifacts/spec-verification-private-jobs.md.
+Root reconciled actual0063/source seams and exact dependency/model choices.
+One fresh implementer owns source/tests/migrations and implementation evidence;
+root owns specification, review and final gate/push/PR. No competing source edits.
+Next hand migration0064; one protected existing PG17.5 cluster. Do not rerender
+BMad or restart delivered blocks. Continue full owner package afterwards.
+Refund policy remains pending/manual; owner autonomy/run-count/split opt-out persists.
+No deployment/provider activation/money operations; no routine permission loops.
+
 # Verification/messages accepted; delivery next — 2026-10-26
 
 Active isolated branch codex/residency-verification-messages-20261026 in
