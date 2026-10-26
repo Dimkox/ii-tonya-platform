@@ -149,3 +149,24 @@ previous full567/567 gate. A focused unchanged rerun of that exact case passed i
 3.463s (1passed,32filtered), including actual recovery verification. The failure
 and focused output are retained losslessly. No timeout, assertion, test or hook
 was weakened. A subsequent mandatory push gate is required, not assumed green.
+
+## Remote base change and deterministic recovery fixture
+
+The next mandatory gate passed567/567 and pushed `d52cc37a` normally. PR creation
+then discovered PR108 had been merged by the owner and its head branch deleted.
+Live connector reports merge `d83977c9` into `codex/phase1-owner-plan-20261023`.
+Its complete Git tree equals former base567e71b4 exactly. Merge `a8804087` records
+that ancestry without any tree change; conflicts were resolved only after exact
+tree equality was asserted. No shared history rewrite or runtime change occurred.
+The new PR targets that surviving development branch, not the removed head.
+
+The mandatory hook for this tree-identical merge reproduced the same health drill
+failure, now explicitly Vitest's5s timeout (8.932s elapsed). Root corrected only
+the simulated sleep clock for the deliberately stale candidate: advance60virtual
+seconds at that wait, then sample the restored old worker normally. Production
+script/deadlines remain byte-identical. Assertions are stronger: no subprocess
+error/signal, exact exit1, the simulated wait was exercised, marker cleanup and
+verified old release. The full focused file passed33/33; tests typecheck and lint
+passed. Independent edge reviewer accepted the precise change read-only. Both
+failed hook logs remain preserved. This fixes nondeterministic fixture cost rather
+than extending timeouts or bypassing recovery verification.

@@ -155,7 +155,16 @@ function drill(fault = "", action = "deploy", first = false) {
     'printf "sudo %s\\n" "$*" >> "$ROOT/events"\n[[ "$1" != -n ]] || shift\nexec "$@"',
   );
   shim("flock", '[[ "$FAULT" != lock ]] || exit 1\nexec /usr/bin/flock "$@"');
-  shim("sleep", 'n=$(<"$ROOT/clock"); echo "$((n+1))" > "$ROOT/clock"');
+  // Fast-forward only the intentionally stale candidate wait. Recovery still
+  // samples the old worker normally; production deadlines are never changed.
+  shim(
+    "sleep",
+    `n=$(<"$ROOT/clock"); step=1
+if [[ "$FAULT" == health && "$(readlink "$ROOT/current" || :)" == releases/${candidateSha} ]]; then
+  step=60; echo candidate-wait-elapsed >> "$ROOT/events"
+fi
+echo "$((n+step))" > "$ROOT/clock"`,
+  );
   shim(
     "date",
     'if [[ "${1:-}" == -d ]]; then echo 100; else n=$(<"$ROOT/clock"); if [[ -e "$ROOT/clock-backwards" ]]; then n=$((n-2)); echo backwards-wall >> "$ROOT/events"; else n=$((n+2)); fi; echo "$n" > "$ROOT/clock"; echo "$n"; fi',
@@ -398,8 +407,11 @@ describe("native cutover remote fault drill", () => {
 
   it("restores and independently verifies the old application after candidate health failure", () => {
     const r = drill("health");
-    expect(r.status).not.toBe(0);
-    expect(r.status).not.toBe(70);
+    expect(r.error, r.stderr).toBeUndefined();
+    expect(r.signal).toBeNull();
+    expect(r.status).toBe(1);
+    expect(r.events).toContain("candidate-wait-elapsed");
+    expect(existsSync(join(r.root, ".deployment-in-progress"))).toBe(false);
     expect(r.selected).toBe(`releases/${oldSha}`);
     expect(existsSync(r.candidate)).toBe(true);
     expect(existsSync(r.incoming)).toBe(true);

@@ -1,3 +1,19 @@
+# Stabilization accepted; delivery base updated — 2026-10-26
+
+Core runtime R1–R13 is independently accepted at401e1bb. Full gate567/567 plus
+focused PG17/17, Python12/12 and callback composition10/10 are retained. Initial
+push d52cc37a succeeded through mandatory hook. Owner merged PR108 and removed
+its head; surviving base codex/phase1-owner-plan-20261023 atd83977c9 has the exact
+same tree as old567e71b4. Merge a8804087 records ancestry without tree changes.
+A repeated hook exposed a timing-dependent existing recovery drill. Its simulated
+candidate-only wait is now deterministic; full focused33/33 and independent review
+pass, production deadlines unchanged. Final hook/PR delivery is root-owned.
+
+Latest owner precedence and website audit remain in the master plan. Next approved
+increment is separated sales and lifetime terms on verified3000 fee, not earlier
+verification-before-price. Three read-only audits are complete; root prepared the
+bounded next contract. No deployment/provider activation or production change.
+
 # Core stabilization R1–R13 remediation ready — 2026-10-26
 
 The single accepted-finding batch against390613bc is implemented. Prepared handoff

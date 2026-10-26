@@ -23,5 +23,35 @@
     "file": "core-push-cutover-focused.log.gz",
     "raw_sha256": "0fe342ae63a5755a1f17e81d46fb303be77dae83c486ec7e495fe2a15192b59b",
     "gzip_sha256": "e8a1aa12f732137f44bb807f6a6e582a279caa914a3a9c2d2ea71b8c41a0c03e"
+  },
+  {
+    "file": "core-push-gate-1793032584808838909.log.gz",
+    "raw_sha256": "d2a6fef09c52384156d156bcef643308f283b6039ba212511cf157c4affde4ab",
+    "gzip_sha256": "0371c4ee27fa834e1211eb22d1ebd126e52d4f989243b3da16a0853cce220b91"
+  },
+  {
+    "file": "core-push-repo-1793032584808838909.log.gz",
+    "raw_sha256": "fb676d7194bc753e55ec1fccfe400e25990aff1b8b88c3297269f93bde7b7cff",
+    "gzip_sha256": "c175fc2daa12f751880cb43947f69cf9ee19df89e20463c4f9bf800092bc621c"
+  },
+  {
+    "file": "core-push-gate-1793032764569293300.log.gz",
+    "raw_sha256": "30cd14dc1769c4a71ac882eb3ec42bdb1b7bddda9bfcc523a69ebf814842d83a",
+    "gzip_sha256": "c7e681e157bdab604c74e0d4b5818b8e14b104a36fa60e833010c7bbb518fd64"
+  },
+  {
+    "file": "core-push-repo-1793032764569293300.log.gz",
+    "raw_sha256": "71bbc59037b192b3afc0de0171510bdf53c6144e5ed0d26aacba22ee2364a00e",
+    "gzip_sha256": "b418f307a074c78f403f36593a519e8e39ffd469e8b58dfe865b6d80ddae7cd0"
+  },
+  {
+    "file": "core-cutover-clock-fix.log.gz",
+    "raw_sha256": "2eb1663d7ef3bed8fdcf9c0679cc6f821d2a660f2189da0e6120ef042099bac8",
+    "gzip_sha256": "f7c6656fd26d79bd2cd4a696eb1f611d37ea86c20cc66699b1782d323e05614e"
+  },
+  {
+    "file": "core-cutover-test-types.log.gz",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gzip_sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
   }
 ]
