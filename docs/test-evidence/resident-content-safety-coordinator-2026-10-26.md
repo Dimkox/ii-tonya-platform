@@ -123,3 +123,38 @@ original and archive byte lengths/SHA256 values. These are the same bytes inspec
 locally, not rerun or rewritten output. Empty type/lint output remains empty and
 does not alone establish process exit status; implementation command completion is
 reported separately, and the final canonical gate remains outstanding.
+
+## Bounded remediation in progress
+
+Independent review acceptedR1 underlying policy-transition authorization,R2 proposal
+recovery at a media-only100-entry cap,R3 swallowed fault assertions andR4 real-browser
+refusal coverage. Root'sR5 hypothesis was disproved by exact a882d562 source: failed()
+already clears known refused commands. It is rejected, not silently counted as fixed.
+The same implementer owns one corrective batch; root makes no source edits.
+
+Root read remediation `r1-r2-red.log`:R1 reproduces an unauthorized direct UPDATE;
+R2 initially failed on a fixture cast and was not yet behavioral evidence. Corrected
+`r2-red.log` then reproduces the missing actual owner recovery command. The real-client
+plus view `browser-baseline.log` passes26/26 on existing runtime, covering refusal
+recovery without an unnecessary runtime rewrite. Source/PG changes remain in progress.
+
+## Corrective matrix GREEN
+
+Root inspected remediation `r1-r2-green1.log` (2 selected passes,12 filtered skips),
+`r3-mutation-red.log` (expected assertion failures when assessment unexpectedly
+succeeds), and `matrix-final.log` (14/14, no skips,20:08UTC). Final matrix includes
+genuinely valid review activation becoming invalid after authorized policy rollback
+and the actual proposal discard/replacement path at100 media entries. The changed
+schema was reconstructed again:197 tables,121 functions,172 triggers,1333 constraints,
+502 indexes and2 extensions. Final types/registrations and the independent bounded
+closure remain outstanding; no final gate or push yet.
+
+## Independent closure PASS
+
+All three original reviewers independently accepted corrected candidate
+`2419347c02f0a98c1310069f2c9472775aea7a7f`: blindR1, edgeR1/R2, gapR3/R4.
+No remaining assigned finding. Root's disprovedR5 remains rejected. Corrective
+verification reports app/DB builds, app/DB/API/web/tests types, lint/format and
+metadata/scope152/152; actual PG14/14 and browser26/26 logs are committed with hashes.
+The shared mandatory pre-push hook is active. Canonical full gate is now next;
+no hosted CI, deployment or live-provider evidence is claimed.

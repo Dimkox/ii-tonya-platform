@@ -26,7 +26,10 @@ and rejected it. No runtime redesign is required for R5.
 
 ## Closure
 
-R1–R4 await corrective commit, focused evidence and independent bounded re-review.
+R1–R4 independently PASS at `2419347c02f0a98c1310069f2c9472775aea7a7f`.
+Blind reviewer acceptedR1; edge reviewer acceptedR1/R2; verification-gap reviewer
+acceptedR3/R4. Each inspected the corrected source and retained PG14/14/browser26/26
+evidence without rerunning tests. No remaining assigned defect or fresh quota hunt.
 R5 is rejected with exact candidate evidence above; no quota or replacement finding.
 Do not rerun broad unchanged suites or repeat a finding quota. Regenerate0061 state
 and exact hashes if its unpublished SQL changes; do not edit historical migrations.
