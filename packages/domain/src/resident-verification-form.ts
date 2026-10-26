@@ -50,6 +50,33 @@ const choices = {
 function fail(): never {
   throw new Error("resident_patch_invalid");
 }
+/** Leaves ample room for PostgreSQL JSONB spacing below its 100000-byte guard. */
+export const RESIDENT_DRAFT_MAX_BYTES = 64000;
+const forbiddenText = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u;
+const socialUrl =
+  /^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?:[/?#][^\s\\]*)?$/iu;
+export function normalizeResidentSocialUrl(value: string): string {
+  if (
+    forbiddenText.test(value) ||
+    /[\s\\]/u.test(value) ||
+    !socialUrl.test(value)
+  )
+    fail();
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return fail();
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    !socialUrl.test(url.href)
+  )
+    fail();
+  return url.href;
+}
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 export function applyResidentPatch(
@@ -117,18 +144,13 @@ export function applyResidentPatch(
         )
       )
         fail();
-      if (key === "socialLinks")
-        for (const v of value) {
-          let url: URL;
-          try {
-            url = new URL(v);
-          } catch {
-            fail();
-          }
-          if (url!.protocol !== "https:" || url!.username || url!.password)
-            fail();
-        }
-      clean[key] = [...value];
+      if (value.some((v) => forbiddenText.test(v))) fail();
+      const normalized =
+        key === "socialLinks"
+          ? value.map((v) => normalizeResidentSocialUrl(v))
+          : value;
+      if (new Set(normalized).size !== normalized.length) fail();
+      clean[key] = [...normalized];
     } else if (key === "education" || key === "propertyEvidence") {
       if (!Array.isArray(value) || value.length > 10) fail();
       for (const doc of value)
@@ -170,6 +192,11 @@ export function applyResidentPatch(
     !result.roles.includes(result.primaryRole)
   )
     fail();
+  if (
+    new TextEncoder().encode(JSON.stringify(result)).length >
+    RESIDENT_DRAFT_MAX_BYTES
+  )
+    throw new Error("resident_draft_too_large");
   return result;
 }
 export function residentForm(

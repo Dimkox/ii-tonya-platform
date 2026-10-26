@@ -7,6 +7,7 @@ import {
   type ResidentPolicy,
   type ResidentField,
   type ResidentDraft,
+  type ResidentDocument,
 } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
 import {
@@ -17,7 +18,7 @@ import type { ExpertPromoCommand } from "./expert-promo-repository.js";
 export interface ResidentSnapshot extends Record<string, unknown> {
   currentField?: ResidentField | null;
   policyVersion?: string;
-  educationRequirement?: string;
+  educationRequirement?: ResidentPolicy["education"];
   id: string;
   revision: number;
   draft: ResidentDraft;
@@ -31,6 +32,7 @@ export type ResidentMutation = ExpertPromoCommand & {
   applicationId?: string;
   patch?: unknown;
   answer?: string;
+  documents?: ResidentDocument[];
   field?: ResidentField;
 };
 function fail(code: string): never {
@@ -50,6 +52,9 @@ export class PostgresResidentVerificationRepository {
     const input = {
       ...raw,
       ...(raw.patch === undefined ? {} : { patch: structuredClone(raw.patch) }),
+      ...(raw.documents === undefined
+        ? {}
+        : { documents: structuredClone(raw.documents) }),
     };
     if (
       input.botId !== this.policy.botId ||
@@ -99,13 +104,23 @@ export class PostgresResidentVerificationRepository {
       !/^[0-9a-f-]{36}$/u.test(input.applicationId)
     )
       fail("resident_invalid_request");
-    if (
-      input.action === "followup" &&
-      (typeof input.answer !== "string" ||
-        input.answer.trim().length < 1 ||
-        input.answer.length > 3000)
-    )
-      fail("resident_invalid_answer");
+    if (input.action === "followup") {
+      if (
+        input.answer !== undefined &&
+        (typeof input.answer !== "string" ||
+          !input.answer.trim() ||
+          input.answer.length > 3000 ||
+          /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(input.answer))
+      )
+        fail("resident_invalid_answer");
+      if (input.documents !== undefined) {
+        if (!Array.isArray(input.documents) || input.documents.length < 1)
+          fail("resident_invalid_documents");
+        applyResidentPatch({}, { education: input.documents });
+      }
+      if (input.answer === undefined && input.documents === undefined)
+        fail("resident_invalid_answer");
+    }
     const fingerprint = createHash("sha256")
       .update(
         JSON.stringify({
@@ -115,6 +130,7 @@ export class PostgresResidentVerificationRepository {
           applicationId: input.applicationId,
           patch: input.patch,
           answer: input.answer,
+          documents: input.documents,
           field: input.field,
         }),
       )
@@ -220,7 +236,7 @@ export class PostgresResidentVerificationRepository {
           )
         ).rows[0]!;
         await tx.execute(
-          sql`insert into resident_verification_application_updates(application_id,user_id,revision,kind,answers) values(${row.id}::uuid,${userId}::uuid,${updated.revision},${input.action},${JSON.stringify(input.action === "patch" ? input.patch : input.action === "followup" ? { answer: input.answer } : input.action === "question" ? { field: input.field } : {})}::jsonb)`,
+          sql`insert into resident_verification_application_updates(application_id,user_id,revision,kind,answers) values(${row.id}::uuid,${userId}::uuid,${updated.revision},${input.action},${JSON.stringify(input.action === "patch" ? input.patch : input.action === "followup" ? { ...(input.answer === undefined ? {} : { answer: input.answer }), ...(input.documents === undefined ? {} : { documents: input.documents }) } : input.action === "question" ? { field: input.field } : {})}::jsonb)`,
         );
         if (submitting)
           await tx.execute(

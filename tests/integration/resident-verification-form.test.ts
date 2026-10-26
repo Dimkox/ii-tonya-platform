@@ -273,6 +273,15 @@ describe("resident intake privacy and pricing boundaries", () => {
       action: "followup",
       expectedRevision: 2,
       answer: "Личное дополнение",
+      documents: [
+        {
+          kind: "document",
+          fileId: "private_erasure_supplement",
+          mimeType: null,
+          size: null,
+          caption: "Частное дополнение",
+        },
+      ],
     });
     const { PostgresPrivacyRepository } =
       await import("../../packages/db/src/repositories/privacy-repository.js");
@@ -565,4 +574,346 @@ it("classifies enabled registration atomically against a first quote and preserv
     )
   ).rows[0]!;
   expect(Number(state.apps) + Number(state.quotes)).toBe(1);
+});
+
+describe("remediation PostgreSQL regressions", () => {
+  it("preserves explicit primary deletion and normalizes inline and text role changes with exact replay", async () => {
+    const { createResidentVerificationService } =
+      await import("../../packages/application/src/resident-verification-service.js");
+    for (const mode of ["inline", "text"]) {
+      const scope = await owner();
+      await repo.mutate({ ...command(scope), action: "start" });
+      await repo.mutate({
+        ...command(scope),
+        action: "patch",
+        expectedRevision: 0,
+        patch: {
+          ...complete,
+          roles: ["EXPERT"],
+          primaryRole: "EXPERT",
+          specialization: "Сохранить",
+          averageCheckMinor: "1500000",
+        },
+      });
+      const service = createResidentVerificationService({
+        enabled: true,
+        repository: repo,
+      });
+      let updateId = mode === "inline" ? 100000 : 101000;
+      const click = async (op: string) => {
+        const s = await repo.mutate({ ...command(scope), action: "start" });
+        return service.handle({
+          ...scope,
+          updateId: updateId++,
+          text: "",
+          callbackData: `rv:${s.id}:${s.revision}:${op}`,
+        });
+      };
+      if (mode === "inline") {
+        await click("r:OTHER");
+        await click("r:EXPERT");
+        const q = await click("next");
+        expect(JSON.stringify(q)).toContain("p:OTHER");
+      } else {
+        const request = {
+          ...scope,
+          updateId: updateId++,
+          text: "/set roles OTHER",
+        };
+        const first = await service.handle(request);
+        expect(JSON.stringify(first)).toContain("p:OTHER");
+        expect(await service.handle(request)).toEqual(first);
+      }
+      const cleared = await repo.mutate({ ...command(scope), action: "start" });
+      expect(cleared.draft).toMatchObject({
+        roles: ["OTHER"],
+        city: "Москва",
+        specialization: "Сохранить",
+      });
+      expect(cleared.draft.primaryRole).toBeUndefined();
+      await click("p:OTHER");
+      expect(
+        (await repo.mutate({ ...command(scope), action: "start" })).draft
+          .primaryRole,
+      ).toBe("OTHER");
+    }
+  });
+  it("keeps policy-version and requirement mismatches read-only", async () => {
+    const scope = await owner();
+    const original = await repo.mutate({ ...command(scope), action: "start" });
+    const baseline = (
+      await database.db.execute(
+        sql`select revision,draft,(select count(*)::int from resident_verification_application_updates where application_id=${original.id}::uuid) updates from residents_applications where id=${original.id}::uuid`,
+      )
+    ).rows[0];
+    for (const policy of [
+      { version: "changed_v2", education: "unknown_manual_review" as const },
+      {
+        version: "resident_education_unknown_v1",
+        education: "required" as const,
+      },
+    ]) {
+      const other = new PostgresResidentVerificationRepository(database.db, {
+        botId: scope.botId,
+        botKey: scope.botKey,
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        fieldPolicy: policy,
+      });
+      await expect(
+        other.mutate({
+          ...command(scope),
+          action: "patch",
+          expectedRevision: 0,
+          patch: { city: "Уфа" },
+        }),
+      ).rejects.toThrow("resident_policy_conflict");
+      expect(
+        (
+          await database.db.execute(
+            sql`select revision,draft,(select count(*)::int from resident_verification_application_updates where application_id=${original.id}::uuid) updates from residents_applications where id=${original.id}::uuid`,
+          )
+        ).rows[0],
+      ).toEqual(baseline);
+    }
+  });
+  it("stores bounded post-submit text and file supplements while freezing submitted facts", async () => {
+    const scope = await owner();
+    await repo.mutate({ ...command(scope), action: "start" });
+    await repo.mutate({
+      ...command(scope),
+      action: "patch",
+      expectedRevision: 0,
+      patch: complete,
+    });
+    const submitted = await repo.mutate({
+      ...command(scope),
+      action: "submit",
+      expectedRevision: 1,
+    });
+    const { createResidentVerificationService } =
+      await import("../../packages/application/src/resident-verification-service.js");
+    const service = createResidentVerificationService({
+      enabled: true,
+      repository: repo,
+    });
+    expect(
+      (await service.handle({ ...scope, updateId: 102000, text: "Дополнение" }))
+        ?.status,
+    ).toBe("handled");
+    const document = {
+      kind: "document" as const,
+      fileId: "private_followup",
+      mimeType: null,
+      size: null,
+      caption: "Частная подпись",
+    };
+    const request = {
+      ...scope,
+      updateId: 102001,
+      text: "Частная подпись",
+      media: document,
+    };
+    const reply = await service.handle(request);
+    expect(reply?.status).toBe("handled");
+    expect(await service.handle(request)).toEqual(reply);
+    const stored = (
+      await database.db.execute(
+        sql`select revision,draft,submitted_draft from residents_applications where id=${submitted.id}::uuid`,
+      )
+    ).rows[0]!;
+    expect(stored).toMatchObject({
+      revision: 4,
+      draft: complete,
+      submitted_draft: complete,
+    });
+    const updates = (
+      await database.db.execute(
+        sql`select answers from resident_verification_application_updates where application_id=${submitted.id}::uuid and kind='followup' order by revision`,
+      )
+    ).rows;
+    expect(updates).toEqual([
+      { answers: { answer: "Дополнение" } },
+      { answers: { answer: "Частная подпись", documents: [document] } },
+    ]);
+    expect(
+      (await service.handle({ ...scope, updateId: 102002, text: " \n " }))
+        ?.status,
+    ).toBe("handled");
+    expect(
+      (await repo.mutate({ ...command(scope), action: "start" })).revision,
+    ).toBe(4);
+  });
+  it("rejects shared prohibited URL/text/caption cases in SQL and accepts normalized uppercase HTTPS", async () => {
+    const scope = await owner();
+    const a = await repo.mutate({ ...command(scope), action: "start" });
+    for (const draft of [
+      { socialLinks: ["https://name:secret@example.com/me"] },
+      { socialLinks: ["https://example.com/white space"] },
+      { socialLinks: ["https://example.com\\evil"] },
+      { city: "Москва\u0001" },
+      { motivation: "a\u0085b" },
+      {
+        education: [
+          {
+            kind: "document",
+            fileId: "private",
+            mimeType: null,
+            size: null,
+            caption: "a\u0001b",
+          },
+        ],
+      },
+    ])
+      await expect(
+        database.db.execute(
+          sql`update residents_applications set draft=${JSON.stringify(draft)}::jsonb,revision=revision+1 where id=${a.id}::uuid`,
+        ),
+      ).rejects.toThrow();
+    const saved = await repo.mutate({
+      ...command(scope),
+      action: "patch",
+      expectedRevision: 0,
+      patch: { socialLinks: ["HTTPS://Example.COM/Profile"] },
+    });
+    expect(saved.draft.socialLinks).toEqual(["https://example.com/Profile"]);
+    expect(
+      (
+        await database.db.execute(
+          sql`select social_links_json from residents_applications where id=${a.id}::uuid`,
+        )
+      ).rows[0]?.social_links_json,
+    ).toEqual({ "example.com": ["https://example.com/Profile"] });
+  });
+  it("bounds cumulative caption bytes before SQL and preserves the previous draft", async () => {
+    const scope = await owner();
+    await repo.mutate({ ...command(scope), action: "start" });
+    const docs = Array.from({ length: 10 }, (_, i) => ({
+      kind: "document",
+      fileId: `private_${i}`,
+      mimeType: null,
+      size: null,
+      caption: "я".repeat(3000),
+    }));
+    const before = await repo.mutate({
+      ...command(scope),
+      action: "patch",
+      expectedRevision: 0,
+      patch: { education: docs },
+    });
+    await expect(
+      repo.mutate({
+        ...command(scope),
+        action: "patch",
+        expectedRevision: 1,
+        patch: { propertyEvidence: docs },
+      }),
+    ).rejects.toThrow("resident_draft_too_large");
+    expect(
+      await repo.mutate({ ...command(scope), action: "start" }),
+    ).toMatchObject({ revision: 1, draft: before.draft });
+  });
+});
+
+it("remediation: document correction recovers after ten refs and the subject index covers erasure", async () => {
+  const { createResidentVerificationService } =
+    await import("../../packages/application/src/resident-verification-service.js");
+  const scope = await owner();
+  let id = 103000;
+  await repo.mutate({ ...command(scope), action: "start" });
+  let s = await repo.mutate({
+    ...command(scope),
+    action: "patch",
+    expectedRevision: 0,
+    patch: {
+      roles: ["EXPERT"],
+      primaryRole: "EXPERT",
+      category: "BASIC",
+      tax: "IP",
+    },
+  });
+  const service = createResidentVerificationService({
+    enabled: true,
+    repository: repo,
+  });
+  const wrong = await service.handle({
+    ...scope,
+    updateId: id++,
+    text: "",
+    media: {
+      kind: "document",
+      fileId: "wrong_cursor",
+      mimeType: null,
+      size: null,
+    },
+  });
+  expect(wrong?.status).toBe("handled");
+  expect(
+    (await repo.mutate({ ...command(scope), action: "start" })).revision,
+  ).toBe(1);
+  const click = async (op: string) => {
+    s = await repo.mutate({ ...command(scope), action: "start" });
+    return service.handle({
+      ...scope,
+      updateId: id++,
+      text: "",
+      callbackData: `rv:${s.id}:${s.revision}:${op}`,
+    });
+  };
+  await click("e:d");
+  s = await repo.mutate({ ...command(scope), action: "start" });
+  await repo.mutate({
+    ...command(scope),
+    action: "patch",
+    expectedRevision: s.revision,
+    field: "education",
+    patch: {
+      education: Array.from({ length: 10 }, (_, i) => ({
+        kind: "document",
+        fileId: `old_${i}`,
+        mimeType: null,
+        size: null,
+      })),
+    },
+  });
+  await click("rm:d_9");
+  expect(
+    (await repo.mutate({ ...command(scope), action: "start" })).draft.education,
+  ).toHaveLength(9);
+  await service.handle({
+    ...scope,
+    updateId: id++,
+    text: "",
+    media: {
+      kind: "document",
+      fileId: "replacement",
+      mimeType: null,
+      size: null,
+      caption: "Новый документ",
+    },
+  });
+  expect(
+    (await repo.mutate({ ...command(scope), action: "start" })).draft.education,
+  ).toHaveLength(10);
+  await click("replace:d");
+  expect(
+    (await repo.mutate({ ...command(scope), action: "start" })).draft.education,
+  ).toEqual([]);
+  await service.handle({
+    ...scope,
+    updateId: id++,
+    text: "",
+    media: { kind: "document", fileId: "last", mimeType: null, size: null },
+  });
+  await click("clear:d");
+  await click("back");
+  const resumed = await repo.mutate({ ...command(scope), action: "start" });
+  expect(resumed.currentField).toBeNull();
+  expect(resumed.draft.education).toEqual([]);
+  const index = (
+    await database.db.execute(
+      sql`select indexdef from pg_indexes where schemaname='public' and indexname='resident_verification_requests_subject_idx'`,
+    )
+  ).rows[0]?.indexdef;
+  expect(index).toContain("(user_id)");
+  expect(index).toContain("WHERE (user_id IS NOT NULL)");
 });

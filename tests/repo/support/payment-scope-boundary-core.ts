@@ -772,15 +772,15 @@ const approvedMigrationHashes = new Map([
   // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.
   [
     "packages/db/migrations/0057_resident_verification_form.sql",
-    "58871a8406098d507edc012d0f18c82def950e2b84f2dd43884947e3cfff5f3b",
+    "06b540f1cfd16a86984454fd52ab90e0bfb0d9984c1ed82f23c0799283292093",
   ],
   [
     "packages/db/migrations/meta/0057_snapshot.json",
-    "6d9a7e89e0edab9b0ff772c2d8cd985214c074c7678067a0285407478e4b4c06",
+    "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
   ],
   [
     "packages/db/migrations/state/0057_verification_sql_objects.json",
-    "731b647a5a53f873137b9f7234e215cfba0b708eb66a929ebf8ea5acb1320d7a",
+    "23158ba19989bc5919a93bc967465244a2865f2be3d6550e8d2bacb538d2dc6c",
   ],
 
   // Reviewed additive v2 SQL, PG-derived supported snapshot and exact catalogue.

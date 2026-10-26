@@ -13,7 +13,7 @@ adds five tables to169, plus the channel-identity owner composite unique and
 `users.current_verification_stage`. The full SQL chain was replayed on task-owned
 PostgreSQL17.5; fresh introspection was normalized using migration-state.ts.
 Only new tables and the two additive existing-table projections are promoted.
-The companion records8functions,5triggers,42constraints and11indexes affected by
+The companion records9functions,5triggers,43constraints and12indexes affected by
 0057, including original PostgreSQL definitions and validation flags.
 
 The exact new relations are `residents_applications`,
@@ -72,3 +72,45 @@ consent grant and existing-owner enrollment admit the new cohort atomically.
 There is no later approval implementation in this increment: all intake cohorts
 remain fenced, including after submission. A future reviewed manager provenance
 migration must deliberately change that gate.
+
+## Reviewed remediation — 2026-10-26
+
+Role patches retain the explicit primary-role deletion marker through cloning,
+validation, fingerprinting and merging. Text and inline role changes clear an
+incompatible primary without losing other answers. Intake media is accepted only
+at an applicable document question; files after submission become typed private
+supplements, never edits to the frozen submitted snapshot. Document controls can
+remove, clear or replace active draft references, including at the ten-item cap.
+Optional education has Skip/Back; required missing documents remain non-skippable.
+Private history still belongs to the existing erasure/consent lifecycle.
+
+Normal HTTPS scheme/hostname case is canonicalized. A conservative DNS-host HTTPS
+subset rejects userinfo, explicit ports, whitespace and backslashes;
+SQL enforces the same submitted URL subset and projects host keys case-insensitively.
+Text/caption prohibited controls are rejected by domain and SQL. Before SQL, the
+serialized draft is capped at64000UTF8bytes, conservatively below the100000-byte
+JSONB constraint; a rejected aggregate leaves the saved draft unchanged.
+
+`resident_verification_followup_valid` constrains supplemental answer/document
+shape and bounds. The partial `resident_verification_requests_subject_idx` on
+non-null user_id serves actual erasure/consent cleanup. Receipt retention remains
+governed by that existing lifecycle; this increment adds no TTL or retention policy.
+A persisted education-policy mismatch yields a read-only manual-review message,
+not questions under a new policy. Disabled form admission cannot expose pending
+cohort prices or advertise a usable tariff entry. Capability validation refuses
+both upward and downward mismatches with trusted configuration.
+
+Confirmation uses bounded saved facts and document counts, with Russian role/tax
+labels and unchanged internal enums. It never shows Telegram file IDs or complete
+long private fields. Inline callbacks return the next/current question through
+the webhook sendMessage response. There is no separate answerCallbackQuery network
+transport in this increment, so a client spinner can remain briefly. No bot token
+or provider transport dependency was added solely for that acknowledgement.
+
+The first form prompt also retains the pre-existing non-price promo code, guide
+status and frozen-bonus information. It does not carry the legacy tariff listing
+instruction. The decoder distinguishes valid-but-unsupported user content from
+malformed structure: unsupported declared MIME/size, overlong form text and old
+controls after feature disablement receive corrective200 without a service call,
+after authentication and the existing per-user rate limit. Malformed structures
+remain400 and failed authentication401. This changes no SQL or pricing boundary.

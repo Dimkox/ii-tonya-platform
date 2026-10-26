@@ -1,5 +1,5 @@
 {
-  "id": "617ffc36-8975-4c18-89ea-213b6077f8a5",
+  "id": "a98e4e1d-0360-4cae-bc14-b504ae0eae4c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -23686,6 +23686,10 @@
         "resident_verification_application_updates_revision_check": {
           "name": "resident_verification_application_updates_revision_check",
           "value": "revision > 0"
+        },
+        "resident_verification_followup_check": {
+          "name": "resident_verification_followup_check",
+          "value": "kind <> 'followup'::text OR resident_verification_followup_valid(answers)"
         }
       },
       "policies": {},
@@ -23855,7 +23859,25 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "resident_verification_requests_subject_idx": {
+          "name": "resident_verification_requests_subject_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "asc": true,
+              "nulls": "last",
+              "opclass": "uuid_ops",
+              "isExpression": false
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "where": "(user_id IS NOT NULL)",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "resident_verification_requests_user_id_fkey": {
           "name": "resident_verification_requests_user_id_fkey",

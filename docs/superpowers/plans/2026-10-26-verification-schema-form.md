@@ -64,3 +64,23 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 ## Local implementation checkpoint
 
 Tasks1–3 source is consolidated in one coherent review checkpoint. PostgreSQL acceptance15/15, focused unit coverage79 cases across final file results, relevant builds/types/lint and exact guard checks are recorded in `docs/test-evidence/verification-schema-form-implementation-2026-10-26.md`. Root owns independent whole-branch review, the final branch gate and push/draft PR; no source task is declared release-complete.
+
+## Independent-review remediation checkpoint
+
+The accepted patch set addresses P1–P11 against8fc8e34. The earlier claim that the
+committed repository discarded the primary-role deletion marker was disproved;
+its existing cloned raw-patch/fingerprint behavior is retained. The actual text
+role-change defect is fixed and both role-change paths have real PostgreSQL
+coverage. Media/correction/supplement paths, saved-policy mismatch, URL/control
+parity, aggregate-byte bounds, erasure subject index, durable flag-off denial,
+real Fastify composition, configuration ceiling and bounded Russian confirmation
+are covered by focused regression tests. No manager/provider subsystem or policy
+migration was introduced. SQL is frozen after one final metadata reconstruction.
+Final re-review and the final branch gate remain coordinator-owned.
+
+Final compatibility closure preserves the existing /start promo/guide/frozen-bonus
+information alongside form markup, without tariff instructions. Final decoder
+closure handles structurally valid unsupported MIME/size, long form text and old
+disabled-form controls with non-mutating corrective200, retaining structural,
+authentication and rate guards. Applicant28/28 and route15/15 focused regressions
+pass. Neither correction changed SQL or required broad PostgreSQL repetition.

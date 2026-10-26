@@ -116,3 +116,33 @@ describe("resident verification form", () => {
       ).toEqual([]);
   });
 });
+it("remediation: normalizes HTTPS and rejects credentials and shared prohibited characters", () => {
+  expect(
+    applyResidentPatch({}, { socialLinks: ["HTTPS://Example.COM/Profile"] })
+      .socialLinks,
+  ).toEqual(["https://example.com/Profile"]);
+  for (const link of [
+    "https://user:pw@example.com/me",
+    "https://example.com/\u0001",
+    "https://example.com/white space",
+    "https://example.com\\evil",
+  ])
+    expect(() => applyResidentPatch({}, { socialLinks: [link] })).toThrow(
+      "resident_patch_invalid",
+    );
+});
+it("remediation: bounds cumulative serialized multilingual document captions", () => {
+  const docs = Array.from({ length: 10 }, (_, i) => ({
+    kind: "document",
+    fileId: `private_${i}`,
+    mimeType: null,
+    size: null,
+    caption: "я".repeat(3000),
+  }));
+  const first = applyResidentPatch({}, { education: docs });
+  expect(first.education).toHaveLength(10);
+  expect(() => applyResidentPatch(first, { propertyEvidence: docs })).toThrow(
+    "resident_draft_too_large",
+  );
+  expect(first.propertyEvidence).toBeUndefined();
+});

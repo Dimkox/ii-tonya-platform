@@ -104,6 +104,20 @@ export class PostgresExpertPromoRepository {
       return userId ? { userId } : null;
     });
   }
+  async isVerificationPending(scope: ExpertPromoScope): Promise<boolean> {
+    const copy = { ...scope };
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
+      const userId = await this.identity(tx, copy);
+      if (!userId) return false;
+      return !(
+        await tx.execute<{ ok: boolean }>(
+          sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+        )
+      ).rows[0]?.ok;
+    });
+  }
   private async replay(
     tx: Executor,
     input: ExpertPromoCommand,

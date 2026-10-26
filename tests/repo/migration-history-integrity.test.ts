@@ -112,6 +112,7 @@ const HAND_SQL_FUNCTIONS = [
   "reject_test_expert_immutable_mutation",
   "resident_verification_consent_cleanup",
   "resident_verification_draft_valid",
+  "resident_verification_followup_valid",
   "resident_verification_price_allowed",
   "resident_verification_price_guard",
   "resident_verification_social_projection",

@@ -63,6 +63,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
       let text = "";
       let callbackData: string | undefined;
       let media: ResidentDocument | undefined;
+      let correction: string | undefined;
       if (
         !body ||
         !Number.isSafeInteger(body.update_id) ||
@@ -77,7 +78,6 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
       if (callback) {
         const origin = message?.from as Record<string, unknown> | undefined;
         if (
-          !c.verificationFormEnabled ||
           body.message !== undefined ||
           typeof callback.id !== "string" ||
           callback.id.length > 128 ||
@@ -89,6 +89,9 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
         )
           return reply.code(400).send({ error: "invalid_update" });
         callbackData = callback.data;
+        if (!c.verificationFormEnabled)
+          correction =
+            "Форма временно недоступна. Сохранённые ответы не изменены; старую кнопку применять не нужно.";
       } else {
         const kinds = [
           message?.text !== undefined,
@@ -98,18 +101,23 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
         if (kinds !== 1)
           return reply.code(400).send({ error: "invalid_update" });
         if (message?.text !== undefined) {
+          if (typeof message.text !== "string" || message.text.length < 1)
+            return reply.code(400).send({ error: "invalid_update" });
           if (
-            typeof message.text !== "string" ||
-            message.text.length < 1 ||
             message.text.length > (c.verificationFormEnabled ? 3000 : 256) ||
             /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(message.text) ||
             (!c.verificationFormEnabled && /[\r\n\t]/u.test(message.text))
-          )
-            return reply.code(400).send({ error: "invalid_update" });
+          ) {
+            if (!c.verificationFormEnabled)
+              return reply.code(400).send({ error: "invalid_update" });
+            correction =
+              "Ответ слишком длинный или содержит неподдерживаемые символы. Отправьте до 3000 символов. Сохранённые ответы не изменены.";
+          }
           text = message.text;
         } else {
           if (!c.verificationFormEnabled)
-            return reply.code(400).send({ error: "invalid_update" });
+            correction =
+              "Форма временно недоступна. Сохранённые ответы не изменены.";
           const photo = message?.photo;
           if (
             photo !== undefined &&
@@ -136,23 +144,33 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             !file ||
             typeof file.file_id !== "string" ||
             !/^[A-Za-z0-9_-]{1,512}$/u.test(file.file_id) ||
-            (mimeType !== null &&
-              (typeof mimeType !== "string" ||
-                !["application/pdf", "image/jpeg", "image/png"].includes(
-                  mimeType,
-                ))) ||
+            (mimeType !== null && typeof mimeType !== "string") ||
             (file.file_size !== undefined &&
               (!Number.isSafeInteger(file.file_size) ||
-                Number(file.file_size) < 1 ||
-                Number(file.file_size) > 20971520)) ||
+                Number(file.file_size) < 0)) ||
             (message?.caption !== undefined &&
-              (typeof message.caption !== "string" ||
-                message.caption.length > 3000 ||
-                /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(
-                  message.caption,
-                )))
+              typeof message.caption !== "string")
           )
             return reply.code(400).send({ error: "invalid_update" });
+          if (
+            (mimeType !== null &&
+              !["application/pdf", "image/jpeg", "image/png"].includes(
+                mimeType,
+              )) ||
+            (file.file_size !== undefined &&
+              (Number(file.file_size) < 1 || Number(file.file_size) > 20971520))
+          )
+            correction =
+              "Этот формат или размер файла не подходит. Пришлите PDF/JPEG/PNG до 20 МБ. Сохранённые ответы не изменены.";
+          if (
+            typeof message?.caption === "string" &&
+            (message.caption.length > 3000 ||
+              /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(
+                message.caption,
+              ))
+          )
+            correction =
+              "Подпись слишком длинная или содержит неподдерживаемые символы. Сохранённые ответы не изменены.";
           media = {
             kind: photo !== undefined ? "photo" : "document",
             fileId: file.file_id,
@@ -167,6 +185,14 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
       }
       if (!limiter.consume(`promo:auth:${c.botId}:${userId}`, 30, 60_000))
         return reply.code(429).send({ error: "rate_limited" });
+      if (correction)
+        return {
+          method: "sendMessage",
+          chat_id: chatId,
+          text: correction,
+          protect_content: true,
+          reply_markup: { remove_keyboard: true },
+        };
       try {
         const result = await c.service.handle({
           botId: c.botId,

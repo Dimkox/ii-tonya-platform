@@ -1,9 +1,10 @@
 -- Separate pre-price intake; no financial rows or prompt history are rewritten.
 CREATE FUNCTION resident_verification_draft_valid(d jsonb, complete boolean DEFAULT false, education_requirement text DEFAULT 'unknown_manual_review') RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$
-DECLARE k text; v jsonb; item jsonb; roles jsonb;
+DECLARE k text; v jsonb; item jsonb; roles jsonb; prohibited text := U&'[\0001-\0008\000B-\001F\007F-\009F]';
 BEGIN
  IF d IS NULL OR jsonb_typeof(d)<>'object' OR octet_length(d::text)>100000 THEN RETURN false; END IF;
  FOR k,v IN SELECT * FROM jsonb_each(d) LOOP
+  IF jsonb_typeof(v)='string' AND v#>>'{}' ~ prohibited THEN RETURN false; END IF;
   IF k IN ('primaryRole','category','tax') THEN
    IF jsonb_typeof(v)<>'string' THEN RETURN false; END IF;
    IF k='primaryRole' AND v#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;
@@ -17,11 +18,11 @@ BEGIN
     IF k IN ('education','propertyEvidence') THEN
      IF jsonb_typeof(item)<>'object' OR NOT item ?& ARRAY['kind','fileId','mimeType','size'] OR EXISTS(SELECT 1 FROM jsonb_object_keys(item) key WHERE key NOT IN ('kind','fileId','mimeType','size','caption')) THEN RETURN false; END IF;
      IF jsonb_typeof(item->'kind')<>'string' OR item->>'kind' NOT IN ('photo','document') OR jsonb_typeof(item->'fileId')<>'string' OR (length(item->>'fileId') NOT BETWEEN 1 AND 512 OR item->>'fileId' !~ '^[A-Za-z0-9_-]+$') OR (jsonb_typeof(item->'mimeType')<>'null' AND (jsonb_typeof(item->'mimeType')<>'string' OR item->>'mimeType' NOT IN ('image/jpeg','image/png','application/pdf'))) OR (item->>'kind'='photo' AND item->>'mimeType'<>'image/jpeg') OR (jsonb_typeof(item->'size')<>'null' AND (jsonb_typeof(item->'size')<>'number' OR item->>'size' !~ '^[0-9]+$' OR (item->>'size')::numeric NOT BETWEEN 1 AND 20971520)) THEN RETURN false; END IF;
-     IF item ? 'caption' AND (jsonb_typeof(item->'caption')<>'string' OR length(item->>'caption')>3000) THEN RETURN false; END IF;
+     IF item ? 'caption' AND (jsonb_typeof(item->'caption')<>'string' OR length(item->>'caption')>3000 OR item->>'caption' ~ prohibited) THEN RETURN false; END IF;
     ELSE
-     IF jsonb_typeof(item)<>'string' THEN RETURN false; END IF;
+     IF jsonb_typeof(item)<>'string' OR item#>>'{}' ~ prohibited THEN RETURN false; END IF;
      IF k='roles' AND item#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;
-     IF k='socialLinks' AND (length(item#>>'{}')>500 OR item#>>'{}' !~ '^https://[^/@[:space:]]+[^[:space:]]*$') THEN RETURN false; END IF;
+     IF k='socialLinks' AND (length(item#>>'{}')>500 OR item#>>'{}' !~* '^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?([/?#][^[:space:]\\]*)?$') THEN RETURN false; END IF;
      IF k='amenities' AND length(btrim(item#>>'{}')) NOT BETWEEN 1 AND 100 THEN RETURN false; END IF;
     END IF;
    END LOOP;
@@ -48,7 +49,7 @@ EXCEPTION WHEN OTHERS THEN RETURN false;
 END $$;
 --> statement-breakpoint
 CREATE FUNCTION resident_verification_social_projection(links jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
- SELECT coalesce(jsonb_object_agg(platform,urls),'{}'::jsonb) FROM (SELECT lower(substring(value#>>'{}' from '^https://([^/:?#]+)')) platform,jsonb_agg(value) urls FROM jsonb_array_elements(coalesce(links,'[]'::jsonb)) GROUP BY 1) grouped
+ SELECT coalesce(jsonb_object_agg(platform,urls),'{}'::jsonb) FROM (SELECT lower(substring(value#>>'{}' from '(?i)^https://([^/:?#]+)')) platform,jsonb_agg(value) urls FROM jsonb_array_elements(coalesce(links,'[]'::jsonb)) GROUP BY 1) grouped
 $$;
 --> statement-breakpoint
 ALTER TABLE channel_identities ADD CONSTRAINT channel_identity_resident_owner UNIQUE(id,user_id);
@@ -82,8 +83,19 @@ CREATE TABLE residents_applications (
  UNIQUE(id,user_id)
 );
 --> statement-breakpoint
+CREATE FUNCTION resident_verification_followup_valid(a jsonb) RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN
+ IF a IS NULL OR jsonb_typeof(a)<>'object' OR octet_length(a::text)>100000 OR NOT (a ? 'answer' OR a ? 'documents') OR EXISTS(SELECT 1 FROM jsonb_object_keys(a) key WHERE key NOT IN ('answer','documents')) THEN RETURN false; END IF;
+ IF a ? 'answer' AND (jsonb_typeof(a->'answer')<>'string' OR length(btrim(a->>'answer',E' \t\r\n')) NOT BETWEEN 1 AND 3000 OR a->>'answer' ~ U&'[\0001-\0008\000B-\001F\007F-\009F]') THEN RETURN false; END IF;
+ IF a ? 'documents' THEN
+  IF jsonb_typeof(a->'documents')<>'array' OR jsonb_array_length(a->'documents') NOT BETWEEN 1 AND 10 OR NOT resident_verification_draft_valid(jsonb_build_object('education',a->'documents')) THEN RETURN false; END IF;
+ END IF;
+ RETURN true;
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END $$;
+--> statement-breakpoint
 CREATE TABLE resident_verification_application_updates (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL, user_id uuid NOT NULL, revision integer NOT NULL CHECK(revision>0), kind text NOT NULL CHECK(kind IN ('patch','submit','followup','question')), answers jsonb NOT NULL CHECK(jsonb_typeof(answers)='object' AND octet_length(answers::text)<=100000), created_at timestamptz NOT NULL DEFAULT now(),
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL, user_id uuid NOT NULL, revision integer NOT NULL CHECK(revision>0), kind text NOT NULL CHECK(kind IN ('patch','submit','followup','question')), answers jsonb NOT NULL CHECK(jsonb_typeof(answers)='object' AND octet_length(answers::text)<=100000),
+ CONSTRAINT resident_verification_followup_check CHECK(kind<>'followup' OR resident_verification_followup_valid(answers)), created_at timestamptz NOT NULL DEFAULT now(),
  FOREIGN KEY(application_id,user_id) REFERENCES residents_applications(id,user_id) ON DELETE CASCADE, UNIQUE(application_id,revision)
 );
 --> statement-breakpoint
@@ -159,3 +171,6 @@ CREATE FUNCTION resident_verification_stage_projection() RETURNS trigger LANGUAG
 END $$;
 --> statement-breakpoint
 CREATE TRIGGER resident_verification_stage_projection AFTER INSERT OR UPDATE OR DELETE ON residents_applications FOR EACH ROW EXECUTE FUNCTION resident_verification_stage_projection();
+
+--> statement-breakpoint
+CREATE INDEX resident_verification_requests_subject_idx ON resident_verification_requests(user_id) WHERE user_id IS NOT NULL;

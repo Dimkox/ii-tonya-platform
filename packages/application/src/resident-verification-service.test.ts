@@ -4,7 +4,7 @@ import {
   type ResidentFormRepository,
   type ResidentFormSnapshot,
 } from "./resident-verification-service.js";
-import { applyResidentPatch } from "@ii-tonya/domain";
+import { applyResidentPatch, type ResidentPolicy } from "@ii-tonya/domain";
 const scope = {
   botId: "717171",
   botKey: "resident-promo",
@@ -12,7 +12,10 @@ const scope = {
   chatId: "123",
   updateId: 1,
 };
-function fixture(initial: Partial<ResidentFormSnapshot> = {}) {
+function fixture(
+  initial: Partial<ResidentFormSnapshot> = {},
+  policy?: ResidentPolicy,
+) {
   const s: ResidentFormSnapshot = {
     id: "00000000-0000-4000-8000-000000000001",
     revision: 0,
@@ -47,7 +50,11 @@ function fixture(initial: Partial<ResidentFormSnapshot> = {}) {
     },
   };
   return {
-    service: createResidentVerificationService({ enabled: true, repository }),
+    service: createResidentVerificationService({
+      enabled: true,
+      repository,
+      ...(policy ? { policy } : {}),
+    }),
     snapshot: () => s,
   };
 }
@@ -162,4 +169,226 @@ it("rejects prototype names as permanent invalid edit controls", async () => {
     expect(result?.status).toBe("handled");
     expect(f.snapshot().revision).toBe(0);
   }
+});
+it("remediation: text role changes clear incompatible primary and preserve other answers", async () => {
+  const f = fixture({
+    draft: {
+      roles: ["EXPERT"],
+      primaryRole: "EXPERT",
+      city: "Москва",
+      specialization: "Практика",
+    },
+  });
+  const reply = await f.service.handle({
+    ...scope,
+    updateId: 900,
+    text: "/set roles OTHER",
+  });
+  expect(reply?.status).toBe("handled");
+  expect(f.snapshot().draft).toEqual({
+    roles: ["OTHER"],
+    city: "Москва",
+    specialization: "Практика",
+  });
+  expect(JSON.stringify(reply)).toContain("p:OTHER");
+});
+it("remediation: rejects unexpected media and empty supplements as permanent corrective responses", async () => {
+  const f = fixture({
+    draft: {
+      roles: ["EXPERT"],
+      primaryRole: "EXPERT",
+      category: "BASIC",
+      tax: "IP",
+    },
+    currentField: "city",
+  });
+  const before = structuredClone(f.snapshot());
+  const reply = await f.service.handle({
+    ...scope,
+    updateId: 901,
+    text: "",
+    media: {
+      kind: "document",
+      fileId: "wrong_place",
+      mimeType: null,
+      size: null,
+    },
+  });
+  expect(reply?.status).toBe("handled");
+  expect(f.snapshot()).toEqual(before);
+  const submitted = fixture({ status: "UNDER_REVIEW", progress: "AUTO_CHECK" });
+  expect(
+    (await submitted.service.handle({ ...scope, updateId: 902, text: "  " }))
+      ?.status,
+  ).toBe("handled");
+  expect(submitted.snapshot().revision).toBe(0);
+});
+it("remediation: policy mismatch is read-only manual review without new-policy controls", async () => {
+  const f = fixture({
+    policyVersion: "saved_v1",
+    educationRequirement: "required",
+    draft: { roles: ["EXPERT"] },
+  } as Partial<ResidentFormSnapshot>);
+  const reply = await f.service.handle({
+    ...scope,
+    updateId: 903,
+    text: "/verification",
+  });
+  expect(reply?.status).toBe("handled");
+  expect(reply?.text).toContain("правила анкеты изменились");
+  expect(JSON.stringify(reply)).not.toContain("inline_keyboard");
+  expect(f.snapshot().revision).toBe(0);
+});
+it("remediation: optional documents can be skipped, removed and replaced at the limit", async () => {
+  const f = fixture({
+    currentField: "education",
+    draft: {
+      roles: ["EXPERT"],
+      primaryRole: "EXPERT",
+      education: Array.from({ length: 10 }, (_, i) => ({
+        kind: "document",
+        fileId: `private_${i}`,
+        mimeType: null,
+        size: null,
+      })),
+    },
+  });
+  const menu = await f.service.handle({
+    ...scope,
+    updateId: 904,
+    text: "/verification",
+  });
+  expect(JSON.stringify(menu)).toContain("back");
+  expect(JSON.stringify(menu)).toContain("replace:d");
+  expect(JSON.stringify(menu)).toContain("rm:d_9");
+  const click = (updateId: number, op: string) =>
+    f.service.handle({
+      ...scope,
+      updateId,
+      text: "",
+      callbackData: `rv:${f.snapshot().id}:${f.snapshot().revision}:${op}`,
+    });
+  await click(905, "rm:d_9");
+  expect(f.snapshot().draft.education).toHaveLength(9);
+  await click(906, "replace:d");
+  expect(f.snapshot().draft.education).toEqual([]);
+  await click(907, "back");
+  expect(f.snapshot().currentField).toBeNull();
+});
+it("remediation: confirmation summarizes bounded owned facts without private document IDs", async () => {
+  const f = fixture({
+    draft: {
+      roles: ["OTHER"],
+      primaryRole: "OTHER",
+      category: "BASIC",
+      tax: "INDIVIDUAL",
+      city: "Казань",
+      socialLinks: ["https://example.com/me"],
+      motivation: "я".repeat(3000),
+      path: "Путь",
+      cases: "Кейсы",
+      education: [
+        {
+          kind: "document",
+          fileId: "private_never_display",
+          mimeType: null,
+          size: null,
+        },
+      ],
+    },
+  });
+  const reply = await f.service.handle({
+    ...scope,
+    updateId: 908,
+    text: "/verification",
+  });
+  expect(reply?.text).toContain("Казань");
+  expect(reply?.text).toContain("Физическое лицо");
+  expect(reply?.text).toContain("Образование: 1");
+  expect(reply?.text?.length).toBeLessThan(2000);
+  expect(JSON.stringify(reply)).not.toContain("private_never_display");
+});
+
+it("remediation: required document cursor has no skip and rejects a forged back action", async () => {
+  const policy = { version: "required_v1", education: "required" as const };
+  const f = fixture(
+    {
+      policyVersion: policy.version,
+      educationRequirement: policy.education,
+      currentField: "education",
+      draft: { roles: ["EXPERT"], primaryRole: "EXPERT" },
+    },
+    policy,
+  );
+  const prompt = await f.service.handle({
+    ...scope,
+    updateId: 950,
+    text: "/verification",
+  });
+  expect(JSON.stringify(prompt)).not.toContain('"back"');
+  expect(
+    (
+      await f.service.handle({
+        ...scope,
+        updateId: 951,
+        text: "",
+        callbackData: `rv:${f.snapshot().id}:0:back`,
+      })
+    )?.status,
+  ).toBe("rejected");
+  expect(f.snapshot().revision).toBe(0);
+});
+it("remediation: cumulative caption overflow is corrective and preserves the saved draft", async () => {
+  const f = fixture({
+    currentField: "propertyEvidence",
+    draft: {
+      roles: ["EXPERT", "CENTER"],
+      primaryRole: "CENTER",
+      education: Array.from({ length: 10 }, (_, i) => ({
+        kind: "document",
+        fileId: `private_${i}`,
+        mimeType: null,
+        size: null,
+        caption: "я".repeat(3000),
+      })),
+    },
+  });
+  const before = structuredClone(f.snapshot());
+  const reply = await f.service.handle({
+    ...scope,
+    updateId: 952,
+    text: "",
+    media: {
+      kind: "document",
+      fileId: "too_much_combined",
+      mimeType: null,
+      size: null,
+      caption: "я".repeat(3000),
+    },
+  });
+  expect(reply?.status).toBe("handled");
+  expect(reply?.text).toContain("не изменены");
+  expect(f.snapshot()).toEqual(before);
+});
+
+it("remediation: Russian choice labels preserve canonical callback enum values", async () => {
+  const f = fixture();
+  const role = await f.service.handle({
+    ...scope,
+    updateId: 953,
+    text: "/verification",
+  });
+  expect(JSON.stringify(role)).toContain("Образовательный проект");
+  expect(JSON.stringify(role)).toContain(":r:EDU_PROJECT");
+  const tax = fixture({
+    currentField: "tax",
+    draft: { roles: ["EXPERT"], primaryRole: "EXPERT" },
+  });
+  const taxReply = await tax.service.handle({
+    ...scope,
+    updateId: 954,
+    text: "/verification",
+  });
+  expect(JSON.stringify(taxReply)).toContain("Самозанятый");
+  expect(JSON.stringify(taxReply)).toContain(":t:SELF_EMPLOYED");
 });

@@ -26,6 +26,7 @@ it("binds additive verification metadata to replayed SQL, prior snapshot and all
     "erase_resident_verification_subject",
     "resident_verification_consent_cleanup",
     "resident_verification_draft_valid",
+    "resident_verification_followup_valid",
     "resident_verification_price_allowed",
     "resident_verification_price_guard",
     "resident_verification_social_projection",

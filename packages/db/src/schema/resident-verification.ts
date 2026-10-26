@@ -165,6 +165,10 @@ export const residentVerificationApplicationUpdates = pgTable(
   },
   (t) => [
     check(
+      "resident_verification_followup_check",
+      sql`kind<>'followup' OR resident_verification_followup_valid(answers)`,
+    ),
+    check(
       "resident_verification_application_updates_answers_check",
       sql.raw(
         "jsonb_typeof(answers) = 'object'::text AND octet_length(answers::text) <= 100000",
@@ -248,6 +252,9 @@ export const residentVerificationRequests = pgTable(
     createdAt: at("created_at").notNull().defaultNow(),
   },
   (t) => [
+    index("resident_verification_requests_subject_idx")
+      .on(t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
     check(
       "resident_verification_request_erasure",
       sql.raw(

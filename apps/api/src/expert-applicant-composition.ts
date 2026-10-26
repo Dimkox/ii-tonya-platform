@@ -18,12 +18,17 @@ export function assertExpertApplicantCapability(
   capability: ExpertApplicantTelegramCapability | undefined,
 ): void {
   assertExpertApplicantConfig(config);
+  if (
+    capability?.verificationFormEnabled === true &&
+    config.features.expertVerificationForm !== true
+  )
+    throw new Error("expert_applicant_capability_required");
   if (config.features.expertApplicant !== true) return;
   const scope = config.expertApplicant!;
   if (
     !capability ||
-    (config.features.expertVerificationForm === true &&
-      capability.verificationFormEnabled !== true) ||
+    (config.features.expertVerificationForm === true) !==
+      (capability.verificationFormEnabled === true) ||
     capability.botId !== scope.botId ||
     capability.botKey !== scope.botKey ||
     capability.webhookSecret !== scope.webhookSecret ||

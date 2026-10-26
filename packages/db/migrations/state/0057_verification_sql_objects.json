@@ -1,9 +1,9 @@
 {
   "description": "Additive 0057 PostgreSQL17.5 catalogue; hand-authored full-chain SQL replay and normalized fresh introspection. No generation authority.",
   "serverVersionNum": 170005,
-  "sourceMigrationSha256": "58871a8406098d507edc012d0f18c82def950e2b84f2dd43884947e3cfff5f3b",
+  "sourceMigrationSha256": "06b540f1cfd16a86984454fd52ab90e0bfb0d9984c1ed82f23c0799283292093",
   "parentSnapshotSha256": "b22ff021153b6a85fce4dad523921edba378be4ca518ffeb8d26c3811c0c5ec5",
-  "normalizedSnapshotSha256": "6d9a7e89e0edab9b0ff772c2d8cd985214c074c7678067a0285407478e4b4c06",
+  "normalizedSnapshotSha256": "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
   "functions": [
     {
       "name": "erase_resident_verification_subject",
@@ -18,7 +18,12 @@
     {
       "name": "resident_verification_draft_valid",
       "arguments": "d jsonb, complete boolean, education_requirement text",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_draft_valid(d jsonb, complete boolean DEFAULT false, education_requirement text DEFAULT 'unknown_manual_review'::text)\n RETURNS boolean\n LANGUAGE plpgsql\n IMMUTABLE\nAS $function$\nDECLARE k text; v jsonb; item jsonb; roles jsonb;\nBEGIN\n IF d IS NULL OR jsonb_typeof(d)<>'object' OR octet_length(d::text)>100000 THEN RETURN false; END IF;\n FOR k,v IN SELECT * FROM jsonb_each(d) LOOP\n  IF k IN ('primaryRole','category','tax') THEN\n   IF jsonb_typeof(v)<>'string' THEN RETURN false; END IF;\n   IF k='primaryRole' AND v#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n   IF k='category' AND v#>>'{}' NOT IN ('BASIC','EXCLUSIVE','BOTH') THEN RETURN false; END IF;\n   IF k='tax' AND v#>>'{}' NOT IN ('SELF_EMPLOYED','IP','LLC','INDIVIDUAL') THEN RETURN false; END IF;\n  ELSIF k IN ('roles','socialLinks','amenities','education','propertyEvidence') THEN\n   IF jsonb_typeof(v)<>'array' OR jsonb_array_length(v)>(CASE WHEN k='roles' THEN 6 ELSE 10 END) THEN RETURN false; END IF;\n   IF k='roles' AND jsonb_array_length(v)=0 THEN RETURN false; END IF;\n   IF k IN ('roles','socialLinks','amenities') AND (SELECT count(*)<>count(DISTINCT value) FROM jsonb_array_elements(v)) THEN RETURN false; END IF;\n   FOR item IN SELECT * FROM jsonb_array_elements(v) LOOP\n    IF k IN ('education','propertyEvidence') THEN\n     IF jsonb_typeof(item)<>'object' OR NOT item ?& ARRAY['kind','fileId','mimeType','size'] OR EXISTS(SELECT 1 FROM jsonb_object_keys(item) key WHERE key NOT IN ('kind','fileId','mimeType','size','caption')) THEN RETURN false; END IF;\n     IF jsonb_typeof(item->'kind')<>'string' OR item->>'kind' NOT IN ('photo','document') OR jsonb_typeof(item->'fileId')<>'string' OR (length(item->>'fileId') NOT BETWEEN 1 AND 512 OR item->>'fileId' !~ '^[A-Za-z0-9_-]+$') OR (jsonb_typeof(item->'mimeType')<>'null' AND (jsonb_typeof(item->'mimeType')<>'string' OR item->>'mimeType' NOT IN ('image/jpeg','image/png','application/pdf'))) OR (item->>'kind'='photo' AND item->>'mimeType'<>'image/jpeg') OR (jsonb_typeof(item->'size')<>'null' AND (jsonb_typeof(item->'size')<>'number' OR item->>'size' !~ '^[0-9]+$' OR (item->>'size')::numeric NOT BETWEEN 1 AND 20971520)) THEN RETURN false; END IF;\n     IF item ? 'caption' AND (jsonb_typeof(item->'caption')<>'string' OR length(item->>'caption')>3000) THEN RETURN false; END IF;\n    ELSE\n     IF jsonb_typeof(item)<>'string' THEN RETURN false; END IF;\n     IF k='roles' AND item#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n     IF k='socialLinks' AND (length(item#>>'{}')>500 OR item#>>'{}' !~ '^https://[^/@[:space:]]+[^[:space:]]*$') THEN RETURN false; END IF;\n     IF k='amenities' AND length(btrim(item#>>'{}')) NOT BETWEEN 1 AND 100 THEN RETURN false; END IF;\n    END IF;\n   END LOOP;\n  ELSIF k IN ('city','motivation','specialization','path','cases') THEN\n   IF jsonb_typeof(v)<>'string' OR length(btrim(v#>>'{}'))<1 OR length(v#>>'{}')>(CASE WHEN k='city' THEN 120 WHEN k='specialization' THEN 300 ELSE 3000 END) THEN RETURN false; END IF;\n  ELSIF k='capacity' THEN\n   IF jsonb_typeof(v)<>'number' OR v#>>'{}' !~ '^[0-9]+$' OR (v#>>'{}')::numeric NOT BETWEEN 1 AND 100000 THEN RETURN false; END IF;\n  ELSIF k='averageCheckMinor' THEN\n   IF jsonb_typeof(v)<>'string' OR v#>>'{}' !~ '^(0|[1-9][0-9]{0,11})$' THEN RETURN false; END IF;\n  ELSE RETURN false;\n  END IF;\n END LOOP;\n roles:=d->'roles';\n IF d ? 'primaryRole' AND d ? 'roles' AND NOT roles ? (d->>'primaryRole') THEN RETURN false; END IF;\n IF complete THEN\n  IF NOT d ?& ARRAY['primaryRole','roles','category','tax','city','socialLinks','motivation'] OR jsonb_array_length(d->'socialLinks')=0 THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND NOT d ?& ARRAY['specialization','averageCheckMinor'] THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND education_requirement='required' AND (NOT d ? 'education' OR jsonb_array_length(d->'education')=0) THEN RETURN false; END IF;\n  IF roles ? 'CENTER' AND (NOT d ?& ARRAY['propertyEvidence','capacity','amenities'] OR jsonb_array_length(d->'propertyEvidence')=0 OR jsonb_array_length(d->'amenities')=0) THEN RETURN false; END IF;\n  IF (roles ? 'ESOTERIC' OR roles ? 'OTHER') AND NOT d ?& ARRAY['path','cases'] THEN RETURN false; END IF;\n END IF;\n RETURN true;\nEXCEPTION WHEN OTHERS THEN RETURN false;\nEND $function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_draft_valid(d jsonb, complete boolean DEFAULT false, education_requirement text DEFAULT 'unknown_manual_review'::text)\n RETURNS boolean\n LANGUAGE plpgsql\n IMMUTABLE\nAS $function$\nDECLARE k text; v jsonb; item jsonb; roles jsonb; prohibited text := U&'[\\0001-\\0008\\000B-\\001F\\007F-\\009F]';\nBEGIN\n IF d IS NULL OR jsonb_typeof(d)<>'object' OR octet_length(d::text)>100000 THEN RETURN false; END IF;\n FOR k,v IN SELECT * FROM jsonb_each(d) LOOP\n  IF jsonb_typeof(v)='string' AND v#>>'{}' ~ prohibited THEN RETURN false; END IF;\n  IF k IN ('primaryRole','category','tax') THEN\n   IF jsonb_typeof(v)<>'string' THEN RETURN false; END IF;\n   IF k='primaryRole' AND v#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n   IF k='category' AND v#>>'{}' NOT IN ('BASIC','EXCLUSIVE','BOTH') THEN RETURN false; END IF;\n   IF k='tax' AND v#>>'{}' NOT IN ('SELF_EMPLOYED','IP','LLC','INDIVIDUAL') THEN RETURN false; END IF;\n  ELSIF k IN ('roles','socialLinks','amenities','education','propertyEvidence') THEN\n   IF jsonb_typeof(v)<>'array' OR jsonb_array_length(v)>(CASE WHEN k='roles' THEN 6 ELSE 10 END) THEN RETURN false; END IF;\n   IF k='roles' AND jsonb_array_length(v)=0 THEN RETURN false; END IF;\n   IF k IN ('roles','socialLinks','amenities') AND (SELECT count(*)<>count(DISTINCT value) FROM jsonb_array_elements(v)) THEN RETURN false; END IF;\n   FOR item IN SELECT * FROM jsonb_array_elements(v) LOOP\n    IF k IN ('education','propertyEvidence') THEN\n     IF jsonb_typeof(item)<>'object' OR NOT item ?& ARRAY['kind','fileId','mimeType','size'] OR EXISTS(SELECT 1 FROM jsonb_object_keys(item) key WHERE key NOT IN ('kind','fileId','mimeType','size','caption')) THEN RETURN false; END IF;\n     IF jsonb_typeof(item->'kind')<>'string' OR item->>'kind' NOT IN ('photo','document') OR jsonb_typeof(item->'fileId')<>'string' OR (length(item->>'fileId') NOT BETWEEN 1 AND 512 OR item->>'fileId' !~ '^[A-Za-z0-9_-]+$') OR (jsonb_typeof(item->'mimeType')<>'null' AND (jsonb_typeof(item->'mimeType')<>'string' OR item->>'mimeType' NOT IN ('image/jpeg','image/png','application/pdf'))) OR (item->>'kind'='photo' AND item->>'mimeType'<>'image/jpeg') OR (jsonb_typeof(item->'size')<>'null' AND (jsonb_typeof(item->'size')<>'number' OR item->>'size' !~ '^[0-9]+$' OR (item->>'size')::numeric NOT BETWEEN 1 AND 20971520)) THEN RETURN false; END IF;\n     IF item ? 'caption' AND (jsonb_typeof(item->'caption')<>'string' OR length(item->>'caption')>3000 OR item->>'caption' ~ prohibited) THEN RETURN false; END IF;\n    ELSE\n     IF jsonb_typeof(item)<>'string' OR item#>>'{}' ~ prohibited THEN RETURN false; END IF;\n     IF k='roles' AND item#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n     IF k='socialLinks' AND (length(item#>>'{}')>500 OR item#>>'{}' !~* '^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?([/?#][^[:space:]\\\\]*)?$') THEN RETURN false; END IF;\n     IF k='amenities' AND length(btrim(item#>>'{}')) NOT BETWEEN 1 AND 100 THEN RETURN false; END IF;\n    END IF;\n   END LOOP;\n  ELSIF k IN ('city','motivation','specialization','path','cases') THEN\n   IF jsonb_typeof(v)<>'string' OR length(btrim(v#>>'{}'))<1 OR length(v#>>'{}')>(CASE WHEN k='city' THEN 120 WHEN k='specialization' THEN 300 ELSE 3000 END) THEN RETURN false; END IF;\n  ELSIF k='capacity' THEN\n   IF jsonb_typeof(v)<>'number' OR v#>>'{}' !~ '^[0-9]+$' OR (v#>>'{}')::numeric NOT BETWEEN 1 AND 100000 THEN RETURN false; END IF;\n  ELSIF k='averageCheckMinor' THEN\n   IF jsonb_typeof(v)<>'string' OR v#>>'{}' !~ '^(0|[1-9][0-9]{0,11})$' THEN RETURN false; END IF;\n  ELSE RETURN false;\n  END IF;\n END LOOP;\n roles:=d->'roles';\n IF d ? 'primaryRole' AND d ? 'roles' AND NOT roles ? (d->>'primaryRole') THEN RETURN false; END IF;\n IF complete THEN\n  IF NOT d ?& ARRAY['primaryRole','roles','category','tax','city','socialLinks','motivation'] OR jsonb_array_length(d->'socialLinks')=0 THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND NOT d ?& ARRAY['specialization','averageCheckMinor'] THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND education_requirement='required' AND (NOT d ? 'education' OR jsonb_array_length(d->'education')=0) THEN RETURN false; END IF;\n  IF roles ? 'CENTER' AND (NOT d ?& ARRAY['propertyEvidence','capacity','amenities'] OR jsonb_array_length(d->'propertyEvidence')=0 OR jsonb_array_length(d->'amenities')=0) THEN RETURN false; END IF;\n  IF (roles ? 'ESOTERIC' OR roles ? 'OTHER') AND NOT d ?& ARRAY['path','cases'] THEN RETURN false; END IF;\n END IF;\n RETURN true;\nEXCEPTION WHEN OTHERS THEN RETURN false;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_followup_valid",
+      "arguments": "a jsonb",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_followup_valid(a jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n IMMUTABLE\nAS $function$ BEGIN\n IF a IS NULL OR jsonb_typeof(a)<>'object' OR octet_length(a::text)>100000 OR NOT (a ? 'answer' OR a ? 'documents') OR EXISTS(SELECT 1 FROM jsonb_object_keys(a) key WHERE key NOT IN ('answer','documents')) THEN RETURN false; END IF;\n IF a ? 'answer' AND (jsonb_typeof(a->'answer')<>'string' OR length(btrim(a->>'answer',E' \\t\\r\\n')) NOT BETWEEN 1 AND 3000 OR a->>'answer' ~ U&'[\\0001-\\0008\\000B-\\001F\\007F-\\009F]') THEN RETURN false; END IF;\n IF a ? 'documents' THEN\n  IF jsonb_typeof(a->'documents')<>'array' OR jsonb_array_length(a->'documents') NOT BETWEEN 1 AND 10 OR NOT resident_verification_draft_valid(jsonb_build_object('education',a->'documents')) THEN RETURN false; END IF;\n END IF;\n RETURN true;\nEXCEPTION WHEN OTHERS THEN RETURN false;\nEND $function$\n"
     },
     {
       "name": "resident_verification_price_allowed",
@@ -33,7 +38,7 @@
     {
       "name": "resident_verification_social_projection",
       "arguments": "links jsonb",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_social_projection(links jsonb)\n RETURNS jsonb\n LANGUAGE sql\n IMMUTABLE\nAS $function$\n SELECT coalesce(jsonb_object_agg(platform,urls),'{}'::jsonb) FROM (SELECT lower(substring(value#>>'{}' from '^https://([^/:?#]+)')) platform,jsonb_agg(value) urls FROM jsonb_array_elements(coalesce(links,'[]'::jsonb)) GROUP BY 1) grouped\n$function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_social_projection(links jsonb)\n RETURNS jsonb\n LANGUAGE sql\n IMMUTABLE\nAS $function$\n SELECT coalesce(jsonb_object_agg(platform,urls),'{}'::jsonb) FROM (SELECT lower(substring(value#>>'{}' from '(?i)^https://([^/:?#]+)')) platform,jsonb_agg(value) urls FROM jsonb_array_elements(coalesce(links,'[]'::jsonb)) GROUP BY 1) grouped\n$function$\n"
     },
     {
       "name": "resident_verification_stage_projection",
@@ -168,6 +173,18 @@
       "columns_from": null,
       "columns_to": null,
       "expression": "revision > 0"
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_followup_check",
+      "kind": "c",
+      "definition": "CHECK (kind <> 'followup'::text OR resident_verification_followup_valid(answers))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "kind <> 'followup'::text OR resident_verification_followup_valid(answers)"
     },
     {
       "table_name": "resident_verification_check_work",
@@ -694,6 +711,17 @@
         {
           "position": 3,
           "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_subject_idx",
+      "definition": "CREATE INDEX resident_verification_requests_subject_idx ON public.resident_verification_requests USING btree (user_id) WHERE (user_id IS NOT NULL)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
         }
       ]
     },

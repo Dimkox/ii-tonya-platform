@@ -1,3 +1,19 @@
+# Resident verification review remediation ready — 2026-10-26
+
+Accepted P1–P11 fixes implemented against8fc8e34. The rejected P1 clone-loss
+mechanism was absent in committed source; text role normalization is fixed while
+preserving deletion/fingerprint semantics. Document cursor integrity, correction
+controls, bounded frozen-snapshot supplements, manual policy-change response,
+URL/control parity,64000-byte draft bound, subject erasure index, stable flag-off
+pricing denial, symmetric capability ceiling and Russian saved-fact confirmation
+are covered. No approval, price, provider, OCR, S3 or live transport was added.
+
+Focused PostgreSQL21/21 and real Fastify+PG composition acceptance pass. Final
+SQL replay:58migrations,174tables,9functions/5triggers,43constraints/12indexes.
+See docs/test-evidence/verification-schema-form-remediation-2026-10-26.md.
+Root owns final accepted-patch review, branch gate and draft PR; do not claim
+release completion or rerun unchanged PostgreSQL coverage without a new defect.
+
 # Resident verification source ready for review — 2026-10-26
 
 Schema+Form Logic is implemented on codex/verification-schema-form-20261026 in

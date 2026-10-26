@@ -14,6 +14,8 @@ import type {
 } from "./expert-applicant-service.js";
 export interface ResidentFormSnapshot {
   currentField?: ResidentField | null;
+  policyVersion?: string;
+  educationRequirement?: ResidentPolicy["education"];
   id: string;
   revision: number;
   draft: ResidentDraft;
@@ -31,6 +33,7 @@ export interface ResidentFormRepository {
       applicationId?: string;
       patch?: unknown;
       answer?: string;
+      documents?: ResidentDocument[];
       field?: ResidentField;
     },
   ): Promise<ResidentFormSnapshot>;
@@ -41,6 +44,25 @@ export type ResidentFormInput = ExpertApplicantScope & {
   callbackData?: string;
   media?: ResidentDocument;
 };
+const roleLabels = {
+  EXPERT: "Эксперт",
+  CENTER: "Центр / помещение",
+  ORGANIZER: "Организатор",
+  EDU_PROJECT: "Образовательный проект",
+  ESOTERIC: "Эзотерическая практика",
+  OTHER: "Другая роль",
+} as const;
+const taxLabels = {
+  SELF_EMPLOYED: "Самозанятый",
+  IP: "ИП",
+  LLC: "ООО",
+  INDIVIDUAL: "Физическое лицо",
+} as const;
+const categoryLabels = {
+  BASIC: "Базовая",
+  EXCLUSIVE: "Эксклюзивная",
+  BOTH: "Обе категории",
+} as const;
 const labels: Record<ResidentField, string> = {
   roles: "Выберите все роли и нажмите «Далее».",
   primaryRole: "Выберите основную роль.",
@@ -83,6 +105,48 @@ const fieldCodes: Record<string, ResidentField> = {
 };
 const fieldCode = (field: ResidentField) =>
   Object.entries(fieldCodes).find(([, v]) => v === field)![0];
+const corrective = (
+  text = "Ответ не подошёл. Сохранённые ответы не изменены. Отправьте /verification, чтобы продолжить, или /edit для исправления.",
+): ExpertApplicantReply => ({
+  status: "handled",
+  text,
+  replyMarkup: { remove_keyboard: true },
+});
+const policyChanged = (): ExpertApplicantReply =>
+  corrective(
+    "Ответы сохранены без изменений: правила анкеты изменились. Дальнейшее заполнение ожидает ручной проверки версии правил. Редактирование и отправка временно недоступны.",
+  );
+function rolePatch(
+  draft: ResidentDraft,
+  roles: NonNullable<ResidentDraft["roles"]>,
+) {
+  return {
+    roles,
+    ...(draft.primaryRole && !roles.includes(draft.primaryRole)
+      ? { primaryRole: null }
+      : {}),
+  };
+}
+function summary(draft: ResidentDraft): string {
+  const short = (v: string | undefined, n = 120) =>
+    (v ?? "—").replace(/\s+/gu, " ").slice(0, n);
+  return [
+    `Проверьте сохранённые ответы:`,
+    `Роли: ${(draft.roles ?? []).map((r) => roleLabels[r]).join(", ")}. Основная: ${draft.primaryRole ? roleLabels[draft.primaryRole] : "—"}.`,
+    `Категория: ${draft.category ? categoryLabels[draft.category] : "—"}. Налоговый статус: ${draft.tax ? taxLabels[draft.tax] : "—"}.`,
+    `Город: ${short(draft.city)}. Ссылок: ${draft.socialLinks?.length ?? 0}.`,
+    `Мотивация: ${short(draft.motivation, 160)}${(draft.motivation?.length ?? 0) > 160 ? "…" : ""}`,
+    ...(draft.specialization
+      ? [`Специализация: ${short(draft.specialization)}.`]
+      : []),
+    `Образование: ${draft.education?.length ?? 0}. Документы о помещении: ${draft.propertyEvidence?.length ?? 0}.`,
+    ...(draft.capacity
+      ? [
+          `Вместимость: ${draft.capacity}. Удобств: ${draft.amenities?.length ?? 0}.`,
+        ]
+      : []),
+  ].join("\n");
+}
 function render(
   s: ResidentFormSnapshot,
   policy: ResidentPolicy,
@@ -92,6 +156,7 @@ function render(
   if (s.status !== "PENDING_DOCS")
     return {
       status: "handled",
+      replyMarkup: { remove_keyboard: true },
       text: "Анкета получена. Дополнения можно прислать ответным сообщением. Автоматические проверки и загрузка документов ожидают обработки; результаты пока не подтверждены. Решение менеджера и цены ещё не доступны.",
     };
   const callback = (action: string) => `rv:${s.id}:${s.revision}:${action}`;
@@ -103,21 +168,28 @@ function render(
   if (field === "roles")
     keyboard = [
       ...residentRoles.map((r) => [
-        button(`${s.draft.roles?.includes(r) ? "✓ " : ""}${r}`, `r:${r}`),
+        button(
+          `${s.draft.roles?.includes(r) ? "✓ " : ""}${roleLabels[r]}`,
+          `r:${r}`,
+        ),
       ]),
       [button("Далее", "next")],
     ];
   if (field === "primaryRole")
-    keyboard = (s.draft.roles ?? []).map((r) => [button(r, `p:${r}`)]);
+    keyboard = (s.draft.roles ?? []).map((r) => [
+      button(roleLabels[r], `p:${r}`),
+    ]);
   if (field === "category")
     keyboard = [
-      ...["BASIC", "EXCLUSIVE", "BOTH"].map((v) => [button(v, `c:${v}`)]),
+      ...(["BASIC", "EXCLUSIVE", "BOTH"] as const).map((v) => [
+        button(categoryLabels[v], `c:${v}`),
+      ]),
       [button("Изменить роли", "roles")],
     ];
   if (field === "tax")
-    keyboard = ["SELF_EMPLOYED", "IP", "LLC", "INDIVIDUAL"].map((v) => [
-      button(v, `t:${v}`),
-    ]);
+    keyboard = (["SELF_EMPLOYED", "IP", "LLC", "INDIVIDUAL"] as const).map(
+      (v) => [button(taxLabels[v], `t:${v}`)],
+    );
   if (field === "amenities")
     keyboard = [
       [button("Wi-Fi", "a:wifi"), button("Парковка", "a:parking")],
@@ -125,6 +197,28 @@ function render(
       [button("Нет перечисленных", "a:none")],
       [button("Далее", "next")],
     ];
+  if (field === "education" || field === "propertyEvidence") {
+    const code = fieldCode(field),
+      docs = s.draft[field] ?? [];
+    keyboard = [
+      ...docs.map((_, i) => [
+        button(`Удалить документ ${i + 1}`, `rm:${code}_${i}`),
+      ]),
+      ...(docs.length
+        ? [
+            [
+              button("Очистить документы", `clear:${code}`),
+              button("Заменить документы", `replace:${code}`),
+            ],
+          ]
+        : []),
+      ...(field === "education" &&
+      !residentForm(s.draft, policy).required.includes("education")
+        ? [[button("Пропустить / назад", "back")]]
+        : []),
+      ...(docs.length ? [[button("Далее", "next")]] : []),
+    ];
+  }
   if (!field)
     keyboard = [
       [button("Отправить анкету", "submit")],
@@ -137,7 +231,7 @@ function render(
     status: "handled",
     text: field
       ? `${field === "education" && policy.education === "required" ? "Пришлите документ об образовании (PDF/JPEG/PNG до 20 МБ): это требование действующей версии анкеты, документ будет проверен отдельно." : labels[field]}\nАнкета сохранена (ревизия ${s.revision}). /verification — продолжить; /roles — изменить роли; /edit — исправить ответы.`
-      : `Обязательные ответы сохранены. ${s.draft.roles?.includes("EXPERT") ? "Можно добавить образование или отправить анкету." : "Можно отправить анкету."} Критерии категории ещё готовятся. Проверка не означает одобрение; тарифы будут доступны после отдельного решения.`,
+      : `${summary(s.draft)}\n\nОбязательные ответы сохранены. ${s.draft.roles?.includes("EXPERT") ? "Можно добавить образование или отправить анкету." : "Можно отправить анкету."} Критерии категории ещё готовятся. Проверка не означает одобрение; тарифы будут доступны после отдельного решения.`,
     ...(keyboard.length
       ? { replyMarkup: { inline_keyboard: keyboard } }
       : { replyMarkup: { remove_keyboard: true as const } }),
@@ -203,6 +297,12 @@ export function createResidentVerificationService(deps: {
           action: "start",
         });
         if (
+          (s.policyVersion ?? residentPolicy.version) !== policy.version ||
+          (s.educationRequirement ?? residentPolicy.education) !==
+            policy.education
+        )
+          return policyChanged();
+        if (
           input.text === "/verification" ||
           input.text === "/start" ||
           /^\/start promo_/u.test(input.text)
@@ -223,7 +323,8 @@ export function createResidentVerificationService(deps: {
             ),
           },
         });
-        if (input.text === "/edit") return editMenu();
+        if (input.text === "/edit")
+          return s.status === "PENDING_DOCS" ? editMenu() : render(s, policy);
 
         if (
           /^\/(?:tariff|tariffs|apply|profile|my_tariff)(?: |$)/u.test(
@@ -236,22 +337,63 @@ export function createResidentVerificationService(deps: {
             text: "Сначала заполните анкету: /verification. Тарифы появятся после отдельного решения по проверке.",
           };
         let patch: unknown;
+        let followupAnswer: string | undefined;
+        let documents: ResidentDocument[] | undefined;
         let action: "patch" | "submit" | "followup" | "question" = "patch";
         let requestedField: ResidentField | null = null;
-        if (input.text === "/roles") {
+        if (
+          ["UNDER_REVIEW", "INFO_REQUESTED"].includes(s.status) &&
+          !input.callbackData &&
+          !input.text.startsWith("/")
+        ) {
+          action = "followup";
+          if (input.media) documents = [input.media];
+          if (input.text.trim()) followupAnswer = input.text;
+          if (!documents && !followupAnswer)
+            throw Error("resident_invalid_answer");
+        } else if (input.text === "/roles") {
           action = "question";
           requestedField = "roles";
         } else if (input.callbackData) {
           const match =
-            /^rv:([0-9a-f-]{36}):([0-9]{1,10}):([a-z]+)(?::([A-Z_a-z]+))?$/u.exec(
+            /^rv:([0-9a-f-]{36}):([0-9]{1,10}):([a-z]+)(?::([A-Z_a-z0-9]+))?$/u.exec(
               input.callbackData,
             );
           if (!match || match[1] !== s.id) return { status: "rejected" };
           if (Number(match[2]) !== s.revision) return render(s, policy);
           const op = match[3],
             value = match[4];
-          if (op === "edit") return editMenu();
-          if (op === "roles") {
+          if (op === "edit")
+            return s.status === "PENDING_DOCS" ? editMenu() : render(s, policy);
+          if (op === "back") {
+            if (
+              s.currentField !== "education" ||
+              residentForm(s.draft, policy).required.includes("education")
+            )
+              throw Error("resident_callback_invalid");
+            action = "question";
+            requestedField = null;
+          } else if (["rm", "clear", "replace"].includes(op ?? "")) {
+            const [code, position] = value?.split("_") ?? [],
+              field = code ? fieldCodes[code] : undefined;
+            if (
+              (field !== "education" && field !== "propertyEvidence") ||
+              !residentForm(s.draft, policy).visible.includes(field)
+            )
+              throw Error("resident_callback_invalid");
+            const docs = [...(s.draft[field] ?? [])];
+            if (op === "rm") {
+              if (
+                position === undefined ||
+                !/^\d$/u.test(position) ||
+                Number(position) >= docs.length
+              )
+                throw Error("resident_callback_invalid");
+              docs.splice(Number(position), 1);
+            }
+            patch = { [field]: op === "rm" ? docs : [] };
+            requestedField = field;
+          } else if (op === "roles") {
             action = "question";
             requestedField = "roles";
           } else if (op === "next") {
@@ -274,12 +416,7 @@ export function createResidentVerificationService(deps: {
             if (at >= 0) roles.splice(at, 1);
             else roles.push(value as (typeof roles)[number]);
             if (!roles.length) return render(s, policy, "roles");
-            patch = {
-              roles,
-              ...(s.draft.primaryRole && !roles.includes(s.draft.primaryRole)
-                ? { primaryRole: null }
-                : {}),
-            };
+            patch = rolePatch(s.draft, roles);
             requestedField = "roles";
           } else if (op === "p") patch = { primaryRole: value };
           else if (op === "c") patch = { category: value };
@@ -301,11 +438,13 @@ export function createResidentVerificationService(deps: {
           } else throw Error("resident_callback_invalid");
         } else if (input.media) {
           const cursor = s.currentField ?? residentForm(s.draft, policy).next;
-          const field =
-            cursor === "propertyEvidence" ? "propertyEvidence" : "education";
-          if (field === "education" && !s.draft.roles?.includes("EXPERT"))
+          if (
+            (cursor !== "education" && cursor !== "propertyEvidence") ||
+            !residentForm(s.draft, policy).visible.includes(cursor)
+          )
             throw Error("resident_media_unexpected");
-          patch = { [field]: [...(s.draft[field] ?? []), input.media] };
+          patch = { [cursor]: [...(s.draft[cursor] ?? []), input.media] };
+          if (s.currentField === cursor) requestedField = cursor;
         } else {
           const edit = /^\/set ([A-Za-z]+) ([\s\S]+)$/u.exec(input.text);
           const field = edit
@@ -321,6 +460,11 @@ export function createResidentVerificationService(deps: {
             )
               return render(s, policy);
             patch = textPatch(field, edit?.[2] ?? input.text);
+            if (field === "roles")
+              patch = rolePatch(
+                s.draft,
+                (patch as { roles: NonNullable<ResidentDraft["roles"]> }).roles,
+              );
           }
         }
         const updated = await deps.repository.mutate({
@@ -330,7 +474,14 @@ export function createResidentVerificationService(deps: {
           action,
           ...(patch === undefined ? {} : { patch }),
           ...(requestedField ? { field: requestedField } : {}),
-          ...(action === "followup" ? { answer: input.text } : {}),
+          ...(action === "followup"
+            ? {
+                ...(followupAnswer === undefined
+                  ? {}
+                  : { answer: followupAnswer }),
+                ...(documents === undefined ? {} : { documents }),
+              }
+            : {}),
         });
         // Replays use the originally stored response snapshot, never reapply an answer.
         return render(
@@ -347,12 +498,16 @@ export function createResidentVerificationService(deps: {
             "resident_patch_invalid",
             "resident_money_invalid",
             "resident_incomplete",
+            "resident_media_unexpected",
+            "resident_invalid_answer",
+            "resident_invalid_documents",
+            "resident_invalid_field",
+            "resident_invalid_request",
+            "resident_invalid_revision",
+            "resident_draft_too_large",
           ].includes(error.message)
         )
-          return {
-            status: "handled",
-            text: "Ответ не подошёл или анкета ещё не полна. Отправьте /verification, чтобы продолжить с сохранённого вопроса, или /edit для исправления.",
-          };
+          return corrective();
         if (
           error instanceof Error &&
           [
@@ -365,10 +520,14 @@ export function createResidentVerificationService(deps: {
           return { status: "rejected" };
         if (
           error instanceof Error &&
+          error.message === "resident_policy_conflict"
+        )
+          return policyChanged();
+        if (
+          error instanceof Error &&
           [
             "resident_revision_conflict",
             "resident_submission_frozen",
-            "resident_policy_conflict",
             "resident_followup_unavailable",
           ].includes(error.message)
         )
