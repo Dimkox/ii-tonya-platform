@@ -436,7 +436,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "2a17235a262302331a5cc055b66888390b26c1928c6d22ea835922c38870268b",
+    "90f611ef2424a6e246cbb081db8d45b7e1caa7700bff38d7f954c758f9eec73b",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -563,14 +563,47 @@ const reviewedDomHarnessHashes = new Map([
 ]);
 
 const approvedAutomationArtifactHashes = new Map([
+  // Reviewed S2b isolated helper and synthetic witnesses; exact paths and bytes only.
+  [
+    "compose.private-parser.yaml",
+    "f427649d02cc363c4e4894cf03b7a436da345be08b1c9c7468871d2d80b805da",
+  ],
+  [
+    "packages/integrations/parser/dockerfile",
+    "05bc975e61f4be435f1e83a647952ad52c3a3129da5bf16f35b627652e0bd41f",
+  ],
+  [
+    "packages/integrations/parser/build-image.sh",
+    "ad9cc39982c5a9660e8787cd661bcd332ff435e5569cae65744f2d0847188d52",
+  ],
+  [
+    "packages/integrations/parser/socket_server.py",
+    "8d65070a7c92c78bf42c9e5380f5f9747ea7221f3c063a0d06de444a9c697643",
+  ],
+  [
+    "packages/integrations/parser/test_coverage.py",
+    "c91184645d5c5124866095e59c148886595e038051a45cb1fe5cf582be5c8aed",
+  ],
+  [
+    "tests/acceptance/private-verification/make-parser-fixtures.py",
+    "22491e04222bc5be599ab20e22a7dc073ba4b79f44c23518114c816d27a20746",
+  ],
+  [
+    "tests/acceptance/private-verification/sandbox-probe.py",
+    "271a3b646dfe5e8a8f0a9ef3b96b07ade0c10cca8799e07c6a6fac5eb9a93d53",
+  ],
+  [
+    "tests/acceptance/private-verification/socket-denial-probe.py",
+    "5b14f07f9b4eac0b4825a589c438bc52308f33932ba12400685687d899e84ab2",
+  ],
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
     "packages/integrations/parser/helper.py",
-    "0f3eb56f912d9d53fa8ded5934442f4f76563624a73eeb46cf2276d3c74a1fe4",
+    "c9afa24fa01446c2aea4d5772491fc09d44f394b4160b2caaf7b5969abacf7d5",
   ],
   [
     "packages/integrations/parser/test_helper.py",
-    "3ed29d04ca824af214978ae0de89acbb996cee7c1ef98d1cfeea70c0f8e1378f",
+    "3df51295dc4820998763a4fa9e1322cf9767c564c2eb7282562850be59f0cdda",
   ],
 
   // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
@@ -1466,7 +1499,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cb93c1755cddb34f2e289b482b333098cf4f9e63a1a580d745f05a33189caef9",
+    "4978ba6b4325c5355f8a075d4446c94a9ac51b1b884041c321cb4c00e56de575",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1546,7 +1579,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cb93c1755cddb34f2e289b482b333098cf4f9e63a1a580d745f05a33189caef9",
+    "4978ba6b4325c5355f8a075d4446c94a9ac51b1b884041c321cb4c00e56de575",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

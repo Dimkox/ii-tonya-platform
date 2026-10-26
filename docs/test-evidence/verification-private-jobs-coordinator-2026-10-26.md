@@ -244,3 +244,13 @@ code, assertions and actual retained logs without running tests or changing file
 Final producer builds/types/scoped lint/repository26 and diff checks passed; retained
 failed lint/types logs were followed by explicit corrective success. Original and
 corrective evidence are distinct. Root now owns canonical full gate and gated push.
+
+## Final-gate registration correction
+
+Canonical gate at8760c2b3 failed6 repository assertions (588pass/594), all other
+checks including types passed. Root traced missing exact automation registrations,
+stale helper/test/export/journal hashes and empty optional token example. Exact
+registrations/placeholder markers are corrected without relaxing policy. New guard
+RED8/3 is retained; first affected run150/152 exposed lowercase Dockerfile key,
+corrected then affected141/141 passed. Separate evidence preserves every failure.
+A bounded independent guard review and new canonical gate follow the changed files.
