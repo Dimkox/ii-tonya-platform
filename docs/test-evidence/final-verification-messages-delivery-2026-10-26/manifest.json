@@ -1,0 +1,25 @@
+{
+  "logs": [
+    {
+      "source": "/tmp/verification-messages-final-gate-1793051608180218567.log",
+      "archive": "verification-messages-final-gate-1793051608180218567.log.gz",
+      "bytes": 809,
+      "sha256": "3466ae4e2455ac199be8ed79fb01838398f1e260fbde3c65d2f1dbac6e92d5d7",
+      "archiveSha256": "f6da0772afaa5818c6caaefb9e5c58e20d21edd7a2b2a30276f256e97ce16999"
+    },
+    {
+      "source": "/tmp/verification-messages-final-repo-1793051608180218567.log",
+      "archive": "verification-messages-final-repo-1793051608180218567.log.gz",
+      "bytes": 8950,
+      "sha256": "ad43da85266c103ce9095ee645e884ecf4c4d52919ed3a797e4bf62c22f8207a",
+      "archiveSha256": "bdce9af7ea40d21a30764041b4284758e2a607f6b27a3ff6f0cf15a5d77c7a68"
+    },
+    {
+      "source": "/tmp/verification-messages-onboarding-schema-green.log",
+      "archive": "verification-messages-onboarding-schema-green.log.gz",
+      "bytes": 356,
+      "sha256": "6673fa227e819e324bd8149c861d47768f7078b74865efbc2146e23cadbbabdf",
+      "archiveSha256": "30c85b3a18fa474deeaa7482d138ef15b4b81388a1225f6f7a43201c44242eae"
+    }
+  ]
+}

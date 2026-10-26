@@ -25,8 +25,24 @@ describe("expert onboarding schema metadata", () => {
         "archive_until_date",
       ].sort(),
     );
-    expect(config.uniqueConstraints.map((c) => c.name)).toContain(
-      "expert_onboarding_user_unique",
+    expect(
+      config.uniqueConstraints.map((c) => ({
+        name: c.name,
+        columns: c.columns.map((column) => column.name),
+      })),
+    ).toEqual([
+      { name: "expert_onboarding_id_user_unique", columns: ["id", "user_id"] },
+    ]);
+    // Rejected attempts remain history; pending/approved ownership stays unique.
+    const current = config.indexes.find(
+      (i) => i.config.name === "expert_onboarding_current_user_unique",
+    )!;
+    expect(current.config.unique).toBe(true);
+    expect(
+      current.config.columns.map((c) => ("name" in c ? c.name : null)),
+    ).toEqual(["user_id"]);
+    expect(new PgDialect().sqlToQuery(current.config.where!).sql).toBe(
+      '"expert_onboarding_applications"."verification_status" <> \'rejected\'',
     );
     expect(config.foreignKeys.map((c) => c.getName())).toContain(
       "expert_onboarding_quote_owner_fk",

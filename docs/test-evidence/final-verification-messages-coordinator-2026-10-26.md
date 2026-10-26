@@ -157,3 +157,19 @@ All three original reviewers accepted only their assigned closure claims at3baaf
 Root confirmed active mandatory pre-push hook and parent DraftPR112 still OPEN at
 53df4d2f. Canonical full gate is next; no full gate or push for this block has yet
 been claimed. Refund policy remains pending/manual and S2b remains the next block.
+
+## Canonical gate exposed a stale schema assertion
+
+Full gate at6ec5e973 failed one of592 repository tests: the old
+expert-onboarding-schema test required unconditional `expert_onboarding_user_unique`,
+removed by0062 to retain rejected attempts while allowing a legitimate new one.
+Other591 tests and all other gate checks, including full tests typecheck, passed.
+The gate was not bypassed. Failed gate/repository logs are retained in the delivery
+archive alongside the focused correction witness.
+
+Root owns this test-only correction. It now asserts exactly the preserved composite
+id/user uniqueness and the unique user index with the precise non-rejected predicate;
+quote-owner FK, pending queue and all prior checks remain. No runtime/schema change
+or relaxed assertion. Focused test passes1/1 at21:56UTC. A bounded independent review
+of this guard change and a corrected canonical gate follow; runtime R1–R6 acceptance
+at3baaf003 is unchanged.
