@@ -320,3 +320,75 @@ it("saves structured qualifications without caller money authority", async () =>
     }),
   );
 });
+it("remediation: acknowledges durable pending cohort while form admission is disabled", async () => {
+  const f = fixture();
+  const service = createExpertApplicantService({
+    enabled: true,
+    repository: {
+      beginEnrollment: f.beginEnrollment,
+      completeEnrollment: f.completeEnrollment,
+      register: f.register,
+      resolve: f.resolve,
+      listTariffs: async () => {
+        throw Error("resident_verification_required");
+      },
+      createQuote: f.createQuote,
+      createApplication: f.createApplication,
+      isVerificationPending: async () => true,
+    },
+    personalOffers: { readPromoIdentity: async () => null },
+  });
+  for (const text of ["/tariffs", "/my_tariff", "/start"]) {
+    const reply = await service.handle({ ...scope, text });
+    expect(reply.status).toBe("handled");
+    expect(reply.text).toContain("провер");
+    expect(reply.text).not.toContain("Тарифы: /tariffs");
+    expect(JSON.stringify(reply)).toContain("remove_keyboard");
+  }
+});
+it("remediation: start preserves non-price referral information alongside the real form controls", async () => {
+  const f = fixture();
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        {
+          text: "Эксперт",
+          callback_data: "rv:00000000-0000-4000-8000-000000000001:0:r:EXPERT",
+        },
+      ],
+    ],
+  };
+  const service = createExpertApplicantService({
+    enabled: true,
+    repository: {
+      beginEnrollment: f.beginEnrollment,
+      completeEnrollment: f.completeEnrollment,
+      register: f.register,
+      resolve: f.resolve,
+      listTariffs: f.listTariffs,
+      createQuote: f.createQuote,
+      createApplication: f.createApplication,
+    },
+    verificationForm: {
+      async handle() {
+        return {
+          status: "handled",
+          text: "Выберите роль для анкеты",
+          replyMarkup,
+        };
+      },
+    },
+  });
+  const response = await service.handle({ ...scope, text: "/start" });
+  expect(response.status).toBe("handled");
+  expect(response.text).toContain("promo_abcdef");
+  expect(response.text).toContain("100");
+  expect(response.text).toContain("заморожены");
+  expect(response.text).toContain("PDF");
+  expect(response.text).toContain("Выберите роль");
+  expect(response).toMatchObject({ replyMarkup });
+  expect(response.text).not.toContain("/tariffs");
+  expect(response.text).not.toContain("300000");
+  expect(f.createQuote).not.toHaveBeenCalled();
+  expect(f.createApplication).not.toHaveBeenCalled();
+});

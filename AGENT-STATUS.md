@@ -1,3 +1,92 @@
+# Resident verification first PR delivered — 2026-10-26
+
+Draft PR108 is open: https://github.com/Dimkox/ii-tonya-platform/pull/108
+Branch codex/verification-schema-form-20261026; base codex/phase1-owner-plan-20261023
+at1a006fff4e2985fd83b72f3c67a66823fab87078. Reviewed implementation
+5e2bb8e336812197ad4105bbae9addfdd957da7f; final canonical full gate at
+6583f08d1cb3aa65ba18ec859dcc65a258de770d passed all seven checks, including
+repository558/558. The first gate's exact unique-constraint expectation drift
+was diagnosed/fixed, focused12/12 and independently reviewed; failed evidence stays.
+
+The first push's mandatory hook also passed. A final documentation-only checkpoint
+records this delivery; confirm live PR/remote head rather than trusting copied SHA.
+Working source contains Schema+Form Logic only. Manager decisions, automatic
+OCR/social checks, S3/LLM ingestion, callback acknowledgement transport and staging
+evidence remain later work. Feature defaults false. No merge, deploy or provider
+activation occurred. Do not restart completed verification without a new reason.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Evidence: docs/test-evidence/verification-schema-form-coordinator-2026-10-26.md
+
+# Resident verification review closed; final delivery pending — 2026-10-26
+
+Reviewed source5e2bb8e336812197ad4105bbae9addfdd957da7f on
+codex/verification-schema-form-20261026; base1a006fff. Three independent review
+layers and bounded remediation closure have no accepted finding left open.
+PostgreSQL21/21 plus actual composed Fastify/PG1/1, focused units, affected builds,
+types and static checks pass. Source is default-off and contains Schema+Form Logic
+only, not full automatic verification or manager decisions.
+
+Root is running the final clean-commit gate and then owns authorized push/draft PR
+against codex/phase1-owner-plan-20261023. Confirm live remote/PR state before any
+continuation. No deploy/provider activation or staging evidence is claimed.
+Evidence: docs/test-evidence/verification-schema-form-coordinator-2026-10-26.md.
+
+# Resident verification review remediation ready — 2026-10-26
+
+Accepted P1–P11 fixes implemented against8fc8e34. The rejected P1 clone-loss
+mechanism was absent in committed source; text role normalization is fixed while
+preserving deletion/fingerprint semantics. Document cursor integrity, correction
+controls, bounded frozen-snapshot supplements, manual policy-change response,
+URL/control parity,64000-byte draft bound, subject erasure index, stable flag-off
+pricing denial, symmetric capability ceiling and Russian saved-fact confirmation
+are covered. No approval, price, provider, OCR, S3 or live transport was added.
+
+Focused PostgreSQL21/21 and real Fastify+PG composition acceptance pass. Final
+SQL replay:58migrations,174tables,9functions/5triggers,43constraints/12indexes.
+See docs/test-evidence/verification-schema-form-remediation-2026-10-26.md.
+Root owns final accepted-patch review, branch gate and draft PR; do not claim
+release completion or rerun unchanged PostgreSQL coverage without a new defect.
+
+# Resident verification source ready for review — 2026-10-26
+
+Schema+Form Logic is implemented on codex/verification-schema-form-20261026 in
+the assigned isolated worktree. Default-off, private promo-bot/consent/owner-bound
+intake precedes pricing. All six role flows persist, with explicit primary role,
+conditional documents, durable edit cursor and pending checks. No manager outcome,
+OCR/social processing, document fetch, S3 upload, price/invoice or activation was
+implemented. Existing authoritative offers retain their original clocks.
+
+PostgreSQL17.5 focused acceptance15/15 PASS; metadata replay58migrations,
+174tables,8newfunctions/5triggers,42additiveconstraints/11indexes. Actual erasure,
+consent withdrawal and user-stage reset covered. Cohort survives PII deletion and
+UI disablement, maintaining the pricing fence. Relevant package builds/types,
+full tests typecheck, focused unit results and exact guards are evidenced in
+docs/test-evidence/verification-schema-form-implementation-2026-10-26.md.
+
+Root owns independent review, final full branch gate and authorized draft PR;
+these remain pending. No deployment, provider call or feature activation occurred.
+Do not repeat completed PG/files without a new defect. Owner task-wide routine
+approval/run-count opt-out persists; all failed logs remain retained.
+
+# Resident verification Schema+Form Logic starting — 2026-10-26
+
+Active branch codex/verification-schema-form-20261026 in this existing isolated
+worktree; baseline1a006fff4e2985fd83b72f3c67a66823fab87078 is pushed on
+origin/codex/phase1-owner-plan-20261023. The owner requests a first-part draft PR
+containing schema and real dynamic form, not OCR/social/LLM provider activation.
+New order is verification BEFORE pricing; new approval must not call the old
+invoice-producing decision. Preserve issued quotes, paid access and audit history.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Plan: docs/superpowers/plans/2026-10-26-verification-schema-form.md
+RequireDocker preflight passed Node24.22.1/pnpm11.9.0/PG-compatible Docker tools;
+no.env or credentials were used. Schema/form and identity audits are complete.
+Existing owner opt-out from routine approvals/focused run-count questions persists.
+No blind repeats or weakened checks. Push+draft PR are authorized by this request;
+merge/deploy/live activation are not. Root owns coordinator evidence/final gate;
+fresh implementer owns source, plan/status and implementation evidence.
+
 # Owner payment/offer corrections locally complete — 2026-10-23
 
 Verified implementation:3466408a54fb6796b386d0c1da428ae283e40dd1 on

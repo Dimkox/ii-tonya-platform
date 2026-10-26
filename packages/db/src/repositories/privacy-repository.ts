@@ -1008,6 +1008,14 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         // Promo acquisition has no financial retention authority. Remove queued
         // sends, pending enrollment and direct identity digests; keep only inactive
         // UUID ownership tombstones so an erased inviter can never be reassigned.
+        // New intake PII and private Telegram references disappear before identity deletion.
+        // Retain only erased request tombstones so delayed updates cannot resurrect data.
+        await tx.execute(
+          sql`delete from residents_applications where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update resident_verification_requests set user_id=null,request_digest=null,result=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
         await tx.execute(
           sql`delete from expert_promo_guide_work where user_id=${command.targetUserId}::uuid`,
         );

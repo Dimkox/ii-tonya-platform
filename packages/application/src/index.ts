@@ -53,3 +53,5 @@ export * from "./client-bot-account-read-service.js";
 export * from "./expert-manager-telegram-service.js";
 
 export * from "./expert-personal-offer-service.js";
+
+export * from "./resident-verification-service.js";

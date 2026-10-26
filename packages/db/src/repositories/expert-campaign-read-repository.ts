@@ -31,7 +31,7 @@ export class PostgresExpertCampaignReadRepository {
       const owner = (
         await tx.execute<{ id: string }>(sql`
         select e.id from experts e join users u on u.id=e.user_id
-        where e.id=${input.expertId}::uuid and e.active and e.verified and u.active
+        where e.id=${input.expertId}::uuid and e.active and e.verified and u.active and resident_verification_price_allowed(u.id)
       `)
       ).rows[0];
       if (!owner)
@@ -58,7 +58,7 @@ export class PostgresExpertCampaignReadRepository {
     return (
       await this.db.execute<{ userId: string }>(sql`
       select e.user_id as "userId" from experts e join users u on u.id=e.user_id
-      where e.id=${expertId}::uuid and e.active and e.verified and u.active
+      where e.id=${expertId}::uuid and e.active and e.verified and u.active and resident_verification_price_allowed(u.id)
     `)
     ).rows[0]?.userId;
   }

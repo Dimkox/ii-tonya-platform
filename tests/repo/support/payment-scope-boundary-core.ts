@@ -96,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0057_resident_verification_form.sql",
   "packages/db/migrations/0056_residency_offer_corrections.sql",
   "packages/db/migrations/0055_expert_residency_lifecycle.sql",
   "packages/db/migrations/0054_expert_card_publication.sql",
@@ -128,6 +129,13 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // Pre-price intake only; docs/spec/verification-schema-form-guard-registration.md.
+  "residents_applications",
+  "resident_verification_cohorts",
+  "resident_verification_application_updates",
+  "resident_verification_check_work",
+  "resident_verification_requests",
+
   // Exact correction inventory; docs/spec/residency-offer-corrections-guard-registration.md.
   "expert_application_material_jobs",
   "expert_application_promo_confirmations",
@@ -289,6 +297,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "EXPERT_VERIFICATION_FORM_ENABLED",
   "EXPERT_RESIDENCY_LIFECYCLE_ENABLED",
   "EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED",
   "EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED",
@@ -760,6 +769,20 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.
+  [
+    "packages/db/migrations/0057_resident_verification_form.sql",
+    "06b540f1cfd16a86984454fd52ab90e0bfb0d9984c1ed82f23c0799283292093",
+  ],
+  [
+    "packages/db/migrations/meta/0057_snapshot.json",
+    "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
+  ],
+  [
+    "packages/db/migrations/state/0057_verification_sql_objects.json",
+    "23158ba19989bc5919a93bc967465244a2865f2be3d6550e8d2bacb538d2dc6c",
+  ],
+
   // Reviewed additive v2 SQL, PG-derived supported snapshot and exact catalogue.
   [
     "packages/db/migrations/0056_residency_offer_corrections.sql",
@@ -1217,7 +1240,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "407098daea3b91c6e6fd622d344d2e0c395bfb31f8cef894d9c95a7fb46a2a0d",
+    "41d6ce619528562112a39073e177cbbdf8f6447fc7a9532eec3f0176e142dff7",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1297,7 +1320,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "407098daea3b91c6e6fd622d344d2e0c395bfb31f8cef894d9c95a7fb46a2a0d",
+    "41d6ce619528562112a39073e177cbbdf8f6447fc7a9532eec3f0176e142dff7",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1444,7 +1467,8 @@ const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
 const expertResidencyRoute =
   /^\/v1\/(?:(?:admin\/)?expert(?:-|\/)|webhooks\/telegram\/expert(?:-|\/))/u;
-const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
+const expertResidencyFlag =
+  /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI|VERIFICATION)_/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;

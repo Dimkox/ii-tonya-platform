@@ -63,7 +63,10 @@ function command(input: ExpertPromoCommand) {
 export class PostgresExpertPromoRepository {
   constructor(
     private readonly db: DrizzleDb,
-    private readonly consent: { messagingConsentPolicyVersion: string },
+    private readonly consent: {
+      messagingConsentPolicyVersion: string;
+      verificationFormEnabled?: boolean;
+    },
   ) {}
   private async identity(
     tx: Executor,
@@ -85,6 +88,11 @@ export class PostgresExpertPromoRepository {
       externalUserId: scope.telegramUserId,
       messagingPolicyVersion: this.consent.messagingConsentPolicyVersion,
     });
+    if (authority && this.consent.verificationFormEnabled) {
+      await tx.execute(
+        sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id) select ${userId}::uuid,${scope.botId},${scope.botKey},(select id from channel_identities where user_id=${userId}::uuid and provider='telegram' and bot_key=${scope.botKey} and external_id=${scope.telegramUserId} and external_chat_id=${scope.chatId} and status='active'),${scope.telegramUserId},${scope.chatId} where not exists(select 1 from expert_campaign_quotes where user_id=${userId}::uuid) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled') on conflict(user_id) do nothing`,
+      );
+    }
     return authority ? userId : null;
   }
   async resolve(scope: ExpertPromoScope): Promise<{ userId: string } | null> {
@@ -94,6 +102,20 @@ export class PostgresExpertPromoRepository {
       await tx.execute(sql`set local lock_timeout='1000ms'`);
       const userId = await this.identity(tx, copy);
       return userId ? { userId } : null;
+    });
+  }
+  async isVerificationPending(scope: ExpertPromoScope): Promise<boolean> {
+    const copy = { ...scope };
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
+      const userId = await this.identity(tx, copy);
+      if (!userId) return false;
+      return !(
+        await tx.execute<{ ok: boolean }>(
+          sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+        )
+      ).rows[0]?.ok;
     });
   }
   private async replay(
@@ -284,6 +306,14 @@ export class PostgresExpertPromoRepository {
       );
       const userId = await this.identity(tx, input);
       if (!userId) return fail("promo_identity_unavailable");
+      if (
+        !(
+          await tx.execute<{ ok: boolean }>(
+            sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+          )
+        ).rows[0]?.ok
+      )
+        fail("resident_verification_required");
       const replay = await this.replay(tx, input, userId, "tariffs");
       const tariffs = (
         await tx.execute<{ id: string; displayName: string }>(
@@ -315,6 +345,14 @@ export class PostgresExpertPromoRepository {
     return this.db.transaction(async (tx) => {
       const userId = await this.identity(tx, input);
       if (!userId) return fail("promo_identity_unavailable");
+      if (
+        !(
+          await tx.execute<{ ok: boolean }>(
+            sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+          )
+        ).rows[0]?.ok
+      )
+        fail("resident_verification_required");
       const replay = await this.replay(tx, input, userId, "profile");
       const profile = await saveExpertOfferProfileInTransaction(tx, {
         ...qualifications,
@@ -340,6 +378,14 @@ export class PostgresExpertPromoRepository {
       );
       const userId = await this.identity(tx, input);
       if (!userId) return fail("promo_identity_unavailable");
+      if (
+        !(
+          await tx.execute<{ ok: boolean }>(
+            sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+          )
+        ).rows[0]?.ok
+      )
+        fail("resident_verification_required");
       const replay = await this.replay(tx, input, userId, "quote");
       const quote = await new PostgresExpertCampaignQuoteRepository(
         this.db,
@@ -573,6 +619,10 @@ export class PostgresExpertPromoRepository {
         await tx.execute(
           sql`update expert_promo_enrollments set status=${decision} where user_id=${row.userId}::uuid`,
         );
+        if (decision === "granted" && this.consent.verificationFormEnabled) {
+          if (!(await this.identity(tx, input)))
+            fail("promo_identity_unavailable");
+        }
         await this.saveRequest(tx, input, row.userId, "consent");
         return { kind: decision, replay: false };
       },
@@ -598,6 +648,14 @@ export class PostgresExpertPromoRepository {
       );
       const userId = await this.identity(tx, input);
       if (!userId) return fail("promo_identity_unavailable");
+      if (
+        !(
+          await tx.execute<{ ok: boolean }>(
+            sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
+          )
+        ).rows[0]?.ok
+      )
+        fail("resident_verification_required");
       const replay = await this.replay(tx, input, userId, "application");
       const prior = (
         await tx.execute<{ id: string; quoteId: string; status: string }>(

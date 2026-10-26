@@ -75,6 +75,7 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
   "erase_expert_offer_delivery_state",
+  "erase_resident_verification_subject",
   "expert_campaign_current_profile_valid",
   "expert_card_activation_gate_valid",
   "expert_card_current_messaging_authority",
@@ -109,6 +110,14 @@ const HAND_SQL_FUNCTIONS = [
   "reject_partner_commerce_mutation",
   "reject_selarti_budget_policy_mutation",
   "reject_test_expert_immutable_mutation",
+  "resident_verification_consent_cleanup",
+  "resident_verification_draft_valid",
+  "resident_verification_followup_valid",
+  "resident_verification_price_allowed",
+  "resident_verification_price_guard",
+  "resident_verification_social_projection",
+  "resident_verification_stage_projection",
+  "resident_verification_write_guard",
   "validate_and_consume_selarti_budget_approval",
   "validate_test_expert_campaign_prompt",
   "validate_test_expert_campaign_transition",
@@ -215,6 +224,11 @@ const HAND_SQL_TRIGGERS = [
   "planerka_reservation_transition_guard",
   "prompt_versions_append_only",
   "reconciliation_mismatches_append_only",
+  "resident_verification_anchor_guard",
+  "resident_verification_consent_cleanup",
+  "resident_verification_quote_guard",
+  "resident_verification_stage_projection",
+  "resident_verification_write_guard",
   "safety_incidents_append_only",
   "selarti_budget_policy_approval",
   "selarti_budget_policy_immutable",
@@ -286,7 +300,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(56);
+    expect(newest).toBe(57);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -402,6 +416,6 @@ describe("migration history integrity", () => {
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
     // 0056 adds fourteen offer, qualification, manager, application-material and admission relations.
-    expect(declared.size).toBe(169);
+    expect(declared.size).toBe(174);
   });
 });

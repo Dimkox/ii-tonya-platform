@@ -295,7 +295,7 @@ describe("authoritative Drizzle schema parity", () => {
         "channel_identities_provider_external_legacy_unique",
         "channel_identities_telegram_bot_user_chat_unique",
       ],
-      uniques: [],
+      uniques: ["channel_identity_resident_owner"],
     });
     expect(names(clientProfiles).checks).toEqual([
       "client_profiles_expert_note_bounded",

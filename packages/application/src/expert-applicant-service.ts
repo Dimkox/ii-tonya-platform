@@ -1,3 +1,5 @@
+import type { ResidentDocument } from "@ii-tonya/domain";
+import type { ResidentFormInput } from "./resident-verification-service.js";
 import {
   renderPersonalOffer,
   type PersonalOfferView,
@@ -15,6 +17,7 @@ type Command = ExpertApplicantScope & {
   requestDigest: string;
 };
 export interface ExpertApplicantRepository {
+  isVerificationPending?(scope: ExpertApplicantScope): Promise<boolean>;
   saveProfile?(
     input: Command & {
       cityCode: string;
@@ -76,18 +79,32 @@ export interface ExpertApplicantRepository {
   }>;
 }
 export type ExpertApplicantReply =
-  | { status: "handled"; text: string }
+  | {
+      status: "handled";
+      text: string;
+      replyMarkup?:
+        | { inline_keyboard: { text: string; callback_data: string }[][] }
+        | { remove_keyboard: true };
+    }
   | {
       status:
         "disabled" | "unavailable" | "rejected" | "unhandled" | "duplicate";
       text?: never;
     };
+const pendingVerification = (): ExpertApplicantReply => ({
+  status: "handled",
+  text: "Ваша анкета ожидает проверки. Тарифы пока недоступны; сохранённые ответы остаются на месте.",
+  replyMarkup: { remove_keyboard: true },
+});
 const uuid =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
 const apply = new RegExp(`^/apply (${uuid})$`, "u");
 export function createExpertApplicantService(deps: {
   enabled: boolean;
+  verificationForm?: {
+    handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
+  };
   repository: ExpertApplicantRepository;
   personalOffers?: {
     readPromoIdentity(
@@ -97,7 +114,12 @@ export function createExpertApplicantService(deps: {
 }) {
   return {
     async handle(
-      input: ExpertApplicantScope & { updateId: number; text: string },
+      input: ExpertApplicantScope & {
+        updateId: number;
+        text: string;
+        callbackData?: string;
+        media?: ResidentDocument;
+      },
     ): Promise<ExpertApplicantReply> {
       if (!deps.enabled) return { status: "disabled" };
       if (
@@ -109,7 +131,7 @@ export function createExpertApplicantService(deps: {
         input.chatId !== input.telegramUserId ||
         !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(input.botKey) ||
         typeof input.text !== "string" ||
-        input.text.length > 256
+        input.text.length > (deps.verificationForm ? 3000 : 256)
       )
         return { status: "rejected" };
       const { botId, botKey, telegramUserId, chatId, updateId } = input;
@@ -122,10 +144,19 @@ export function createExpertApplicantService(deps: {
       });
       try {
         if (
+          deps.verificationForm &&
+          !/^\/(?:start|consent)(?: |$)/u.test(input.text)
+        ) {
+          const form = await deps.verificationForm.handle(input);
+          if (form) return form;
+        }
+        if (
           input.text === "Мой актуальный тариф" ||
           input.text === "/my_tariff"
         ) {
           const offer = await deps.personalOffers?.readPromoIdentity(scope);
+          if (!offer && (await deps.repository.isVerificationPending?.(scope)))
+            return pendingVerification();
           return offer
             ? { status: "handled", text: renderPersonalOffer(offer) }
             : { status: "unavailable" };
@@ -175,7 +206,6 @@ export function createExpertApplicantService(deps: {
             ...command(),
             ...(start[1] ? { refCode: start[1] } : {}),
           });
-          if (result.replay) return { status: "duplicate" };
           const guide =
             result.guideStatus === "waiting_content"
               ? "TODO: Wait for PDF"
@@ -186,6 +216,22 @@ export function createExpertApplicantService(deps: {
             result.bonusStatus === "frozen"
               ? "Предварительные 100 бонусов заморожены и входят в квалифицированное вознаграждение; доступного баланса пока нет."
               : "";
+          const registrationText =
+            `Ваш промокод: ${result.refCode}. Уникальных регистраций: ${result.referralCount}. ${guide} ${bonus}`.trim();
+          if (deps.verificationForm) {
+            const form = await deps.verificationForm.handle(input);
+            if (form)
+              return form.status === "handled"
+                ? { ...form, text: `${registrationText}\n\n${form.text}` }
+                : form;
+          }
+          if (await deps.repository.isVerificationPending?.(scope)) {
+            const pending = pendingVerification();
+            return pending.status === "handled"
+              ? { ...pending, text: `${registrationText}\n\n${pending.text}` }
+              : pending;
+          }
+          if (result.replay) return { status: "duplicate" };
           return {
             status: "handled",
             text: `Ваш промокод: ${result.refCode}. Уникальных регистраций: ${result.referralCount}. Тарифы: /tariffs. ${guide} ${bonus}`.trim(),
@@ -258,7 +304,12 @@ export function createExpertApplicantService(deps: {
             ? "rejected"
             : "unhandled",
         };
-      } catch {
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "resident_verification_required"
+        )
+          return pendingVerification();
         return { status: "unavailable" };
       }
     },

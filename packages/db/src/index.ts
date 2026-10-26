@@ -372,3 +372,5 @@ export * from "./repositories/expert-personal-offer-repository.js";
 export * from "./repositories/yookassa-payment-purpose-repository.js";
 
 export * from "./repositories/expert-offer-v2.js";
+
+export * from "./repositories/resident-verification-repository.js";
