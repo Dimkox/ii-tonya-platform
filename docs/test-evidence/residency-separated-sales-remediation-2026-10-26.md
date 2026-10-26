@@ -72,3 +72,24 @@ flags, receipt key configuration, reviewed provider capabilities and environment
 activation requirements still apply. Unknown-create recovery requires a real
 provider object identifier supplied by an authorized operator and verified by GET.
 Recovery facts do not execute refunds or grant access.
+
+## R3 bounded closure follow-up
+
+The bounded review of425b58ee accepted the other review groups and found one
+remaining0059 upgrade order: submit, add a supplemental answer, enter v3 sales,
+then create the bridge.0059 records the mutable revision2 in that bridge while
+the original submission work records revision1. The added case reproduced
+`valid=false` and revision2 with the first0060 backfill (`r3-upgrade-order-red`).
+
+The still-unpublished0060 correction now backfills submitted revision from the
+same form/owner's genuine submission work alongside digest/time. The focused
+actual0059→0060 test is GREEN (`r3-upgrade-order-green`) and retains the original
+bridge-before-follow-up and erased-owner cases. No0059 SQL or runtime behavior
+was changed. Full state reconstruction, exact hashes and metadata checks were
+refreshed; the other accepted suites were not repeated. New raw evidence uses
+`r3-` stems in the existing archive and manifest.
+
+Closure checks: upgraded fixture1/1, metadata/migration17/17, tests typecheck,
+changed-test lint and formatting all pass. Original0059 input hashes remain
+unchanged; the reconstructed SQL catalogue is byte-identical because this repair
+changes historical data backfill, not the resulting schema.

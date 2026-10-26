@@ -289,6 +289,69 @@
       "bytes": 37,
       "captureBytes": 15,
       "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-diff-check.txt",
+      "sha256": "53eee548ced260ce25d5e2819932756576d2e6aa1e906397047e3d562a850ddd",
+      "bytes": 46,
+      "captureBytes": 24,
+      "captureSha256": "bbee93ad3bf0892b2b27d80bf52bd5626ceb26dfae55122100808052926c46f8"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-format.txt",
+      "sha256": "4befedb2818fe8cb0fe5700c95833cc1a08bedeba16b8213163e986efd58d715",
+      "bytes": 88,
+      "captureBytes": 66,
+      "captureSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-introspection.txt",
+      "sha256": "3fb1f125e470ef4ef7de07c24a9ff247858dc4f1b14f177d72e84d8e360da4a2",
+      "bytes": 228406,
+      "captureBytes": 228384,
+      "captureSha256": "dc86886b1d5f0ede0fe97b593fafb137133b37c170d2fa0d0d98ed235a374866"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-lint.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-metadata.txt",
+      "sha256": "d3e13a278e51b31dd067a97ae915dffa51dedb3a27e5a2ff19676ae14d8ca79d",
+      "bytes": 460,
+      "captureBytes": 438,
+      "captureSha256": "c99053085692e65a649f705572b01b819d8a05d41608011245b6eb54c3f4ab92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-reconstruction.txt",
+      "sha256": "0e8b9bf6104fd1bf92baf74e800210f354594b67955c9cbf3ad94fdb43eb6995",
+      "bytes": 247,
+      "captureBytes": 225,
+      "captureSha256": "775c17be6bded887c0e20b7221aff32690b65c6ee29efa95a058e53610afc800"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-types.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-upgrade-order-green.txt",
+      "sha256": "ee2583d39c097ea715bdbe18d764636c0bf7070daab09e1a0c33b0d69a9800a2",
+      "bytes": 493,
+      "captureBytes": 471,
+      "captureSha256": "8a3700a12ff4fc8aaa9223087d3d719d5eede9789f3f76e98dccb00ca3e61d8d"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-remediation-2026-10-26/raw/r3-upgrade-order-red.txt",
+      "sha256": "a5e25854a71db765d4c38c274878190296f6a4f11d9e7537edea7458431c5692",
+      "bytes": 1544,
+      "captureBytes": 1522,
+      "captureSha256": "22efbc648e74fba47dd55810429d6d8ef81974cd2996898a2b8a6ef3bd67c759"
     }
   ]
 }

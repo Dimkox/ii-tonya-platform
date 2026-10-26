@@ -1,7 +1,7 @@
 -- Additive review corrections preserve issued and historical financial facts.
 ALTER TABLE expert_sales_form_bridges ADD COLUMN submitted_digest text, ADD COLUMN submitted_at timestamptz;
 DROP TRIGGER expert_sales_bridge_immutable ON expert_sales_form_bridges;
-UPDATE expert_sales_form_bridges b SET submitted_digest=encode(digest(f.submitted_draft::text,'sha256'),'hex'),submitted_at=f.submitted_at FROM residents_applications f WHERE f.id=b.form_id AND f.user_id=b.user_id;
+UPDATE expert_sales_form_bridges b SET submitted_digest=encode(digest(f.submitted_draft::text,'sha256'),'hex'),submitted_at=f.submitted_at,submitted_revision=w.submitted_revision FROM residents_applications f JOIN resident_verification_check_work w ON w.application_id=f.id AND w.user_id=f.user_id WHERE f.id=b.form_id AND f.user_id=b.user_id;
 ALTER TABLE expert_sales_form_bridges ADD CONSTRAINT expert_sales_submission_proof CHECK((submitted_digest IS NULL AND submitted_at IS NULL) OR (submitted_digest IS NOT NULL AND submitted_digest ~ '^[0-9a-f]{64}$' AND submitted_at IS NOT NULL AND isfinite(submitted_at)));
 CREATE TRIGGER expert_sales_bridge_immutable BEFORE UPDATE ON expert_sales_form_bridges FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();
 --> statement-breakpoint

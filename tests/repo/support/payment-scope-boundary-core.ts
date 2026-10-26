@@ -815,11 +815,11 @@ const approvedDependencySpecifiers = new Map([
 const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0060_separated_sales_review_corrections.sql",
-    "fd2dc2cd3de31d9ffc6b375eb9d128b6db089dc4d71ff1c5a08dbf23cb7fa4ce",
+    "4b9f5b78690f8eb7bd59d7d1d2f8f51fd73b3ae50ac2e99bd28767cff4f43933",
   ],
   [
     "packages/db/migrations/meta/0060_snapshot.json",
-    "06ebff85fe3908e80c5e1e6eb7e663f0edbb7be480e3f51476baf13fab3d3f3a",
+    "c2590b2c31ccfb74236a34b0e20598005b5cefea1a67641c113fb4ad3ffc4a7d",
   ],
   [
     "packages/db/migrations/state/0060_sql_objects.json",
@@ -827,7 +827,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0060_manifest.json",
-    "3080f5531929409cfd09f587c587e6f5107e57155cb39b3cac99d3fd3038f2f3",
+    "9dc31e816dd08f3971b59920fa251f87bdb9a881f4ec690cd884e205e0f89cf1",
   ],
 
   [

@@ -205,3 +205,9 @@ from uncertain sends. Runtime form copy is sales-first only for the v3 cohort.
 Migration0060 preserves0059 historical state; real erased forms cascade their
 bridge and do not regain submission proof. Status remains in-review pending the
 coordinator's bounded closure. See remediation evidence for raw failures and checks.
+
+R3 bounded closure additionally verifies the existing0059 order submit → follow-up
+→ enter v3 → bridge. Migration0060 backfills the original submission revision from
+same-owner submission work, rather than retaining the bridge's mutable revision.
+The original-order and erasure upgrade cases remain covered; frozen intent and
+in-review status are unchanged.
