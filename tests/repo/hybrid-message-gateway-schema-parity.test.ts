@@ -47,12 +47,12 @@ describe("B1 schema/migration parity", () => {
         breakpoints: true,
       },
     ]);
-    // The reviewed additive 0062 SQL/state projection is the current journal tail.
+    // The reviewed additive 0063 SQL/state projection is the current journal tail.
     expect(journal.entries.at(-1)).toEqual({
-      idx: 62,
+      idx: 63,
       version: "7",
-      when: 1793044800000,
-      tag: "0062_resident_verification_messages",
+      when: 1793044801000,
+      tag: "0063_resident_verification_review_corrections",
       breakpoints: true,
     });
   });

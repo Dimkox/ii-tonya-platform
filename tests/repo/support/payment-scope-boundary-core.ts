@@ -100,6 +100,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0061_resident_content_safety.sql",
   "packages/db/migrations/0062_resident_verification_messages.sql",
+  "packages/db/migrations/0063_resident_verification_review_corrections.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -533,7 +534,7 @@ const approvedPackageManifestHashes = new Map([
 const reviewedDomHarnessHashes = new Map([
   [
     "scripts/verify-resident-review-browser.mjs",
-    "f4bb0156558f284e31f02097c955d5e17511e03982ee5245b2677bfc9a7eff6d",
+    "3ec062ea1c7b511a6a209ac24c95e22db51fbcc2dc1791c4bd44a19acd634be3",
   ],
   [
     "scripts/verify-client-web-account-browser.mjs",
@@ -839,6 +840,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0063_resident_verification_review_corrections.sql",
+    "a68c5513b4ee341950e6e39eae2c81ff6004b02ba2f1df689a7cc9a41f4e042a",
+  ],
+  [
+    "packages/db/migrations/meta/0063_snapshot.json",
+    "1c6e9a6ed43c4c963ef6986ea28edaf2de0035ea6a584341505e4723be6c0aa0",
+  ],
+  [
+    "packages/db/migrations/state/0063_sql_objects.json",
+    "a4df0d0aac2b6fee356fa29f625db4ea65afabdc7d6ce7d69be7228e6ccb3909",
+  ],
+  [
+    "packages/db/migrations/state/0063_manifest.json",
+    "793201b793c47a67fb07a3cc765eacb17ef04dccc262101ec4f7f87a87278469",
+  ],
+
   [
     "packages/db/migrations/0062_resident_verification_messages.sql",
     "6fedda508f5b6fede3dbf3c0113262fbba06c892f16ff2146ee455b1a887a1ff",
@@ -1391,7 +1409,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "5577bf30285c6939161b86c9a8d0ef643a20c1bb5e88452b92099276fa72da43",
+    "cb93c1755cddb34f2e289b482b333098cf4f9e63a1a580d745f05a33189caef9",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1471,7 +1489,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "5577bf30285c6939161b86c9a8d0ef643a20c1bb5e88452b92099276fa72da43",
+    "cb93c1755cddb34f2e289b482b333098cf4f9e63a1a580d745f05a33189caef9",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

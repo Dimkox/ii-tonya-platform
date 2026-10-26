@@ -198,3 +198,15 @@ it("refuses stale confirmation and retries the same preview without inventing su
   );
   expect(bodies[0]).toBe(bodies[1]);
 });
+
+it("continues the bounded queue and refuses malformed continuation before fetch", async () => {
+  const fetcher = vi.fn(async () => response({ kind: "ok", items: [entry] }));
+  const client = new ExpertVerificationClient(token, fetcher);
+  expect(await client.list(id)).toEqual([entry]);
+  expect(fetcher).toHaveBeenCalledWith(
+    `/v1/admin/expert-verification?limit=50&afterApplication=${id}`,
+    expect.any(Object),
+  );
+  await expect(client.list("bad")).rejects.toThrow();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

@@ -244,6 +244,12 @@ export class PostgresResidentVerificationRepository {
           fail("resident_revision_conflict");
         if (input.action === "reapply") {
           if (row.status !== "REJECTED") fail("resident_reapply_unavailable");
+          const eligible = (
+            await tx.execute(
+              sql`select 1 from resident_review_events e where e.attempt_id=${row.id}::uuid and e.action='REJECT_SOFT' and resident_reapply_eligible(e.reapply_at,clock_timestamp()) and not exists(select 1 from expert_onboarding_payment_facts where user_id=${userId}::uuid) and not exists(select 1 from expert_sales_paid_locks where user_id=${userId}::uuid)`,
+            )
+          ).rows[0];
+          if (!eligible) fail("resident_reapply_unavailable");
           await tx.execute(
             sql`update residents_applications set is_current=false,revision=revision+1 where id=${row.id}::uuid`,
           );

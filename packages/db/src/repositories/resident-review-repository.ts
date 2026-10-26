@@ -65,7 +65,11 @@ export class PostgresResidentReviewRepository {
       return work(tx);
     });
   }
-  private async source(tx: Tx, applicationId: string): Promise<Source> {
+  private async source(
+    tx: Tx,
+    applicationId: string,
+    historicalRecovery = false,
+  ): Promise<Source> {
     if (!uuid.test(applicationId)) throw Error("resident_review_invalid");
     const initial = (
       await tx.execute<{ userId: string }>(
@@ -76,7 +80,7 @@ export class PostgresResidentReviewRepository {
     await lockClientConsentSubject(tx, initial.userId);
     const f = (
       await tx.execute<Source>(
-        sql`select f.id,f.user_id as "userId",f.revision,f.check_generation as generation,f.submitted_revision as "submittedRevision",f.submitted_draft as draft,f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",f.status,f.active_request_id as "activeRequestId",clock_timestamp()::text as now,(clock_timestamp()+interval '48 hours')::text as deadline,(clock_timestamp()+interval '1 month')::text as "reapplyAt" from residents_applications f join expert_sales_form_bridges b on b.form_id=f.id join users u on u.id=f.user_id and u.active where b.application_id=${applicationId}::uuid and f.is_current and f.form_version=2 and f.submitted_at is not null for update of f`,
+        sql`select f.id,f.user_id as "userId",f.revision,f.check_generation as generation,f.submitted_revision as "submittedRevision",f.submitted_draft as draft,f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",f.status,f.active_request_id as "activeRequestId",clock_timestamp()::text as now,(clock_timestamp()+interval '48 hours')::text as deadline,(clock_timestamp()+interval '1 month')::text as "reapplyAt" from residents_applications f join expert_sales_form_bridges b on b.form_id=f.id join users u on u.id=f.user_id and u.active where b.application_id=${applicationId}::uuid and (${historicalRecovery} or f.is_current) and f.form_version=2 and f.submitted_at is not null for update of f`,
       )
     ).rows[0];
     if (
@@ -233,7 +237,7 @@ export class PostgresResidentReviewRepository {
     if (!uuid.test(eventId)) throw Error("resident_review_invalid");
     return this.tx(async (tx) => {
       const managerId = await lockExpertManagerAuthority(tx, sessionHash),
-        f = await this.source(tx, applicationId);
+        f = await this.source(tx, applicationId, true);
       const m = (
         await tx.execute(
           sql`select 1 from resident_review_messages where event_id=${eventId}::uuid and application_id=${f.id}::uuid and status in('dispatched','unknown') for update`,
@@ -253,21 +257,30 @@ export class PostgresResidentReviewRepository {
   async expireRequests(limit = 20, sessionHash?: string) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)
       throw Error("resident_batch_invalid");
-    return this.tx(async (tx) => {
-      if (sessionHash !== undefined)
-        await lockExpertManagerAuthority(tx, sessionHash);
-      const due = (
-        await tx.execute<{ id: string; userId: string; formId: string }>(
-          sql`select id,user_id as "userId",application_id as "formId" from resident_information_requests where status='open' and deadline<=clock_timestamp() order by deadline limit ${limit}`,
-        )
-      ).rows;
-      let count = 0;
-      for (const r of due) {
+    if (sessionHash !== undefined)
+      await this.tx((tx) => lockExpertManagerAuthority(tx, sessionHash));
+    // Exclude ineligible owners before LIMIT so they cannot starve valid due work.
+    const due = (
+      await this.db.execute<{ id: string; userId: string; formId: string }>(
+        sql`select r.id,r.user_id as "userId",r.application_id as "formId" from resident_information_requests r join residents_applications f on f.id=r.application_id and f.is_current and f.active_request_id=r.id and f.status='INFO_REQUESTED' join users u on u.id=f.user_id and u.active join channel_identities ci on ci.id=f.channel_identity_id and ci.user_id=f.user_id and ci.provider='telegram' and ci.status='active' and ci.bot_key=f.bot_key and ci.external_id=f.telegram_user_id and ci.external_chat_id=f.chat_id where r.status='open' and r.deadline<=clock_timestamp() order by r.deadline,r.id limit ${limit}`,
+      )
+    ).rows;
+    let count = 0;
+    for (const r of due) {
+      // A separate transaction is a subject boundary; revalidate under identity locks.
+      count += await this.tx(async (tx) => {
         await lockClientConsentSubject(tx, r.userId);
-        const changed = await tx.execute(
-          sql`update resident_information_requests r set status='timeout',completed_at=clock_timestamp() where r.id=${r.id}::uuid and status='open' and deadline<=clock_timestamp() and exists(select 1 from residents_applications f where f.id=r.application_id and f.is_current and f.active_request_id=r.id and f.status='INFO_REQUESTED')`,
+        if (sessionHash !== undefined)
+          await lockExpertManagerAuthority(tx, sessionHash);
+        const current = (
+          await tx.execute(
+            sql`select r.id from resident_information_requests r join residents_applications f on f.id=r.application_id and f.is_current and f.active_request_id=r.id and f.status='INFO_REQUESTED' join users u on u.id=f.user_id and u.active join channel_identities ci on ci.id=f.channel_identity_id and ci.user_id=f.user_id and ci.provider='telegram' and ci.status='active' and ci.bot_key=f.bot_key and ci.external_id=f.telegram_user_id and ci.external_chat_id=f.chat_id where r.id=${r.id}::uuid and r.status='open' and r.deadline<=clock_timestamp() for update of r,f for share of ci,u`,
+          )
+        ).rows[0];
+        if (!current) return 0;
+        await tx.execute(
+          sql`update resident_information_requests set status='timeout',completed_at=clock_timestamp() where id=${r.id}::uuid`,
         );
-        if (!changed.rowCount) continue;
         await tx.execute(
           sql`insert into resident_check_generations(application_id,generation,submitted_revision,supplement_revision,request_id,status) select id,check_generation+1,submitted_revision,revision+1,active_request_id,'manual_review' from residents_applications where id=${r.formId}::uuid`,
         );
@@ -277,10 +290,10 @@ export class PostgresResidentReviewRepository {
         await tx.execute(
           sql`update resident_review_messages set status='cancelled' where event_id=${r.id}::uuid and status='pending'`,
         );
-        count++;
-      }
-      return count;
-    });
+        return 1;
+      });
+    }
+    return count;
   }
   async listDueMaterialJobs(limit: number) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)

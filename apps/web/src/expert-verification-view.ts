@@ -171,7 +171,7 @@ export function bindExpertVerificationActions(
     payment.append(link);
     text(payment, "Переход по ссылке сам по себе не подтверждает оплату.");
   }
-  async function load() {
+  async function load(afterApplication?: string) {
     if (!client || busy || !mounted) return;
     const current = client,
       epoch = generation;
@@ -181,7 +181,7 @@ export function bindExpertVerificationActions(
     status.textContent = "Загружаем очередь…";
     controls();
     try {
-      const values = await current.list();
+      const values = await current.list(afterApplication);
       if (!mounted || epoch !== generation) return;
       for (const item of values) {
         const b = doc.createElement("button");
@@ -189,6 +189,21 @@ export function bindExpertVerificationActions(
         b.textContent = `${item.applicationId} · ${item.maskedContact} · ${item.priceMinor} коп. / ${item.termMonths} мес.`;
         b.onclick = () => void open(item.applicationId);
         queue.append(b);
+      }
+      if (values.length === 50) {
+        const next = doc.createElement("button");
+        next.type = "button";
+        next.textContent = "Следующая страница очереди";
+        next.onclick = () =>
+          void load(values[values.length - 1]!.applicationId);
+        queue.append(next);
+      }
+      if (afterApplication) {
+        const first = doc.createElement("button");
+        first.type = "button";
+        first.textContent = "Начало очереди";
+        first.onclick = () => void load();
+        queue.append(first);
       }
       status.textContent = values.length
         ? `Заявок в загруженной очереди: ${values.length}.`
@@ -202,7 +217,7 @@ export function bindExpertVerificationActions(
       }
     }
   }
-  async function open(id: string) {
+  async function open(id: string, historyCursor?: string) {
     if (!client || busy || !mounted) return;
     const current = client,
       epoch = generation;
@@ -211,7 +226,7 @@ export function bindExpertVerificationActions(
     status.textContent = "Загружаем защищённые данные…";
     controls();
     try {
-      const item = await current.detail(id);
+      const item = await current.detail(id, historyCursor);
       if (!mounted || epoch !== generation) return;
       selected = item;
       text(detail, `Заявка ${item.applicationId}: ${item.status}`);
@@ -264,6 +279,19 @@ export function bindExpertVerificationActions(
             };
             detail.append(close);
           }
+        }
+        const nextCursor = item.questionnaire.history?.nextCursor;
+        if (nextCursor) {
+          const next = doc.createElement("button");
+          next.textContent = "Следующая страница истории";
+          next.onclick = () => void open(id, nextCursor);
+          detail.append(next);
+        }
+        if (historyCursor) {
+          const first = doc.createElement("button");
+          first.textContent = "Начало истории";
+          first.onclick = () => void open(id);
+          detail.append(first);
         }
         if (item.questionnaire.supplements)
           text(
@@ -345,7 +373,9 @@ export function bindExpertVerificationActions(
     let prepared:
       | Awaited<ReturnType<ExpertVerificationClient["previewReview"]>>
       | undefined;
+    let editorRevision = 0;
     const invalidate = () => {
+      editorRevision++;
       prepared = undefined;
       preview.value = "";
       confirmButton.disabled = true;
@@ -358,6 +388,7 @@ export function bindExpertVerificationActions(
       busy = true;
       controls();
       invalidate();
+      const requestedRevision = editorRevision;
       try {
         const result = await current.previewReview(item.applicationId, {
           key: action.value,
@@ -373,12 +404,22 @@ export function bindExpertVerificationActions(
               }
             : {}),
         });
-        if (!mounted || epoch !== generation) return;
+        if (
+          !mounted ||
+          epoch !== generation ||
+          requestedRevision !== editorRevision
+        )
+          return;
         prepared = result;
         preview.value = result.text;
         confirmButton.disabled = false;
       } catch (e) {
-        failed(e);
+        if (
+          mounted &&
+          epoch === generation &&
+          requestedRevision === editorRevision
+        )
+          failed(e);
       } finally {
         busy = false;
         controls();

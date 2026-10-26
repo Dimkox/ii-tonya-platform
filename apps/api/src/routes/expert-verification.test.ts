@@ -184,3 +184,62 @@ it("profile reverification rejects caller user IDs before invoking staff authori
   expect(reverifyProfile).not.toHaveBeenCalled();
   await app.close();
 });
+it("forwards a bounded history cursor and rejects extra detail query keys", async () => {
+  const f = await fixture();
+  const cursor =
+    "4:00000000-0000-0000-0000-000000000000:00000000-0000-0000-0000-000000000000";
+  try {
+    const response = await f.app.inject({
+      method: "GET",
+      url: `/v1/admin/expert-verification/${id}?historyCursor=${encodeURIComponent(cursor)}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(f.detail).toHaveBeenCalledWith(
+      expect.stringMatching(/^sha256:/u),
+      id,
+      cursor,
+    );
+    expect(
+      (
+        await f.app.inject({
+          method: "GET",
+          url: `/v1/admin/expert-verification/${id}?historyCursor=${encodeURIComponent(cursor)}&extra=1`,
+          headers: { authorization: `Bearer ${token}` },
+        })
+      ).statusCode,
+    ).toBe(400);
+  } finally {
+    await f.app.close();
+  }
+});
+
+it("forwards bounded queue continuation and refuses invalid cursors", async () => {
+  const f = await fixture();
+  try {
+    const result = await f.app.inject({
+      method: "GET",
+      url: `/v1/admin/expert-verification?afterApplication=${id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(result.statusCode).toBe(200);
+    expect(f.list).toHaveBeenCalledWith(expect.stringMatching(/^sha256:/u), {
+      limit: 50,
+      afterApplication: id,
+    });
+    for (const query of [
+      "afterApplication=bad",
+      `afterApplication=${id}&extra=1`,
+    ]) {
+      const denied = await f.app.inject({
+        method: "GET",
+        url: `/v1/admin/expert-verification?${query}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(denied.statusCode).toBe(400);
+    }
+    expect(f.list).toHaveBeenCalledTimes(1);
+  } finally {
+    await f.app.close();
+  }
+});

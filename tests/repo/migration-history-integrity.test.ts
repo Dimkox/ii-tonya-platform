@@ -133,6 +133,8 @@ const HAND_SQL_FUNCTIONS = [
   "resident_card_proposal_change_guard",
   "resident_card_review_safety_guard",
   "resident_financial_attempt_source",
+  "resident_reapply_deadline",
+  "resident_reapply_eligible",
   "resident_review_event_source",
   "resident_review_recovery_source",
   "resident_safety_activation_guard",
@@ -393,7 +395,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(62);
+    expect(newest).toBe(63);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );

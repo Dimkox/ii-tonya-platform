@@ -9,10 +9,15 @@ export interface ExpertVerificationRepository {
     strictExpiry?: boolean;
     status: "pending" | "settled" | "cancelled";
   } | null>;
-  listQueue(sessionHash: string, limit?: number): Promise<readonly unknown[]>;
+  listQueue(
+    sessionHash: string,
+    limit?: number,
+    afterApplication?: string,
+  ): Promise<readonly unknown[]>;
   applicationDetail(
     sessionHash: string,
     applicationId: string,
+    historyCursor?: string,
   ): Promise<unknown | null>;
   decide(input: {
     sessionHash: string;
@@ -201,23 +206,43 @@ export function createExpertVerificationService(deps: {
         return safeFailure(e);
       }
     },
-    async list(sessionHash: string, input: { limit?: number }) {
+    async list(
+      sessionHash: string,
+      input: { limit?: number; afterApplication?: string },
+    ) {
       const denied = authorize(sessionHash);
       if (denied) return denied;
       const limit = input.limit ?? 50;
-      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50)
+      if (
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        limit > 50 ||
+        (input.afterApplication !== undefined &&
+          !uuid.test(input.afterApplication))
+      )
         return { kind: "invalid" } as const;
       try {
         await deps.review?.expireRequests(limit, sessionHash);
         return {
           kind: "ok" as const,
-          items: await deps.repository.listQueue(sessionHash, limit),
+          items:
+            input.afterApplication === undefined
+              ? await deps.repository.listQueue(sessionHash, limit)
+              : await deps.repository.listQueue(
+                  sessionHash,
+                  limit,
+                  input.afterApplication,
+                ),
         };
       } catch (e) {
         return safeFailure(e);
       }
     },
-    async detail(sessionHash: string, applicationId: string) {
+    async detail(
+      sessionHash: string,
+      applicationId: string,
+      historyCursor?: string,
+    ) {
       const denied = authorize(sessionHash);
       if (denied) return denied;
       if (!uuid.test(applicationId)) return { kind: "invalid" } as const;
@@ -226,6 +251,7 @@ export function createExpertVerificationService(deps: {
         const item = await deps.repository.applicationDetail(
           sessionHash,
           applicationId,
+          historyCursor,
         );
         return item
           ? { kind: "ok" as const, item }

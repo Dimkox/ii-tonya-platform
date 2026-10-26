@@ -134,7 +134,9 @@ export class PostgresExpertVerificationRepository {
       rows[0]!.policyVersion === this.policy.messagingConsentPolicyVersion
     );
   }
-  async listQueue(sessionHash: string, limit = 50) {
+  async listQueue(sessionHash: string, limit = 50, afterApplication?: string) {
+    if (afterApplication !== undefined && !uuid.test(afterApplication))
+      fail("verification_invalid_request");
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)
       fail("verification_invalid_request");
     return this.transaction(async (tx) => {
@@ -142,19 +144,23 @@ export class PostgresExpertVerificationRepository {
       return (
         await tx.execute<{
           applicationId: string;
-          status: "pending";
+          status: "pending" | "approved" | "rejected";
           maskedContact: string;
           quoteId: string;
           termMonths: 1 | 3;
           priceMinor: string;
           currency: "RUB";
         }>(
-          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",coalesce((select s.term_months from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.term_months) as "termMonths",coalesce((select s.selected_total_minor from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.price_minor)::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.verification_status='pending' or (a.verification_status='approved' and exists(select 1 from expert_offer_profiles p where p.user_id=a.user_id and p.revision=(select max(revision) from expert_offer_profiles where user_id=a.user_id) and not exists(select 1 from expert_offer_profile_verifications pv where pv.user_id=p.user_id and pv.profile_revision=p.revision))) order by a.created_at,a.id limit ${limit}`,
+          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",coalesce((select s.term_months from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.term_months) as "termMonths",coalesce((select s.selected_total_minor from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.price_minor)::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where (${afterApplication ?? null}::uuid is null or (a.created_at,a.id)>(select anchor.created_at,anchor.id from expert_onboarding_applications anchor where anchor.id=${afterApplication ?? null}::uuid)) and (exists(select 1 from expert_sales_form_bridges b join resident_review_messages m on m.application_id=b.form_id where b.application_id=a.id and m.status in('pending','dispatched','unknown')) or a.verification_status='pending' or (a.verification_status='approved' and exists(select 1 from expert_offer_profiles p where p.user_id=a.user_id and p.revision=(select max(revision) from expert_offer_profiles where user_id=a.user_id) and not exists(select 1 from expert_offer_profile_verifications pv where pv.user_id=p.user_id and pv.profile_revision=p.revision)))) order by a.created_at,a.id limit ${limit}`,
         )
       ).rows;
     });
   }
-  async applicationDetail(sessionHash: string, applicationId: string) {
+  async applicationDetail(
+    sessionHash: string,
+    applicationId: string,
+    historyCursor?: string,
+  ) {
     if (!uuid.test(applicationId)) fail("verification_invalid_request");
     return this.transaction(async (tx) => {
       await this.manager(tx, sessionHash);
@@ -197,29 +203,87 @@ export class PostgresExpertVerificationRepository {
           sql`select p.revision,p.city_code as "cityCode",p.million_city as "millionCity",p.service_format as "serviceFormat",p.ticket_minor::text as "ticketMinor",exists(select 1 from expert_offer_profile_verifications v where v.user_id=p.user_id and v.profile_revision=p.revision) as verified from expert_offer_profiles p where p.user_id=${row.userId}::uuid order by p.revision desc limit 1`,
         )
       ).rows[0];
+      const questionnaire = (
+        await tx.execute<{ formId: string; status: string }>(
+          sql`select f.id as "formId",'submitted'::text status,f.submitted_draft draft,(select form_version from residents_applications where id=f.id) as "formVersion",(select revision from residents_applications where id=f.id) as revision,(select check_generation from residents_applications where id=f.id) as generation,(select status from residents_applications where id=f.id) as lifecycle,b.submitted_revision as "submittedRevision",f.base_tariff_amount::text,f.base_offer_shown_at::text,f.promo_accepted_flag,f.final_locked_price::text,f.offer_expiry_date::text,f.monthly_price_minor::text,f.package_price_minor::text,f.selected_total_minor::text,f.term_months from expert_sales_form_bridges b join resident_sales_application f on f.id=b.form_id and f.user_id=b.user_id where b.application_id=${applicationId}::uuid`,
+        )
+      ).rows[0];
       return {
         ...row,
         contact,
         profile: profile ?? null,
-        questionnaire: (
-          await tx.execute<{
-            status: string;
-            draft: unknown;
-            submittedRevision: number;
-            base_tariff_amount: string;
-            base_offer_shown_at: string;
-            promo_accepted_flag: boolean | null;
-            final_locked_price: string | null;
-            offer_expiry_date: string | null;
-          }>(
-            sql`select 'submitted'::text status,f.submitted_draft draft,(select form_version from residents_applications where id=f.id) as "formVersion",(select revision from residents_applications where id=f.id) as revision,(select check_generation from residents_applications where id=f.id) as generation,(select status from residents_applications where id=f.id) as lifecycle,jsonb_build_object('answers',(select jsonb_agg(jsonb_build_object('requestId',u.request_id,'questionNumber',u.question_number,'revision',u.revision,'answers',u.answers) order by u.revision) from resident_verification_application_updates u where u.application_id=f.id and u.kind='followup'),'requests',(select jsonb_agg(jsonb_build_object('id',r.id,'questions',r.questions,'deadline',r.deadline,'status',r.status) order by r.deadline) from resident_information_requests r where r.application_id=f.id)) as supplements,(select jsonb_agg(jsonb_build_object('eventId',m.event_id,'status',m.status,'receipt',m.receipt) order by m.created_at) from resident_review_messages m where m.application_id=f.id) as messages,b.submitted_revision as "submittedRevision",f.base_tariff_amount::text,f.base_offer_shown_at::text,f.promo_accepted_flag,f.final_locked_price::text,f.offer_expiry_date::text,f.monthly_price_minor::text,f.package_price_minor::text,f.selected_total_minor::text,f.term_months from expert_sales_form_bridges b join resident_sales_application f on f.id=b.form_id and f.user_id=b.user_id where b.application_id=${applicationId}::uuid`,
-          )
-        ).rows[0] ?? {
-          status: "waiting_content" as const,
-          contentSlot: "TODO: Wait for Content Spec" as const,
-        },
+        questionnaire: questionnaire
+          ? {
+              ...questionnaire,
+              ...(await this.reviewHistory(
+                tx,
+                questionnaire.formId,
+                historyCursor,
+              )),
+            }
+          : {
+              status: "waiting_content" as const,
+              contentSlot: "TODO: Wait for Content Spec" as const,
+            },
       };
     });
+  }
+  private async reviewHistory(tx: Tx, formId: string, cursor?: string) {
+    const zero = "00000000-0000-0000-0000-000000000000";
+    const parsed =
+      /^(0|[1-9][0-9]{0,9}):([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}):([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/u.exec(
+        cursor ?? `0:${zero}:${zero}`,
+      );
+    if (!parsed || Number(parsed[1]) > 2147483647)
+      fail("verification_invalid_request");
+    const revision = Number(parsed![1]),
+      requestId = parsed![2]!,
+      messageId = parsed![3]!;
+    // One payload per stream: even the largest accepted answer and frozen draft fit
+    // the unchanged private response envelope. Fetch one lookahead row only.
+    const answers = (
+      await tx.execute<{
+        revision: number;
+        requestId: string | null;
+        questionNumber: number | null;
+        answers: unknown;
+        questions: string[];
+      }>(
+        sql`select u.revision,u.request_id as "requestId",u.question_number as "questionNumber",u.answers,coalesce(r.questions,'[]'::jsonb) questions,r.deadline,r.status as "requestStatus" from resident_verification_application_updates u left join resident_information_requests r on r.id=u.request_id and r.application_id=u.application_id where u.application_id=${formId}::uuid and u.kind='followup' and u.revision>${revision} order by u.revision limit 2`,
+      )
+    ).rows;
+    const requests = (
+      await tx.execute<{
+        id: string;
+        questions: string[];
+        deadline: string;
+        status: string;
+      }>(
+        sql`select id,questions,deadline::text,status from resident_information_requests where application_id=${formId}::uuid and id>${requestId}::uuid order by id limit 2`,
+      )
+    ).rows;
+    const messages = (
+      await tx.execute<{
+        eventId: string;
+        status: string;
+        receipt: string | null;
+      }>(
+        sql`select event_id as "eventId",status,receipt from resident_review_messages where application_id=${formId}::uuid and event_id>${messageId}::uuid order by event_id limit 2`,
+      )
+    ).rows;
+    return {
+      supplements: {
+        answers: answers.slice(0, 1),
+        requests: requests.slice(0, 1),
+      },
+      messages: messages.slice(0, 1),
+      history: {
+        nextCursor:
+          answers.length > 1 || requests.length > 1 || messages.length > 1
+            ? `${answers[0]?.revision ?? revision}:${requests[0]?.id ?? requestId}:${messages[0]?.eventId ?? messageId}`
+            : null,
+      },
+    };
   }
   async decide(raw: ExpertVerificationDecisionCommand, transaction?: Tx) {
     const input = { ...raw };

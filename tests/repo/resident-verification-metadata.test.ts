@@ -69,3 +69,33 @@ it("pins the loopback browser harness and denies an altered dynamic loader", () 
     classifyPaymentScopeProbe({ path, content: content + "\n" }),
   ).toContain("unresolved runtime module import requires explicit review");
 });
+it("pins additive0063 state without rewriting0062", () => {
+  const m = read("state/0063_manifest.json"),
+    snapshot = read("meta/0063_snapshot.json"),
+    objects = read("state/0063_sql_objects.json");
+  expect(m.databaseVersion).toBe("170005");
+  expect(m.generatePermitted).toBe(false);
+  expect(m.migrations).toHaveLength(64);
+  for (const migration of m.migrations)
+    expect(digest(`${migration.tag}.sql`)).toBe(migration.sha256);
+  expect(m.snapshotSha256).toBe(digest("meta/0063_snapshot.json"));
+  expect(m.sqlObjectsSha256).toBe(digest("state/0063_sql_objects.json"));
+  expect(snapshot.prevId).toBe(read("meta/0062_snapshot.json").id);
+  expect(Object.keys(snapshot.tables)).toHaveLength(204);
+  expect(objects.functions).toHaveLength(129);
+  expect(objects.triggers).toHaveLength(180);
+  expect(objects.indexes).toHaveLength(516);
+});
+it.each([
+  "0063_resident_verification_review_corrections.sql",
+  "meta/0063_snapshot.json",
+  "state/0063_sql_objects.json",
+  "state/0063_manifest.json",
+])("rejects changed corrective0063 bytes: %s", (file) => {
+  const path = base + file,
+    content = readFileSync(path, "utf8");
+  expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
+  expect(
+    classifyApprovedTrackedScopeContent({ path, content: content + "\n" }),
+  ).not.toEqual([]);
+});

@@ -39,6 +39,7 @@ export interface VerificationDetail extends Omit<
         generation: number;
         lifecycle: string;
         supplements: unknown;
+        history?: { nextCursor: string | null };
         messages?:
           { eventId: string; status: string; receipt: string | null }[] | null;
       };
@@ -172,8 +173,12 @@ export class ExpertVerificationClient {
     if (!object(value) || value.kind !== "ok") return invalid();
     return value;
   }
-  async list(): Promise<VerificationEntry[]> {
-    const value = await this.request("?limit=50");
+  async list(afterApplication?: string): Promise<VerificationEntry[]> {
+    if (afterApplication !== undefined && !uuid(afterApplication))
+      return invalid();
+    const value = await this.request(
+      `?limit=50${afterApplication ? `&afterApplication=${encodeURIComponent(afterApplication)}` : ""}`,
+    );
     if (
       !Array.isArray(value.items) ||
       value.items.length > 50 ||
@@ -182,9 +187,22 @@ export class ExpertVerificationClient {
       return invalid();
     return value.items as VerificationEntry[];
   }
-  async detail(id: string): Promise<VerificationDetail> {
-    if (!uuid(id)) return invalid();
-    const value = await this.request(`/${id}`),
+  async detail(
+    id: string,
+    historyCursor?: string,
+  ): Promise<VerificationDetail> {
+    if (
+      !uuid(id) ||
+      (historyCursor !== undefined &&
+        (typeof historyCursor !== "string" ||
+          !/^(0|[1-9][0-9]{0,9}):[a-f0-9-]{36}:[a-f0-9-]{36}$/u.test(
+            historyCursor,
+          )))
+    )
+      return invalid();
+    const value = await this.request(
+        `/${id}${historyCursor ? `?historyCursor=${encodeURIComponent(historyCursor)}` : ""}`,
+      ),
       v = value.item;
     if (
       !entry(v) ||
@@ -215,6 +233,21 @@ export class ExpertVerificationClient {
       )
     )
       return invalid();
+    if (
+      v.questionnaire.status === "submitted" &&
+      v.questionnaire.history !== undefined
+    ) {
+      const history = v.questionnaire.history;
+      if (
+        !object(history) ||
+        (history.nextCursor !== null &&
+          (typeof history.nextCursor !== "string" ||
+            !/^(0|[1-9][0-9]{0,9}):[a-f0-9-]{36}:[a-f0-9-]{36}$/u.test(
+              history.nextCursor,
+            )))
+      )
+        return invalid();
+    }
     if (v.profile !== undefined && v.profile !== null) {
       const p = v.profile;
       if (

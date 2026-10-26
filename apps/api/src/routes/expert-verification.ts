@@ -62,38 +62,57 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
       .code(status < 500 ? 400 : 503)
       .send({ error: "verification_unavailable" });
   });
-  app.get<{ Querystring: { limit?: string } }>(
+  app.get<{ Querystring: { limit?: string; afterApplication?: string } }>(
     "/v1/admin/expert-verification",
     async (req, reply) => {
       const keys = Object.keys(req.query);
       if (
-        keys.some((k) => k !== "limit") ||
+        keys.some((k) => k !== "limit" && k !== "afterApplication") ||
+        (req.query.afterApplication !== undefined &&
+          !uuid.test(req.query.afterApplication)) ||
         (req.query.limit !== undefined &&
           !/^(?:[1-9]|[1-4][0-9]|50)$/u.test(req.query.limit))
       )
         return reply.code(400).send({ error: "invalid_request" });
       const result = await service.list(session(req.headers.authorization)!, {
         limit: Number(req.query.limit ?? 50),
+        ...(req.query.afterApplication === undefined
+          ? {}
+          : { afterApplication: req.query.afterApplication }),
       });
       return result.kind === "ok"
         ? result
         : reply.code(code(result.kind)).send({ error: result.kind });
     },
   );
-  app.get<{ Params: { applicationId: string } }>(
-    "/v1/admin/expert-verification/:applicationId",
-    async (req, reply) => {
-      if (!uuid.test(req.params.applicationId))
-        return reply.code(400).send({ error: "invalid_request" });
-      const result = await service.detail(
-        session(req.headers.authorization)!,
-        req.params.applicationId,
-      );
-      return result.kind === "ok"
-        ? result
-        : reply.code(code(result.kind)).send({ error: result.kind });
-    },
-  );
+  app.get<{
+    Params: { applicationId: string };
+    Querystring: { historyCursor?: string };
+  }>("/v1/admin/expert-verification/:applicationId", async (req, reply) => {
+    if (
+      !uuid.test(req.params.applicationId) ||
+      Object.keys(req.query).some((k) => k !== "historyCursor") ||
+      (req.query.historyCursor !== undefined &&
+        !/^(0|[1-9][0-9]{0,9}):[a-f0-9-]{36}:[a-f0-9-]{36}$/u.test(
+          req.query.historyCursor,
+        ))
+    )
+      return reply.code(400).send({ error: "invalid_request" });
+    const result =
+      req.query.historyCursor === undefined
+        ? await service.detail(
+            session(req.headers.authorization)!,
+            req.params.applicationId,
+          )
+        : await service.detail(
+            session(req.headers.authorization)!,
+            req.params.applicationId,
+            req.query.historyCursor,
+          );
+    return result.kind === "ok"
+      ? result
+      : reply.code(code(result.kind)).send({ error: result.kind });
+  });
   app.post<{ Params: { applicationId: string }; Body: unknown }>(
     "/v1/admin/expert-verification/:applicationId/review-preview",
     { bodyLimit: 16000 },

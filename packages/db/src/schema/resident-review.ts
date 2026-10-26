@@ -146,6 +146,10 @@ export const residentInformationRequests = pgTable(
     completedAt: at("completed_at"),
   },
   (t) => [
+    index("resident_information_requests_history").on(t.applicationId, t.id),
+    index("resident_information_requests_due")
+      .on(t.deadline, t.id)
+      .where(sql`${t.status}='open'`),
     check(
       "resident_information_requests_questions_check",
       sql`jsonb_typeof(${t.questions})='array' AND jsonb_array_length(${t.questions}) BETWEEN 1 AND 10`,
@@ -219,6 +223,7 @@ export const residentReviewMessages = pgTable(
       "resident_review_messages_attempts_check",
       sql`${t.attempts} BETWEEN 0 AND 3`,
     ),
+    index("resident_review_messages_history").on(t.applicationId, t.eventId),
     index("resident_review_messages_pending")
       .on(t.createdAt)
       .where(sql`${t.status}='pending'`),
