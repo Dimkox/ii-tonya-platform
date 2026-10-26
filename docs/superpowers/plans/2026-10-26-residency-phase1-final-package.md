@@ -86,7 +86,16 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabili
 - [x] Canonical taxonomy foundation and private draft tag selection. Import164
       approved entries/7categories; six historical mocks are fixtures only.
 - [x] Focused tests, independent review, exact metadata/guard registrations and final local branch gate.
-- [ ] Draft `[STABILIZATION]` PR based on PR108's branch.
+- [x] Draft [STABILIZATION PR110](https://github.com/Dimkox/ii-tonya-platform/pull/110), based on the surviving development branch after owner-merged PR108.
+
+### S0.5 — Separated sales (active, latest owner priority)
+
+Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md`.
+
+- [ ] Immutable base offer, explicit positive response, separate promo/base choice.
+- [ ] Existing form/manager bridge, fixed3000 fee attempts and strict expired-payment handling.
+- [ ] Authoritative fee settlement locks selected terms for first main invoice and renewals.
+- [ ] Real normal-composition acceptance, independent review, mandatory gate and draft sales PR.
 
 ### S1 — Blocking content safety
 

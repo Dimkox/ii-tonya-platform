@@ -1,3 +1,30 @@
+# Separated sales active; stabilization delivered — 2026-10-26
+
+Draft PR110 is open at66cb3fd5d2bf18ce3da29d3cca17cbe39ab8aa7b:
+https://github.com/Dimkox/ii-tonya-platform/pull/110
+Base codex/phase1-owner-plan-20261023 atd83977c9 after owner merged PR108.
+Final mandatory push gate passed567/567, no bypass; runtime independent review,
+PG17/17, Python12/12 and recovery fixture33/33 evidence is retained. No merge or
+provider/deployment activation by this agent. Production parser remains unavailable.
+
+Active branch codex/separated-residency-sales-20261026 in the same isolated worktree.
+Approved next contract: docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md.
+Latest source order supersedes old pre-price/no-auto-invoice: base-only→explicit
+positive→separate promo/base+period choice→form/manager→fixed3000→paid lifetime lock.
+Three read-only scouts mapped pricing, real flow and provider gaps. One fresh
+implementer owns source/tests/migrations/evidence; root owns final review/gate/PR.
+Do not rerender BMad, restart completed core or recursively launch another lead.
+Owner autonomy/run-count/splitting opt-out persists; no routine permission loops.
+
+Use the existing ONE task-owned running PG17.5 cluster/config stated in the spec;
+never print protected config or URLs, never use stale container credentials.
+Strict new-expiry fee collection requires supported held-payment capability;
+local expiration is not provider pending cancellation. No fabricated checkout,
+paid lock, provider status, prompt authority or receipt-disclosure grace period.
+Continue the complete package after this block. Website audit is completed;
+latest main13edda58 is a tooling-only successor with identical apps/web and lockfile
+versus the earlier audited9385b9b8. No new build or deployment is inferred.
+
 # Stabilization accepted; delivery base updated — 2026-10-26
 
 Core runtime R1–R13 is independently accepted at401e1bb. Full gate567/567 plus

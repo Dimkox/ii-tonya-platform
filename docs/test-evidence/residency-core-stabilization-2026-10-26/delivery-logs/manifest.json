@@ -53,5 +53,15 @@
     "file": "core-cutover-test-types.log.gz",
     "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "gzip_sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+  },
+  {
+    "file": "core-push-gate-1793033087127437655.log.gz",
+    "raw_sha256": "91e4a45e0e22880b3dbe803ef4785704ec6d5b0cb2d0d75fd7976837dc5873cf",
+    "gzip_sha256": "cc0c83227a64836ce1bb68bf2f26c698b561dc189104f77e89071e8fd4540b16"
+  },
+  {
+    "file": "core-push-repo-1793033087127437655.log.gz",
+    "raw_sha256": "3951b5947ae2a1d8af260d6e385bb351759c49a0d0c0eb6aaffaf0291715e756",
+    "gzip_sha256": "9bfc0e8f312c21d2c50885753a8d5088aca0968210fb8f3a52ce53ff304036ba"
   }
 ]

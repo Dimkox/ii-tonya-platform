@@ -106,7 +106,7 @@ production mocks, duplicate booking/taxonomy authority or client-service collect
 - [x] Add canonical taxonomy/schema/seed/provenance, draft selection storage and actual private UI/tests using isolated mocks plus full-catalogue assertions.
 - [x] Add hand-authored SQL+journal/schema/state where necessary; actual erasure, precise guard inventories/negative probes and focused PostgreSQL acceptance.
 - [x] Complete affected builds/types/lint, independent review and exact-source gate.
-- [ ] Root delivers the authorized draft STABILIZATION PR and continues the package plan.
+- [x] Root delivered Draft PR110 at66cb3fd5 and continues the package plan.
 
 Given every matrix row, its executed test must prove the stated behavior. Given
 parser failure, original answers remain and manual mode survives another request.
