@@ -1,0 +1,12 @@
+[
+  {
+    "file": "core-final-gate-1793025990745001713.log.gz",
+    "raw_sha256": "f3eea8f7a90a9dc5fbb8e12f68b8b7143c8c4c857cfc7ec9df3650cac40ac7f0",
+    "gzip_sha256": "b96eeba1f60c9e351bff6dd7cd744be97f732e5942ce2fc48882d5107ae78c18"
+  },
+  {
+    "file": "core-final-repo-1793025990745001713.log.gz",
+    "raw_sha256": "eae4483b97df2d655c0bb5a6c64ceeb260a510ed684caa6b27b4e9f339f69d95",
+    "gzip_sha256": "e2573eb37c759ffcc575c887374770be8a97968dd0c16140de8eeb45146ca847"
+  }
+]

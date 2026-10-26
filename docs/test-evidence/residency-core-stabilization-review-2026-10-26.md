@@ -37,8 +37,7 @@ inside the notifier and create a test deadlock. Prove committed visibility, star
 redemption, let the send transaction end, then await valid redemption. No privacy
 barrier may be removed to satisfy the fixture.
 
-Status: remediation in progress. Closure will inspect only these accepted findings
-and their required consequences, without imposing another discovery quota.
+Historical checkpoint: remediation was pending; bounded closure is recorded below.
 
 ## Remediation candidate
 
@@ -51,5 +50,14 @@ units/builds/package and full-test types/lint/format/diff are recorded passing.
 No active implementer/check process remains. Lossless evidence now contains119
 logs with raw/compressed SHA manifests; this is not staging or provider evidence.
 
-Status: bounded independent closure pending on R1–R13 only, then canonical final
-gate and authorized draft PR. No new discovery quota or wholesale rewrite.
+## Independent closure
+
+All three reviewers accepted exact candidate `401e1bb877728a4a6bfa227d14068dc89b24330c`.
+Blind review: PASS for R1–R7 and R9–R13. Edge review: PASS for handoff durability
+and callback acknowledgement. Verification-gap review: PASS for R8, including
+actual next-page navigation, distinct IDs, later selection/reload and last/back.
+Reviewers inspected source and retained execution evidence without rerunning suites.
+No accepted finding remains open. The canonical full local gate passed at this
+same candidate: 61 repository files, 567 tests, formatting, lint, evidence,
+whitespace, automation syntax and tests typecheck. This is local source acceptance;
+there is no hosted CI or production runtime acceptance claim.

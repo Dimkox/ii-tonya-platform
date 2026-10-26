@@ -1,6 +1,6 @@
 # Core stabilization coordinator evidence — 2026-10-26
 
-Status: implementation in progress. No completion or release claim.
+Status: local implementation accepted; draft PR delivery in progress. No release claim.
 
 Baseline: `567e71b4dea4bd2720da452c8049916f9d2b437c` (PR108).
 Branch: `codex/residency-foundation-20261026`, existing isolated worktree.
@@ -117,3 +117,21 @@ The urgent P0.5 audit is completed separately in
 `docs/operations/website-deployment-audit-2026-10-26.md`; exact-main web build/types
 pass, while actual production remains selected at13October source. This audit
 made no production mutation and found no last failed deployment log to invent.
+
+## Final local acceptance
+
+Independent bounded closure is PASS from all three reviewers at
+`401e1bb877728a4a6bfa227d14068dc89b24330c`; all13 accepted findings are closed.
+Canonical `pnpm verify:gate --full` passed for baseline567e71b4 through that SHA:
+61 repository files /567 tests, formatting, scoped lint, evidence integrity,
+whitespace, automation syntax and tests typecheck. The unchanged canonical gate
+ran with supported single-worker limits; its complete repository output was
+retained before temporary cleanup. No check was weakened or bypassed.
+
+Final focused PostgreSQL/Fastify acceptance is17/17 without skips, Python12/12
+and normal callback composition10/10. Code did not change after these runs.
+Final gate logs and hashes are preserved in the adjacent delivery-logs directory.
+Shared pre-push hook is installed. Hosted CI does not exist by repository policy;
+local acceptance does not authorize provider activation, deployment or release.
+Story key is unset, so sprint synchronization is inapplicable. VS Code CLI is
+unavailable; the spec's Suggested Review Order is the review navigation artifact.

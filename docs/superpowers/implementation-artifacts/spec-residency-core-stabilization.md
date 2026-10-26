@@ -2,7 +2,7 @@
 title: Stabilize workspace activation, document fallback and draft tags
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 567e71b4dea4bd2720da452c8049916f9d2b437c
 review_loop_iteration: 1
 context:
@@ -105,7 +105,8 @@ production mocks, duplicate booking/taxonomy authority or client-service collect
 - [x] Add SafeDocumentParser interface, bounded real adapter/helper/locked graph and Node/pytest tests; wire durable fallback in actual work-bot import path.
 - [x] Add canonical taxonomy/schema/seed/provenance, draft selection storage and actual private UI/tests using isolated mocks plus full-catalogue assertions.
 - [x] Add hand-authored SQL+journal/schema/state where necessary; actual erasure, precise guard inventories/negative probes and focused PostgreSQL acceptance.
-- [ ] Complete affected builds/types/lint, independent review and exact-source gate; root delivers a draft STABILIZATION PR and continues the package plan.
+- [x] Complete affected builds/types/lint, independent review and exact-source gate.
+- [ ] Root delivers the authorized draft STABILIZATION PR and continues the package plan.
 
 Given every matrix row, its executed test must prove the stated behavior. Given
 parser failure, original answers remain and manual mode survives another request.
@@ -159,3 +160,37 @@ attribute parsing and real main() resource evidence correct the parser guarantee
 The complete final focused PostgreSQL/Fastify file passes17/17; Python12/12.
 See [remediation evidence](../../test-evidence/residency-core-stabilization-remediation-2026-10-26.md).
 No frozen intent was changed; root owns bounded independent closure and final gate.
+
+## Suggested Review Order
+
+**Admission and delivery**
+
+- Read the shared fact-driven admission before following notification delivery.
+  [resident-workspace-repository.ts:14](../../../packages/db/src/repositories/resident-workspace-repository.ts#L14)
+
+- Canonical settlement invokes admission inside the payment transaction.
+  [expert-verification-repository.ts:556](../../../packages/db/src/repositories/expert-verification-repository.ts#L556)
+
+**Private document handling**
+
+- Bound process lifetime, output and cancellation before accepting an untrusted proposal.
+  [safe-document-parser.ts:51](../../../packages/integrations/src/documents/safe-document-parser.ts#L51)
+
+- Inspect actual resource limits and safe document extraction.
+  [helper.py:1](../../../packages/integrations/parser/helper.py#L1)
+
+**Taxonomy and private ownership**
+
+- Review canonical taxonomy, ownership constraints and informational access projection.
+  [0058_residency_core_stabilization.sql:1](../../../packages/db/migrations/0058_residency_core_stabilization.sql#L1)
+
+- Trace authenticated work-bot input into the existing private draft flow.
+  [expert-card-telegram-ingress.ts:47](../../../apps/api/src/expert-card-telegram-ingress.ts#L47)
+
+**Acceptance and evidence**
+
+- Exercise real pagination rather than only checking button construction.
+  [residency-core-stabilization.test.ts:1219](../../../tests/integration/residency-core-stabilization.test.ts#L1219)
+
+- Review all accepted findings and independent closure.
+  [residency-core-stabilization-review-2026-10-26.md:1](../../test-evidence/residency-core-stabilization-review-2026-10-26.md#L1)

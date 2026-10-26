@@ -18,7 +18,7 @@ contracts/history as historical evidence; do not silently erase the conflict.
   Unpaid offers roll windows0–3/4–6/7–9/10+ full days, invalidate stale links and
   regenerate fixed-fee links bound to updated selected main-price terms. After
   day10 standard base locks, no manual repricing except authorized referral bonus.
-- **Urgent read-only website audit runs now:** source location, live origin/main,
+- **Urgent read-only website audit completed:** source location, live origin/main,
   actual production web release and last available deploy evidence. Audit does not
   authorize switching releases, changing configuration or enabling providers.
 - Then complete safety, final role-aware verification/templates and rich onboarding
@@ -79,14 +79,14 @@ Do not rewrite shared history, merge, deploy or activate providers.
 
 Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabilization.md`.
 
-- [ ] Isolate fact-driven workspace activation and consume its durable notification
+- [x] Isolate fact-driven workspace activation and consume its durable notification
       seam, retaining owner-bound handoff and interview/full separation.
-- [ ] Real bounded local PDF/DOCX parser with safe failure, persistent manual fallback,
+- [x] Real bounded local PDF/DOCX parser with safe failure, persistent manual fallback,
       preserved uploads and isolated dependency/runtime evidence.
-- [ ] Canonical taxonomy foundation and private draft tag selection. Import164
+- [x] Canonical taxonomy foundation and private draft tag selection. Import164
       approved entries/7categories; six historical mocks are fixtures only.
-- [ ] Focused tests, independent review, exact metadata/guard registrations, final
-      branch gate and a draft `[STABILIZATION]` PR based on PR108's branch.
+- [x] Focused tests, independent review, exact metadata/guard registrations and final local branch gate.
+- [ ] Draft `[STABILIZATION]` PR based on PR108's branch.
 
 ### S1 — Blocking content safety
 
