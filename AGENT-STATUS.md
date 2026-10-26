@@ -1,3 +1,17 @@
+# Private verification jobs review correction active — 2026-10-26
+
+Same isolated .worktrees/phase1-owner-plan-20261023 directory, branch
+codex/residency-private-verification-jobs-20261026. Initial implementation54d9eb36
+has72 hashed evidence artifacts, PG11 plus6 selected cases, transport26+2,
+actual OCR/sandbox/Chrome, repository26 and builds/types/lint. All evidence retained.
+Three independent read-only reviewers found eight concrete issues, deduplicated in
+verification-private-jobs-review-2026-10-26.md. Runtime is NOT accepted yet.
+Original implementer receives one bounded R1–R8 correction batch; root owns
+specification/review/final gate/push. Preserve0064; next hand migration0065.
+No destructive rederive, quota or permission loop. Reuse protected PG17.5 and
+owned helper ii-tonya-private-parser-20261026; no competing tests or providers.
+BMad already rendered. Continue entire owner package after this block; S3/S4 remain.
+
 # Verification/messages delivered; private verification jobs active — 2026-10-26
 
 Draft PR113 OPEN atf11d5d906acf6e1983fe36739981e31a847207ce:

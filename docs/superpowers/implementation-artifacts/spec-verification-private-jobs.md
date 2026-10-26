@@ -2,9 +2,9 @@
 title: Private verification documents and bounded evidence jobs
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: f11d5d906acf6e1983fe36739981e31a847207ce
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -153,6 +153,33 @@ terminal recovery and per-subject expiry isolation. No submitted snapshot mutati
       and canonical gate before delivery.
 
 ## Spec Change Log
+
+- 2026-10-26, independent review1 R1–R8: retain the working implementation and
+  correct the eight concrete findings in verification-private-jobs-review-2026-10-26.md.
+  Deletion proof must be fenced to settled-before-operation state; owner confirmation
+  cannot apply truncated/unseen values; derived parser/proposal errors cannot erase
+  verified custody; delayed detail responses bind to the selected applicant;
+  incomplete extraction remains UNKNOWN; canonical profile cache keys are shared.
+  Add contradictory-successful-HEAD and actual app-runtime scheduling witnesses.
+  KEEP source/consent/generation and financial authority, append-only attachment
+  paging, truthful erasure barriers, default-off isolation, and retained evidence.
+  Preserve0064; additive0065 for SQL corrections. Owner overrides destructive
+  rederive/quota/approval loops: one bounded correction batch and assigned closure.
+
+- 2026-10-26, implementation integration clarification: accepted follow-ups are
+  append-only; preserve every document through the generation watermark with
+  bounded persisted cursor/pages, including photo-then-text. A latest-answer-only
+  or first10 projection loses accepted attachments. Worker-only24hour refresh
+  and stale-prefix progress must be reachable, not merely represented in tables.
+- 2026-10-26, erasure integration clarification: existing deletion receipt,
+  processor completion and backup proof must remain pending while any allocated
+  private-object deletion is unresolved. This includes consent withdrawal before
+  a formal deletion request. Interpret minimal tombstones as no private payload,
+  with only the minimum pseudonymous linkage needed to prove that responsibility:
+  a namespace-separated subject digest until bound to the existing deletion-job
+  UUID; drop the digest on binding or verified unbound deletion. This linkage is
+  pseudonymous, not anonymous. Add PostgreSQL transition/read fences and actual
+  direct/withdrawal-first erasure witnesses; no new broad privacy workflow.
 
 ## Design Notes
 
