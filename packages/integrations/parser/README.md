@@ -11,7 +11,7 @@ The Node adapter is disabled unless an isolated executable is explicitly supplie
 single active child receives a copied buffer through stdin, no document path or URL.
 Limits:5MiB input,40PDF pages,256ZIP members,20MiB total expansion,10MiB/member,
 200x compression ratio,64000UTF-8 text bytes,90000serialized proposal bytes,at least50trimmed characters,400000wire bytes,
-3CPU seconds,384MiB address space,32file descriptors,no file writes/core dumps and5seconds
+3CPU seconds,384MiB address space,32file descriptors,zero file-size growth/core dumps and5seconds
 wall time by default (configuration ceiling10seconds). Timeout,abort,stderr,crash,short text
 and invalid results yield a fixed warning code and null. Abort sends SIGKILL and waits
 for child close before releasing the concurrency slot. Raw exceptions/text/paths are never logged.
@@ -26,3 +26,10 @@ Revisions,consent,owner and erasure are rechecked before a completion can persis
 production worker cgroup. The Node-only native/container runtime has no Python capability.
 Package assets are included for evidence/review; production parsing remains unavailable
 until separately reviewed isolation,cgroup,dependency and native-release evidence exists.
+
+RLIMIT_FSIZE=0 is a file-size bound, not a filesystem sandbox: a child can still
+create an empty file or perform other filesystem mutations. The subprocess main()
+acceptance explicitly demonstrates empty creation with growth rejected, observes
+all CPU/address-space/FD/core/file-size limits, and checks bounded CPU termination
+and fixed null output on memory exhaustion. These local process checks do not
+prove production cgroup or filesystem/network isolation.

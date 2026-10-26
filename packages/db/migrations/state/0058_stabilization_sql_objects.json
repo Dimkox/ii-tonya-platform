@@ -1,9 +1,9 @@
 {
   "description": "Additive0058 state replayed from the complete hand-authored SQL graph on PostgreSQL17.5. Supported snapshot normalized from fresh empty-directory introspection; SQL functions/triggers/views retained here. No generation authority.",
   "serverVersionNum": 170005,
-  "sourceMigrationSha256": "0811e71752fd2c5561eb943306266d9ce83255004a76b68f85ee6a0c4fa152d8",
+  "sourceMigrationSha256": "b8e32b6377288312800692f03090a341744bec0f360ca108cf03bdadc63aab61",
   "parentSnapshotSha256": "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
-  "normalizedSnapshotSha256": "47addd7d8ae66de941c3c7e4b223baff05a7214bbbaadcc323cab22b164d47bb",
+  "normalizedSnapshotSha256": "79449bbe6d9a42942cb32794250fb8a1ce2fdccbc751e7cc5ef1b88dbaafc78c",
   "functions": [
     {
       "name": "expert_card_tag_selection_guard",
@@ -31,7 +31,7 @@
     },
     {
       "name": "resident_workspace_access",
-      "definition": " SELECT a.user_id,\n    a.id AS application_id,\n    true AS has_access_to_work_bot,\n    'interview'::text AS access_kind\n   FROM (expert_onboarding_applications a\n     JOIN users u ON (((u.id = a.user_id) AND u.active)))\n  WHERE ((a.verification_status = 'approved'::text) AND (a.onboarding_stage IS NOT NULL) AND (a.archived_at IS NULL) AND (EXISTS ( SELECT 1\n           FROM (consent_states s\n             JOIN consents c ON ((c.id = s.last_decision_id)))\n          WHERE ((s.user_id = a.user_id) AND (s.purpose = 'client_messaging'::text) AND expert_card_current_messaging_authority(a.user_id, c.policy_version)))) AND (EXISTS ( SELECT 1\n           FROM (expert_onboarding_invoices i\n             JOIN expert_onboarding_payment_facts f ON (((f.invoice_id = i.id) AND (f.user_id = a.user_id) AND (f.admission = 'interview'::text))))\n          WHERE ((i.application_id = a.id) AND (i.user_id = a.user_id) AND (i.status = 'settled'::text)))));"
+      "definition": " SELECT a.user_id,\n    a.id AS application_id,\n    true AS has_access_to_work_bot,\n    'interview'::text AS access_kind\n   FROM (expert_onboarding_applications a\n     JOIN users u ON (((u.id = a.user_id) AND u.active)))\n  WHERE ((a.verification_status = 'approved'::text) AND (a.onboarding_stage IS NOT NULL) AND (a.archived_at IS NULL) AND (a.archive_until_date IS NULL) AND (EXISTS ( SELECT 1\n           FROM (consent_states s\n             JOIN consents c ON ((c.id = s.last_decision_id)))\n          WHERE ((s.user_id = a.user_id) AND (s.purpose = 'client_messaging'::text) AND expert_card_current_messaging_authority(a.user_id, c.policy_version)))) AND (EXISTS ( SELECT 1\n           FROM (expert_onboarding_invoices i\n             JOIN expert_onboarding_payment_facts f ON (((f.invoice_id = i.id) AND (f.user_id = a.user_id) AND (f.admission = 'interview'::text))))\n          WHERE ((i.application_id = a.id) AND (i.user_id = a.user_id) AND (i.status = 'settled'::text)))));"
     }
   ],
   "constraints": [

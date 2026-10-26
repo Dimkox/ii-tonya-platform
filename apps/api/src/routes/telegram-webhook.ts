@@ -658,6 +658,24 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             } finally {
               request.raw.removeListener("aborted", abort);
             }
+            if (
+              result.tagCallbackAuthorized === true &&
+              parsed.input.callbackQueryId &&
+              interceptor.answerTagCallback
+            ) {
+              try {
+                await interceptor.answerTagCallback({
+                  botId: interceptor.workBotId,
+                  callbackQueryId: parsed.input.callbackQueryId,
+                  signal: AbortSignal.any([
+                    cardShutdown.signal,
+                    AbortSignal.timeout(2000),
+                  ]),
+                });
+              } catch {
+                /* ACK uncertainty cannot retry the committed tag mutation. */
+              }
+            }
             if (result.status === "handled")
               return {
                 method: "sendMessage",

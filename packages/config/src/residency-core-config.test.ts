@@ -23,6 +23,7 @@ it("requires both reviewed UI ceiling and card setting", () => {
     materialDeliveryEnabled: false,
     mainCheckoutEnabled: false,
     draftTagsEnabled: true,
+    workBotToken: `12345:${"synthetic_fixture_".repeat(2)}`,
     workBotId: "12345",
     workBotKey: "work-fixture",
     workBotUsername: "fixture_work_bot",

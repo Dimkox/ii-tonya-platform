@@ -28,7 +28,12 @@ export interface DraftTagPage {
   revision: number;
   page: number;
   pages: number;
-  tags: readonly { id: string; label: string; selected: boolean }[];
+  tags: readonly {
+    id: string;
+    label: string;
+    selected: boolean;
+    active?: boolean;
+  }[];
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
@@ -137,6 +142,7 @@ export type ExpertCardReply =
   | {
       status: "handled";
       text: string;
+      tagCallbackAuthorized?: true;
       inlineKeyboard?: readonly (readonly {
         text: string;
         callback_data: string;
@@ -152,6 +158,7 @@ export type ExpertCardReply =
       status:
         "unhandled" | "rejected" | "unavailable" | "disabled" | "duplicate";
       text?: never;
+      tagCallbackAuthorized?: true;
     };
 const uuid =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
@@ -305,6 +312,7 @@ export function createExpertCardService(deps: {
         requestDigest: string;
         content: ExpertCardContent;
         callbackData?: string;
+        callbackQueryId?: string;
         signal?: AbortSignal;
       },
     ): Promise<ExpertCardReply> {
@@ -366,9 +374,6 @@ export function createExpertCardService(deps: {
               );
             if (!callback) return { status: "rejected" };
             page = Number(callback[3]);
-            const before = await deps.repository.getDraftTags(s, page);
-            if (before.revision !== Number(callback[2]))
-              return reply("Список изменился. Откройте /tags заново.");
             if (callback[1] === "t") {
               if (!callback[4]) return { status: "rejected" };
               const result = await deps.repository.toggleDraftTag({
@@ -376,13 +381,24 @@ export function createExpertCardService(deps: {
                 expectedRevision: Number(callback[2]),
                 tagId: callback[4],
               });
-              if (result.replay) return { status: "duplicate" };
-            } else if (callback[4]) return { status: "rejected" };
+              if (result.replay)
+                return { status: "duplicate", tagCallbackAuthorized: true };
+            } else {
+              if (callback[4]) return { status: "rejected" };
+              const before = await deps.repository.getDraftTags(s, page);
+              if (before.revision !== Number(callback[2]))
+                return {
+                  status: "handled",
+                  text: "Список изменился. Откройте /tags заново.",
+                  tagCallbackAuthorized: true,
+                };
+            }
           }
           const result = await deps.repository.getDraftTags(s, page);
+          page = result.page;
           const buttons = result.tags.map((tag) => [
             {
-              text: `${tag.selected ? "✓ " : ""}${tag.label}`,
+              text: `${tag.selected ? "✓ " : ""}${tag.label}${tag.active === false ? " [неактивен — удалить]" : ""}`,
               callback_data: `ct1:t:${result.revision}:${page}:${tag.id}`,
             },
           ]);
@@ -402,6 +418,9 @@ export function createExpertCardService(deps: {
             status: "handled",
             text: `Теги: ${result.tags_array.length}/20. Страница ${page + 1}/${result.pages}. ${result.tags_array.join(", ")} Теги не подтверждают квалификацию.`,
             inlineKeyboard: buttons,
+            ...(input.callbackData !== undefined
+              ? { tagCallbackAuthorized: true as const }
+              : {}),
           };
         }
         const handoff = /^\/start card_([A-Za-z0-9_-]{43})$/u.exec(text);
@@ -643,11 +662,33 @@ export function createExpertCardService(deps: {
         return reply(
           `Ответ сохранён. Ревизия ${result.revision}. Отправить менеджеру: /card_submit ${result.revision}`,
         );
-      } catch {
-        if (input.callbackData !== undefined || text === "/tags")
-          return reply(
-            "Не удалось изменить теги. Проверьте лимит 20 и откройте /tags заново.",
-          );
+      } catch (error) {
+        if (input.callbackData !== undefined || text === "/tags") {
+          let authorized = false;
+          const code =
+            error && typeof error === "object" && "code" in error
+              ? error.code
+              : null;
+          if (
+            input.callbackData !== undefined &&
+            ![
+              "card_idempotency_conflict",
+              "card_forbidden",
+              "card_invalid_event",
+            ].includes(String(code))
+          )
+            try {
+              await deps.repository.getDraftTags?.(s, 0);
+              authorized = !!deps.repository.getDraftTags;
+            } catch {
+              /* A foreign owner never acquires callback acknowledgement authority. */
+            }
+          return {
+            status: "handled",
+            text: "Не удалось изменить теги. Проверьте лимит 20 и откройте /tags заново.",
+            ...(authorized ? { tagCallbackAuthorized: true as const } : {}),
+          };
+        }
         return { status: "unavailable" };
       }
     },

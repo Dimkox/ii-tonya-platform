@@ -64,3 +64,59 @@ it.each([
     ).toThrow("expert_card_capability_required");
   },
 );
+
+it("R5 normal composition acknowledges only the configured work bot through the trusted ACK boundary", async () => {
+  const token = `12345:${"synthetic_fixture_".repeat(2)}`;
+  const configured = {
+    ...config,
+    features: { expertCard: true, expertDraftTags: true },
+    expertCard: {
+      ...settings,
+      workBotId: "12345",
+      draftTagsEnabled: true,
+      workBotToken: token,
+    },
+  } as RuntimeConfig;
+  const calls: { url: string; body: string }[] = [];
+  const cap = createExpertCardComposition(undefined as never, configured, {
+    tagCallbackFetch: async (url, init) => {
+      calls.push({ url: String(url), body: String(init?.body) });
+      return new Response("true");
+    },
+  })!;
+  expect(() => assertExpertCardCapability(configured, cap)).not.toThrow();
+  await cap.answerTagCallback!({
+    botId: "12345",
+    callbackQueryId: "original-callback-id",
+    signal: new AbortController().signal,
+  });
+  expect(calls).toEqual([
+    {
+      url: `https://api.telegram.org/bot${token}/answerCallbackQuery`,
+      body: JSON.stringify({ callback_query_id: "original-callback-id" }),
+    },
+  ]);
+  await expect(
+    cap.answerTagCallback!({
+      botId: "99999",
+      callbackQueryId: "forged",
+      signal: new AbortController().signal,
+    }),
+  ).rejects.toThrow("card_callback_scope_invalid");
+  expect(calls).toHaveLength(1);
+  expect(() =>
+    assertExpertCardCapability(configured, {
+      ...cap,
+      answerTagCallback: undefined,
+    } as never),
+  ).toThrow("expert_card_capability_required");
+  expect(() =>
+    createExpertCardComposition(
+      undefined as never,
+      {
+        ...configured,
+        expertCard: { ...configured.expertCard!, workBotToken: undefined },
+      } as never,
+    ),
+  ).toThrow("expert_card_configuration_required");
+});

@@ -15,6 +15,11 @@ export interface ExpertCardTelegramIngress {
   workBotKey: string;
   webhookSecret: string;
   service: Pick<ExpertCardService, "handleWork">;
+  answerTagCallback?: (input: {
+    botId: string;
+    callbackQueryId: string;
+    signal: AbortSignal;
+  }) => Promise<void>;
 }
 export function validRawExpertCardUpdateId(body: unknown): boolean {
   if (!body || typeof body !== "object") return false;
@@ -137,7 +142,12 @@ export function parseExpertCardTelegramUpdate(
     chatId: chatId!,
     updateId: String(root.update_id),
     content,
-    ...(callback ? { callbackData: callback.data as string } : {}),
+    ...(callback
+      ? {
+          callbackData: callback.data as string,
+          callbackQueryId: callback.id as string,
+        }
+      : {}),
   };
   return {
     kind: "parsed",

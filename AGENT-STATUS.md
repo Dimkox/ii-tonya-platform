@@ -1,3 +1,19 @@
+# Core stabilization R1–R13 remediation ready — 2026-10-26
+
+The single accepted-finding batch against390613bc is implemented. Prepared handoff
+links commit before disclosure while final send retains the subject privacy lock;
+prior links survive failed notifications and genuine owner /work_handoff recovers
+unknown work without resend. Tag callbacks now have real trusted ACK, durable
+replay, bounded actual pagination and removable inactive selections. Archive view
+parity is restored. Secure XML parsing and real subprocess main() limit tests
+correct the file-size-vs-sandbox guarantee; production parser remains unavailable.
+
+Final focused PostgreSQL/Fastify17/17 and Python12/12 passed; exact changed-view
+metadata and source guards are reconciled. Evidence and retained RED/GREEN logs:
+`docs/test-evidence/residency-core-stabilization-remediation-2026-10-26.md`.
+Root owns bounded independent R1–R13 closure, exact-source final gate and draft PR.
+No new quota, deployment, provider activation or downstream product scope added.
+
 # Core stabilization source ready for review — 2026-10-26
 
 The assigned codex/residency-foundation-20261026 source candidate implements shared

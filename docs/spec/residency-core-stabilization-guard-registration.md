@@ -29,3 +29,14 @@ and uv-locked runtime graph ship as explicit integration-package assets. Node-on
 releases and the256MiB production worker do not include/prove an isolated Python runtime;
 parsing stays unavailable/manual there. A separately reviewed runtime and trusted bounded
 file reader are required before deployment or provider activation, neither authorized here.
+
+## Unknown workspace notification recovery
+
+An unknown outcome is terminal for automated notification attempts, including a
+crash after preparation and before transport. Do not reset it to pending or blindly
+resend. The operator can direct the actual owner to `/work_handoff` in the original
+promo bot. That existing command rechecks current private identity, original
+consent and paid interview admission, then issues a fresh owner-bound ten-minute
+work-bot link through the genuine user request. It cannot grant main access.
+Notification preparation preserves prior valid interactive links; explicit
+owner-request issuance retains its existing replacement semantics.

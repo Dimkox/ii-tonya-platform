@@ -498,11 +498,11 @@ const approvedAutomationArtifactHashes = new Map([
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
     "packages/integrations/parser/helper.py",
-    "bbb3fb7bfafcb8af0448a2f85f7c7d27f168c8cc5f77c2ad2e42a624440978f4",
+    "0f3eb56f912d9d53fa8ded5934442f4f76563624a73eeb46cf2276d3c74a1fe4",
   ],
   [
     "packages/integrations/parser/test_helper.py",
-    "59056d6774f6800c8482b85fb4f07dba544fdf8d40b1be2cd49bcb7c71c1caad",
+    "3ed29d04ca824af214978ae0de89acbb996cee7c1ef98d1cfeea70c0f8e1378f",
   ],
 
   // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
@@ -791,15 +791,15 @@ const approvedMigrationHashes = new Map([
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
     "packages/db/migrations/0058_residency_core_stabilization.sql",
-    "0811e71752fd2c5561eb943306266d9ce83255004a76b68f85ee6a0c4fa152d8",
+    "b8e32b6377288312800692f03090a341744bec0f360ca108cf03bdadc63aab61",
   ],
   [
     "packages/db/migrations/meta/0058_snapshot.json",
-    "47addd7d8ae66de941c3c7e4b223baff05a7214bbbaadcc323cab22b164d47bb",
+    "79449bbe6d9a42942cb32794250fb8a1ce2fdccbc751e7cc5ef1b88dbaafc78c",
   ],
   [
     "packages/db/migrations/state/0058_stabilization_sql_objects.json",
-    "5a2960c044c3cf23a17f6326fb8d3c6ffc2a90a7c295e9fd24c414f554ea8356",
+    "4e502af2dc8bb11fffdd55d8a7a6175c7c328396304d661f6a6d34c9f59b4b07",
   ],
 
   // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.

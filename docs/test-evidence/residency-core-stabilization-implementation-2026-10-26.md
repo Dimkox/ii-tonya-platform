@@ -35,7 +35,9 @@ the coordinator records its complete SHA and subsequent exact-source gate separa
   bytes,64000text bytes and90000serialized proposal bytes. The last limit prevents escaping
   amplification from exceeding the database JSON bound. Helper bounds40PDF pages,256ZIP
   members,20MiB expansion/10MiB member/200x ratio,3CPU seconds,384MiB address space and32FDs;
-  file writes/core dumps are disabled. DOCX entities/external relationships are rejected.
+  file-size growth/core dumps are disabled. This is not a filesystem sandbox: empty-file
+  creation and other filesystem mutations remain possible, as demonstrated by subprocess
+  acceptance in the review remediation record. DOCX entities/external relationships are rejected.
   Cancellation kills/reaps before releasing the slot. Warnings carry one fixed reason only.
 - One canonical hashtags_db contains all164 owner entries/7categories, deterministic UUIDs,
   preserved labels/synonyms/source provenance and weight5. Idempotent SQL never installs mocks.

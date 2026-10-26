@@ -178,7 +178,16 @@ export class PostgresResidentWorkspaceRepository {
       await tx.execute(
         sql`update expert_verification_work set attempt_id=${attemptId}::uuid,attempted_at=clock_timestamp(),status='unknown_outcome' where id=${jobId}::uuid`,
       );
-      return { kind: "prepared" as const };
+      const handoff = await issueOwnedWorkHandoff(tx, {
+        userId: j.userId,
+        applicationId: j.applicationId,
+        sourceBotKey: j.botKey,
+        externalId: j.chatId,
+        targetBotId: o.workBotId!,
+        targetBotKey: o.workBotKey!,
+        revokeExisting: false,
+      });
+      return { kind: "prepared" as const, token: handoff.token };
     });
     if (prepared.kind !== "prepared") return prepared;
     // Durable unknown precedes any external disclosure. Subject lock fences withdrawal/erasure.
@@ -192,19 +201,11 @@ export class PostgresResidentWorkspaceRepository {
       )
         return { kind: "unknown_outcome" as const };
       try {
-        const handoff = await issueOwnedWorkHandoff(tx, {
-          userId: j.userId,
-          applicationId: j.applicationId,
-          sourceBotKey: j.botKey,
-          externalId: j.chatId,
-          targetBotId: o.workBotId!,
-          targetBotKey: o.workBotKey!,
-        });
         const receipt = await o.notifier!.send({
           botId: j.botId,
           botKey: j.botKey,
           chatId: j.chatId,
-          text: `Доступ открыт! Перейдите в рабочий кабинет: https://t.me/${o.workBotUsername}?start=card_${handoff.token}`,
+          text: `Доступ открыт! Перейдите в рабочий кабинет: https://t.me/${o.workBotUsername}?start=card_${prepared.token}`,
           signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
         });
         if (
@@ -233,11 +234,13 @@ export async function issueOwnedWorkHandoff(
     externalId: string;
     targetBotId: string;
     targetBotKey: string;
+    revokeExisting?: boolean;
   },
 ) {
-  await tx.execute(
-    sql`update expert_card_handoffs set consumed_at=clock_timestamp() where user_id=${input.userId}::uuid and consumed_at is null`,
-  );
+  if (input.revokeExisting !== false)
+    await tx.execute(
+      sql`update expert_card_handoffs set consumed_at=clock_timestamp() where user_id=${input.userId}::uuid and consumed_at is null`,
+    );
   const token = randomBytes(32).toString("base64url");
   const row = (
     await tx.execute<{ expiresAt: string }>(

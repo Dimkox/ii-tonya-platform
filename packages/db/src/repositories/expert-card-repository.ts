@@ -842,25 +842,33 @@ export class PostgresExpertCardRepository {
       const draft = await this.ensureDraft(tx, identity.userId, scope);
       if (!["collecting", "changes_requested"].includes(draft.status))
         fail("card_state_conflict");
+      const visible = sql`h.is_active or exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id)`;
+      const total = (
+        await tx.execute<{ n: number }>(
+          sql`select count(*)::int n from hashtags_db h where ${visible}`,
+        )
+      ).rows[0]!.n;
+      const pages = Math.max(1, Math.ceil(total / 8)),
+        actualPage = Math.min(page, pages - 1);
       const tags = (
-        await tx.execute<{ id: string; label: string; selected: boolean }>(
-          sql`select h.id,h.display_label as label,exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) as selected from hashtags_db h where h.is_active order by h.parent_category,h.sub_category,h.tag_value,h.id limit 8 offset ${page * 8}`,
+        await tx.execute<{
+          id: string;
+          label: string;
+          selected: boolean;
+          active: boolean;
+        }>(
+          sql`select h.id,h.display_label as label,h.is_active as active,exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) as selected from hashtags_db h where ${visible} order by h.parent_category,h.sub_category,h.tag_value,h.id limit 8 offset ${actualPage * 8}`,
         )
       ).rows;
       const labels = (
         await tx.execute<{ label: string }>(
-          sql`select h.display_label as label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id and h.is_active where t.draft_id=${draft.id}::uuid order by h.display_label`,
+          sql`select h.display_label as label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id where t.draft_id=${draft.id}::uuid order by h.display_label`,
         )
       ).rows.map((r) => r.label);
-      const total = (
-        await tx.execute<{ n: number }>(
-          sql`select count(*)::int n from hashtags_db where is_active`,
-        )
-      ).rows[0]!.n;
       return {
         revision: draft.revision,
-        page,
-        pages: Math.max(1, Math.ceil(total / 8)),
+        page: actualPage,
+        pages,
         tags,
         tags_array: labels,
       };
@@ -883,7 +891,7 @@ export class PostgresExpertCardRepository {
           fail("card_state_conflict");
         const tag = (
           await tx.execute(
-            sql`select id from hashtags_db where id=${tagId}::uuid and is_active for share`,
+            sql`select id,is_active from hashtags_db where id=${tagId}::uuid for share`,
           )
         ).rows;
         if (tag.length !== 1) fail("card_invalid_tags");
@@ -892,6 +900,8 @@ export class PostgresExpertCardRepository {
             sql`delete from expert_card_draft_tags where draft_id=${draft.id}::uuid and tag_id=${tagId}::uuid returning tag_id`,
           )
         ).rows;
+        if (!selected.length && tag[0]?.is_active !== true)
+          fail("card_invalid_tags");
         if (!selected.length)
           await tx.execute(
             sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) values(${draft.id}::uuid,${draft.userId}::uuid,${tagId}::uuid)`,

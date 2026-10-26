@@ -4,7 +4,7 @@ type: feature
 created: 2026-10-26
 status: in-review
 baseline_commit: 567e71b4dea4bd2720da452c8049916f9d2b437c
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -148,3 +148,14 @@ behavioral RED/GREEN remediation for unknown outcome reporting and import replay
 Root owns the independent review, final exact-source gate and draft PR; the final
 acceptance checkbox remains open for that delivery. No provider/deployment evidence
 is claimed. Preserve all failed logs and existing disabled production boundaries.
+
+## Bounded review remediation — 2026-10-26
+
+The coordinator's13 accepted findings against390613bc are patched in one batch.
+Transactional token durability, existing-link preservation and genuine owner
+recovery retain the final privacy barrier. Callback acknowledgement/replay, actual
+pagination, inactive-tag removal and archive-view parity are covered. Secure XML
+attribute parsing and real main() resource evidence correct the parser guarantees.
+The complete final focused PostgreSQL/Fastify file passes17/17; Python12/12.
+See [remediation evidence](../../test-evidence/residency-core-stabilization-remediation-2026-10-26.md).
+No frozen intent was changed; root owns bounded independent closure and final gate.

@@ -37,8 +37,21 @@ def extract(data, kind):
             # Block external entities/relationships before the XML library sees them.
             for item in items:
                 if item.filename.endswith((".xml", ".rels")):
-                    xml = archive.read(item).lower()
-                    if b"<!doctype" in xml or b"<!entity" in xml or b'targetmode="external"' in xml:
+                    # Parse bounded XML with explicit non-resolving defaults. Attribute
+                    # syntax/escaping/encoding cannot disguise an External relationship.
+                    from lxml import etree
+                    parser = etree.XMLParser(resolve_entities=False, no_network=True,
+                                             load_dtd=False, huge_tree=False)
+                    try:
+                        tree = etree.fromstring(archive.read(item), parser)
+                    except etree.XMLSyntaxError:
+                        return None
+                    if tree.getroottree().docinfo.doctype:
+                        return None
+                    if item.filename.endswith(".rels") and any(
+                        node.get("TargetMode", "").strip().casefold() == "external"
+                        for node in tree.iter()
+                    ):
                         return None
         from docx import Document
         document = Document(io.BytesIO(data))

@@ -1,3 +1,4 @@
+import { createBookingCallbackAck } from "./booking-callback-ack.js";
 import type { ExpertCardLegacyReplayRead } from "./expert-card-telegram-ingress.js";
 import {
   createExpertCardService,
@@ -16,6 +17,11 @@ import {
   sql,
 } from "@ii-tonya/db";
 export interface ExpertCardCapability {
+  answerTagCallback?: (input: {
+    botId: string;
+    callbackQueryId: string;
+    signal: AbortSignal;
+  }) => Promise<void>;
   personalOfferReads?: Pick<PostgresExpertPersonalOfferRepository, "readOwned">;
   legacyReplay: ExpertCardLegacyReplayRead;
   mainCheckoutEnabled: boolean;
@@ -29,6 +35,7 @@ export interface ExpertCardCapability {
   admin: ExpertCardAdminService;
 }
 export type ExpertCardCompositionOptions = {
+  tagCallbackFetch?: typeof fetch;
   documentImport?: Parameters<
     typeof createExpertCardService
   >[0]["documentImport"];
@@ -46,6 +53,8 @@ export function assertExpertCardCapability(
   const settings = config.expertCard!;
   if (
     !capability ||
+    (config.features.expertDraftTags === true &&
+      typeof capability.answerTagCallback !== "function") ||
     capability.mainCheckoutEnabled !== settings.mainCheckoutEnabled ||
     typeof capability.legacyReplay?.read !== "function" ||
     (settings.mainCheckoutEnabled &&
@@ -87,7 +96,27 @@ export function createExpertCardComposition(
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
     providerMode: settings.paymentMode,
   });
+  const acknowledge =
+    settings.draftTagsEnabled === true
+      ? createBookingCallbackAck(
+          settings.workBotToken!,
+          options.tagCallbackFetch,
+        )
+      : undefined;
   return {
+    ...(acknowledge
+      ? {
+          answerTagCallback: async (input: {
+            botId: string;
+            callbackQueryId: string;
+            signal: AbortSignal;
+          }) => {
+            if (input.botId !== settings.workBotId)
+              throw new Error("card_callback_scope_invalid");
+            await acknowledge(input);
+          },
+        }
+      : {}),
     personalOfferReads: new PostgresExpertPersonalOfferRepository(db, {
       workBotId: settings.workBotId,
       workBotKey: settings.workBotKey,

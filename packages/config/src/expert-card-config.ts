@@ -53,6 +53,7 @@ export function assertExpertCardConfig(config: Config): void {
     (config.features.expertCardMaterialDelivery === true &&
       !c.materialDeliveryEnabled) ||
     ((c.materialDeliveryEnabled ||
+      c.draftTagsEnabled === true ||
       config.features.expertResidencyNoticeDelivery === true) &&
       (!exact(/^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u, c.workBotToken) ||
         c.workBotToken.split(":")[0] !== c.workBotId)) ||
@@ -143,7 +144,8 @@ export function readExpertCardConfig(
     materialDeliveryEnabled: delivery === "true",
     mainCheckoutEnabled: checkout === "true",
     ...(tags === "true" ? { draftTagsEnabled: true } : {}),
-    ...((delivery === "true" || notice) && source.EXPERT_TELEGRAM_BOT_TOKEN
+    ...((delivery === "true" || notice || tags === "true") &&
+    source.EXPERT_TELEGRAM_BOT_TOKEN
       ? { workBotToken: source.EXPERT_TELEGRAM_BOT_TOKEN }
       : {}),
     workBotId: source.EXPERT_CARD_WORK_BOT_ID ?? "",
