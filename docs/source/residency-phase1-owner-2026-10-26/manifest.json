@@ -73,8 +73,9 @@
       "path": "docs/source/residency-phase1-owner-2026-10-26/sales-technical-final-correction.txt",
       "original_sha256": "33da487722bbdce1ee91b2e9008649b956fc6f4b65b9c0019909464b49d7f866",
       "original_bytes": 15716,
-      "sha256": "8f8d06a83ed1afe0caf6d2baf783a0e9d9b2fcdb10d4df8d385da3d6a9cee28a",
-      "bytes": 15530
+      "sha256": "910ca280e8c92c00cc01ca952d6bb46f95df8a7a04d154e50c3685580a253728",
+      "bytes": 15527,
+      "normalization_extra": "Trailing empty lines reduced to one terminating LF."
     },
     {
       "module": "phase1-final-comprehensive",
