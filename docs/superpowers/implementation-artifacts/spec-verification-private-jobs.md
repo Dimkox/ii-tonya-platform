@@ -140,12 +140,12 @@ terminal recovery and per-subject expiry isolation. No submitted snapshot mutati
 
 ## Tasks & Acceptance
 
-- [ ] Extend the accepted attempt/check model with custody, bounded jobs,
+- [x] Extend the accepted attempt/check model with custody, bounded jobs,
       current-source observations, owner-confirmed proposals, cache and durable
       deletion reconciliation. Hand migration plus exact metadata/guard inventories.
-- [ ] Concrete Telegram/S3/VK adapters, optional isolated extraction/OCR runtime,
+- [x] Concrete Telegram/S3/VK adapters, optional isolated extraction/OCR runtime,
       authentic manager links and clear unsupported-capability reasons.
-- [ ] Existing applicant/manager/worker composition consumes these capabilities;
+- [x] Existing applicant/manager/worker composition consumes these capabilities;
       all external activation ceilings remain off. Document recovery and deployment
       prerequisites without calling capabilities-only scaffolding complete.
 - [ ] Execute every matrix row with real transports/local fixtures, PostgreSQL,
@@ -247,3 +247,38 @@ Do not run final full gate/push; root owns them after independent review. Commit
 reviewable source/tests/evidence locally and report exact SHA when implementation
 and focused verification finish. No remaining incomplete criterion may be called
 complete merely because a default-off capability returns unavailable.
+
+## Suggested Review Order
+
+**Worker entry and durable authority**
+
+- Compose explicit capabilities through the ordinary application worker lifecycle.
+  [resident-private-jobs-composition.ts:14](../../../apps/worker/src/resident-private-jobs-composition.ts#L14)
+
+- Persist verified custody before derived checks and retain unknown external outcomes.
+  [resident-private-jobs.ts:14](../../../packages/worker/src/resident-private-jobs.ts#L14)
+
+- Fence physical deletion using pre-operation state and exact claim identity.
+  [resident-private-jobs-repository.ts:397](../../../packages/db/src/repositories/resident-private-jobs-repository.ts#L397)
+
+**Provider proof and private review**
+
+- Require matching provider proof before granting object custody.
+  [private-verification.ts:196](../../../packages/integrations/src/documents/private-verification.ts#L196)
+
+- Fence private responses by selected applicant and session.
+  [expert-verification-view.ts:301](../../../apps/web/src/expert-verification-view.ts#L301)
+
+- Carry partial extraction explicitly so incomplete documents remain unknown.
+  [helper.py:13](../../../packages/integrations/parser/helper.py#L13)
+
+**Schema and evidence**
+
+- Add recovery claims without rewriting historical migration0064.
+  [0065_resident_private_recovery_fences.sql:1](../../../packages/db/migrations/0065_resident_private_recovery_fences.sql#L1)
+
+- Exercise recovery races, owner confirmation, grants and actual runtime scheduling.
+  [verification-private-remediation.test.ts:1](../../../tests/integration/verification-private-remediation.test.ts#L1)
+
+- Map all eight corrections to executed evidence and preserved failures.
+  [verification-private-jobs-remediation-2026-10-26.md:1](../../test-evidence/verification-private-jobs-remediation-2026-10-26.md#L1)

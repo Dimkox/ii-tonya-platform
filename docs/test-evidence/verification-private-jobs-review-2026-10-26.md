@@ -24,9 +24,9 @@ owner input. Original successful and failed evidence stays retained.
 | R7  | high     | bad_spec | Gap: SDK tests only supply matching successful HEAD proof or HTTP errors. Removing checksum/custody-id comparison leaves fixtures passing.                                                                                        | Real SDK successful HEAD with missing/wrong checksum, identity, metadata, length, MIME or version must remain unknown; include matching positive proof and assert no verified custody/grant from contradictions.                                                                                                       |
 | R8  | high     | bad_spec | Gap: executed runner test calls createResidentPrivateJobsRunner directly, bypassing app runtime forwarding/scheduling at runtime.ts283/414 and main composition.                                                                  | Execute enabled application-runtime lifecycle with real pending state advancing through its composed job capability; disabled remains inert. The witness must fail if forwarding or scheduled invocation is removed, without production activation.                                                                    |
 
-All findings are pending correction. Runtime is not independently accepted yet.
-Implementation evidence currently proves the runner, not complete application
-runtime scheduling; the correction must state this distinction explicitly.
+Initial findings required correction; their independent closure is recorded below.
+The original runner-only evidence remains historical and is superseded by the
+corrective application-runtime witness, not relabelled retroactively.
 
 ## Preservation and bounded verification
 
@@ -37,3 +37,21 @@ actual OCR isolation and all original evidence. Preserve committed0064 byte-for-
 add0065 if SQL changes, journal/state/negative inventories together. Original producer
 owns one source correction batch, root owns spec/review/gate/delivery. Reviewers
 close their assigned findings against the corrective SHA; no quota-based new review.
+
+## Independent corrective closure
+
+Corrective runtime b360ac466a5cfb0472b05ae3988931a4be0db405 is accepted for all
+eight assigned findings. The original three reviewers independently inspected
+source/witnesses and relevant archived raw hashes, without tests or mutations:
+
+- Blind reviewer: PASS R2 complete bounded confirmation, R3 independent verified
+  custody and R4 selected-detail/session completion fencing.
+- Edge reviewer: PASS R1 pre-operation deletion claim/CAS/receipt barrier, R5 partial
+  extraction UNKNOWN and R6 canonical cache lookup/admission/storage with expiry.
+- Gap reviewer: PASS R7 successful-HTTP contradictory proof/no-grant witnesses and
+  R8 actual composed lifecycle/runtime/worker-loop enabled/disabled evidence.
+
+Root verified all46 corrective archive/raw hashes and original72 hashes.0064 SQL,
+snapshot and exact state remain unchanged. No remaining assigned issue was reported.
+Canonical final gate and mandatory push are separate following delivery checks;
+this acceptance does not authorize provider activation or production deployment.

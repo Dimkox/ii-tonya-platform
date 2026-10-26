@@ -206,3 +206,41 @@ read-only reviewers were launched together and all results collected before tria
 Eight deduplicated concrete findings are accepted in the separate review record.
 The runtime is not yet accepted; one bounded corrective batch follows with additive
 0065 if SQL changes. No source revert, quota, routine permission or full gate ran.
+
+## Corrective batch progress
+
+Root inspected retained R1/R2 RED and mixed-PDF coverage RED. Initial correction
+matrix extraction-head-green passes15/15 and coverage-green1/1. The initial
+pg-green file remains FAILED overall (7pass/3fail); its real two-runner delayed
+DELETE/late PUT race passes. pg-corrected subsequently passes5 selected cases with
+6 filtered, including actual owner complete-preview/stale-revision confirmation,
+canonical cache/expiry and enabled app-runtime lifecycle. Counts are not an invented
+combined11/11 invocation. Disabled runtime and remaining cases are retained in the
+first correction run and must be mapped by final corrective evidence.
+
+Actual Chromium asserts all10 delayed evidence/page/link/recovery success/error
+and logout scenarios, but browser-green.log terminates with an ENOTEMPTY profile
+cleanup failure. Do not treat it as terminal green. Implementer owns bounded cleanup
+and baseline witness correction, then final explicit exit-status evidence.
+
+## Corrective evidence updates
+
+browser-final.log now contains all10 successful delayed-response/logout outcomes
+without the cleanup exception. pg-grants-final passes4 selected cases (8 filtered):
+301-char specialty, oversized derived payload and thrown parser preserve verified
+custody/SHA and manager access; contradictory successful HEAD cannot establish
+custody or issue a grant. Fresh0065 reconstruction records209tables/132functions/
+183triggers/1413constraints/527indexes/2extensions and preserved pending/submitted
+historical rows. Root read-only diff confirms original72 artifacts and all0064 SQL,
+snapshot and state files remain byte-unchanged. Final corrective commit/assigned
+independent closures and canonical gate still remain.
+
+## Corrective handoff accepted
+
+Producer committed b360ac466a5cfb0472b05ae3988931a4be0db405. Root verified46
+corrective and72 original archive/raw hashes and unchanged0064 bytes. All three
+assigned closures returned PASS: blindR2/R3/R4, edgeR1/R5/R6, gapR7/R8. They inspected
+code, assertions and actual retained logs without running tests or changing files.
+Final producer builds/types/scoped lint/repository26 and diff checks passed; retained
+failed lint/types logs were followed by explicit corrective success. Original and
+corrective evidence are distinct. Root now owns canonical full gate and gated push.

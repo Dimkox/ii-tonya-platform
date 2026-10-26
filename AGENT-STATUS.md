@@ -1,3 +1,18 @@
+# Private verification jobs accepted; final gate next — 2026-10-26
+
+Same isolated .worktrees/phase1-owner-plan-20261023 on
+codex/residency-private-verification-jobs-20261026. Corrective runtime
+b360ac466a5cfb0472b05ae3988931a4be0db405 independently acceptedR1–R8 by the
+three assigned reviewers. Original72 plus corrective46 hashed artifacts retained;
+0064 unchanged, additive0065 state reconstructed. Producer stopped; only root owns
+final gate/docs/push/DraftPR against delivered verification/messagesPR113.
+No hosted CI, production activation or deployment is inferred. Continue entire
+package after delivery: S3a rich onboarding, S3b local tags, S4 slots/lifecycle.
+Read-only S3 preparation and draft contract are under /tmp/residency-rich-onboarding-
+preparation-20261026.md and /tmp/spec-residency-rich-onboarding-draft.md.
+One existing protected PG17.5 and owned isolated parser remain. No quota/reapproval
+loop; BMad already rendered once. Refund policy remains pending/manual.
+
 # Private verification jobs review correction active — 2026-10-26
 
 Same isolated .worktrees/phase1-owner-plan-20261023 directory, branch
