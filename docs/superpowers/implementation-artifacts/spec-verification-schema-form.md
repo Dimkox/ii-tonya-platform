@@ -2,7 +2,7 @@
 title: Pre-price resident verification schema and dynamic form
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 1a006fff4e2985fd83b72f3c67a66823fab87078
 review_loop_iteration: 0
 context:
@@ -135,3 +135,41 @@ staging acceptance is claimed; deliver Schema+Form Logic as a draft PR.
 ## Implementation Checkpoint — 2026-10-26
 
 Source implemented and locally verified; final independent review, branch gate and draft PR remain coordinator-owned. Schema uses `residents_applications` with generated owner-schema projections and a canonical channel-identity FK; physical mapping and exact guard inventory: `docs/spec/verification-schema-form-guard-registration.md`. Focused acceptance and retained failures: `docs/test-evidence/verification-schema-form-implementation-2026-10-26.md`. No live acceptance or provider activation is claimed.
+
+## Suggested Review Order
+
+**Entry and conversation**
+
+- Follow normal promo composition into the default-off, consent-bound intake.
+  [expert-applicant-composition.ts:39](../../../apps/api/src/expert-applicant-composition.ts#L39)
+
+- Inspect private Telegram decoding, permanent-input replies and form markup.
+  [expert-applicant-telegram.ts:19](../../../apps/api/src/routes/expert-applicant-telegram.ts#L19)
+
+- Trace durable questions, document corrections and immutable submission.
+  [resident-verification-service.ts:269](../../../packages/application/src/resident-verification-service.ts#L269)
+
+**Authority and privacy**
+
+- Review additive schema, owned cohorts, projections and financial fences.
+  [0057_resident_verification_form.sql:2](../../../packages/db/migrations/0057_resident_verification_form.sql#L2)
+
+- Check original consent, replay, revisions and stored-policy conflicts.
+  [resident-verification-repository.ts:41](../../../packages/db/src/repositories/resident-verification-repository.ts#L41)
+
+- Confirm actual erasure removes private answers and document references.
+  [privacy-repository.ts:1014](../../../packages/db/src/repositories/privacy-repository.ts#L1014)
+
+**Validation and evidence**
+
+- Understand union requirements and bounded URL, text and document validation.
+  [resident-verification-form.ts:83](../../../packages/domain/src/resident-verification-form.ts#L83)
+
+- Follow real enabled composition through authenticated updates and PostgreSQL.
+  [resident-verification-composition.integration.test.ts:27](../../../apps/api/src/routes/resident-verification-composition.integration.test.ts#L27)
+
+- Review owner, erasure, policy, legacy and concurrency acceptance.
+  [resident-verification-form.test.ts:54](../../../tests/integration/resident-verification-form.test.ts#L54)
+
+- Verify exact provenance and deny unreviewed schema lookalikes.
+  [verification-form-boundary.test.ts:1](../../../tests/repo/verification-form-boundary.test.ts#L1)
