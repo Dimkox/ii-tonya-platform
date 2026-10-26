@@ -278,6 +278,10 @@ describe("MVP scope boundary", () => {
     ".superpowers/sdd/task-1-report.md",
     ".agents/skills/bmad-review/scripts/word_metrics.py",
     "_bmad/scripts/render_skill.py",
+    ".getzilla/getzilla/__init__.py",
+    ".grok/hooks/pre_tool_use.py",
+    "scripts/getzilla_verify.py",
+    "session_start.py",
   ])("does not inspect documentation, tests, or evidence at %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(false);
   });
@@ -285,6 +289,10 @@ describe("MVP scope boundary", () => {
   it.each([
     "scripts/bmad-payment.py",
     ".agents/skills/not-bmad/scripts/payment.py",
+    "scripts/getzilla-payment.py",
+    "scripts/getzilla_payment/worker.py",
+    "apps/api/session_start.py",
+    ".grok/payment.py",
   ])("keeps non-vendored executable lookalikes in scope at %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(true);
   });
@@ -487,18 +495,6 @@ describe("MVP scope boundary", () => {
       classifyApprovedTrackedScopeContent({
         path,
         content: `${content}\n# changed\n`,
-      }),
-    ).not.toEqual([]);
-  });
-
-  it("pins reviewed Adaptive Grok workflow automation content", () => {
-    const path = ".grok-stack/adaptive_grok/verification.py";
-    const content = readFileSync(path, "utf8");
-    expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
-    expect(
-      classifyApprovedTrackedScopeContent({
-        path,
-        content: `${content}#`,
       }),
     ).not.toEqual([]);
   });

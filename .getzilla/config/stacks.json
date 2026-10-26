@@ -1,0 +1,459 @@
+{
+  "schema_version": "getzilla-stacks-v1",
+  "note": "Stacks Getzilla recognises. A detected stack without checks is reported as STACK_NOT_VERIFIED, never as a silent pass. Toolchains are installed per user under ~/.getzilla/toolchains, only from the official sources below, and only after the published checksum matches.",
+  "stacks": {
+    "python": {
+      "markers": [
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "requirements.txt"
+      ],
+      "extensions": [
+        ".py"
+      ],
+      "verified_by": "builtin:python",
+      "osv_ecosystem": "PyPI"
+    },
+    "php": {
+      "markers": [
+        "composer.json"
+      ],
+      "extensions": [
+        ".php"
+      ],
+      "verified_by": "builtin:php",
+      "osv_ecosystem": "Packagist"
+    },
+    "node": {
+      "markers": [
+        "package.json"
+      ],
+      "extensions": [
+        ".js",
+        ".mjs",
+        ".cjs",
+        ".jsx",
+        ".ts",
+        ".mts",
+        ".cts",
+        ".tsx"
+      ],
+      "verified_by": "builtin:node",
+      "osv_ecosystem": "npm",
+      "toolchain": {
+        "default_version": "24.22.0",
+        "pin_files": [
+          {
+            "path": ".nvmrc",
+            "kind": "text"
+          },
+          {
+            "path": ".node-version",
+            "kind": "text"
+          },
+          {
+            "path": "package.json",
+            "kind": "json",
+            "key": "engines.node"
+          }
+        ],
+        "source": {
+          "kind": "archive",
+          "algorithm": "sha256",
+          "url": "https://nodejs.org/dist/v{version}/{archive}",
+          "archives": {
+            "linux-x64": "node-v{version}-linux-x64.tar.xz",
+            "linux-arm64": "node-v{version}-linux-arm64.tar.xz",
+            "darwin-x64": "node-v{version}-darwin-x64.tar.gz",
+            "darwin-arm64": "node-v{version}-darwin-arm64.tar.gz",
+            "windows-x64": "node-v{version}-win-x64.zip"
+          },
+          "checksums": {
+            "kind": "sha256-list",
+            "url": "https://nodejs.org/dist/v{version}/SHASUMS256.txt"
+          },
+          "strip_components": 1,
+          "pinned": {
+            "24.22.0": {
+              "linux-x64": "cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008",
+              "linux-arm64": "fef00bb4d36e1c50104a9775a10359beee98f162b4104dd12472c75065c6a143",
+              "darwin-x64": "495e3f273c645f3c4677d438304cdfc701729ea5dec5728f5c8e76a2dece4b91",
+              "darwin-arm64": "6a9724d9b50a5f22b4816cded441b5a8d9ddae546191a5e5b7efa5a5e2ee26d5",
+              "windows-x64": "f9683a19877e12a9b167305c8db71040d812876359de21f0d2e97c3f321f80c3"
+            }
+          }
+        },
+        "bin": {
+          "posix": [
+            "bin"
+          ],
+          "windows": [
+            "."
+          ]
+        }
+      }
+    },
+    "dotnet": {
+      "markers": [
+        "*.sln",
+        "*.slnx",
+        "*.csproj",
+        "*.fsproj",
+        "global.json",
+        "Directory.Build.props"
+      ],
+      "extensions": [
+        ".cs",
+        ".fs",
+        ".fsx",
+        ".csproj",
+        ".fsproj",
+        ".props",
+        ".targets"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": "NuGet",
+      "toolchain": {
+        "default_version": "10.0.402",
+        "pin_files": [
+          {
+            "path": "global.json",
+            "kind": "json",
+            "key": "sdk.version"
+          }
+        ],
+        "source": {
+          "kind": "archive",
+          "algorithm": "sha512",
+          "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/{archive}",
+          "archives": {
+            "linux-x64": "dotnet-sdk-{version}-linux-x64.tar.gz",
+            "linux-arm64": "dotnet-sdk-{version}-linux-arm64.tar.gz",
+            "darwin-x64": "dotnet-sdk-{version}-osx-x64.tar.gz",
+            "darwin-arm64": "dotnet-sdk-{version}-osx-arm64.tar.gz",
+            "windows-x64": "dotnet-sdk-{version}-win-x64.zip"
+          },
+          "checksums": {
+            "kind": "dotnet-releases",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/{channel}/releases.json"
+          },
+          "strip_components": 0,
+          "pinned": {
+            "10.0.402": {
+              "linux-x64": "1904a98dda2db34ba78ba3c4fb1b224455329af91c341d83547843c1839e112b04ae699ee92fa2449a8f62249196a938723078c0c60b9f65c88539d5687729c2",
+              "linux-arm64": "db85ae85527251fbb1290720ac3bf324bb1d9eea74516ef291ed4bb1f8ff6ec63a17593367f49b456115e8b24ead6d0c2ece2801e501f36a6cd4444ed01a498f",
+              "darwin-x64": "1628e0a07261f5bd54dde370c53b90cb72f0c88667d7cde34bd62997a29ff8f32310f81e08c85962a2b0221c05368df37fb04909b6f1431b293f445ecf895292",
+              "darwin-arm64": "ee0d379c144ebddef6efe851e1514883d1b695430d13b3fb13e8153f8476e1e5ac7abc42c08668471aaf4d738ff367cf53009845f94d224ba126febe74d00b75",
+              "windows-x64": "ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd"
+            }
+          }
+        },
+        "bin": {
+          "posix": [
+            "."
+          ],
+          "windows": [
+            "."
+          ]
+        },
+        "env": {
+          "DOTNET_ROOT": "{home}",
+          "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+          "DOTNET_NOLOGO": "1",
+          "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+          "NUGET_PACKAGES": "{cache}/nuget"
+        }
+      }
+    },
+    "rust": {
+      "markers": [
+        "Cargo.toml"
+      ],
+      "extensions": [
+        ".rs"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": "crates.io",
+      "toolchain": {
+        "default_version": "1.99.1",
+        "pin_files": [
+          {
+            "path": "rust-toolchain.toml",
+            "kind": "toml",
+            "key": "toolchain.channel"
+          },
+          {
+            "path": "rust-toolchain",
+            "kind": "text"
+          }
+        ],
+        "source": {
+          "kind": "rustup",
+          "algorithm": "sha256",
+          "rustup_version": "1.29.1",
+          "url": "https://static.rust-lang.org/rustup/archive/{rustup_version}/{target}/{binary}",
+          "checksum_url": "https://static.rust-lang.org/rustup/archive/{rustup_version}/{target}/{binary}.sha256",
+          "targets": {
+            "linux-x64": "x86_64-unknown-linux-gnu",
+            "linux-arm64": "aarch64-unknown-linux-gnu",
+            "darwin-x64": "x86_64-apple-darwin",
+            "darwin-arm64": "aarch64-apple-darwin",
+            "windows-x64": "x86_64-pc-windows-msvc"
+          },
+          "pinned": {
+            "1.29.1": {
+              "linux-x64": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71",
+              "linux-arm64": "15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433",
+              "darwin-x64": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+              "darwin-arm64": "ec1b9233e7f72990ecd8e62063fa7f6c3dfc2bec8e97f88bff165f9100ac696a",
+              "windows-x64": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e"
+            }
+          },
+          "components": [
+            "rustfmt",
+            "clippy"
+          ]
+        },
+        "requires": [
+          {
+            "id": "msvc-build-tools",
+            "platforms": [
+              "windows-x64"
+            ],
+            "unless_channel_suffix": "-gnu",
+            "detect": "msvc",
+            "probe": "link.exe",
+            "message": "the *-msvc Rust target links with the MSVC linker from Visual Studio Build Tools (C++ workload); it needs administrator rights, so Getzilla does not install it",
+            "command": "winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override \"--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\""
+          }
+        ],
+        "bin": {
+          "posix": [
+            "cargo/bin"
+          ],
+          "windows": [
+            "cargo/bin"
+          ]
+        },
+        "env": {
+          "RUSTUP_HOME": "{home}/rustup",
+          "CARGO_HOME": "{home}/cargo",
+          "CARGO_TARGET_DIR": "{cache}/target"
+        }
+      }
+    },
+    "powershell": {
+      "markers": [
+        "*.ps1",
+        "*.psm1",
+        "*.psd1"
+      ],
+      "extensions": [
+        ".ps1",
+        ".psm1",
+        ".psd1"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": null,
+      "toolchain": {
+        "default_version": "psscriptanalyzer-1.25.0+pester-5.9.1",
+        "pin_files": [],
+        "source": {
+          "kind": "psgallery",
+          "algorithm": "sha512-base64",
+          "url": "https://www.powershellgallery.com/api/v2/package/{module}/{version}",
+          "modules": {
+            "PSScriptAnalyzer": {
+              "version": "1.25.0",
+              "hash": "5/tXMmLmBLqymRSuYpIdJLl8L4i1GbQSd7QD72zhY/FLfRs23HNEmmjlrlqNlQKJGxDCZBMf0YE63ym/ExwWYw=="
+            },
+            "Pester": {
+              "version": "5.9.1",
+              "hash": "Ro5dZIKb89GI4ljjInQc3m6sI74uvph1y4QAqBPZ1Jhg0l1wBv8rT0izkGKbOw2Brzn8rNV2NKpDbyvoi7ARqg=="
+            }
+          },
+          "interpreters": [
+            "pwsh",
+            "powershell"
+          ]
+        },
+        "bin": {
+          "posix": [],
+          "windows": []
+        },
+        "env": {
+          "PSModulePath": "{home}/modules"
+        }
+      }
+    },
+    "go": {
+      "markers": [
+        "go.mod"
+      ],
+      "extensions": [
+        ".go"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": "Go",
+      "toolchain": {
+        "default_version": "1.27.2",
+        "pin_files": [
+          {
+            "path": "go.mod",
+            "kind": "regex",
+            "pattern": "^toolchain go(\\S+)"
+          }
+        ],
+        "source": {
+          "kind": "archive",
+          "algorithm": "sha256",
+          "url": "https://go.dev/dl/{archive}",
+          "archives": {
+            "linux-x64": "go{version}.linux-amd64.tar.gz",
+            "linux-arm64": "go{version}.linux-arm64.tar.gz",
+            "darwin-x64": "go{version}.darwin-amd64.tar.gz",
+            "darwin-arm64": "go{version}.darwin-arm64.tar.gz",
+            "windows-x64": "go{version}.windows-amd64.zip"
+          },
+          "checksums": {
+            "kind": "go-dl-json",
+            "url": "https://go.dev/dl/?mode=json&include=all"
+          },
+          "strip_components": 1,
+          "pinned": {
+            "1.27.2": {
+              "linux-x64": "ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5",
+              "linux-arm64": "94f3e30b8e374bc285e7dadc11e0865726b9bc6e85b841ccceaabc0214c6b7c8",
+              "darwin-x64": "587b59182488b23aa6e5fc25110405a3e0e5b38ed2f5b2f46ed13c32aee356fe",
+              "darwin-arm64": "76812b213b1b2302c978d28fa52fa92d541704b9e7d9d5db8002c50e4018c4c5",
+              "windows-x64": "1314008898bd40df77af4b014f777f08873dbdfbcd3d92308728ee03304fe04f"
+            }
+          }
+        },
+        "bin": {
+          "posix": [
+            "bin"
+          ],
+          "windows": [
+            "bin"
+          ]
+        },
+        "env": {
+          "GOROOT": "{home}",
+          "GOTOOLCHAIN": "local",
+          "GOPATH": "{cache}/gopath",
+          "GOMODCACHE": "{cache}/mod",
+          "GOCACHE": "{cache}/build",
+          "GOFLAGS": "-mod=readonly"
+        }
+      }
+    },
+    "java": {
+      "markers": [
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+        "mvnw",
+        "gradlew"
+      ],
+      "extensions": [
+        ".java",
+        ".kt",
+        ".kts"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": "Maven",
+      "toolchain": {
+        "default_version": "21.0.12.1+1",
+        "partial_versions": {
+          "21": "21.0.12.1+1"
+        },
+        "pin_files": [
+          {
+            "path": ".java-version",
+            "kind": "text"
+          }
+        ],
+        "source": {
+          "kind": "archive",
+          "algorithm": "sha256",
+          "url": "https://github.com/adoptium/temurin{major}-binaries/releases/download/jdk-{version_url}/{archive}",
+          "archives": {
+            "linux-x64": "OpenJDK{major}U-jdk_x64_linux_hotspot_{version_file}.tar.gz",
+            "linux-arm64": "OpenJDK{major}U-jdk_aarch64_linux_hotspot_{version_file}.tar.gz",
+            "darwin-x64": "OpenJDK{major}U-jdk_x64_mac_hotspot_{version_file}.tar.gz",
+            "darwin-arm64": "OpenJDK{major}U-jdk_aarch64_mac_hotspot_{version_file}.tar.gz",
+            "windows-x64": "OpenJDK{major}U-jdk_x64_windows_hotspot_{version_file}.zip"
+          },
+          "checksums": {
+            "kind": "sha256-list",
+            "url": "{url}.sha256.txt"
+          },
+          "strip_components": 1,
+          "pinned": {
+            "21.0.12.1+1": {
+              "linux-x64": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
+              "linux-arm64": "23e37e026f12f3e706f18938ff611db3032d075b09d0879a25d06718c773e223",
+              "darwin-x64": "44db0f08196daf19a47f90d13388b0c943b67663cb537f998fe29e836fa842ce",
+              "darwin-arm64": "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
+              "windows-x64": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e"
+            }
+          }
+        },
+        "bin": {
+          "posix": [
+            "bin"
+          ],
+          "darwin": [
+            "Contents/Home/bin"
+          ],
+          "windows": [
+            "bin"
+          ]
+        },
+        "env": {
+          "JAVA_HOME": "{home}",
+          "GRADLE_USER_HOME": "{cache}/gradle",
+          "MAVEN_OPTS": "-Dmaven.repo.local={cache}/m2"
+        },
+        "env_by_os": {
+          "darwin": {
+            "JAVA_HOME": "{home}/Contents/Home"
+          }
+        }
+      }
+    },
+    "ruby": {
+      "markers": [
+        "Gemfile",
+        "*.gemspec"
+      ],
+      "extensions": [
+        ".rb"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": "RubyGems"
+    },
+    "c-cpp": {
+      "markers": [
+        "CMakeLists.txt",
+        "meson.build",
+        "*.vcxproj"
+      ],
+      "extensions": [
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".h",
+        ".hh",
+        ".hpp"
+      ],
+      "verified_by": null,
+      "osv_ecosystem": null
+    }
+  }
+}

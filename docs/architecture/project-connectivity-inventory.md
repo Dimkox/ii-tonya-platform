@@ -17,9 +17,9 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 | `README.md`                                                 | repository orientation -> source/spec/handoff/graph              | ACTIVE DOC                             |
 | `.agents/skills/seo-landing`                                | Codex landing workflow -> `apps/web` build and evidence          | ACTIVE DEV TOOL                        |
 | `.grok/`                                                    | local hooks/configuration -> routed development workflow         | LOCAL DEV TOOL                         |
-| `.grok-stack/`                                              | active route and local receipts -> delivery evidence             | LOCAL EVIDENCE; not merge authority    |
-| `.agents/skills/adaptive-delivery` and routed domain skills | active route -> bounded implementation and verification workflow | LOCAL DEV TOOL                         |
-| `scripts/grok_*.py`                                         | route/status/change/verify/review helpers -> local evidence      | LOCAL DEV TOOL; LOCAL EVIDENCE         |
+| `.getzilla/`                                                | active route and local receipts -> delivery evidence             | LOCAL EVIDENCE; not merge authority    |
+| `.agents/skills/getzilla-delivery` and routed domain skills | active route -> bounded implementation and verification workflow | LOCAL DEV TOOL                         |
+| `scripts/getzilla_*.py`                                     | route/status/change/verify/review helpers -> local evidence      | LOCAL DEV TOOL; LOCAL EVIDENCE         |
 
 ## CI, automation, deployment, and server control
 

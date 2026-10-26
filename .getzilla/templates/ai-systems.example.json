@@ -1,0 +1,75 @@
+{
+  "schema_version": "ai-systems-v1",
+  "note": "Fictional examples only. Replace all classifications and confirmations with actual human decisions. The example risk register is not evidence for a real system.",
+  "systems": [
+    {
+      "id": "support-assistant",
+      "purpose": "Assistant that generates answers to customer support questions",
+      "paths": [
+        "src/support/*.py"
+      ],
+      "class": "limited",
+      "generates_content": true,
+      "disclosure_symbol": "AI_DISCLOSURE",
+      "marking_symbol": "mark_generated_content",
+      "confirmation": {
+        "by": "Jane Doe",
+        "role": "legal counsel",
+        "date": "2026-10-20"
+      },
+      "role": [
+        "provider",
+        "deployer"
+      ],
+      "placed_on_market": "2026-09-01",
+      "publishes_content": false
+    },
+    {
+      "id": "credit-scoring",
+      "purpose": "Creditworthiness scoring of loan applicants",
+      "paths": [
+        "src/scoring/**"
+      ],
+      "class": "high-risk",
+      "generates_content": false,
+      "disclosure_symbol": "AI_DISCLOSURE",
+      "logging_symbol": "record_decision_event",
+      "oversight_symbol": "require_human_review",
+      "risk_register": ".getzilla/templates/eu-ai-act/risk-register.example.json",
+      "confirmation": {
+        "by": "Jane Doe",
+        "role": "legal counsel",
+        "date": "2026-10-20"
+      },
+      "role": "provider",
+      "annex": "III"
+    },
+    {
+      "id": "code-review-bot",
+      "purpose": "Assistant that generates review comments on internal pull requests",
+      "paths": [
+        "tools/review_bot/**"
+      ],
+      "class": "limited",
+      "role": "deployer",
+      "generates_content": true,
+      "disclosure_symbol": "AI_DISCLOSURE",
+      "exemptions": [
+        {
+          "obligation": "AIA-50-2",
+          "basis": "Art. 50(2): assistive function for standard editing that does not substantially alter the input",
+          "confirmation": {
+            "by": "Jane Doe",
+            "role": "legal counsel",
+            "date": "2026-10-20"
+          }
+        }
+      ],
+      "confirmation": {
+        "by": "Jane Doe",
+        "role": "legal counsel",
+        "date": "2026-10-20"
+      }
+    }
+  ]
+}

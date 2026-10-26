@@ -973,9 +973,30 @@ const isExecutableAutomationPath = (path: string): boolean =>
 const isVersionedBmadToolingPath = (path: string): boolean =>
   path.startsWith("_bmad/") || /^\.agents\/skills\/bmad-[^/]+\//u.test(path);
 
+// Getzilla workflow tooling installed by `getzilla update`: its engine, hooks, root hook
+// shims and helper scripts. Vendored like BMAD; it never ships with the product.
+const GETZILLA_ROOT_HOOK_SHIMS = new Set([
+  "session_start.py",
+  "user_prompt_submit.py",
+  "pre_tool_use.py",
+  "post_tool_use.py",
+  "pre_compact.py",
+  "subagent_start.py",
+  "subagent_stop.py",
+  "stop_gate.py",
+  "session_end.py",
+]);
+
+const isVersionedGetzillaToolingPath = (path: string): boolean =>
+  path.startsWith(".getzilla/") ||
+  path.startsWith(".grok/hooks/") ||
+  /^scripts\/getzilla_[a-z_]+\.py$/u.test(path) ||
+  GETZILLA_ROOT_HOOK_SHIMS.has(path);
+
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
   if (isVersionedBmadToolingPath(path)) return false;
+  if (isVersionedGetzillaToolingPath(path)) return false;
   if (path.endsWith("/package.json") || path === "package.json") return true;
   if (
     /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||

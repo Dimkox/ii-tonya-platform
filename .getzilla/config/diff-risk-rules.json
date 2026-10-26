@@ -1,0 +1,222 @@
+{
+  "schema_version": "diff-risk-rules-v1",
+  "note": "Exact committed source risk; baseline and candidate policies are both evaluated. Prompt risk is provisional. Audits require category and minimum risk.",
+  "rules": [
+    {
+      "id": "AUTH_PATH",
+      "risk": "high",
+      "paths": [
+        "**/auth/**",
+        "**/auth.*",
+        "**/auth_*",
+        "**/*_auth.*",
+        "**/*-auth.*",
+        "**/*authentication*",
+        "**/*authorization*",
+        "**/*authz*",
+        "**/*authn*",
+        "**/*login*",
+        "**/*signin*",
+        "**/*sign_in*",
+        "**/*oauth*",
+        "**/*session*.py",
+        "**/*permission*"
+      ]
+    },
+    {
+      "id": "MONEY_PATH",
+      "risk": "high",
+      "paths": [
+        "**/*payment*",
+        "**/*billing*",
+        "**/*checkout*",
+        "**/*refund*",
+        "**/*invoice*",
+        "**/*subscription*",
+        "**/*charge*",
+        "**/*wallet*",
+        "**/*stripe*",
+        "**/*paypal*"
+      ]
+    },
+    {
+      "id": "SECRET_PATH",
+      "risk": "high",
+      "paths": [
+        "**/.env",
+        "**/.env.*",
+        "**/*secret*",
+        "**/*credential*",
+        "**/*password*",
+        "**/*.pem",
+        "**/*.key"
+      ]
+    },
+    {
+      "id": "DATA_MIGRATION",
+      "risk": "medium",
+      "paths": [
+        "**/migrations/**",
+        "**/migration/**",
+        "**/*.sql",
+        "**/alembic/**"
+      ]
+    },
+    {
+      "id": "DEPENDENCY_OR_CI",
+      "risk": "medium",
+      "paths": [
+        ".github/**",
+        ".gitlab-ci.yml",
+        "**/pyproject.toml",
+        "**/requirements*.txt",
+        "**/setup.py",
+        "**/setup.cfg",
+        "**/poetry.lock",
+        "**/uv.lock",
+        "**/pipfile",
+        "**/pipfile.lock",
+        "**/package.json",
+        "**/package-lock.json",
+        "**/npm-shrinkwrap.json",
+        "**/pnpm-lock.yaml",
+        "**/yarn.lock",
+        "**/cargo.toml",
+        "**/cargo.lock",
+        "**/go.mod",
+        "**/go.sum",
+        "**/composer.json",
+        "**/composer.lock",
+        "**/*.csproj",
+        "**/*.fsproj",
+        "**/packages.lock.json",
+        "**/directory.build.props",
+        "**/global.json",
+        "**/pom.xml",
+        "**/build.gradle",
+        "**/build.gradle.kts",
+        "**/gradle.lockfile",
+        "**/dockerfile",
+        "**/docker-compose*.yml",
+        "**/docker-compose*.yaml",
+        "makefile"
+      ]
+    },
+    {
+      "id": "CONTROL_PLANE",
+      "risk": "medium",
+      "paths": [
+        "agents.md",
+        "claude.md",
+        "gemini.md",
+        "qwen.md",
+        "**/skill.md",
+        ".agents/**",
+        ".claude/**",
+        ".codex/**",
+        ".gemini/**",
+        ".grok/**",
+        ".qwen/**",
+        ".cursor/**",
+        ".getzilla/**"
+      ]
+    },
+    {
+      "id": "DATA_SCHEMA",
+      "risk": "medium",
+      "paths": [
+        "schemas/**",
+        "contracts/**"
+      ]
+    },
+    {
+      "id": "RELEASE_PATH",
+      "risk": "medium",
+      "paths": [
+        "packages/**",
+        "scripts/build*",
+        "scripts/release*",
+        "VERSION"
+      ]
+    },
+    {
+      "id": "RISK_POLICY",
+      "risk": "high",
+      "paths": [
+        ".getzilla/config/diff-risk-rules.json",
+        ".getzilla/config/routing.json",
+        ".getzilla/getzilla/review_plan.py",
+        ".getzilla/getzilla/diff_risk.py"
+      ]
+    }
+  ],
+  "tests": [
+    "tests/**",
+    "test/**",
+    "**/tests/**",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/*_test.go",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/__tests__/**",
+    "**/*tests.cs",
+    "**/*.tests.ps1"
+  ],
+  "trivial": {
+    "allow": [
+      "*.md",
+      "**/*.md",
+      "docs/**",
+      "*.txt",
+      "**/*.rst"
+    ],
+    "deny": [
+      "agents.md",
+      "claude.md",
+      "gemini.md",
+      "qwen.md",
+      "**/skill.md",
+      "docs/bitrix-local-agents.md",
+      "**/evidence/historical-*/**",
+      ".agents/**",
+      ".claude/**",
+      ".codex/**",
+      ".gemini/**",
+      ".grok/**",
+      ".qwen/**",
+      ".cursor/**",
+      ".github/**",
+      ".getzilla/**",
+      "**/requirements*.txt"
+    ]
+  },
+  "audits": {
+    "security": {
+      "minimum_risk": "medium",
+      "rules": [
+        "AUTH_PATH",
+        "MONEY_PATH",
+        "SECRET_PATH",
+        "ARCHITECTURE_SECRET_NODE",
+        "CONTROL_PLANE",
+        "RISK_POLICY"
+      ]
+    },
+    "data": {
+      "minimum_risk": "medium",
+      "rules": [
+        "DATA_MIGRATION",
+        "DATA_SCHEMA",
+        "ARCHITECTURE_RESTRICTED_NODE"
+      ]
+    },
+    "release": {
+      "minimum_risk": "medium",
+      "rules": [
+        "DEPENDENCY_OR_CI",
+        "RELEASE_PATH"
+      ]
+    }
+  }
+}

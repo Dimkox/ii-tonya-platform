@@ -1,0 +1,49 @@
+{
+  "schema_version": "getzilla-parallel-v1",
+  "note": "Independent heavy work runs on every verified CPU. The PreToolUse hook refuses a serial batch of heavy commands and a test runner forced into one process, and answers with the parallel command. A deliberate serial run starts with GETZILLA_SERIAL=1 and says why.",
+  "min_batch": 3,
+  "reserve": 2,
+  "heavy_programs": ["php", "python", "python3", "pypy3", "node", "deno", "bun", "ruby", "perl", "bash", "sh", "zsh",
+                     "pytest", "phpunit", "paratest", "go", "cargo", "dotnet", "npm", "pnpm", "yarn", "npx", "java",
+                     "mvn", "gradle", "pwsh", "make", "ctest"],
+  "install_words": ["install", "add", "ci", "update", "upgrade", "require", "remove", "uninstall", "publish", "deploy",
+                    "push", "migrate"],
+  "batch_target_pattern": "(?i)(test|spec|check|lint|probe|bench|smoke|e2e)",
+  "runners": [
+    {
+      "id": "pytest",
+      "programs": ["pytest", "py.test"],
+      "module": "pytest",
+      "parallel_flags": ["-n", "--numprocesses", "--dist"],
+      "requires_module": "xdist",
+      "targeted": "(::|\\.py$)",
+      "advice": "add -n {workers} (pytest-xdist) to use every verified CPU"
+    },
+    {
+      "id": "jest-vitest",
+      "programs": ["jest", "vitest"],
+      "serial_flags": ["--runInBand", "-i", "--no-file-parallelism", "--maxWorkers=1", "-w=1", "--threads=false"],
+      "advice": "drop {flag} and pass --maxWorkers={workers}"
+    },
+    {
+      "id": "go-test",
+      "programs": ["go"],
+      "subcommand": "test",
+      "serial_flags": ["-p=1", "-p 1", "-parallel=1", "-parallel 1"],
+      "advice": "drop {flag} and pass -p {workers}"
+    },
+    {
+      "id": "cargo-test",
+      "programs": ["cargo"],
+      "subcommand": "test",
+      "serial_flags": ["--test-threads=1", "--test-threads 1", "-j1", "-j 1", "--jobs=1", "--jobs 1"],
+      "advice": "drop {flag}; cargo already uses every CPU (pass --jobs {workers} to cap it)"
+    },
+    {
+      "id": "phpunit",
+      "programs": ["phpunit"],
+      "paratest": "vendor/bin/paratest",
+      "advice": "run vendor/bin/paratest -p {workers} with the same arguments"
+    }
+  ]
+}

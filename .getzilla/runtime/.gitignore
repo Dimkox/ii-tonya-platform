@@ -1,0 +1,5 @@
+# Getzilla runtime state (receipts, metrics, counters, worktrees) is machine-local and never committed.
+# This file ships with Getzilla so a project needs no root .gitignore rule for it.
+*
+!.gitignore
+!.gitkeep

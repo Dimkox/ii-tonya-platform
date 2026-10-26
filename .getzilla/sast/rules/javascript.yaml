@@ -1,0 +1,119 @@
+rules:
+  - id: getzilla.javascript.command-injection
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Untrusted request data reaches a shell command. Use execFile/spawn with an argument array.
+    metadata: {cwe: "CWE-78", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: &js-request-sources
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.body
+          - pattern: $REQ.params
+          - pattern: $REQ.headers
+          - pattern: $REQ.cookies
+          - pattern: process.argv
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: child_process.exec($C, ...)
+              - pattern: child_process.execSync($C, ...)
+              - pattern: $CP.exec($C, ...)
+              - pattern: $CP.execSync($C, ...)
+              - pattern: exec($C, ...)
+              - pattern: execSync($C, ...)
+          - focus-metavariable: $C
+  - id: getzilla.javascript.code-injection
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Untrusted request data is evaluated as code.
+    metadata: {cwe: "CWE-95", owasp: "A03:2021", confidence: HIGH}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+          - pattern: vm.runInNewContext(...)
+          - pattern: vm.runInThisContext(...)
+  - id: getzilla.javascript.sql-injection
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Untrusted request data is built into a SQL string. Use placeholders and pass values separately.
+    metadata: {cwe: "CWE-89", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.query($Q, ...)
+              - pattern: $DB.execute($Q, ...)
+              - pattern: $DB.raw($Q, ...)
+              - pattern: $DB.$queryRawUnsafe($Q, ...)
+          - focus-metavariable: $Q
+    pattern-sanitizers:
+      - pattern: parseInt(...)
+      - pattern: Number(...)
+  - id: getzilla.javascript.path-traversal
+    mode: taint
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Untrusted request data chooses a file path. Resolve it under a fixed root and reject anything outside it.
+    metadata: {cwe: "CWE-22", owasp: "A01:2021", confidence: MEDIUM}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fs.$F($P, ...)
+              - pattern: $RES.sendFile($P, ...)
+              - pattern: $RES.download($P, ...)
+          - metavariable-regex:
+              metavariable: $F
+              regex: ^(readFile|readFileSync|createReadStream|writeFile|writeFileSync|unlink|unlinkSync|rm|rmSync)$
+          - focus-metavariable: $P
+    pattern-sanitizers:
+      - pattern: path.basename(...)
+  - id: getzilla.javascript.ssrf
+    mode: taint
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Untrusted request data chooses the URL of a server-side request. Allow-list hosts before fetching.
+    metadata: {cwe: "CWE-918", owasp: "A10:2021", confidence: MEDIUM}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch($U, ...)
+              - pattern: axios.$M($U, ...)
+              - pattern: axios($U, ...)
+              - pattern: http.get($U, ...)
+              - pattern: https.get($U, ...)
+          - focus-metavariable: $U
+  - id: getzilla.javascript.reflected-xss
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Untrusted request data is written into an HTML response without escaping.
+    metadata: {cwe: "CWE-79", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $RES.send($H)
+              - pattern: $RES.write($H)
+          - focus-metavariable: $H
+    pattern-sanitizers:
+      - pattern: escapeHtml(...)
+      - pattern: encodeURIComponent(...)
+      - pattern: JSON.stringify(...)
+  - id: getzilla.javascript.open-redirect
+    mode: taint
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Untrusted request data chooses a redirect target. Redirect only to known paths or hosts.
+    metadata: {cwe: "CWE-601", owasp: "A01:2021", confidence: MEDIUM}
+    pattern-sources: *js-request-sources
+    pattern-sinks:
+      - patterns:
+          - pattern: $RES.redirect($U)
+          - focus-metavariable: $U

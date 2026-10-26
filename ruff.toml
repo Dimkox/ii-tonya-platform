@@ -3,7 +3,7 @@ line-length = 120
 
 exclude = [
   ".git",
-  ".grok-stack/runtime",
+  ".getzilla/runtime",
   "dist",
   "packages",
   "engineering",

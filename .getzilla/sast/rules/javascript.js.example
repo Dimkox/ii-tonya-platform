@@ -1,0 +1,62 @@
+const child_process = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+const express = require('express');
+
+const app = express();
+
+function runLookup(host) {
+  // ruleid: getzilla.javascript.command-injection
+  child_process.exec('nslookup ' + host);
+}
+
+app.get('/lookup', (req, res) => {
+  runLookup(req.query.host);
+  // ok: getzilla.javascript.command-injection
+  child_process.execFile('nslookup', [req.query.host]);
+  res.end();
+});
+
+app.post('/calc', (req, res) => {
+  // ruleid: getzilla.javascript.code-injection
+  res.json({ value: eval(req.body.expression) });
+});
+
+app.get('/user', async (req, res) => {
+  // ruleid: getzilla.javascript.sql-injection
+  await db.query(`SELECT * FROM users WHERE name = '${req.query.name}'`);
+  // ok: getzilla.javascript.sql-injection
+  await db.query('SELECT * FROM users WHERE name = $1', [req.query.name]);
+  // ok: getzilla.javascript.sql-injection
+  await db.query('SELECT * FROM users WHERE id = ' + parseInt(req.query.id, 10));
+  res.end();
+});
+
+app.get('/file', (req, res) => {
+  // ruleid: getzilla.javascript.path-traversal
+  fs.readFile('/srv/files/' + req.query.name, () => {});
+  // ok: getzilla.javascript.path-traversal
+  fs.readFile('/srv/files/' + path.basename(req.query.name), () => {});
+  res.end();
+});
+
+app.get('/proxy', async (req, res) => {
+  // ruleid: getzilla.javascript.ssrf
+  const answer = await axios.get(req.query.url);
+  res.json(answer.data);
+});
+
+app.get('/hello', (req, res) => {
+  // ruleid: getzilla.javascript.reflected-xss
+  res.send('<h1>Hello ' + req.query.name + '</h1>');
+  // ok: getzilla.javascript.reflected-xss
+  res.send('<h1>Hello ' + escapeHtml(req.query.name) + '</h1>');
+});
+
+app.get('/login', (req, res) => {
+  // ruleid: getzilla.javascript.open-redirect
+  res.redirect(req.query.next);
+  // ok: getzilla.javascript.open-redirect
+  res.redirect('/dashboard');
+});

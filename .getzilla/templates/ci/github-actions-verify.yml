@@ -1,0 +1,72 @@
+# Getzilla CI gate for a public repository.
+#
+# The CI/merge gate follows repository visibility (owner decision 2026-10-06):
+# a public repository is gated by GitHub Actions with this workflow; a private
+# repository is gated by the self-hosted Trust CI GitHub App instead and gets
+# no workflow. `python3 scripts/getzilla_ci.py --write` renders this template
+# into .github/workflows/getzilla-verify.yml; change it afterwards only through
+# a reviewed pull request.
+name: getzilla-verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "__GETZILLA_DEFAULT_BRANCH__"
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  getzilla-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact commit with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install test requirements
+        shell: bash
+        run: |
+          if [ -f .getzilla/config/python-test-requirements.txt ]; then
+            python -m pip install --disable-pip-version-check -r .getzilla/config/python-test-requirements.txt
+          fi
+          python -m pip install --disable-pip-version-check ruff==0.16.2 bandit==1.9.4
+      - name: Install OpenGrep for taint analysis
+        shell: bash
+        env:
+          OPENGREP_VERSION: "1.30.1"
+          OPENGREP_SHA256: "d3195b9d8d5ae93179f6aa5f5daaba6a920a5a09d38c5d5ae5e60924050210c4"
+        run: |
+          mkdir -p "$RUNNER_TEMP/opengrep"
+          curl -fsSL -o "$RUNNER_TEMP/opengrep/opengrep" "https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          echo "${OPENGREP_SHA256}  $RUNNER_TEMP/opengrep/opengrep" | sha256sum -c -
+          chmod 0755 "$RUNNER_TEMP/opengrep/opengrep"
+          echo "$RUNNER_TEMP/opengrep" >> "$GITHUB_PATH"
+      - name: Record startup capacity
+        run: python scripts/getzilla_startup_cpu.py --no-probe
+      - name: Getzilla verification
+        env:
+          GETZILLA_OSV_ONLINE: "1"
+        run: python scripts/getzilla_verify.py --mode pr
+      - name: Export CI evidence
+        id: export_evidence
+        if: always()
+        run: python scripts/getzilla_ci_evidence.py --output "${{ runner.temp }}/getzilla-evidence" --job getzilla-verify --status "${{ job.status }}"
+      - name: Retain CI evidence for 30 days
+        if: always() && steps.export_evidence.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: getzilla-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/getzilla-evidence/
+          retention-days: 30
+          if-no-files-found: error
