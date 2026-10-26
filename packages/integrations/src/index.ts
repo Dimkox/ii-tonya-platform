@@ -185,6 +185,7 @@ export type {
   YooKassaOperationKind,
   YooKassaOperationPort,
   YooKassaOperationStatus,
+  YooKassaReceiptAuthority,
   YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./yookassa/operation-port.js";

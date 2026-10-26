@@ -172,11 +172,8 @@ export class PostgresExpertCampaignOrderRepository {
                   throw new ExpertCampaignOrderError(
                     "EXPERT_CAMPAIGN_IDEMPOTENCY_CONFLICT",
                   );
-                await lockPayerReceiptSelection(
-                  tx,
-                  { ...command, receiptContactId },
-                  this.receiptVault,
-                );
+                // Replaying this immutable selection does not disclose it.
+                // Fresh orders still require a live, decryptable contact below.
               }
               // Return the committed expiry, never throw after the release and undo it.
               if (
