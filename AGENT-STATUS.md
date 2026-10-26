@@ -1,3 +1,21 @@
+# Resident verification Schema+Form Logic starting — 2026-10-26
+
+Active branch codex/verification-schema-form-20261026 in this existing isolated
+worktree; baseline1a006fff4e2985fd83b72f3c67a66823fab87078 is pushed on
+origin/codex/phase1-owner-plan-20261023. The owner requests a first-part draft PR
+containing schema and real dynamic form, not OCR/social/LLM provider activation.
+New order is verification BEFORE pricing; new approval must not call the old
+invoice-producing decision. Preserve issued quotes, paid access and audit history.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Plan: docs/superpowers/plans/2026-10-26-verification-schema-form.md
+RequireDocker preflight passed Node24.22.1/pnpm11.9.0/PG-compatible Docker tools;
+no.env or credentials were used. Schema/form and identity audits are complete.
+Existing owner opt-out from routine approvals/focused run-count questions persists.
+No blind repeats or weakened checks. Push+draft PR are authorized by this request;
+merge/deploy/live activation are not. Root owns coordinator evidence/final gate;
+fresh implementer owns source, plan/status and implementation evidence.
+
 # Owner payment/offer corrections locally complete — 2026-10-23
 
 Verified implementation:3466408a54fb6796b386d0c1da428ae283e40dd1 on
