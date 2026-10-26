@@ -48,6 +48,22 @@
       "capture_sha256": "22b5aba5e84f66aad9e3f7a15d4e96f68c9bcadfb78e281ef135b87dd9d04481",
       "capture_bytes": 7892,
       "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-push-gate-1793041632945921932.log.gz",
+      "sha256": "95d118572ac278247ff9b65db48efbbed4ee455c42730da6358200c6b26908d0",
+      "bytes": 436,
+      "capture_sha256": "54b82349d73f6f1f2cac480856aff94c42c6a8d374ce08757abc35338b4b979c",
+      "capture_bytes": 926,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-push-repo-1793041632945921932.log.gz",
+      "sha256": "3117902f9585ef68e550ba25e5c692e166df6e05efa3b644d715989f77766b59",
+      "bytes": 2245,
+      "capture_sha256": "0eb6097227647279e01505b0b2b02fa661126a3d238aa49e2f89f9774cbc4f75",
+      "capture_bytes": 7892,
+      "encoding": "gzip"
     }
   ]
 }

@@ -88,16 +88,16 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabili
 - [x] Focused tests, independent review, exact metadata/guard registrations and final local branch gate.
 - [x] Draft [STABILIZATION PR110](https://github.com/Dimkox/ii-tonya-platform/pull/110), based on the surviving development branch after owner-merged PR108.
 
-### S0.5 — Separated sales (verified; remote delivery in progress)
+### S0.5 — Separated sales (delivered)
 
 Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md`.
 
 - [x] Immutable base offer, explicit positive response, separate promo/base choice.
 - [x] Existing form/manager bridge, fixed3000 fee attempts and strict expired-payment handling.
 - [x] Authoritative fee settlement locks selected terms for first main invoice and renewals.
-- [ ] Real normal-composition acceptance, independent review, mandatory gate and draft sales PR.
+- [x] Real normal-composition acceptance, independent review, mandatory gate and [Draft sales PR111](https://github.com/Dimkox/ii-tonya-platform/pull/111).
 
-### S1 — Blocking content safety
+### S1 — Blocking content safety (current)
 
 - [ ] Versioned active forbidden-pattern registry, at least20 effective rules,
       BLOCKER/WARNING semantics, tags filtering, incident hashes and guarded reload.

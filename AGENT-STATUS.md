@@ -1,3 +1,22 @@
+# Sales delivered; blocking content safety next — 2026-10-26
+
+Draft PR111 is OPEN/mergeable at1ac2091735836fe2a07ed0e8d95bd749f5617e80:
+https://github.com/Dimkox/ii-tonya-platform/pull/111
+Base codex/residency-foundation-20261026 at66cb3fd5 (DraftPR110 still open).
+All14 sales review groups closed. Canonical full gate and mandatory push gate
+passed575/575; full tests typecheck passed. Failed checks and exact corrections
+are retained. Sales source is complete; no live activation, deployment or merge.
+
+Active branch codex/residency-content-safety-20261026 uses the SAME isolated
+.worktrees/phase1-owner-plan-20261023 directory. Next block is the approved
+content_safety_filter from docs/source/residency-phase1-owner-2026-10-26.
+Do not restart completed sales/core work. Read-only preparation is in
+/tmp/phase1-next-safety-preparation-20261026.md. Next hand SQL migration0061.
+Continue BMad's already-rendered workflow, not a new render or recursive lead.
+Root owns specification/review/delivery; assign explicit nonoverlapping source
+ownership. Owner autonomy, bounded tests and no routine approval loops persist.
+Reuse one task-owned PG17.5 cluster and protected compose configuration.
+
 # Separated sales verified; push next — 2026-10-26
 
 Active isolated worktree: .worktrees/phase1-owner-plan-20261023, branch
