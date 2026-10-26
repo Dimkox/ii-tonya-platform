@@ -2,7 +2,7 @@
 title: Guard resident content with bounded rules and human warning review
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 1ac2091735836fe2a07ed0e8d95bd749f5617e80
 review_loop_iteration: 1
 context:
@@ -99,10 +99,10 @@ introduce a second application stack, paid LLM, new client cabinet or Kanban pro
 
 ## Tasks & Acceptance
 
-- [ ] Add0061 registry, bounded interpreter, policy activation, exact safety/outcome/incident and effective-content correction structures; hand SQL+journal/schema/state reconstruction and privacy guards.
-- [ ] Seed effective source rules with provenance and positive witnesses; implement atomic hot reload and bounded failure behavior.
-- [ ] Wire normal bot corrections, save/import/tags/submit, manager detail/edit/acknowledgment and new publication guards.
-- [ ] Execute full matrix, legacy compatibility and policy races; precise boundary/inventory negative probes, metadata, builds/types/lint; retain RED/GREEN evidence and local commit.
+- [x] Add0061 registry, bounded interpreter, policy activation, exact safety/outcome/incident and effective-content correction structures; hand SQL+journal/schema/state reconstruction and privacy guards.
+- [x] Seed effective source rules with provenance and positive witnesses; implement atomic hot reload and bounded failure behavior.
+- [x] Wire normal bot corrections, save/import/tags/submit, manager detail/edit/acknowledgment and new publication guards.
+- [x] Execute full matrix, legacy compatibility and policy races; precise boundary/inventory negative probes, metadata, builds/types/lint; retain RED/GREEN evidence and local commit.
 
 Acceptance includes every seeded rule's positive witness; Cyrillic/mixed case,
 NBSP/newline, percentage endings and benign containing words; caps49/50/51;
@@ -165,3 +165,34 @@ RED before behavior; focused GREEN, relevant old-path compatibility, affected
 builds/types/lint/format/diff checks. No unchanged broad repeats; repeat helper≤3.
 Retain complete logs/hashes and distinguish skipped cases. Root owns canonical
 final gate/independent review; no hosted CI exists, no release claim from local tests.
+
+## Suggested Review Order
+
+**Normal private workflow**
+
+- Trace owner commands and refusal rendering through the existing paid-interview workflow.
+  [expert-card-service.ts:237](../../../packages/application/src/expert-card-service.ts#L237)
+
+**Database authority**
+
+- Authorize immutable publication facts and bind activation to a fresh generation.
+  [0061_resident_content_safety.sql:124](../../../packages/db/migrations/0061_resident_content_safety.sql#L124)
+
+- Apply bounded normalized rules and bind exact content to current policy.
+  [0061_resident_content_safety.sql:176](../../../packages/db/migrations/0061_resident_content_safety.sql#L176)
+
+**Recovery and human review**
+
+- Preserve originals while repairing current content at the raw-entry cap.
+  [expert-card-repository.ts:829](../../../packages/db/src/repositories/expert-card-repository.ts#L829)
+
+- Require fresh manager authority and explicit current warning acknowledgment.
+  [expert-card-repository.ts:1424](../../../packages/db/src/repositories/expert-card-repository.ts#L1424)
+
+- Propagate committed refusals without reporting false success.
+  [expert-card-client.ts:292](../../../apps/web/src/expert-card-client.ts#L292)
+
+**Acceptance evidence**
+
+- Verify underlying SQL authorization and old-proof invalidation after authorized rollback.
+  [resident-content-safety.test.ts:1003](../../../tests/integration/resident-content-safety.test.ts#L1003)

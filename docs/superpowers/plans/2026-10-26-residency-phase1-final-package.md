@@ -97,21 +97,21 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sa
 - [x] Authoritative fee settlement locks selected terms for first main invoice and renewals.
 - [x] Real normal-composition acceptance, independent review, mandatory gate and [Draft sales PR111](https://github.com/Dimkox/ii-tonya-platform/pull/111).
 
-### S1 — Blocking content safety (current)
+### S1 — Blocking content safety (verified; delivery pending)
 
 Contract: `docs/superpowers/implementation-artifacts/spec-resident-content-safety.md`.
-Implementation is in progress on `codex/residency-content-safety-20261026`;
-independent review and delivery remain outstanding.
+Implementation is independently accepted on `codex/residency-content-safety-20261026`.
+Canonical final gate578/578 passes; mandatory push and draft PR are next.
 
-- [ ] Versioned active forbidden-pattern registry, at least20 effective rules,
+- [x] Versioned active forbidden-pattern registry, at least20 effective rules,
       BLOCKER/WARNING semantics, tags filtering, incident hashes and guarded reload.
-- [ ] Unicode-aware matching: the supplied ASCII word-boundary examples do not
+- [x] Unicode-aware matching: the supplied ASCII word-boundary examples do not
       reliably match Cyrillic. Correct malformed examples/placeholder character
       classes explicitly, preserving original source/provenance and intended policy.
-- [ ] Bind safety results to exact draft/service/tag revision and policy. Block
+- [x] Bind safety results to exact draft/service/tag revision and policy. Block
       unsafe new writes/submission; warn for explicitly sensitive practices such as
       custom #приворот. Do not blanket-ban approved CAT_03 or treat taxonomy as proof.
-- [ ] Bounded safe regex execution; malformed/unsafe policy cannot crash workers or
+- [x] Bounded safe regex execution; malformed/unsafe policy cannot crash workers or
       silently authorize publication. No legal-compliance guarantee from regex alone.
 
 ### S2 — Final verification and communications
