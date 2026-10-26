@@ -97,11 +97,12 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sa
 - [x] Authoritative fee settlement locks selected terms for first main invoice and renewals.
 - [x] Real normal-composition acceptance, independent review, mandatory gate and [Draft sales PR111](https://github.com/Dimkox/ii-tonya-platform/pull/111).
 
-### S1 — Blocking content safety (verified; delivery pending)
+### S1 — Blocking content safety (delivered)
 
 Contract: `docs/superpowers/implementation-artifacts/spec-resident-content-safety.md`.
 Implementation is independently accepted on `codex/residency-content-safety-20261026`.
-Canonical final gate578/578 passes; mandatory push and draft PR are next.
+Canonical full gate and mandatory push passed578/578.
+Delivered [Draft PR112](https://github.com/Dimkox/ii-tonya-platform/pull/112) at53df4d2f.
 
 - [x] Versioned active forbidden-pattern registry, at least20 effective rules,
       BLOCKER/WARNING semantics, tags filtering, incident hashes and guarded reload.
@@ -114,7 +115,14 @@ Canonical final gate578/578 passes; mandatory push and draft PR are next.
 - [x] Bounded safe regex execution; malformed/unsafe policy cannot crash workers or
       silently authorize publication. No legal-compliance guarantee from regex alone.
 
-### S2 — Final verification and communications
+### S2 — Final verification and communications (current)
+
+Active branch: `codex/residency-verification-messages-20261026` in the same isolated tree.
+The latest owner sales order controls this block: selected tariff precedes form;
+manager approval reuses fixed3000 invoice and genuine payment alone locks price.
+Earlier no-auto-invoice/tariff-after-verification wording below is historical only.
+Reuse the existing manager interface; Kanban stays Phase2. Prepare the bounded
+implementation contract after read-only form, decision/delivery and private-job audits.
 
 - [ ] Versioned form expansion for final role fields, no-status tax help and optional
       evidence. Preserve earlier submitted versions and pending private references.

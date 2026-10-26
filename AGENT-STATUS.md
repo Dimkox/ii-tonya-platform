@@ -1,3 +1,22 @@
+# Content safety delivered; final verification/messages next — 2026-10-26
+
+Draft PR112 OPEN at53df4d2fbbe09038bde2298e4642cee4247fbe2b:
+https://github.com/Dimkox/ii-tonya-platform/pull/112
+Base codex/separated-residency-sales-20261026 at1ac20917 (PR111 still open).
+Runtime2419347c independently acceptedR1–R4; R5 was disproved/rejected. Full gate
+and mandatory push578/578, PG14/14, browser26/26; retained failed/passing evidence.
+No source work remains for safety. No merge/deployment/provider activation.
+
+Active branch codex/residency-verification-messages-20261026 uses the same isolated
+.worktrees/phase1-owner-plan-20261023 directory. Next approved blockS2: final dynamic
+verification and communication templates. Owner sources/master plan control;
+latest sales order overrides older no-invoice/tariff-after-verification wording.
+Reuse existing form/manager/worker authority; no second stack or Phase2 Kanban.
+Root prepares contract after read-only bounded audits, then assigns one implementer.
+BMad workflow is already rendered once; do not rerender or restart core/sales/safety.
+User autonomy and run-count/split/approval opt-out persist. Reuse one protected
+PG17.5 task cluster; next hand migration0062. No live commands/reviewers currently.
+
 # Content safety accepted; delivery next — 2026-10-26
 
 Current isolated worktree .worktrees/phase1-owner-plan-20261023 on
