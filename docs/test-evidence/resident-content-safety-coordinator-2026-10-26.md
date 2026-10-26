@@ -55,3 +55,56 @@ The final three-layer review is read-only. Concrete accepted findings go to the 
 implementer in one bounded corrective batch, preserving good code. No routine approval,
 re-derivation or quota loop. Final local gates and push evidence will be recorded after
 implementation and independent review; hosted CI does not exist in this repository.
+
+## First behavioral RED
+
+Root inspected `.superpowers/sdd/resident-content-safety-20261026/red.log`: one
+expected failing PG test at19:25UTC reproduces unsafe answer persistence. The
+expected blocked outcome and zero entries instead returned one stored entry.
+This establishes the missing behavior, not successful moderation. No root tests
+ran in parallel with implementer verification. Separate append-only correction
+data is selected to keep legacy100-entry drafts correctable without raising the
+raw-entry cap; acceptance must still prove the real bot path.
+
+## First focused GREEN
+
+Root inspected `green-initial.log` and `green-first.log`: the first migration
+attempt failed on heterogeneous trigger NEW field resolution before the test ran;
+that failure is retained, not counted as RED behavior or a pass. After branch-specific
+field assignment, the focused PG case passed1/1 at19:31UTC. Unsafe content is absent,
+one incident persists, and replay remains blocked without duplication. This is
+partial acceptance only; the full matrix, source/type/metadata checks and independent
+review are still outstanding.
+
+## Initial matrix GREEN
+
+Root inspected `matrix2.log`:9/9 integration cases pass at19:33UTC, covering
+real work ingress, uploaded-file fallback, correction at the raw-entry limit, manager
+API acknowledgment, tag-value binding, policy activation/race, SQL rejection and
+erasure. This is an in-flight result; final delivery still needs completed compatibility,
+metadata/static checks and independent source review. Root identified oversized
+answer-list and multi-rule feedback rendering in the current bot diff; implementer
+is bounding/paginating those actual user paths before final acceptance.
+
+## Compatibility and bounded-input correction
+
+Root read UI11/11 and publication/main-payment20/20 successful logs. Selected
+core compatibility passed16 cases with1 explicitly skipped; not17/17. A new
+near-limit accepted-input probe in `bounds.log` fails on the existing2-second
+statement timeout during repeated normalization. This is a real availability defect
+inside the advertised input size, not justification to raise timeout/file ceilings.
+Implementer is correcting shared normalization/scanning and will retain this failure
+alongside focused post-fix evidence. Metadata generated before that correction must
+be regenerated to match the final SQL exactly.
+
+## Expanded matrix candidate
+
+Root inspected `bounds-green.log` (one focused pass,9 filtered skips) and
+`matrix-final.log` (12/12 passed, no skips,19:41UTC). Normalize-once resolves the
+valid-size timeout; the latter full focused file includes the near64KB document
+and100 large Cyrillic fields under the unchanged2-second limit. It also checks
+13 bounded answer pages, genuinely eligible activation becoming ineligible after
+a tag-label change, corrupted policy engine/program denial, lock exhaustion and
+removal of legacy forbidden selections. These supersede the initial9-case count.
+No final source acceptance yet: metadata/static verification and independent review
+are still required before the mandatory delivery gate.
