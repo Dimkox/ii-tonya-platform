@@ -137,11 +137,13 @@ explicit five insults only; no invented broad abusive vocabulary.
 ## Spec Change Log
 
 - Review iteration1: preserve working bounded matching, owner/finance/privacy gates,
-  committed outcomes and correction history. Close concrete R1–R5 findings in
+  committed outcomes and correction history. Close concrete R1–R4 findings in
   `docs/test-evidence/resident-content-safety-review-2026-10-26.md`: authorized
   underlying policy transitions and nonresurrecting rollback, proposal recovery
   at the raw-entry cap, non-swallowing fault assertions, actual browser refusal
   coverage and known-refusal UI recovery without weakening unknown-send retries.
+  R5 was rejected after exact candidate inspection: failed() already clears known
+  refused commands. R4 tests that existing behavior without an unnecessary redesign.
   Owner autonomy overrides routine re-derivation/approval loops; one corrective batch.
 
 ## Execution & Verification
