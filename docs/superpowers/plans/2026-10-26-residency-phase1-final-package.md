@@ -92,9 +92,9 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabili
 
 Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md`.
 
-- [ ] Immutable base offer, explicit positive response, separate promo/base choice.
-- [ ] Existing form/manager bridge, fixed3000 fee attempts and strict expired-payment handling.
-- [ ] Authoritative fee settlement locks selected terms for first main invoice and renewals.
+- [x] Immutable base offer, explicit positive response, separate promo/base choice.
+- [x] Existing form/manager bridge, fixed3000 fee attempts and strict expired-payment handling.
+- [x] Authoritative fee settlement locks selected terms for first main invoice and renewals.
 - [ ] Real normal-composition acceptance, independent review, mandatory gate and draft sales PR.
 
 ### S1 — Blocking content safety

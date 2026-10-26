@@ -192,7 +192,6 @@ Implementation handoff evidence: `docs/test-evidence/residency-separated-sales-i
 Independent review and final exact-commit gate remain coordinator-owned; status stays
 in-progress until those complete.
 
-
 ### Review remediation execution note — 2026-10-26
 
 R1–R14 are implemented as an additive correction to the same frozen intent.
@@ -211,3 +210,46 @@ R3 bounded closure additionally verifies the existing0059 order submit → follo
 same-owner submission work, rather than retaining the bridge's mutable revision.
 The original-order and erasure upgrade cases remain covered; frozen intent and
 in-review status are unchanged.
+
+## Suggested Review Order
+
+**Separated sales and owner choices**
+
+- Start with the actual private-bot flow and explicit price choices.
+  [expert-separated-sales-service.ts:41](../../../packages/application/src/expert-separated-sales-service.ts#L41)
+
+- Persist immutable base and owner-bound selections; refresh only provisional terms.
+  [expert-separated-sales-repository.ts:95](../../../packages/db/src/repositories/expert-separated-sales-repository.ts#L95)
+
+**Payment and submission authority**
+
+- Upgrade genuine submitted-form proof without losing supplemental answers or erasure.
+  [0060_separated_sales_review_corrections.sql:4](../../../packages/db/migrations/0060_separated_sales_review_corrections.sql#L4)
+
+- Persist exact custody before bounded sends; reconcile uncertain operations through GET.
+  [expert-held-onboarding-repository.ts:168](../../../packages/db/src/repositories/expert-held-onboarding-repository.ts#L168)
+
+- Record every genuine payment, but grant one eligible permanent price lock.
+  [expert-verification-repository.ts:491](../../../packages/db/src/repositories/expert-verification-repository.ts#L491)
+
+- Reuse locked terms for initial main invoices and both renewal paths.
+  [expert-separated-sales-repository.ts:378](../../../packages/db/src/repositories/expert-separated-sales-repository.ts#L378)
+
+**Notifications and operational wiring**
+
+- Lease preparation, fence actual delivery, and cancel superseded notices.
+  [expert-sales-scheduler.ts:128](../../../packages/db/src/repositories/expert-sales-scheduler.ts#L128)
+
+- Compose held checkout and authoritative webhook processing behind reviewed capabilities.
+  [expert-verification-composition.ts:90](../../../apps/api/src/expert-verification-composition.ts#L90)
+
+**Verification and support**
+
+- Inspect fault recovery, ownership, erasure, and composed webhook acceptance.
+  [expert-separated-sales-state.test.ts:1027](../../../tests/integration/expert-separated-sales-state.test.ts#L1027)
+
+- Review actual migration upgrades with both supplemental-answer orderings and erasure.
+  [expert-sales-upgrade.test.ts:9](../../../tests/integration/expert-sales-upgrade.test.ts#L9)
+
+- Follow independent findings, remediation, and exact-candidate closure.
+  [residency-separated-sales-review-2026-10-26.md:1](../../test-evidence/residency-separated-sales-review-2026-10-26.md#L1)
