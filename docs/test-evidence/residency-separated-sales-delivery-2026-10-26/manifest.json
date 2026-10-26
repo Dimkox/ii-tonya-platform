@@ -32,6 +32,22 @@
       "capture_sha256": "264181cc7969d3647749b3eea6f23d2879fc59770d248d404dd9e283048734c9",
       "capture_bytes": 365,
       "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-gate-1793041429704613404.log.gz",
+      "sha256": "63a931d3089600775d1c0d2114e575d94b541175d7830e82bc2e25027c9384d0",
+      "bytes": 263,
+      "capture_sha256": "ba4bb3ce0cb4202f3b6bfb143e4e953f1f4bd2301e966ed0089e8d490836fbaa",
+      "capture_bytes": 477,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-repo-1793041429704613404.log.gz",
+      "sha256": "b0032cea28e867d67126f145c0c4442d4afaeeba0db195238210bb08d9a9c7a9",
+      "bytes": 2267,
+      "capture_sha256": "22b5aba5e84f66aad9e3f7a15d4e96f68c9bcadfb78e281ef135b87dd9d04481",
+      "capture_bytes": 7892,
+      "encoding": "gzip"
     }
   ]
 }

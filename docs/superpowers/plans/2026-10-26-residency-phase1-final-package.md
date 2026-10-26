@@ -88,7 +88,7 @@ Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabili
 - [x] Focused tests, independent review, exact metadata/guard registrations and final local branch gate.
 - [x] Draft [STABILIZATION PR110](https://github.com/Dimkox/ii-tonya-platform/pull/110), based on the surviving development branch after owner-merged PR108.
 
-### S0.5 — Separated sales (active, latest owner priority)
+### S0.5 — Separated sales (verified; remote delivery in progress)
 
 Contract: `docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md`.
 

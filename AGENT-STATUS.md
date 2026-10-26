@@ -1,3 +1,23 @@
+# Separated sales verified; push next — 2026-10-26
+
+Active isolated worktree: .worktrees/phase1-owner-plan-20261023, branch
+codex/separated-residency-sales-20261026. Reviewed runtime source8bd15f1f; all
+R1–R14 closed. Exact guard inventory correction independently reviewed. Full
+canonical gate at `91fa6ca127d6ddd0b4a421e90c53ff4e30f473df` passed575/575 plus tests typecheck and
+all seven checks. Spec-residency-separated-sales.md is done for development.
+Root is recording acceptance then pushing through the active mandatory hook and
+creating the authorized draft PR against codex/residency-foundation-20261026.
+PR110 is still Draft/open at66cb3fd5; confirm remote state if it changes.
+No hosted CI, deployment, provider activation or actual money operation inferred.
+
+Continue the full owner package after delivery: blocking resident content safety,
+final verification/templates, rich onboarding, local tags, dynamic slots/lifecycle.
+Use existing master/source docs and one task-owned PG cluster; preserve original
+consent/erasure, financial gates and owner autonomy. No repeated permission, split
+or run-count loops; no unneeded reruns. BMad is already rendered once. Root has
+read-only next-safety preparation at /tmp/phase1-next-safety-preparation-20261026.md.
+Sales reviewers/implementer are completed; no source work remains assigned to them.
+
 # Separated sales active; stabilization delivered — 2026-10-26
 
 Draft PR110 is open at66cb3fd5d2bf18ce3da29d3cca17cbe39ab8aa7b:

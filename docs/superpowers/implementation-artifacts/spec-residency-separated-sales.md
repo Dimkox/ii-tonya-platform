@@ -2,7 +2,7 @@
 title: Separate base sales and freeze residency terms on verified onboarding payment
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 66cb3fd5d2bf18ce3da29d3cca17cbe39ab8aa7b
 review_loop_iteration: 0
 context:
@@ -189,8 +189,7 @@ verified paid lock. Work-bot current-tariff reads show only the selected paid to
 and period. New provider and sales flags remain off by default.
 
 Implementation handoff evidence: `docs/test-evidence/residency-separated-sales-implementation-2026-10-26.md`.
-Independent review and final exact-commit gate remain coordinator-owned; status stays
-in-progress until those complete.
+Independent review and the full local gate are complete; remote delivery remains coordinator-owned.
 
 ### Review remediation execution note — 2026-10-26
 
@@ -210,6 +209,18 @@ R3 bounded closure additionally verifies the existing0059 order submit → follo
 same-owner submission work, rather than retaining the bridge's mutable revision.
 The original-order and erasure upgrade cases remain covered; frozen intent and
 in-review status are unchanged.
+
+## Local Acceptance
+
+All R1–R14 are independently closed at source8bd15f1f. The exact inventory-only
+correction is separately reviewed. Canonical full gate passed at `91fa6ca127d6ddd0b4a421e90c53ff4e30f473df`:
+62 repository files/575 tests, tests typecheck and all seven checks. Initial gate
+failures and focused corrections are retained in the delivery evidence. No hosted
+CI exists by repository policy; these results do not authorize live activation.
+The selected-price/expiry, normal ingress, payment faults, privacy, main/renewal
+and real0059→0060 upgrade acceptance are linked in the implementation/remediation
+and independent-review records. Spec completion concerns this development block;
+the complete Phase1 package continues after remote delivery.
 
 ## Suggested Review Order
 

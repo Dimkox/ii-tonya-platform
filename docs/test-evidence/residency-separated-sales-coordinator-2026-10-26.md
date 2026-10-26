@@ -167,3 +167,13 @@ The original edge reviewer independently accepted this precise diff; no suites
 were rerun by the reviewer. Failed gate and focused logs are losslessly retained
 in residency-separated-sales-delivery-2026-10-26/logs with hashes. No bypass.
 The corrected full gate remains required before delivery.
+
+## Canonical final gate PASS
+
+Clean candidate `91fa6ca127d6ddd0b4a421e90c53ff4e30f473df` passed all seven canonical full-gate checks:
+bash syntax, formatting, whitespace, evidence integrity, changed-file lint,
+62 repository files/575 tests, and tests typecheck. Complete raw outputs are
+archived alongside the failed first attempt. Source corrections remain independently
+accepted; no test weakening or bypass occurred. This subsequent commit records
+acceptance and marks the spec done; the normal push hook must still verify its
+exact head. Hosted CI is absent by repository policy. Remote delivery is next.
