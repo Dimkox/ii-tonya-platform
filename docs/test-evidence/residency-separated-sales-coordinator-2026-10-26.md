@@ -154,3 +154,16 @@ only the unpublished0060 backfill, upgrade test and corresponding metadata/evide
 metadata17/17 pass, with relevant types/lint/format/whitespace checks.
 The shared mandatory pre-push hook is active. Final canonical full gate is next.
 No story_key exists, so BMad sprint synchronization is inapplicable.
+
+## Final gate inventory correction
+
+Canonical full gate at clean502af7c938d69253b4f6bc5e2cb1d389d90e707c exited1:
+573/575 repository tests passed, with all other checks including full tests
+typecheck passing. Two exact inventory assertions still named the pre-sales
+migrations/relations/flags/routes and journal tail. Root updated only their
+literal expected lists to the independently reviewed0059/0060 registration;
+classifier, runtime and negative probes are unchanged. Focused10/10 and3/3 pass.
+The original edge reviewer independently accepted this precise diff; no suites
+were rerun by the reviewer. Failed gate and focused logs are losslessly retained
+in residency-separated-sales-delivery-2026-10-26/logs with hashes. No bypass.
+The corrected full gate remains required before delivery.
