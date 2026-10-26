@@ -118,6 +118,10 @@ Delivered [Draft PR112](https://github.com/Dimkox/ii-tonya-platform/pull/112) at
 ### S2 — Final verification and communications (current)
 
 Active branch: `codex/residency-verification-messages-20261026` in the same isolated tree.
+S2a contract: `docs/superpowers/implementation-artifacts/spec-final-verification-messages.md`.
+S2a completes versioned forms, decisions/follow-ups/reapplication and communication
+custody; S2b then connects private file extraction, OCR/social checks and safe links
+to those stable submission/check generations. Both remain required within S2.
 The latest owner sales order controls this block: selected tariff precedes form;
 manager approval reuses fixed3000 invoice and genuine payment alone locks price.
 Earlier no-auto-invoice/tariff-after-verification wording below is historical only.
