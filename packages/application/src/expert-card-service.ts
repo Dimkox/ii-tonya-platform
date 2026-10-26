@@ -46,6 +46,12 @@ export interface DraftTagPage {
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
+  changeDocumentProposal?(
+    input: ExpertCardEvent & {
+      expectedRevision: number;
+      replacement: string | null;
+    },
+  ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   readOwnAnswers?(
     scope: ExpertCardScope,
   ): Promise<{ revision: number; fields: Record<string, string> }>;
@@ -188,6 +194,10 @@ const quoteCommand = new RegExp(
 );
 const acceptCommand = new RegExp(`^/main_accept (${uuid}) ${revision}$`, "u");
 const invoiceCommand = new RegExp(`^/main_invoice ${revision}$`, "u");
+const documentCommand = new RegExp(
+  `^/card_document ${revision} (discard|replace)(?: ([\\s\\S]+))?$`,
+  "u",
+);
 const correctCommand = new RegExp(
   `^/card_correct ${revision} (${uuid}) ([\\s\\S]+)$`,
   "u",
@@ -476,7 +486,7 @@ export function createExpertCardService(deps: {
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_answers|card_correct|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
+          !/^\/(?:card|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -496,12 +506,35 @@ export function createExpertCardService(deps: {
           const pages = Math.max(1, Math.ceil(lines.length / 8));
           const page = Math.min(Number(answerPage[1] ?? 0), pages - 1);
           return reply(
-            `Ревизия ${answers.revision}. Страница ${page + 1}/${pages}. Исправление: /card_correct ${answers.revision} ID новый текст\n${lines
+            `Ревизия ${answers.revision}. Страница ${page + 1}/${pages}. Исправление: /card_correct ${answers.revision} ID новый текст. Предложение из файла: /card_document ${answers.revision} discard — удалить; /card_document ${answers.revision} replace новый текст — заменить (от 50 символов).\n${lines
               .slice(page * 8, page * 8 + 8)
               .map(([key, value]) => `${key.slice(6)}: ${value.slice(0, 80)}`)
               .join(
                 "\n",
               )}\n${page + 1 < pages ? `/card_answers ${page + 1} — следующие ответы` : ""}`,
+          );
+        }
+        const documentChange = documentCommand.exec(text);
+        if (documentChange && deps.repository.changeDocumentProposal) {
+          if (
+            (documentChange[2] === "discard" &&
+              documentChange[3] !== undefined) ||
+            (documentChange[2] === "replace" && !documentChange[3])
+          )
+            return { status: "rejected" };
+          const result = await deps.repository.changeDocumentProposal({
+            ...event,
+            expectedRevision: Number(documentChange[1]),
+            replacement:
+              documentChange[2] === "discard" ? null : documentChange[3]!,
+          });
+          return (
+            safetyReply(result) ??
+            (result.replay
+              ? { status: "duplicate" }
+              : reply(
+                  `Предложение из файла ${documentChange[2] === "discard" ? "удалено" : "заменено"}. Исходные файлы и история сохранены. Ревизия ${result.revision}.`,
+                ))
           );
         }
         const correction = correctCommand.exec(text);

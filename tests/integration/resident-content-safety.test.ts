@@ -298,6 +298,53 @@ async function assess(
     )
   ).rows[0]!.v;
 }
+async function probeSafetyFault(fault: "missing" | "engine" | "compiled") {
+  const rollback = new Error("synthetic_fault_probe_rollback");
+  let outcome:
+    | { kind: "accepted" }
+    | { kind: "denied"; code: string | undefined }
+    | undefined;
+  try {
+    await database.db.transaction(async (tx) => {
+      if (fault === "missing") {
+        await tx.execute(
+          sql`alter table resident_safety_active disable trigger user`,
+        );
+        await tx.execute(sql`delete from resident_safety_active`);
+      } else if (fault === "engine") {
+        await tx.execute(
+          sql`alter table resident_safety_policies disable trigger user`,
+        );
+        await tx.execute(
+          sql`update resident_safety_policies set engine='unknown' where id=(select policy_id from resident_safety_active)`,
+        );
+      } else {
+        await tx.execute(
+          sql`alter table forbidden_patterns disable trigger user`,
+        );
+        await tx.execute(
+          sql`update forbidden_patterns set compiled='{}' where policy_id=(select policy_id from resident_safety_active)`,
+        );
+      }
+      try {
+        await tx.execute(
+          sql`select resident_safety_assess('{"bio":"normal"}',1)`,
+        );
+        outcome = { kind: "accepted" };
+      } catch (error) {
+        outcome = {
+          kind: "denied",
+          code: (error as { cause?: { code?: string } }).cause?.code,
+        };
+      }
+      throw rollback;
+    });
+  } catch (error) {
+    if (error !== rollback) throw error;
+  }
+  if (!outcome) throw new Error("fault_probe_incomplete");
+  return outcome;
+}
 describe("resident content safety PG17.5", () => {
   beforeAll(async () => {
     database = await startExpertReferralTestDatabase();
@@ -830,16 +877,12 @@ describe("resident content safety PG17.5", () => {
     expect(await approving).toMatchObject({ safetyBlocked: true });
     expect((await assess({ bio: "обычная практика" })).blocked).toBe(true);
     await database.db.execute(
-      sql`update resident_safety_active set policy_id=${previous}::uuid`,
+      sql`select resident_safety_publish(${previous}::uuid,${managerId}::uuid,${manager.sessionHash})`,
     );
-    await database.db
-      .transaction(async (tx) => {
-        await tx.execute(sql`delete from resident_safety_active`);
-        await expect(
-          tx.execute(sql`select resident_safety_assess('{"bio":"normal"}',1)`),
-        ).rejects.toThrow();
-      })
-      .catch(() => {});
+    expect(await probeSafetyFault("missing")).toEqual({
+      kind: "denied",
+      code: "P0001",
+    });
     // Failed transactions leave the singleton intact; a missing policy cannot pass.
     expect(
       (
@@ -856,31 +899,11 @@ describe("resident content safety PG17.5", () => {
   });
   it("denies corrupted engines/programs and lock exhaustion without saving content", async () => {
     const f = await linked();
-    for (const fault of ["engine", "compiled"]) {
-      await database.db
-        .transaction(async (tx) => {
-          if (fault === "engine") {
-            await tx.execute(
-              sql`alter table resident_safety_policies disable trigger user`,
-            );
-            await tx.execute(
-              sql`update resident_safety_policies set engine='unknown' where id=(select policy_id from resident_safety_active)`,
-            );
-          } else {
-            await tx.execute(
-              sql`alter table forbidden_patterns disable trigger user`,
-            );
-            await tx.execute(
-              sql`update forbidden_patterns set compiled='{}' where policy_id=(select policy_id from resident_safety_active)`,
-            );
-          }
-          await expect(
-            tx.execute(
-              sql`select resident_safety_assess('{"bio":"normal"}',1)`,
-            ),
-          ).rejects.toThrow();
-        })
-        .catch(() => {});
+    for (const fault of ["engine", "compiled"] as const) {
+      expect(await probeSafetyFault(fault)).toEqual({
+        kind: "denied",
+        code: "P0001",
+      });
     }
     let release!: () => void, ready!: () => void;
     const hold = new Promise<void>((r) => (release = r)),
@@ -976,5 +999,194 @@ describe("resident content safety PG17.5", () => {
       ).rows[0]?.n,
     ).toBe(0);
     await expect(f.card.addEntry(input)).rejects.toThrow();
+  });
+  it("R1 rejects direct publication/pointer writes and never revives old review authority after authorized rollback", async () => {
+    const initial = (
+      await database.db.execute<{ policy_id: string }>(
+        sql`select policy_id from resident_safety_active`,
+      )
+    ).rows[0]!.policy_id;
+    const before = await assess({ bio: "обычная практика" });
+    const f = await linked();
+    await f.card.addEntry({
+      ...event(f.work),
+      expectedRevision: 0,
+      entry: { kind: "text", text: "#приворот" },
+    });
+    await f.card.submitDraft({ ...event(f.work), expectedRevision: 1 });
+    await f.card.editPublicCard({
+      sessionHash: manager.sessionHash,
+      applicationId: f.applicationId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+      publicCard,
+    });
+    const detail = (await f.card.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!;
+    await f.card.reviewCard({
+      sessionHash: manager.sessionHash,
+      applicationId: f.applicationId,
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
+      action: "approve",
+      warningAcknowledgment: detail.safety.digest,
+    });
+    await f.card.submitPromoProof({
+      ...event(f.work),
+      expectedRevision: 2,
+      proof: { kind: "link", reference: "https://example.org/promo" },
+    });
+    const confirmed = await f.card.confirmPromo({
+      sessionHash: manager.sessionHash,
+      applicationId: f.applicationId,
+      expectedRevision: 2,
+      idempotencyKey: randomUUID(),
+    });
+    const valid = async () =>
+      (
+        await database.db.execute(
+          sql`select expert_card_activation_gate_valid(${f.userId}::uuid,${confirmed.reviewId!}::uuid) valid`,
+        )
+      ).rows[0]?.valid;
+    expect(await valid()).toBe(true);
+
+    await expect(
+      database.db.execute(
+        sql`update resident_safety_active set policy_id=${initial}::uuid`,
+      ),
+    ).rejects.toThrow();
+    const candidate = randomUUID();
+    await expect(
+      database.db.execute(
+        sql`insert into resident_safety_policies(id,published_at) values(${candidate}::uuid,clock_timestamp())`,
+      ),
+    ).rejects.toThrow();
+    await database.db.execute(
+      sql`insert into resident_safety_policies(id) values(${candidate}::uuid)`,
+    );
+    await database.db.execute(
+      sql`insert into forbidden_patterns(policy_id,pattern_regex,category,severity_level,error_message_template,provenance,positive_witness) values(${candidate}::uuid,'обычная','MEDICAL_CLAIM','BLOCKER','Исправьте текст','regression','обычная')`,
+    );
+    await expect(
+      database.db.execute(
+        sql`update resident_safety_policies set published_at=clock_timestamp() where id=${candidate}::uuid`,
+      ),
+    ).rejects.toThrow();
+    const managerId = (
+      await database.db.execute<{ admin_id: string }>(
+        sql`select admin_id from admin_sessions where session_id_hash=${manager.sessionHash}`,
+      )
+    ).rows[0]!.admin_id;
+    await database.db.execute(
+      sql`insert into admin_role_assignments(admin_id,role) values(${managerId}::uuid,'security_admin') on conflict do nothing`,
+    );
+    await expect(
+      database.db.execute(
+        sql`select resident_safety_publish(${candidate}::uuid,${managerId}::uuid,${"sha256:" + "0".repeat(64)})`,
+      ),
+    ).rejects.toThrow();
+    await database.db.execute(
+      sql`select resident_safety_publish(${candidate}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+    );
+    expect((await assess({ bio: "обычная практика" })).blocked).toBe(true);
+    await expect(
+      database.db.execute(
+        sql`update resident_safety_active set policy_id=${initial}::uuid`,
+      ),
+    ).rejects.toThrow();
+    await database.db.execute(
+      sql`select resident_safety_publish(${initial}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+    );
+    expect(await valid()).toBe(false);
+    const after = await assess({ bio: "обычная практика" });
+    expect(after.blocked).toBe(false);
+    expect(after.policyId).toBe(before.policyId);
+    expect(after.digest).not.toBe(before.digest);
+  });
+  it("R2 discards and replaces a legacy blocked proposal through the owner bot at100 media entries", async () => {
+    const f = await linked();
+    const source = event(f.work);
+    await f.card.addEntry({
+      ...source,
+      expectedRevision: 0,
+      entry: { kind: "document", reference: "telegram:file:source_proposal" },
+    });
+    await f.card.completeDocumentImport({
+      ...source,
+      expectedRevision: 1,
+      proposal: { source: "pdf", content: "обычная практика ".repeat(8) },
+    });
+    const d = (await f.card.getWorkflow(f.work))!;
+    await database.db.execute(
+      sql`insert into expert_card_entries(draft_id,user_id,revision,kind,media_reference) select ${d.draftId}::uuid,${f.userId}::uuid,n,'document','telegram:file:original_'||n from generate_series(2,100) n`,
+    );
+    for (let revision = 2; revision <= 100; revision++)
+      await database.db.execute(
+        sql`update expert_card_drafts set revision=${revision} where id=${d.draftId}::uuid`,
+      );
+    await database.db.execute(
+      sql`update expert_card_drafts set document_proposal=jsonb_build_object('source','pdf','content',${"вылечу рак. " + "старое описание ".repeat(8)}::text) where id=${d.draftId}::uuid`,
+    );
+    const other = await linked();
+    const app = await workHttp(f.card);
+    const send = (text: string, scope = f.work, update = ++sequence) =>
+      app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers: {
+          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+        },
+        payload: {
+          update_id: update,
+          message: {
+            from: { id: Number(scope.telegramUserId) },
+            chat: { id: Number(scope.chatId), type: "private" },
+            text,
+          },
+        },
+      });
+    try {
+      await send("/card_document 100 discard", other.work);
+      await send("/card_document 99 discard");
+      expect(
+        (await f.card.readDraft(manager.sessionHash, f.applicationId))?.safety
+          .blocked,
+      ).toBe(true);
+      expect(
+        (
+          await send(
+            "/card_document 100 replace Работаю с темой благополучия. " +
+              "Описание консультации. ".repeat(3),
+          )
+        ).body,
+      ).toContain("Предложение из файла заменено");
+      expect((await f.card.getWorkflow(f.work))?.entryCount).toBe(100);
+      const update = ++sequence;
+      expect(
+        (await send("/card_document 101 discard", f.work, update)).body,
+      ).toContain("Предложение из файла удалено");
+      await send("/card_document 101 discard", f.work, update);
+      expect(
+        (
+          await database.db.execute(
+            sql`select count(*)::int n from resident_card_proposal_changes where draft_id=${d.draftId}::uuid`,
+          )
+        ).rows[0]?.n,
+      ).toBe(2);
+      expect(
+        (
+          await database.db.execute(
+            sql`select count(*)::int n from expert_card_entries where draft_id=${d.draftId}::uuid`,
+          )
+        ).rows[0]?.n,
+      ).toBe(100);
+      expect((await send("/card_submit 102")).body).toContain(
+        "передана менеджеру",
+      );
+    } finally {
+      await app.close();
+    }
   });
 });

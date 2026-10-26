@@ -202,3 +202,37 @@ it("does not accept an edit acknowledgement that fails to advance its revision",
     }),
   ).rejects.toThrow("verification_invalid_response");
 });
+
+it.each(["edit", "review"] as const)(
+  "R4 rejects committed %s refusals with private field reasons",
+  async (operation) => {
+    const client = createExpertCardClient(async () => ({
+      kind: "ok",
+      item: {
+        ...workflow,
+        status: "manager_review",
+        replay: false,
+        safetyBlocked: true,
+        safetyIssues: [
+          {
+            field: "public:summary",
+            ruleId: id,
+            severity: "BLOCKER",
+            reason: "Уберите обещание лечения.",
+          },
+        ],
+      },
+    }));
+    const command = {
+      expectedRevision: 3,
+      idempotencyKey: "safety-refusal-001",
+    };
+    const result =
+      operation === "edit"
+        ? client.edit(id, { ...command, publicCard })
+        : client.review(id, { ...command, action: "approve" });
+    await expect(result).rejects.toThrow(
+      "card_safety_blocked:public:summary: Уберите обещание лечения.",
+    );
+  },
+);

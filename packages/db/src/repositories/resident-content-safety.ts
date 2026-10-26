@@ -8,6 +8,8 @@ export interface ResidentSafetyIssue {
 }
 export interface ResidentSafetyAssessment {
   policyId: string;
+  publicationId: string;
+  generation: string;
   revision: number;
   digest: string;
   issues: ResidentSafetyIssue[];

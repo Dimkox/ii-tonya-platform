@@ -3,6 +3,7 @@ import {
   bindExpertCardReview,
   renderExpertCardReview,
 } from "./expert-card-view.js";
+import { createExpertCardClient } from "./expert-card-client.js";
 import type {
   ExpertCardAdminClient,
   ExpertCardDraft,
@@ -67,7 +68,7 @@ class E {
     if (!this.disabled) this.onclick?.();
   }
 }
-function setup() {
+function setup(clientOverride?: ExpertCardAdminClient) {
   const names = [
     "refresh",
     "queue",
@@ -100,7 +101,7 @@ function setup() {
       replay: false,
     })),
   };
-  let client: ExpertCardAdminClient | undefined = port;
+  let client: ExpertCardAdminClient | undefined = clientOverride ?? port;
   const unauthorized = vi.fn();
   let keySequence = 0;
   const ui = bindExpertCardReview(root as unknown as HTMLElement, {
@@ -374,4 +375,123 @@ it("lets the manager return an approved card whose current policy blocks its con
     id,
     expect.objectContaining({ action: "return_changes" }),
   );
+});
+
+it("R4 actual client refusal unlocks public correction and uses a fresh key without a success display", async () => {
+  const sent: Record<string, unknown>[] = [];
+  let current = { ...draft };
+  const client = createExpertCardClient(async (path, body) => {
+    if (body) {
+      sent.push(structuredClone(body as Record<string, unknown>));
+      if (sent.length === 1)
+        return {
+          kind: "ok",
+          item: {
+            ...current,
+            replay: false,
+            safetyBlocked: true,
+            safetyIssues: [
+              {
+                field: "public:summary",
+                ruleId: id,
+                severity: "BLOCKER",
+                reason: "Исправьте обещание лечения",
+              },
+            ],
+          },
+        };
+      current = {
+        ...current,
+        revision: 4,
+        publicCard: (body as { publicCard: typeof publicCard }).publicCard,
+      };
+      return { kind: "ok", item: { ...current, replay: false } };
+    }
+    return path.startsWith("?")
+      ? { kind: "ok", items: [current] }
+      : { kind: "ok", item: current };
+  });
+  const f = setup(client);
+  await select(f);
+  f.get("summary").value = "вылечу рак";
+  f.get("save").click();
+  await flush();
+  expect(f.get("status").textContent).toContain("Исправьте обещание лечения");
+  expect(f.get("status").textContent).not.toContain("Действие сохранено");
+  expect(f.get("summary").disabled).toBe(false);
+  f.get("summary").value = "Работаю с темой благополучия";
+  f.get("save").click();
+  await flush();
+  expect(sent).toHaveLength(2);
+  expect(sent[1]!.idempotencyKey).not.toBe(sent[0]!.idempotencyKey);
+  expect(sent[1]!.publicCard).toMatchObject({
+    summary: "Работаю с темой благополучия",
+  });
+  expect(f.get("status").textContent).toContain("Действие сохранено");
+});
+it("R4 actual client refusal permits fresh current-warning acknowledgment while unknown transport retains exact retry", async () => {
+  const sent: Record<string, unknown>[] = [];
+  let current: ExpertCardDraft = {
+    ...draft,
+    safety: {
+      policyId: id,
+      revision: 3,
+      digest: "a".repeat(64),
+      blocked: false,
+      issues: [
+        {
+          field: "entry:current",
+          ruleId: id,
+          severity: "WARNING",
+          reason: "Личное рассмотрение",
+        },
+      ],
+    },
+  };
+  const client = createExpertCardClient(async (path, body) => {
+    if (body) {
+      sent.push(structuredClone(body as Record<string, unknown>));
+      if (sent.length === 1) {
+        current = {
+          ...current,
+          safety: { ...current.safety!, digest: "b".repeat(64) },
+        };
+        return {
+          kind: "ok",
+          item: {
+            ...current,
+            replay: false,
+            safetyBlocked: true,
+            safetyIssues: current.safety!.issues,
+          },
+        };
+      }
+      if (sent.length === 2) throw new Error("network_unknown");
+      current = { ...current, status: "approved", approvedReviewId: reviewId };
+      return { kind: "ok", item: { ...current, replay: false } };
+    }
+    return path.startsWith("?")
+      ? { kind: "ok", items: [current] }
+      : { kind: "ok", item: current };
+  });
+  const f = setup(client);
+  await select(f);
+  f.get("warning-ack").checked = true;
+  f.get("warning-ack").onchange?.();
+  f.get("approve").click();
+  await flush();
+  expect(f.get("status").textContent).not.toContain("Действие сохранено");
+  await select(f);
+  expect(f.get("warning-ack").checked).toBe(false);
+  f.get("warning-ack").checked = true;
+  f.get("warning-ack").onchange?.();
+  f.get("approve").click();
+  await flush();
+  expect(sent[1]!.idempotencyKey).not.toBe(sent[0]!.idempotencyKey);
+  expect(sent[1]!.warningAcknowledgment).toBe("b".repeat(64));
+  expect(f.get("summary").disabled).toBe(true);
+  f.get("approve").click();
+  await flush();
+  expect(sent[2]).toEqual(sent[1]);
+  expect(f.get("status").textContent).toContain("Действие сохранено");
 });

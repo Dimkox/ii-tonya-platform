@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
+  bigint,
   pgTable,
   uuid,
   text,
@@ -10,18 +12,43 @@ import {
   unique,
   check,
 } from "drizzle-orm/pg-core";
+import { adminSessions } from "./audit.js";
 import { users } from "./identity.js";
 import { expertCardDrafts, expertCardEntries } from "./expert-cards.js";
 const created = () =>
   timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`clock_timestamp()`);
+const firstPublicationColumn = (): AnyPgColumn => residentSafetyPublications.id;
 export const residentSafetyPolicies = pgTable("resident_safety_policies", {
   id: uuid("id").defaultRandom().primaryKey(),
   engine: text("engine").notNull().default("resident_safe_regex_v1"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  firstPublicationId: uuid("first_publication_id").references(
+    firstPublicationColumn,
+  ),
   createdAt: created(),
 });
+export const residentSafetyPublications = pgTable(
+  "resident_safety_publications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    policyId: uuid("policy_id")
+      .notNull()
+      .references(() => residentSafetyPolicies.id),
+    generation: bigint("generation", { mode: "bigint" })
+      .generatedAlwaysAsIdentity()
+      .unique(),
+    managerId: uuid("manager_id").references(() => users.id),
+    managerSessionHash: text("manager_session_hash").references(
+      () => adminSessions.sessionIdHash,
+    ),
+    transactionId: bigint("transaction_id", { mode: "bigint" })
+      .notNull()
+      .default(sql`txid_current()`),
+    createdAt: created(),
+  },
+);
 export const forbiddenPatterns = pgTable(
   "forbidden_patterns",
   {
@@ -57,6 +84,9 @@ export const residentSafetyActive = pgTable(
   "resident_safety_active",
   {
     id: integer("id").primaryKey(),
+    publicationId: uuid("publication_id")
+      .notNull()
+      .references(() => residentSafetyPublications.id),
     policyId: uuid("policy_id")
       .notNull()
       .references(() => residentSafetyPolicies.id),
@@ -146,6 +176,33 @@ export const securityLogs = pgTable(
     check(
       "security_logs_action_taken_check",
       sql`${t.actionTaken} in ('Blocked','Warned')`,
+    ),
+  ],
+);
+
+export const residentCardProposalChanges = pgTable(
+  "resident_card_proposal_changes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    draftId: uuid("draft_id")
+      .notNull()
+      .references(() => expertCardDrafts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    revision: integer("revision").notNull(),
+    previousProposal: jsonb("previous_proposal").notNull(),
+    replacementProposal: jsonb("replacement_proposal"),
+    createdAt: created(),
+  },
+  (t) => [
+    unique("resident_card_proposal_changes_draft_id_revision_key").on(
+      t.draftId,
+      t.revision,
+    ),
+    check(
+      "resident_card_proposal_changes_revision_check",
+      sql`${t.revision}>0`,
     ),
   ],
 );

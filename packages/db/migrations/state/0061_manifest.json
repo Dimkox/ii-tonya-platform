@@ -312,9 +312,9 @@
     {
       "idx": 61,
       "tag": "0061_resident_content_safety",
-      "sha256": "e019262bcab01050ae4e56f039dbdb010608efe864abffdcab39899093245b97"
+      "sha256": "2e8c028c080e8e00a5c8a02bddaae31bb6f90fc5ce536c041c9852d560619a3b"
     }
   ],
-  "snapshotSha256": "53d4caa08e56f3ffdef43efe3d1e3e6a94b676bf25711cea701e0da6ad183494",
-  "sqlObjectsSha256": "0a1f894c3d8c00070bfd56cd9af818aff818e98bf81820ab7f670a1e50706010"
+  "snapshotSha256": "368c6872330255d153218cb00a8c5b0702f0740338ff653a8fe4941dd0e346d5",
+  "sqlObjectsSha256": "30bf08027abf68d8bfcb0f2d56e393e56e26c6c412da5f92b706e8d498f6b237"
 }

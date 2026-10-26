@@ -55,13 +55,19 @@ COMMIT;
 `resident_safety_publish` requires the existing fresh MFA/session authority and
 `security_admin` role. It compiles and validates every candidate rule and witness,
 then publishes the singleton atomically. Published policy/rule rows are immutable.
+An append-only publication ledger authenticates every activation using that same
+fresh session and role. Policy and pointer triggers require the ledger fact from
+the current transaction; direct publication, pointer rewriting, and pointer deletion
+are refused. Every activation receives a monotonic generation and new UUID.
+Rollback uses the same publication function with a previously published policy;
+it creates a new activation, so old human acknowledgments never become valid again.
 The active-row trigger independently validates the selected version. Invalid or
 oversized candidates roll back without changing the prior version. No restart or
 application cache is involved: gated transactions hold the singleton `FOR SHARE`.
 The next transaction sees the new version. Missing/corrupt policy, unknown engine
 or timeout fails closed. This document authorizes no production policy mutation.
 
-Reviews contain a database-produced assessment bound to policy UUID, exact effective
+Reviews contain a database-produced assessment bound to policy and publication UUIDs, exact effective
 field values, selected tag UUIDs/current values and labels, and draft revision.
 Approvals with warnings require the displayed assessment digest as the explicit
 manager acknowledgment. A changed policy/tag/content invalidates that proof for
@@ -81,6 +87,13 @@ This permits incremental repair of multiple legacy blocked answers. Selected
 forbidden tags can likewise be removed incrementally. Changes invalidate existing
 review/public projection using the normal draft semantics. Approved cards can be
 returned for correction through the actual manager interface.
+
+`/card_document REVISION discard` removes the current extracted proposal from
+effective content. `/card_document REVISION replace replacement text` replaces it
+with text of at least 50 characters (at most 64000 UTF-8 bytes). Both preserve all
+uploaded entries and the previous proposal in a separate append-only history,
+bounded to 10000 changes per draft. They remain available at 100 media entries,
+check the current owner/revision, and use normal replay and erasure semantics.
 
 The manager detail shows current effective fields, extracted proposal, selected
 tag values, warnings and separately labelled original history. An unchecked warning

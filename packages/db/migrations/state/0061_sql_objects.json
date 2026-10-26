@@ -476,6 +476,11 @@
       "definition": "CREATE OR REPLACE FUNCTION public.resident_card_effective_fields(target uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\nAS $function$\nDECLARE result jsonb;\nBEGIN\n PERFORM h.id FROM hashtags_db h JOIN expert_card_draft_tags t ON t.tag_id=h.id WHERE t.draft_id=target FOR SHARE OF h;\n SELECT coalesce(jsonb_object_agg(field,value),'{}') INTO result FROM (\n  SELECT 'entry:'||e.id::text field,coalesce((SELECT c.text_content FROM resident_card_corrections c WHERE c.entry_id=e.id ORDER BY c.revision DESC LIMIT 1),e.text_content) value FROM expert_card_entries e WHERE e.draft_id=target AND e.kind='text'\n  UNION ALL SELECT 'document_proposal',document_proposal->>'content' FROM expert_card_drafts WHERE id=target AND document_proposal IS NOT NULL\n  UNION ALL SELECT 'public:'||j.key,j.value FROM expert_card_drafts d CROSS JOIN LATERAL jsonb_each_text(coalesce(d.public_payload,'{}')) j WHERE d.id=target\n  UNION ALL SELECT 'tag:'||h.id::text,h.tag_value||' '||h.display_label FROM expert_card_draft_tags t JOIN hashtags_db h ON h.id=t.tag_id WHERE t.draft_id=target\n ) f;\n RETURN result;\nEND $function$\n"
     },
     {
+      "name": "resident_card_proposal_change_guard",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_card_proposal_change_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));\n IF NOT EXISTS(SELECT 1 FROM expert_card_drafts d JOIN users u ON u.id=d.user_id AND u.active WHERE d.id=NEW.draft_id AND d.user_id=NEW.user_id AND d.revision+1=NEW.revision AND d.document_proposal=NEW.previous_proposal AND d.status IN('collecting','changes_requested') AND expert_card_current_messaging_authority(d.user_id,d.messaging_policy_version)) THEN RAISE EXCEPTION 'resident_card_proposal_source'; END IF;\n IF (SELECT count(*) FROM resident_card_proposal_changes WHERE draft_id=NEW.draft_id)>=10000 THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
       "name": "resident_card_review_safety_guard",
       "arguments": "",
       "definition": "CREATE OR REPLACE FUNCTION public.resident_card_review_safety_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE assessment jsonb;\nBEGIN\n IF NEW.action='approve' THEN\n  assessment:=resident_safety_assess(resident_card_effective_fields(NEW.draft_id),NEW.revision);\n  IF (assessment->>'blocked')::boolean OR (jsonb_array_length(assessment->'issues')>0 AND NEW.warning_acknowledgment IS DISTINCT FROM assessment->>'digest') THEN RAISE EXCEPTION 'resident_safety_review_required'; END IF;\n  NEW.safety_proof:=assessment;\n ELSE NEW.safety_proof:=NULL; NEW.warning_acknowledgment:=NULL; END IF;\n RETURN NEW;\nEND $function$\n"
@@ -483,12 +488,12 @@
     {
       "name": "resident_safety_activation_guard",
       "arguments": "",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_activation_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE r record; n integer;\nBEGIN\n IF NOT EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=NEW.policy_id AND engine='resident_safe_regex_v1' AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=NEW.policy_id AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=NEW.policy_id LOOP\n  IF r.compiled IS DISTINCT FROM resident_safety_compile(r.pattern_regex) OR NOT resident_safety_matches(r.positive_witness,r.compiled) THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n END LOOP;\n RETURN NEW;\nEND $function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_activation_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE r record; n integer; next_generation bigint; old_generation bigint;\nBEGIN\n IF TG_OP='DELETE' THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;\n SELECT generation INTO next_generation FROM resident_safety_publications WHERE id=NEW.publication_id AND policy_id=NEW.policy_id AND transaction_id=txid_current();\n IF TG_OP='UPDATE' THEN SELECT generation INTO old_generation FROM resident_safety_publications WHERE id=OLD.publication_id; END IF;\n IF next_generation IS NULL OR next_generation IS DISTINCT FROM (SELECT max(generation) FROM resident_safety_publications) OR (TG_OP='UPDATE' AND next_generation<=old_generation) THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;\n IF NOT EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=NEW.policy_id AND engine='resident_safe_regex_v1' AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=NEW.policy_id AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=NEW.policy_id LOOP\n  IF r.compiled IS DISTINCT FROM resident_safety_compile(r.pattern_regex) OR NOT resident_safety_matches(r.positive_witness,r.compiled) THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n END LOOP;\n RETURN NEW;\nEND $function$\n"
     },
     {
       "name": "resident_safety_assess",
       "arguments": "fields jsonb, revision integer",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_assess(fields jsonb, revision integer)\n RETURNS jsonb\n LANGUAGE plpgsql\nAS $function$\nDECLARE active_policy uuid; engine_name text; r record; f record; issues jsonb:='[]'; normalized text; normalized_fields jsonb; letters integer; capitals integer; bytes bigint; n integer;\nBEGIN\n SELECT a.policy_id,p.engine INTO active_policy,engine_name FROM resident_safety_active a JOIN resident_safety_policies p ON p.id=a.policy_id AND p.published_at IS NOT NULL WHERE a.id=1 FOR SHARE OF a;\n IF active_policy IS NULL OR engine_name<>'resident_safe_regex_v1' THEN RAISE EXCEPTION 'resident_safety_policy_unavailable'; END IF;\n IF jsonb_typeof(fields)<>'object' THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n SELECT count(*),sum(octet_length(value)) INTO n,bytes FROM jsonb_each_text(fields);\n IF n>125 OR bytes>2097152 OR EXISTS(SELECT 1 FROM jsonb_each(fields) WHERE jsonb_typeof(value)<>'string' OR octet_length(key)>100) THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n SELECT coalesce(jsonb_object_agg(key,resident_safety_normalize(value)),'{}') INTO normalized_fields FROM jsonb_each_text(fields);\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=active_policy AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_unavailable'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=active_policy AND is_active ORDER BY id LOOP\n  IF r.compiled IS DISTINCT FROM resident_safety_compile(r.pattern_regex) THEN RAISE EXCEPTION 'resident_safety_policy_corrupt'; END IF;\n  FOR f IN SELECT * FROM jsonb_each_text(normalized_fields) LOOP\n   IF resident_safety_matches_normalized(f.value,r.compiled) THEN issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',r.id,'severity',r.severity_level,'reason',r.error_message_template)); END IF;\n  END LOOP;\n END LOOP;\n FOR f IN SELECT * FROM jsonb_each_text(fields) LOOP\n  IF octet_length(f.value)>64000 THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n  normalized:=normalize(f.value,NFKC);\n  IF translate(normalized,chr(173)||chr(8203)||chr(8204)||chr(8205)||chr(8206)||chr(8207)||chr(8234)||chr(8235)||chr(8236)||chr(8237)||chr(8238)||chr(8288)||chr(8294)||chr(8295)||chr(8296)||chr(8297)||chr(65279),'') IS DISTINCT FROM normalized THEN\n   issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',null,'severity','BLOCKER','reason','Уберите невидимые управляющие символы и повторите ввод обычным текстом.'));\n  END IF;\n  SELECT count(*) FILTER(WHERE lower(c COLLATE \"C.utf8\")<>upper(c COLLATE \"C.utf8\")), count(*) FILTER(WHERE lower(c COLLATE \"C.utf8\")<>upper(c COLLATE \"C.utf8\") AND c=upper(c COLLATE \"C.utf8\")) INTO letters,capitals FROM regexp_split_to_table(normalized,'') c;\n  IF capitals*2>letters THEN issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',null,'severity','WARNING','reason','Пожалуйста, используйте обычный регистр. КАПС воспринимается как крик.')); END IF;\n END LOOP;\n RETURN jsonb_build_object('policyId',active_policy,'revision',revision,'digest',encode(digest(jsonb_build_object('fields',fields,'revision',revision,'policy',active_policy)::text,'sha256'),'hex'),'issues',issues,'blocked',EXISTS(SELECT 1 FROM jsonb_array_elements(issues) i WHERE i->>'severity'='BLOCKER'));\nEND $function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_assess(fields jsonb, revision integer)\n RETURNS jsonb\n LANGUAGE plpgsql\nAS $function$\nDECLARE active_policy uuid; activation_id uuid; activation_generation bigint; engine_name text; r record; f record; issues jsonb:='[]'; normalized text; normalized_fields jsonb; letters integer; capitals integer; bytes bigint; n integer;\nBEGIN\n SELECT a.policy_id,a.publication_id,publication.generation,p.engine INTO active_policy,activation_id,activation_generation,engine_name FROM resident_safety_active a JOIN resident_safety_policies p ON p.id=a.policy_id AND p.published_at IS NOT NULL JOIN resident_safety_publications publication ON publication.id=a.publication_id AND publication.policy_id=a.policy_id WHERE a.id=1 FOR SHARE OF a;\n IF active_policy IS NULL OR engine_name<>'resident_safe_regex_v1' THEN RAISE EXCEPTION 'resident_safety_policy_unavailable'; END IF;\n IF jsonb_typeof(fields)<>'object' THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n SELECT count(*),sum(octet_length(value)) INTO n,bytes FROM jsonb_each_text(fields);\n IF n>125 OR bytes>2097152 OR EXISTS(SELECT 1 FROM jsonb_each(fields) WHERE jsonb_typeof(value)<>'string' OR octet_length(key)>100) THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n SELECT coalesce(jsonb_object_agg(key,resident_safety_normalize(value)),'{}') INTO normalized_fields FROM jsonb_each_text(fields);\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=active_policy AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_unavailable'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=active_policy AND is_active ORDER BY id LOOP\n  IF r.compiled IS DISTINCT FROM resident_safety_compile(r.pattern_regex) THEN RAISE EXCEPTION 'resident_safety_policy_corrupt'; END IF;\n  FOR f IN SELECT * FROM jsonb_each_text(normalized_fields) LOOP\n   IF resident_safety_matches_normalized(f.value,r.compiled) THEN issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',r.id,'severity',r.severity_level,'reason',r.error_message_template)); END IF;\n  END LOOP;\n END LOOP;\n FOR f IN SELECT * FROM jsonb_each_text(fields) LOOP\n  IF octet_length(f.value)>64000 THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;\n  normalized:=normalize(f.value,NFKC);\n  IF translate(normalized,chr(173)||chr(8203)||chr(8204)||chr(8205)||chr(8206)||chr(8207)||chr(8234)||chr(8235)||chr(8236)||chr(8237)||chr(8238)||chr(8288)||chr(8294)||chr(8295)||chr(8296)||chr(8297)||chr(65279),'') IS DISTINCT FROM normalized THEN\n   issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',null,'severity','BLOCKER','reason','Уберите невидимые управляющие символы и повторите ввод обычным текстом.'));\n  END IF;\n  SELECT count(*) FILTER(WHERE lower(c COLLATE \"C.utf8\")<>upper(c COLLATE \"C.utf8\")), count(*) FILTER(WHERE lower(c COLLATE \"C.utf8\")<>upper(c COLLATE \"C.utf8\") AND c=upper(c COLLATE \"C.utf8\")) INTO letters,capitals FROM regexp_split_to_table(normalized,'') c;\n  IF capitals*2>letters THEN issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',null,'severity','WARNING','reason','Пожалуйста, используйте обычный регистр. КАПС воспринимается как крик.')); END IF;\n END LOOP;\n RETURN jsonb_build_object('policyId',active_policy,'publicationId',activation_id,'generation',activation_generation::text,'revision',revision,'digest',encode(digest(jsonb_build_object('fields',fields,'revision',revision,'policy',active_policy,'publication',activation_id)::text,'sha256'),'hex'),'issues',issues,'blocked',EXISTS(SELECT 1 FROM jsonb_array_elements(issues) i WHERE i->>'severity'='BLOCKER'));\nEND $function$\n"
     },
     {
       "name": "resident_safety_compile",
@@ -513,12 +518,22 @@
     {
       "name": "resident_safety_policy_guard",
       "arguments": "",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_policy_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE target uuid;\nBEGIN\n IF TG_TABLE_NAME='forbidden_patterns' THEN target:=COALESCE(NEW.policy_id,OLD.policy_id); ELSE target:=COALESCE(NEW.id,OLD.id); END IF;\n IF TG_TABLE_NAME='forbidden_patterns' AND TG_OP='UPDATE' THEN\n  IF OLD.policy_id IS DISTINCT FROM NEW.policy_id THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;\n END IF;\n PERFORM 1 FROM resident_safety_policies WHERE id=target FOR UPDATE;\n IF EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=target AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;\n IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;\nEND $function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_policy_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE target uuid;\nBEGIN\n IF TG_TABLE_NAME='resident_safety_policies' AND TG_OP='INSERT' THEN\n  IF NEW.published_at IS NOT NULL OR NEW.first_publication_id IS NOT NULL THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;\n  RETURN NEW;\n END IF;\n IF TG_TABLE_NAME='forbidden_patterns' THEN target:=COALESCE(NEW.policy_id,OLD.policy_id); ELSE target:=COALESCE(NEW.id,OLD.id); END IF;\n IF TG_TABLE_NAME='forbidden_patterns' AND TG_OP='UPDATE' THEN\n  IF OLD.policy_id IS DISTINCT FROM NEW.policy_id THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;\n END IF;\n PERFORM 1 FROM resident_safety_policies WHERE id=target FOR UPDATE;\n IF EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=target AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;\n IF TG_TABLE_NAME='resident_safety_policies' AND TG_OP='UPDATE' THEN\n  IF (NEW.published_at IS NOT NULL OR NEW.first_publication_id IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM resident_safety_publications a WHERE a.id=NEW.first_publication_id AND a.policy_id=NEW.id AND a.transaction_id=txid_current()) THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;\n END IF;\n IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "resident_safety_publication_apply",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_publication_apply()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n UPDATE resident_safety_policies SET published_at=NEW.created_at,first_publication_id=NEW.id WHERE id=NEW.policy_id AND published_at IS NULL;\n INSERT INTO resident_safety_active(id,policy_id,publication_id) VALUES(1,NEW.policy_id,NEW.id) ON CONFLICT(id) DO UPDATE SET policy_id=excluded.policy_id,publication_id=excluded.publication_id;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "resident_safety_publication_authorize",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_publication_authorize()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE r record; compiled_rule jsonb; n integer; already_published boolean;\nBEGIN\n IF NEW.manager_id IS NULL OR NEW.manager_session_hash IS NULL OR NOT expert_card_manager_authority_valid(NEW.manager_id,NEW.manager_session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;\n PERFORM 1 FROM admin_sessions s JOIN admin_role_assignments a ON a.admin_id=s.admin_id WHERE s.session_id_hash=NEW.manager_session_hash AND s.admin_id=NEW.manager_id AND a.role='security_admin' FOR SHARE OF s,a;\n IF NOT FOUND OR NOT expert_card_manager_authority_valid(NEW.manager_id,NEW.manager_session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;\n PERFORM 1 FROM resident_safety_active WHERE id=1 FOR UPDATE;\n SELECT published_at IS NOT NULL INTO already_published FROM resident_safety_policies WHERE id=NEW.policy_id AND engine='resident_safe_regex_v1' FOR UPDATE;\n IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=NEW.policy_id AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=NEW.policy_id LOOP\n  compiled_rule:=resident_safety_compile(r.pattern_regex);\n  IF NOT resident_safety_matches(r.positive_witness,compiled_rule) THEN RAISE EXCEPTION 'resident_safety_witness_invalid'; END IF;\n  IF already_published THEN\n   IF r.compiled IS DISTINCT FROM compiled_rule THEN RAISE EXCEPTION 'resident_safety_policy_corrupt'; END IF;\n  ELSE UPDATE forbidden_patterns SET compiled=compiled_rule WHERE id=r.id;\n  END IF;\n END LOOP;\n NEW.transaction_id:=txid_current(); NEW.created_at:=clock_timestamp();\n NEW.generation:=nextval(pg_get_serial_sequence('resident_safety_publications','generation'));\n RETURN NEW;\nEND $function$\n"
     },
     {
       "name": "resident_safety_publish",
       "arguments": "target uuid, manager uuid, session_hash text",
-      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_publish(target uuid, manager uuid, session_hash text)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nDECLARE r record; compiled_rule jsonb; n integer;\nBEGIN\n IF NOT expert_card_manager_authority_valid(manager,session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;\n PERFORM 1 FROM admin_sessions s JOIN admin_role_assignments a ON a.admin_id=s.admin_id WHERE s.session_id_hash=session_hash AND s.admin_id=manager AND a.role='security_admin' FOR SHARE OF s,a;\n IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;\n PERFORM 1 FROM resident_safety_active WHERE id=1 FOR UPDATE;\n PERFORM 1 FROM resident_safety_policies WHERE id=target AND engine='resident_safe_regex_v1' AND published_at IS NULL FOR UPDATE;\n IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=target AND is_active;\n IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;\n FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=target LOOP\n  compiled_rule:=resident_safety_compile(r.pattern_regex);\n  IF NOT resident_safety_matches(r.positive_witness,compiled_rule) THEN RAISE EXCEPTION 'resident_safety_witness_invalid'; END IF;\n  UPDATE forbidden_patterns SET compiled=compiled_rule WHERE id=r.id;\n END LOOP;\n UPDATE resident_safety_policies SET published_at=clock_timestamp() WHERE id=target;\n INSERT INTO resident_safety_active(id,policy_id) VALUES(1,target) ON CONFLICT(id) DO UPDATE SET policy_id=excluded.policy_id;\nEND $function$\n"
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_safety_publish(target uuid, manager uuid, session_hash text)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n INSERT INTO resident_safety_publications(policy_id,manager_id,manager_session_hash) VALUES(target,manager,session_hash);\nEND $function$\n"
     },
     {
       "name": "resident_safety_subject_guard",
@@ -1445,9 +1460,21 @@
       "enabled": "O"
     },
     {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_immutable",
+      "definition": "CREATE TRIGGER resident_card_proposal_immutable BEFORE UPDATE ON resident_card_proposal_changes FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_source",
+      "definition": "CREATE TRIGGER resident_card_proposal_source BEFORE INSERT ON resident_card_proposal_changes FOR EACH ROW EXECUTE FUNCTION resident_card_proposal_change_guard()",
+      "enabled": "O"
+    },
+    {
       "table_name": "resident_safety_active",
       "name": "resident_safety_active_valid",
-      "definition": "CREATE TRIGGER resident_safety_active_valid BEFORE INSERT OR UPDATE ON resident_safety_active FOR EACH ROW EXECUTE FUNCTION resident_safety_activation_guard()",
+      "definition": "CREATE TRIGGER resident_safety_active_valid BEFORE INSERT OR DELETE OR UPDATE ON resident_safety_active FOR EACH ROW EXECUTE FUNCTION resident_safety_activation_guard()",
       "enabled": "O"
     },
     {
@@ -1465,7 +1492,25 @@
     {
       "table_name": "resident_safety_policies",
       "name": "resident_safety_policy_immutable",
-      "definition": "CREATE TRIGGER resident_safety_policy_immutable BEFORE DELETE OR UPDATE ON resident_safety_policies FOR EACH ROW EXECUTE FUNCTION resident_safety_policy_guard()",
+      "definition": "CREATE TRIGGER resident_safety_policy_immutable BEFORE INSERT OR DELETE OR UPDATE ON resident_safety_policies FOR EACH ROW EXECUTE FUNCTION resident_safety_policy_guard()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publication_apply",
+      "definition": "CREATE TRIGGER resident_safety_publication_apply AFTER INSERT ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION resident_safety_publication_apply()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publication_authorize",
+      "definition": "CREATE TRIGGER resident_safety_publication_authorize BEFORE INSERT ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION resident_safety_publication_authorize()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publication_immutable",
+      "definition": "CREATE TRIGGER resident_safety_publication_immutable BEFORE DELETE OR UPDATE ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION reject_append_only_change()",
       "enabled": "O"
     },
     {
@@ -15369,6 +15414,66 @@
       "expression": null
     },
     {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_draft_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (draft_id) REFERENCES expert_card_drafts(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["draft_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_draft_id_revision_key",
+      "kind": "u",
+      "definition": "UNIQUE (draft_id, revision)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_revision_check",
+      "kind": "c",
+      "definition": "CHECK (revision > 0)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "revision > 0"
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
       "table_name": "resident_safety_active",
       "name": "resident_safety_active_id_check",
       "kind": "c",
@@ -15401,6 +15506,18 @@
       "deferrable": false,
       "initially_deferred": false,
       "columns_from": ["policy_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_active",
+      "name": "resident_safety_active_publication_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (publication_id) REFERENCES resident_safety_publications(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["publication_id"],
       "columns_to": ["id"],
       "expression": null
     },
@@ -15466,6 +15583,18 @@
     },
     {
       "table_name": "resident_safety_policies",
+      "name": "resident_safety_policies_first_publication_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (first_publication_id) REFERENCES resident_safety_publications(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["first_publication_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_policies",
       "name": "resident_safety_policies_pkey",
       "kind": "p",
       "definition": "PRIMARY KEY (id)",
@@ -15474,6 +15603,66 @@
       "initially_deferred": false,
       "columns_from": null,
       "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_generation_key",
+      "kind": "u",
+      "definition": "UNIQUE (generation)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_manager_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (manager_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["manager_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_manager_session_hash_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (manager_session_hash) REFERENCES admin_sessions(session_id_hash)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["manager_session_hash"],
+      "columns_to": ["session_id_hash"],
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_policy_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (policy_id) REFERENCES resident_safety_policies(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["policy_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -23092,6 +23281,32 @@
       ]
     },
     {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_draft_id_revision_key",
+      "definition": "CREATE UNIQUE INDEX resident_card_proposal_changes_draft_id_revision_key ON public.resident_card_proposal_changes USING btree (draft_id, revision)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "int4_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_card_proposal_changes",
+      "name": "resident_card_proposal_changes_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_card_proposal_changes_pkey ON public.resident_card_proposal_changes USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
       "table_name": "resident_safety_active",
       "name": "resident_safety_active_pkey",
       "definition": "CREATE UNIQUE INDEX resident_safety_active_pkey ON public.resident_safety_active USING btree (id)",
@@ -23132,6 +23347,28 @@
       "table_name": "resident_safety_policies",
       "name": "resident_safety_policies_pkey",
       "definition": "CREATE UNIQUE INDEX resident_safety_policies_pkey ON public.resident_safety_policies USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_generation_key",
+      "definition": "CREATE UNIQUE INDEX resident_safety_publications_generation_key ON public.resident_safety_publications USING btree (generation)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "int8_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_safety_publications",
+      "name": "resident_safety_publications_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_safety_publications_pkey ON public.resident_safety_publications USING btree (id)",
       "columns": [
         {
           "position": 1,

@@ -130,6 +130,7 @@ const HAND_SQL_FUNCTIONS = [
   "reject_test_expert_immutable_mutation",
   "resident_card_correction_guard",
   "resident_card_effective_fields",
+  "resident_card_proposal_change_guard",
   "resident_card_review_safety_guard",
   "resident_safety_activation_guard",
   "resident_safety_assess",
@@ -138,6 +139,8 @@ const HAND_SQL_FUNCTIONS = [
   "resident_safety_matches_normalized",
   "resident_safety_normalize",
   "resident_safety_policy_guard",
+  "resident_safety_publication_apply",
+  "resident_safety_publication_authorize",
   "resident_safety_publish",
   "resident_safety_subject_guard",
   "resident_verification_consent_cleanup",
@@ -282,12 +285,17 @@ const HAND_SQL_TRIGGERS = [
   "reconciliation_mismatches_append_only",
   "resident_card_correction_source",
   "resident_card_corrections_immutable",
+  "resident_card_proposal_immutable",
+  "resident_card_proposal_source",
   "resident_card_review_safety",
   "resident_safety_active_valid",
   "resident_safety_log_subject",
   "resident_safety_outcome_subject",
   "resident_safety_outcomes_immutable",
   "resident_safety_policy_immutable",
+  "resident_safety_publication_apply",
+  "resident_safety_publication_authorize",
+  "resident_safety_publication_immutable",
   "resident_safety_rules_immutable",
   "resident_verification_anchor_guard",
   "resident_verification_consent_cleanup",
@@ -486,7 +494,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0061 adds six private content-safety relations.
-    expect(declared.size).toBe(195);
+    // 0061 adds eight private content-safety relations.
+    expect(declared.size).toBe(197);
   });
 });

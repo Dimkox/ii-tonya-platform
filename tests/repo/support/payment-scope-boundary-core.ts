@@ -136,9 +136,11 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "forbidden_patterns",
   "resident_card_corrections",
+  "resident_card_proposal_changes",
   "resident_safety_active",
   "resident_safety_outcomes",
   "resident_safety_policies",
+  "resident_safety_publications",
   "security_logs",
 
   "expert_sales_operator_recoveries",
@@ -823,19 +825,19 @@ const approvedDependencySpecifiers = new Map([
 const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0061_resident_content_safety.sql",
-    "e019262bcab01050ae4e56f039dbdb010608efe864abffdcab39899093245b97",
+    "2e8c028c080e8e00a5c8a02bddaae31bb6f90fc5ce536c041c9852d560619a3b",
   ],
   [
     "packages/db/migrations/meta/0061_snapshot.json",
-    "53d4caa08e56f3ffdef43efe3d1e3e6a94b676bf25711cea701e0da6ad183494",
+    "368c6872330255d153218cb00a8c5b0702f0740338ff653a8fe4941dd0e346d5",
   ],
   [
     "packages/db/migrations/state/0061_sql_objects.json",
-    "0a1f894c3d8c00070bfd56cd9af818aff818e98bf81820ab7f670a1e50706010",
+    "30bf08027abf68d8bfcb0f2d56e393e56e26c6c412da5f92b706e8d498f6b237",
   ],
   [
     "packages/db/migrations/state/0061_manifest.json",
-    "5bbfd1b82b0451dd6e158c8e87b1974d349a6a072e2fdac8353031ea83c2682a",
+    "1b036e4fd3729eba94ac67dba0beeef8a8f7fe194dbca09be44d6450524036dc",
   ],
 
   [

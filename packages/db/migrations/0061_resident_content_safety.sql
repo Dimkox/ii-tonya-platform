@@ -4,6 +4,16 @@ CREATE TABLE resident_safety_policies (
  published_at timestamptz, created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 --> statement-breakpoint
+-- Every activation is a new authorized, immutable fact, including rollback.
+CREATE TABLE resident_safety_publications (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), policy_id uuid NOT NULL REFERENCES resident_safety_policies(id),
+ generation bigint GENERATED ALWAYS AS IDENTITY UNIQUE, manager_id uuid REFERENCES users(id),
+ manager_session_hash text REFERENCES admin_sessions(session_id_hash),
+ transaction_id bigint NOT NULL DEFAULT txid_current(), created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+--> statement-breakpoint
+ALTER TABLE resident_safety_policies ADD COLUMN first_publication_id uuid REFERENCES resident_safety_publications(id);
+--> statement-breakpoint
 CREATE TABLE forbidden_patterns (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), policy_id uuid NOT NULL REFERENCES resident_safety_policies(id),
  pattern_regex text NOT NULL, category text NOT NULL CHECK(category IN('MEDICAL_CLAIM','FINANCIAL_GUARANTEE','POLITICAL_RELIGIOUS','HATE_SPEECH','SPAM_SCAM')),
@@ -11,7 +21,7 @@ CREATE TABLE forbidden_patterns (
  is_active boolean NOT NULL DEFAULT true, compiled jsonb, provenance text NOT NULL, positive_witness text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE resident_safety_active (id integer PRIMARY KEY CHECK(id=1), policy_id uuid NOT NULL REFERENCES resident_safety_policies(id));
+CREATE TABLE resident_safety_active (id integer PRIMARY KEY CHECK(id=1), policy_id uuid NOT NULL REFERENCES resident_safety_policies(id), publication_id uuid NOT NULL REFERENCES resident_safety_publications(id));
 --> statement-breakpoint
 CREATE FUNCTION resident_safety_normalize(value text) RETURNS text LANGUAGE sql IMMUTABLE STRICT AS $$
  SELECT lower(regexp_replace(translate(normalize(value,NFKC), E'\t\n\r'||chr(160)||chr(8239), '     '), '[[:space:]]+', ' ', 'g') COLLATE "C.utf8")
@@ -91,37 +101,29 @@ $$;
 CREATE FUNCTION resident_safety_policy_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE target uuid;
 BEGIN
+ IF TG_TABLE_NAME='resident_safety_policies' AND TG_OP='INSERT' THEN
+  IF NEW.published_at IS NOT NULL OR NEW.first_publication_id IS NOT NULL THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;
+  RETURN NEW;
+ END IF;
  IF TG_TABLE_NAME='forbidden_patterns' THEN target:=COALESCE(NEW.policy_id,OLD.policy_id); ELSE target:=COALESCE(NEW.id,OLD.id); END IF;
  IF TG_TABLE_NAME='forbidden_patterns' AND TG_OP='UPDATE' THEN
   IF OLD.policy_id IS DISTINCT FROM NEW.policy_id THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;
  END IF;
  PERFORM 1 FROM resident_safety_policies WHERE id=target FOR UPDATE;
  IF EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=target AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_immutable'; END IF;
+ IF TG_TABLE_NAME='resident_safety_policies' AND TG_OP='UPDATE' THEN
+  IF (NEW.published_at IS NOT NULL OR NEW.first_publication_id IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM resident_safety_publications a WHERE a.id=NEW.first_publication_id AND a.policy_id=NEW.id AND a.transaction_id=txid_current()) THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;
+ END IF;
  IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
 END $$;
 --> statement-breakpoint
 CREATE TRIGGER resident_safety_rules_immutable BEFORE INSERT OR UPDATE OR DELETE ON forbidden_patterns FOR EACH ROW EXECUTE FUNCTION resident_safety_policy_guard();
 --> statement-breakpoint
-CREATE TRIGGER resident_safety_policy_immutable BEFORE UPDATE OR DELETE ON resident_safety_policies FOR EACH ROW EXECUTE FUNCTION resident_safety_policy_guard();
+CREATE TRIGGER resident_safety_policy_immutable BEFORE INSERT OR UPDATE OR DELETE ON resident_safety_policies FOR EACH ROW EXECUTE FUNCTION resident_safety_policy_guard();
 --> statement-breakpoint
 CREATE FUNCTION resident_safety_publish(target uuid, manager uuid, session_hash text) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE r record; compiled_rule jsonb; n integer;
 BEGIN
- IF NOT expert_card_manager_authority_valid(manager,session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;
- PERFORM 1 FROM admin_sessions s JOIN admin_role_assignments a ON a.admin_id=s.admin_id WHERE s.session_id_hash=session_hash AND s.admin_id=manager AND a.role='security_admin' FOR SHARE OF s,a;
- IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;
- PERFORM 1 FROM resident_safety_active WHERE id=1 FOR UPDATE;
- PERFORM 1 FROM resident_safety_policies WHERE id=target AND engine='resident_safe_regex_v1' AND published_at IS NULL FOR UPDATE;
- IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
- SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=target AND is_active;
- IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
- FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=target LOOP
-  compiled_rule:=resident_safety_compile(r.pattern_regex);
-  IF NOT resident_safety_matches(r.positive_witness,compiled_rule) THEN RAISE EXCEPTION 'resident_safety_witness_invalid'; END IF;
-  UPDATE forbidden_patterns SET compiled=compiled_rule WHERE id=r.id;
- END LOOP;
- UPDATE resident_safety_policies SET published_at=clock_timestamp() WHERE id=target;
- INSERT INTO resident_safety_active(id,policy_id) VALUES(1,target) ON CONFLICT(id) DO UPDATE SET policy_id=excluded.policy_id;
+ INSERT INTO resident_safety_publications(policy_id,manager_id,manager_session_hash) VALUES(target,manager,session_hash);
 END $$;
 --> statement-breakpoint
 CREATE TABLE resident_card_corrections (
@@ -172,9 +174,9 @@ BEGIN
 END $$;
 --> statement-breakpoint
 CREATE FUNCTION resident_safety_assess(fields jsonb, revision integer) RETURNS jsonb LANGUAGE plpgsql VOLATILE AS $$
-DECLARE active_policy uuid; engine_name text; r record; f record; issues jsonb:='[]'; normalized text; normalized_fields jsonb; letters integer; capitals integer; bytes bigint; n integer;
+DECLARE active_policy uuid; activation_id uuid; activation_generation bigint; engine_name text; r record; f record; issues jsonb:='[]'; normalized text; normalized_fields jsonb; letters integer; capitals integer; bytes bigint; n integer;
 BEGIN
- SELECT a.policy_id,p.engine INTO active_policy,engine_name FROM resident_safety_active a JOIN resident_safety_policies p ON p.id=a.policy_id AND p.published_at IS NOT NULL WHERE a.id=1 FOR SHARE OF a;
+ SELECT a.policy_id,a.publication_id,publication.generation,p.engine INTO active_policy,activation_id,activation_generation,engine_name FROM resident_safety_active a JOIN resident_safety_policies p ON p.id=a.policy_id AND p.published_at IS NOT NULL JOIN resident_safety_publications publication ON publication.id=a.publication_id AND publication.policy_id=a.policy_id WHERE a.id=1 FOR SHARE OF a;
  IF active_policy IS NULL OR engine_name<>'resident_safe_regex_v1' THEN RAISE EXCEPTION 'resident_safety_policy_unavailable'; END IF;
  IF jsonb_typeof(fields)<>'object' THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;
  SELECT count(*),sum(octet_length(value)) INTO n,bytes FROM jsonb_each_text(fields);
@@ -197,7 +199,7 @@ BEGIN
   SELECT count(*) FILTER(WHERE lower(c COLLATE "C.utf8")<>upper(c COLLATE "C.utf8")), count(*) FILTER(WHERE lower(c COLLATE "C.utf8")<>upper(c COLLATE "C.utf8") AND c=upper(c COLLATE "C.utf8")) INTO letters,capitals FROM regexp_split_to_table(normalized,'') c;
   IF capitals*2>letters THEN issues:=issues||jsonb_build_array(jsonb_build_object('field',f.key,'ruleId',null,'severity','WARNING','reason','Пожалуйста, используйте обычный регистр. КАПС воспринимается как крик.')); END IF;
  END LOOP;
- RETURN jsonb_build_object('policyId',active_policy,'revision',revision,'digest',encode(digest(jsonb_build_object('fields',fields,'revision',revision,'policy',active_policy)::text,'sha256'),'hex'),'issues',issues,'blocked',EXISTS(SELECT 1 FROM jsonb_array_elements(issues) i WHERE i->>'severity'='BLOCKER'));
+ RETURN jsonb_build_object('policyId',active_policy,'publicationId',activation_id,'generation',activation_generation::text,'revision',revision,'digest',encode(digest(jsonb_build_object('fields',fields,'revision',revision,'policy',active_policy,'publication',activation_id)::text,'sha256'),'hex'),'issues',issues,'blocked',EXISTS(SELECT 1 FROM jsonb_array_elements(issues) i WHERE i->>'severity'='BLOCKER'));
 END $$;
 --> statement-breakpoint
 ALTER TABLE expert_card_reviews ADD COLUMN safety_proof jsonb,ADD COLUMN warning_acknowledgment text;
@@ -286,9 +288,12 @@ INSERT INTO forbidden_patterns(policy_id,pattern_regex,category,severity_level,e
 --> statement-breakpoint
 UPDATE forbidden_patterns SET compiled=resident_safety_compile(pattern_regex) WHERE policy_id='61000000-0000-4000-8000-000000000001';
 --> statement-breakpoint
-UPDATE resident_safety_policies SET published_at=clock_timestamp() WHERE id='61000000-0000-4000-8000-000000000001';
+-- The sole bootstrap publication precedes installation of the authorization triggers.
+INSERT INTO resident_safety_publications(id,policy_id) VALUES('61000000-0000-4000-8000-000000000002','61000000-0000-4000-8000-000000000001');
 --> statement-breakpoint
-INSERT INTO resident_safety_active(id,policy_id) VALUES(1,'61000000-0000-4000-8000-000000000001');
+UPDATE resident_safety_policies SET published_at=clock_timestamp(),first_publication_id='61000000-0000-4000-8000-000000000002' WHERE id='61000000-0000-4000-8000-000000000001';
+--> statement-breakpoint
+INSERT INTO resident_safety_active(id,policy_id,publication_id) VALUES(1,'61000000-0000-4000-8000-000000000001','61000000-0000-4000-8000-000000000002');
 --> statement-breakpoint
 CREATE FUNCTION resident_safety_subject_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -305,8 +310,12 @@ CREATE TRIGGER resident_safety_outcome_subject BEFORE INSERT ON resident_safety_
 CREATE TRIGGER resident_safety_log_subject BEFORE INSERT ON security_logs FOR EACH ROW EXECUTE FUNCTION resident_safety_subject_guard();
 --> statement-breakpoint
 CREATE FUNCTION resident_safety_activation_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE r record; n integer;
+DECLARE r record; n integer; next_generation bigint; old_generation bigint;
 BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;
+ SELECT generation INTO next_generation FROM resident_safety_publications WHERE id=NEW.publication_id AND policy_id=NEW.policy_id AND transaction_id=txid_current();
+ IF TG_OP='UPDATE' THEN SELECT generation INTO old_generation FROM resident_safety_publications WHERE id=OLD.publication_id; END IF;
+ IF next_generation IS NULL OR next_generation IS DISTINCT FROM (SELECT max(generation) FROM resident_safety_publications) OR (TG_OP='UPDATE' AND next_generation<=old_generation) THEN RAISE EXCEPTION 'resident_safety_publication_required'; END IF;
  IF NOT EXISTS(SELECT 1 FROM resident_safety_policies WHERE id=NEW.policy_id AND engine='resident_safe_regex_v1' AND published_at IS NOT NULL) THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
  SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=NEW.policy_id AND is_active;
  IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
@@ -316,4 +325,60 @@ BEGIN
  RETURN NEW;
 END $$;
 --> statement-breakpoint
-CREATE TRIGGER resident_safety_active_valid BEFORE INSERT OR UPDATE ON resident_safety_active FOR EACH ROW EXECUTE FUNCTION resident_safety_activation_guard();
+CREATE TRIGGER resident_safety_active_valid BEFORE INSERT OR UPDATE OR DELETE ON resident_safety_active FOR EACH ROW EXECUTE FUNCTION resident_safety_activation_guard();
+
+--> statement-breakpoint
+CREATE FUNCTION resident_safety_publication_authorize() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE r record; compiled_rule jsonb; n integer; already_published boolean;
+BEGIN
+ IF NEW.manager_id IS NULL OR NEW.manager_session_hash IS NULL OR NOT expert_card_manager_authority_valid(NEW.manager_id,NEW.manager_session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;
+ PERFORM 1 FROM admin_sessions s JOIN admin_role_assignments a ON a.admin_id=s.admin_id WHERE s.session_id_hash=NEW.manager_session_hash AND s.admin_id=NEW.manager_id AND a.role='security_admin' FOR SHARE OF s,a;
+ IF NOT FOUND OR NOT expert_card_manager_authority_valid(NEW.manager_id,NEW.manager_session_hash) THEN RAISE EXCEPTION 'resident_safety_policy_forbidden'; END IF;
+ PERFORM 1 FROM resident_safety_active WHERE id=1 FOR UPDATE;
+ SELECT published_at IS NOT NULL INTO already_published FROM resident_safety_policies WHERE id=NEW.policy_id AND engine='resident_safe_regex_v1' FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
+ SELECT count(*) INTO n FROM forbidden_patterns WHERE policy_id=NEW.policy_id AND is_active;
+ IF n<1 OR n>256 THEN RAISE EXCEPTION 'resident_safety_policy_invalid'; END IF;
+ FOR r IN SELECT * FROM forbidden_patterns WHERE policy_id=NEW.policy_id LOOP
+  compiled_rule:=resident_safety_compile(r.pattern_regex);
+  IF NOT resident_safety_matches(r.positive_witness,compiled_rule) THEN RAISE EXCEPTION 'resident_safety_witness_invalid'; END IF;
+  IF already_published THEN
+   IF r.compiled IS DISTINCT FROM compiled_rule THEN RAISE EXCEPTION 'resident_safety_policy_corrupt'; END IF;
+  ELSE UPDATE forbidden_patterns SET compiled=compiled_rule WHERE id=r.id;
+  END IF;
+ END LOOP;
+ NEW.transaction_id:=txid_current(); NEW.created_at:=clock_timestamp();
+ NEW.generation:=nextval(pg_get_serial_sequence('resident_safety_publications','generation'));
+ RETURN NEW;
+END $$;
+--> statement-breakpoint
+CREATE FUNCTION resident_safety_publication_apply() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ UPDATE resident_safety_policies SET published_at=NEW.created_at,first_publication_id=NEW.id WHERE id=NEW.policy_id AND published_at IS NULL;
+ INSERT INTO resident_safety_active(id,policy_id,publication_id) VALUES(1,NEW.policy_id,NEW.id) ON CONFLICT(id) DO UPDATE SET policy_id=excluded.policy_id,publication_id=excluded.publication_id;
+ RETURN NEW;
+END $$;
+--> statement-breakpoint
+CREATE TRIGGER resident_safety_publication_authorize BEFORE INSERT ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION resident_safety_publication_authorize();
+--> statement-breakpoint
+CREATE TRIGGER resident_safety_publication_apply AFTER INSERT ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION resident_safety_publication_apply();
+--> statement-breakpoint
+CREATE TRIGGER resident_safety_publication_immutable BEFORE UPDATE OR DELETE ON resident_safety_publications FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();
+--> statement-breakpoint
+CREATE TABLE resident_card_proposal_changes (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), draft_id uuid NOT NULL REFERENCES expert_card_drafts(id) ON DELETE CASCADE,
+ user_id uuid NOT NULL REFERENCES users(id), revision integer NOT NULL CHECK(revision>0),
+ previous_proposal jsonb NOT NULL, replacement_proposal jsonb, created_at timestamptz NOT NULL DEFAULT clock_timestamp(), UNIQUE(draft_id,revision)
+);
+--> statement-breakpoint
+CREATE FUNCTION resident_card_proposal_change_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));
+ IF NOT EXISTS(SELECT 1 FROM expert_card_drafts d JOIN users u ON u.id=d.user_id AND u.active WHERE d.id=NEW.draft_id AND d.user_id=NEW.user_id AND d.revision+1=NEW.revision AND d.document_proposal=NEW.previous_proposal AND d.status IN('collecting','changes_requested') AND expert_card_current_messaging_authority(d.user_id,d.messaging_policy_version)) THEN RAISE EXCEPTION 'resident_card_proposal_source'; END IF;
+ IF (SELECT count(*) FROM resident_card_proposal_changes WHERE draft_id=NEW.draft_id)>=10000 THEN RAISE EXCEPTION 'resident_safety_budget'; END IF;
+ RETURN NEW;
+END $$;
+--> statement-breakpoint
+CREATE TRIGGER resident_card_proposal_source BEFORE INSERT ON resident_card_proposal_changes FOR EACH ROW EXECUTE FUNCTION resident_card_proposal_change_guard();
+--> statement-breakpoint
+CREATE TRIGGER resident_card_proposal_immutable BEFORE UPDATE ON resident_card_proposal_changes FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();

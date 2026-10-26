@@ -1,5 +1,5 @@
 {
-  "id": "cb6a33fb-a204-4f98-aef3-996d3695d68e",
+  "id": "37141bf0-c390-4916-91ab-2e412800ed14",
   "prevId": "d4714d16-e9ed-4351-8afd-d4d3370140d1",
   "version": "7",
   "dialect": "postgresql",
@@ -22650,6 +22650,112 @@
       "policies": {},
       "isRLSEnabled": false
     },
+    "public.resident_safety_publications": {
+      "name": "resident_safety_publications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "policy_id": {
+          "name": "policy_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "resident_safety_publications_generation_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "manager_id": {
+          "name": "manager_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manager_session_hash": {
+          "name": "manager_session_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transaction_id": {
+          "name": "transaction_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "txid_current()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "resident_safety_publications_manager_id_fkey": {
+          "name": "resident_safety_publications_manager_id_fkey",
+          "tableFrom": "resident_safety_publications",
+          "tableTo": "users",
+          "schemaTo": "public",
+          "columnsFrom": ["manager_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "resident_safety_publications_manager_session_hash_fkey": {
+          "name": "resident_safety_publications_manager_session_hash_fkey",
+          "tableFrom": "resident_safety_publications",
+          "tableTo": "admin_sessions",
+          "schemaTo": "public",
+          "columnsFrom": ["manager_session_hash"],
+          "columnsTo": ["session_id_hash"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "resident_safety_publications_policy_id_fkey": {
+          "name": "resident_safety_publications_policy_id_fkey",
+          "tableFrom": "resident_safety_publications",
+          "tableTo": "resident_safety_policies",
+          "schemaTo": "public",
+          "columnsFrom": ["policy_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "resident_safety_publications_generation_key": {
+          "columns": ["generation"],
+          "nullsNotDistinct": false,
+          "name": "resident_safety_publications_generation_key"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
     "public.resident_safety_policies": {
       "name": "resident_safety_policies",
       "schema": "",
@@ -22680,10 +22786,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "clock_timestamp()"
+        },
+        "first_publication_id": {
+          "name": "first_publication_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "resident_safety_policies_first_publication_id_fkey": {
+          "name": "resident_safety_policies_first_publication_id_fkey",
+          "tableFrom": "resident_safety_policies",
+          "tableTo": "resident_safety_publications",
+          "schemaTo": "public",
+          "columnsFrom": ["first_publication_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {},
@@ -22804,6 +22927,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "publication_id": {
+          "name": "publication_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -22814,6 +22943,16 @@
           "tableTo": "resident_safety_policies",
           "schemaTo": "public",
           "columnsFrom": ["policy_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "resident_safety_active_publication_id_fkey": {
+          "name": "resident_safety_active_publication_id_fkey",
+          "tableFrom": "resident_safety_active",
+          "tableTo": "resident_safety_publications",
+          "schemaTo": "public",
+          "columnsFrom": ["publication_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -23165,6 +23304,95 @@
         "security_logs_action_taken_check": {
           "name": "security_logs_action_taken_check",
           "value": "action_taken = ANY (ARRAY['Blocked'::text, 'Warned'::text])"
+        }
+      },
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.resident_card_proposal_changes": {
+      "name": "resident_card_proposal_changes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "draft_id": {
+          "name": "draft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previous_proposal": {
+          "name": "previous_proposal",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "replacement_proposal": {
+          "name": "replacement_proposal",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "resident_card_proposal_changes_draft_id_fkey": {
+          "name": "resident_card_proposal_changes_draft_id_fkey",
+          "tableFrom": "resident_card_proposal_changes",
+          "tableTo": "expert_card_drafts",
+          "schemaTo": "public",
+          "columnsFrom": ["draft_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "resident_card_proposal_changes_user_id_fkey": {
+          "name": "resident_card_proposal_changes_user_id_fkey",
+          "tableFrom": "resident_card_proposal_changes",
+          "tableTo": "users",
+          "schemaTo": "public",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "resident_card_proposal_changes_draft_id_revision_key": {
+          "columns": ["draft_id", "revision"],
+          "nullsNotDistinct": false,
+          "name": "resident_card_proposal_changes_draft_id_revision_key"
+        }
+      },
+      "checkConstraints": {
+        "resident_card_proposal_changes_revision_check": {
+          "name": "resident_card_proposal_changes_revision_check",
+          "value": "revision > 0"
         }
       },
       "policies": {},
@@ -24740,6 +24968,13 @@
       "expert_card_handoffs": {
         "columns": {
           "expires_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "resident_safety_publications": {
+        "columns": {
+          "transaction_id": {
             "isDefaultAnExpression": true
           }
         }

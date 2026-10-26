@@ -875,6 +875,58 @@ export class PostgresExpertCardRepository {
       },
     );
   }
+  async changeDocumentProposal(
+    raw: ExpertCardEvent & {
+      expectedRevision: number;
+      replacement: string | null;
+    },
+  ) {
+    this.revision(raw.expectedRevision);
+    if (
+      raw.replacement !== null &&
+      (typeof raw.replacement !== "string" ||
+        raw.replacement.trim().length < 50 ||
+        Buffer.byteLength(raw.replacement) > 64000)
+    )
+      fail("card_invalid_entry");
+    return this.ownerAction(
+      raw,
+      "entry",
+      { documentProposal: raw.replacement, revision: raw.expectedRevision },
+      async (tx, draft) => {
+        if (draft.revision !== raw.expectedRevision)
+          fail("card_revision_conflict");
+        if (!["collecting", "changes_requested"].includes(draft.status))
+          fail("card_state_conflict");
+        const current = (
+          await tx.execute<{
+            proposal: { source: "pdf" | "docx"; content: string } | null;
+          }>(
+            sql`select document_proposal as proposal from expert_card_drafts where id=${draft.id}::uuid`,
+          )
+        ).rows[0]!.proposal;
+        if (!current) return fail("card_state_conflict");
+        const proposal =
+          raw.replacement === null
+            ? null
+            : { source: current.source, content: raw.replacement };
+        const assessment = await assessResidentContent(
+          tx,
+          proposal ? { document_proposal: proposal.content } : {},
+          draft.revision + 1,
+        );
+        if (assessment.blocked) return assessment;
+        await tx.execute(
+          sql`insert into resident_card_proposal_changes(draft_id,user_id,revision,previous_proposal,replacement_proposal) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision + 1},${JSON.stringify(current)}::jsonb,${proposal ? JSON.stringify(proposal) : null}::jsonb)`,
+        );
+        await tx.execute(
+          sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode=${proposal ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${proposal ? JSON.stringify(proposal) : null}::jsonb,document_import_revision=${proposal ? draft.revision + 1 : null},public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        );
+        await this.invalidateJobs(tx, draft.id);
+        return assessment;
+      },
+    );
+  }
   async completeDocumentImport(
     raw: ExpertCardEvent & {
       expectedRevision: number;
