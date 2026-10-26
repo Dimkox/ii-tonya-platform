@@ -200,6 +200,10 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   bookingCallbacksEnabled?: boolean;
   bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  const cardShutdown = new AbortController();
+  app.addHook("preClose", async () => {
+    cardShutdown.abort();
+  });
   if (
     deps.expertCardEnabled === true &&
     (!deps.expertCard ||
@@ -639,12 +643,29 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           )
             return reply.code(429).send({ error: "rate_limited" });
           try {
-            const result = await interceptor.service.handleWork(parsed.input);
+            const requestAbort = new AbortController();
+            const abort = () => requestAbort.abort();
+            request.raw.once("aborted", abort);
+            let result;
+            try {
+              result = await interceptor.service.handleWork({
+                ...parsed.input,
+                signal: AbortSignal.any([
+                  cardShutdown.signal,
+                  requestAbort.signal,
+                ]),
+              });
+            } finally {
+              request.raw.removeListener("aborted", abort);
+            }
             if (result.status === "handled")
               return {
                 method: "sendMessage",
                 chat_id: parsed.input.chatId,
                 text: result.text,
+                ...("inlineKeyboard" in result && result.inlineKeyboard
+                  ? { reply_markup: { inline_keyboard: result.inlineKeyboard } }
+                  : {}),
                 protect_content: true,
               };
             if (result.status === "duplicate")

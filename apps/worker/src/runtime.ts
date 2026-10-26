@@ -12,6 +12,7 @@ export interface WorkerCycleReport {
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
   readonly expertCardMaterials?: unknown;
+  readonly residentWorkspaceNotifications?: unknown;
   readonly expertResidencyLifecycle?: unknown;
   readonly expertPersonalOffers?: unknown;
   readonly safetyHandoffs: unknown;
@@ -51,6 +52,10 @@ interface BookingNotificationLifecycle {
 export interface WorkerRuntimeDependencies {
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentWorkspaceNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly expertCardMaterials?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -91,6 +96,10 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentWorkspaceNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly expertCardMaterials?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -241,6 +250,9 @@ export function createWorkerRuntime(
       const bookingNotifications = acceptingClaims
         ? await deps.bookingNotifications?.runOnce()
         : undefined;
+      const residentWorkspaceNotifications = acceptingClaims
+        ? await deps.residentWorkspaceNotifications?.runOnce()
+        : undefined;
       const expertCardMaterials = acceptingClaims
         ? await deps.expertCardMaterials?.runOnce()
         : undefined;
@@ -257,6 +269,9 @@ export function createWorkerRuntime(
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentWorkspaceNotifications === undefined
+          ? {}
+          : { residentWorkspaceNotifications }),
         ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
         ...(expertResidencyLifecycle === undefined
           ? {}
@@ -291,6 +306,7 @@ export function createWorkerRuntime(
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
     deps.expertCardMaterials?.stopAccepting();
+    deps.residentWorkspaceNotifications?.stopAccepting();
     deps.expertPersonalOffers?.stopAccepting();
     deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
@@ -351,6 +367,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.residentWorkspaceNotifications
+      ? { residentWorkspaceNotifications: deps.residentWorkspaceNotifications }
+      : {}),
     ...(deps.expertPersonalOffers === undefined
       ? {}
       : { expertPersonalOffers: deps.expertPersonalOffers }),

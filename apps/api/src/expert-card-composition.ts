@@ -29,6 +29,9 @@ export interface ExpertCardCapability {
   admin: ExpertCardAdminService;
 }
 export type ExpertCardCompositionOptions = {
+  documentImport?: Parameters<
+    typeof createExpertCardService
+  >[0]["documentImport"];
   mainCheckout?: ExpertCardMainCheckout;
   materialTransport?: ConstructorParameters<
     typeof PostgresExpertCardRepository
@@ -110,6 +113,12 @@ export function createExpertCardComposition(
     legacyReplay: createExpertCardLegacyReplayRead(db, settings.workBotId),
     service: createExpertCardService({
       enabled: true,
+      draftTagsEnabled:
+        config.features.expertDraftTags === true &&
+        settings.draftTagsEnabled === true,
+      ...(options.documentImport
+        ? { documentImport: options.documentImport }
+        : {}),
       paymentMode: settings.paymentMode,
       ...(settings.mainCheckoutEnabled && options.mainCheckout
         ? { mainCheckout: options.mainCheckout }

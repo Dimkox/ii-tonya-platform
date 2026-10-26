@@ -2,7 +2,7 @@
 title: Stabilize workspace activation, document fallback and draft tags
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 567e71b4dea4bd2720da452c8049916f9d2b437c
 review_loop_iteration: 0
 context:
@@ -101,10 +101,10 @@ production mocks, duplicate booking/taxonomy authority or client-service collect
 
 ## Tasks & Acceptance
 
-- [ ] Add resident-workspace application service, shared transactional repository activation and durable notification composition/tests; preserve canonical settlement and handoff authority.
-- [ ] Add SafeDocumentParser interface, bounded real adapter/helper/locked graph and Node/pytest tests; wire durable fallback in actual work-bot import path.
-- [ ] Add canonical taxonomy/schema/seed/provenance, draft selection storage and actual private UI/tests using isolated mocks plus full-catalogue assertions.
-- [ ] Add hand-authored SQL+journal/schema/state where necessary; actual erasure, precise guard inventories/negative probes and focused PostgreSQL acceptance.
+- [x] Add resident-workspace application service, shared transactional repository activation and durable notification composition/tests; preserve canonical settlement and handoff authority.
+- [x] Add SafeDocumentParser interface, bounded real adapter/helper/locked graph and Node/pytest tests; wire durable fallback in actual work-bot import path.
+- [x] Add canonical taxonomy/schema/seed/provenance, draft selection storage and actual private UI/tests using isolated mocks plus full-catalogue assertions.
+- [x] Add hand-authored SQL+journal/schema/state where necessary; actual erasure, precise guard inventories/negative probes and focused PostgreSQL acceptance.
 - [ ] Complete affected builds/types/lint, independent review and exact-source gate; root delivers a draft STABILIZATION PR and continues the package plan.
 
 Given every matrix row, its executed test must prove the stated behavior. Given
@@ -138,3 +138,13 @@ locked parser graph, not observed global packages. Preserve failed logs. Stage n
 files before tracked-source guards and reconcile exact old-table constraint pins.
 No unchanged broad suite repeats; root runs the canonical final gate with retained
 full logs and supported Vitest worker limits1. No staging/provider evidence claim.
+
+## Implementation handoff — 2026-10-26
+
+Source, tests, additive metadata and focused acceptance are ready for independent
+review. Evidence: [implementation record](../../test-evidence/residency-core-stabilization-implementation-2026-10-26.md).
+All10 matrix-focused PostgreSQL cases executed, with additional narrowly executed
+behavioral RED/GREEN remediation for unknown outcome reporting and import replay.
+Root owns the independent review, final exact-source gate and draft PR; the final
+acceptance checkbox remains open for that delivery. No provider/deployment evidence
+is claimed. Preserve all failed logs and existing disabled production boundaries.

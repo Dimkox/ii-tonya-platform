@@ -1,8 +1,9 @@
+import { issueOwnedWorkHandoff } from "./resident-workspace-repository.js";
 import {
   PostgresExpertApplicationMaterials,
   applicationProofDigest,
 } from "./expert-application-materials.js";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import type { ExpertPromoScope } from "./expert-promo-repository.js";
@@ -261,6 +262,7 @@ const canonical = (value: unknown): string => {
   return fail("card_invalid_event");
 };
 type Operation =
+  | "tags_toggle"
   | "entry"
   | "submit"
   | "promo_proof"
@@ -304,7 +306,7 @@ async function paidApplication(tx: ExpertCardTransaction, userId: string) {
   return (
     (
       await tx.execute<{ applicationId: string }>(
-        sql`select a.id as "applicationId" from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.purpose='onboarding' and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.user_id=a.user_id and f.admission='interview' where a.user_id=${userId}::uuid and a.verification_status='approved' and a.onboarding_stage is not null for share of a,u`,
+        sql`select a.id as "applicationId" from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.purpose='onboarding' and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.user_id=a.user_id and f.admission='interview' where a.user_id=${userId}::uuid and a.verification_status='approved' and a.onboarding_stage is not null and a.archived_at is null and a.archive_until_date is null for share of a,u`,
       )
     ).rows[0] ?? null
   );
@@ -763,10 +765,143 @@ export class PostgresExpertCardRepository {
         sql`insert into expert_card_entries(draft_id,user_id,revision,kind,text_content,media_reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision + 1},${entry.kind},${entry.kind === "text" ? entry.text : null},${entry.kind === "text" ? null : entry.reference})`,
       );
       await tx.execute(
-        sql`update expert_card_drafts set revision=revision+1,status='collecting',public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode='INTERVIEW',document_proposal=null,document_import_revision=null,public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
       );
       await this.invalidateJobs(tx, draft.id);
     });
+  }
+  async completeDocumentImport(
+    raw: ExpertCardEvent & {
+      expectedRevision: number;
+      proposal: { source: "pdf" | "docx"; content: string } | null;
+    },
+  ) {
+    const event = normalizeCardEvent(raw);
+    const expected = raw.expectedRevision;
+    this.revision(expected);
+    const proposal = raw.proposal ? { ...raw.proposal } : null;
+    if (
+      proposal &&
+      (!["pdf", "docx"].includes(proposal.source) ||
+        typeof proposal.content !== "string" ||
+        proposal.content.trim().length < 50 ||
+        Buffer.byteLength(proposal.content) > 64000 ||
+        Buffer.byteLength(JSON.stringify(proposal)) > 90000)
+    )
+      fail("card_invalid_entry");
+    if (!this.work(event)) fail("card_forbidden");
+    return this.tx(async (tx) => {
+      const identity = await owner(
+        tx,
+        event,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return false;
+      const draft = await this.draft(tx, identity.userId);
+      if (
+        !draft ||
+        draft.revision !== expected ||
+        !["collecting", "changes_requested"].includes(draft.status) ||
+        draft.botId !== event.botId ||
+        draft.botKey !== event.botKey ||
+        draft.chatId !== event.chatId
+      )
+        return false;
+      const original = (
+        await tx.execute(
+          sql`select 1 from expert_card_requests r join expert_card_entries e on e.draft_id=r.result_id and e.user_id=r.user_id and e.revision=${expected} and e.kind='document' where r.bot_id=${event.botId} and r.update_id=${event.updateId} and r.request_digest=${event.requestDigest} and r.user_id=${identity.userId}::uuid and r.operation='entry'`,
+        )
+      ).rows;
+      if (original.length !== 1) return false;
+      const previous = (
+        await tx.execute<{ revision: number | null; proposal: unknown }>(
+          sql`select document_import_revision as revision,document_proposal as proposal from expert_card_drafts where id=${draft.id}::uuid`,
+        )
+      ).rows[0]!;
+      if (previous.revision !== null)
+        return (
+          previous.revision === expected &&
+          canonical(previous.proposal) === canonical(proposal)
+        );
+      await tx.execute(
+        sql`update expert_card_drafts set document_import_revision=${expected},input_mode=${proposal ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${proposal ? JSON.stringify(proposal) : null}::jsonb,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+      );
+      return true;
+    });
+  }
+  async getDraftTags(scope: ExpertPromoScope, page = 0) {
+    if (!this.work(scope) || !Number.isInteger(page) || page < 0 || page > 100)
+      fail("card_invalid_tags");
+    return this.tx(async (tx) => {
+      const identity = await owner(
+        tx,
+        scope,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return fail("card_forbidden");
+      const draft = await this.ensureDraft(tx, identity.userId, scope);
+      if (!["collecting", "changes_requested"].includes(draft.status))
+        fail("card_state_conflict");
+      const tags = (
+        await tx.execute<{ id: string; label: string; selected: boolean }>(
+          sql`select h.id,h.display_label as label,exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) as selected from hashtags_db h where h.is_active order by h.parent_category,h.sub_category,h.tag_value,h.id limit 8 offset ${page * 8}`,
+        )
+      ).rows;
+      const labels = (
+        await tx.execute<{ label: string }>(
+          sql`select h.display_label as label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id and h.is_active where t.draft_id=${draft.id}::uuid order by h.display_label`,
+        )
+      ).rows.map((r) => r.label);
+      const total = (
+        await tx.execute<{ n: number }>(
+          sql`select count(*)::int n from hashtags_db where is_active`,
+        )
+      ).rows[0]!.n;
+      return {
+        revision: draft.revision,
+        page,
+        pages: Math.max(1, Math.ceil(total / 8)),
+        tags,
+        tags_array: labels,
+      };
+    });
+  }
+  async toggleDraftTag(
+    raw: ExpertCardEvent & { expectedRevision: number; tagId: string },
+  ) {
+    const expected = raw.expectedRevision,
+      tagId = raw.tagId;
+    this.revision(expected);
+    if (!id.test(tagId)) fail("card_invalid_tags");
+    return this.ownerAction(
+      raw,
+      "tags_toggle",
+      { revision: expected, tagId },
+      async (tx, draft) => {
+        if (draft.revision !== expected) fail("card_revision_conflict");
+        if (!["collecting", "changes_requested"].includes(draft.status))
+          fail("card_state_conflict");
+        const tag = (
+          await tx.execute(
+            sql`select id from hashtags_db where id=${tagId}::uuid and is_active for share`,
+          )
+        ).rows;
+        if (tag.length !== 1) fail("card_invalid_tags");
+        const selected = (
+          await tx.execute(
+            sql`delete from expert_card_draft_tags where draft_id=${draft.id}::uuid and tag_id=${tagId}::uuid returning tag_id`,
+          )
+        ).rows;
+        if (!selected.length)
+          await tx.execute(
+            sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) values(${draft.id}::uuid,${draft.userId}::uuid,${tagId}::uuid)`,
+          );
+        await tx.execute(
+          sql`update expert_card_drafts set revision=revision+1,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        );
+        await this.invalidateJobs(tx, draft.id);
+      },
+    );
   }
   async submitDraft(raw: ExpertCardEvent & { expectedRevision: number }) {
     const event = normalizeCardEvent(raw);
@@ -1159,17 +1294,20 @@ export class PostgresExpertCardRepository {
         this.policy.messagingConsentPolicyVersion,
       );
       if (!identity) return fail("card_forbidden");
-      await tx.execute(
-        sql`update expert_card_handoffs set consumed_at=clock_timestamp() where user_id=${identity.userId}::uuid and consumed_at is null`,
-      );
-      const token = randomBytes(32).toString("base64url");
-      const row = (
-        await tx.execute<{ expiresAt: string }>(
-          sql`insert into expert_card_handoffs(token_digest,user_id,application_id,source_bot_key,external_id,target_bot_id,target_bot_key) values(${`sha256:${sha(token)}`},${identity.userId}::uuid,${identity.applicationId}::uuid,${event.botKey},${event.telegramUserId},${this.policy.workBotId},${this.policy.workBotKey}) returning to_char(expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "expiresAt"`,
-        )
-      ).rows[0]!;
+      const row = await issueOwnedWorkHandoff(tx, {
+        userId: identity.userId,
+        applicationId: identity.applicationId,
+        sourceBotKey: event.botKey,
+        externalId: event.telegramUserId,
+        targetBotId: this.policy.workBotId,
+        targetBotKey: this.policy.workBotKey,
+      });
       await finishCardRequest(tx, started, identity.applicationId);
-      return { kind: "issued" as const, token, expiresAt: row.expiresAt };
+      return {
+        kind: "issued" as const,
+        token: row.token,
+        expiresAt: row.expiresAt,
+      };
     });
   }
   async redeemWorkHandoff(raw: ExpertCardEvent & { token: string }) {

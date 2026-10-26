@@ -1,0 +1,249 @@
+{
+  "description": "Additive0058 state replayed from the complete hand-authored SQL graph on PostgreSQL17.5. Supported snapshot normalized from fresh empty-directory introspection; SQL functions/triggers/views retained here. No generation authority.",
+  "serverVersionNum": 170005,
+  "sourceMigrationSha256": "0811e71752fd2c5561eb943306266d9ce83255004a76b68f85ee6a0c4fa152d8",
+  "parentSnapshotSha256": "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
+  "normalizedSnapshotSha256": "47addd7d8ae66de941c3c7e4b223baff05a7214bbbaadcc323cab22b164d47bb",
+  "functions": [
+    {
+      "name": "expert_card_tag_selection_guard",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.expert_card_tag_selection_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n PERFORM 1 FROM expert_card_drafts WHERE id=NEW.draft_id AND user_id=NEW.user_id AND status IN ('collecting','changes_requested') FOR UPDATE;\n IF NOT FOUND THEN RAISE EXCEPTION 'card_tag_draft_unavailable'; END IF;\n PERFORM 1 FROM hashtags_db WHERE id=NEW.tag_id AND is_active FOR SHARE;\n IF NOT FOUND OR (SELECT count(*) FROM expert_card_draft_tags WHERE draft_id=NEW.draft_id)>=20 THEN RAISE EXCEPTION 'card_tag_selection_invalid'; END IF;\n RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "hashtags_synonyms_valid",
+      "arguments": "v jsonb",
+      "definition": "CREATE OR REPLACE FUNCTION public.hashtags_synonyms_valid(v jsonb)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE\nAS $function$\n SELECT coalesce(jsonb_typeof(v)='array' AND jsonb_array_length(v) BETWEEN 1 AND 20 AND octet_length(v::text)<=10000 AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(v) e WHERE jsonb_typeof(e)<>'object' OR (e-'term')<>'{}'::jsonb OR jsonb_typeof(e->'term') IS DISTINCT FROM 'string' OR length(btrim(e->>'term')) NOT BETWEEN 1 AND 300),false)\n$function$\n"
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "expert_card_draft_tags",
+      "name": "expert_card_tag_selection_guard",
+      "definition": "CREATE TRIGGER expert_card_tag_selection_guard BEFORE INSERT OR UPDATE ON expert_card_draft_tags FOR EACH ROW EXECUTE FUNCTION expert_card_tag_selection_guard()",
+      "enabled": "O"
+    }
+  ],
+  "views": [
+    {
+      "name": "hashtags_taxonomy",
+      "definition": " SELECT id,\n    parent_category AS category,\n    display_label AS tag_name,\n    (synonyms_json)::text AS description_context\n   FROM hashtags_db;"
+    },
+    {
+      "name": "resident_workspace_access",
+      "definition": " SELECT a.user_id,\n    a.id AS application_id,\n    true AS has_access_to_work_bot,\n    'interview'::text AS access_kind\n   FROM (expert_onboarding_applications a\n     JOIN users u ON (((u.id = a.user_id) AND u.active)))\n  WHERE ((a.verification_status = 'approved'::text) AND (a.onboarding_stage IS NOT NULL) AND (a.archived_at IS NULL) AND (EXISTS ( SELECT 1\n           FROM (consent_states s\n             JOIN consents c ON ((c.id = s.last_decision_id)))\n          WHERE ((s.user_id = a.user_id) AND (s.purpose = 'client_messaging'::text) AND expert_card_current_messaging_authority(a.user_id, c.policy_version)))) AND (EXISTS ( SELECT 1\n           FROM (expert_onboarding_invoices i\n             JOIN expert_onboarding_payment_facts f ON (((f.invoice_id = i.id) AND (f.user_id = a.user_id) AND (f.admission = 'interview'::text))))\n          WHERE ((i.application_id = a.id) AND (i.user_id = a.user_id) AND (i.status = 'settled'::text)))));"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "expert_card_draft_tags",
+      "name": "expert_card_draft_tag_owner",
+      "kind": "f",
+      "definition": "FOREIGN KEY (draft_id, user_id) REFERENCES expert_card_drafts(id, user_id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["draft_id", "user_id"],
+      "columns_to": ["id", "user_id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_card_draft_tags",
+      "name": "expert_card_draft_tags_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (draft_id, tag_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_card_draft_tags",
+      "name": "expert_card_draft_tags_tag_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (tag_id) REFERENCES hashtags_db(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["tag_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_card_drafts",
+      "name": "expert_card_input_mode",
+      "kind": "c",
+      "definition": "CHECK (COALESCE((document_import_revision IS NULL OR document_import_revision >= 1 AND document_import_revision <= revision) AND (input_mode = ANY (ARRAY['INTERVIEW'::text, 'DOCUMENT_PROPOSAL'::text])) AND (input_mode = 'INTERVIEW'::text AND document_proposal IS NULL OR input_mode = 'DOCUMENT_PROPOSAL'::text AND jsonb_typeof(document_proposal) = 'object'::text AND jsonb_typeof(document_proposal -> 'source'::text) = 'string'::text AND jsonb_typeof(document_proposal -> 'content'::text) = 'string'::text AND document_proposal ?& ARRAY['source'::text, 'content'::text] AND (document_proposal - 'source'::text - 'content'::text) = '{}'::jsonb AND ((document_proposal ->> 'source'::text) = ANY (ARRAY['pdf'::text, 'docx'::text])) AND length(btrim(document_proposal ->> 'content'::text)) >= 50 AND octet_length(document_proposal::text) <= 100000), false))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "COALESCE((document_import_revision IS NULL OR document_import_revision >= 1 AND document_import_revision <= revision) AND (input_mode = ANY (ARRAY['INTERVIEW'::text, 'DOCUMENT_PROPOSAL'::text])) AND (input_mode = 'INTERVIEW'::text AND document_proposal IS NULL OR input_mode = 'DOCUMENT_PROPOSAL'::text AND jsonb_typeof(document_proposal) = 'object'::text AND jsonb_typeof(document_proposal -> 'source'::text) = 'string'::text AND jsonb_typeof(document_proposal -> 'content'::text) = 'string'::text AND document_proposal ?& ARRAY['source'::text, 'content'::text] AND (document_proposal - 'source'::text - 'content'::text) = '{}'::jsonb AND ((document_proposal ->> 'source'::text) = ANY (ARRAY['pdf'::text, 'docx'::text])) AND length(btrim(document_proposal ->> 'content'::text)) >= 50 AND octet_length(document_proposal::text) <= 100000), false)"
+    },
+    {
+      "table_name": "expert_card_requests",
+      "name": "expert_card_request_operation",
+      "kind": "c",
+      "definition": "CHECK (COALESCE(operation = ANY (ARRAY['entry'::text, 'submit'::text, 'promo_proof'::text, 'handoff_issue'::text, 'handoff_redeem'::text, 'main_quote'::text, 'main_accept'::text, 'main_checkout'::text, 'residency_pause'::text, 'residency_resume'::text, 'tags_toggle'::text]), false))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "COALESCE(operation = ANY (ARRAY['entry'::text, 'submit'::text, 'promo_proof'::text, 'handoff_issue'::text, 'handoff_redeem'::text, 'main_quote'::text, 'main_accept'::text, 'main_checkout'::text, 'residency_pause'::text, 'residency_resume'::text, 'tags_toggle'::text]), false)"
+    },
+    {
+      "table_name": "expert_verification_work",
+      "name": "expert_verification_work_status",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text, 'unknown_outcome'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text, 'unknown_outcome'::text])"
+    },
+    {
+      "table_name": "expert_verification_work",
+      "name": "expert_workspace_notification_attempt",
+      "kind": "c",
+      "definition": "CHECK (attempt_id IS NULL AND attempted_at IS NULL AND delivery_message_id IS NULL OR kind = 'interview_ready'::text AND attempt_id IS NOT NULL AND attempted_at IS NOT NULL AND isfinite(attempted_at) AND (status = ANY (ARRAY['unknown_outcome'::text, 'completed'::text, 'cancelled'::text])) AND (delivery_message_id IS NULL OR delivery_message_id ~ '^[1-9][0-9]{0,19}$'::text))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "attempt_id IS NULL AND attempted_at IS NULL AND delivery_message_id IS NULL OR kind = 'interview_ready'::text AND attempt_id IS NOT NULL AND attempted_at IS NOT NULL AND isfinite(attempted_at) AND (status = ANY (ARRAY['unknown_outcome'::text, 'completed'::text, 'cancelled'::text])) AND (delivery_message_id IS NULL OR delivery_message_id ~ '^[1-9][0-9]{0,19}$'::text)"
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_source",
+      "kind": "c",
+      "definition": "CHECK (source_sha256 ~ '^[0-9a-f]{64}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "source_sha256 ~ '^[0-9a-f]{64}$'::text"
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_synonyms",
+      "kind": "c",
+      "definition": "CHECK (hashtags_synonyms_valid(synonyms_json))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "hashtags_synonyms_valid(synonyms_json)"
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_tag_value_key",
+      "kind": "u",
+      "definition": "UNIQUE (tag_value)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_value",
+      "kind": "c",
+      "definition": "CHECK (length(tag_value) >= 1 AND length(tag_value) <= 100 AND length(display_label) >= 1 AND length(display_label) <= 101 AND length(parent_category) >= 1 AND length(parent_category) <= 200 AND length(sub_category) >= 1 AND length(sub_category) <= 200)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "length(tag_value) >= 1 AND length(tag_value) <= 100 AND length(display_label) >= 1 AND length(display_label) <= 101 AND length(parent_category) >= 1 AND length(parent_category) <= 200 AND length(sub_category) >= 1 AND length(sub_category) <= 200"
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_weight",
+      "kind": "c",
+      "definition": "CHECK (weight_score >= 1 AND weight_score <= 10)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "weight_score >= 1 AND weight_score <= 10"
+    }
+  ],
+  "indexes": [
+    {
+      "table_name": "audit_events",
+      "name": "expert_workspace_activation_audit_once",
+      "definition": "CREATE UNIQUE INDEX expert_workspace_activation_audit_once ON public.audit_events USING btree (object_id, action) WHERE (action = 'ACCESS_ACTIVATED'::text)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_card_draft_tags",
+      "name": "expert_card_draft_tags_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_card_draft_tags_pkey ON public.expert_card_draft_tags USING btree (draft_id, tag_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_pkey",
+      "definition": "CREATE UNIQUE INDEX hashtags_db_pkey ON public.hashtags_db USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "hashtags_db",
+      "name": "hashtags_db_tag_value_key",
+      "definition": "CREATE UNIQUE INDEX hashtags_db_tag_value_key ON public.hashtags_db USING btree (tag_value)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        }
+      ]
+    }
+  ]
+}

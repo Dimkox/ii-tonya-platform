@@ -24,7 +24,24 @@ export interface ExpertCardWorkflow {
   promoConfirmed: boolean;
   activeResident?: boolean;
 }
+export interface DraftTagPage {
+  revision: number;
+  page: number;
+  pages: number;
+  tags: readonly { id: string; label: string; selected: boolean }[];
+  tags_array: readonly string[];
+}
 export interface ExpertCardRepository {
+  completeDocumentImport?(
+    input: ExpertCardEvent & {
+      expectedRevision: number;
+      proposal: { source: "pdf" | "docx"; content: string } | null;
+    },
+  ): Promise<boolean>;
+  getDraftTags?(scope: ExpertCardScope, page?: number): Promise<DraftTagPage>;
+  toggleDraftTag?(
+    input: ExpertCardEvent & { expectedRevision: number; tagId: string },
+  ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   getWorkflow(scope: ExpertCardScope): Promise<ExpertCardWorkflow | null>;
   addEntry(
     input: ExpertCardEvent & {
@@ -120,6 +137,10 @@ export type ExpertCardReply =
   | {
       status: "handled";
       text: string;
+      inlineKeyboard?: readonly (readonly {
+        text: string;
+        callback_data: string;
+      }[])[];
       payment?: {
         status: "ready" | "waiting_configuration" | "pending" | "unavailable";
         orderId: string;
@@ -183,6 +204,19 @@ export function createExpertCardService(deps: {
   promoScope?: { botId: string; botKey: string };
   repository: ExpertCardRepository;
   financial: ExpertCardFinancial;
+  draftTagsEnabled?: boolean;
+  documentImport?: {
+    read(
+      input: ExpertCardScope & { reference: string; signal: AbortSignal },
+    ): Promise<{ bytes: Uint8Array; type: "pdf" | "docx" } | null>;
+    parser: {
+      parse(input: {
+        bytes: Uint8Array;
+        type: "pdf" | "docx";
+        signal: AbortSignal;
+      }): Promise<{ source: "pdf" | "docx"; content: string } | null>;
+    };
+  };
   personalOffers?: {
     read(scope: ExpertCardScope): Promise<{ text: string } | null>;
   };
@@ -270,6 +304,8 @@ export function createExpertCardService(deps: {
         updateId: string;
         requestDigest: string;
         content: ExpertCardContent;
+        callbackData?: string;
+        signal?: AbortSignal;
       },
     ): Promise<ExpertCardReply> {
       if (!deps.enabled) return { status: "disabled" };
@@ -315,6 +351,59 @@ export function createExpertCardService(deps: {
         requestDigest: input.requestDigest,
       };
       try {
+        if (input.callbackData !== undefined || text === "/tags") {
+          if (
+            !deps.draftTagsEnabled ||
+            !deps.repository.getDraftTags ||
+            !deps.repository.toggleDraftTag
+          )
+            return reply("Выбор тегов пока недоступен.");
+          let page = 0;
+          if (input.callbackData !== undefined) {
+            const callback =
+              /^ct1:(p|t):(0|[1-9][0-9]{0,5}):([0-9]{1,3})(?::([0-9a-f-]{36}))?$/u.exec(
+                input.callbackData,
+              );
+            if (!callback) return { status: "rejected" };
+            page = Number(callback[3]);
+            const before = await deps.repository.getDraftTags(s, page);
+            if (before.revision !== Number(callback[2]))
+              return reply("Список изменился. Откройте /tags заново.");
+            if (callback[1] === "t") {
+              if (!callback[4]) return { status: "rejected" };
+              const result = await deps.repository.toggleDraftTag({
+                ...event,
+                expectedRevision: Number(callback[2]),
+                tagId: callback[4],
+              });
+              if (result.replay) return { status: "duplicate" };
+            } else if (callback[4]) return { status: "rejected" };
+          }
+          const result = await deps.repository.getDraftTags(s, page);
+          const buttons = result.tags.map((tag) => [
+            {
+              text: `${tag.selected ? "✓ " : ""}${tag.label}`,
+              callback_data: `ct1:t:${result.revision}:${page}:${tag.id}`,
+            },
+          ]);
+          const navigation = [];
+          if (page > 0)
+            navigation.push({
+              text: "←",
+              callback_data: `ct1:p:${result.revision}:${page - 1}`,
+            });
+          if (page + 1 < result.pages)
+            navigation.push({
+              text: "→",
+              callback_data: `ct1:p:${result.revision}:${page + 1}`,
+            });
+          if (navigation.length) buttons.push(navigation);
+          return {
+            status: "handled",
+            text: `Теги: ${result.tags_array.length}/20. Страница ${page + 1}/${result.pages}. ${result.tags_array.join(", ")} Теги не подтверждают квалификацию.`,
+            inlineKeyboard: buttons,
+          };
+        }
         const handoff = /^\/start card_([A-Za-z0-9_-]{43})$/u.exec(text);
         if (text.startsWith("/start card_") && !handoff)
           return { status: "rejected" };
@@ -330,7 +419,7 @@ export function createExpertCardService(deps: {
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff)(?:\s|$)/u.test(
+          !/^\/(?:card|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -496,10 +585,69 @@ export function createExpertCardService(deps: {
           entry,
         });
         if (result.replay) return { status: "duplicate" };
+        if (content.kind === "document") {
+          let proposal: { source: "pdf" | "docx"; content: string } | null =
+            null;
+          if (deps.documentImport) {
+            const signal = input.signal
+              ? AbortSignal.any([input.signal, AbortSignal.timeout(10000)])
+              : AbortSignal.timeout(10000);
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            try {
+              const work = (async () => {
+                const document = await deps.documentImport!.read({
+                  ...s,
+                  reference: content.reference,
+                  signal,
+                });
+                if (
+                  !document ||
+                  !(document.bytes instanceof Uint8Array) ||
+                  document.bytes.byteLength > 5 * 1024 * 1024 ||
+                  !["pdf", "docx"].includes(document.type) ||
+                  signal.aborted
+                )
+                  return null;
+                return deps.documentImport!.parser.parse({
+                  ...document,
+                  signal,
+                });
+              })();
+              proposal = await Promise.race([
+                work,
+                new Promise<null>((resolve) => {
+                  timer = setTimeout(() => resolve(null), 10000);
+                }),
+              ]);
+            } catch {
+              proposal = null;
+            } finally {
+              if (timer) clearTimeout(timer);
+            }
+          }
+          const saved = await deps.repository.completeDocumentImport?.({
+            ...event,
+            expectedRevision: result.revision,
+            proposal,
+          });
+          if (saved === false)
+            return reply(
+              "Исходный файл сохранён. Карточка уже изменилась; продолжайте текущее интервью.",
+            );
+          return reply(
+            proposal && saved === true
+              ? "Файл сохранён. Текст извлечён как приватный неподтверждённый черновик. Проверьте его в интервью; публикация требует отдельной проверки."
+              : "Не удалось автоматически прочитать файл. Возможно, это картинка или сложный формат. Давайте заполним данные вручную.",
+          );
+        }
         return reply(
           `Ответ сохранён. Ревизия ${result.revision}. Отправить менеджеру: /card_submit ${result.revision}`,
         );
       } catch {
+        if (input.callbackData !== undefined || text === "/tags")
+          return reply(
+            "Не удалось изменить теги. Проверьте лимит 20 и откройте /tags заново.",
+          );
         return { status: "unavailable" };
       }
     },

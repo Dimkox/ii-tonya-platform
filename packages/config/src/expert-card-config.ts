@@ -2,6 +2,7 @@ export interface ExpertCardConfig {
   paymentMode: "test" | "live";
   materialDeliveryEnabled: boolean;
   mainCheckoutEnabled: boolean;
+  draftTagsEnabled?: boolean;
   workBotToken?: string;
   workBotId: string;
   workBotKey: string;
@@ -13,6 +14,7 @@ type Config = {
   features: {
     expertCard?: boolean;
     expertCardMaterialDelivery?: boolean;
+    expertDraftTags?: boolean;
     expertResidencyLifecycle?: boolean;
     expertResidencyLifecycleCommands?: boolean;
     expertResidencyNoticeDelivery?: boolean;
@@ -28,6 +30,8 @@ const exact = (r: RegExp, v: unknown): v is string =>
   typeof v === "string" && r.exec(v)?.[0] === v;
 export function assertExpertCardConfig(config: Config): void {
   if (
+    config.features.expertDraftTags !== true &&
+    config.expertCard?.draftTagsEnabled !== true &&
     config.features.expertCard !== true &&
     config.features.expertCardMaterialDelivery !== true &&
     config.expertCard?.materialDeliveryEnabled !== true &&
@@ -39,6 +43,9 @@ export function assertExpertCardConfig(config: Config): void {
   const c = config.expertCard;
   if (
     !c ||
+    (config.features.expertDraftTags === true) !==
+      (c.draftTagsEnabled === true) ||
+    (c.draftTagsEnabled === true && config.features.expertCard !== true) ||
     !["test", "live"].includes(c.paymentMode) ||
     typeof c.materialDeliveryEnabled !== "boolean" ||
     typeof c.mainCheckoutEnabled !== "boolean" ||
@@ -100,6 +107,15 @@ export function readExpertCardConfig(
     commands = source.EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED === "true",
     notice = source.EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED === "true";
   const checkout = source.EXPERT_CARD_MAIN_CHECKOUT_ENABLED || "false";
+  const tags = source.EXPERT_DRAFT_TAGS_ENABLED || "false";
+  const workspace = source.RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED || "false";
+  if (
+    !["true", "false"].includes(tags) ||
+    !["true", "false"].includes(workspace)
+  )
+    throw new Error("expert_card_configuration_invalid");
+  if ((tags === "true" || workspace === "true") && enabled !== "true")
+    throw new Error("expert_card_configuration_required");
   if (
     !["true", "false"].includes(enabled) ||
     !["true", "false"].includes(delivery) ||
@@ -126,6 +142,7 @@ export function readExpertCardConfig(
     paymentMode: source.EXPERT_CARD_PAYMENT_MODE as "test" | "live",
     materialDeliveryEnabled: delivery === "true",
     mainCheckoutEnabled: checkout === "true",
+    ...(tags === "true" ? { draftTagsEnabled: true } : {}),
     ...((delivery === "true" || notice) && source.EXPERT_TELEGRAM_BOT_TOKEN
       ? { workBotToken: source.EXPERT_TELEGRAM_BOT_TOKEN }
       : {}),
@@ -139,6 +156,7 @@ export function readExpertCardConfig(
   assertExpertCardConfig({
     features: {
       expertCard: enabled === "true",
+      expertDraftTags: tags === "true",
       expertCardMaterialDelivery: delivery === "true",
       expertResidencyLifecycle: lifecycle,
       expertResidencyLifecycleCommands: commands,

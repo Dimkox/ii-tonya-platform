@@ -34,6 +34,12 @@ export const expertCardDrafts = pgTable(
       .references(() => users.id),
     revision: integer("revision").notNull().default(0),
     status: text("status").notNull().default("collecting"),
+    inputMode: text("input_mode").notNull().default("INTERVIEW"),
+    documentImportRevision: integer("document_import_revision"),
+    documentProposal: jsonb("document_proposal").$type<{
+      source: "pdf" | "docx";
+      content: string;
+    }>(),
     publicPayload: jsonb("public_payload").$type<ProfessionalCard>(),
     approvedReviewId: uuid("approved_review_id"),
     messagingPolicyVersion: text("messaging_policy_version").notNull(),
@@ -44,6 +50,10 @@ export const expertCardDrafts = pgTable(
     updatedAt: time("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    check(
+      "expert_card_input_mode",
+      sql`coalesce((document_import_revision IS NULL OR document_import_revision BETWEEN 1 AND revision) AND input_mode IN ('INTERVIEW','DOCUMENT_PROPOSAL') AND ((input_mode='INTERVIEW' AND document_proposal IS NULL) OR (input_mode='DOCUMENT_PROPOSAL' AND jsonb_typeof(document_proposal)='object' AND jsonb_typeof(document_proposal->'source')='string' AND jsonb_typeof(document_proposal->'content')='string' AND document_proposal ?& ARRAY['source','content'] AND (document_proposal-'source'-'content')='{}'::jsonb AND document_proposal->>'source' IN ('pdf','docx') AND length(btrim(document_proposal->>'content'))>=50 AND octet_length(document_proposal::text)<=100000)),false)`,
+    ),
     unique("expert_card_draft_owner").on(t.id, t.userId),
     // SQL0054 makes this circular review FK DEFERRABLE INITIALLY DEFERRED.
     // Drizzle cannot express the flags; the SQL catalogue retains them.
@@ -343,7 +353,7 @@ export const expertCardRequests = pgTable(
     ),
     check(
       "expert_card_request_operation",
-      sql`coalesce((${t.operation} IN ('entry','submit','promo_proof','handoff_issue','handoff_redeem','main_quote','main_accept','main_checkout','residency_pause','residency_resume')),false)`,
+      sql`coalesce((${t.operation} IN ('entry','submit','promo_proof','handoff_issue','handoff_redeem','main_quote','main_accept','main_checkout','residency_pause','residency_resume','tags_toggle')),false)`,
     ),
   ],
 );

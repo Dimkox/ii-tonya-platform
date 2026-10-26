@@ -5,7 +5,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "parser/helper.py",
+    "parser/pyproject.toml",
+    "parser/uv.lock"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -468,6 +468,8 @@ export type RuntimeConfig = {
     expertVerification?: boolean;
     expertCard?: boolean;
     expertCardMaterialDelivery?: boolean;
+    expertDraftTags?: boolean;
+    residentWorkspaceNotifications?: boolean;
     expertResidencyLifecycle?: boolean;
     expertResidencyLifecycleCommands?: boolean;
     expertResidencyNoticeDelivery?: boolean;
@@ -895,6 +897,12 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         ? { expertVerificationForm: true }
         : {}),
       ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
+      ...(source.EXPERT_DRAFT_TAGS_ENABLED === "true"
+        ? { expertDraftTags: true }
+        : {}),
+      ...(source.RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED === "true"
+        ? { residentWorkspaceNotifications: true }
+        : {}),
       ...(expertResidencyLifecycle?.enabled
         ? { expertResidencyLifecycle: true }
         : {}),

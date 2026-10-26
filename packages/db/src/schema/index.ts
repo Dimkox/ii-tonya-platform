@@ -32,3 +32,5 @@ export * from "./expert-residency-lifecycle.js";
 export * from "./expert-offer-corrections.js";
 
 export * from "./resident-verification.js";
+
+export * from "./residency-core.js";

@@ -407,6 +407,13 @@
       "when": 1792972800000,
       "tag": "0057_resident_verification_form",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792972800001,
+      "tag": "0058_residency_core_stabilization",
+      "breakpoints": true
     }
   ]
 }

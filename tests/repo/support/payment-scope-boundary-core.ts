@@ -96,6 +96,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
   "packages/db/migrations/0056_residency_offer_corrections.sql",
   "packages/db/migrations/0055_expert_residency_lifecycle.sql",
@@ -129,6 +130,12 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  // Core stabilization: docs/spec/residency-core-stabilization-guard-registration.md.
+  "hashtags_db",
+  "hashtags_taxonomy",
+  "expert_card_draft_tags",
+  "resident_workspace_access",
+
   // Pre-price intake only; docs/spec/verification-schema-form-guard-registration.md.
   "residents_applications",
   "resident_verification_cohorts",
@@ -297,6 +304,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "EXPERT_DRAFT_TAGS_ENABLED",
+  "RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED",
   "EXPERT_VERIFICATION_FORM_ENABLED",
   "EXPERT_RESIDENCY_LIFECYCLE_ENABLED",
   "EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED",
@@ -363,7 +372,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "2bdb7122cf60ccf4f5d822d9b71c15584c2fe76c2f7745c9ac8c67cf74450867",
+    "768d603013df28dca8d9366eefab6e04c9fd1ddb7834fe33e993bf484a416ce1",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -457,7 +466,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/integrations/package.json",
-    "e041afbaee8eacfd08b0ac94127f5fd181787713ffb89e56c6d33aa055d708df",
+    "b00abc613aee38b56847c04ca0dc3b324c80ce59b67c6bed22bf45256d3124a3",
   ],
   [
     "packages/observability/package.json",
@@ -486,6 +495,16 @@ const reviewedDomHarnessHashes = new Map([
 ]);
 
 const approvedAutomationArtifactHashes = new Map([
+  // Exact core stabilization artifacts; no adjacent namespace exemption.
+  [
+    "packages/integrations/parser/helper.py",
+    "bbb3fb7bfafcb8af0448a2f85f7c7d27f168c8cc5f77c2ad2e42a624440978f4",
+  ],
+  [
+    "packages/integrations/parser/test_helper.py",
+    "59056d6774f6800c8482b85fb4f07dba544fdf8d40b1be2cd49bcb7c71c1caad",
+  ],
+
   // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
   [
     "_bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py",
@@ -769,6 +788,20 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  // Exact core stabilization artifacts; no adjacent namespace exemption.
+  [
+    "packages/db/migrations/0058_residency_core_stabilization.sql",
+    "0811e71752fd2c5561eb943306266d9ce83255004a76b68f85ee6a0c4fa152d8",
+  ],
+  [
+    "packages/db/migrations/meta/0058_snapshot.json",
+    "47addd7d8ae66de941c3c7e4b223baff05a7214bbbaadcc323cab22b164d47bb",
+  ],
+  [
+    "packages/db/migrations/state/0058_stabilization_sql_objects.json",
+    "5a2960c044c3cf23a17f6326fb8d3c6ffc2a90a7c295e9fd24c414f554ea8356",
+  ],
+
   // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.
   [
     "packages/db/migrations/0057_resident_verification_form.sql",
@@ -1240,7 +1273,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "41d6ce619528562112a39073e177cbbdf8f6447fc7a9532eec3f0176e142dff7",
+    "62eb000ace710e7de0555b326463a9c039219a156c01cd1d0ccc2f1e9dd82e81",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1320,7 +1353,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "41d6ce619528562112a39073e177cbbdf8f6447fc7a9532eec3f0176e142dff7",
+    "62eb000ace710e7de0555b326463a9c039219a156c01cd1d0ccc2f1e9dd82e81",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1468,7 +1501,7 @@ const paymentApiIdentifier =
 const expertResidencyRoute =
   /^\/v1\/(?:(?:admin\/)?expert(?:-|\/)|webhooks\/telegram\/expert(?:-|\/))/u;
 const expertResidencyFlag =
-  /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI|VERIFICATION)_/u;
+  /^(?:EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI|VERIFICATION|DRAFT_TAGS)_|RESIDENT_WORKSPACE_)/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;

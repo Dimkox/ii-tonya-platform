@@ -1,4 +1,4 @@
-import { enqueueApplicationMaterials } from "./expert-application-materials.js";
+import { activateResidentWorkspaceInTransaction } from "./resident-workspace-repository.js";
 import {
   lockExpertManagerAuthority,
   ExpertManagerAuthorityError,
@@ -553,16 +553,10 @@ export class PostgresExpertVerificationRepository {
         if (reason === "payment_verified") {
           if (!stored.applicationId)
             return fail("verification_application_unavailable");
-          await enqueueApplicationMaterials(
+          await activateResidentWorkspaceInTransaction(
             tx,
-            stored.applicationId,
             proof.userId,
-          );
-          await tx.execute(
-            sql`update expert_onboarding_applications set onboarding_stage='interview',updated_at=clock_timestamp() where id=${stored.applicationId}::uuid`,
-          );
-          await tx.execute(
-            sql`insert into expert_verification_work(application_id,user_id,kind) values(${stored.applicationId}::uuid,${proof.userId}::uuid,'interview_ready') on conflict(application_id,kind) do nothing`,
+            this.policy.messagingConsentPolicyVersion,
           );
         }
         await tx.execute(

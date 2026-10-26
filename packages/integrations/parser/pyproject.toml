@@ -1,0 +1,7 @@
+[project]
+name = "ii-tonya-private-document-parser"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["pymupdf==1.26.7", "python-docx==1.2.0"]
+[dependency-groups]
+dev = ["pytest==8.4.2"]

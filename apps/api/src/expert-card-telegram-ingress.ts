@@ -41,20 +41,26 @@ export function parseExpertCardTelegramUpdate(
   | { kind: "unhandled" | "invalid" }
   | { kind: "parsed"; input: Parameters<ExpertCardService["handleWork"]>[0] } {
   const root = record(body);
-  if (!root || root.callback_query) return { kind: "unhandled" };
-  const message = record(root.message);
+  if (!root) return { kind: "unhandled" };
+  const callback = record(root.callback_query);
+  if (
+    root.callback_query &&
+    (typeof callback?.data !== "string" || !callback.data.startsWith("ct1:"))
+  )
+    return { kind: "unhandled" };
+  const message = callback ? record(callback.message) : record(root.message);
   if (!message) return { kind: "unhandled" };
   // Existing slash commands retain their original authorization and rate limits.
   if (
     typeof message.text === "string" &&
     message.text.startsWith("/") &&
-    !/^\/(?:card|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice)(?:\s|$)|^\/start card_/u.test(
+    !/^\/(?:card|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice|tags)(?:\s|$)|^\/start card_/u.test(
       message.text,
     ) &&
     !(options.lifecycleCommands && isExpertResidencyLifecycleUpdate(root))
   )
     return { kind: "unhandled" };
-  const from = record(message.from),
+  const from = record(callback ? callback.from : message.from),
     chat = record(message.chat),
     telegramUserId = id(from?.id),
     chatId = id(chat?.id);
@@ -67,8 +73,19 @@ export function parseExpertCardTelegramUpdate(
     from?.is_bot === true
   )
     return { kind: "invalid" };
+  if (
+    callback &&
+    (typeof callback.id !== "string" ||
+      callback.id.length < 1 ||
+      callback.id.length > 128 ||
+      typeof callback.data !== "string" ||
+      callback.data.length > 64 ||
+      record(message.from)?.is_bot !== true ||
+      id(record(message.from)?.id) !== scope.workBotId)
+  )
+    return { kind: "invalid" };
   let content: ExpertCardContent;
-  const hasText = message.text !== undefined,
+  const hasText = callback ? true : message.text !== undefined,
     hasPhoto = message.photo !== undefined,
     hasDocument = message.document !== undefined;
   if ([hasText, hasPhoto, hasDocument].filter(Boolean).length === 0)
@@ -77,12 +94,16 @@ export function parseExpertCardTelegramUpdate(
     return { kind: "invalid" };
   if (hasText) {
     if (
-      typeof message.text !== "string" ||
-      message.text.length < 1 ||
-      message.text.length > 4000
+      !callback &&
+      (typeof message.text !== "string" ||
+        message.text.length < 1 ||
+        message.text.length > 4000)
     )
       return { kind: "invalid" };
-    content = { kind: "text", text: message.text };
+    content = {
+      kind: "text",
+      text: callback ? "/tags" : (message.text as string),
+    };
   } else {
     let reference: string | null = null;
     if (hasPhoto) {
@@ -116,6 +137,7 @@ export function parseExpertCardTelegramUpdate(
     chatId: chatId!,
     updateId: String(root.update_id),
     content,
+    ...(callback ? { callbackData: callback.data as string } : {}),
   };
   return {
     kind: "parsed",

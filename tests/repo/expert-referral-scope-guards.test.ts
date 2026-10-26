@@ -47,6 +47,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0055_expert_residency_lifecycle.sql",
       "packages/db/migrations/0056_residency_offer_corrections.sql",
       "packages/db/migrations/0057_resident_verification_form.sql",
+      "packages/db/migrations/0058_residency_core_stabilization.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -78,6 +79,7 @@ describe("expert residency referral scope boundary", () => {
       "expert_campaign_anchors",
       "expert_campaign_quotes",
       "expert_card_consent_epoch",
+      "expert_card_draft_tags",
       "expert_card_drafts",
       "expert_card_entries",
       "expert_card_handoffs",
@@ -143,6 +145,8 @@ describe("expert residency referral scope boundary", () => {
       "expert_verification_decisions",
       "expert_verification_work",
       "experts_published",
+      "hashtags_db",
+      "hashtags_taxonomy",
       "organization_profiles",
       "partner_command_receipts",
       "partner_shadow_quotes",
@@ -157,6 +161,7 @@ describe("expert residency referral scope boundary", () => {
       "resident_verification_check_work",
       "resident_verification_cohorts",
       "resident_verification_requests",
+      "resident_workspace_access",
       "residents_applications",
       "selarti_actual_usage_facts",
       "selarti_budget_alerts",
@@ -207,6 +212,7 @@ describe("expert residency referral scope boundary", () => {
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_FLAGS].sort()).toEqual([
       "EXPERT_AI_INGRESS_ENABLED",
+      "EXPERT_DRAFT_TAGS_ENABLED",
       "EXPERT_REFERRAL_ENABLED",
       "EXPERT_REFERRAL_HMAC_KEYS_JSON",
       "EXPERT_REFERRAL_HMAC_KEY_REF",
@@ -221,6 +227,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
       "EXPERT_TELEGRAM_REFERRAL_ENABLED",
       "EXPERT_VERIFICATION_FORM_ENABLED",
+      "RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
       "expert_referral.abuse_hold_close",

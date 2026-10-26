@@ -224,9 +224,16 @@ export const expertVerificationWork = pgTable(
       .notNull()
       .default("TODO: Wait for Content Spec"),
     status: text("status").notNull().default("pending"),
+    attemptId: uuid("attempt_id"),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    deliveryMessageId: text("delivery_message_id"),
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      "expert_workspace_notification_attempt",
+      sql`(attempt_id IS NULL AND attempted_at IS NULL AND delivery_message_id IS NULL) OR (kind='interview_ready' AND attempt_id IS NOT NULL AND attempted_at IS NOT NULL AND isfinite(attempted_at) AND status IN ('unknown_outcome','completed','cancelled') AND (delivery_message_id IS NULL OR delivery_message_id ~ '^[1-9][0-9]{0,19}$'))`,
+    ),
     unique("expert_verification_work_once").on(t.applicationId, t.kind),
     check(
       "expert_verification_work_kind",
@@ -238,7 +245,7 @@ export const expertVerificationWork = pgTable(
     ),
     check(
       "expert_verification_work_status",
-      sql`${t.status} IN ('pending','completed','cancelled')`,
+      sql`${t.status} IN ('pending','completed','cancelled','unknown_outcome')`,
     ),
   ],
 );

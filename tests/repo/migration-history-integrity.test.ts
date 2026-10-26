@@ -83,6 +83,7 @@ const HAND_SQL_FUNCTIONS = [
   "expert_card_manager_authority_valid",
   "expert_card_proof_digest",
   "expert_card_public_payload_valid",
+  "expert_card_tag_selection_guard",
   "expert_first_settlement_guard_change",
   "expert_jsonb_has_exact_keys",
   "expert_provider_reversal_result_guard",
@@ -92,6 +93,7 @@ const HAND_SQL_FUNCTIONS = [
   "expert_residency_current_coverage",
   "expert_residency_default_provider_deadline",
   "expert_reward_grant_require_eligible_settlement",
+  "hashtags_synonyms_valid",
   "lock_and_reject_selarti_budget_policy_overlap",
   "lock_partner_policy_window",
   "payer_receipt_redaction_due",
@@ -172,6 +174,7 @@ const HAND_SQL_TRIGGERS = [
   "expert_card_review_source",
   "expert_card_reviews_immutable",
   "expert_card_staff_actions_immutable",
+  "expert_card_tag_selection_guard",
   "expert_main_activation_admission_source",
   "expert_main_activation_admissions_append_only",
   "expert_offer_application_erasure",
@@ -245,7 +248,11 @@ const HAND_SQL_TRIGGERS = [
   "test_expert_prompt_transition_audit",
 ] as const;
 
-const HAND_SQL_VIEWS = ["package_balances"] as const;
+const HAND_SQL_VIEWS = [
+  "hashtags_taxonomy",
+  "package_balances",
+  "resident_workspace_access",
+] as const;
 
 const HAND_SQL_EXTENSIONS = ["btree_gist", "pgcrypto"] as const;
 
@@ -300,7 +307,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(57);
+    expect(newest).toBe(58);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -416,6 +423,6 @@ describe("migration history integrity", () => {
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
     // 0056 adds fourteen offer, qualification, manager, application-material and admission relations.
-    expect(declared.size).toBe(174);
+    expect(declared.size).toBe(176);
   });
 });

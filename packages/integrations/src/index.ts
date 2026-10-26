@@ -313,3 +313,6 @@ export {
 } from "./max-business/text-contract.js";
 
 export * from "./telegram/manager-notification-transport.js";
+
+export * from "./documents/safe-document-parser.js";
+export * from "./telegram/workspace-notification-transport.js";

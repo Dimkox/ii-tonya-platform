@@ -1,3 +1,4 @@
+import { createResidentWorkspaceNotificationLifecycle } from "./resident-workspace-notification-composition.js";
 import {
   createExpertPersonalOfferRunner,
   type ExpertCardMainCheckout,
@@ -141,6 +142,7 @@ export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly expertPersonalOfferCheckout?: ExpertCardMainCheckout;
   readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly expertCardMaterialFetch?: typeof globalThis.fetch;
+  readonly residentWorkspaceNotifier?: import("@ii-tonya/db").WorkspaceNotifier;
   readonly expertResidencyNoticeFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
@@ -554,6 +556,12 @@ export function createProductionWorkerRuntimeFactory(
         config,
         db,
       );
+      const residentWorkspaceNotifications =
+        createResidentWorkspaceNotificationLifecycle(
+          config,
+          db,
+          deps.residentWorkspaceNotifier,
+        );
       const expertCardMaterials = createExpertCardMaterialsLifecycle(config, {
         createRepository: (materialTransport) =>
           new PostgresExpertCardRepository(db, {
@@ -655,6 +663,9 @@ export function createProductionWorkerRuntimeFactory(
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
         ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentWorkspaceNotifications
+          ? { residentWorkspaceNotifications }
+          : {}),
         ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
         ...(expertResidencyLifecycle === undefined
           ? {}

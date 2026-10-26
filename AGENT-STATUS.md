@@ -1,3 +1,25 @@
+# Core stabilization source ready for review — 2026-10-26
+
+The assigned codex/residency-foundation-20261026 source candidate implements shared
+transactional interview activation/audit, durable owner-bound promo notification,
+bounded optional local PDF/DOCX parsing with durable manual fallback, and private
+164-entry/7-category draft tag selection. Public-card and financial gates remain.
+New tag/notification flags default false; Python execution remains unavailable in
+the existing Node-only256MiB production worker. No provider/deployment mutation.
+
+Focused acceptance: stabilization PostgreSQL/Fastify10/10, canonical settlement
+regression23/23, real locked Python5/5 and Node parser3/3. Narrow behavioral
+RED/GREEN closes honest unknown reporting and first-completion replay. Replay is
+59migrations/176tables; metadata and individual guard registrations are retained.
+Affected builds/types, full test types and static checks are recorded in
+`docs/test-evidence/residency-core-stabilization-implementation-2026-10-26.md`.
+
+Root owns independent review, final exact-source gate, its new-owner documentation
+checkpoint and draft STABILIZATION PR. Source is in-review, not release-complete.
+New owner sales precedence belongs to the root's separate master-plan addendum.
+Do not rerun unchanged broad checks or mistake optional local helper evidence for
+production isolation. Preserve failed logs and current task-owned PG configuration.
+
 # Core stabilization active — 2026-10-26
 
 Branch codex/residency-foundation-20261026 in the existing isolated worktree.
