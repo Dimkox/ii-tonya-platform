@@ -1,0 +1,53 @@
+{
+  "received_date": "2026-10-26",
+  "kind": "verbatim_owner_sources",
+  "precedence": {
+    "verification-final": {
+      "supersedes": ["verification-protocol-prior"]
+    }
+  },
+  "sources": [
+    {
+      "module": "verification-final",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/verification-final.txt",
+      "sha256": "7e5b51fdc7f8ab68d0850bbad63484de6cc5f00a64a7b11e37c5634980140b1d",
+      "bytes": 16926
+    },
+    {
+      "module": "core-stabilization",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/core-stabilization.txt",
+      "sha256": "937c55426e92543ba8c52a50c44c2113027f45aeb78cfbb14f50bbe64e8f8e03",
+      "bytes": 8432
+    },
+    {
+      "module": "verification-protocol-prior",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/verification-protocol-prior.txt",
+      "sha256": "e9f52c5e8488cc69faf7e440dc88e80bf55e6f669d44e5b1b079adc6a1c30264",
+      "bytes": 13884
+    },
+    {
+      "module": "resident-onboarding",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/resident-onboarding.txt",
+      "sha256": "102cc07e418fbae071483e34cb370e66d5886ef49f230a2e75f41393db86818f",
+      "bytes": 22064
+    },
+    {
+      "module": "communication-templates",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/communication-templates.txt",
+      "sha256": "b7b93c3bc3375cb9a43e4e6dc1f3fcb6d10a078a9cce0035c0bc6c60e3a7e7f1",
+      "bytes": 12100
+    },
+    {
+      "module": "hashtaxonomy-v2",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/hashtaxonomy-v2.txt",
+      "sha256": "25095561968806b6b68e30da439896984407bcdf6147a86867b89c33d90bc13a",
+      "bytes": 32761
+    },
+    {
+      "module": "content-safety-filter",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/content-safety-filter.txt",
+      "sha256": "c8571df1683c9dd67b28d68330c8e7a9c567681890a747c369db0bb1b48d2172",
+      "bytes": 12582
+    }
+  ]
+}

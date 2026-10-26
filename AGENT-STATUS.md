@@ -1,3 +1,26 @@
+# Core stabilization active — 2026-10-26
+
+Branch codex/residency-foundation-20261026 in the existing isolated worktree.
+Baseline 567e71b4dea4bd2720da452c8049916f9d2b437c is the delivered PR108 head.
+Seven new verbatim owner specifications are archived with hashes under
+docs/source/residency-phase1-owner-2026-10-26. Final verification supersedes
+its prior protocol. Ordered package: stabilization, guardrails, final verification
+and communications, onboarding/taxonomy, schedule/lifecycle. Continue authorized
+work without routine approval pauses. No deployment or provider activation.
+
+Contract: docs/superpowers/implementation-artifacts/spec-residency-core-stabilization.md
+Master: docs/superpowers/plans/2026-10-26-residency-phase1-final-package.md
+RequireDocker preflight passed Node24.22.1/pnpm11.9.0. Three independent read-only
+foundation audits completed. Root owns final review/gate/push/draft PR; a fresh
+implementer owns source, tests and implementation evidence. Do not recursively
+launch another implementation lead or re-render the already loaded Bmad workflow.
+
+Reuse the stopped task-owned PostgreSQL17.5 cluster and protected configuration
+specified in the contract; no extra cluster or secret output. Existing owner
+run-count opt-out persists; preserve failures and avoid unchanged broad repeats.
+Manager prepayment exception has no genuine producer yet and must remain denied.
+Python parser production execution stays unavailable until reviewed runtime proof.
+
 # Resident verification first PR delivered — 2026-10-26
 
 Draft PR108 is open: https://github.com/Dimkox/ii-tonya-platform/pull/108
