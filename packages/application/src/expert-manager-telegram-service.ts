@@ -27,6 +27,7 @@ export interface ExpertManagerTelegramRepository {
     applicationId: string;
     decision: "approved" | "rejected";
     idempotencyKey: string;
+    requiresEditor?: boolean;
     profileUserId?: string;
     profileRevision?: number;
   } | null>;
@@ -156,6 +157,7 @@ export function createExpertManagerTelegramService(deps: {
           nonceHash,
         });
         if (!stored) return { kind: "forbidden" } as const;
+        if (stored.requiresEditor) return { kind: "editor_required" } as const;
         if (
           stored.decision === "approved" &&
           stored.profileUserId &&

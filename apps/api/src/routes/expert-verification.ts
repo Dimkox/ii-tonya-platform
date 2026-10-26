@@ -25,7 +25,16 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
     ExpertVerificationService,
     "list" | "detail" | "decide" | "checkout"
   > &
-    Partial<Pick<ExpertVerificationService, "reverifyProfile" | "recoverHeld">>;
+    Partial<
+      Pick<
+        ExpertVerificationService,
+        | "reverifyProfile"
+        | "recoverHeld"
+        | "previewReview"
+        | "confirmReview"
+        | "closeUnknownReview"
+      >
+    >;
 }> = async (app, deps) => {
   if (!deps.enabled) return;
   const service = deps.service;
@@ -79,6 +88,127 @@ export const expertVerificationRoutes: FastifyPluginAsync<{
       const result = await service.detail(
         session(req.headers.authorization)!,
         req.params.applicationId,
+      );
+      return result.kind === "ok"
+        ? result
+        : reply.code(code(result.kind)).send({ error: result.kind });
+    },
+  );
+  app.post<{ Params: { applicationId: string }; Body: unknown }>(
+    "/v1/admin/expert-verification/:applicationId/review-preview",
+    { bodyLimit: 16000 },
+    async (req, reply) => {
+      const b = req.body as Record<string, unknown> | null;
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !b ||
+        typeof b !== "object" ||
+        Array.isArray(b) ||
+        Object.keys(b).some(
+          (k) =>
+            ![
+              "key",
+              "expectedRevision",
+              "expectedGeneration",
+              "questions",
+              "tone",
+              "editedText",
+            ].includes(k),
+        ) ||
+        typeof b.key !== "string" ||
+        ![
+          "APPROVED_BASIC",
+          "APPROVED_EXCLUSIVE",
+          "REJECT_NICHE_MISMATCH",
+          "REJECT_INSUFFICIENT_PROOF",
+          "REJECT_LEGAL_VIOLATION",
+          "REQ_INFO_GENERIC",
+          "REJECT_POST_PAYMENT_REFUND",
+        ].includes(b.key) ||
+        !Number.isSafeInteger(b.expectedRevision) ||
+        !Number.isSafeInteger(b.expectedGeneration) ||
+        Number(b.expectedRevision) < 1 ||
+        Number(b.expectedGeneration) < 1 ||
+        (b.questions !== undefined &&
+          (!Array.isArray(b.questions) ||
+            b.questions.length > 10 ||
+            b.questions.some(
+              (q) => typeof q !== "string" || q.length > 200,
+            ))) ||
+        (b.tone !== undefined &&
+          !["standard", "warm", "brief"].includes(String(b.tone))) ||
+        (b.editedText !== undefined && typeof b.editedText !== "string")
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!service.previewReview)
+        return reply.code(503).send({ error: "unavailable" });
+      const result = await service.previewReview(
+        session(req.headers.authorization)!,
+        { applicationId: req.params.applicationId, ...b } as Parameters<
+          NonNullable<typeof service.previewReview>
+        >[1],
+      );
+      return result.kind === "ok"
+        ? result
+        : reply.code(code(result.kind)).send({
+            error: result.kind,
+            ...("reason" in result
+              ? { reason: result.reason, contentSlot: result.contentSlot }
+              : {}),
+          });
+    },
+  );
+  app.post<{ Params: { applicationId: string }; Body: unknown }>(
+    "/v1/admin/expert-verification/:applicationId/review-confirm",
+    { bodyLimit: 1024 },
+    async (req, reply) => {
+      const b = req.body as Record<string, unknown> | null;
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !b ||
+        typeof b !== "object" ||
+        Array.isArray(b) ||
+        Object.keys(b).sort().join(",") !== "finalHash,previewId" ||
+        typeof b.previewId !== "string" ||
+        !uuid.test(b.previewId) ||
+        typeof b.finalHash !== "string" ||
+        !/^[0-9a-f]{64}$/u.test(b.finalHash)
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!service.confirmReview)
+        return reply.code(503).send({ error: "unavailable" });
+      const result = await service.confirmReview(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        b.previewId,
+        b.finalHash,
+      );
+      return result.kind === "ok"
+        ? result
+        : reply.code(code(result.kind)).send({ error: result.kind });
+    },
+  );
+  app.post<{ Params: { applicationId: string }; Body: unknown }>(
+    "/v1/admin/expert-verification/:applicationId/review-recovery",
+    { bodyLimit: 1024 },
+    async (req, reply) => {
+      const b = req.body as Record<string, unknown> | null;
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !b ||
+        typeof b !== "object" ||
+        Array.isArray(b) ||
+        Object.keys(b).join(",") !== "eventId" ||
+        typeof b.eventId !== "string" ||
+        !uuid.test(b.eventId)
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      if (!service.closeUnknownReview)
+        return reply.code(503).send({ error: "unavailable" });
+      const result = await service.closeUnknownReview(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        b.eventId,
       );
       return result.kind === "ok"
         ? result

@@ -132,6 +132,9 @@ const HAND_SQL_FUNCTIONS = [
   "resident_card_effective_fields",
   "resident_card_proposal_change_guard",
   "resident_card_review_safety_guard",
+  "resident_financial_attempt_source",
+  "resident_review_event_source",
+  "resident_review_recovery_source",
   "resident_safety_activation_guard",
   "resident_safety_assess",
   "resident_safety_compile",
@@ -143,13 +146,16 @@ const HAND_SQL_FUNCTIONS = [
   "resident_safety_publication_authorize",
   "resident_safety_publish",
   "resident_safety_subject_guard",
+  "resident_terminal_decision_guard",
   "resident_verification_consent_cleanup",
+  "resident_verification_draft_v2_valid",
   "resident_verification_draft_valid",
   "resident_verification_followup_valid",
   "resident_verification_price_allowed",
   "resident_verification_price_guard",
   "resident_verification_social_projection",
   "resident_verification_stage_projection",
+  "resident_verification_version_valid",
   "resident_verification_write_guard",
   "validate_and_consume_selarti_budget_approval",
   "validate_test_expert_campaign_prompt",
@@ -288,6 +294,13 @@ const HAND_SQL_TRIGGERS = [
   "resident_card_proposal_immutable",
   "resident_card_proposal_source",
   "resident_card_review_safety",
+  "resident_financial_attempt_source",
+  "resident_message_templates_immutable",
+  "resident_review_event_source",
+  "resident_review_events_immutable",
+  "resident_review_previews_immutable",
+  "resident_review_recoveries_immutable",
+  "resident_review_recovery_source",
   "resident_safety_active_valid",
   "resident_safety_log_subject",
   "resident_safety_outcome_subject",
@@ -297,6 +310,7 @@ const HAND_SQL_TRIGGERS = [
   "resident_safety_publication_authorize",
   "resident_safety_publication_immutable",
   "resident_safety_rules_immutable",
+  "resident_terminal_decision_guard",
   "resident_verification_anchor_guard",
   "resident_verification_consent_cleanup",
   "resident_verification_quote_guard",
@@ -379,7 +393,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(61);
+    expect(newest).toBe(62);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -494,7 +508,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0061 adds eight private content-safety relations.
-    expect(declared.size).toBe(197);
+    // 0062 adds seven versioned review, custody and audit relations.
+    expect(declared.size).toBe(204);
   });
 });

@@ -13,7 +13,15 @@ type Client = Pick<
   ExpertVerificationClient,
   "list" | "detail" | "decide" | "recover" | "clear"
 > &
-  Partial<Pick<ExpertVerificationClient, "reverifyProfile">> & {
+  Partial<
+    Pick<
+      ExpertVerificationClient,
+      | "reverifyProfile"
+      | "previewReview"
+      | "confirmReview"
+      | "closeUnknownReview"
+    >
+  > & {
     readonly cards?: ExpertCardAdminClient;
   };
 export function renderExpertVerificationPage(): string {
@@ -69,12 +77,16 @@ export function bindExpertVerificationActions(
       !active ||
       busy ||
       selected?.status !== "pending" ||
+      (selected.questionnaire.status === "submitted" &&
+        selected.questionnaire.formVersion === 2) ||
       (!!selected.profile && !selected.profile.verified) ||
       (!!item && item.decision !== "approved");
     reject.disabled =
       !active ||
       busy ||
       selected?.status !== "pending" ||
+      (selected.questionnaire.status === "submitted" &&
+        selected.questionnaire.formVersion === 2) ||
       (!!item && item.decision !== "rejected");
     if (profileButton)
       profileButton.disabled =
@@ -209,7 +221,61 @@ export function bindExpertVerificationActions(
       );
       for (const contact of item.contact)
         text(detail, `${contact.provider}: ${contact.externalId}`);
-      text(detail, item.questionnaire.contentSlot);
+      if (item.questionnaire.status === "waiting_content")
+        text(detail, item.questionnaire.contentSlot);
+      else {
+        text(
+          detail,
+          `Анкета v${item.questionnaire.formVersion}, ревизия ${item.questionnaire.revision}. Состояние: ${item.questionnaire.lifecycle}. Проверки документов и соцсетей: неизвестно, требуется ручная оценка.`,
+        );
+        for (const [field, value] of Object.entries(item.questionnaire.draft))
+          text(
+            detail,
+            `${field}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
+          );
+        for (const message of item.questionnaire.messages ?? []) {
+          text(detail, `Доставка ${message.eventId}: ${message.status}.`);
+          if (
+            ["dispatched", "unknown"].includes(message.status) &&
+            current.closeUnknownReview
+          ) {
+            const close = doc.createElement("button");
+            close.textContent = "Закрыть неопределённую доставку без повтора";
+            close.onclick = async () => {
+              if (busy) return;
+              busy = true;
+              controls();
+              try {
+                await current.closeUnknownReview!(
+                  item.applicationId,
+                  message.eventId,
+                );
+                if (mounted && epoch === generation) {
+                  close.remove();
+                  status.textContent =
+                    "Неопределённая доставка закрыта без повторной отправки.";
+                }
+              } catch (e) {
+                failed(e);
+              } finally {
+                busy = false;
+                controls();
+              }
+            };
+            detail.append(close);
+          }
+        }
+        if (item.questionnaire.supplements)
+          text(
+            detail,
+            `Дополнения: ${JSON.stringify(item.questionnaire.supplements)}`,
+          );
+        if (
+          item.questionnaire.formVersion === 2 &&
+          item.questionnaire.lifecycle === "UNDER_REVIEW"
+        )
+          reviewEditor(current, item, epoch);
+      }
       if (item.profile)
         text(
           detail,
@@ -224,6 +290,136 @@ export function bindExpertVerificationActions(
         controls();
       }
     }
+  }
+  function reviewEditor(
+    current: Client,
+    item: VerificationDetail,
+    epoch: number,
+  ) {
+    if (item.questionnaire.status !== "submitted") return;
+    const form = item.questionnaire;
+    const panel = doc.createElement("section"),
+      action = doc.createElement("select"),
+      questions = doc.createElement("textarea"),
+      tone = doc.createElement("select"),
+      previewButton = doc.createElement("button"),
+      confirmButton = doc.createElement("button"),
+      preview = doc.createElement("textarea");
+    action.setAttribute("aria-label", "Решение по анкете");
+    for (const [value, label] of [
+      ["APPROVED_BASIC", "Одобрить базовый"],
+      ["APPROVED_EXCLUSIVE", "Одобрить эксклюзив"],
+      ["REQ_INFO_GENERIC", "Запросить информацию"],
+      ["REJECT_NICHE_MISMATCH", "Отказать: формат"],
+      ["REJECT_INSUFFICIENT_PROOF", "Отказать после уточнений"],
+      ["REJECT_LEGAL_VIOLATION", "Окончательный отказ"],
+      [
+        "REJECT_POST_PAYMENT_REFUND",
+        "Возврат — ручная проверка, политика не согласована",
+      ],
+    ]) {
+      const option = doc.createElement("option");
+      option.value = value!;
+      option.textContent = label!;
+      option.disabled = value === "REJECT_POST_PAYMENT_REFUND";
+      action.append(option);
+    }
+    questions.setAttribute("aria-label", "Вопросы, по одному на строку");
+    questions.maxLength = 2100;
+    tone.setAttribute("aria-label", "Тон сообщения");
+    for (const [v, l] of [
+      ["standard", "Стандартный"],
+      ["warm", "Тёплый"],
+      ["brief", "Краткий"],
+    ]) {
+      const o = doc.createElement("option");
+      o.value = v!;
+      o.textContent = l!;
+      tone.append(o);
+    }
+    previewButton.textContent = "Предпросмотр";
+    confirmButton.textContent = "Подтвердить точный текст";
+    confirmButton.disabled = true;
+    preview.readOnly = true;
+    preview.setAttribute("aria-label", "Точный текст сообщения");
+    let prepared:
+      | Awaited<ReturnType<ExpertVerificationClient["previewReview"]>>
+      | undefined;
+    const invalidate = () => {
+      prepared = undefined;
+      preview.value = "";
+      confirmButton.disabled = true;
+    };
+    action.onchange = invalidate;
+    questions.oninput = invalidate;
+    tone.onchange = invalidate;
+    previewButton.onclick = async () => {
+      if (!current.previewReview || busy) return;
+      busy = true;
+      controls();
+      invalidate();
+      try {
+        const result = await current.previewReview(item.applicationId, {
+          key: action.value,
+          expectedRevision: form.revision,
+          expectedGeneration: form.generation,
+          tone: tone.value,
+          ...(action.value === "REQ_INFO_GENERIC"
+            ? {
+                questions: questions.value
+                  .split("\n")
+                  .map((v) => v.trim())
+                  .filter(Boolean),
+              }
+            : {}),
+        });
+        if (!mounted || epoch !== generation) return;
+        prepared = result;
+        preview.value = result.text;
+        confirmButton.disabled = false;
+      } catch (e) {
+        failed(e);
+      } finally {
+        busy = false;
+        controls();
+      }
+    };
+    confirmButton.onclick = async () => {
+      if (!prepared || !current.confirmReview || busy) return;
+      busy = true;
+      controls();
+      confirmButton.disabled = true;
+      try {
+        await current.confirmReview(
+          item.applicationId,
+          prepared.previewId,
+          prepared.hash,
+        );
+        if (!mounted || epoch !== generation) return;
+        status.textContent =
+          "Решение записано. Доставка ожидает доступного канала; это не подтверждение оплаты.";
+        panel.remove();
+      } catch (e) {
+        failed(e);
+        confirmButton.disabled = false;
+      } finally {
+        busy = false;
+        controls();
+      }
+    };
+    text(
+      panel,
+      "Изменяйте тон и вопросы до предпросмотра. Произвольное редактирование итогового текста недоступно: факты решения и сроки защищены. Критерии категорий: ожидается контент. Возвраты требуют ручной проверки и согласованной политики.",
+    );
+    panel.append(
+      action,
+      questions,
+      tone,
+      previewButton,
+      preview,
+      confirmButton,
+    );
+    detail.append(panel);
   }
   async function decide(decision: "approved" | "rejected") {
     if (

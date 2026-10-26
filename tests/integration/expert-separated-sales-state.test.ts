@@ -71,6 +71,10 @@ async function owner(intake = false) {
     participantKind: "expert",
     idempotencyKey: randomUUID(),
   });
+  // Historical v1 cohort fixture: the final module must preserve these old rules.
+  await db.db.execute(
+    sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id,form_version,policy_version,education_requirement) select ${userId}::uuid,${scope.botId},${scope.botKey},id,${chatId},${chatId},1,'resident_education_unknown_v1','unknown_manual_review' from channel_identities where user_id=${userId}::uuid`,
+  );
   const sales = new PostgresExpertSeparatedSalesRepository(db.db, policy),
     form = new PostgresResidentVerificationRepository(db.db, policy);
   if (intake) await form.mutate({ ...command(scope), action: "start" });

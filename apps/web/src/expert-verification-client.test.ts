@@ -124,3 +124,77 @@ it("reverifies exactly the displayed revision on the owned application endpoint"
     }),
   );
 });
+it("reads real submitted questionnaires and confirms exactly the returned preview hash", async () => {
+  const calls: unknown[] = [];
+  const hash = "a".repeat(64);
+  const fetcher = vi.fn(
+    async (url: RequestInfo | URL, options?: RequestInit) => {
+      calls.push({ url, options });
+      return response({
+        kind: "ok",
+        item: String(url).endsWith("review-preview")
+          ? {
+              previewId: id,
+              text: "Здравствуйте!",
+              hash,
+              expiresAt: "2026-10-26T11:00:00Z",
+            }
+          : String(url).endsWith("review-confirm")
+            ? { eventId: id, action: "APPROVED_BASIC", replay: false }
+            : {
+                ...entry,
+                userId: id,
+                contact: [],
+                questionnaire: {
+                  status: "submitted",
+                  draft: {
+                    roles: ["EXPERT"],
+                    motivation: "<script>private</script>",
+                  },
+                  submittedRevision: 2,
+                  formVersion: 2,
+                  revision: 4,
+                  generation: 2,
+                  lifecycle: "UNDER_REVIEW",
+                  supplements: null,
+                },
+              },
+      });
+    },
+  );
+  const client = new ExpertVerificationClient(token, fetcher);
+  expect((await client.detail(id)).questionnaire.status).toBe("submitted");
+  const preview = await client.previewReview(id, {
+    key: "APPROVED_BASIC",
+    expectedRevision: 4,
+    expectedGeneration: 2,
+  });
+  await client.confirmReview(id, preview.previewId, preview.hash);
+  expect(fetcher).toHaveBeenLastCalledWith(
+    `/v1/admin/expert-verification/${id}/review-confirm`,
+    expect.objectContaining({
+      body: JSON.stringify({ previewId: id, finalHash: hash }),
+      credentials: "omit",
+      cache: "no-store",
+    }),
+  );
+});
+it("refuses stale confirmation and retries the same preview without inventing success", async () => {
+  let attempt = 0;
+  const bodies: string[] = [];
+  const client = new ExpertVerificationClient(token, async (_url, options) => {
+    bodies.push(String(options?.body));
+    attempt++;
+    return attempt === 1
+      ? response({ error: "unavailable" }, 503)
+      : response({
+          kind: "ok",
+          item: { eventId: id, action: "REJECT_SOFT", replay: true },
+        });
+  });
+  await expect(client.confirmReview(id, id, "a".repeat(64))).rejects.toThrow();
+  expect((await client.confirmReview(id, id, "a".repeat(64))).replay).toBe(
+    true,
+  );
+  expect(bodies[0]).toBe(bodies[1]);
+});

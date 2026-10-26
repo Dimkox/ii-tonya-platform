@@ -103,6 +103,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           message?.text !== undefined,
           message?.photo !== undefined,
           message?.document !== undefined,
+          message?.video !== undefined,
         ].filter(Boolean).length;
         if (kinds !== 1)
           return reply.code(400).send({ error: "invalid_update" });
@@ -142,7 +143,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           const file = (
             photo !== undefined
               ? (photo as Record<string, unknown>[]).at(-1)
-              : message?.document
+              : (message?.document ?? message?.video)
           ) as Record<string, unknown> | undefined;
           const mimeType =
             photo !== undefined ? null : (file?.mime_type ?? null);
@@ -160,14 +161,18 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             return reply.code(400).send({ error: "invalid_update" });
           if (
             (mimeType !== null &&
-              !["application/pdf", "image/jpeg", "image/png"].includes(
-                mimeType,
-              )) ||
+              ![
+                "application/pdf",
+                "image/jpeg",
+                "image/png",
+                "video/mp4",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              ].includes(mimeType)) ||
             (file.file_size !== undefined &&
               (Number(file.file_size) < 1 || Number(file.file_size) > 20971520))
           )
             correction =
-              "Этот формат или размер файла не подходит. Пришлите PDF/JPEG/PNG до 20 МБ. Сохранённые ответы не изменены.";
+              "Этот формат или размер файла не подходит. Пришлите PDF/DOCX/JPEG/PNG или видео MP4 до 20 МБ. Сохранённые ответы не изменены.";
           if (
             typeof message?.caption === "string" &&
             (message.caption.length > 3000 ||
@@ -178,7 +183,12 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             correction =
               "Подпись слишком длинная или содержит неподдерживаемые символы. Сохранённые ответы не изменены.";
           media = {
-            kind: photo !== undefined ? "photo" : "document",
+            kind:
+              photo !== undefined
+                ? "photo"
+                : message?.video
+                  ? "video"
+                  : "document",
             fileId: file.file_id,
             mimeType,
             size: file.file_size === undefined ? null : Number(file.file_size),

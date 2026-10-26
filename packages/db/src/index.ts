@@ -384,3 +384,5 @@ export {
   PostgresExpertSalesScheduler,
   type SalesNoticeTransport,
 } from "./repositories/expert-sales-scheduler.js";
+
+export * from "./repositories/resident-review-repository.js";

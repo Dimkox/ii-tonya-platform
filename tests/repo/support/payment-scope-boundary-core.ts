@@ -99,6 +99,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0061_resident_content_safety.sql",
+  "packages/db/migrations/0062_resident_verification_messages.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -166,6 +167,13 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 
   // Pre-price intake only; docs/spec/verification-schema-form-guard-registration.md.
   "residents_applications",
+  "resident_message_templates",
+  "resident_review_previews",
+  "resident_review_events",
+  "resident_information_requests",
+  "resident_check_generations",
+  "resident_review_messages",
+  "resident_review_recoveries",
   "resident_verification_cohorts",
   "resident_verification_application_updates",
   "resident_verification_check_work",
@@ -312,6 +320,10 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
   "/v1/admin/expert-verification/invoices/:invoiceId/recover",
   "/v1/admin/expert-verification/:applicationId/decision",
+  "/v1/admin/expert-verification/:applicationId/review-preview",
+  "/v1/admin/expert-verification/:applicationId/review-confirm",
+  "/v1/admin/expert-verification/:applicationId/review-recovery",
+
   "/v1/webhooks/telegram/expert-promo/:botKey",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "/v1/expert/browser/residency/checkouts",
@@ -407,7 +419,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "888ffe4cdea69b98ccdaa1f4e3a94f0e299166fb14631841045539f72e5e1ab3",
+    "2a17235a262302331a5cc055b66888390b26c1928c6d22ea835922c38870268b",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -519,6 +531,10 @@ const approvedPackageManifestHashes = new Map([
 // Existing loopback DOM harnesses load an operator-supplied Playwright install.
 // This exception covers unresolved loader names only, never internal mint access.
 const reviewedDomHarnessHashes = new Map([
+  [
+    "scripts/verify-resident-review-browser.mjs",
+    "f4bb0156558f284e31f02097c955d5e17511e03982ee5245b2677bfc9a7eff6d",
+  ],
   [
     "scripts/verify-client-web-account-browser.mjs",
     "02ffce350b89d5d89a50966693eb23cc14fd0caaf0dd2ed469ac07d5e8678e4d",
@@ -823,6 +839,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0062_resident_verification_messages.sql",
+    "6fedda508f5b6fede3dbf3c0113262fbba06c892f16ff2146ee455b1a887a1ff",
+  ],
+  [
+    "packages/db/migrations/meta/0062_snapshot.json",
+    "eb4bc06d16ce0fe1900a46fd3e3c1734867fe7b5b421df8ac0acd8c10c76b7e8",
+  ],
+  [
+    "packages/db/migrations/state/0062_sql_objects.json",
+    "23fc5f17f92cee664dfa6b67fb48eeeebca8523e8fae1717fad387757a17c751",
+  ],
+  [
+    "packages/db/migrations/state/0062_manifest.json",
+    "bc3ead0c5ebe1cddf40b41a83a109cccb724a4c49a00753034690de573a8a660",
+  ],
+
   [
     "packages/db/migrations/0061_resident_content_safety.sql",
     "2e8c028c080e8e00a5c8a02bddaae31bb6f90fc5ce536c041c9852d560619a3b",
@@ -1358,7 +1391,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "5826dab6c2783bba14481d67828affc4645851b214c581cc4e862a1176c234cd",
+    "5577bf30285c6939161b86c9a8d0ef643a20c1bb5e88452b92099276fa72da43",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1438,7 +1471,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "5826dab6c2783bba14481d67828affc4645851b214c581cc4e862a1176c234cd",
+    "5577bf30285c6939161b86c9a8d0ef643a20c1bb5e88452b92099276fa72da43",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

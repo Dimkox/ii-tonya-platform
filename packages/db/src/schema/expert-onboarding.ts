@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./identity.js";
@@ -41,7 +42,9 @@ export const expertOnboardingApplications = pgTable(
       .defaultNow(),
   },
   (t) => [
-    unique("expert_onboarding_user_unique").on(t.userId),
+    uniqueIndex("expert_onboarding_current_user_unique")
+      .on(t.userId)
+      .where(sql`${t.verificationStatus} <> 'rejected'`),
     unique("expert_onboarding_id_user_unique").on(t.id, t.userId),
     foreignKey({
       name: "expert_onboarding_user_fk",

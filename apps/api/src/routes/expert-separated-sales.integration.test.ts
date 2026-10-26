@@ -152,6 +152,9 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     await send("/set socialLinks https://example.com/expert");
     await send("/set motivation Работа с клиентами");
     await send("/set specialization Психология");
+    await send("/set methods Практика");
+    await send("/set experienceYears 5");
+    await send("/set cases Пример");
     const ready = await send("/set averageCheckMinor 300000");
     const submitted = await click(ready, ":submit");
     expect(submitted.text).toContain("Анкета получена");
@@ -176,7 +179,8 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     ).rows[0]!;
     expect(bridge).toBeDefined();
     const manager = await database.createUser();
-    const session = `sha256:${createHash("sha256").update(randomUUID()).digest("hex")}`;
+    const managerToken = randomUUID();
+    const session = `sha256:${createHash("sha256").update(managerToken).digest("hex")}`;
     await database.db.execute(
       sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values(${session},${manager}::uuid,clock_timestamp(),clock_timestamp()+interval '1 hour')`,
     );
@@ -189,13 +193,79 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     });
     const detail = await repo.applicationDetail(session, bridge.id);
     expect(detail?.questionnaire).toMatchObject({ status: "submitted" });
-    const decision = await repo.decide({
-      sessionHash: session,
-      applicationId: bridge.id,
-      decision: "approved",
-      reasonCode: "identity_verified",
-      idempotencyKey: randomUUID(),
+    const reviewForm = (
+      await database.db.execute<{ revision: number; generation: number }>(
+        sql`select f.revision,f.check_generation generation from residents_applications f join expert_sales_form_bridges b on b.form_id=f.id where b.application_id=${bridge.id}::uuid`,
+      )
+    ).rows[0]!;
+    const { expertVerificationRoutes } =
+      await import("./expert-verification.js");
+    const { createExpertVerificationComposition } =
+      await import("../expert-verification-composition.js");
+    const managerApp = Fastify({ logger: false });
+    const managerConfig = loadEnv({
+      DATABASE_URL: "postgresql://synthetic:synthetic@localhost/fixture",
+      ALLOW_INSECURE_LOCAL_DATABASE: "true",
+      EXPERT_VERIFICATION_ENABLED: "true",
+      EXPERT_VERIFICATION_PAYMENT_MODE: "test",
+      EXPERT_VERIFICATION_MESSAGING_CONSENT_POLICY_VERSION:
+        "client-messaging-v1",
     });
+    const capability = createExpertVerificationComposition(
+      database.db,
+      managerConfig,
+    )!;
+    await managerApp.register(expertVerificationRoutes, {
+      enabled: true,
+      service: capability.service,
+    });
+    try {
+      const headers = { authorization: `Bearer ${managerToken}` };
+      const denied = await managerApp.inject({
+        method: "POST",
+        url: `/v1/admin/expert-verification/${bridge.id}/decision`,
+        headers,
+        payload: {
+          decision: "approved",
+          reasonCode: "verified",
+          idempotencyKey: randomUUID(),
+        },
+      });
+      expect(denied.statusCode).toBe(503);
+      const previewResponse = await managerApp.inject({
+        method: "POST",
+        url: `/v1/admin/expert-verification/${bridge.id}/review-preview`,
+        headers,
+        payload: {
+          key: "APPROVED_BASIC",
+          expectedRevision: reviewForm.revision,
+          expectedGeneration: reviewForm.generation,
+        },
+      });
+      expect(previewResponse.statusCode, previewResponse.body).toBe(200);
+      const preview = previewResponse.json().item;
+      const confirmed = await managerApp.inject({
+        method: "POST",
+        url: `/v1/admin/expert-verification/${bridge.id}/review-confirm`,
+        headers,
+        payload: { previewId: preview.previewId, finalHash: preview.hash },
+      });
+      expect(confirmed.statusCode, confirmed.body).toBe(200);
+      const result = await managerApp.inject({
+        method: "GET",
+        url: `/v1/admin/expert-verification/${bridge.id}`,
+        headers,
+      });
+      expect(result.statusCode).toBe(200);
+      expect(result.json().item.questionnaire.lifecycle).toBe("APPROVED_BASIC");
+    } finally {
+      await managerApp.close();
+    }
+    const decision = (
+      await database.db.execute<{ invoiceId: string }>(
+        sql`select id as "invoiceId" from expert_onboarding_invoices where application_id=${bridge.id}::uuid`,
+      )
+    ).rows[0]!;
     expect(
       (
         await database.db.execute(

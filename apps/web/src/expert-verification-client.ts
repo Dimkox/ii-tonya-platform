@@ -25,10 +25,23 @@ export interface VerificationDetail extends Omit<
     verified: boolean;
   } | null;
   contact: { provider: "telegram"; externalId: string }[];
-  questionnaire: {
-    status: "waiting_content";
-    contentSlot: "TODO: Wait for Content Spec";
-  };
+  questionnaire:
+    | {
+        status: "waiting_content";
+        contentSlot: "TODO: Wait for Content Spec";
+      }
+    | {
+        status: "submitted";
+        draft: Record<string, unknown>;
+        submittedRevision: number;
+        formVersion: 1 | 2;
+        revision: number;
+        generation: number;
+        lifecycle: string;
+        supplements: unknown;
+        messages?:
+          { eventId: string; status: string; receipt: string | null }[] | null;
+      };
 }
 export type VerificationPayment =
   | { status: "ready"; url: string; paymentId: string }
@@ -108,7 +121,8 @@ export class ExpertVerificationClient {
   private readonly abort = new AbortController();
   constructor(
     token: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (...args) =>
+      globalThis.fetch(...args),
   ) {
     if (!/^[A-Za-z0-9._~-]{24,512}$/u.test(token))
       throw new Error("verification_unauthorized");
@@ -187,8 +201,18 @@ export class ExpertVerificationClient {
           /^[1-9]\d{0,19}$/u.test(c.externalId),
       ) ||
       !object(v.questionnaire) ||
-      v.questionnaire.status !== "waiting_content" ||
-      v.questionnaire.contentSlot !== "TODO: Wait for Content Spec"
+      !(
+        (v.questionnaire.status === "waiting_content" &&
+          v.questionnaire.contentSlot === "TODO: Wait for Content Spec") ||
+        (v.questionnaire.status === "submitted" &&
+          object(v.questionnaire.draft) &&
+          JSON.stringify(v.questionnaire.draft).length <= 100000 &&
+          Number.isSafeInteger(v.questionnaire.submittedRevision) &&
+          [1, 2].includes(Number(v.questionnaire.formVersion)) &&
+          Number.isSafeInteger(v.questionnaire.revision) &&
+          Number.isSafeInteger(v.questionnaire.generation) &&
+          typeof v.questionnaire.lifecycle === "string")
+      )
     )
       return invalid();
     if (v.profile !== undefined && v.profile !== null) {
@@ -210,6 +234,68 @@ export class ExpertVerificationClient {
         return invalid();
     }
     return v as unknown as VerificationDetail;
+  }
+  async closeUnknownReview(id: string, eventId: string) {
+    if (!uuid(id) || !uuid(eventId)) return invalid();
+    const value = await this.request(
+      `/${id}/review-recovery`,
+      { eventId },
+      true,
+    );
+    if (
+      !object(value.item) ||
+      value.item.eventId !== eventId ||
+      value.item.status !== "closed_without_resend"
+    )
+      return invalid();
+  }
+  async previewReview(
+    id: string,
+    input: {
+      key: string;
+      expectedRevision: number;
+      expectedGeneration: number;
+      questions?: string[];
+      tone?: string;
+    },
+  ) {
+    if (!uuid(id)) return invalid();
+    const value = await this.request(`/${id}/review-preview`, input, true),
+      v = value.item;
+    if (
+      !object(v) ||
+      !uuid(v.previewId) ||
+      typeof v.text !== "string" ||
+      v.text.length > 4096 ||
+      typeof v.hash !== "string" ||
+      !/^[0-9a-f]{64}$/u.test(v.hash) ||
+      typeof v.expiresAt !== "string"
+    )
+      return invalid();
+    return {
+      previewId: v.previewId as string,
+      text: v.text,
+      hash: v.hash,
+      expiresAt: v.expiresAt,
+    };
+  }
+  async confirmReview(id: string, previewId: string, finalHash: string) {
+    if (!uuid(id) || !uuid(previewId) || !/^[0-9a-f]{64}$/u.test(finalHash))
+      return invalid();
+    const value = await this.request(
+        `/${id}/review-confirm`,
+        { previewId, finalHash },
+        true,
+      ),
+      v = value.item;
+    if (
+      !object(v) ||
+      !uuid(v.eventId) ||
+      typeof v.action !== "string" ||
+      typeof v.replay !== "boolean"
+    )
+      return invalid();
+    return { eventId: v.eventId as string, action: v.action, replay: v.replay };
   }
   async decide(
     id: string,

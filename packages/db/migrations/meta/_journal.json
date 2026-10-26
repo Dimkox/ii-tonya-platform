@@ -435,6 +435,13 @@
       "when": 1793041200001,
       "tag": "0061_resident_content_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793044800000,
+      "tag": "0062_resident_verification_messages",
+      "breakpoints": true
     }
   ]
 }

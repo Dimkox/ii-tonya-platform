@@ -53,9 +53,10 @@ export class PostgresExpertManagerTelegramRepository {
           decision: "approved" | "rejected";
           profileRevision: number | null;
           profileUserId: string;
+          requiresEditor: boolean;
           id: string;
         }>(
-          sql`select p.session_hash as "sessionHash",c.application_id as "applicationId",c.decision,c.id,c.profile_revision as "profileRevision",a.user_id as "profileUserId" from expert_manager_telegram_callbacks c join expert_manager_telegram_pairings p on p.id=c.pairing_id join expert_onboarding_applications a on a.id=c.application_id where c.nonce_hash=${input.nonceHash} and p.bot_id=${input.botId} and p.telegram_user_id=${input.telegramUserId} and p.telegram_chat_id=${input.chatId} and p.paired_at is not null and p.revoked_at is null and c.expires_at>clock_timestamp() and c.profile_revision is not distinct from (select max(revision) from expert_offer_profiles where user_id=a.user_id) for share of p,c`,
+          sql`select p.session_hash as "sessionHash",c.application_id as "applicationId",c.decision,c.id,c.profile_revision as "profileRevision",a.user_id as "profileUserId",exists(select 1 from expert_sales_form_bridges b join residents_applications f on f.id=b.form_id where b.application_id=a.id and f.form_version=2) as "requiresEditor" from expert_manager_telegram_callbacks c join expert_manager_telegram_pairings p on p.id=c.pairing_id join expert_onboarding_applications a on a.id=c.application_id where c.nonce_hash=${input.nonceHash} and p.bot_id=${input.botId} and p.telegram_user_id=${input.telegramUserId} and p.telegram_chat_id=${input.chatId} and p.paired_at is not null and p.revoked_at is null and c.expires_at>clock_timestamp() and c.profile_revision is not distinct from (select max(revision) from expert_offer_profiles where user_id=a.user_id) for share of p,c`,
         )
       ).rows[0];
       if (!row) return null;
@@ -69,6 +70,7 @@ export class PostgresExpertManagerTelegramRepository {
       return {
         sessionHash: row.sessionHash,
         applicationId: row.applicationId,
+        requiresEditor: row.requiresEditor,
         decision: row.decision,
         idempotencyKey: `manager-telegram:${row.id}`,
         ...(row.profileRevision

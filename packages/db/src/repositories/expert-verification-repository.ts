@@ -212,7 +212,7 @@ export class PostgresExpertVerificationRepository {
             final_locked_price: string | null;
             offer_expiry_date: string | null;
           }>(
-            sql`select 'submitted'::text status,f.submitted_draft draft,b.submitted_revision as "submittedRevision",f.base_tariff_amount::text,f.base_offer_shown_at::text,f.promo_accepted_flag,f.final_locked_price::text,f.offer_expiry_date::text,f.monthly_price_minor::text,f.package_price_minor::text,f.selected_total_minor::text,f.term_months from expert_sales_form_bridges b join resident_sales_application f on f.id=b.form_id and f.user_id=b.user_id where b.application_id=${applicationId}::uuid`,
+            sql`select 'submitted'::text status,f.submitted_draft draft,(select form_version from residents_applications where id=f.id) as "formVersion",(select revision from residents_applications where id=f.id) as revision,(select check_generation from residents_applications where id=f.id) as generation,(select status from residents_applications where id=f.id) as lifecycle,jsonb_build_object('answers',(select jsonb_agg(jsonb_build_object('requestId',u.request_id,'questionNumber',u.question_number,'revision',u.revision,'answers',u.answers) order by u.revision) from resident_verification_application_updates u where u.application_id=f.id and u.kind='followup'),'requests',(select jsonb_agg(jsonb_build_object('id',r.id,'questions',r.questions,'deadline',r.deadline,'status',r.status) order by r.deadline) from resident_information_requests r where r.application_id=f.id)) as supplements,(select jsonb_agg(jsonb_build_object('eventId',m.event_id,'status',m.status,'receipt',m.receipt) order by m.created_at) from resident_review_messages m where m.application_id=f.id) as messages,b.submitted_revision as "submittedRevision",f.base_tariff_amount::text,f.base_offer_shown_at::text,f.promo_accepted_flag,f.final_locked_price::text,f.offer_expiry_date::text,f.monthly_price_minor::text,f.package_price_minor::text,f.selected_total_minor::text,f.term_months from expert_sales_form_bridges b join resident_sales_application f on f.id=b.form_id and f.user_id=b.user_id where b.application_id=${applicationId}::uuid`,
           )
         ).rows[0] ?? {
           status: "waiting_content" as const,
@@ -221,7 +221,7 @@ export class PostgresExpertVerificationRepository {
       };
     });
   }
-  async decide(raw: ExpertVerificationDecisionCommand) {
+  async decide(raw: ExpertVerificationDecisionCommand, transaction?: Tx) {
     const input = { ...raw };
     if (
       !uuid.test(input.applicationId) ||
@@ -230,7 +230,7 @@ export class PostgresExpertVerificationRepository {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u.test(input.idempotencyKey)
     )
       fail("verification_invalid_request");
-    return this.transaction(async (tx) => {
+    const work = async (tx: Tx) => {
       const managerId = await this.manager(tx, input.sessionHash);
       // Manager-key lock closes reuse across two applications as well as duplicate decisions.
       await tx.execute(
@@ -329,7 +329,8 @@ export class PostgresExpertVerificationRepository {
         invoiceId,
         replay: false,
       };
-    });
+    };
+    return transaction ? work(transaction) : this.transaction(work);
   }
   private async audit(
     tx: Tx,

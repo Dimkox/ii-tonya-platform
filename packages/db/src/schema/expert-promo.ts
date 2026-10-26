@@ -5,6 +5,7 @@ import {
   index,
   integer,
   pgTable,
+  uniqueIndex,
   primaryKey,
   text,
   timestamp,
@@ -153,7 +154,6 @@ export const expertPromoManagerWork = pgTable(
       }),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     status: text("status").notNull().default("pending"),
     contentSlot: text("content_slot")
@@ -162,6 +162,9 @@ export const expertPromoManagerWork = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("expert_promo_manager_current_owner")
+      .on(t.userId)
+      .where(sql`${t.status}='pending'`),
     check(
       "expert_promo_manager_status",
       sql`${t.status} IN ('pending','completed','cancelled')`,

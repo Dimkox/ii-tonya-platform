@@ -95,7 +95,7 @@ export class PostgresExpertPromoRepository {
       !this.consent.separatedSalesEnabled
     ) {
       await tx.execute(
-        sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id) select ${userId}::uuid,${scope.botId},${scope.botKey},(select id from channel_identities where user_id=${userId}::uuid and provider='telegram' and bot_key=${scope.botKey} and external_id=${scope.telegramUserId} and external_chat_id=${scope.chatId} and status='active'),${scope.telegramUserId},${scope.chatId} where not exists(select 1 from expert_campaign_quotes where user_id=${userId}::uuid) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled') on conflict(user_id) do nothing`,
+        sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id) select ${userId}::uuid,${scope.botId},${scope.botKey},(select id from channel_identities where user_id=${userId}::uuid and provider='telegram' and bot_key=${scope.botKey} and external_id=${scope.telegramUserId} and external_chat_id=${scope.chatId} and status='active'),${scope.telegramUserId},${scope.chatId} where not exists(select 1 from expert_campaign_quotes where user_id=${userId}::uuid) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled') on conflict(user_id) where is_current do nothing`,
       );
     }
     return authority ? userId : null;
@@ -669,7 +669,7 @@ export class PostgresExpertPromoRepository {
       const replay = await this.replay(tx, input, userId, "application");
       const prior = (
         await tx.execute<{ id: string; quoteId: string; status: string }>(
-          sql`select id,campaign_quote_id as "quoteId",verification_status as status from expert_onboarding_applications where user_id=${userId}::uuid for update`,
+          sql`select id,campaign_quote_id as "quoteId",verification_status as status from expert_onboarding_applications where user_id=${userId}::uuid order by created_at desc,id desc limit 1 for update`,
         )
       ).rows[0];
       if (prior) {

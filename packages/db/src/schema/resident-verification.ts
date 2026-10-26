@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  boolean,
+  uniqueIndex,
   uuid,
   text,
   integer,
@@ -13,6 +15,7 @@ import {
   check,
 } from "drizzle-orm/pg-core";
 import { users, channelIdentities } from "./identity.js";
+import { residentInformationRequests } from "./resident-review.js";
 import type { ResidentDraft } from "@ii-tonya/domain";
 const at = (name: string) => timestamp(name, { withTimezone: true });
 export const residentVerificationApplications = pgTable(
@@ -21,7 +24,6 @@ export const residentVerificationApplications = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     botId: text("bot_id").notNull(),
     botKey: text("bot_key").notNull(),
@@ -46,7 +48,7 @@ export const residentVerificationApplications = pgTable(
     currentField: text("current_field"),
     educationRequirement: text("education_requirement")
       .notNull()
-      .default("unknown_manual_review"),
+      .default("optional"),
     roleType: text("role_type").generatedAlwaysAs(sql`draft->>'primaryRole'`),
     targetCategory: text("target_category").generatedAlwaysAs(
       sql`draft->>'category'`,
@@ -57,10 +59,13 @@ export const residentVerificationApplications = pgTable(
       sql`resident_verification_social_projection(draft->'socialLinks')`,
     ),
     revision: integer("revision").notNull().default(0),
-    formVersion: integer("form_version").notNull().default(1),
-    policyVersion: text("policy_version")
-      .notNull()
-      .default("resident_education_unknown_v1"),
+    formVersion: integer("form_version").notNull().default(2),
+    isCurrent: boolean("is_current").notNull().default(true),
+    attemptNumber: integer("attempt_number").notNull().default(1),
+    submittedRevision: integer("submitted_revision"),
+    checkGeneration: integer("check_generation").notNull().default(0),
+    activeRequestId: uuid("active_request_id"),
+    policyVersion: text("policy_version").notNull().default("resident_form_v2"),
     draft: jsonb("draft").$type<ResidentDraft>().notNull().default({}),
     status: text("status").notNull().default("PENDING_DOCS"),
     progress: text("progress").notNull().default("FORM_FILLING"),
@@ -70,10 +75,25 @@ export const residentVerificationApplications = pgTable(
     updatedAt: at("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex("resident_verification_current_owner")
+      .on(t.userId)
+      .where(sql`${t.isCurrent}`),
+    uniqueIndex("resident_verification_owner_attempt").on(
+      t.userId,
+      t.attemptNumber,
+    ),
+    check(
+      "residents_applications_attempt_number_check",
+      sql`${t.attemptNumber}>0`,
+    ),
+    check(
+      "residents_applications_check_generation_check",
+      sql`${t.checkGeneration}>=0`,
+    ),
     check(
       "resident_verification_submission",
       sql.raw(
-        "submitted_at IS NULL AND submitted_draft IS NULL AND status = 'PENDING_DOCS'::text AND progress = 'FORM_FILLING'::text OR submitted_at IS NOT NULL AND isfinite(submitted_at) AND submitted_draft IS NOT NULL AND resident_verification_draft_valid(submitted_draft, true, education_requirement) AND status <> 'PENDING_DOCS'::text",
+        "submitted_at IS NULL AND submitted_draft IS NULL AND status = 'PENDING_DOCS'::text AND progress = 'FORM_FILLING'::text OR submitted_at IS NOT NULL AND isfinite(submitted_at) AND submitted_draft IS NOT NULL AND resident_verification_version_valid(submitted_draft, form_version, true, education_requirement) AND status <> 'PENDING_DOCS'::text",
       ),
     ),
     check(
@@ -91,7 +111,7 @@ export const residentVerificationApplications = pgTable(
     check(
       "residents_applications_current_field_check",
       sql.raw(
-        "current_field = ANY (ARRAY['roles'::text, 'primaryRole'::text, 'category'::text, 'tax'::text, 'city'::text, 'socialLinks'::text, 'motivation'::text, 'specialization'::text, 'averageCheckMinor'::text, 'education'::text, 'propertyEvidence'::text, 'capacity'::text, 'amenities'::text, 'path'::text, 'cases'::text])",
+        "current_field = ANY (ARRAY['roles'::text, 'primaryRole'::text, 'category'::text, 'tax'::text, 'city'::text, 'socialLinks'::text, 'motivation'::text, 'specialization'::text, 'averageCheckMinor'::text, 'education'::text, 'propertyEvidence'::text, 'capacity'::text, 'amenities'::text, 'path'::text, 'cases'::text,'methods'::text,'experienceYears'::text,'premisesType'::text,'tourMedia'::text,'eventFormat'::text,'programme'::text,'speakers'::text,'pastEvents'::text,'projectName'::text,'licence'::text,'teachingTeam'::text,'graduateReviews'::text])",
       ),
     ),
     check(
@@ -102,7 +122,7 @@ export const residentVerificationApplications = pgTable(
     ),
     check(
       "residents_applications_form_version_check",
-      sql.raw("form_version = 1"),
+      sql.raw("form_version IN (1,2)"),
     ),
     check(
       "residents_applications_manager_notes_check",
@@ -148,7 +168,7 @@ export const residentVerificationApplications = pgTable(
     unique("residents_applications_id_user_id_key").on(t.id, t.userId),
     check(
       "residents_applications_draft_check",
-      sql`resident_verification_draft_valid(${t.draft})`,
+      sql`resident_verification_version_valid(${t.draft},${t.formVersion})`,
     ),
   ],
 );
@@ -160,10 +180,19 @@ export const residentVerificationApplicationUpdates = pgTable(
     userId: uuid("user_id").notNull(),
     revision: integer("revision").notNull(),
     kind: text("kind").notNull(),
+    requestId: uuid("request_id").references(
+      () => residentInformationRequests.id,
+      { onDelete: "cascade" },
+    ),
+    questionNumber: integer("question_number"),
     answers: jsonb("answers").notNull(),
     createdAt: at("created_at").notNull().defaultNow(),
   },
   (t) => [
+    check(
+      "resident_verification_application_updates_question_number_check",
+      sql`${t.questionNumber} BETWEEN 1 AND 10`,
+    ),
     check(
       "resident_verification_followup_check",
       sql`kind<>'followup' OR resident_verification_followup_valid(answers)`,
@@ -264,7 +293,7 @@ export const residentVerificationRequests = pgTable(
     check(
       "resident_verification_requests_operation_check",
       sql.raw(
-        "operation = ANY (ARRAY['start'::text, 'patch'::text, 'submit'::text, 'followup'::text, 'question'::text])",
+        "operation = ANY (ARRAY['start'::text, 'patch'::text, 'submit'::text, 'followup'::text, 'question'::text, 'complete'::text, 'reapply'::text])",
       ),
     ),
     check(

@@ -225,12 +225,13 @@ it("remediation: rejects unexpected media and empty supplements as permanent cor
   ).toBe("handled");
   expect(submitted.snapshot().revision).toBe(0);
 });
-it("remediation: policy mismatch is read-only manual review without new-policy controls", async () => {
+it("remediation: unsupported form version is read-only manual review without new-policy controls", async () => {
   const f = fixture({
-    policyVersion: "saved_v1",
+    formVersion: 3,
+    policyVersion: "future_v3",
     educationRequirement: "required",
     draft: { roles: ["EXPERT"] },
-  } as Partial<ResidentFormSnapshot>);
+  } as unknown as Partial<ResidentFormSnapshot>);
   const reply = await f.service.handle({
     ...scope,
     updateId: 903,
@@ -392,7 +393,14 @@ it("remediation: Russian choice labels preserve canonical callback enum values",
     text: "/verification",
   });
   expect(JSON.stringify(taxReply)).toContain("Самозанятый");
-  expect(JSON.stringify(taxReply)).toContain(":t:SELF_EMPLOYED");
+  expect(JSON.stringify(taxReply)).toContain(":t:s");
+  await tax.service.handle({
+    ...scope,
+    updateId: 955,
+    text: "",
+    callbackData: `rv:${tax.snapshot().id}:0:t:s`,
+  });
+  expect(tax.snapshot().draft.tax).toBe("SELF_EMPLOYED");
 });
 it("closure: Unicode URL expansion is a permanent correction and preserves the saved draft", async () => {
   const f = fixture({

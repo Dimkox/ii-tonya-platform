@@ -9,7 +9,7 @@ export const residentRoles = [
 ] as const;
 export type ResidentRole = (typeof residentRoles)[number];
 export interface ResidentDocument {
-  kind: "photo" | "document";
+  kind: "photo" | "document" | "video";
   fileId: string;
   mimeType: string | null;
   size: number | null;
@@ -19,7 +19,7 @@ export interface ResidentDraft {
   primaryRole?: ResidentRole;
   roles?: ResidentRole[];
   category?: "BASIC" | "EXCLUSIVE" | "BOTH";
-  tax?: "SELF_EMPLOYED" | "IP" | "LLC" | "INDIVIDUAL";
+  tax?: "SELF_EMPLOYED" | "IP" | "LLC" | "INDIVIDUAL" | "INDIVIDUAL_NO_STATUS";
   city?: string;
   socialLinks?: string[];
   motivation?: string;
@@ -31,6 +31,18 @@ export interface ResidentDraft {
   amenities?: string[];
   path?: string;
   cases?: string;
+  methods?: string;
+  experienceYears?: number;
+  premisesType?: string;
+  tourMedia?: ResidentDocument[];
+  eventFormat?: string;
+  programme?: string;
+  speakers?: string;
+  pastEvents?: string;
+  projectName?: string;
+  licence?: ResidentDocument[];
+  teachingTeam?: string;
+  graduateReviews?: string;
 }
 export type ResidentField = keyof ResidentDraft;
 export interface ResidentPolicy {
@@ -41,6 +53,27 @@ export const residentPolicy: ResidentPolicy = {
   version: "resident_education_unknown_v1",
   education: "unknown_manual_review",
 };
+export const residentPolicyV2: ResidentPolicy = {
+  version: "resident_form_v2",
+  education: "optional",
+};
+export const residentDocumentFields = [
+  "education",
+  "propertyEvidence",
+  "tourMedia",
+  "licence",
+] as const;
+export const residentV2TextFields = [
+  "methods",
+  "premisesType",
+  "eventFormat",
+  "programme",
+  "speakers",
+  "pastEvents",
+  "projectName",
+  "teachingTeam",
+  "graduateReviews",
+] as const;
 const choices = {
   primaryRole: residentRoles,
   roles: residentRoles,
@@ -83,8 +116,10 @@ const record = (v: unknown): v is Record<string, unknown> =>
 export function applyResidentPatch(
   draft: ResidentDraft,
   patch: unknown,
+  version: 1 | 2 = 1,
 ): ResidentDraft {
-  if (!record(patch) || Object.keys(patch).length > 16) fail();
+  if (!record(patch) || Object.keys(patch).length > (version === 2 ? 28 : 16))
+    fail();
   const clean: Record<string, unknown> = {};
   const clearPrimary =
     Object.hasOwn(patch, "primaryRole") &&
@@ -92,7 +127,10 @@ export function applyResidentPatch(
   for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
     if (key === "primaryRole" && value === null) continue;
     if (Object.hasOwn(choices, key)) {
-      const allowed = choices[key as keyof typeof choices] as readonly string[];
+      const allowed: readonly string[] =
+        key === "tax" && version === 2
+          ? ["SELF_EMPLOYED", "IP", "LLC", "INDIVIDUAL_NO_STATUS"]
+          : choices[key as keyof typeof choices];
       if (key === "roles") {
         if (
           !Array.isArray(value) ||
@@ -108,7 +146,14 @@ export function applyResidentPatch(
         clean[key] = value;
       }
     } else if (
-      ["city", "motivation", "specialization", "path", "cases"].includes(key)
+      [
+        "city",
+        "motivation",
+        "specialization",
+        "path",
+        "cases",
+        ...(version === 2 ? residentV2TextFields : []),
+      ].includes(key)
     ) {
       const max = key === "city" ? 120 : key === "specialization" ? 300 : 3000;
       if (
@@ -123,12 +168,15 @@ export function applyResidentPatch(
       if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,11})$/u.test(value))
         fail();
       clean[key] = value;
-    } else if (key === "capacity") {
+    } else if (
+      key === "capacity" ||
+      (version === 2 && key === "experienceYears")
+    ) {
       if (
         typeof value !== "number" ||
         !Number.isInteger(value) ||
-        value < 1 ||
-        value > 100000
+        value < (key === "experienceYears" ? 0 : 1) ||
+        value > (key === "experienceYears" ? 100 : 100000)
       )
         fail();
       clean[key] = value;
@@ -152,7 +200,11 @@ export function applyResidentPatch(
           : value;
       if (new Set(normalized).size !== normalized.length) fail();
       clean[key] = [...normalized];
-    } else if (key === "education" || key === "propertyEvidence") {
+    } else if (
+      key === "education" ||
+      key === "propertyEvidence" ||
+      (version === 2 && (key === "tourMedia" || key === "licence"))
+    ) {
       if (!Array.isArray(value) || value.length > 10) fail();
       for (const doc of value)
         if (
@@ -162,13 +214,33 @@ export function applyResidentPatch(
               !["kind", "fileId", "mimeType", "size", "caption"].includes(k),
           ) ||
           !["kind", "fileId", "mimeType", "size"].every((k) => k in doc) ||
-          !["photo", "document"].includes(String(doc.kind)) ||
+          !["photo", "document", ...(version === 2 ? ["video"] : [])].includes(
+            String(doc.kind),
+          ) ||
           typeof doc.fileId !== "string" ||
           !/^[A-Za-z0-9_-]{1,512}$/u.test(doc.fileId) ||
           (doc.mimeType !== null &&
-            !["image/jpeg", "image/png", "application/pdf"].includes(
+            ![
+              "image/jpeg",
+              "image/png",
+              "application/pdf",
+              ...(version === 2
+                ? [
+                    "video/mp4",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  ]
+                : []),
+            ].includes(String(doc.mimeType))) ||
+          (key === "tourMedia" &&
+            doc.kind !== "photo" &&
+            !["image/jpeg", "image/png", "video/mp4"].includes(
               String(doc.mimeType),
             )) ||
+          (doc.mimeType ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+            doc.size === null) ||
+          (doc.kind === "video" &&
+            (doc.mimeType !== "video/mp4" || doc.size === null)) ||
           (doc.kind === "photo" &&
             doc.mimeType !== null &&
             doc.mimeType !== "image/jpeg") ||
@@ -203,6 +275,7 @@ export function applyResidentPatch(
 export function residentForm(
   draft: ResidentDraft,
   policy: ResidentPolicy = residentPolicy,
+  version: 1 | 2 = 1,
 ) {
   const required: ResidentField[] = [
     "roles",
@@ -215,16 +288,30 @@ export function residentForm(
   ];
   if (draft.roles?.includes("EXPERT")) {
     required.push("specialization", "averageCheckMinor");
-    if (policy.education === "required") required.push("education");
+    if (version === 1 && policy.education === "required")
+      required.push("education");
   }
   if (draft.roles?.includes("CENTER"))
     required.push("propertyEvidence", "capacity", "amenities");
   if (draft.roles?.some((r) => r === "ESOTERIC" || r === "OTHER"))
     required.push("path", "cases");
+  if (version === 2) {
+    if (draft.roles?.includes("EXPERT"))
+      required.push("methods", "experienceYears", "cases");
+    if (draft.roles?.includes("CENTER"))
+      required.push("premisesType", "tourMedia");
+    if (draft.roles?.includes("ORGANIZER"))
+      required.push("eventFormat", "programme", "speakers", "pastEvents");
+    if (draft.roles?.includes("EDU_PROJECT"))
+      required.push("projectName", "teachingTeam", "graduateReviews");
+  }
   const visible = [
     ...new Set([
       ...required,
       ...(draft.roles?.includes("EXPERT") ? ["education" as const] : []),
+      ...(version === 2 && draft.roles?.includes("EDU_PROJECT")
+        ? ["licence" as const]
+        : []),
     ]),
   ];
   const missing = required.filter(
@@ -234,13 +321,13 @@ export function residentForm(
       (Array.isArray(draft[k]) && (draft[k] as unknown[]).length === 0),
   );
   return {
-    version: 1,
+    version,
     policyVersion: policy.version,
-    required,
+    required: [...new Set(required)],
     visible,
     missing,
     next: missing[0] ?? null,
-    educationPolicy: policy.education,
+    educationPolicy: version === 2 ? "optional" : policy.education,
     categoryCriteria: "pending_content" as const,
     reviewSignals:
       draft.averageCheckMinor && BigInt(draft.averageCheckMinor) > 1500000n

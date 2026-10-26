@@ -13,6 +13,7 @@ import {
 } from "@ii-tonya/config";
 import {
   PostgresExpertVerificationRepository,
+  PostgresResidentReviewRepository,
   PostgresHeldOnboardingCheckout,
   PostgresExpertCampaignQuoteRepository,
   type DrizzleDb,
@@ -134,6 +135,10 @@ export function createExpertVerificationComposition(
     ...(onboardingWebhook ? { onboardingWebhook } : {}),
     ...(heldCheckout ? { heldCheckout } : {}),
     service: createExpertVerificationService({
+      review: new PostgresResidentReviewRepository(db, {
+        providerMode: settings.paymentMode,
+        messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
+      }),
       enabled: config.features.expertVerification === true,
       repository,
       ...(heldCheckout ? { heldCheckout } : {}),

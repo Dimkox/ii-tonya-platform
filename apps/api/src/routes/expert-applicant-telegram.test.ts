@@ -370,8 +370,7 @@ it("remediation: valid unsupported MIME, oversized media and long form text get 
     {
       document: {
         file_id: "private_doc",
-        mime_type:
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        mime_type: "application/zip",
         file_size: 100,
       },
     },
@@ -427,4 +426,64 @@ it("remediation: old authenticated form controls are acknowledged while the form
   expect(response.json().text).toContain("временно");
   expect(f.handle).not.toHaveBeenCalled();
   await f.app.close();
+});
+it("admits bounded private DOCX and video references without downloading media", async () => {
+  const app = Fastify({ logger: false });
+  const handle = vi.fn(async (...input: unknown[]) => {
+    void input;
+    return {
+      status: "handled" as const,
+      text: "Сохранено",
+    };
+  });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: "synthetic-secret",
+      verificationFormEnabled: true,
+      service: { handle },
+    },
+  });
+  try {
+    let updateId = 1000;
+    for (const [field, mime, kind] of [
+      [
+        "document",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "document",
+      ],
+      ["video", "video/mp4", "video"],
+    ]) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram/expert-promo/promo-key",
+        headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+        payload: {
+          update_id: updateId++,
+          message: {
+            from: { id: 456 },
+            chat: { id: 456, type: "private" },
+            [field!]: {
+              file_id: "private_reference",
+              mime_type: mime,
+              file_size: 20971520,
+            },
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(handle.mock.calls.at(-1)?.[0]).toMatchObject({
+        media: {
+          kind,
+          fileId: "private_reference",
+          mimeType: mime,
+          size: 20971520,
+        },
+      });
+    }
+  } finally {
+    await app.close();
+  }
 });

@@ -38,3 +38,5 @@ export * from "./residency-core.js";
 export * from "./expert-separated-sales.js";
 
 export * from "./resident-content-safety.js";
+
+export * from "./resident-review.js";

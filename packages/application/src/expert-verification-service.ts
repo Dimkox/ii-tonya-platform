@@ -1,3 +1,4 @@
+import type { ResidentMessageInput } from "@ii-tonya/domain";
 export interface ExpertVerificationRepository {
   invoiceForManager(
     sessionHash: string,
@@ -54,6 +55,28 @@ const safeFailure = (e: unknown): Failure => ({
 });
 export function createExpertVerificationService(deps: {
   enabled: boolean;
+  review?: {
+    closeUnknown(
+      session: string,
+      applicationId: string,
+      eventId: string,
+    ): Promise<unknown>;
+    expireRequests(limit?: number, sessionHash?: string): Promise<number>;
+    preview(
+      session: string,
+      input: ResidentMessageInput & {
+        applicationId: string;
+        expectedRevision: number;
+        expectedGeneration: number;
+      },
+    ): Promise<unknown>;
+    confirm(
+      session: string,
+      applicationId: string,
+      previewId: string,
+      finalHash: string,
+    ): Promise<unknown>;
+  };
   repository: ExpertVerificationRepository;
   checkout?: ExpertVerificationCheckout;
   heldCheckout?: ExpertVerificationCheckout & {
@@ -77,6 +100,79 @@ export function createExpertVerificationService(deps: {
         ? { kind: "forbidden" }
         : undefined;
   return {
+    async closeUnknownReview(
+      sessionHash: string,
+      applicationId: string,
+      eventId: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.closeUnknown(
+            sessionHash,
+            applicationId,
+            eventId,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async previewReview(
+      sessionHash: string,
+      input: ResidentMessageInput & {
+        applicationId: string;
+        expectedRevision: number;
+        expectedGeneration: number;
+      },
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.preview(sessionHash, input),
+        };
+      } catch (e) {
+        if (
+          e instanceof Error &&
+          e.message === "resident_refund_policy_unavailable"
+        )
+          return {
+            kind: "unavailable",
+            reason: "refund_policy_pending",
+            contentSlot: "TODO: Wait for Refund Policy",
+          } as const;
+        return safeFailure(e);
+      }
+    },
+    async confirmReview(
+      sessionHash: string,
+      applicationId: string,
+      previewId: string,
+      finalHash: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.confirm(
+            sessionHash,
+            applicationId,
+            previewId,
+            finalHash,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
     async recoverHeld(
       sessionHash: string,
       invoiceId: string,
@@ -112,6 +208,7 @@ export function createExpertVerificationService(deps: {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50)
         return { kind: "invalid" } as const;
       try {
+        await deps.review?.expireRequests(limit, sessionHash);
         return {
           kind: "ok" as const,
           items: await deps.repository.listQueue(sessionHash, limit),
@@ -125,6 +222,7 @@ export function createExpertVerificationService(deps: {
       if (denied) return denied;
       if (!uuid.test(applicationId)) return { kind: "invalid" } as const;
       try {
+        await deps.review?.expireRequests(20, sessionHash);
         const item = await deps.repository.applicationDetail(
           sessionHash,
           applicationId,

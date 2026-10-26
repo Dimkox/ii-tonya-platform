@@ -322,3 +322,5 @@ export {
   type HeldOnboardingClient,
   type HeldPaymentObservation,
 } from "./yookassa/held-onboarding.js";
+
+export * from "./telegram/resident-review-notification-transport.js";
