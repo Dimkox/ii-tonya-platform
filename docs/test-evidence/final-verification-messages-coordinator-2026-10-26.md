@@ -46,3 +46,41 @@ Retain failures, exact hashes and true skipped counts. No unchanged broad repeat
 no repeat helper above3. Source acceptance requires real Fastify/PG/browser/worker,
 actual legacy upgrade and financial/consent/replay regression, not helper-only mocks.
 No hosted CI exists and no local result alone authorizes deployment/provider enablement.
+
+## Initial implementation evidence and timing clarification
+
+Root inspected domain RED (6 failures/2 passes) and GREEN8/8 for typed v2 data.
+Initial PG RED2/2 establishes the missing versioned snapshot contract. These are
+in-flight checks, not acceptance. No root test/build/PG commands overlap implementation.
+
+Implementer correctly identified that exact pre-confirmation preview cannot contain
+a future confirmation-time-derived absolute deadline. Root rejected backdating or
+reserving an effective decision time. Keep the confirmed notice bytes static and
+truthful (48hours from request creation; actual deadline via existing /verification).
+Confirmation creates the real DB deadline; the current owner view displays it and
+remaining time. Expired/superseded notices cannot disclose stale requests. This is
+a clarification of root's earlier inline-deadline suggestion, not a policy change.
+
+## First integrated verification GREEN
+
+Root inspected `pg-green3.log`:6/6 cases pass at20:42UTC, including exact category
+confirmation, old-route bypass denial, one fixed onboarding fee, exact delivery hash,
+info-first refusal and stale previews. This follows retained migration alias/type
+failures; filenames alone are never treated as success. Actual complete flow, worker
+fault/privacy matrix, old-version upgrade, browser and final metadata/static checks
+remain implementer work. No final acceptance or gate is claimed from these six cases.
+
+## Expanded database acceptance
+
+Root inspected `pg-final1.log`:11/11 passed at20:49UTC (8.13seconds). Implementer
+reports current category/source preservation, one fee under concurrent confirmation,
+information completion and48h manual-review timeout, stale/MFA/identity fences,
+calendar-month reapplication with preserved base/financial history, unknown-send
+quarantine and private erasure/hash retention. Actual Fastify/browser/worker,
+historical upgrade, metadata and independent review remain acceptance work; this
+does not by itself complete the matrix. The exposed old manager-work user uniqueness
+is corrected alongside the original current-form uniqueness, not by resetting history.
+
+Root prepared `spec-verification-private-jobs.md` as a draft only. No S2b source or
+shared tests run concurrently; its baseline/Code Map await accepted S2a generation
+contracts. Preparation is not a claim that file custody, OCR or social readers exist.

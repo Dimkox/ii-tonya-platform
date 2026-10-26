@@ -129,3 +129,28 @@ policy and protected credentials; original bot capability; VK user/service token
 optional isolated OCR runtime/model assets; Telegram preview evidence or authorized
 MTProto capability. These gate activation, not implementation/local transport proof.
 Do not ask for secrets in chat or enable anything through development access.
+
+## Dependency preparation during S2a (read-only)
+
+On2026-10-26 the public package metadata reported3.1157.0 for both
+`@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`, each requiring Node>=20.
+These are candidate exact pins for the following implementation, not installed
+dependencies or evidence of adapter compatibility. Registry integrity values:
+
+- client-s3: `sha512-fbZIxqZVzK/PMLj9az3+ieAcYdZhzpTrfIVAnrE4PnRc1C6SokMDnaxAJycKTNmzLlY1fvmlItZWBDPUEFlGLQ==`
+- s3-request-presigner: `sha512-zHdXg1UuA4Z2ICQeGCBfSL5A+0TbFCkS6uq4WoX74jpv3PozoPsaDswu2OBU6cIUJLg6JWUZd226SLM/MGHAKA==`
+
+The client graph includes credential-provider-node transitively; explicit client
+credentials still prevent accidental default-chain lookup. Include a negative test
+with ambient credentials/metadata endpoints rather than claiming that the package
+has no credential-discovery dependency. Actual signing, timeout, retry and redirect
+behavior must be established in local transport tests after intentional lock update.
+The official constructor reference documents explicit credentials and bounded Node
+HTTP-handler options:
+https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/migrate-client-constructors.html
+
+Official fast OCR model repository: https://github.com/tesseract-ocr/tessdata_fast
+(Apache2.0 integer LSTM models). Pin an exact revision and content hashes for rus/eng
+when assembling the optional runtime; this read-only check did not download/install
+models or prove recognition quality. No source, lockfile, environment or live state
+changed during preparation.

@@ -153,6 +153,13 @@ Use synthetic providers only. Unknown capability must have real manual recovery.
 
 ## Design Notes
 
+Info-request preview keeps exact confirmed bytes: its protected timing text says
+48hours from request creation and points to `/verification` for the actual absolute
+deadline/remaining time. Confirmation uses real DB time+48hours; never backdate a
+decision to preview time. The current owner request view renders live timing. Expired
+or superseded notices are cancelled before first disclosure. This avoids inventing
+a future timestamp during preview or changing approved text after confirmation.
+
 Prefer additive immutable attempt/event provenance plus explicit current selection
 inside existing repositories; avoid a second parallel form model. If uniqueness or
 SQL source predicates change, enumerate every affected lookup and verify upgrade of
