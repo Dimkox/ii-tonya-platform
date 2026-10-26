@@ -1,3 +1,4 @@
+import { bridgeSeparatedSalesForm } from "./expert-separated-sales-repository.js";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
@@ -242,8 +243,12 @@ export class PostgresResidentVerificationRepository {
           await tx.execute(
             sql`insert into resident_verification_check_work(application_id,user_id,submitted_revision) values(${row.id}::uuid,${userId}::uuid,${updated.revision}) on conflict(application_id) do nothing`,
           );
+        if (submitting)
+          await bridgeSeparatedSalesForm(tx, userId, row.id, updated.revision);
         row = updated;
       }
+      if (input.action === "start" && row.status === "UNDER_REVIEW")
+        await bridgeSeparatedSalesForm(tx, userId, row.id, row.revision);
       const result = { ...row, replay: false };
       await tx.execute(
         sql`insert into resident_verification_requests(bot_id,bot_key,request_key,user_id,request_digest,operation,result) values(${input.botId},${input.botKey},${input.requestKey},${userId}::uuid,${fingerprint},${input.action},${JSON.stringify(result)}::jsonb)`,

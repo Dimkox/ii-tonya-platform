@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  integer,
+  uniqueIndex,
   check,
   foreignKey,
   pgTable,
@@ -78,11 +80,12 @@ export const expertOnboardingInvoices = pgTable(
       () => expertOnboardingApplications.id,
       { onDelete: "set null" },
     ),
-    applicationAuditId: uuid("application_audit_id").notNull().unique(),
+    applicationAuditId: uuid("application_audit_id").notNull(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    decisionId: uuid("decision_id").notNull().unique(),
+    decisionId: uuid("decision_id").notNull(),
+    salesAttemptNumber: integer("sales_attempt_number"),
     decision: text("decision").notNull().default("approved"),
     purpose: text("purpose").notNull().default("onboarding"),
     amountMinor: money(),
@@ -95,6 +98,15 @@ export const expertOnboardingInvoices = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("expert_onboarding_legacy_application_once")
+      .on(t.applicationAuditId)
+      .where(sql`${t.salesAttemptNumber} IS NULL`),
+    uniqueIndex("expert_onboarding_legacy_decision_once")
+      .on(t.decisionId)
+      .where(sql`${t.salesAttemptNumber} IS NULL`),
+    uniqueIndex("expert_onboarding_sales_attempt_once")
+      .on(t.decisionId, t.salesAttemptNumber)
+      .where(sql`${t.salesAttemptNumber} IS NOT NULL`),
     foreignKey({
       name: "expert_onboarding_invoice_decision_fk",
       columns: [t.decisionId, t.applicationAuditId, t.userId, t.decision],

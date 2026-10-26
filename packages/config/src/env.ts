@@ -465,6 +465,8 @@ export type RuntimeConfig = {
     clientAccountQueries?: boolean;
     expertApplicant?: boolean;
     expertVerificationForm?: boolean;
+    expertSeparatedSales?: boolean;
+    expertHeldOnboarding?: boolean;
     expertVerification?: boolean;
     expertCard?: boolean;
     expertCardMaterialDelivery?: boolean;
@@ -693,7 +695,20 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     (verificationFormFlag === "true" && !expertApplicant)
   )
     throw new Error("resident_verification_configuration_required");
+  const separatedSalesFlag = source.EXPERT_SEPARATED_SALES_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(separatedSalesFlag) ||
+    (separatedSalesFlag === "true" && verificationFormFlag !== "true")
+  )
+    throw new Error("expert_sales_configuration_required");
   const expertVerification = readExpertVerificationConfig(source);
+  const heldFlag = source.EXPERT_ONBOARDING_HELD_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(heldFlag) ||
+    (heldFlag === "true" &&
+      (separatedSalesFlag !== "true" || !expertVerification?.checkoutEnabled))
+  )
+    throw new Error("held_onboarding_configuration_required");
   const clientAccountQueries = readClientAccountQueriesConfig(source);
   const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
   const expertCard = readExpertCardConfig(source);
@@ -891,6 +906,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     features: {
+      ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
+      ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
       ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
       ...(expertApplicant ? { expertApplicant: true } : {}),
       ...(verificationFormFlag === "true"

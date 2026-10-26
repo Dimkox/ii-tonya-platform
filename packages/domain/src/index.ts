@@ -97,3 +97,7 @@ export type {
 } from "./expert-referral.js";
 
 export * from "./resident-verification-form.js";
+export {
+  calculateExpertBasePrice,
+  calculateSeparatedSalesTerms,
+} from "./expert-separated-sales.js";

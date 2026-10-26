@@ -66,6 +66,7 @@ export class PostgresExpertPromoRepository {
     private readonly consent: {
       messagingConsentPolicyVersion: string;
       verificationFormEnabled?: boolean;
+      separatedSalesEnabled?: boolean;
     },
   ) {}
   private async identity(
@@ -88,7 +89,11 @@ export class PostgresExpertPromoRepository {
       externalUserId: scope.telegramUserId,
       messagingPolicyVersion: this.consent.messagingConsentPolicyVersion,
     });
-    if (authority && this.consent.verificationFormEnabled) {
+    if (
+      authority &&
+      this.consent.verificationFormEnabled &&
+      !this.consent.separatedSalesEnabled
+    ) {
       await tx.execute(
         sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id) select ${userId}::uuid,${scope.botId},${scope.botKey},(select id from channel_identities where user_id=${userId}::uuid and provider='telegram' and bot_key=${scope.botKey} and external_id=${scope.telegramUserId} and external_chat_id=${scope.chatId} and status='active'),${scope.telegramUserId},${scope.chatId} where not exists(select 1 from expert_campaign_quotes where user_id=${userId}::uuid) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled') on conflict(user_id) do nothing`,
       );
@@ -346,6 +351,7 @@ export class PostgresExpertPromoRepository {
       const userId = await this.identity(tx, input);
       if (!userId) return fail("promo_identity_unavailable");
       if (
+        !this.consent.separatedSalesEnabled &&
         !(
           await tx.execute<{ ok: boolean }>(
             sql`select resident_verification_price_allowed(${userId}::uuid) as ok`,
@@ -619,7 +625,11 @@ export class PostgresExpertPromoRepository {
         await tx.execute(
           sql`update expert_promo_enrollments set status=${decision} where user_id=${row.userId}::uuid`,
         );
-        if (decision === "granted" && this.consent.verificationFormEnabled) {
+        if (
+          decision === "granted" &&
+          this.consent.verificationFormEnabled &&
+          !this.consent.separatedSalesEnabled
+        ) {
           if (!(await this.identity(tx, input)))
             fail("promo_identity_unavailable");
         }

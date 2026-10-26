@@ -414,6 +414,13 @@
       "when": 1792972800001,
       "tag": "0058_residency_core_stabilization",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793030400000,
+      "tag": "0059_residency_separated_sales",
+      "breakpoints": true
     }
   ]
 }

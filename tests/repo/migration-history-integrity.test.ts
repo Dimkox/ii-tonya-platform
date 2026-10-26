@@ -75,6 +75,7 @@ const HAND_SQL_FUNCTIONS = [
   "enforce_expert_verification_immutable",
   "enforce_human_escalation_transition",
   "erase_expert_offer_delivery_state",
+  "erase_expert_sales_subject",
   "erase_resident_verification_subject",
   "expert_campaign_current_profile_valid",
   "expert_card_activation_gate_valid",
@@ -93,6 +94,17 @@ const HAND_SQL_FUNCTIONS = [
   "expert_residency_current_coverage",
   "expert_residency_default_provider_deadline",
   "expert_reward_grant_require_eligible_settlement",
+  "expert_sales_attempt_source",
+  "expert_sales_base_source",
+  "expert_sales_bridge_source",
+  "expert_sales_choice_source",
+  "expert_sales_invoice_source",
+  "expert_sales_paid_lock_source",
+  "expert_sales_privacy_cleanup",
+  "expert_sales_privacy_guard",
+  "expert_sales_provider_request_guard",
+  "expert_sales_quote_source",
+  "expert_sales_selection_source",
   "hashtags_synonyms_valid",
   "lock_and_reject_selarti_budget_policy_overlap",
   "lock_partner_policy_window",
@@ -209,6 +221,29 @@ const HAND_SQL_TRIGGERS = [
   "expert_residency_calendar_pause_publication",
   "expert_residency_renewal_attempt_source",
   "expert_residency_renewal_bill_source",
+  "expert_sales_attempt_immutable",
+  "expert_sales_attempt_source",
+  "expert_sales_base_immutable",
+  "expert_sales_base_source",
+  "expert_sales_bridge_immutable",
+  "expert_sales_bridge_source",
+  "expert_sales_choice_immutable",
+  "expert_sales_choice_source",
+  "expert_sales_consent_erasure",
+  "expert_sales_form_erasure",
+  "expert_sales_identity_erasure",
+  "expert_sales_identity_revocation",
+  "expert_sales_invoice_source",
+  "expert_sales_observation_immutable",
+  "expert_sales_paid_lock_immutable",
+  "expert_sales_paid_lock_source",
+  "expert_sales_provider_request_guard",
+  "expert_sales_provider_request_no_delete",
+  "expert_sales_quote_source",
+  "expert_sales_recovery_immutable",
+  "expert_sales_selection_immutable",
+  "expert_sales_selection_source",
+  "expert_sales_user_erasure",
   "expert_space_tariff_approval_source",
   "expert_space_tariff_approvals_append_only",
   "expert_verification_decisions_immutable",
@@ -251,6 +286,7 @@ const HAND_SQL_TRIGGERS = [
 const HAND_SQL_VIEWS = [
   "hashtags_taxonomy",
   "package_balances",
+  "resident_sales_application",
   "resident_workspace_access",
 ] as const;
 
@@ -307,7 +343,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(58);
+    expect(newest).toBe(59);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -422,7 +458,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0056 adds fourteen offer, qualification, manager, application-material and admission relations.
-    expect(declared.size).toBe(176);
+    // 0059 adds twelve scoped sales, custody, recovery and privacy relations.
+    expect(declared.size).toBe(188);
   });
 });

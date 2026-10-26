@@ -5,6 +5,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ExpertApplicantService } from "@ii-tonya/application";
 export interface ExpertApplicantTelegramCapability {
   verificationFormEnabled?: boolean;
+  separatedSalesEnabled?: boolean;
   botId: string;
   botKey: string;
   webhookSecret: string;
@@ -85,7 +86,10 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           identity(origin.id) !== c.botId ||
           typeof callback.data !== "string" ||
           Buffer.byteLength(callback.data) > 64 ||
-          !callback.data.startsWith("rv:")
+          !(
+            callback.data.startsWith("rv:") ||
+            (c.separatedSalesEnabled && /^(ss|sb):/u.test(callback.data))
+          )
         )
           return reply.code(400).send({ error: "invalid_update" });
         callbackData = callback.data;

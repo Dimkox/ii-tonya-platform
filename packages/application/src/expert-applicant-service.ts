@@ -102,6 +102,9 @@ const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
 const apply = new RegExp(`^/apply (${uuid})$`, "u");
 export function createExpertApplicantService(deps: {
   enabled: boolean;
+  separatedSales?: {
+    handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
+  };
   verificationForm?: {
     handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
   };
@@ -144,7 +147,15 @@ export function createExpertApplicantService(deps: {
       });
       try {
         if (
+          deps.separatedSales &&
+          !/^\/(?:start|consent)(?: |$)/u.test(input.text)
+        ) {
+          const sales = await deps.separatedSales.handle(input);
+          if (sales) return sales;
+        }
+        if (
           deps.verificationForm &&
+          !(deps.separatedSales && input.text.startsWith("/profile")) &&
           !/^\/(?:start|consent)(?: |$)/u.test(input.text)
         ) {
           const form = await deps.verificationForm.handle(input);
@@ -218,6 +229,10 @@ export function createExpertApplicantService(deps: {
               : "";
           const registrationText =
             `Ваш промокод: ${result.refCode}. Уникальных регистраций: ${result.referralCount}. ${guide} ${bonus}`.trim();
+          if (deps.separatedSales) {
+            const sales = await deps.separatedSales.handle(input);
+            if (sales) return sales;
+          }
           if (deps.verificationForm) {
             const form = await deps.verificationForm.handle(input);
             if (form)

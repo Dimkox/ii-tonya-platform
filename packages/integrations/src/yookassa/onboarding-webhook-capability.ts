@@ -27,6 +27,9 @@ export class YooKassaOnboardingWebhookCapability {
     private readonly settlements: {
       settleVerified(proof: VerifiedOnboardingPayment): Promise<unknown>;
     },
+    private readonly held?: {
+      reconcile(invoiceId: string): Promise<{ kind: string }>;
+    },
   ) {}
   async handle(notification: YooKassaNotification): Promise<boolean> {
     try {
@@ -40,6 +43,10 @@ export class YooKassaOnboardingWebhookCapability {
           event.object.id,
         );
       if (invoiceId === null) return false;
+      if (event.event !== "payment.succeeded" && this.held) {
+        const result = await this.held.reconcile(invoiceId);
+        if (result.kind === "observed") return true;
+      }
       if (event.event !== "payment.succeeded")
         throw new OnboardingWebhookError(
           "onboarding_payment_manual_review_required",

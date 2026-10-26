@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ apps/api/src/routes/resident-verification-composition.integration.test.ts (1 test) 1921ms
+   ✓ remediation: real Fastify composition enrolls original consent, persists returned role callback and keeps flag-off pricing fenced  361ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:56:11
+   Duration  6.18s (transform 1.79s, setup 0ms, collect 3.74s, tests 1.92s, environment 0ms, prepare 124ms)
+
+
+[END OF RAW CAPTURE]

@@ -123,11 +123,11 @@ package modules follow separately; preserve their current gates and TODO slots.
 
 ## Tasks & Acceptance
 
-- [ ] Add immutable base/choices/paid lock, versioned quote/cohort/bridge and additive migration/schema/state/privacy/guards.
-- [ ] Wire base/positive/promo/base/period/form through actual private webhook and manager queue; update active prompts/current tariff.
-- [ ] Implement versioned fee attempts, strict held-payment adapter/recovery, current-state expiry/reminders and authoritative settlement.
-- [ ] Use paid lock for main and both renewal paths, preserving period and downstream admission gates.
-- [ ] Execute matrix acceptance, affected builds/types/lint and precise guard negatives; retain failed logs and hand off for independent review.
+- [x] Add immutable base/choices/paid lock, versioned quote/cohort/bridge and additive migration/schema/state/privacy/guards.
+- [x] Wire base/positive/promo/base/period/form through actual private webhook and manager queue; update active prompts/current tariff.
+- [x] Implement versioned fee attempts, strict held-payment adapter/recovery, current-state expiry/reminders and authoritative settlement.
+- [x] Use paid lock for main and both renewal paths, preserving period and downstream admission gates.
+- [x] Execute matrix acceptance, affected builds/types/lint and precise guard negatives; retain failed logs and hand off for independent review.
 
 Actual Fastify→PostgreSQL flow must prove base-only, separate explicit choice, form,
 manager approval and exactly300000 invoice. Real local transport fixtures must prove
@@ -168,3 +168,26 @@ Provider facts: https://yookassa.ru/developers/payment-acceptance/getting-starte
 and https://yookassa.ru/developers/using-api/interaction-format (official sources).
 Verify exact capture/cancel request contracts from primary docs before implementation;
 no credentials, live charge, provider mutation or production enablement.
+
+Execution clarification (2026-10-26, applies existing owner constraints): the
+commercial choices are one month, or the promotional three-month package while
+available. Declining promotion exposes monthly only; losing the unpaid package
+requires an explicit monthly selection. A genuine paid quarter retains its exact
+quarter total and period. The displayed base incorporates the monthly floor, so
+accepting the base never produces a higher undisclosed floor later.
+
+An explicit period change on the same frozen submitted form reuses its genuine
+manager quality approval. It does not create a second verification decision.
+Every replacement still binds the current explicit selection, original decision,
+unchanged submitted revision, owner/consent, finite deadline and no paid winner.
+The implementation does not introduce a second manager approval for period alone.
+
+The requested application fields are exposed by `resident_sales_application`, a
+canonical projection of the existing `residents_applications` row and immutable
+sales facts; manager detail consumes it. `final_locked_price` is null until the
+verified paid lock. Work-bot current-tariff reads show only the selected paid total
+and period. New provider and sales flags remain off by default.
+
+Implementation handoff evidence: `docs/test-evidence/residency-separated-sales-implementation-2026-10-26.md`.
+Independent review and final exact-commit gate remain coordinator-owned; status stays
+in-progress until those complete.

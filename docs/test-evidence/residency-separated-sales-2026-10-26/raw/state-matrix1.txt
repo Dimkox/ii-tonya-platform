@@ -1,0 +1,62 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (6 tests | 1 failed) 3280ms
+   ✓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU 176ms
+   ✓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII 72ms
+   ✓ expired waiting payment is GET-verified and canceled, never captured  444ms
+   ✓ unknown create never becomes a second POST and recovers only through actual GET identity  360ms
+   × deletion during pre-send decryption cancels actual first disclosure 243ms
+     → Failed query: update users set active=false where id=$1::uuid
+params: e9f86232-b7a8-4c17-8af6-46f07960e5ce
+   ✓ proven late money remains immutable recovery work without price lock or interview  320ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > deletion during pre-send decryption cancels actual first disclosure
+Error: Failed query: update users set active=false where id=$1::uuid
+params: e9f86232-b7a8-4c17-8af6-46f07960e5ce
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ tests/integration/expert-separated-sales-state.test.ts:72:116
+
+
+Caused by: error: record "new" has no field "bot_id"
+ ❯ node_modules/.pnpm/pg-pool@3.14.0_pg@8.22.0/node_modules/pg-pool/index.js:45:11
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ tests/integration/expert-separated-sales-state.test.ts:72:116
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 780, severity: 'ERROR', code: '42703', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'SQL expression "TG_TABLE_NAME=\'expert_sales_bases\' AND (to_jsonb(NEW)-ARRAY[\'bot_id\',\'bot_key\',\'chat_id\',\'consent_version\'])=(to_jsonb(OLD)-ARRAY[\'bot_id\',\'bot_key\',\'chat_id\',\'consent_version\']) AND NEW.bot_id IS NULL AND NEW.bot_key IS NULL AND NEW.chat_id IS NULL AND NEW.consent_version IS NULL"\nPL/pgSQL function expert_sales_privacy_guard() line 5 at IF\nSQL statement "UPDATE expert_sales_choices SET request_key=NULL,request_digest=NULL WHERE user_id=subject"\nPL/pgSQL function erase_expert_sales_subject(uuid) line 6 at SQL statement\nSQL statement "SELECT erase_expert_sales_subject(NEW.id)"\nPL/pgSQL function expert_sales_privacy_cleanup() line 2 at PERFORM', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'plpgsql_exec_get_datum_type_info' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: held_payment_unknown
+ ❯ request packages/integrations/src/yookassa/held-onboarding.ts:21:226
+
+ ❯ processTicksAndRejections node:internal/process/task_queues:104:5
+ ❯ Object.postExact packages/integrations/src/yookassa/held-onboarding.ts:43:12
+ ❯ packages/db/src/repositories/expert-held-onboarding-repository.ts:65:19
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresHeldOnboardingCheckout.recoverCheckout packages/db/src/repositories/expert-held-onboarding-repository.ts:99:30
+
+This error originated in "tests/integration/expert-separated-sales-state.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "proven late money remains immutable recovery work without price lock or interview". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+     Errors  1 error
+   Start at  17:24:30
+   Duration  6.74s (transform 1.30s, setup 0ms, collect 2.97s, tests 3.28s, environment 0ms, prepare 112ms)
+
+
+[END OF RAW CAPTURE]

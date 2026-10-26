@@ -7,15 +7,15 @@
   "assets": [
     {
       "path": "docs/prompts/residency-offer-v2-shared.md",
-      "sha256": "692cb9b0c0699ffd710b0238ffa852766b9ec901c9e4d9910ae5d63daffe2f36"
+      "sha256": "a6ca6f0fa61700794100fe8a388e220e3df96947f89345c883cb6eb35dd8c594"
     },
     {
       "path": "docs/prompts/demo_access_test_expert.md",
-      "sha256": "0da57d59887eb946b72891c68f39227cce32081d61e78ae6125365684370d495"
+      "sha256": "e2d201dad65507f4e7ce6b356acef30c962e506fa2e585daee97383d3da3d8b3"
     },
     {
       "path": "docs/prompts/work_expert_residency_v2.md",
-      "sha256": "a8af7287bcfb92f72d0d75325fc4e5bce655cd2003a1ed081bbbdbfca9581abe"
+      "sha256": "b5e9067e81082069c3edca15184680b96ab85670995589edcc10d851b2a827e3"
     }
   ],
   "activationRequirements": [

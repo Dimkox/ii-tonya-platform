@@ -34,3 +34,5 @@ export * from "./expert-offer-corrections.js";
 export * from "./resident-verification.js";
 
 export * from "./residency-core.js";
+
+export * from "./expert-separated-sales.js";

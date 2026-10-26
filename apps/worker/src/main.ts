@@ -1,3 +1,4 @@
+import { createSeparatedSalesRunner } from "./expert-separated-sales-composition.js";
 import { createResidentWorkspaceNotificationLifecycle } from "./resident-workspace-notification-composition.js";
 import {
   createExpertPersonalOfferRunner,
@@ -139,6 +140,7 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly expertHeldOnboarding?: import("./expert-separated-sales-composition.js").HeldSalesCapabilities;
   readonly expertPersonalOfferCheckout?: ExpertCardMainCheckout;
   readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly expertCardMaterialFetch?: typeof globalThis.fetch;
@@ -656,9 +658,16 @@ export function createProductionWorkerRuntimeFactory(
               };
             })()
           : undefined;
+      const expertSeparatedSales = createSeparatedSalesRunner(
+        db,
+        config,
+        deps.expertResidencyNoticeFetch,
+        deps.expertHeldOnboarding,
+      );
       const bookingHandoffRevocations =
         new PostgresBookingHandoffRevocationRepository(db);
       return createProductionWorkerRuntime({
+        ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
         bookingHandoffRevocations: () =>
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),

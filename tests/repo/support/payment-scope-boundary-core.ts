@@ -15,6 +15,7 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  "packages/integrations/src/yookassa/held-onboarding.ts",
   // BlockB purpose-bound onboarding verifier; no residency mint authority.
   "packages/integrations/src/yookassa/onboarding-verifier.ts",
   "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
@@ -96,6 +97,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
   "packages/db/migrations/0056_residency_offer_corrections.sql",
@@ -130,6 +132,20 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "expert_sales_bases",
+  "expert_sales_choices",
+  "expert_sales_selections",
+  "expert_sales_form_bridges",
+  "expert_sales_fee_attempts",
+  "expert_sales_paid_locks",
+  "expert_sales_recovery_work",
+  "expert_sales_provider_requests",
+  "expert_sales_provider_observations",
+  "expert_sales_notices",
+  "expert_sales_ticks",
+  "expert_sales_erased_cohorts",
+  "resident_sales_application",
+
   // Core stabilization: docs/spec/residency-core-stabilization-guard-registration.md.
   "hashtags_db",
   "hashtags_taxonomy",
@@ -304,6 +320,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "EXPERT_SEPARATED_SALES_ENABLED",
+  "EXPERT_ONBOARDING_HELD_ENABLED",
   "EXPERT_DRAFT_TAGS_ENABLED",
   "RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED",
   "EXPERT_VERIFICATION_FORM_ENABLED",
@@ -346,12 +364,16 @@ const approvedPaymentBoundaryPaths = new Set([
 ]);
 const approvedPaymentBoundaryHashes = new Map([
   [
+    "packages/integrations/src/yookassa/held-onboarding.ts",
+    "f938a376d3cb0bfde235a619c4be9db6b27b8c531eee699dd1fd13f15cc66182",
+  ],
+  [
     "packages/integrations/src/yookassa/onboarding-verifier.ts",
     "0c4867e541393854644eac11b2e7b8ac0221a3d183850f40a40d75763bda1b82",
   ],
   [
     "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
-    "a6b8ec8649dcc9c8865630d610d466a64e8cf2d8afc072790befd99a05e32c13",
+    "039cd4403d8ff78c3b58add7b1e30bc00be659f7a268a2d27dedc4b8303c5fb0",
   ],
 
   [
@@ -372,7 +394,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "768d603013df28dca8d9366eefab6e04c9fd1ddb7834fe33e993bf484a416ce1",
+    "888ffe4cdea69b98ccdaa1f4e3a94f0e299166fb14631841045539f72e5e1ab3",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -788,6 +810,22 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/state/0059_sql_objects.json",
+    "25d1c71c3a0ad26a24c0ed538662792d54b4136527e6b4cf9773003aebec6353",
+  ],
+  [
+    "packages/db/migrations/state/0059_manifest.json",
+    "414ccd8d616a65be0beb91a94cc2d8220db1929db85c9e736b289be93e4952cc",
+  ],
+  [
+    "packages/db/migrations/meta/0059_snapshot.json",
+    "65f53050b8edbc5abe06cdde115b6ea6dc6751960b894dcf7b7f78a6d12d5ed5",
+  ],
+  [
+    "packages/db/migrations/0059_residency_separated_sales.sql",
+    "b0b50a318ed689d1c9032787e17e3889224d7ec0d0b842fafd800d725dbd3846",
+  ],
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
     "packages/db/migrations/0058_residency_core_stabilization.sql",
@@ -1273,7 +1311,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "62eb000ace710e7de0555b326463a9c039219a156c01cd1d0ccc2f1e9dd82e81",
+    "17a83068493f191ad03e6f0dc40170679baf21a2e6ac0c7223a77a8b8e965b7b",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1353,7 +1391,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "62eb000ace710e7de0555b326463a9c039219a156c01cd1d0ccc2f1e9dd82e81",
+    "17a83068493f191ad03e6f0dc40170679baf21a2e6ac0c7223a77a8b8e965b7b",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2159,7 +2197,8 @@ const inspectTypeScript = (
         ...content.matchAll(/https?:\/\/[^\s"'`]+/gu),
       ].map((match) => match[0]);
       const approvedYooKassaCall =
-        path === "packages/integrations/src/yookassa/client.ts" &&
+        (path === "packages/integrations/src/yookassa/client.ts" ||
+          path === "packages/integrations/src/yookassa/held-onboarding.ts") &&
         ((target !== undefined &&
           target.startsWith("https://api.yookassa.ru/v3/")) ||
           (content.includes('const ORIGIN = "https://api.yookassa.ru"') &&

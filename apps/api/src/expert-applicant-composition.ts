@@ -1,5 +1,6 @@
 import {
   createResidentVerificationService,
+  createExpertSeparatedSalesService,
   createExpertApplicantService,
 } from "@ii-tonya/application";
 import {
@@ -8,6 +9,7 @@ import {
 } from "@ii-tonya/config";
 import {
   PostgresExpertPromoRepository,
+  PostgresExpertSeparatedSalesRepository,
   PostgresResidentVerificationRepository,
   PostgresExpertPersonalOfferRepository,
   type DrizzleDb,
@@ -18,6 +20,12 @@ export function assertExpertApplicantCapability(
   capability: ExpertApplicantTelegramCapability | undefined,
 ): void {
   assertExpertApplicantConfig(config);
+  if (
+    capability &&
+    (capability.separatedSalesEnabled === true) !==
+      (config.features.expertSeparatedSales === true)
+  )
+    throw new Error("expert_applicant_capability_required");
   if (
     capability?.verificationFormEnabled === true &&
     config.features.expertVerificationForm !== true
@@ -44,12 +52,27 @@ export function createExpertApplicantComposition(
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
   return {
+    separatedSalesEnabled: config.features.expertSeparatedSales === true,
     verificationFormEnabled: config.features.expertVerificationForm === true,
     botId: scope.botId,
     botKey: scope.botKey,
     webhookSecret: scope.webhookSecret,
     service: createExpertApplicantService({
       enabled: true,
+      ...(config.features.expertSeparatedSales === true
+        ? {
+            separatedSales: createExpertSeparatedSalesService({
+              repository: new PostgresExpertSeparatedSalesRepository(db, scope),
+              form: createResidentVerificationService({
+                enabled: true,
+                repository: new PostgresResidentVerificationRepository(
+                  db,
+                  scope,
+                ),
+              }),
+            }),
+          }
+        : {}),
       ...(config.features.expertVerificationForm === true
         ? {
             verificationForm: createResidentVerificationService({
@@ -72,6 +95,7 @@ export function createExpertApplicantComposition(
         messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
       }),
       repository: new PostgresExpertPromoRepository(db, {
+        separatedSalesEnabled: config.features.expertSeparatedSales === true,
         messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
         verificationFormEnabled:
           config.features.expertVerificationForm === true,

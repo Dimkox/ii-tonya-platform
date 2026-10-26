@@ -14,6 +14,8 @@ import {
 } from "./expert-card-repository.js";
 
 export interface PersonalOfferProjection extends Record<string, unknown> {
+  selected_locked_total?: string;
+  selected_locked_term?: 1 | 3;
   offer_start_date: string;
   current_discount_stage: number;
   discount_percent: number;
@@ -55,7 +57,7 @@ export class PostgresExpertPersonalOfferRepository {
     private readonly policy: Policy,
   ) {}
   private eligible(userId: string) {
-    return sql`resident_verification_price_allowed(${userId}::uuid) and exists(select 1 from users u join expert_promo_enrollments p on p.user_id=u.id where u.id=${userId}::uuid and u.active and p.status='granted' and p.policy_version=${this.policy.promoConsentPolicyVersion ?? this.policy.messagingConsentPolicyVersion} and exists(select 1 from (${originalClientConsentSql(userId, "client_messaging")}) original join consents c on c.id=original."decisionId"::uuid and c.presentation_id=p.presentation_id)) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled')`;
+    return sql`not exists(select 1 from expert_sales_bases where user_id=${userId}::uuid) and resident_verification_price_allowed(${userId}::uuid) and exists(select 1 from users u join expert_promo_enrollments p on p.user_id=u.id where u.id=${userId}::uuid and u.active and p.status='granted' and p.policy_version=${this.policy.promoConsentPolicyVersion ?? this.policy.messagingConsentPolicyVersion} and exists(select 1 from (${originalClientConsentSql(userId, "client_messaging")}) original join consents c on c.id=original."decisionId"::uuid and c.presentation_id=p.presentation_id)) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled')`;
   }
   async refreshDue(
     rawLimit = 10,
@@ -244,6 +246,17 @@ export class PostgresExpertPersonalOfferRepository {
       sql`insert into expert_personal_offer_state(user_id,quote_id,schedule_id,refreshed_at,next_refresh_at) values(${userId}::uuid,${quote.id}::uuid,${source.scheduleId}::uuid,clock_timestamp(),clock_timestamp()) on conflict(user_id) do update set quote_id=excluded.quote_id,schedule_id=excluded.schedule_id,payment_id=null,payment_url=null,order_id=null,refreshed_at=excluded.refreshed_at,next_refresh_at=excluded.next_refresh_at`,
     );
   }
+  private async readPaidSales(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    userId: string,
+  ): Promise<PersonalOfferProjection | null> {
+    const row = (
+      await tx.execute<PersonalOfferProjection>(
+        sql`select l.final_locked_price::text selected_locked_total,l.term_months selected_locked_term,b.base_offer_shown_at::text offer_start_date,4 current_discount_stage,s.energy_discount_bps/100 discount_percent,s.monthly_price_minor::text locked_price_monthly,case when l.term_months=3 then l.final_locked_price::text end locked_price_package,l.locked_at::text payment_link_expires_at,0 remaining_seconds,'pending_gates'::text readiness,null::text payment_url from expert_sales_paid_locks l join expert_sales_selections s on s.id=l.selection_id join expert_sales_bases b on b.id=s.base_id join users u on u.id=l.user_id and u.active where l.user_id=${userId}::uuid and b.consent_version is not null and expert_card_current_messaging_authority(l.user_id,b.consent_version)`,
+      )
+    ).rows[0];
+    return row ?? null;
+  }
   async read(scope: {
     botId: string;
     botKey: string;
@@ -285,6 +298,8 @@ export class PostgresExpertPersonalOfferRepository {
         }))
       )
         return null;
+      const paidSales = await this.readPaidSales(tx, userId);
+      if (paidSales) return paidSales;
       await this.refreshOwnedQuote(tx, userId);
       const row = (
         await tx.execute<
@@ -335,6 +350,8 @@ export class PostgresExpertPersonalOfferRepository {
         )
       ).rows[0];
       if (!owned) return null;
+      const paidSales = await this.readPaidSales(tx, userId);
+      if (paidSales) return paidSales;
       await this.refreshOwnedQuote(tx, userId);
       const row = (
         await tx.execute<

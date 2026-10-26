@@ -35,6 +35,7 @@ export interface OnboardingInvoice {
   id: string;
   applicationId: string;
   userId: string;
+  strictExpiry?: boolean;
   purpose: "onboarding";
   amountMinor: "300000";
   currency: "RUB";
@@ -147,7 +148,7 @@ export class PostgresExpertVerificationRepository {
           priceMinor: string;
           currency: "RUB";
         }>(
-          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",q.term_months as "termMonths",q.price_minor::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.verification_status='pending' or (a.verification_status='approved' and exists(select 1 from expert_offer_profiles p where p.user_id=a.user_id and p.revision=(select max(revision) from expert_offer_profiles where user_id=a.user_id) and not exists(select 1 from expert_offer_profile_verifications pv where pv.user_id=p.user_id and pv.profile_revision=p.revision))) order by a.created_at,a.id limit ${limit}`,
+          sql`select a.id as "applicationId",a.verification_status as status,'telegram:***'::text as "maskedContact",q.id as "quoteId",coalesce((select s.term_months from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.term_months) as "termMonths",coalesce((select s.selected_total_minor from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.price_minor)::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.verification_status='pending' or (a.verification_status='approved' and exists(select 1 from expert_offer_profiles p where p.user_id=a.user_id and p.revision=(select max(revision) from expert_offer_profiles where user_id=a.user_id) and not exists(select 1 from expert_offer_profile_verifications pv where pv.user_id=p.user_id and pv.profile_revision=p.revision))) order by a.created_at,a.id limit ${limit}`,
         )
       ).rows;
     });
@@ -173,7 +174,7 @@ export class PostgresExpertVerificationRepository {
           priceMinor: string;
           currency: "RUB";
         }>(
-          sql`select a.id as "applicationId",a.user_id as "userId",a.verification_status as status,q.id as "quoteId",q.term_months as "termMonths",q.price_minor::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.id=${applicationId}::uuid`,
+          sql`select a.id as "applicationId",a.user_id as "userId",a.verification_status as status,q.id as "quoteId",coalesce((select s.term_months from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.term_months) as "termMonths",coalesce((select s.selected_total_minor from expert_sales_selections s where s.user_id=a.user_id order by s.selected_at desc,s.id desc limit 1),q.price_minor)::text as "priceMinor",q.currency from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_campaign_quotes q on q.id=a.campaign_quote_id and q.user_id=a.user_id where a.id=${applicationId}::uuid`,
         )
       ).rows[0];
       if (!row || !(await this.currentConsent(tx, row.userId))) return null;
@@ -199,7 +200,20 @@ export class PostgresExpertVerificationRepository {
         ...row,
         contact,
         profile: profile ?? null,
-        questionnaire: {
+        questionnaire: (
+          await tx.execute<{
+            status: string;
+            draft: unknown;
+            submittedRevision: number;
+            base_tariff_amount: string;
+            base_offer_shown_at: string;
+            promo_accepted_flag: boolean | null;
+            final_locked_price: string | null;
+            offer_expiry_date: string | null;
+          }>(
+            sql`select 'submitted'::text status,f.submitted_draft draft,b.submitted_revision as "submittedRevision",f.base_tariff_amount::text,f.base_offer_shown_at::text,f.promo_accepted_flag,f.final_locked_price::text,f.offer_expiry_date::text,f.monthly_price_minor::text,f.package_price_minor::text,f.selected_total_minor::text,f.term_months from expert_sales_form_bridges b join resident_sales_application f on f.id=b.form_id and f.user_id=b.user_id where b.application_id=${applicationId}::uuid`,
+          )
+        ).rows[0] ?? {
           status: "waiting_content" as const,
           contentSlot: "TODO: Wait for Content Spec" as const,
         },
@@ -238,6 +252,7 @@ export class PostgresExpertVerificationRepository {
       await this.manager(tx, input.sessionHash);
       const previous = (
         await tx.execute<{
+          decisionId: string;
           applicationId: string;
           decision: string;
           reasonCode: string;
@@ -245,11 +260,12 @@ export class PostgresExpertVerificationRepository {
           idempotencyKey: string;
           invoiceId: string | null;
         }>(
-          sql`select d.application_audit_id as "applicationId",d.decision,d.reason_code as "reasonCode",d.manager_id as "managerId",d.idempotency_key as "idempotencyKey",i.id as "invoiceId" from expert_verification_decisions d left join expert_onboarding_invoices i on i.decision_id=d.id where d.application_audit_id=${input.applicationId}::uuid or (d.manager_id=${managerId}::uuid and d.idempotency_key=${input.idempotencyKey}) order by d.id`,
+          sql`select d.id as "decisionId",d.application_audit_id as "applicationId",d.decision,d.reason_code as "reasonCode",d.manager_id as "managerId",d.idempotency_key as "idempotencyKey",i.id as "invoiceId" from expert_verification_decisions d left join lateral (select i.id from expert_onboarding_invoices i where i.decision_id=d.id order by i.sales_attempt_number asc nulls first limit 1) i on true where d.application_audit_id=${input.applicationId}::uuid or (d.manager_id=${managerId}::uuid and d.idempotency_key=${input.idempotencyKey}) order by d.id`,
         )
       ).rows;
       if (previous.length) {
         const prior = previous[0]!;
+
         if (
           previous.length !== 1 ||
           prior.applicationId !== input.applicationId ||
@@ -277,10 +293,13 @@ export class PostgresExpertVerificationRepository {
       if (input.decision === "approved") {
         const invoice = (
           await tx.execute<{ id: string }>(
-            sql`insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode) values(${input.applicationId}::uuid,${input.applicationId}::uuid,${application!.userId}::uuid,${decision.id}::uuid,${this.policy.providerMode}) returning id`,
+            sql`insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values(${input.applicationId}::uuid,${input.applicationId}::uuid,${application!.userId}::uuid,${decision.id}::uuid,${this.policy.providerMode},case when exists(select 1 from expert_sales_form_bridges where application_id=${input.applicationId}::uuid) then 1 else null end) returning id`,
           )
         ).rows[0]!;
         invoiceId = invoice.id;
+        await tx.execute(
+          sql`insert into expert_sales_fee_attempts(invoice_id,user_id,selection_id,expires_at) select ${invoice.id}::uuid,b.user_id,s.id,least(s.offer_expiry_date,clock_timestamp()+interval '24 hours') from expert_sales_form_bridges b join expert_sales_selections original on original.id=b.selection_id join lateral(select current.* from expert_sales_selections current where current.base_id=original.base_id and current.choice_id=original.choice_id order by current.selected_at desc,current.id desc limit 1) s on true where b.application_id=${input.applicationId}::uuid`,
+        );
         await tx.execute(
           sql`insert into expert_onboarding_payment_operations(invoice_id,application_audit_id,user_id,provider_mode) values(${invoice.id}::uuid,${input.applicationId}::uuid,${application!.userId}::uuid,${this.policy.providerMode})`,
         );
@@ -337,7 +356,7 @@ export class PostgresExpertVerificationRepository {
       return (
         (
           await tx.execute<OnboardingInvoice & Record<string, unknown>>(
-            sql`select i.id,i.application_audit_id as "applicationId",i.user_id as "userId",i.purpose,i.amount_minor::text as "amountMinor",i.currency,i.provider_mode as mode,i.status,o.id as "operationId",o.status as "operationStatus",o.provider_object_id as "providerObjectId" from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id join expert_onboarding_applications a on a.id=i.application_id and a.user_id=i.user_id where i.id=${invoiceId}::uuid and i.user_id=${userId}::uuid and a.verification_status='approved'`,
+            sql`select i.id,i.application_audit_id as "applicationId",i.user_id as "userId",(i.sales_attempt_number is not null) as "strictExpiry",i.purpose,i.amount_minor::text as "amountMinor",i.currency,i.provider_mode as mode,i.status,o.id as "operationId",o.status as "operationStatus",o.provider_object_id as "providerObjectId" from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id join expert_onboarding_applications a on a.id=i.application_id and a.user_id=i.user_id where i.id=${invoiceId}::uuid and i.user_id=${userId}::uuid and a.verification_status='approved'`,
           )
         ).rows[0] ?? null
       );
@@ -362,7 +381,7 @@ export class PostgresExpertVerificationRepository {
       return (
         (
           await tx.execute<OnboardingInvoice & Record<string, unknown>>(
-            sql`select i.id,i.application_audit_id as "applicationId",i.user_id as "userId",i.purpose,i.amount_minor::text as "amountMinor",i.currency,i.provider_mode as mode,i.status,o.id as "operationId",o.status as "operationStatus",o.provider_object_id as "providerObjectId" from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id join expert_onboarding_applications a on a.id=i.application_id and a.user_id=i.user_id join users u on u.id=i.user_id and u.active=true where i.id=${invoiceId}::uuid and a.verification_status='approved'`,
+            sql`select i.id,i.application_audit_id as "applicationId",i.user_id as "userId",(i.sales_attempt_number is not null) as "strictExpiry",i.purpose,i.amount_minor::text as "amountMinor",i.currency,i.provider_mode as mode,i.status,o.id as "operationId",o.status as "operationStatus",o.provider_object_id as "providerObjectId" from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id join expert_onboarding_applications a on a.id=i.application_id and a.user_id=i.user_id join users u on u.id=i.user_id and u.active=true where i.id=${invoiceId}::uuid and a.verification_status='approved'`,
           )
         ).rows[0] ?? null
       );
@@ -533,13 +552,34 @@ export class PostgresExpertVerificationRepository {
         | "application_erased"
         | "owner_inactive"
         | "consent_unavailable"
-        | "application_unavailable" = "payment_verified";
+        | "application_unavailable"
+        | "expired_terms"
+        | "duplicate_fee"
+        | "capture_unproven" = "payment_verified";
       if (!stored.applicationId) reason = "application_erased";
       else if (!user?.active) reason = "owner_inactive";
       else if (!app || app.status !== "approved")
         reason = "application_unavailable";
       else if (!(await this.currentConsent(tx, proof.userId)))
         reason = "consent_unavailable";
+      const salesAttempt = (
+        await tx.execute<{
+          selectionId: string;
+          expired: boolean;
+          winner: string | null;
+          captureProven: boolean;
+          applicationCurrent: boolean;
+        }>(
+          sql`select exists(select 1 from expert_sales_form_bridges b join residents_applications form on form.id=b.form_id and form.user_id=b.user_id and form.revision=b.submitted_revision and form.submitted_at is not null join expert_sales_bases base on base.user_id=b.user_id and base.consent_version is not null where b.user_id=a.user_id) as "applicationCurrent",a.selection_id as "selectionId",${proof.capturedAt}::timestamptz>=a.expires_at as expired,l.invoice_id as winner,exists(select 1 from expert_sales_provider_requests r join expert_sales_provider_observations o on o.invoice_id=r.invoice_id and o.provider_object_id=r.provider_object_id and o.status='waiting_for_capture' and o.observed_at<=r.dispatched_at where r.invoice_id=a.invoice_id and r.kind='capture' and r.status in('dispatched','observed') and r.dispatched_at<a.expires_at and r.dispatched_at<=${proof.capturedAt}::timestamptz) as "captureProven" from expert_sales_fee_attempts a left join expert_sales_paid_locks l on l.user_id=a.user_id where a.invoice_id=${proof.invoiceId}::uuid`,
+        )
+      ).rows[0];
+      if (reason === "payment_verified" && salesAttempt) {
+        if (!salesAttempt.applicationCurrent) reason = "application_erased";
+        else if (salesAttempt.expired) reason = "expired_terms";
+        else if (!salesAttempt.captureProven) reason = "capture_unproven";
+        else if (salesAttempt.winner && salesAttempt.winner !== proof.invoiceId)
+          reason = "duplicate_fee";
+      }
       if (!paid) {
         await tx.execute(
           sql`insert into expert_onboarding_payment_facts(invoice_id,operation_id,user_id,purpose,amount_minor,currency,provider_mode,provider_object_id,event_id,evidence_digest,captured_at,admission,reason_code) values(${proof.invoiceId}::uuid,${proof.operationId}::uuid,${proof.userId}::uuid,${proof.purpose},${proof.amountMinor}::bigint,${proof.currency},${proof.mode},${proof.providerObjectId},${proof.eventId},${proof.evidenceDigest},${proof.capturedAt}::timestamptz,${reason === "payment_verified" ? "interview" : "blocked"},${reason})`,
@@ -550,6 +590,16 @@ export class PostgresExpertVerificationRepository {
         await tx.execute(
           sql`update expert_onboarding_payment_operations set status='succeeded' where id=${proof.operationId}::uuid`,
         );
+        if (salesAttempt) {
+          if (reason === "payment_verified")
+            await tx.execute(
+              sql`insert into expert_sales_paid_locks(user_id,invoice_id,selection_id,final_locked_price,term_months) select user_id,${proof.invoiceId}::uuid,id,selected_total_minor,term_months from expert_sales_selections where id=${salesAttempt.selectionId}::uuid`,
+            );
+          else
+            await tx.execute(
+              sql`insert into expert_sales_recovery_work(invoice_id,reason) values(${proof.invoiceId}::uuid,${reason})`,
+            );
+        }
         if (reason === "payment_verified") {
           if (!stored.applicationId)
             return fail("verification_application_unavailable");

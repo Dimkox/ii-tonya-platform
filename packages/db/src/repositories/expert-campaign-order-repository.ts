@@ -302,7 +302,8 @@ export class PostgresExpertCampaignOrderRepository {
                 "EXPERT_CAMPAIGN_QUOTE_UNAVAILABLE",
               );
             if (
-              quote.ruleVersion === "expert_energy_start_v2" &&
+              (quote.ruleVersion === "expert_energy_start_v2" ||
+                quote.ruleVersion === "expert_separated_sales_v3") &&
               !mainAdmission
             )
               throw new ExpertCampaignOrderError(
@@ -341,7 +342,7 @@ export class PostgresExpertCampaignOrderRepository {
                 quoteValid: boolean;
                 tariffValid: boolean;
               }>(
-                sql`with clock as materialized (select clock_timestamp() now) select clock.now as now, q.quoted_at<=clock.now and clock.now<q.expires_at as "quoteValid",t.active_from<=clock.now and clock.now<t.active_to as "tariffValid" from clock,expert_campaign_quotes q,expert_residency_tariff_versions t where q.id=${quote.id}::uuid and t.id=${quote.tariffVersionId}::uuid`,
+                sql`with clock as materialized (select clock_timestamp() now) select clock.now as now, q.quoted_at<=clock.now and clock.now<q.expires_at as "quoteValid",((t.active_from<=clock.now and clock.now<t.active_to) or (q.rule_version='expert_separated_sales_v3' and exists(select 1 from expert_sales_paid_locks l where l.user_id=q.user_id and l.invoice_id=q.paid_lock_invoice_id and l.selection_id=q.sales_selection_id))) as "tariffValid" from clock,expert_campaign_quotes q,expert_residency_tariff_versions t where q.id=${quote.id}::uuid and t.id=${quote.tariffVersionId}::uuid`,
               )
             ).rows[0];
             if (!clock)

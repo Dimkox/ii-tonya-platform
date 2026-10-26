@@ -13,6 +13,7 @@ import {
 } from "@ii-tonya/config";
 import {
   PostgresExpertVerificationRepository,
+  PostgresHeldOnboardingCheckout,
   PostgresExpertCampaignQuoteRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -21,6 +22,10 @@ type ServiceDependencies = Parameters<
 >[0];
 export interface ExpertVerificationPaymentCapabilities {
   providerMode: "test" | "live";
+  heldOnboarding?: Omit<
+    ConstructorParameters<typeof PostgresHeldOnboardingCheckout>[1],
+    "enabled" | "repository" | "mode"
+  >;
   checkout?: NonNullable<ServiceDependencies["checkout"]> & {
     readonly strictFirstSendCancellation: true;
   };
@@ -47,6 +52,7 @@ export function assertExpertVerificationPayments(
     throw new Error("expert_verification_payment_mode_conflict");
   if (
     settings.checkoutEnabled &&
+    config.features.expertHeldOnboarding !== true &&
     (payment?.checkout?.strictFirstSendCancellation !== true ||
       typeof payment.checkout.createCheckout !== "function" ||
       typeof payment.checkout.recoverCheckout !== "function")
@@ -97,6 +103,17 @@ export function createExpertVerificationComposition(
     providerMode: settings.paymentMode,
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
   });
+  const heldCheckout =
+    config.features.expertHeldOnboarding === true && payment?.heldOnboarding
+      ? new PostgresHeldOnboardingCheckout(db, {
+          ...payment.heldOnboarding,
+          enabled: true,
+          repository,
+          mode: settings.paymentMode,
+        })
+      : undefined;
+  if (config.features.expertHeldOnboarding === true && !heldCheckout)
+    throw new Error("held_onboarding_capability_required");
   const onboardingWebhook =
     settings.paymentVerificationEnabled && payment?.paymentVerification
       ? new YooKassaOnboardingWebhookCapability(
@@ -106,6 +123,7 @@ export function createExpertVerificationComposition(
             repository,
           ),
           repository,
+          heldCheckout,
         )
       : undefined;
   return {
@@ -116,6 +134,7 @@ export function createExpertVerificationComposition(
     service: createExpertVerificationService({
       enabled: config.features.expertVerification === true,
       repository,
+      ...(heldCheckout ? { heldCheckout } : {}),
       verifyProfile: (input) =>
         new PostgresExpertCampaignQuoteRepository(db).verifyProfile(input),
       ...(settings.checkoutEnabled && payment?.checkout

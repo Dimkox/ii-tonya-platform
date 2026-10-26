@@ -5,6 +5,7 @@ export interface ExpertVerificationRepository {
   ): Promise<{
     id: string;
     operationId: string;
+    strictExpiry?: boolean;
     status: "pending" | "settled" | "cancelled";
   } | null>;
   listQueue(sessionHash: string, limit?: number): Promise<readonly unknown[]>;
@@ -55,6 +56,7 @@ export function createExpertVerificationService(deps: {
   enabled: boolean;
   repository: ExpertVerificationRepository;
   checkout?: ExpertVerificationCheckout;
+  heldCheckout?: ExpertVerificationCheckout;
   verifyProfile?: (input: {
     sessionHash: string;
     userId: string;
@@ -144,14 +146,17 @@ export function createExpertVerificationService(deps: {
         if (!invoice) return { kind: "not_found" } as const;
         if (invoice.status !== "pending")
           return { kind: "ok" as const, payment: { status: invoice.status } };
-        if (!deps.checkout)
+        const checkout = invoice.strictExpiry
+          ? deps.heldCheckout
+          : deps.checkout;
+        if (!checkout)
           return {
             kind: "ok" as const,
             payment: { status: "waiting_configuration" as const },
           };
         // Recovery owns the same durable operation and its exact-body/GET custody.
         // Never turn an unknown outcome into another initial POST from this service.
-        const payment = await deps.checkout.recoverCheckout({
+        const payment = await checkout.recoverCheckout({
           invoiceId: invoice.id,
           operationId: invoice.operationId,
         });
@@ -219,14 +224,21 @@ export function createExpertVerificationService(deps: {
             ...result,
             payment: { status: "not_repeated" as const },
           };
-        if (!deps.checkout)
+        const invoice = await deps.repository.invoiceForManager(
+          sessionHash,
+          result.invoiceId,
+        );
+        const checkout = invoice?.strictExpiry
+          ? deps.heldCheckout
+          : deps.checkout;
+        if (!invoice || !checkout)
           return {
             kind: "ok" as const,
             ...result,
             payment: { status: "waiting_configuration" as const },
           };
         try {
-          const payment = await deps.checkout.createCheckout({
+          const payment = await checkout.createCheckout({
             invoiceId: result.invoiceId,
           });
           const url = new URL(payment.url);

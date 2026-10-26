@@ -1,0 +1,28 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/integrations/src/yookassa/held-onboarding.test.ts [ packages/integrations/src/yookassa/held-onboarding.test.ts ]
+Error: Cannot find module './held-onboarding.js' imported from '/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/integrations/src/yookassa/held-onboarding.test.ts'
+ ❯ packages/integrations/src/yookassa/held-onboarding.test.ts:2:1
+      1| import { expect,it } from "vitest";
+      2| import { createHeldOnboardingClient } from "./held-onboarding.js";
+       | ^
+      3| it("uses capture:false bank-card create, GET then exact capture/cancel…
+      4|  const requests:{url:string;init:RequestInit}[]=[];
+
+Caused by: Error: Failed to load url ./held-onboarding.js (resolved id: ./held-onboarding.js) in /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/integrations/src/yookassa/held-onboarding.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  17:03:06
+   Duration  552ms (transform 61ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 124ms)
+
+
+[END OF RAW CAPTURE]

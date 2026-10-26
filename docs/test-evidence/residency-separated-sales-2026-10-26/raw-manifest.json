@@ -1,0 +1,257 @@
+{
+  "localRawDirectory": ".superpowers/sdd/separated-sales-20261026",
+  "artifacts": [
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/domain-red.txt",
+      "sha256": "028d8e722fda4a4411283c88163a3fe65993fc44d2525ea77616e416295e9489",
+      "bytes": 1572,
+      "captureBytes": 1550,
+      "captureSha256": "f7e4c11c934380b005e826b290d4f61a91de66c8aa14e9efa72876706a53e5ff"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/domain-final.txt",
+      "sha256": "5105f0530efd3f7c50bf3a125399fa7e336e87125913eea6bd9ded6e0d19ca71",
+      "bytes": 385,
+      "captureBytes": 363,
+      "captureSha256": "8bbff1913f9e26aa5e9c9e8216bb0feca4b0c1b43f883b4fea92c92751747e98"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/held-red.txt",
+      "sha256": "42058fb94fb695eb7292303bf5b3dc55ef38de25cb654a58679413d1184ada25",
+      "bytes": 1563,
+      "captureBytes": 1541,
+      "captureSha256": "eba4e060573f26ac79b1450f52fbd3ca7a093bc1e5c7eba1033e42ea528ffdab"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/held-stream-green.txt",
+      "sha256": "c532bbdd3df86b241b5a93cd992a0ee83540d2b419ab5724f9be6a00137cc920",
+      "bytes": 392,
+      "captureBytes": 370,
+      "captureSha256": "9c3f74413fe3682ba090063dc4c6c1c38efd16c107745466b5addeda2d62d88c"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/composition-red.txt",
+      "sha256": "34e75def8faca0c0cf72a5736d6ea8a3c7e43790a6ef77fdf2ba87701c15d085",
+      "bytes": 1246,
+      "captureBytes": 1224,
+      "captureSha256": "d250e1c5d03e7c2d40c16f9c39baa81c9eafffbd79e3e17b6451bd4bb65e2ccf"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/composition-final2.txt",
+      "sha256": "4c2d10a6ccfa09f67a1eeb4332e3da3e78aede104d493b22248c11213b20f0b0",
+      "bytes": 741,
+      "captureBytes": 719,
+      "captureSha256": "cb3102f3da328743c7b0d9040c011e1942c6ac3ba34f57dddeed3979ec0375cc"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/state-matrix1.txt",
+      "sha256": "e2137f458f732177e97e89369c2a3db9163be1fe030d906d134af8bedfcce019",
+      "bytes": 4916,
+      "captureBytes": 4894,
+      "captureSha256": "8d164ce1fe9d424fedea7cfac6757ef05184569223fd28e468e25171521f6a3c"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/erased-form-red-filtered.txt",
+      "sha256": "47f375294686b68e41d40809fd8228a8bffc6d45675c43e6ea73717093a864d5",
+      "bytes": 2596,
+      "captureBytes": 2574,
+      "captureSha256": "b1e125c8912b03e1f1a77ce760d069c8dc26a01b30ff1d90a151b12942faa503"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/state-worker-final2.txt",
+      "sha256": "469e40a4c7d89c7d546fffbf5d5f4daa784d599effab23b6f3553422832c9de9",
+      "bytes": 1102,
+      "captureBytes": 1080,
+      "captureSha256": "c872e54b8631f54cb704db45ed4efdd49114417944242b00840a4d66c2cacd77"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/legacy-offer-v2.txt",
+      "sha256": "e70e932f007f8cf291aa5fbdf1a47de9aa1e9889a88417a0def087eb65a78feb",
+      "bytes": 768,
+      "captureBytes": 746,
+      "captureSha256": "6ea1aadb5b261ebb974ae48cc96c1d5c71802c70df27ffd7e464399ec775faa1"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/legacy-form-composition.txt",
+      "sha256": "456e266519d2f5c6c473ed69b20bae5fe12f3724f64c2b9204688f1efdc4cdd1",
+      "bytes": 555,
+      "captureBytes": 533,
+      "captureSha256": "83b188b1f6e3624b01da539816fdea11c7884b2a7607e7f43871acd40575000b"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/config-env.txt",
+      "sha256": "4862c57fdd0327bb19e347fd68693391efba7303f14c9b2c4e2b9a41d1eec3cf",
+      "bytes": 4081,
+      "captureBytes": 4059,
+      "captureSha256": "c41b17b6385757e968d76d33e7a71b4a2abfb5756422e10882aad87957b19785"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/config-env-final.txt",
+      "sha256": "c51c64d1a2f66068e22da52f25e15622253e442023db5138e39efef171f1558f",
+      "bytes": 370,
+      "captureBytes": 348,
+      "captureSha256": "79781cf3bf1ab098ae7682718b3561a9c88477acdbdc289a2983b7603b413ce1"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/personal-offer-service.txt",
+      "sha256": "afa8b62f1d979d0d1b285daf845494398fcf24496e504525e2d9c8afd8b6dffc",
+      "bytes": 396,
+      "captureBytes": 374,
+      "captureSha256": "39c62999e08b0bfdf7a6d69cb48615c085f286f32d2d8e467d63f0cd048e01f5"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/boundary-final.txt",
+      "sha256": "7c66f97a1ce4c2681e6fdc4d51bed05c80d587ce0eb68ce13d2cb4f3bce69d6f",
+      "bytes": 391,
+      "captureBytes": 369,
+      "captureSha256": "e654d5f6018a84728ea2b7e0213eaa875ee2f4b2b025265f5e38e3533f97e0ba"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/migration-history1.txt",
+      "sha256": "f160e3d7c2e633a0f5c21705ce7a29a156a80a7d8a64abbf03b228427d2f268d",
+      "bytes": 3941,
+      "captureBytes": 3919,
+      "captureSha256": "257d242b723342f1a526f12d9dc1450fa5b91aca28dbda82d97a28d986a08647"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/migration-history2.txt",
+      "sha256": "3594958947ada876113cc4c3656c404b3f12d5850142efbf3557a4b7c2b11c46",
+      "bytes": 380,
+      "captureBytes": 358,
+      "captureSha256": "d06402d1e36d2ddcb7f164a8321aaa695b5fce4fb2ff0b8a5b1524b9c1b38693"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/scope-boundary1.txt",
+      "sha256": "99a4ed6f9d5a985e185a78c79f5ec77fd94bacbe51761b03d31b7723ded37878",
+      "bytes": 557,
+      "captureBytes": 535,
+      "captureSha256": "157427d83d7995d69d45ecf8ba3013aef64455fae08dd29009f394bbbbb8fe66"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/state-reconstruction4.txt",
+      "sha256": "93a899c14f1fcb2f9bb10750df2d6a86dcfc9b0eb9b4073982560579871dee43",
+      "bytes": 247,
+      "captureBytes": 225,
+      "captureSha256": "5237d90c06bf200fac258dd6abf4256c1cc5d888f00d75a3d0c54caf0a2f3944"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/api-types-final.txt",
+      "sha256": "1fcc7d3a5e7b41b567ea7842da8f75f5991c692292473c5005dcd1da35a751f2",
+      "bytes": 37,
+      "captureBytes": 15,
+      "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/worker-types-final.txt",
+      "sha256": "1fcc7d3a5e7b41b567ea7842da8f75f5991c692292473c5005dcd1da35a751f2",
+      "bytes": 37,
+      "captureBytes": 15,
+      "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/db-types-final.txt",
+      "sha256": "1fcc7d3a5e7b41b567ea7842da8f75f5991c692292473c5005dcd1da35a751f2",
+      "bytes": 37,
+      "captureBytes": 15,
+      "captureSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/tests-types-final2.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/integrations-final.txt",
+      "sha256": "d3100bb200755602000baaaa61e1fb2d5e9f588d388537be00ca12794807384d",
+      "bytes": 402,
+      "captureBytes": 380,
+      "captureSha256": "97eeb6d49526245d4f5def1e17d44fa874f4584e4d9a447eda119aaa31c5e343"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/application-final2.txt",
+      "sha256": "8fd00920e25dd434c445369be2e0aea18d932d1c339f5771bd989549d298d2d9",
+      "bytes": 403,
+      "captureBytes": 381,
+      "captureSha256": "a82faede2ecef2b76c1ccd9bfaaf725aed88cce2caf10e815e484f04a3deb058"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/db-final3.txt",
+      "sha256": "3076cf1c61a900d1e7ce3b111d1eb54a86ac8ed0f233095543ae403431bb8929",
+      "bytes": 401,
+      "captureBytes": 379,
+      "captureSha256": "96b1b8d49fb99d7ef4b17279c14d20ff90f12577d819c08310a32b7fe811106b"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/lint1.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/held-final.txt",
+      "sha256": "93076e151645db4fb0e624885e604518be79c2449c8d1cb71590d1bb0f758747",
+      "bytes": 393,
+      "captureBytes": 371,
+      "captureSha256": "920f115886c54d40598b044b8e9db9cea1b292b42b133c607d8643cd39312b91"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/state-release-candidate.txt",
+      "sha256": "240991a8f2ec4d8123436d81bc7dd9890a303d605bd175e6b40247cb043e903d",
+      "bytes": 1199,
+      "captureBytes": 1177,
+      "captureSha256": "7a0abd0f8595294ef266586065fc1e3be34e6c58d08573967dc8678ab595cf46"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/tests-types-release-candidate.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/integrations-final2.txt",
+      "sha256": "7ebf86b994d7c50541147a768e5532391ddaa31ca794d333ca1689a979774f22",
+      "bytes": 402,
+      "captureBytes": 380,
+      "captureSha256": "4cfd8d5a67caa1f0433d54e9cd47311b65f0ce88e2651976b3203729e27d8fc1"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/db-final4.txt",
+      "sha256": "bc6f3bc2efe4b5c497223d115d22797693e866d11af2c3c81d514d4b903a70df",
+      "bytes": 401,
+      "captureBytes": 379,
+      "captureSha256": "f43106b95b6f7721d9385cd6eb5e8df83cbef1ec6d862f2193ee7d93410d9f88"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/lint-release-candidate.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/boundary-release-candidate.txt",
+      "sha256": "d35cd3a7d9b896c8e18cb5d6e406b2bd60aa9a7eb6255215c1408f9e21cb59a1",
+      "bytes": 391,
+      "captureBytes": 369,
+      "captureSha256": "63c97ef2493e17fab79355ad6194d8a4e77ea5a0e1b2b847ad8aaf1f3435f8f5"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/format-release-candidate.txt",
+      "sha256": "3f3d637d21be8b23ff0f095c8db9a123adb8adf433b62502d89b8a6542a6c791",
+      "bytes": 3335,
+      "captureBytes": 3313,
+      "captureSha256": "a26b3b62a930561f22612a1fedce16018dba8d57ac30b6eac0571a849cb6cc9d"
+    },
+    {
+      "path": "docs/test-evidence/residency-separated-sales-2026-10-26/raw/diff-check-final.txt",
+      "sha256": "31cbb5f8ce6b15a819787a25e32c1cec8bfd9b444534e3e0a41f6de319b1cd55",
+      "bytes": 22,
+      "captureBytes": 0,
+      "captureSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

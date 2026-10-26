@@ -1,0 +1,32 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ apps/api/src/routes/expert-separated-sales.integration.test.ts (1 test | 1 failed) 1930ms
+   × normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee 282ms
+     → {"error":"expert_applicant_unavailable"}: expected 503 to be 200 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/api/src/routes/expert-separated-sales.integration.test.ts > normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee
+AssertionError: {"error":"expert_applicant_unavailable"}: expected 503 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 503
+
+ ❯ send apps/api/src/routes/expert-separated-sales.integration.test.ts:19:509
+
+ ❯ apps/api/src/routes/expert-separated-sales.integration.test.ts:25:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  16:58:47
+   Duration  6.31s (transform 1.80s, setup 0ms, collect 3.89s, tests 1.93s, environment 0ms, prepare 118ms)
+
+
+[END OF RAW CAPTURE]

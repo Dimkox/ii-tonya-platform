@@ -316,3 +316,9 @@ export * from "./telegram/manager-notification-transport.js";
 
 export * from "./documents/safe-document-parser.js";
 export * from "./telegram/workspace-notification-transport.js";
+export {
+  createHeldOnboardingClient,
+  assertHeldPaymentObservation,
+  type HeldOnboardingClient,
+  type HeldPaymentObservation,
+} from "./yookassa/held-onboarding.js";

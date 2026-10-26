@@ -376,3 +376,11 @@ export * from "./repositories/expert-offer-v2.js";
 export * from "./repositories/resident-verification-repository.js";
 
 export * from "./repositories/resident-workspace-repository.js";
+
+export { PostgresExpertSeparatedSalesRepository } from "./repositories/expert-separated-sales-repository.js";
+
+export { PostgresHeldOnboardingCheckout } from "./repositories/expert-held-onboarding-repository.js";
+export {
+  PostgresExpertSalesScheduler,
+  type SalesNoticeTransport,
+} from "./repositories/expert-sales-scheduler.js";

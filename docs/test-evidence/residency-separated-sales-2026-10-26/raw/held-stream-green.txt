@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ packages/integrations/src/yookassa/held-onboarding.test.ts (3 tests) 32ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  17:40:16
+   Duration  620ms (transform 84ms, setup 0ms, collect 156ms, tests 32ms, environment 0ms, prepare 98ms)
+
+
+[END OF RAW CAPTURE]

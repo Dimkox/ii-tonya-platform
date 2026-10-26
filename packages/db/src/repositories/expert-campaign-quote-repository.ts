@@ -1,3 +1,4 @@
+import { createSeparatedSalesQuote } from "./expert-separated-sales-repository.js";
 import {
   createCurrentExpertOffer,
   saveExpertOfferProfile,
@@ -23,7 +24,10 @@ export interface ExpertCampaignQuote {
   id: string;
   userId: string;
   tariffVersionId: string;
-  ruleVersion: "expert_energy_start_v1" | "expert_energy_start_v2";
+  ruleVersion:
+    | "expert_energy_start_v1"
+    | "expert_energy_start_v2"
+    | "expert_separated_sales_v3";
   profileRevision: number | null;
   packagePriceMinor: string | null;
   calculationTimestamp: string;
@@ -64,6 +68,34 @@ export class ExpertCampaignQuoteError extends Error {
 
 export class PostgresExpertCampaignQuoteRepository {
   constructor(private readonly db: DrizzleDb) {}
+  private async paidQuote(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    input: CreateExpertCampaignQuote,
+  ): Promise<ExpertCampaignQuote | null> {
+    await lockClientConsentSubject(tx, input.userId);
+    const l = (
+      await tx.execute<{ term: number; tariff: string }>(
+        sql`select l.term_months term,b.tariff_version_id tariff from expert_sales_paid_locks l join expert_sales_selections s on s.id=l.selection_id join expert_sales_bases b on b.id=s.base_id where l.user_id=${input.userId}::uuid`,
+      )
+    ).rows[0];
+    if (!l) return null;
+    if (l.term !== input.termMonths || l.tariff !== input.tariffVersionId)
+      throw new ExpertCampaignQuoteError("EXPERT_CAMPAIGN_INVALID_INPUT");
+    const id = await createSeparatedSalesQuote(
+      tx,
+      input.userId,
+      input.idempotencyKey,
+      true,
+    );
+    const row = (
+      await tx
+        .select()
+        .from(expertCampaignQuotes)
+        .where(sql`id=${id}::uuid`)
+    )[0];
+    if (!row) throw new ExpertCampaignQuoteError("EXPERT_CAMPAIGN_STORAGE");
+    return toQuote(row);
+  }
   async saveProfile(input: ExpertOfferProfileInput) {
     return saveExpertOfferProfile(this.db, input);
   }
@@ -91,7 +123,10 @@ export class PostgresExpertCampaignQuoteRepository {
     tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
     input: CreateExpertCampaignQuote,
   ): Promise<ExpertCampaignQuote> {
-    return toQuote(await createCurrentExpertOffer(tx, parseCommand(input)));
+    const locked = await this.paidQuote(tx, parseCommand(input));
+    return (
+      locked ?? toQuote(await createCurrentExpertOffer(tx, parseCommand(input)))
+    );
   }
   async createQuote(
     input: CreateExpertCampaignQuote,
@@ -114,6 +149,8 @@ export class PostgresExpertCampaignQuoteRepository {
     input: CreateExpertCampaignQuote,
   ): Promise<ExpertCampaignQuote> {
     const request = parseCommand(input);
+    const locked = await this.paidQuote(tx, request);
+    if (locked) return locked;
     try {
       await lockClientConsentSubject(tx, request.userId);
       const user = (
