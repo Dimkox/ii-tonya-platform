@@ -2,9 +2,9 @@
 title: Complete versioned resident verification and truthful manager communications
 type: feature
 created: 2026-10-26
-status: in-review
+status: in-progress
 baseline_commit: 53df4d2fbbe09038bde2298e4642cee4247fbe2b
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -151,7 +151,30 @@ Use synthetic providers only. Unknown capability must have real manual recovery.
 
 ## Spec Change Log
 
+- 2026-10-26, independent review1 (R1–R6): retain the implementation and correct
+  one concrete batch, following owner instruction against destructive loops.
+  Add accessible terminal-delivery recovery; bounded paged accepted history;
+  non-poisoning overdue processing with blocked identities; asynchronous editor
+  response fencing; actual production calendar-deadline witnesses and actual
+  applicant completion/reapplication commands. The known-bad states are inaccessible
+  recovery, unopenable valid history, global read/worker outage, obsolete preview
+  confirmation and tests that cannot detect broken public paths/calendar arithmetic.
+  KEEP all passing v1/v2 forms, immutable submission/financial authority, fixed3000
+  capture, exact bytes/hash, privacy cleanup, unknown-send quarantine and default-off
+  worker. Do not rederive unrelated source or repeat unchanged suites. Details and
+  exact source lines are in the independent review evidence.
+
 ## Design Notes
+
+Terminal outcome does not end communication recovery: pending/ambiguous notices
+must remain discoverable after reload. Existing accepted supplemental history must
+remain readable in bounded pages, including its request/question context; neither
+silent truncation nor a larger browser envelope is a fix. A single blocked due
+subject cannot abort every manager read/worker cycle; retain strict identity checks
+and safe per-subject isolation. An editor change fences outstanding preview
+responses, not only the last resolved value. Deadline tests must exercise production
+calculation plus genuine events, and applicant commands must reach the actual
+repository through the normal service. No production clock override is introduced.
 
 Info-request preview keeps exact confirmed bytes: its protected timing text says
 48hours from request creation and points to `/verification` for the actual absolute
