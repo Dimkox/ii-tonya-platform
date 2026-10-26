@@ -1,0 +1,772 @@
+{
+  "description": "Additive 0057 PostgreSQL17.5 catalogue; hand-authored full-chain SQL replay and normalized fresh introspection. No generation authority.",
+  "serverVersionNum": 170005,
+  "sourceMigrationSha256": "58871a8406098d507edc012d0f18c82def950e2b84f2dd43884947e3cfff5f3b",
+  "parentSnapshotSha256": "b22ff021153b6a85fce4dad523921edba378be4ca518ffeb8d26c3811c0c5ec5",
+  "normalizedSnapshotSha256": "6d9a7e89e0edab9b0ff772c2d8cd985214c074c7678067a0285407478e4b4c06",
+  "functions": [
+    {
+      "name": "erase_resident_verification_subject",
+      "arguments": "subject uuid",
+      "definition": "CREATE OR REPLACE FUNCTION public.erase_resident_verification_subject(subject uuid)\n RETURNS void\n LANGUAGE plpgsql\nAS $function$ BEGIN\n PERFORM pg_advisory_xact_lock(hashtextextended(subject::text,0));\n DELETE FROM residents_applications WHERE user_id=subject;\n UPDATE resident_verification_requests SET user_id=NULL,request_digest=NULL,result=NULL,erased_at=clock_timestamp() WHERE user_id=subject;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_consent_cleanup",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_consent_cleanup()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN\n PERFORM erase_resident_verification_subject(NEW.user_id); RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_draft_valid",
+      "arguments": "d jsonb, complete boolean, education_requirement text",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_draft_valid(d jsonb, complete boolean DEFAULT false, education_requirement text DEFAULT 'unknown_manual_review'::text)\n RETURNS boolean\n LANGUAGE plpgsql\n IMMUTABLE\nAS $function$\nDECLARE k text; v jsonb; item jsonb; roles jsonb;\nBEGIN\n IF d IS NULL OR jsonb_typeof(d)<>'object' OR octet_length(d::text)>100000 THEN RETURN false; END IF;\n FOR k,v IN SELECT * FROM jsonb_each(d) LOOP\n  IF k IN ('primaryRole','category','tax') THEN\n   IF jsonb_typeof(v)<>'string' THEN RETURN false; END IF;\n   IF k='primaryRole' AND v#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n   IF k='category' AND v#>>'{}' NOT IN ('BASIC','EXCLUSIVE','BOTH') THEN RETURN false; END IF;\n   IF k='tax' AND v#>>'{}' NOT IN ('SELF_EMPLOYED','IP','LLC','INDIVIDUAL') THEN RETURN false; END IF;\n  ELSIF k IN ('roles','socialLinks','amenities','education','propertyEvidence') THEN\n   IF jsonb_typeof(v)<>'array' OR jsonb_array_length(v)>(CASE WHEN k='roles' THEN 6 ELSE 10 END) THEN RETURN false; END IF;\n   IF k='roles' AND jsonb_array_length(v)=0 THEN RETURN false; END IF;\n   IF k IN ('roles','socialLinks','amenities') AND (SELECT count(*)<>count(DISTINCT value) FROM jsonb_array_elements(v)) THEN RETURN false; END IF;\n   FOR item IN SELECT * FROM jsonb_array_elements(v) LOOP\n    IF k IN ('education','propertyEvidence') THEN\n     IF jsonb_typeof(item)<>'object' OR NOT item ?& ARRAY['kind','fileId','mimeType','size'] OR EXISTS(SELECT 1 FROM jsonb_object_keys(item) key WHERE key NOT IN ('kind','fileId','mimeType','size','caption')) THEN RETURN false; END IF;\n     IF jsonb_typeof(item->'kind')<>'string' OR item->>'kind' NOT IN ('photo','document') OR jsonb_typeof(item->'fileId')<>'string' OR (length(item->>'fileId') NOT BETWEEN 1 AND 512 OR item->>'fileId' !~ '^[A-Za-z0-9_-]+$') OR (jsonb_typeof(item->'mimeType')<>'null' AND (jsonb_typeof(item->'mimeType')<>'string' OR item->>'mimeType' NOT IN ('image/jpeg','image/png','application/pdf'))) OR (item->>'kind'='photo' AND item->>'mimeType'<>'image/jpeg') OR (jsonb_typeof(item->'size')<>'null' AND (jsonb_typeof(item->'size')<>'number' OR item->>'size' !~ '^[0-9]+$' OR (item->>'size')::numeric NOT BETWEEN 1 AND 20971520)) THEN RETURN false; END IF;\n     IF item ? 'caption' AND (jsonb_typeof(item->'caption')<>'string' OR length(item->>'caption')>3000) THEN RETURN false; END IF;\n    ELSE\n     IF jsonb_typeof(item)<>'string' THEN RETURN false; END IF;\n     IF k='roles' AND item#>>'{}' NOT IN ('EXPERT','CENTER','ORGANIZER','EDU_PROJECT','ESOTERIC','OTHER') THEN RETURN false; END IF;\n     IF k='socialLinks' AND (length(item#>>'{}')>500 OR item#>>'{}' !~ '^https://[^/@[:space:]]+[^[:space:]]*$') THEN RETURN false; END IF;\n     IF k='amenities' AND length(btrim(item#>>'{}')) NOT BETWEEN 1 AND 100 THEN RETURN false; END IF;\n    END IF;\n   END LOOP;\n  ELSIF k IN ('city','motivation','specialization','path','cases') THEN\n   IF jsonb_typeof(v)<>'string' OR length(btrim(v#>>'{}'))<1 OR length(v#>>'{}')>(CASE WHEN k='city' THEN 120 WHEN k='specialization' THEN 300 ELSE 3000 END) THEN RETURN false; END IF;\n  ELSIF k='capacity' THEN\n   IF jsonb_typeof(v)<>'number' OR v#>>'{}' !~ '^[0-9]+$' OR (v#>>'{}')::numeric NOT BETWEEN 1 AND 100000 THEN RETURN false; END IF;\n  ELSIF k='averageCheckMinor' THEN\n   IF jsonb_typeof(v)<>'string' OR v#>>'{}' !~ '^(0|[1-9][0-9]{0,11})$' THEN RETURN false; END IF;\n  ELSE RETURN false;\n  END IF;\n END LOOP;\n roles:=d->'roles';\n IF d ? 'primaryRole' AND d ? 'roles' AND NOT roles ? (d->>'primaryRole') THEN RETURN false; END IF;\n IF complete THEN\n  IF NOT d ?& ARRAY['primaryRole','roles','category','tax','city','socialLinks','motivation'] OR jsonb_array_length(d->'socialLinks')=0 THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND NOT d ?& ARRAY['specialization','averageCheckMinor'] THEN RETURN false; END IF;\n  IF roles ? 'EXPERT' AND education_requirement='required' AND (NOT d ? 'education' OR jsonb_array_length(d->'education')=0) THEN RETURN false; END IF;\n  IF roles ? 'CENTER' AND (NOT d ?& ARRAY['propertyEvidence','capacity','amenities'] OR jsonb_array_length(d->'propertyEvidence')=0 OR jsonb_array_length(d->'amenities')=0) THEN RETURN false; END IF;\n  IF (roles ? 'ESOTERIC' OR roles ? 'OTHER') AND NOT d ?& ARRAY['path','cases'] THEN RETURN false; END IF;\n END IF;\n RETURN true;\nEXCEPTION WHEN OTHERS THEN RETURN false;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_price_allowed",
+      "arguments": "owner_id uuid",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_price_allowed(owner_id uuid)\n RETURNS boolean\n LANGUAGE sql\nAS $function$ SELECT NOT EXISTS(SELECT 1 FROM resident_verification_cohorts WHERE user_id=owner_id) $function$\n"
+    },
+    {
+      "name": "resident_verification_price_guard",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_price_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN\n PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));\n IF NOT resident_verification_price_allowed(NEW.user_id) THEN RAISE EXCEPTION 'resident_verification_required'; END IF; RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_social_projection",
+      "arguments": "links jsonb",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_social_projection(links jsonb)\n RETURNS jsonb\n LANGUAGE sql\n IMMUTABLE\nAS $function$\n SELECT coalesce(jsonb_object_agg(platform,urls),'{}'::jsonb) FROM (SELECT lower(substring(value#>>'{}' from '^https://([^/:?#]+)')) platform,jsonb_agg(value) urls FROM jsonb_array_elements(coalesce(links,'[]'::jsonb)) GROUP BY 1) grouped\n$function$\n"
+    },
+    {
+      "name": "resident_verification_stage_projection",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_stage_projection()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN\n IF TG_OP='DELETE' THEN UPDATE users SET current_verification_stage='NONE' WHERE id=OLD.user_id; RETURN OLD; END IF;\n IF TG_OP='UPDATE' AND OLD.submitted_at IS NULL AND NEW.submitted_at IS NOT NULL THEN INSERT INTO resident_verification_check_work(application_id,user_id,submitted_revision) VALUES(NEW.id,NEW.user_id,NEW.revision); END IF;\n UPDATE users SET current_verification_stage=NEW.progress WHERE id=NEW.user_id; RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "name": "resident_verification_write_guard",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.resident_verification_write_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$ BEGIN\n PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));\n IF NOT EXISTS(SELECT 1 FROM channel_identities ci JOIN users u ON u.id=ci.user_id AND u.active WHERE ci.id=NEW.channel_identity_id AND ci.user_id=NEW.user_id AND ci.provider='telegram' AND ci.status='active' AND ci.bot_key=NEW.bot_key AND ci.external_id=NEW.telegram_user_id AND ci.external_chat_id=NEW.chat_id) THEN RAISE EXCEPTION 'resident_identity_unavailable'; END IF;\n IF TG_OP='INSERT' THEN\n  IF NEW.status<>'PENDING_DOCS' OR NEW.progress<>'FORM_FILLING' OR NEW.revision<>0 OR NEW.submitted_at IS NOT NULL THEN RAISE EXCEPTION 'resident_initial_state_invalid'; END IF;\n  NEW.created_at:=clock_timestamp();\n  INSERT INTO resident_verification_cohorts(user_id) VALUES(NEW.user_id) ON CONFLICT DO NOTHING;\n END IF;\n NEW.updated_at:=clock_timestamp();\n IF TG_OP='UPDATE' AND OLD.submitted_at IS NULL AND NEW.submitted_at IS NOT NULL THEN NEW.submitted_at:=clock_timestamp(); END IF;\n IF NEW.status IN ('APPROVED_BASIC','APPROVED_EXCLUSIVE','REJECTED','INFO_REQUESTED') THEN RAISE EXCEPTION 'resident_manager_decisions_unavailable'; END IF;\n IF TG_OP='UPDATE' THEN\n  IF OLD.user_id<>NEW.user_id OR OLD.bot_id<>NEW.bot_id OR OLD.bot_key<>NEW.bot_key OR OLD.channel_identity_id<>NEW.channel_identity_id OR OLD.created_at<>NEW.created_at OR OLD.policy_version<>NEW.policy_version OR OLD.education_requirement<>NEW.education_requirement OR OLD.telegram_user_id<>NEW.telegram_user_id OR OLD.chat_id<>NEW.chat_id OR NEW.revision<>OLD.revision+1 THEN RAISE EXCEPTION 'resident_revision_invalid'; END IF;\n  IF OLD.submitted_at IS NOT NULL AND (OLD.draft IS DISTINCT FROM NEW.draft OR OLD.submitted_draft IS DISTINCT FROM NEW.submitted_draft OR OLD.submitted_at IS DISTINCT FROM NEW.submitted_at OR OLD.status<>NEW.status OR OLD.progress<>NEW.progress) THEN RAISE EXCEPTION 'resident_submission_frozen'; END IF;\n END IF;\n IF NEW.submitted_at IS NOT NULL AND (NEW.draft<>NEW.submitted_draft OR NEW.status<>'UNDER_REVIEW' OR NEW.progress<>'AUTO_CHECK') THEN RAISE EXCEPTION 'resident_submission_invalid'; END IF;\n RETURN NEW;\nEND $function$\n"
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "consents",
+      "name": "resident_verification_consent_cleanup",
+      "definition": "CREATE TRIGGER resident_verification_consent_cleanup AFTER INSERT ON consents FOR EACH ROW WHEN (new.consent_type = 'client_messaging'::text AND (new.decision = ANY (ARRAY['denied'::text, 'revoked'::text]))) EXECUTE FUNCTION resident_verification_consent_cleanup()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_campaign_anchors",
+      "name": "resident_verification_anchor_guard",
+      "definition": "CREATE TRIGGER resident_verification_anchor_guard BEFORE INSERT ON expert_campaign_anchors FOR EACH ROW EXECUTE FUNCTION resident_verification_price_guard()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_campaign_quotes",
+      "name": "resident_verification_quote_guard",
+      "definition": "CREATE TRIGGER resident_verification_quote_guard BEFORE INSERT ON expert_campaign_quotes FOR EACH ROW EXECUTE FUNCTION resident_verification_price_guard()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "resident_verification_stage_projection",
+      "definition": "CREATE TRIGGER resident_verification_stage_projection AFTER INSERT OR DELETE OR UPDATE ON residents_applications FOR EACH ROW EXECUTE FUNCTION resident_verification_stage_projection()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "resident_verification_write_guard",
+      "definition": "CREATE TRIGGER resident_verification_write_guard BEFORE INSERT OR UPDATE ON residents_applications FOR EACH ROW EXECUTE FUNCTION resident_verification_write_guard()",
+      "enabled": "O"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "channel_identities",
+      "name": "channel_identity_resident_owner",
+      "kind": "u",
+      "definition": "UNIQUE (id, user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_u_application_id_revision_key",
+      "kind": "u",
+      "definition": "UNIQUE (application_id, revision)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_u_application_id_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (application_id, user_id) REFERENCES residents_applications(id, user_id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "application_id",
+        "user_id"
+      ],
+      "columns_to": [
+        "id",
+        "user_id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_updates_answers_check",
+      "kind": "c",
+      "definition": "CHECK (jsonb_typeof(answers) = 'object'::text AND octet_length(answers::text) <= 100000)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "jsonb_typeof(answers) = 'object'::text AND octet_length(answers::text) <= 100000"
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_updates_kind_check",
+      "kind": "c",
+      "definition": "CHECK (kind = ANY (ARRAY['patch'::text, 'submit'::text, 'followup'::text, 'question'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "kind = ANY (ARRAY['patch'::text, 'submit'::text, 'followup'::text, 'question'::text])"
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_updates_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_updates_revision_check",
+      "kind": "c",
+      "definition": "CHECK (revision > 0)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "revision > 0"
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_application_id_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (application_id, user_id) REFERENCES residents_applications(id, user_id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "application_id",
+        "user_id"
+      ],
+      "columns_to": [
+        "id",
+        "user_id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_education_result_check",
+      "kind": "c",
+      "definition": "CHECK (education_result = 'unknown'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "education_result = 'unknown'::text"
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (application_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_social_result_check",
+      "kind": "c",
+      "definition": "CHECK (social_result = 'pending'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "social_result = 'pending'::text"
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_status_check",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'cancelled'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['pending'::text, 'cancelled'::text])"
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_submitted_revision_check",
+      "kind": "c",
+      "definition": "CHECK (submitted_revision > 0)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "submitted_revision > 0"
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_upload_state_check",
+      "kind": "c",
+      "definition": "CHECK (upload_state = 'pending_upload'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "upload_state = 'pending_upload'::text"
+    },
+    {
+      "table_name": "resident_verification_cohorts",
+      "name": "resident_verification_cohorts_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_cohorts",
+      "name": "resident_verification_cohorts_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "user_id"
+      ],
+      "columns_to": [
+        "id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_request_erasure",
+      "kind": "c",
+      "definition": "CHECK (user_id IS NOT NULL AND request_digest ~ '^[0-9a-f]{64}$'::text AND request_digest IS NOT NULL AND result IS NOT NULL AND erased_at IS NULL OR user_id IS NULL AND request_digest IS NULL AND result IS NULL AND erased_at IS NOT NULL)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "user_id IS NOT NULL AND request_digest ~ '^[0-9a-f]{64}$'::text AND request_digest IS NOT NULL AND result IS NOT NULL AND erased_at IS NULL OR user_id IS NULL AND request_digest IS NULL AND result IS NULL AND erased_at IS NOT NULL"
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_operation_check",
+      "kind": "c",
+      "definition": "CHECK (operation = ANY (ARRAY['start'::text, 'patch'::text, 'submit'::text, 'followup'::text, 'question'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "operation = ANY (ARRAY['start'::text, 'patch'::text, 'submit'::text, 'followup'::text, 'question'::text])"
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (bot_id, bot_key, request_key)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_request_key_check",
+      "kind": "c",
+      "definition": "CHECK (length(request_key) >= 1 AND length(request_key) <= 200)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "length(request_key) >= 1 AND length(request_key) <= 200"
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "user_id"
+      ],
+      "columns_to": [
+        "id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "resident_verification_submission",
+      "kind": "c",
+      "definition": "CHECK (submitted_at IS NULL AND submitted_draft IS NULL AND status = 'PENDING_DOCS'::text AND progress = 'FORM_FILLING'::text OR submitted_at IS NOT NULL AND isfinite(submitted_at) AND submitted_draft IS NOT NULL AND resident_verification_draft_valid(submitted_draft, true, education_requirement) AND status <> 'PENDING_DOCS'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "submitted_at IS NULL AND submitted_draft IS NULL AND status = 'PENDING_DOCS'::text AND progress = 'FORM_FILLING'::text OR submitted_at IS NOT NULL AND isfinite(submitted_at) AND submitted_draft IS NOT NULL AND resident_verification_draft_valid(submitted_draft, true, education_requirement) AND status <> 'PENDING_DOCS'::text"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_bot_id_check",
+      "kind": "c",
+      "definition": "CHECK (bot_id ~ '^[1-9][0-9]{0,15}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "bot_id ~ '^[1-9][0-9]{0,15}$'::text"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_bot_key_check",
+      "kind": "c",
+      "definition": "CHECK (length(bot_key) >= 1 AND length(bot_key) <= 128)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "length(bot_key) >= 1 AND length(bot_key) <= 128"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_channel_identity_id_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (channel_identity_id, user_id) REFERENCES channel_identities(id, user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "channel_identity_id",
+        "user_id"
+      ],
+      "columns_to": [
+        "id",
+        "user_id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_check",
+      "kind": "c",
+      "definition": "CHECK (chat_id = telegram_user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "chat_id = telegram_user_id"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_current_field_check",
+      "kind": "c",
+      "definition": "CHECK (current_field = ANY (ARRAY['roles'::text, 'primaryRole'::text, 'category'::text, 'tax'::text, 'city'::text, 'socialLinks'::text, 'motivation'::text, 'specialization'::text, 'averageCheckMinor'::text, 'education'::text, 'propertyEvidence'::text, 'capacity'::text, 'amenities'::text, 'path'::text, 'cases'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "current_field = ANY (ARRAY['roles'::text, 'primaryRole'::text, 'category'::text, 'tax'::text, 'city'::text, 'socialLinks'::text, 'motivation'::text, 'specialization'::text, 'averageCheckMinor'::text, 'education'::text, 'propertyEvidence'::text, 'capacity'::text, 'amenities'::text, 'path'::text, 'cases'::text])"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_draft_check",
+      "kind": "c",
+      "definition": "CHECK (resident_verification_draft_valid(draft))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "resident_verification_draft_valid(draft)"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_education_requirement_check",
+      "kind": "c",
+      "definition": "CHECK (education_requirement = ANY (ARRAY['required'::text, 'optional'::text, 'unknown_manual_review'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "education_requirement = ANY (ARRAY['required'::text, 'optional'::text, 'unknown_manual_review'::text])"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_form_version_check",
+      "kind": "c",
+      "definition": "CHECK (form_version = 1)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "form_version = 1"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_id_user_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (id, user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_manager_notes_check",
+      "kind": "c",
+      "definition": "CHECK (manager_notes IS NULL)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "manager_notes IS NULL"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_policy_version_check",
+      "kind": "c",
+      "definition": "CHECK (policy_version ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "policy_version ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'::text"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_progress_check",
+      "kind": "c",
+      "definition": "CHECK (progress = ANY (ARRAY['NONE'::text, 'FORM_FILLING'::text, 'AUTO_CHECK'::text, 'MANAGER_REVIEW'::text, 'DONE'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "progress = ANY (ARRAY['NONE'::text, 'FORM_FILLING'::text, 'AUTO_CHECK'::text, 'MANAGER_REVIEW'::text, 'DONE'::text])"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_revision_check",
+      "kind": "c",
+      "definition": "CHECK (revision >= 0)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "revision >= 0"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_status_check",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['PENDING_DOCS'::text, 'UNDER_REVIEW'::text, 'INFO_REQUESTED'::text, 'APPROVED_BASIC'::text, 'APPROVED_EXCLUSIVE'::text, 'REJECTED'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['PENDING_DOCS'::text, 'UNDER_REVIEW'::text, 'INFO_REQUESTED'::text, 'APPROVED_BASIC'::text, 'APPROVED_EXCLUSIVE'::text, 'REJECTED'::text])"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_system_check_result_check",
+      "kind": "c",
+      "definition": "CHECK (system_check_result = '{\"social\": \"pending\", \"upload\": \"pending_upload\", \"education\": \"unknown\"}'::jsonb)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "system_check_result = '{\"social\": \"pending\", \"upload\": \"pending_upload\", \"education\": \"unknown\"}'::jsonb"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_telegram_user_id_check",
+      "kind": "c",
+      "definition": "CHECK (telegram_user_id ~ '^[1-9][0-9]{0,19}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "telegram_user_id ~ '^[1-9][0-9]{0,19}$'::text"
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": [
+        "user_id"
+      ],
+      "columns_to": [
+        "id"
+      ],
+      "expression": null
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_user_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "users",
+      "name": "users_current_verification_stage_check",
+      "kind": "c",
+      "definition": "CHECK (current_verification_stage = ANY (ARRAY['NONE'::text, 'FORM_FILLING'::text, 'AUTO_CHECK'::text, 'MANAGER_REVIEW'::text, 'DONE'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "current_verification_stage = ANY (ARRAY['NONE'::text, 'FORM_FILLING'::text, 'AUTO_CHECK'::text, 'MANAGER_REVIEW'::text, 'DONE'::text])"
+    }
+  ],
+  "indexes": [
+    {
+      "table_name": "channel_identities",
+      "name": "channel_identity_resident_owner",
+      "definition": "CREATE UNIQUE INDEX channel_identity_resident_owner ON public.channel_identities USING btree (id, user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_u_application_id_revision_key",
+      "definition": "CREATE UNIQUE INDEX resident_verification_application_u_application_id_revision_key ON public.resident_verification_application_updates USING btree (application_id, revision)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "int4_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_application_updates",
+      "name": "resident_verification_application_updates_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_verification_application_updates_pkey ON public.resident_verification_application_updates USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_check_work",
+      "name": "resident_verification_check_work_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_verification_check_work_pkey ON public.resident_verification_check_work USING btree (application_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_cohorts",
+      "name": "resident_verification_cohorts_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_verification_cohorts_pkey ON public.resident_verification_cohorts USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "resident_verification_requests",
+      "name": "resident_verification_requests_pkey",
+      "definition": "CREATE UNIQUE INDEX resident_verification_requests_pkey ON public.resident_verification_requests USING btree (bot_id, bot_key, request_key)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 3,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_application_role_status_idx",
+      "definition": "CREATE INDEX residents_application_role_status_idx ON public.residents_applications USING btree (role_type, status)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_application_telegram_idx",
+      "definition": "CREATE INDEX residents_application_telegram_idx ON public.residents_applications USING btree (bot_id, bot_key, telegram_user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 3,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_id_user_id_key",
+      "definition": "CREATE UNIQUE INDEX residents_applications_id_user_id_key ON public.residents_applications USING btree (id, user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_pkey",
+      "definition": "CREATE UNIQUE INDEX residents_applications_pkey ON public.residents_applications USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "residents_applications",
+      "name": "residents_applications_user_id_key",
+      "definition": "CREATE UNIQUE INDEX residents_applications_user_id_key ON public.residents_applications USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    }
+  ]
+}

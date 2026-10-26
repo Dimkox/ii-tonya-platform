@@ -1,3 +1,24 @@
+# Resident verification source ready for review — 2026-10-26
+
+Schema+Form Logic is implemented on codex/verification-schema-form-20261026 in
+the assigned isolated worktree. Default-off, private promo-bot/consent/owner-bound
+intake precedes pricing. All six role flows persist, with explicit primary role,
+conditional documents, durable edit cursor and pending checks. No manager outcome,
+OCR/social processing, document fetch, S3 upload, price/invoice or activation was
+implemented. Existing authoritative offers retain their original clocks.
+
+PostgreSQL17.5 focused acceptance15/15 PASS; metadata replay58migrations,
+174tables,8newfunctions/5triggers,42additiveconstraints/11indexes. Actual erasure,
+consent withdrawal and user-stage reset covered. Cohort survives PII deletion and
+UI disablement, maintaining the pricing fence. Relevant package builds/types,
+full tests typecheck, focused unit results and exact guards are evidenced in
+docs/test-evidence/verification-schema-form-implementation-2026-10-26.md.
+
+Root owns independent review, final full branch gate and authorized draft PR;
+these remain pending. No deployment, provider call or feature activation occurred.
+Do not repeat completed PG/files without a new defect. Owner task-wide routine
+approval/run-count opt-out persists; all failed logs remain retained.
+
 # Resident verification Schema+Form Logic starting — 2026-10-26
 
 Active branch codex/verification-schema-form-20261026 in this existing isolated

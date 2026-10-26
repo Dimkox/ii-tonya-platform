@@ -138,3 +138,202 @@ it("bounds authenticated promo requests before storage", async () => {
   expect(f.handle).toHaveBeenCalledTimes(30);
   await f.app.close();
 });
+it("accepts scoped form callbacks and private media with per-result markup", async () => {
+  const app = Fastify({ logger: false });
+  const seen: unknown[] = [];
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: "synthetic-secret",
+      verificationFormEnabled: true,
+      service: {
+        async handle(input) {
+          seen.push(input);
+          return {
+            status: "handled",
+            text: "Выберите роль",
+            replyMarkup: {
+              inline_keyboard: [[{ text: "EXPERT", callback_data: "rv:test" }]],
+            },
+          };
+        },
+      },
+    },
+  });
+  const post = (payload: Record<string, unknown>) =>
+    app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram/expert-promo/promo-key",
+      headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+      payload,
+    });
+  const r = await post({
+    update_id: 2,
+    callback_query: {
+      id: "query",
+      from: { id: 456 },
+      message: {
+        from: { id: 123, is_bot: true },
+        chat: { id: 456, type: "private" },
+      },
+      data: "rv:00000000-0000-4000-8000-000000000001:0:r:EXPERT",
+    },
+  });
+  expect(r.statusCode).toBe(200);
+  expect(r.json().reply_markup.inline_keyboard[0][0].text).toBe("EXPERT");
+  const media = await post({
+    update_id: 3,
+    message: {
+      from: { id: 456 },
+      chat: { id: 456, type: "private" },
+      document: {
+        file_id: "private-file",
+        mime_type: "application/pdf",
+        file_size: 100,
+      },
+    },
+  });
+  expect(media.statusCode).toBe(200);
+  expect(seen[1]).toMatchObject({
+    media: {
+      kind: "document",
+      fileId: "private-file",
+      mimeType: "application/pdf",
+      size: 100,
+    },
+  });
+  expect(
+    (
+      await post({
+        update_id: 4,
+        message: {
+          from: { id: 456 },
+          chat: { id: 456, type: "private" },
+          document: {
+            file_id: "private-file",
+            mime_type: "application/pdf",
+            file_size: 20971521,
+          },
+        },
+      })
+    ).statusCode,
+  ).toBe(400);
+  expect(
+    (
+      await post({
+        update_id: 5,
+        callback_query: {
+          id: "q",
+          from: { id: 789 },
+          message: {
+            from: { id: 123, is_bot: true },
+            chat: { id: 456, type: "private" },
+          },
+          data: "rv:test",
+        },
+      })
+    ).statusCode,
+  ).toBe(400);
+  await app.close();
+});
+it("preserves honest unknown media metadata when Telegram omits optional fields", async () => {
+  const app = Fastify({ logger: false });
+  const handle = vi.fn<
+    (input: unknown) => Promise<{ status: "handled"; text: string }>
+  >(async () => ({
+    status: "handled" as const,
+    text: "Документ сохранён для проверки",
+  }));
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: "synthetic-secret",
+      verificationFormEnabled: true,
+      service: { handle },
+    },
+  });
+  for (const [i, content] of [
+    { photo: [{ file_id: "private-photo", width: 100, height: 100 }] },
+    { document: { file_id: "private-doc" } },
+  ].entries()) {
+    const r = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram/expert-promo/promo-key",
+      headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+      payload: {
+        update_id: 100 + i,
+        message: {
+          from: { id: 456 },
+          chat: { id: 456, type: "private" },
+          ...content,
+        },
+      },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(handle.mock.calls[i]?.[0]).toMatchObject({
+      media: { size: null, mimeType: null },
+    });
+  }
+  await app.close();
+});
+it("acknowledges stale form controls without mutation or Telegram retries", async () => {
+  const { createResidentVerificationService } =
+    await import("../../../../packages/application/src/resident-verification-service.js");
+  let mutations = 0;
+  const form = createResidentVerificationService({
+    enabled: true,
+    repository: {
+      async mutate(input) {
+        if (input.action !== "start") mutations++;
+        return {
+          id: "00000000-0000-4000-8000-000000000001",
+          revision: 2,
+          draft: { roles: ["EXPERT"] },
+          status: "PENDING_DOCS",
+          progress: "FORM_FILLING",
+          replay: false,
+        };
+      },
+    },
+  });
+  const app = Fastify({ logger: false });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: "synthetic-secret",
+      verificationFormEnabled: true,
+      service: {
+        async handle(input) {
+          return (await form.handle(input)) ?? { status: "rejected" };
+        },
+      },
+    },
+  });
+  const r = await app.inject({
+    method: "POST",
+    url: "/v1/webhooks/telegram/expert-promo/promo-key",
+    headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+    payload: {
+      update_id: 777,
+      callback_query: {
+        id: "q",
+        from: { id: 456 },
+        message: {
+          from: { id: 123, is_bot: true },
+          chat: { id: 456, type: "private" },
+        },
+        data: "rv:00000000-0000-4000-8000-000000000001:0:r:CENTER",
+      },
+    },
+  });
+  expect(r.statusCode).toBe(200);
+  expect(r.json().text).toContain("основную роль");
+  expect(mutations).toBe(0);
+  await app.close();
+});

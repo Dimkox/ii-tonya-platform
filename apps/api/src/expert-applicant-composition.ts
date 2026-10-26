@@ -1,10 +1,14 @@
-import { createExpertApplicantService } from "@ii-tonya/application";
+import {
+  createResidentVerificationService,
+  createExpertApplicantService,
+} from "@ii-tonya/application";
 import {
   assertExpertApplicantConfig,
   type RuntimeConfig,
 } from "@ii-tonya/config";
 import {
   PostgresExpertPromoRepository,
+  PostgresResidentVerificationRepository,
   PostgresExpertPersonalOfferRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
@@ -18,6 +22,8 @@ export function assertExpertApplicantCapability(
   const scope = config.expertApplicant!;
   if (
     !capability ||
+    (config.features.expertVerificationForm === true &&
+      capability.verificationFormEnabled !== true) ||
     capability.botId !== scope.botId ||
     capability.botKey !== scope.botKey ||
     capability.webhookSecret !== scope.webhookSecret ||
@@ -33,11 +39,25 @@ export function createExpertApplicantComposition(
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
   return {
+    verificationFormEnabled: config.features.expertVerificationForm === true,
     botId: scope.botId,
     botKey: scope.botKey,
     webhookSecret: scope.webhookSecret,
     service: createExpertApplicantService({
       enabled: true,
+      ...(config.features.expertVerificationForm === true
+        ? {
+            verificationForm: createResidentVerificationService({
+              enabled: true,
+              repository: new PostgresResidentVerificationRepository(db, {
+                botId: scope.botId,
+                botKey: scope.botKey,
+                messagingConsentPolicyVersion:
+                  scope.messagingConsentPolicyVersion,
+              }),
+            }),
+          }
+        : {}),
       personalOffers: new PostgresExpertPersonalOfferRepository(db, {
         workBotId: config.expertCard?.workBotId ?? "unconfigured",
         workBotKey: config.expertCard?.workBotKey ?? "unconfigured",
@@ -48,6 +68,8 @@ export function createExpertApplicantComposition(
       }),
       repository: new PostgresExpertPromoRepository(db, {
         messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
+        verificationFormEnabled:
+          config.features.expertVerificationForm === true,
       }),
     }),
   };

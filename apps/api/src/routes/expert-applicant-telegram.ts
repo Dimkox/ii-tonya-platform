@@ -1,8 +1,10 @@
+import type { ResidentDocument } from "@ii-tonya/application";
 import { createWindowedRateLimiter } from "../rate-limit.js";
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyPluginAsync } from "fastify";
 import type { ExpertApplicantService } from "@ii-tonya/application";
 export interface ExpertApplicantTelegramCapability {
+  verificationFormEnabled?: boolean;
   botId: string;
   botKey: string;
   webhookSecret: string;
@@ -49,11 +51,18 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
     },
     async (req, reply) => {
       const body = req.body as Record<string, unknown> | null;
-      const message = body?.message as Record<string, unknown> | null;
-      const from = message?.from as Record<string, unknown> | null;
-      const chat = message?.chat as Record<string, unknown> | null;
+      const callback = body?.callback_query as
+        Record<string, unknown> | undefined;
+      const message = (callback?.message ?? body?.message) as
+        Record<string, unknown> | undefined;
+      const from = (callback?.from ?? message?.from) as
+        Record<string, unknown> | undefined;
+      const chat = message?.chat as Record<string, unknown> | undefined;
       const userId = identity(from?.id),
         chatId = identity(chat?.id);
+      let text = "";
+      let callbackData: string | undefined;
+      let media: ResidentDocument | undefined;
       if (
         !body ||
         !Number.isSafeInteger(body.update_id) ||
@@ -61,12 +70,101 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
         !userId ||
         userId !== chatId ||
         from?.is_bot === true ||
-        chat?.type !== "private" ||
-        typeof message?.text !== "string" ||
-        message.text.length > 256 ||
-        /[\u0000-\u001F\u007F-\u009F]/u.test(message.text)
+        (from?.is_bot !== undefined && typeof from.is_bot !== "boolean") ||
+        chat?.type !== "private"
       )
         return reply.code(400).send({ error: "invalid_update" });
+      if (callback) {
+        const origin = message?.from as Record<string, unknown> | undefined;
+        if (
+          !c.verificationFormEnabled ||
+          body.message !== undefined ||
+          typeof callback.id !== "string" ||
+          callback.id.length > 128 ||
+          origin?.is_bot !== true ||
+          identity(origin.id) !== c.botId ||
+          typeof callback.data !== "string" ||
+          Buffer.byteLength(callback.data) > 64 ||
+          !callback.data.startsWith("rv:")
+        )
+          return reply.code(400).send({ error: "invalid_update" });
+        callbackData = callback.data;
+      } else {
+        const kinds = [
+          message?.text !== undefined,
+          message?.photo !== undefined,
+          message?.document !== undefined,
+        ].filter(Boolean).length;
+        if (kinds !== 1)
+          return reply.code(400).send({ error: "invalid_update" });
+        if (message?.text !== undefined) {
+          if (
+            typeof message.text !== "string" ||
+            message.text.length < 1 ||
+            message.text.length > (c.verificationFormEnabled ? 3000 : 256) ||
+            /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(message.text) ||
+            (!c.verificationFormEnabled && /[\r\n\t]/u.test(message.text))
+          )
+            return reply.code(400).send({ error: "invalid_update" });
+          text = message.text;
+        } else {
+          if (!c.verificationFormEnabled)
+            return reply.code(400).send({ error: "invalid_update" });
+          const photo = message?.photo;
+          if (
+            photo !== undefined &&
+            (!Array.isArray(photo) ||
+              photo.length < 1 ||
+              photo.length > 10 ||
+              photo.some(
+                (p) =>
+                  !p ||
+                  typeof p !== "object" ||
+                  typeof p.file_id !== "string" ||
+                  !/^[A-Za-z0-9_-]{1,512}$/u.test(p.file_id),
+              ))
+          )
+            return reply.code(400).send({ error: "invalid_update" });
+          const file = (
+            photo !== undefined
+              ? (photo as Record<string, unknown>[]).at(-1)
+              : message?.document
+          ) as Record<string, unknown> | undefined;
+          const mimeType =
+            photo !== undefined ? null : (file?.mime_type ?? null);
+          if (
+            !file ||
+            typeof file.file_id !== "string" ||
+            !/^[A-Za-z0-9_-]{1,512}$/u.test(file.file_id) ||
+            (mimeType !== null &&
+              (typeof mimeType !== "string" ||
+                !["application/pdf", "image/jpeg", "image/png"].includes(
+                  mimeType,
+                ))) ||
+            (file.file_size !== undefined &&
+              (!Number.isSafeInteger(file.file_size) ||
+                Number(file.file_size) < 1 ||
+                Number(file.file_size) > 20971520)) ||
+            (message?.caption !== undefined &&
+              (typeof message.caption !== "string" ||
+                message.caption.length > 3000 ||
+                /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u.test(
+                  message.caption,
+                )))
+          )
+            return reply.code(400).send({ error: "invalid_update" });
+          media = {
+            kind: photo !== undefined ? "photo" : "document",
+            fileId: file.file_id,
+            mimeType,
+            size: file.file_size === undefined ? null : Number(file.file_size),
+            ...(typeof message?.caption === "string"
+              ? { caption: message.caption }
+              : {}),
+          };
+          text = typeof message?.caption === "string" ? message.caption : "";
+        }
+      }
       if (!limiter.consume(`promo:auth:${c.botId}:${userId}`, 30, 60_000))
         return reply.code(429).send({ error: "rate_limited" });
       try {
@@ -76,7 +174,9 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           telegramUserId: userId,
           chatId,
           updateId: body.update_id as number,
-          text: message.text,
+          text,
+          ...(callbackData === undefined ? {} : { callbackData }),
+          ...(media === undefined ? {} : { media }),
         });
         if (result.status === "duplicate")
           return { accepted: true, duplicate: true };
@@ -86,7 +186,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             chat_id: chatId,
             text: result.text,
             protect_content: true,
-            reply_markup: {
+            reply_markup: result.replyMarkup ?? {
               keyboard: [[{ text: "Мой актуальный тариф" }]],
               resize_keyboard: true,
             },

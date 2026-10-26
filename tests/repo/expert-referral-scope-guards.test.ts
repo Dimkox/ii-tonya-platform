@@ -46,6 +46,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0054_expert_card_publication.sql",
       "packages/db/migrations/0055_expert_residency_lifecycle.sql",
       "packages/db/migrations/0056_residency_offer_corrections.sql",
+      "packages/db/migrations/0057_resident_verification_form.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -152,6 +153,11 @@ describe("expert residency referral scope boundary", () => {
       "planerka_booking_operations",
       "planerka_legacy_booking_reviews",
       "planerka_service_mappings",
+      "resident_verification_application_updates",
+      "resident_verification_check_work",
+      "resident_verification_cohorts",
+      "resident_verification_requests",
+      "residents_applications",
       "selarti_actual_usage_facts",
       "selarti_budget_alerts",
       "selarti_budget_policies",
@@ -214,6 +220,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED",
       "EXPERT_TELEGRAM_QUERIES_ENABLED",
       "EXPERT_TELEGRAM_REFERRAL_ENABLED",
+      "EXPERT_VERIFICATION_FORM_ENABLED",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_ADMIN_ACTIONS].sort()).toEqual([
       "expert_referral.abuse_hold_close",

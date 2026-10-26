@@ -95,3 +95,5 @@ export type {
   RewardReversalInput,
   RewardStatus,
 } from "./expert-referral.js";
+
+export * from "./resident-verification-form.js";

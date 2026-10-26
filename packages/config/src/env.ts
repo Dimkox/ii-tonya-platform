@@ -464,6 +464,7 @@ export type RuntimeConfig = {
   features: {
     clientAccountQueries?: boolean;
     expertApplicant?: boolean;
+    expertVerificationForm?: boolean;
     expertVerification?: boolean;
     expertCard?: boolean;
     expertCardMaterialDelivery?: boolean;
@@ -683,6 +684,13 @@ function readBookingCallbacks(
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
   const expertApplicant = readExpertApplicantConfig(source);
+  const verificationFormFlag =
+    source.EXPERT_VERIFICATION_FORM_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(verificationFormFlag) ||
+    (verificationFormFlag === "true" && !expertApplicant)
+  )
+    throw new Error("resident_verification_configuration_required");
   const expertVerification = readExpertVerificationConfig(source);
   const clientAccountQueries = readClientAccountQueriesConfig(source);
   const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
@@ -883,6 +891,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     features: {
       ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
       ...(expertApplicant ? { expertApplicant: true } : {}),
+      ...(verificationFormFlag === "true"
+        ? { expertVerificationForm: true }
+        : {}),
       ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
       ...(expertResidencyLifecycle?.enabled
         ? { expertResidencyLifecycle: true }

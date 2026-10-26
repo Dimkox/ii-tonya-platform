@@ -28,9 +28,9 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 
 **Interfaces:** A versioned draft plus trusted field-policy input yields visible/required fields, validation errors and next question. Mutations accept only bounded applicant fields, never status/checks/prices. Use bigint/string money and typed private document references.
 
-- [ ] RED tests for all six roles, union rules, primary membership, tax for all, unknown/required/optional education policy, role changes and incomplete submission.
-- [ ] Implement deterministic validation and question generation; preserve raw answers while ignoring inapplicable fields for requirements.
-- [ ] GREEN tests; domain build before importer tests; commit.
+- [x] RED tests for all six roles, union rules, primary membership, tax for all, unknown/required/optional education policy, role changes and incomplete submission.
+- [x] Implement deterministic validation and question generation; preserve raw answers while ignoring inapplicable fields for requirements.
+- [x] GREEN tests; domain build before importer tests; commit.
 
 ### Task2: Owned persistence and privacy
 
@@ -38,9 +38,9 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 
 **Interfaces:** Private promo scope plus request key/digest and expected revision starts, reads, patches and submits an owned application. A complete submission atomically records revision/update and pending check work, not a verified outcome. Progress is derived/updated transactionally. Existing user identity/tombstone authority remains canonical.
 
-- [ ] RED ownership, consent, replay/conflict, stale/concurrent submit, SQL NULL/role/tax checks, pending-results and actual-erasure cases.
-- [ ] Implement partial-draft schema and submit guards, composite ownership, private refs, bounded content and cancellation. Trusted outcome/status fields have no applicant patch path.
-- [ ] GREEN serialized PostgreSQL cases. Preserve historical migrations. Reconstruct supported snapshot57 and exact SQL supplement using a fresh temporary introspection directory.
+- [x] RED ownership, consent, replay/conflict, stale/concurrent submit, SQL NULL/role/tax checks, pending-results and actual-erasure cases.
+- [x] Implement partial-draft schema and submit guards, composite ownership, private refs, bounded content and cancellation. Trusted outcome/status fields have no applicant patch path.
+- [x] GREEN serialized PostgreSQL cases. Preserve historical migrations. Reconstruct supported snapshot57 and exact SQL supplement using a fresh temporary introspection directory.
 - [ ] Review migration/privacy and commit.
 
 ### Task3: Real Telegram form and pre-price fence
@@ -49,14 +49,18 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 
 **Interfaces:** Authenticated private updates normalize into bounded text/media or scoped revision-bound callback actions. Replies carry explicit inline/reply markup. New-cohort enrollment enters the form; the owner can resume it. Submission acknowledges receipt and pending checks only. Legacy authoritative offers/settlements select the existing flow without timer reset.
 
-- [ ] RED real-ingress callbacks/photos/files/text, role/category menus, consent-first start/resume, forged/stale/cross-owner actions and repeated updates.
-- [ ] RED direct `/tariff`, `/apply`, tariff listing/current-offer reads before new approval, with no anchor/invoice; preserve legacy equivalents.
-- [ ] Implement default-off real composition and repository-level fences. Keep document upload/OCR/social/LLM adapters as explicit unavailable contracts; no fabricated processing.
+- [x] RED real-ingress callbacks/photos/files/text, role/category menus, consent-first start/resume, forged/stale/cross-owner actions and repeated updates.
+- [x] RED direct `/tariff`, `/apply`, tariff listing/current-offer reads before new approval, with no anchor/invoice; preserve legacy equivalents.
+- [x] Implement default-off real composition and repository-level fences. Keep document upload/OCR/social/LLM adapters as explicit unavailable contracts; no fabricated processing.
 - [ ] GREEN focused tests and relevant build/type/lint; independent adversarial review and fix findings.
 
 ### Task4: Reviewable delivery
 
-- [ ] Stage all new files before exact scope/inventory checks. Register only reviewed migration/schema/table/route/flag changes with negative probes and provenance.
-- [ ] Run focused acceptance, package/test types, formatting/lint/diff; record genuine staging limitation rather than claiming live evidence.
+- [x] Stage all new files before exact scope/inventory checks. Register only reviewed migration/schema/table/route/flag changes with negative probes and provenance.
+- [x] Run focused acceptance, package/test types, formatting/lint/diff; record genuine staging limitation rather than claiming live evidence.
 - [ ] Commit clean source and run final branch gate once, preserving detailed logs. Diagnose new failures, do not blindly repeat.
 - [ ] Push this branch and create a draft PR against codex/phase1-owner-plan-20261023 so only the new increment appears. No merge/deploy/provider activation.
+
+## Local implementation checkpoint
+
+Tasks1–3 source is consolidated in one coherent review checkpoint. PostgreSQL acceptance15/15, focused unit coverage79 cases across final file results, relevant builds/types/lint and exact guard checks are recorded in `docs/test-evidence/verification-schema-form-implementation-2026-10-26.md`. Root owns independent whole-branch review, the final branch gate and push/draft PR; no source task is declared release-complete.

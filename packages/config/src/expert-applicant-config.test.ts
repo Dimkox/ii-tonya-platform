@@ -93,3 +93,16 @@ it("accepts an optional dedicated promo delivery token only for its exact config
     }),
   ).toThrow("expert_applicant_configuration_required");
 });
+it("keeps verification form default-off and requires dedicated applicant configuration", () => {
+  expect(loadEnv(enabled).features.expertVerificationForm).not.toBe(true);
+  expect(
+    loadEnv({ ...enabled, EXPERT_VERIFICATION_FORM_ENABLED: "true" }).features
+      .expertVerificationForm,
+  ).toBe(true);
+  expect(() =>
+    loadEnv({ ...base, EXPERT_VERIFICATION_FORM_ENABLED: "true" }),
+  ).toThrow("resident_verification_configuration_required");
+  expect(() =>
+    loadEnv({ ...enabled, EXPERT_VERIFICATION_FORM_ENABLED: "1" }),
+  ).toThrow("resident_verification_configuration_required");
+});

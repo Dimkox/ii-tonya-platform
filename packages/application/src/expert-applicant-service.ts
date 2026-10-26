@@ -1,3 +1,5 @@
+import type { ResidentDocument } from "@ii-tonya/domain";
+import type { ResidentFormInput } from "./resident-verification-service.js";
 import {
   renderPersonalOffer,
   type PersonalOfferView,
@@ -76,7 +78,13 @@ export interface ExpertApplicantRepository {
   }>;
 }
 export type ExpertApplicantReply =
-  | { status: "handled"; text: string }
+  | {
+      status: "handled";
+      text: string;
+      replyMarkup?:
+        | { inline_keyboard: { text: string; callback_data: string }[][] }
+        | { remove_keyboard: true };
+    }
   | {
       status:
         "disabled" | "unavailable" | "rejected" | "unhandled" | "duplicate";
@@ -88,6 +96,9 @@ const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
 const apply = new RegExp(`^/apply (${uuid})$`, "u");
 export function createExpertApplicantService(deps: {
   enabled: boolean;
+  verificationForm?: {
+    handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
+  };
   repository: ExpertApplicantRepository;
   personalOffers?: {
     readPromoIdentity(
@@ -97,7 +108,12 @@ export function createExpertApplicantService(deps: {
 }) {
   return {
     async handle(
-      input: ExpertApplicantScope & { updateId: number; text: string },
+      input: ExpertApplicantScope & {
+        updateId: number;
+        text: string;
+        callbackData?: string;
+        media?: ResidentDocument;
+      },
     ): Promise<ExpertApplicantReply> {
       if (!deps.enabled) return { status: "disabled" };
       if (
@@ -109,7 +125,7 @@ export function createExpertApplicantService(deps: {
         input.chatId !== input.telegramUserId ||
         !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(input.botKey) ||
         typeof input.text !== "string" ||
-        input.text.length > 256
+        input.text.length > (deps.verificationForm ? 3000 : 256)
       )
         return { status: "rejected" };
       const { botId, botKey, telegramUserId, chatId, updateId } = input;
@@ -121,6 +137,13 @@ export function createExpertApplicantService(deps: {
         requestDigest: digest,
       });
       try {
+        if (
+          deps.verificationForm &&
+          !/^\/(?:start|consent)(?: |$)/u.test(input.text)
+        ) {
+          const form = await deps.verificationForm.handle(input);
+          if (form) return form;
+        }
         if (
           input.text === "Мой актуальный тариф" ||
           input.text === "/my_tariff"
@@ -175,6 +198,10 @@ export function createExpertApplicantService(deps: {
             ...command(),
             ...(start[1] ? { refCode: start[1] } : {}),
           });
+          if (deps.verificationForm) {
+            const form = await deps.verificationForm.handle(input);
+            if (form) return form;
+          }
           if (result.replay) return { status: "duplicate" };
           const guide =
             result.guideStatus === "waiting_content"

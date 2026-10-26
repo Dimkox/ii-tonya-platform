@@ -1,0 +1,238 @@
+import { createHash } from "node:crypto";
+import { sql } from "drizzle-orm";
+import {
+  applyResidentPatch,
+  residentForm,
+  residentPolicy,
+  type ResidentPolicy,
+  type ResidentField,
+  type ResidentDraft,
+} from "@ii-tonya/domain";
+import type { DrizzleDb } from "../client.js";
+import {
+  lockClientConsentSubject,
+  captureClientConsentAuthority,
+} from "./client-consent-authority.js";
+import type { ExpertPromoCommand } from "./expert-promo-repository.js";
+export interface ResidentSnapshot extends Record<string, unknown> {
+  currentField?: ResidentField | null;
+  policyVersion?: string;
+  educationRequirement?: string;
+  id: string;
+  revision: number;
+  draft: ResidentDraft;
+  status: string;
+  progress: string;
+  replay: boolean;
+}
+export type ResidentMutation = ExpertPromoCommand & {
+  action: "start" | "patch" | "submit" | "followup" | "question";
+  expectedRevision?: number;
+  applicationId?: string;
+  patch?: unknown;
+  answer?: string;
+  field?: ResidentField;
+};
+function fail(code: string): never {
+  throw new Error(code);
+}
+export class PostgresResidentVerificationRepository {
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly policy: {
+      botId: string;
+      botKey: string;
+      messagingConsentPolicyVersion: string;
+      fieldPolicy?: ResidentPolicy;
+    },
+  ) {}
+  async mutate(raw: ResidentMutation): Promise<ResidentSnapshot> {
+    const input = {
+      ...raw,
+      ...(raw.patch === undefined ? {} : { patch: structuredClone(raw.patch) }),
+    };
+    if (
+      input.botId !== this.policy.botId ||
+      input.botKey !== this.policy.botKey ||
+      !/^[1-9][0-9]{0,19}$/u.test(input.telegramUserId) ||
+      input.chatId !== input.telegramUserId
+    )
+      fail("resident_identity_unavailable");
+    if (
+      !/^[\x21-\x7e]{1,200}$/u.test(input.requestKey) ||
+      !/^[0-9a-f]{64}$/u.test(input.requestDigest) ||
+      !["start", "patch", "submit", "followup", "question"].includes(
+        input.action,
+      )
+    )
+      fail("resident_invalid_request");
+    if (input.patch !== undefined) applyResidentPatch({}, input.patch);
+    if (
+      input.field !== undefined &&
+      ![
+        "roles",
+        "primaryRole",
+        "category",
+        "tax",
+        "city",
+        "socialLinks",
+        "motivation",
+        "specialization",
+        "averageCheckMinor",
+        "education",
+        "propertyEvidence",
+        "capacity",
+        "amenities",
+        "path",
+        "cases",
+      ].includes(input.field)
+    )
+      fail("resident_invalid_field");
+    if (
+      input.action !== "start" &&
+      (!Number.isSafeInteger(input.expectedRevision) ||
+        input.expectedRevision! < 0)
+    )
+      fail("resident_invalid_revision");
+    if (
+      input.applicationId !== undefined &&
+      !/^[0-9a-f-]{36}$/u.test(input.applicationId)
+    )
+      fail("resident_invalid_request");
+    if (
+      input.action === "followup" &&
+      (typeof input.answer !== "string" ||
+        input.answer.trim().length < 1 ||
+        input.answer.length > 3000)
+    )
+      fail("resident_invalid_answer");
+    const fingerprint = createHash("sha256")
+      .update(
+        JSON.stringify({
+          digest: input.requestDigest,
+          action: input.action,
+          expectedRevision: input.expectedRevision,
+          applicationId: input.applicationId,
+          patch: input.patch,
+          answer: input.answer,
+          field: input.field,
+        }),
+      )
+      .digest("hex");
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='4000ms'`);
+      await tx.execute(sql`set local lock_timeout='2000ms'`);
+      const rows = (
+        await tx.execute<{ userId: string; identityId: string }>(
+          sql`select ci.id as "identityId",ci.user_id as "userId" from channel_identities ci join users u on u.id=ci.user_id and u.active where ci.provider='telegram' and ci.bot_key=${input.botKey} and ci.external_id=${input.telegramUserId} and ci.external_chat_id=${input.chatId} and ci.status='active' limit 2`,
+        )
+      ).rows;
+      if (rows.length !== 1) return fail("resident_identity_unavailable");
+      const userId = rows[0]!.userId;
+      await lockClientConsentSubject(tx, userId);
+      if (
+        !(await captureClientConsentAuthority(tx, {
+          subjectId: userId,
+          botKey: input.botKey,
+          chatId: input.chatId,
+          externalUserId: input.telegramUserId,
+          messagingPolicyVersion: this.policy.messagingConsentPolicyVersion,
+        }))
+      )
+        fail("resident_identity_unavailable");
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`resident-request:${input.botId}:${input.botKey}:${input.requestKey}`},0))`,
+      );
+      const prior = (
+        await tx.execute<{
+          userId: string | null;
+          digest: string | null;
+          operation: string;
+          result: ResidentSnapshot | null;
+        }>(
+          sql`select user_id as "userId",request_digest as digest,operation,result from resident_verification_requests where bot_id=${input.botId} and bot_key=${input.botKey} and request_key=${input.requestKey}`,
+        )
+      ).rows[0];
+      if (prior) {
+        if (
+          prior.userId !== userId ||
+          prior.digest !== fingerprint ||
+          prior.operation !== input.action ||
+          !prior.result
+        )
+          fail("resident_idempotency_conflict");
+        return { ...prior.result!, replay: true };
+      }
+      let row = (
+        await tx.execute<ResidentSnapshot>(
+          sql`select id,revision,draft,status,progress,current_field as "currentField",policy_version as "policyVersion",education_requirement as "educationRequirement" from residents_applications where user_id=${userId}::uuid and bot_id=${input.botId} and bot_key=${input.botKey} for update`,
+        )
+      ).rows[0];
+      if (!row && input.action === "start") {
+        // Legacy authoritative offers are never moved into the new intake cohort.
+        const legacy = (
+          await tx.execute<{ yes: boolean }>(
+            sql`select exists(select 1 from expert_campaign_quotes where user_id=${userId}::uuid) or exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled') as yes`,
+          )
+        ).rows[0]?.yes;
+        if (legacy) fail("resident_legacy_flow");
+        row = (
+          await tx.execute<ResidentSnapshot>(
+            sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id,policy_version,education_requirement) values(${userId}::uuid,${input.botId},${input.botKey},${rows[0]!.identityId}::uuid,${input.telegramUserId},${input.chatId},${(this.policy.fieldPolicy ?? residentPolicy).version},${(this.policy.fieldPolicy ?? residentPolicy).education}) returning id,revision,draft,status,progress,current_field as "currentField",policy_version as "policyVersion",education_requirement as "educationRequirement"`,
+          )
+        ).rows[0];
+      }
+      if (
+        !row ||
+        (input.applicationId !== undefined && row.id !== input.applicationId)
+      )
+        return fail("resident_application_unavailable");
+      if (input.action !== "start") {
+        if (
+          row.policyVersion !==
+            (this.policy.fieldPolicy ?? residentPolicy).version ||
+          row.educationRequirement !==
+            (this.policy.fieldPolicy ?? residentPolicy).education
+        )
+          fail("resident_policy_conflict");
+        if (row.revision !== input.expectedRevision)
+          fail("resident_revision_conflict");
+        if (input.action === "followup") {
+          // Supplemental applicant answers never mutate the frozen submitted facts or outcomes.
+          if (!["INFO_REQUESTED", "UNDER_REVIEW"].includes(row.status))
+            fail("resident_followup_unavailable");
+        } else if (row.status !== "PENDING_DOCS")
+          fail("resident_submission_frozen");
+        const draft =
+          input.action === "patch"
+            ? applyResidentPatch(row.draft, input.patch)
+            : row.draft;
+        if (
+          input.action === "submit" &&
+          residentForm(draft, this.policy.fieldPolicy ?? residentPolicy).missing
+            .length
+        )
+          fail("resident_incomplete");
+        const submitting = input.action === "submit";
+        const updated = (
+          await tx.execute<ResidentSnapshot>(
+            sql`update residents_applications set draft=${JSON.stringify(draft)}::jsonb,current_field=${input.field ?? null},revision=revision+1,status=${submitting ? "UNDER_REVIEW" : row.status},progress=${submitting ? "AUTO_CHECK" : row.progress},submitted_draft=${submitting ? sql`${JSON.stringify(draft)}::jsonb` : sql`submitted_draft`},submitted_at=${submitting ? sql`clock_timestamp()` : sql`submitted_at`},updated_at=clock_timestamp() where id=${row.id}::uuid returning id,revision,draft,status,progress,current_field as "currentField",policy_version as "policyVersion",education_requirement as "educationRequirement"`,
+          )
+        ).rows[0]!;
+        await tx.execute(
+          sql`insert into resident_verification_application_updates(application_id,user_id,revision,kind,answers) values(${row.id}::uuid,${userId}::uuid,${updated.revision},${input.action},${JSON.stringify(input.action === "patch" ? input.patch : input.action === "followup" ? { answer: input.answer } : input.action === "question" ? { field: input.field } : {})}::jsonb)`,
+        );
+        if (submitting)
+          await tx.execute(
+            sql`insert into resident_verification_check_work(application_id,user_id,submitted_revision) values(${row.id}::uuid,${userId}::uuid,${updated.revision}) on conflict(application_id) do nothing`,
+          );
+        row = updated;
+      }
+      const result = { ...row, replay: false };
+      await tx.execute(
+        sql`insert into resident_verification_requests(bot_id,bot_key,request_key,user_id,request_digest,operation,result) values(${input.botId},${input.botKey},${input.requestKey},${userId}::uuid,${fingerprint},${input.action},${JSON.stringify(result)}::jsonb)`,
+      );
+      return result;
+    });
+  }
+}

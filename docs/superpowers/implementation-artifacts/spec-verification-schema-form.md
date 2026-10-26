@@ -92,10 +92,10 @@ button/event consumer belong to the following increment. No financial-table rewr
 
 **Execution:**
 
-- [ ] Add `packages/domain/src/resident-verification-form.ts` and tests: pure versioned fields, union validation, bounded patches and next-question logic; export without new dependencies.
-- [ ] Add migration0057, schema/repository `resident-verification`, updates/progress/check-work/idempotency storage; SQL ownership/submit constraints, real privacy cleanup and focused PostgreSQL tests.
-- [ ] Add application form service/tests; extend actual promo ingress/composition/config and test inline controls, media, resume and all matrix denials.
-- [ ] Guard new-cohort pricing at repository/read boundaries; preserve prior offers/paid users. No approval/payment implementation.
+- [x] Add `packages/domain/src/resident-verification-form.ts` and tests: pure versioned fields, union validation, bounded patches and next-question logic; export without new dependencies.
+- [x] Add migration0057, schema/repository `resident-verification`, updates/progress/check-work/idempotency storage; SQL ownership/submit constraints, real privacy cleanup and focused PostgreSQL tests.
+- [x] Add application form service/tests; extend actual promo ingress/composition/config and test inline controls, media, resume and all matrix denials.
+- [x] Guard new-cohort pricing at repository/read boundaries; preserve prior offers/paid users. No approval/payment implementation.
 - [ ] Reconstruct additive metadata, register exact guards with negative probes, run builds/types/lint/focused tests and independent review; record evidence and create a draft PR based on codex/phase1-owner-plan-20261023.
 
 **Acceptance Criteria:**
@@ -131,3 +131,7 @@ files before tracked-source guard checks. One final full branch gate, with suppo
 Vitest worker limits1; do not weaken deadlines or repeat unchanged suites. Existing
 task-wide owner opt-out covers routine approvals/focused count limits. No live
 staging acceptance is claimed; deliver Schema+Form Logic as a draft PR.
+
+## Implementation Checkpoint — 2026-10-26
+
+Source implemented and locally verified; final independent review, branch gate and draft PR remain coordinator-owned. Schema uses `residents_applications` with generated owner-schema projections and a canonical channel-identity FK; physical mapping and exact guard inventory: `docs/spec/verification-schema-form-guard-registration.md`. Focused acceptance and retained failures: `docs/test-evidence/verification-schema-form-implementation-2026-10-26.md`. No live acceptance or provider activation is claimed.
