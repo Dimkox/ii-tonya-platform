@@ -135,3 +135,17 @@ Shared pre-push hook is installed. Hosted CI does not exist by repository policy
 local acceptance does not authorize provider activation, deployment or release.
 Story key is unset, so sprint synchronization is inapplicable. VS Code CLI is
 unavailable; the spec's Suggested Review Order is the review navigation artifact.
+
+## First mandatory push gate
+
+Push at `fb6b78abc48798ce3379e3d09370308a2b934576` was refused, not bypassed.
+Repository checks passed566/567. The existing native-cutover recovery drill's
+health-failure case stopped after15.882s without its final recovery confirmation;
+its subprocess has a15s harness timeout. Retained isolated artifacts show the old
+release selected, but no completed recovery marker cleanup. This is consistent
+with harness termination; the retained output does not independently expose the
+spawn error, so that cause is not certified. No product/source changed after the
+previous full567/567 gate. A focused unchanged rerun of that exact case passed in
+3.463s (1passed,32filtered), including actual recovery verification. The failure
+and focused output are retained losslessly. No timeout, assertion, test or hook
+was weakened. A subsequent mandatory push gate is required, not assumed green.
