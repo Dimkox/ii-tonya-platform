@@ -1,10 +1,48 @@
 # Final Residency Phase1 Package Execution Plan
 
+## Latest owner correction — 2026-10-26 (takes precedence)
+
+Two later approved sources are archived as `sales-technical-final-correction.txt`
+and `phase1-final-comprehensive.txt`, with original and normalized hashes. Their
+explicit latest order supersedes conflicting earlier rows below. Preserve prior
+contracts/history as historical evidence; do not silently erase the conflict.
+
+- Finish the active stabilization acceptance; do not discard passing source.
+- **Next product block: separated sales, highest priority.** Base-only offer first,
+  explicit positive response before separate promotion message; first shown time
+  immutable. Verification follows tariff selection. Manager approval now issues
+  the fixed3000 onboarding invoice, superseding pre-price/no-auto-invoice rules.
+- Keep selected terms provisional until genuine fee capture; only the authoritative
+  successful onboarding settlement writes immutable `final_locked_price`. Preserve
+  selected1/3month totals, monthly/package floor and lifetime locked renewal terms.
+  Unpaid offers roll windows0–3/4–6/7–9/10+ full days, invalidate stale links and
+  regenerate fixed-fee links bound to updated selected main-price terms. After
+  day10 standard base locks, no manual repricing except authorized referral bonus.
+- **Urgent read-only website audit runs now:** source location, live origin/main,
+  actual production web release and last available deploy evidence. Audit does not
+  authorize switching releases, changing configuration or enabling providers.
+- Then complete safety, final role-aware verification/templates and rich onboarding
+  in dependency order, followed by local tag optimizer and dynamic service slots.
+  Safety remains required before enabling newly collected/published content.
+- New recommendation limit is top15, exact/synonym weight100, local semantic50
+  above0.85 cosine, cached local embeddings and no paid runtime LLM call. Existing
+  confirmed selection limit20 remains distinct. Measure warm generation<500ms.
+- Phase1 online rooms require a static URL; dynamic per-slot/Zoom/GCal remain
+  deferred. Profile-specific materials follow manager card approval in the latest
+  final flow; earlier parallel automatic release must be revised accordingly.
+- Dynamic slots use each service duration plus buffer, bounded workday/breaks and
+  conflict-safe CSV/text import; no overwriting booked slots or competing ledger.
+- Manager Kanban frontend is Phase2 after backend stability; client web cabinet,
+  advanced BI and deferred external calendar integrations remain excluded.
+
+The sections below retain the earlier package decomposition for traceability.
+Where they conflict with this addendum, this addendum controls. Root will write
+bounded new sales/other contracts against the accepted stabilization source.
+
 ## Owner sources and precedence
 
-All seven supplied documents are preserved verbatim under
-`docs/source/residency-phase1-owner-2026-10-26/`; `manifest.json` records their exact
-byte hashes. `verification-final.txt` supersedes `verification-protocol-prior.txt`.
+All seven supplied documents are preserved with CRLF and trailing whitespace normalized under
+`docs/source/residency-phase1-owner-2026-10-26/`; `manifest.json` records original attachment hashes and normalized file hashes. `verification-final.txt` supersedes `verification-protocol-prior.txt`.
 The owner explicitly ordered stabilization before the other modules and requested
 a first PR prefixed `[STABILIZATION]`. Execute this sequence without routine
 approval pauses; the previously authorized autonomy and focused-run override stay

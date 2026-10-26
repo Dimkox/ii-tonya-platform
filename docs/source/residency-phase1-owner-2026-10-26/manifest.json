@@ -4,6 +4,11 @@
   "precedence": {
     "verification-final": {
       "supersedes": ["verification-protocol-prior"]
+    },
+    "phase1-final-comprehensive": {
+      "supersedes_conflicting_prior_phase1_flow": true,
+      "received_after": "verification-final",
+      "details": "Sales before verification; approval issues fixed onboarding invoice; fee settlement locks selected main price; static online room only; local top15 tag recommendations."
     }
   },
   "sources": [
@@ -62,6 +67,22 @@
       "original_bytes": 12582,
       "sha256": "612b0cdc3cc8095bcc79c97195bdc60e60cb3cc940b1a5826a20ab942ee45927",
       "bytes": 12445
+    },
+    {
+      "module": "sales-technical-final-correction",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/sales-technical-final-correction.txt",
+      "original_sha256": "33da487722bbdce1ee91b2e9008649b956fc6f4b65b9c0019909464b49d7f866",
+      "original_bytes": 15716,
+      "sha256": "8f8d06a83ed1afe0caf6d2baf783a0e9d9b2fcdb10d4df8d385da3d6a9cee28a",
+      "bytes": 15530
+    },
+    {
+      "module": "phase1-final-comprehensive",
+      "path": "docs/source/residency-phase1-owner-2026-10-26/phase1-final-comprehensive.txt",
+      "original_sha256": "b58c4de802a821a0e92e413aaa68bc13cd03dccd7df37ad6462c51ec1f50709d",
+      "original_bytes": 32874,
+      "sha256": "afb01eb74846a84779cd2d3cafadbb0690ea90cc5a15639c4e82f762bbdb2a24",
+      "bytes": 32572
     }
   ],
   "normalization": "UTF-8; CRLF to LF; trailing line whitespace removed. Original attachment SHA256 and byte length retained separately; wording unchanged."
