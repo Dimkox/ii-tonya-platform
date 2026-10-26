@@ -294,6 +294,15 @@ def _cap_entries(entries: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]
     return dict(ordered)
 
 
+def _source_sha256(module: Any, filename: str) -> str:
+    """Digest of a hook source; one inside the engine archive (getzilla.zip) is read through its import loader."""
+    try:
+        data = Path(filename).read_bytes()
+    except OSError:
+        data = module.__loader__.get_data(filename)
+    return hashlib.sha256(data).hexdigest()
+
+
 def _record_denial(
     root: Path,
     session: str,
@@ -318,10 +327,10 @@ def _record_denial(
     )
     path = runtime_dir(root) / 'tool-denials.json'
     command = input_data.get('command')
-    source_paths = {
-        'hook': Path(__file__).resolve(),
-        'root_parser': Path(root_context.__code__.co_filename).resolve(),
-        'policy_parser': Path(_policy_legacy.__file__).resolve(),
+    sources = {
+        'hook': (sys.modules.get(__name__), __file__),
+        'root_parser': (sys.modules.get(root_context.__module__), root_context.__code__.co_filename),
+        'policy_parser': (_policy_legacy, _policy_legacy.__file__),
     }
     evidence = {
         'session_cwd': context.session_cwd,
@@ -335,8 +344,8 @@ def _record_denial(
             key for key, value in context.command_workdirs.items() if value == '<ambiguous>'
         ),
         'hook_implementation': {
-            name: {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
-            for name, path in source_paths.items()
+            name: {'path': str(Path(filename).resolve()), 'sha256': _source_sha256(module, filename)}
+            for name, (module, filename) in sources.items()
         },
         'effective_root': str(context.effective_root) if context.effective_root else None,
         'resolution_status': context.resolution_status,
