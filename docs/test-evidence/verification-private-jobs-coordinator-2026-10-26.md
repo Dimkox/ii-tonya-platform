@@ -254,3 +254,13 @@ registrations/placeholder markers are corrected without relaxing policy. New gua
 RED8/3 is retained; first affected run150/152 exposed lowercase Dockerfile key,
 corrected then affected141/141 passed. Separate evidence preserves every failure.
 A bounded independent guard review and new canonical gate follow the changed files.
+
+## Final canonical gate passed
+
+At2d943517dd27fcb951c82a3df0a7cc15fbf4c038, the canonical full gate exits0:
+605/605 repository tests, tests typecheck, changed lint, formatting, whitespace,
+evidence integrity and script syntax. Its two logs are hashed under
+verification-private-jobs-final-gate-2026-10-26. The separate gap reviewer accepted
+the guard/example correction and verified all6 correction archives. Spec is done
+for development. No code CLI is available; Suggested Review Order links are saved.
+Root next pushes through the mandatory hook; no bypass or production activation.

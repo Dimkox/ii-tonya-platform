@@ -2,7 +2,7 @@
 title: Private verification documents and bounded evidence jobs
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: f11d5d906acf6e1983fe36739981e31a847207ce
 review_loop_iteration: 1
 context:
@@ -148,7 +148,7 @@ terminal recovery and per-subject expiry isolation. No submitted snapshot mutati
 - [x] Existing applicant/manager/worker composition consumes these capabilities;
       all external activation ceilings remain off. Document recovery and deployment
       prerequisites without calling capabilities-only scaffolding complete.
-- [ ] Execute every matrix row with real transports/local fixtures, PostgreSQL,
+- [x] Execute every matrix row with real transports/local fixtures, PostgreSQL,
       actual owner/manager routes and isolated parser witnesses; independent review
       and canonical gate before delivery.
 
@@ -282,3 +282,14 @@ complete merely because a default-off capability returns unavailable.
 
 - Map all eight corrections to executed evidence and preserved failures.
   [verification-private-jobs-remediation-2026-10-26.md:1](../../test-evidence/verification-private-jobs-remediation-2026-10-26.md#L1)
+
+## Development acceptance
+
+Runtime b360ac466a5cfb0472b05ae3988931a4be0db405 independently closesR1–R8.
+Exact guard/example correction2d943517dd27fcb951c82a3df0a7cc15fbf4c038 also
+passed independent review. Canonical full gate at2d943517 passes605/605 repository
+tests, full tests typecheck and every other check. Original failed gates and
+corrections remain retained. Mandatory final-head push remains the delivery step;
+no hosted CI or provider/production readiness is claimed. No story_key is present,
+so sprint synchronization does not apply. The code CLI is unavailable; the Suggested
+Review Order above is the review navigation artifact.

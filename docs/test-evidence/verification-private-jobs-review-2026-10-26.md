@@ -55,3 +55,12 @@ Root verified all46 corrective archive/raw hashes and original72 hashes.0064 SQL
 snapshot and exact state remain unchanged. No remaining assigned issue was reported.
 Canonical final gate and mandatory push are separate following delivery checks;
 this acceptance does not authorize provider activation or production deployment.
+
+## Gate correction and final acceptance
+
+The gap reviewer separately accepted2d943517dd27fcb951c82a3df0a7cc15fbf4c038:
+all changed normalized hashes match, both journal entries and lowercase Dockerfile
+lookup are exact,8 artifact mutation and3 adjacent-file tests preserve the guard.
+All6 gate-correction archive/raw hashes were verified independently. Canonical
+full gate at this SHA passes605/605 plus tests typecheck and all other checks.
+The earlier6 failed assertions and subsequent bounded corrections remain evidence.

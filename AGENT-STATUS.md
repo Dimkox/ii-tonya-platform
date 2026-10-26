@@ -1,3 +1,15 @@
+# Private verification jobs ready for gated push — 2026-10-26
+
+Same isolated worktree and codex/residency-private-verification-jobs-20261026.
+Runtime b360ac46 independently acceptedR1–R8; guard/example2d943517 separately
+accepted. Canonical full gate at2d943517 passes605/605 and types/all checks.
+Spec done; failed/successful evidence retained. Root owns final mandatory push and
+DraftPR on codex/residency-verification-messages-20261026 (PR113 open atf11d5d90).
+Continue entire package immediately afterwards: S3a rich profile/services, then
+S3b local tags, S4 slots/lifecycle. Temp S3 spec/preparation remain ready.
+One protected PG17.5 and owned isolated helper; no production/provider activation.
+No routine permission/quota loop. Do not rerender BMad or restart delivered blocks.
+
 # Private verification jobs accepted; final gate next — 2026-10-26
 
 Same isolated .worktrees/phase1-owner-plan-20261023 on
