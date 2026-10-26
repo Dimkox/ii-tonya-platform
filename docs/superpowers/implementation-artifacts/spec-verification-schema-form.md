@@ -2,7 +2,7 @@
 title: Pre-price resident verification schema and dynamic form
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 1a006fff4e2985fd83b72f3c67a66823fab87078
 review_loop_iteration: 0
 context:
@@ -96,7 +96,7 @@ button/event consumer belong to the following increment. No financial-table rewr
 - [x] Add migration0057, schema/repository `resident-verification`, updates/progress/check-work/idempotency storage; SQL ownership/submit constraints, real privacy cleanup and focused PostgreSQL tests.
 - [x] Add application form service/tests; extend actual promo ingress/composition/config and test inline controls, media, resume and all matrix denials.
 - [x] Guard new-cohort pricing at repository/read boundaries; preserve prior offers/paid users. No approval/payment implementation.
-- [ ] Reconstruct additive metadata, register exact guards with negative probes, run builds/types/lint/focused tests and independent review; record evidence and create a draft PR based on codex/phase1-owner-plan-20261023.
+- [x] Reconstruct additive metadata, register exact guards with negative probes, run builds/types/lint/focused tests and independent review; record evidence and create a draft PR based on codex/phase1-owner-plan-20261023.
 
 **Acceptance Criteria:**
 

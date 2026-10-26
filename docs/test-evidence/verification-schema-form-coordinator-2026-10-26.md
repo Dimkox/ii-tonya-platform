@@ -156,3 +156,28 @@ Failed gate log: /tmp/verification-form-final-gate-1793017264392745111.log.
 Complete retained repository failure: /tmp/verification-form-final-repo-1793017264392745111.log.
 Focused green: /tmp/verification-form-schema-parity-green.log. This is a diagnosed
 exact-inventory correction, not an assertion bypass or unexplained timing retry.
+
+## Final canonical gate and authorized PR
+
+Canonical full gate2 exited0 on the clean exact source
+6583f08d1cb3aa65ba18ec859dcc65a258de770d over the complete correction range
+from1a006fff4e2985fd83b72f3c67a66823fab87078. All seven checks passed: shell
+syntax, format, whitespace, evidence integrity, changed-file lint, all60repository
+files/558tests, and tests typecheck. Repo tests took86s; test types22s. No checks
+were disabled and no timeout changed. Supported fork/thread limits1 were used.
+
+Main log: /tmp/verification-form-final-gate-1793017578313337917.log
+Retained full repo log: /tmp/verification-form-final-repo-1793017578313337917.log
+The read-only observer invoked the canonical script unchanged and retained an
+opened log inode through cleanup. Earlier failure evidence remains preserved.
+
+The authorized branch push completed after its mandatory hook passed, recorded
+in /tmp/verification-form-push-1.log. Connected GitHub created open Draft PR108:
+https://github.com/Dimkox/ii-tonya-platform/pull/108 . Its initial head was the
+verified6583f08d and base exactly1a006fff on codex/phase1-owner-plan-20261023.
+No merge/deployment/provider activation or live staging evidence is claimed.
+
+This final documentation checkpoint marks the first-part contract and plan done
+and includes the Suggested Review Order. The code CLI is unavailable in this
+environment; the review trail is linked in the PR instead. Final delivery requires
+pushing this documentation-only checkpoint and confirming the live PR head.

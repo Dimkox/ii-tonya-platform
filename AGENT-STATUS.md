@@ -1,3 +1,23 @@
+# Resident verification first PR delivered — 2026-10-26
+
+Draft PR108 is open: https://github.com/Dimkox/ii-tonya-platform/pull/108
+Branch codex/verification-schema-form-20261026; base codex/phase1-owner-plan-20261023
+at1a006fff4e2985fd83b72f3c67a66823fab87078. Reviewed implementation
+5e2bb8e336812197ad4105bbae9addfdd957da7f; final canonical full gate at
+6583f08d1cb3aa65ba18ec859dcc65a258de770d passed all seven checks, including
+repository558/558. The first gate's exact unique-constraint expectation drift
+was diagnosed/fixed, focused12/12 and independently reviewed; failed evidence stays.
+
+The first push's mandatory hook also passed. A final documentation-only checkpoint
+records this delivery; confirm live PR/remote head rather than trusting copied SHA.
+Working source contains Schema+Form Logic only. Manager decisions, automatic
+OCR/social checks, S3/LLM ingestion, callback acknowledgement transport and staging
+evidence remain later work. Feature defaults false. No merge, deploy or provider
+activation occurred. Do not restart completed verification without a new reason.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Evidence: docs/test-evidence/verification-schema-form-coordinator-2026-10-26.md
+
 # Resident verification review closed; final delivery pending — 2026-10-26
 
 Reviewed source5e2bb8e336812197ad4105bbae9addfdd957da7f on

@@ -41,7 +41,7 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 - [x] RED ownership, consent, replay/conflict, stale/concurrent submit, SQL NULL/role/tax checks, pending-results and actual-erasure cases.
 - [x] Implement partial-draft schema and submit guards, composite ownership, private refs, bounded content and cancellation. Trusted outcome/status fields have no applicant patch path.
 - [x] GREEN serialized PostgreSQL cases. Preserve historical migrations. Reconstruct supported snapshot57 and exact SQL supplement using a fresh temporary introspection directory.
-- [ ] Review migration/privacy and commit.
+- [x] Review migration/privacy and commit.
 
 ### Task3: Real Telegram form and pre-price fence
 
@@ -52,14 +52,14 @@ Base1a006fff4e2985fd83b72f3c67a66823fab87078; branch codex/verification-schema-f
 - [x] RED real-ingress callbacks/photos/files/text, role/category menus, consent-first start/resume, forged/stale/cross-owner actions and repeated updates.
 - [x] RED direct `/tariff`, `/apply`, tariff listing/current-offer reads before new approval, with no anchor/invoice; preserve legacy equivalents.
 - [x] Implement default-off real composition and repository-level fences. Keep document upload/OCR/social/LLM adapters as explicit unavailable contracts; no fabricated processing.
-- [ ] GREEN focused tests and relevant build/type/lint; independent adversarial review and fix findings.
+- [x] GREEN focused tests and relevant build/type/lint; independent adversarial review and fix findings.
 
 ### Task4: Reviewable delivery
 
 - [x] Stage all new files before exact scope/inventory checks. Register only reviewed migration/schema/table/route/flag changes with negative probes and provenance.
 - [x] Run focused acceptance, package/test types, formatting/lint/diff; record genuine staging limitation rather than claiming live evidence.
-- [ ] Commit clean source and run final branch gate once, preserving detailed logs. Diagnose new failures, do not blindly repeat.
-- [ ] Push this branch and create a draft PR against codex/phase1-owner-plan-20261023 so only the new increment appears. No merge/deploy/provider activation.
+- [x] Commit clean source and run final branch gate once, preserving detailed logs. Diagnose new failures, do not blindly repeat.
+- [x] Push this branch and create a draft PR against codex/phase1-owner-plan-20261023 so only the new increment appears. No merge/deploy/provider activation.
 
 ## Local implementation checkpoint
 
@@ -84,3 +84,16 @@ closure handles structurally valid unsupported MIME/size, long form text and old
 disabled-form controls with non-mutating corrective200, retaining structural,
 authentication and rate guards. Applicant28/28 and route15/15 focused regressions
 pass. Neither correction changed SQL or required broad PostgreSQL repetition.
+
+## Final local acceptance and delivery
+
+Reviewed implementation5e2bb8e336812197ad4105bbae9addfdd957da7f.
+Canonical full gate passed at6583f08d1cb3aa65ba18ec859dcc65a258de770d:
+all seven checks, including repository558/558 and test types. The first gate's
+one stale exact-constraint expectation was corrected, independently checked, and
+recorded without weakening assertions. Actual pre-push gate also passed.
+
+Draft PR: https://github.com/Dimkox/ii-tonya-platform/pull/108
+Base: codex/phase1-owner-plan-20261023. No merge, deployment, provider activation
+or staging acceptance. This completes the requested Schema+Form Logic first PR;
+manager outcomes, OCR/social/LLM/S3 integration remain subsequent increments.
