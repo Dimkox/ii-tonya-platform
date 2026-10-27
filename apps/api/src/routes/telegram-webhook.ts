@@ -676,6 +676,12 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
                 /* ACK uncertainty cannot retry the committed tag mutation. */
               }
             }
+            if (
+              result.status === "handled" &&
+              "promptDelivered" in result &&
+              result.promptDelivered
+            )
+              return { accepted: true };
             if (result.status === "handled")
               return {
                 method: "sendMessage",

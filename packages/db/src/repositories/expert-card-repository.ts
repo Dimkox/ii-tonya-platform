@@ -1808,11 +1808,12 @@ export class PostgresExpertCardRepository {
   }
   async tagAction(
     raw: ExpertCardEvent & {
-      action: "recommend" | "toggle" | "confirm" | "custom";
+      action: "recommend" | "toggle" | "confirm" | "custom" | "custom_start";
       scope?: string;
       token?: string;
       index?: number;
       label?: string;
+      replyToMessageId?: string;
     },
   ) {
     const event = normalizeCardEvent(raw);
@@ -1824,6 +1825,9 @@ export class PostgresExpertCardRepository {
         token: raw.token ?? null,
         index: raw.index ?? null,
         label: raw.label ?? null,
+        ...(raw.replyToMessageId === undefined
+          ? {}
+          : { replyToMessageId: raw.replyToMessageId }),
       });
       const identity = await owner(
         tx,
@@ -1981,7 +1985,10 @@ export class PostgresExpertCardRepository {
       } else {
         if (
           !preview ||
-          preview.token !== raw.token ||
+          (raw.replyToMessageId !== undefined
+            ? raw.action !== "custom" ||
+              preview.customInput?.messageId !== raw.replyToMessageId
+            : preview.token !== raw.token) ||
           preview.revision !== d.revision ||
           preview.registry !== registry ||
           preview.safety !== safety.digest
@@ -1993,6 +2000,7 @@ export class PostgresExpertCardRepository {
             return fail("card_revision_conflict");
         }
         const choices = preview.choices;
+        delete preview.customInput;
         if (raw.action === "toggle") {
           if (
             !Number.isInteger(raw.index) ||
@@ -2076,7 +2084,11 @@ export class PostgresExpertCardRepository {
           await this.invalidateJobs(tx, d.id);
           preview = null;
         }
-        if (preview) preview.token = randomUUID();
+        if (preview) {
+          preview.token = randomUUID();
+          if (raw.action === "custom_start")
+            preview.customInput = { requestKey: event.requestKey };
+        }
       }
       if (preview)
         await tx.execute(
@@ -2084,6 +2096,49 @@ export class PostgresExpertCardRepository {
         );
       await finishCardRequest(tx, started, d.id);
       return { replay: false, preview };
+    });
+  }
+  async bindCustomTagReply(
+    raw: ExpertCardEvent & { token: string; messageId: string },
+  ) {
+    const event = normalizeCardEvent(raw);
+    if (
+      !this.work(event) ||
+      !id.test(raw.token) ||
+      !/^[1-9][0-9]{0,19}$/u.test(raw.messageId)
+    )
+      return false;
+    return this.tx(async (tx) => {
+      const identity = await owner(
+        tx,
+        event,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return false;
+      const d = await this.ensureDraft(tx, identity.userId, event);
+      const original = await tx.execute(
+        sql`select 1 from expert_card_requests where bot_id=${event.botId} and update_id=${event.updateId} and request_digest=${event.requestDigest} and user_id=${identity.userId}::uuid and operation='entry' and result_id=${d.id}::uuid`,
+      );
+      if (original.rows.length !== 1) return false;
+      const row = (
+        await tx.execute<{ preview: TagPreview | null }>(
+          sql`select tag_preview as preview from expert_card_drafts where id=${d.id}::uuid`,
+        )
+      ).rows[0];
+      const p = row?.preview;
+      if (
+        !p ||
+        p.token !== raw.token ||
+        p.revision !== d.revision ||
+        p.customInput?.requestKey !== event.requestKey ||
+        p.customInput.messageId
+      )
+        return false;
+      p.customInput.messageId = raw.messageId;
+      await tx.execute(
+        sql`update expert_card_drafts set tag_preview=${JSON.stringify(p)}::jsonb where id=${d.id}::uuid`,
+      );
+      return true;
     });
   }
   async decideCustomTag(

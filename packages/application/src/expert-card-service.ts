@@ -61,17 +61,21 @@ export interface DraftTagPage {
 export interface ExpertCardRepository {
   tagAction?(
     input: ExpertCardEvent & {
-      action: "recommend" | "toggle" | "confirm" | "custom";
+      action: "recommend" | "toggle" | "confirm" | "custom" | "custom_start";
       scope?: string;
       token?: string;
       index?: number;
       label?: string;
+      replyToMessageId?: string;
     },
   ): Promise<{
     replay: boolean;
     preview: TagPreview | null;
     safetyBlocked?: boolean;
   }>;
+  bindCustomTagReply?(
+    input: ExpertCardEvent & { token: string; messageId: string },
+  ): Promise<boolean>;
   ingestRichPhoto?(
     input: ExpertCardEvent & {
       expectedRevision: number;
@@ -227,6 +231,7 @@ export type ExpertCardReply =
       status: "handled";
       text: string;
       tagCallbackAuthorized?: true;
+      promptDelivered?: true;
       inlineKeyboard?: readonly (readonly {
         text: string;
         callback_data: string;
@@ -304,6 +309,9 @@ export function createExpertCardService(deps: {
   repository: ExpertCardRepository;
   financial: ExpertCardFinancial;
   draftTagsEnabled?: boolean;
+  sendCustomTagPrompt?: (
+    input: ExpertCardScope & { signal: AbortSignal },
+  ) => Promise<string | null>;
   documentImport?: {
     read(
       input: ExpertCardScope & {
@@ -423,6 +431,7 @@ export function createExpertCardService(deps: {
         content: ExpertCardContent;
         callbackData?: string;
         callbackQueryId?: string;
+        replyToBotMessageId?: string;
         signal?: AbortSignal;
       },
     ): Promise<ExpertCardReply> {
@@ -470,6 +479,7 @@ export function createExpertCardService(deps: {
       };
       try {
         if (
+          input.replyToBotMessageId !== undefined ||
           input.callbackData?.startsWith("ct2:") ||
           /^\/tags_(?:recommend|custom)(?:\s|$)/u.test(text)
         ) {
@@ -479,15 +489,27 @@ export function createExpertCardService(deps: {
             NonNullable<ExpertCardRepository["tagAction"]>
           >[0];
           if (input.callbackData) {
-            const m = /^ct2:(t|c):([0-9a-f-]{36})(?::([0-9]{1,2}))?$/u.exec(
+            const m = /^ct2:(t|c|a):([0-9a-f-]{36})(?::([0-9]{1,2}))?$/u.exec(
               input.callbackData,
             );
             if (!m) return { status: "rejected" };
             command = {
               ...event,
-              action: m[1] === "t" ? "toggle" : "confirm",
+              action:
+                m[1] === "t"
+                  ? "toggle"
+                  : m[1] === "a"
+                    ? "custom_start"
+                    : "confirm",
               token: m[2]!,
               ...(m[1] === "t" ? { index: Number(m[3]) } : {}),
+            };
+          } else if (input.replyToBotMessageId) {
+            command = {
+              ...event,
+              action: "custom",
+              replyToMessageId: input.replyToBotMessageId,
+              label: text,
             };
           } else if (text.startsWith("/tags_custom ")) {
             const m = /^\/tags_custom ([0-9a-f-]{36}) (.+)$/u.exec(text);
@@ -529,6 +551,43 @@ export function createExpertCardService(deps: {
               status: "duplicate",
               ...(input.callbackData ? { tagCallbackAuthorized: true } : {}),
             };
+          if (command.action === "custom_start" && r.preview) {
+            let bound = false;
+            try {
+              const messageId = await deps.sendCustomTagPrompt?.({
+                ...s,
+                signal: input.signal ?? new AbortController().signal,
+              });
+              if (messageId && deps.repository.bindCustomTagReply)
+                bound = await deps.repository.bindCustomTagReply({
+                  ...event,
+                  token: r.preview.token,
+                  messageId,
+                });
+            } catch {
+              /* Committed attempt is never resent; unbound prompts have no authority. */
+            }
+            if (bound)
+              return {
+                status: "handled",
+                text: "Напишите свой тег в ответ на приглашение.",
+                promptDelivered: true,
+                tagCallbackAuthorized: true,
+              };
+            return {
+              status: "handled",
+              tagCallbackAuthorized: true,
+              text: "Не удалось подтвердить приглашение. Нажмите «Добавить свой тег» ещё раз; на старое сообщение отвечать не нужно.",
+              inlineKeyboard: [
+                [
+                  {
+                    text: "Добавить свой тег / Другое",
+                    callback_data: `ct2:a:${r.preview.token}`,
+                  },
+                ],
+              ],
+            };
+          }
           if (r.safetyBlocked)
             return reply(
               "Этот тег не прошёл проверку безопасности. Остальные ответы сохранены.",
@@ -572,7 +631,7 @@ export function createExpertCardService(deps: {
                   .join(", "),
             ].join(
               "\n",
-            )}\nЭто предложения для вашего подтверждения, а не доказательство квалификации. Свой тег (модерация): /tags_custom ${p.token} ваш тег. Каталог: /tags.`,
+            )}\nЭто предложения для вашего подтверждения, а не доказательство квалификации. Добавьте свой тег кнопкой ниже; он пройдёт модерацию. Каталог: /tags.`,
             inlineKeyboard: [
               ...p.choices.map((label, i) => [
                 {
@@ -583,6 +642,12 @@ export function createExpertCardService(deps: {
                   callback_data: `ct2:t:${p.token}:${i}`,
                 },
               ]),
+              [
+                {
+                  text: "Добавить свой тег / Другое",
+                  callback_data: `ct2:a:${p.token}`,
+                },
+              ],
               [
                 {
                   text: "Подтвердить показанный набор",

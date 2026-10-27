@@ -922,7 +922,13 @@ it.skipIf(!process.env.II_TONYA_SEMANTIC_TEST_SOCKET)(
           message_id: customUpdate,
           from: { id: Number(f.work.chatId) },
           chat: { id: Number(f.work.chatId), type: "private" },
-          text: `/tags_custom ${changed.json().text.match(/tags_custom ([0-9a-f-]{36})/u)[1]} #личная_практика`,
+          text: `/tags_custom ${changed
+            .json()
+            .reply_markup.inline_keyboard.flat()
+            .find((b: { callback_data: string }) =>
+              b.callback_data.startsWith("ct2:a:"),
+            )
+            .callback_data.slice(6)} #личная_практика`,
         },
       };
       const custom = await send(customPayload);
@@ -1035,3 +1041,176 @@ it("rejects absent or null cache vectors instead of SQL unknown acceptance", asy
     expect(result.rows[0]!.valid).toBe(false);
   }
 });
+
+it("ordinary own-tag ForceReply binds the original preview and never resends uncertain attempts", async () => {
+  const f = await linked();
+  await patch(f, { specialization: "КПТ" });
+  let sends = 0,
+    unknown = false;
+  const config = {
+    features: { expertCard: true, expertDraftTags: true },
+    expertCard: {
+      materialDeliveryEnabled: false,
+      mainCheckoutEnabled: false,
+      draftTagsEnabled: true,
+      workBotId: workScope.botId,
+      workBotKey: workScope.botKey,
+      workBotUsername: "synthetic_work_bot",
+      workBotToken: workScope.botId + ":" + "s".repeat(35),
+      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      messagingConsentPolicyVersion: "client-messaging-v1",
+      paymentMode: "test",
+    },
+  } as unknown as RuntimeConfig;
+  const cap = createExpertCardComposition(database.db, config, {
+    tagCallbackFetch: async () => new Response('{"ok":true,"result":true}'),
+    tagPromptFetch: async (_url, init) => {
+      sends++;
+      const body = JSON.parse(String(init?.body));
+      expect(body.text).toBe(
+        "Напишите один свой тег в ответ на это сообщение.",
+      );
+      expect(body.reply_markup.force_reply).toBe(true);
+      expect(body.chat_id).toBe(f.work.chatId);
+      if (unknown) throw new Error("synthetic unknown delivery");
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          result: {
+            message_id: 8800 + sends,
+            from: { id: Number(workScope.botId), is_bot: true },
+            chat: { id: Number(f.work.chatId), type: "private" },
+          },
+        }),
+      );
+    },
+  })!;
+  const app = await workHttp(f.card, undefined, cap.answerTagCallback, cap);
+  const send = (body: unknown) =>
+    app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: {
+        "x-telegram-bot-api-secret-token":
+          "synthetic-core-webhook-secret-12345678",
+      },
+      payload: body,
+    });
+  const message = (
+    text: string,
+    replyId?: number,
+    bot = Number(workScope.botId),
+    chat = Number(f.work.chatId),
+  ) => ({
+    update_id: ++sequence,
+    message: {
+      message_id: sequence,
+      from: { id: Number(f.work.chatId) },
+      chat: { id: Number(f.work.chatId), type: "private" },
+      text,
+      ...(replyId
+        ? {
+            reply_to_message: {
+              message_id: replyId,
+              from: { id: bot, is_bot: true },
+              chat: { id: chat, type: "private" },
+              text: "Напишите один свой тег в ответ на это сообщение.",
+            },
+          }
+        : {}),
+    },
+  });
+  const add = (r: {
+    text: string;
+    reply_markup: {
+      inline_keyboard: { text: string; callback_data: string }[][];
+    };
+  }) => ({
+    update_id: ++sequence,
+    callback_query: {
+      id: "add_" + sequence,
+      from: { id: Number(f.work.chatId) },
+      message: {
+        message_id: sequence,
+        from: { id: Number(workScope.botId), is_bot: true },
+        chat: { id: Number(f.work.chatId), type: "private" },
+        text: r.text,
+      },
+      data: r.reply_markup.inline_keyboard
+        .flat()
+        .find((b) => b.text === "Добавить свой тег / Другое")!.callback_data,
+    },
+  });
+  try {
+    const recommended = (await send(message("/tags_recommend профиль"))).json();
+    const start = add(recommended);
+    expect((await send(start)).json()).toEqual({ accepted: true });
+    expect(sends).toBe(1);
+    expect((await send(start)).json().duplicate).toBe(true);
+    expect(sends).toBe(1);
+    const label = message("личная практика", 8801);
+    const selected = (await send(label)).json();
+    expect(selected.text).toContain("личная практика");
+    expect((await send(label)).json().duplicate).toBe(true);
+    const oldStart = add(selected);
+    await send(oldStart);
+    expect(sends).toBe(2);
+    await send(message("/tags_recommend текущая"));
+    const stale = await send(message("ошибочный тег", 8802));
+    expect(stale.json().text ?? "").not.toContain("ошибочный тег");
+    const wrongBot = await send(message("ошибочный тег", 8802, 99999));
+    expect(wrongBot.statusCode).toBe(400);
+    const wrongChat = await send(
+      message("ошибочный тег", 8802, Number(workScope.botId), 99999),
+    );
+    expect(wrongChat.statusCode).toBe(400);
+    const fresh = (await send(message("/tags_recommend профиль"))).json();
+    unknown = true;
+    const attempt = add(fresh);
+    const failed = await send(attempt);
+    expect(failed.json().text).toContain("Добавить свой тег");
+    expect(sends).toBe(3);
+    expect((await send(attempt)).json().duplicate).toBe(true);
+    expect(sends).toBe(3);
+    const orphan = await send(message("непривязанный тег", 8803));
+    expect(orphan.json().text ?? "").not.toContain("непривязанный тег");
+    unknown = false;
+    await database.db.execute(
+      sql`create function semantic_fixture_bind_failure() returns trigger language plpgsql as $$begin if NEW.tag_preview#>>'{customInput,messageId}' is not null then raise exception 'synthetic_bind_rollback'; end if;return NEW;end$$`,
+    );
+    await database.db.execute(
+      sql`create trigger semantic_fixture_bind_failure before update on expert_card_drafts for each row execute function semantic_fixture_bind_failure()`,
+    );
+    try {
+      const next = (await send(message("/tags_recommend профиль"))).json();
+      const rollback = add(next);
+      expect((await send(rollback)).json().text).toContain("Добавить свой тег");
+      expect(sends).toBe(4);
+      expect((await send(rollback)).json().duplicate).toBe(true);
+      expect(sends).toBe(4);
+      const unbound = await send(message("после отката", 8804));
+      expect(unbound.json().text ?? "").not.toContain("после отката");
+    } finally {
+      await database.db.execute(
+        sql`drop trigger semantic_fixture_bind_failure on expert_card_drafts`,
+      );
+      await database.db.execute(
+        sql`drop function semantic_fixture_bind_failure()`,
+      );
+    }
+    console.log(
+      JSON.stringify({
+        ordinaryLabel: true,
+        originalBotAndChat: true,
+        staleScopeRejected: true,
+        callbackAndLabelReplay: true,
+        unknownAttemptNotResent: true,
+        orphanRejected: true,
+        bindingTransactionRollbackNotResent: true,
+        promptSends: sends,
+      }),
+    );
+  } finally {
+    await app.close();
+  }
+}, 30000);

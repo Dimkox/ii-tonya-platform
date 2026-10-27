@@ -153,6 +153,22 @@ export function parseExpertCardTelegramUpdate(
         : { caption: message.caption as string }),
     };
   }
+  const replyMessage = !callback ? record(message.reply_to_message) : null;
+  let replyToBotMessageId: string | null = null;
+  if (!callback && message.reply_to_message !== undefined) {
+    replyToBotMessageId = id(replyMessage?.message_id);
+    const replyFrom = record(replyMessage?.from),
+      replyChat = record(replyMessage?.chat);
+    if (
+      !replyToBotMessageId ||
+      replyFrom?.is_bot !== true ||
+      id(replyFrom.id) !== scope.workBotId ||
+      replyChat?.type !== "private" ||
+      id(replyChat.id) !== chatId ||
+      !hasText
+    )
+      return { kind: "invalid" };
+  }
   const input = {
     botId: scope.workBotId,
     botKey: scope.workBotKey,
@@ -160,6 +176,7 @@ export function parseExpertCardTelegramUpdate(
     chatId: chatId!,
     updateId: String(root.update_id),
     content,
+    ...(replyToBotMessageId ? { replyToBotMessageId } : {}),
     ...(callback
       ? {
           callbackData: callback.data as string,

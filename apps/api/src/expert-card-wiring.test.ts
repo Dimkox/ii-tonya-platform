@@ -98,3 +98,46 @@ it("configured main checkout still requires canonical merchant callback before m
     "expert_card_merchant_callback_required",
   );
 });
+
+it("acknowledges an already delivered ForceReply without sending a competing message", async () => {
+  const config = enabledConfig();
+  const deps = await createDefaultLifecycle().dependencies(
+    config,
+    undefined as never,
+  );
+  vi.spyOn(deps.expertCard!.legacyReplay, "read").mockResolvedValue("absent");
+  vi.spyOn(deps.expertCard!.service, "handleWork").mockResolvedValue({
+    status: "handled",
+    text: "already sent",
+    promptDelivered: true,
+    tagCallbackAuthorized: true,
+  });
+  const app = await buildApp(deps);
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: {
+        "x-telegram-bot-api-secret-token": config.telegramWebhookSecret!,
+      },
+      payload: {
+        update_id: 91,
+        callback_query: {
+          id: "custom-field",
+          from: { id: 42 },
+          message: {
+            message_id: 90,
+            from: { id: 11, is_bot: true },
+            chat: { id: 42, type: "private" },
+            text: "Теги",
+          },
+          data: "ct2:a:11111111-1111-4111-8111-111111111111",
+        },
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ accepted: true });
+  } finally {
+    await app.close();
+  }
+});

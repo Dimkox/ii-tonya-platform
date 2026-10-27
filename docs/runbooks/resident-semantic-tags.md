@@ -15,8 +15,13 @@ admission, publication, provider flag, hosting limit or production configuration
   format metadata and explicitly attributed method associations. They are advice,
   never evidence of clinical qualifications. Existing selections remain unchanged
   until the owner confirms the displayed set.
-- The custom-tag command supplied with the preview adds a bounded label for that
-  scope. BLOCKER refuses it. WARNING, including `#приворот`, remains visible to the
+- “Добавить свой тег / Другое” opens an ordinary Russian ForceReply field. The owner
+  replies with one label, sees it in the full proposed set, then confirms the set.
+  The private preview binds the original attempt to the returned bot message ID;
+  ingress requires that exact bot message in the same private chat. No token,
+  identifier or command syntax is required in the normal flow. The advanced
+  `/tags_custom <preview-token> <label>` command remains supported.
+  BLOCKER refuses it. WARNING, including `#приворот`, remains visible to the
   manager. Unknown labels are pending until a fresh support/security manager decides
   them with a reason for the exact current rich revision. No custom label is inserted
   into the global catalogue. Any later revision requires a new decision.
@@ -30,6 +35,15 @@ A stale preview, changed catalogue or safety publication, or changed semantic mo
 cannot commit. Callback tokens rotate on each edit. Original Telegram update identity
 is checked before allocating a preview or calling the helper. Repeat acknowledgments
 still recheck ownership/consent; erasure deletes private previews and decisions.
+
+The ordinary-input attempt commits before a single bounded Telegram prompt send.
+Only a verified returned message ID can then bind to the still-current attempt.
+The prompt contains fixed nonprivate text; transport has a two-second deadline and
+16 KiB response cap. Unknown delivery, process interruption or binding rollback
+leaves no accepted reply binding. Repeating that original callback never sends
+again; the owner can explicitly request a fresh invitation. Orphan/stale replies
+cannot fall through into interview answers. A successful send gets only a webhook
+acknowledgment, so no second bot message competes with the ForceReply field.
 
 ## Provisioned helper
 

@@ -45,6 +45,7 @@ export interface TagPreview {
   generation: string;
   registry: string;
   safety: string;
+  customInput?: { requestKey: string; messageId?: string };
 }
 export function canonicalTag(
   value: string,

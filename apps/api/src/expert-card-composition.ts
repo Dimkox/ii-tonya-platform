@@ -1,3 +1,4 @@
+import { createExpertCardTagPrompt } from "./expert-card-tag-prompt.js";
 import {
   createPrivateObjectStore,
   createTelegramDocumentReader,
@@ -44,6 +45,7 @@ export interface ExpertCardCapability {
 }
 export type ExpertCardCompositionOptions = {
   tagCallbackFetch?: typeof fetch;
+  tagPromptFetch?: typeof fetch;
   privateTelegramFetch?: typeof fetch;
   documentImport?: Parameters<
     typeof createExpertCardService
@@ -243,6 +245,15 @@ export function createExpertCardComposition(
     legacyReplay: createExpertCardLegacyReplayRead(db, settings.workBotId),
     service: createExpertCardService({
       enabled: true,
+      ...(settings.draftTagsEnabled && settings.workBotToken
+        ? {
+            sendCustomTagPrompt: createExpertCardTagPrompt(
+              settings.workBotToken,
+              settings.workBotId,
+              options.tagPromptFetch,
+            ),
+          }
+        : {}),
       draftTagsEnabled:
         config.features.expertDraftTags === true &&
         settings.draftTagsEnabled === true,
