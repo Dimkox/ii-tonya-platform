@@ -4,7 +4,7 @@ type: feature
 created: 2026-10-26
 status: in-progress
 baseline_commit: 219f8e0c9d0938fccb4188cf0081f71b3f8b2db9
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -146,6 +146,34 @@ in this source set; keep exact typed service duration/IDs for the next block.
 - [ ] Execute matrix through real authenticated ingress, PostgreSQL/SQL guards, actual browser and local transport/parser witnesses; preserve RED/GREEN evidence.
 
 ## Spec Change Log
+
+- 2026-10-27, implementation seam clarification: existing human_escalations and
+  operator cases are restricted to safety/negative-feedback/delivery incidents.
+  The owner call-manager action may use an explicit assistance-request state in
+  the existing protected staff card queue, with truthful pending acknowledgment,
+  current owner/revision/consent/audit, bounded deduplication and manager visibility.
+  Do not fabricate a safety incident or introduce unrelated messaging authority.
+  This preserves the approved assistance intent without blocking on a nonexistent
+  generic support producer.
+
+- 2026-10-27, usability implementation clarification: the approved guided mode,
+  checklist and complete preview must use resident-readable Russian labels and
+  ordinary answers, with server-generated stable service IDs. Advanced JSON commands
+  may coexist but cannot be the only completion route. Owner preview must expose
+  actual selected photos through owner-bound protected access, not only media UUIDs.
+  Preserve exact revision/consent/safety confirmation and all valid partial data.
+  Trigger: initial source exposed schema keys/JSON/UUIDs as the ordinary route.
+
+- 2026-10-27, independent review R1–R13: incremental corrections must preserve
+  stable original-input replay identity, historical draft/material compatibility,
+  canonical photo/service UUID identity, useful photo replacement and SQL null
+  rejection. Private approval must survive unavailable paid visibility and later
+  renewal must use the latest approved content. Preserve partial labelled services
+  for gap-only completion. Add actual normal-composition, lifecycle-command and
+  populated-upgrade witnesses. Exact triage/ownership is in
+  docs/test-evidence/residency-rich-onboarding-review-2026-10-27.md.
+  KEEP all accepted working behavior and original evidence; no destructive rewrite.
+  Add hand-authored0067 correction/state while preserving0066 and earlier bytes.
 
 ## Design Notes
 

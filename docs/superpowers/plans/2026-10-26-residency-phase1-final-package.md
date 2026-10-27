@@ -49,7 +49,11 @@ full/push605/605. Original and corrective evidence plus failed gates retained.
 Active S3a: codex/residency-rich-onboarding-20261026, contract
 spec-residency-rich-onboarding.md. Detailed profile/services/3 input modes and
 reviewed versions precede S3b semantic optimization, then S4 dynamic slots/lifecycle.
-The same isolated worktree and one task PostgreSQL cluster are reused.
+The same isolated worktree and one task PostgreSQL cluster are reused. S3a exposes
+review outcomes/return reason through the owner card command and protected manager
+queue. A generic unsolicited review-status push producer does not exist in the
+baseline; S4 owns its real durable original-work-bot composition alongside lifecycle
+notices. This requirement remains open for the whole package, not silently dropped.
 
 ## Owner sources and precedence
 
@@ -87,7 +91,7 @@ Do not rewrite shared history, merge, deploy or activate providers.
 
 ## Ordered deliverables
 
-### S0 — Core stabilization (current)
+### S0 — Core stabilization (delivered)
 
 Contract: `docs/superpowers/implementation-artifacts/spec-residency-core-stabilization.md`.
 
@@ -129,16 +133,17 @@ Delivered [Draft PR112](https://github.com/Dimkox/ii-tonya-platform/pull/112) at
 
 ### S2 — Final verification and communications (delivered)
 
-Active branch: `codex/residency-verification-messages-20261026` in the same isolated tree.
+Delivered branches: `codex/residency-verification-messages-20261026` (PR113) and
+`codex/residency-private-verification-jobs-20261026` (PR114), in the same isolated tree.
 S2a contract: `docs/superpowers/implementation-artifacts/spec-final-verification-messages.md`.
 S2a completes versioned forms, decisions/follow-ups/reapplication and communication
-custody; S2b then connects private file extraction, OCR/social checks and safe links
-to those stable submission/check generations. Both remain required within S2.
+custody; S2b connects private file extraction, OCR/social checks and safe links
+to those stable submission/check generations. Both are delivered and reviewed.
 The latest owner sales order controls this block: selected tariff precedes form;
 manager approval reuses fixed3000 invoice and genuine payment alone locks price.
 Earlier no-auto-invoice/tariff-after-verification wording below is historical only.
-Reuse the existing manager interface; Kanban stays Phase2. Prepare the bounded
-implementation contract after read-only form, decision/delivery and private-job audits.
+The existing manager interface is reused; Kanban stays Phase2. The delivered
+contracts and evidence are authoritative; no earlier block is restarted.
 
 - [x] Versioned form expansion for final role fields, no-status tax help and optional
       evidence. Preserve earlier submitted versions and pending private references.
@@ -165,8 +170,8 @@ implementation contract after read-only form, decision/delivery and private-job 
 - [ ] Required photos/online-room choice/offline logistics; bounded Yandex geocoding
       capability and human-correctable link, no unrestricted URL/file fetch.
 - [ ] In parallel where ownership is independent: semantic matching over the164-tag
-      catalogue, synonyms, proposed method associations, format tags, top10 selected
-      suggestions, maximum20 confirmed tags, moderated custom tags and admin export.
+      catalogue, synonyms, proposed method associations, format tags, top15 proposed
+      suggestions under the latest correction, maximum20 confirmed tags, moderated custom tags and admin export.
       Associations are proposals, not verified clinical competence or diagnoses.
 - [ ] Human final review and versioned diffs. Retain current live version until a new
       version passes safety and manager approval; no raw parser/LLM auto-publication.
@@ -178,8 +183,8 @@ implementation contract after read-only form, decision/delivery and private-job 
       Reuse canonical booking authority; no competing available-slot ledger.
 - [ ] Preview/confirm generated slots. Existing BOOKED_* slots survive recalculation.
       External-busy commands hide genuinely free time without cancelling booked clients.
-- [ ] Promo confirmation and main payment govern ACTIVE_VISIBLE. Preserve parallel
-      materials already introduced after onboarding fee; missing templates stay honest.
+- [ ] Promo confirmation and main payment govern ACTIVE_VISIBLE. Latest approved
+      flow releases materials after manager card approval; missing templates stay honest.
 - [ ] Seven-day promo and three-day unpaid escalations, archived/paused visibility,
       daily resident-cancellation rate above20percent and manager alerts.
 - [ ] End-to-end local acceptance, migration compatibility, recovery, independent
