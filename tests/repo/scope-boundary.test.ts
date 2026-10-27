@@ -278,6 +278,10 @@ describe("MVP scope boundary", () => {
     ".superpowers/sdd/task-1-report.md",
     ".agents/skills/bmad-review/scripts/word_metrics.py",
     "_bmad/scripts/render_skill.py",
+    ".getzilla/getzilla/__init__.py",
+    ".grok/hooks/pre_tool_use.py",
+    "scripts/getzilla_verify.py",
+    "session_start.py",
   ])("does not inspect documentation, tests, or evidence at %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(false);
   });
@@ -285,6 +289,10 @@ describe("MVP scope boundary", () => {
   it.each([
     "scripts/bmad-payment.py",
     ".agents/skills/not-bmad/scripts/payment.py",
+    "scripts/getzilla-payment.py",
+    "scripts/getzilla_payment/worker.py",
+    "apps/api/session_start.py",
+    ".grok/payment.py",
   ])("keeps non-vendored executable lookalikes in scope at %s", (path) => {
     expect(isPaymentScopeInspectionPath(path)).toBe(true);
   });
@@ -392,6 +400,8 @@ describe("MVP scope boundary", () => {
     "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
     "packages/db/migrations/0037_partner_commerce_a.sql",
     "packages/db/migrations/0038_test_expert_trial.sql",
+    "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
+    "packages/db/migrations/0072_booking_waitlist_d1.sql",
     "packages/db/migrations/meta/0021_snapshot.json",
     "packages/db/migrations/meta/_journal.json",
   ])("pins approved post-MVP migration content for %s", (path) => {

@@ -1,4 +1,5 @@
 import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/expert-offer-v2.js";
+import { readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { PostgresExpertReferralControlRepository } from "../../packages/db/src/repositories/expert-referral-control-repository.js";
@@ -124,7 +125,7 @@ let financial: PostgresExpertOnboardingMainPaymentRepository;
 let verification: PostgresExpertVerificationRepository;
 let promo: PostgresExpertPromoRepository;
 let tariffId: string;
-let manager: { sessionHash: string; token: string };
+let manager: { sessionHash: string; token: string; userId: string };
 let sequence = 940000;
 let messageSequence = 1;
 let transportCalls: string[] = [];
@@ -143,7 +144,7 @@ async function staff() {
   await database.db.execute(
     sql`insert into admin_role_assignments(admin_id,role) values(${userId}::uuid,'support')`,
   );
-  return { token, sessionHash };
+  return { token, sessionHash, userId };
 }
 function client(body: Record<string, unknown>, calls: string[] = []) {
   return createYooKassaClient(
@@ -930,6 +931,31 @@ describe("Phase1 card publication and main-payment gates (PostgreSQL17.5)", () =
     );
     await database.enableExpertReferralCommands();
     manager = await staff();
+    const safetySeed = readFileSync(
+      "packages/db/migrations/0061_resident_content_safety.sql",
+      "utf8",
+    )
+      .split("--> statement-breakpoint")
+      .filter(
+        (statement) =>
+          statement.includes("INSERT INTO resident_safety_policies(id)") ||
+          statement.trim().startsWith("INSERT INTO forbidden_patterns("),
+      );
+    expect(safetySeed).toHaveLength(2);
+    for (const statement of safetySeed)
+      await database.db.execute(sql.raw(statement));
+    // reset() truncates users with CASCADE, including policy publications.
+    // Restore the trusted synthetic policy through its real manager gate.
+    await database.db.execute(sql`
+      insert into admin_role_assignments(admin_id,role)
+      values(${manager.userId}::uuid,'security_admin')
+    `);
+    await database.db.execute(sql`
+      select resident_safety_publish(
+        '61000000-0000-4000-8000-000000000001'::uuid,
+        ${manager.userId}::uuid,${manager.sessionHash}
+      )
+    `);
     tariffId = await database.createResidencyTariff({
       tariffKey: "PRO",
       displayName: "PRO",

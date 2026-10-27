@@ -44,16 +44,16 @@ it("enables callbacks independently of new admission, calendar and legacy Telegr
   expect(c.planerkaWorkflow).toBeUndefined();
   expect(c.integrations.telegram).toBe(false);
 });
-it("disabled callbacks preserve broader legacy bot key and ignore unavailable callback keys", () => {
+it("disabled callbacks preserve a valid bot key and ignore unavailable callback keys", () => {
   const c = loadEnv({
     ...base,
     BOOKING_CALLBACKS_ENABLED: "false",
-    CLIENT_TELEGRAM_BOT_KEY: "legacy.bot:key-1",
+    CLIENT_TELEGRAM_BOT_KEY: "legacy.bot-key-1",
     BOOKING_CALLBACK_HMAC_KEY: "unprovisioned",
     BOOKING_CALLBACK_VAULT_ACTIVE_KEY_ID: "bad id",
     BOOKING_CALLBACK_VAULT_KEYS: "not-json",
   });
-  expect(c.clientTelegramBotKey).toBe("legacy.bot:key-1");
+  expect(c.clientTelegramBotKey).toBe("legacy.bot-key-1");
   expect(c.features.bookingCallbacks).toBe(false);
   expect(c.bookingCallbacks).toBeUndefined();
 });

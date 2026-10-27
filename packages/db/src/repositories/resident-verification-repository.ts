@@ -240,6 +240,13 @@ export class PostgresResidentVerificationRepository {
           version: row.policyVersion!,
           education: row.educationRequirement!,
         };
+        if (
+          row.formVersion !== 2 &&
+          this.policy.fieldPolicy !== undefined &&
+          (storedPolicy.version !== this.policy.fieldPolicy.version ||
+            storedPolicy.education !== this.policy.fieldPolicy.education)
+        )
+          fail("resident_policy_conflict");
         if (row.revision !== input.expectedRevision)
           fail("resident_revision_conflict");
         if (input.action === "reapply") {

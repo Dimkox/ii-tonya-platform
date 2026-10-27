@@ -1,5 +1,6 @@
 import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/expert-offer-v2.js";
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { loadEnv } from "../../packages/config/src/index.js";
 import { sql } from "drizzle-orm";
@@ -91,7 +92,7 @@ let financial: PostgresExpertOnboardingMainPaymentRepository;
 let verification: PostgresExpertVerificationRepository;
 let promo: PostgresExpertPromoRepository;
 let tariffId: string;
-let manager: { sessionHash: string; token: string };
+let manager: { sessionHash: string; token: string; userId: string };
 let sequence = 940000;
 let messageSequence = 1;
 const event = <T extends { botId: string }>(scope: T) => {
@@ -108,7 +109,7 @@ async function staff() {
   await database.db.execute(
     sql`insert into admin_role_assignments(admin_id,role) values(${userId}::uuid,'support')`,
   );
-  return { token, sessionHash };
+  return { token, sessionHash, userId };
 }
 function client(body: Record<string, unknown>, calls: string[] = []) {
   return createYooKassaClient(
@@ -1173,6 +1174,31 @@ describe("Phase1 residency lifecycle real calendar and canonical renewal (PG17.5
     );
     await database.enableExpertReferralCommands();
     manager = await staff();
+    const safetySeed = readFileSync(
+      "packages/db/migrations/0061_resident_content_safety.sql",
+      "utf8",
+    )
+      .split("--> statement-breakpoint")
+      .filter(
+        (statement) =>
+          statement.includes("INSERT INTO resident_safety_policies(id)") ||
+          statement.trim().startsWith("INSERT INTO forbidden_patterns("),
+      );
+    expect(safetySeed).toHaveLength(2);
+    for (const statement of safetySeed)
+      await database.db.execute(sql.raw(statement));
+    // Shared reset removes the safety publication through users CASCADE.
+    // Re-establish its genuine manager-authorized synthetic publication.
+    await database.db.execute(sql`
+      insert into admin_role_assignments(admin_id,role)
+      values(${manager.userId}::uuid,'security_admin')
+    `);
+    await database.db.execute(sql`
+      select resident_safety_publish(
+        '61000000-0000-4000-8000-000000000001'::uuid,
+        ${manager.userId}::uuid,${manager.sessionHash}
+      )
+    `);
     tariffId = await database.createResidencyTariff({
       tariffKey: "PRO",
       displayName: "PRO",
@@ -1581,6 +1607,23 @@ describe("Phase1 residency lifecycle real calendar and canonical renewal (PG17.5
             )
           ).rows[0]?.status,
         ).toBe("settled");
+        expect(
+          (
+            await database.db.execute(sql`
+              select count(*)::int n from expert_main_activation_admissions
+              where order_id=${checkoutFixture.order.orderId}::uuid
+                and user_id=${f.userId}::uuid and expert_id=${f.expertId}::uuid
+            `)
+          ).rows[0]?.n,
+        ).toBe(1);
+        expect(
+          (
+            await database.db.execute(sql`
+              select count(*)::int n from experts_published
+              where expert_id=${f.expertId}::uuid and active
+            `)
+          ).rows[0]?.n,
+        ).toBe(0);
         expect(
           (
             await database.db.execute(

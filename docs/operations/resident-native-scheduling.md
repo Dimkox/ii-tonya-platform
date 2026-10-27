@@ -24,8 +24,29 @@ An abandoned or uncertain attempt becomes `unknown` and is never automatically r
 
 ## Migration and rollback
 
-Migration 0070 is hand-authored and append-only relative to 0070's predecessors. Apply it using the repository's migration workflow. Do not run `drizzle-kit generate` or edit 0043/0069. State was reconstructed by full SQL replay and fresh-directory introspection on the task-owned PostgreSQL 17.5 cluster, with exact SQL-only functions, triggers and constraints retained separately.
+Migration0074 is hand-authored and additive to canonical main0000..0073; those SQL/state bytes are unchanged. Apply it using the repository's migration workflow. Do not run `drizzle-kit generate` or edit 0043/0069. State was reconstructed by full SQL replay and fresh-directory introspection on the task-owned PostgreSQL 17.5 cluster, with exact SQL-only functions, triggers and constraints retained separately.
 
 Take the normal database backup before an authorized deployment. A source rollback that loses native confirmation/read/logistics support is unsafe once native bookings exist. Stop new booking admission and new sends using the existing reviewed controls, preserve booked snapshots and unknown delivery facts, and roll forward with a reviewed correction. Do not drop native tables, relabel booked rows, invent provider success, or overwrite held/booked slot identities as a rollback technique. Restoring listing eligibility never extends the owner's confirmed dates.
 
 Local evidence is synthetic and does not prove live provider delivery, hosted CI or release readiness. The implementation evidence manifest records the executed checks and their failed predecessors. Independent review and the coordinator's exact-head gate remain delivery prerequisites.
+
+## Integration with canonical main (2026-10-27)
+
+The native0070 source at `f047f295b26fc9ef6c90fa9c143447d118ab498c` is archived
+byte-for-byte with its journal and state under `packages/db/migrations/history/native-before-main-20261027`.
+The canonical0074 timestamp is1793152800005, strictly after main0073. Normal
+`migrateDb` requires an exact applied prefix before any SQL: databases carrying
+old-native0070 fail with `migration_history_reconciliation_required` and no mutation.
+There is no automatic ledger rewrite. An operator reconciliation needs its own
+reviewed plan: identify exact source/hash lineage, take a verified backup, inventory
+booked obligations and private delivery states, rehearse a forward reconciliation
+on a disposable copy, then obtain explicit target authorization. Never use archived
+SQL/state as a replacement canonical chain or falsely mark main migrations applied.
+
+Native source or target rescheduling returns a controlled conflict. Native waitlist
+join/promotion is deferred and rejects unsupported slots. External rescheduling and
+promotion retain shared client/expert/slot locks, native occupied-until buffers, busy
+blocks, provider mapping and final database-clock checks. The normal lifecycle worker
+also discovers eligible booked reservations and creates reminders idempotently; generic
+reminders omit native private meeting links. Dedicated native logistics remains the
+only automatic native link-delivery authority.

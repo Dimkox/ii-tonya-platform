@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   integer,
+  index,
   pgTable,
   text,
   timestamp,
@@ -67,6 +68,9 @@ export const slots = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
+    index("slots_planerka_service_start_idx")
+      .on(table.expertServiceId, table.startsAt)
+      .where(sql`${table.provider} = 'planerka'`),
     unique("slots_provider_external_unique").on(
       table.provider,
       table.externalSlotId,

@@ -490,4 +490,3 @@ S4a native scheduling/booking and S4b lifecycle/final journey remain required.
 
 - Provision the isolated helper and recover without granting publication authority.
   [resident-semantic-tags.md:1](../../runbooks/resident-semantic-tags.md#L1)
-

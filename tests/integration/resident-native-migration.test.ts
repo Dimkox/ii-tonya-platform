@@ -13,16 +13,16 @@ import { sql } from "drizzle-orm";
 import { migrateDb } from "../../packages/db/src/client.js";
 import { startTestPostgres } from "../../packages/db/src/testkit/postgres.js";
 
-it("R1 normal migrateDb applies 0070 to a populated 0069 database exactly once", async () => {
+it("R1 normal migrateDb applies 0074 to a populated main0073 database exactly once", async () => {
   const database = await startTestPostgres();
-  const folder = await mkdtemp(join(tmpdir(), "native-migration-0069-"));
+  const folder = await mkdtemp(join(tmpdir(), "native-migration-0073-"));
   try {
     const source = "packages/db/migrations";
     const journal = JSON.parse(
       await readFile(join(source, "meta/_journal.json"), "utf8"),
     );
     const previous = journal.entries.filter(
-      (entry: { idx: number }) => entry.idx < 70,
+      (entry: { idx: number }) => entry.idx < 74,
     );
     await mkdir(join(folder, "meta"));
     await writeFile(
@@ -66,7 +66,7 @@ it("R1 normal migrateDb applies 0070 to a populated 0069 database exactly once",
           sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
         )
       ).rows[0]?.n,
-    ).toBe(70);
+    ).toBe(74);
     await migrateDb(database.db, source);
     expect(
       (
@@ -82,7 +82,7 @@ it("R1 normal migrateDb applies 0070 to a populated 0069 database exactly once",
           sql`select count(*)::int as n,max(created_at)::text as latest from drizzle.__drizzle_migrations`,
         )
       ).rows[0],
-    ).toEqual({ n: 71, latest: String(journal.entries.at(-1).when) });
+    ).toEqual({ n: 75, latest: String(journal.entries.at(-1).when) });
     await migrateDb(database.db, source);
     expect(
       (
@@ -90,10 +90,80 @@ it("R1 normal migrateDb applies 0070 to a populated 0069 database exactly once",
           sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
         )
       ).rows[0]?.n,
-    ).toBe(71);
+    ).toBe(75);
     expect((await snapshot()).rows).toEqual(before);
   } finally {
     await database.stop();
     await rm(folder, { recursive: true, force: true });
+  }
+}, 120000);
+
+it("canonical migrateDb rejects the real archived native0070 lineage without writes", async () => {
+  const database = await startTestPostgres();
+  const folder = await mkdtemp(join(tmpdir(), "native-old-lineage-"));
+  try {
+    const source = "packages/db/migrations";
+    const archive = join(source, "history/native-before-main-20261027");
+    const journal = JSON.parse(
+      await readFile(join(archive, "meta/_journal.json"), "utf8"),
+    );
+    await mkdir(join(folder, "meta"));
+    await writeFile(
+      join(folder, "meta/_journal.json"),
+      JSON.stringify(journal),
+    );
+    for (const entry of journal.entries)
+      await copyFile(
+        join(entry.idx === 70 ? archive : source, entry.tag + ".sql"),
+        join(folder, entry.tag + ".sql"),
+      );
+    await migrateDb(database.db, folder);
+    const userId = await database.createUser();
+    const snapshot = async () =>
+      (
+        await database.db.execute(sql`select
+      (select jsonb_agg(to_jsonb(m) order by id) from drizzle.__drizzle_migrations m) as journal,
+      (select jsonb_agg(to_jsonb(u) order by id) from users u) as users,
+      (select count(*)::int from pg_class where relnamespace='public'::regnamespace) as relations,
+      to_regclass('lifecycle_jobs') as lifecycle`)
+      ).rows;
+    expect(userId).toBeTruthy();
+    const before = await snapshot();
+    await expect(migrateDb(database.db, source)).rejects.toThrow(
+      "migration_history_reconciliation_required",
+    );
+    expect(await snapshot()).toEqual(before);
+  } finally {
+    await database.stop();
+    await rm(folder, { recursive: true, force: true });
+  }
+}, 120000);
+
+it("fresh canonical migration preserves tags and schedule independently in confirmation digest", async () => {
+  const database = await startTestPostgres();
+  try {
+    await migrateDb(database.db, "packages/db/migrations");
+    const digest = async (value: object) =>
+      (
+        await database.db.execute<{ digest: string }>(
+          sql`select resident_rich_digest(jsonb_populate_record(null::expert_card_drafts,${JSON.stringify({ revision: 1, rich_pending_services: [], semantic_tags: [], ...value })}::jsonb)) digest`,
+        )
+      ).rows[0]!.digest;
+    const empty = await digest({});
+    expect(await digest({ initial_schedule: null, semantic_tags: [] })).toBe(
+      empty,
+    );
+    expect(await digest({ semantic_tags: ["#тревожность"] })).not.toBe(empty);
+    expect(
+      await digest({ initial_schedule: { previewId: "fixture" } }),
+    ).not.toBe(empty);
+    expect(
+      await digest({
+        semantic_tags: ["#тревожность"],
+        initial_schedule: { previewId: "fixture" },
+      }),
+    ).not.toBe(await digest({ initial_schedule: { previewId: "fixture" } }));
+  } finally {
+    await database.stop();
   }
 }, 120000);

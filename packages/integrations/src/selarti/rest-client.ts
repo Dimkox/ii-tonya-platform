@@ -8,7 +8,8 @@ const id = z
   .string()
   .min(1)
   .max(256)
-  .regex(/^[^\p{Cc}]+$/u);
+  .regex(/^[^\p{Cc}]+$/u)
+  .refine((value) => value.isWellFormed() && value.trim().length > 0);
 const text = z.string().min(1).max(4096);
 const sendSchema = z.object({ taskId: id, companyId: id, chatId: id, text });
 const querySchema = z.object({
@@ -72,7 +73,7 @@ export class SelartiRestClient {
     if (
       typeof bearerToken !== "string" ||
       !bearerToken.length ||
-      /[\s\p{Cc}]/u.test(bearerToken)
+      /[^\x21-\x7e]/u.test(bearerToken)
     ) {
       throw new Error("selarti_invalid_input");
     }

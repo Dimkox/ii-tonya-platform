@@ -25,5 +25,10 @@ _bmad/*.bak
 .worktrees/
 work/
 /.native-release/
+.getzilla/runtime/*
+!.getzilla/runtime/.gitkeep
+!.getzilla/runtime/.gitignore
+.coverage
+.coverage.*
 *.bundle
 *.tar.gz

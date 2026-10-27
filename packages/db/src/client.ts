@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { sql } from "drizzle-orm";
 import { fileURLToPath } from "node:url";
 import { Pool, type PoolConfig } from "pg";
@@ -26,6 +27,38 @@ export async function migrateDb(
   db: DrizzleDb,
   migrationsFolder: string,
 ): Promise<void> {
+  const expected = readMigrationFiles({ migrationsFolder });
+  const presence = await db.execute<{
+    journal: boolean;
+    existing: boolean;
+  }>(sql`
+    select to_regclass('drizzle.__drizzle_migrations') is not null as journal,
+      to_regclass('public.users') is not null as existing
+  `);
+  if (!presence.rows[0]?.journal) {
+    if (presence.rows[0]?.existing)
+      throw new Error("migration_history_reconciliation_required");
+  } else {
+    const applied = await db.execute<{ hash: string; created_at: string }>(sql`
+      select hash, created_at::text from drizzle.__drizzle_migrations order by id
+    `);
+    // Both branches used indexes 0039–0041 for different SQL. Timestamp-only
+    // Drizzle replay would skip required migrations on the old main lineage.
+    // Require an exact prefix of the deployed RC history before touching SQL;
+    // an operator must reconcile any other history separately.
+    if (
+      (presence.rows[0]?.existing && applied.rows.length === 0) ||
+      applied.rows.some((row, index) => {
+        const migration = expected[index];
+        return (
+          !migration ||
+          row.hash !== migration.hash ||
+          row.created_at !== String(migration.folderMillis)
+        );
+      })
+    )
+      throw new Error("migration_history_reconciliation_required");
+  }
   await migrate(db, { migrationsFolder });
 }
 

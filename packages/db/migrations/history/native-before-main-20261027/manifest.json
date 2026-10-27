@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "f047f295b26fc9ef6c90fa9c143447d118ab498c",
+  "canonicalMain": "2220f523b7ce66ccda4df74c2715c2f937304594",
+  "files": {
+    "0070_resident_native_scheduling.sql": "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
+    "meta/0070_snapshot.json": "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
+    "meta/_journal.json": "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+    "state/0070_manifest.json": "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+    "state/0070_sql_objects.json": "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0"
+  },
+  "policy": "Historical bytes only. Never execute as canonical migrations or rewrite applied ledgers automatically."
+}

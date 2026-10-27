@@ -77,6 +77,32 @@ describe("promotional landing view", () => {
     }
   });
 
+  it("names every major region and gives the hero a compact trust strip", () => {
+    for (const [section, heading] of [
+      ["about", "about-title"],
+      ["clients", "clients-title"],
+      ["experts", "experts-title"],
+      ["tariffs", "tariffs-title"],
+      ["faq", "faq-title"],
+      ["contacts", "contacts-title"],
+    ] as const) {
+      expect(html).toContain(`id="${section}" aria-labelledby="${heading}"`);
+      expect(html).toContain(`id="${heading}"`);
+    }
+    expect(html).toContain('class="hero-proof"');
+    expect(html).toContain("Открытый каталог");
+    expect(html).toContain("Личный кабинет");
+    expect(html).toContain("Навигация в Telegram");
+  });
+
+  it("provides visible keyboard focus and reduced-motion fallbacks", () => {
+    expect(styles).toMatch(/:focus-visible[\s\S]*outline:/u);
+    expect(styles).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/u);
+    expect(styles).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*\.hero-proof/u,
+    );
+  });
+
   it("renders the offer-backed expert contract boundaries", () => {
     expect(html).toContain('class="contract-boundary"');
     expect(html).toContain("не гарантируются и зависят от клиентских запросов");
@@ -108,6 +134,24 @@ describe("promotional landing view", () => {
     }
     expect(html).toContain('href="/account"');
     expect(html).toContain('href="/catalog"');
+  });
+
+  it("maps rendered CTAs to the intended bot and start payloads", () => {
+    const targets = [
+      ...html.matchAll(/data-messenger-action href="([^"]+)"/gu),
+    ].map(([, target]) => new URL(target!));
+
+    expect(targets.map(({ pathname }) => pathname)).toEqual(
+      targets.map(() => "/ii_tonya_bot"),
+    );
+    expect(targets.map((target) => target.searchParams.get("start"))).toEqual([
+      "expert",
+      "expert",
+      "expert_base",
+      "expert_exclusive",
+      "expert_event",
+      "expert",
+    ]);
   });
 
   it("publishes the requested landing offer and safe form stub", () => {

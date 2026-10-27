@@ -1,81 +1,89 @@
-import {
-  bindExpertVerificationActions,
-  renderExpertVerificationPage,
-} from "./expert-verification-view.js";
 import "./styles.css";
-import {
-  bindExpertAccountActions,
-  renderExpertAccountPage,
-} from "./expert-account-view.js";
-import { readPublicConfig } from "./config.js";
-import type { LegalDocumentCode } from "./legal-content.js";
-import { renderLegalPage } from "./legal-view.js";
-import { renderLanding } from "./landing-view.js";
-import { bindCatalogActions, renderCatalogPage } from "./catalog-view.js";
-import {
-  bindDemoWalkthrough,
-  renderDemoWalkthrough,
-} from "./demo-walkthrough.js";
-import {
-  bindPrivacyActions,
-  renderConsentPage,
-  renderMyDataPage,
-  renderAccountPage,
-} from "./consent-view.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("web_root_missing");
+const root = app;
 
 const route = window.location.pathname.replace(/\/+$/u, "") || "/";
-const legalRoute: LegalDocumentCode | undefined =
+const legalRoute: "oferta" | "privacy" | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
-if (route === "/admin/expert-verification") {
-  app.innerHTML = renderExpertVerificationPage();
-  bindExpertVerificationActions(app);
-  document.title = "Проверка заявок — ии-Тоня";
-} else if (route === "/expert/account") {
-  app.innerHTML = renderExpertAccountPage();
-  bindExpertAccountActions(app);
-  document.title = "Кабинет эксперта — ии-Тоня";
-} else if (route === "/demo") {
-  app.innerHTML = renderDemoWalkthrough();
-  bindDemoWalkthrough(app);
-  document.title = "Интерактивное демо — ии-Тоня";
-} else if (route === "/catalog") {
-  app.innerHTML = renderCatalogPage();
-  bindCatalogActions(app);
-  document.title = "Каталог услуг — ии-Тоня";
-} else if (
-  route === "/consent" ||
-  route === "/my-data" ||
-  route === "/account"
-) {
-  app.innerHTML =
-    route === "/consent"
-      ? renderConsentPage()
-      : route === "/my-data"
-        ? renderMyDataPage()
-        : renderAccountPage();
-  bindPrivacyActions(app);
-  document.title =
-    route === "/consent"
-      ? "Согласия — ии-Тоня"
-      : route === "/my-data"
-        ? "Мои данные — ии-Тоня"
-        : "Личный кабинет — ии-Тоня";
-} else if (legalRoute !== undefined) {
-  app.innerHTML = renderLegalPage(legalRoute);
-  document.title =
-    legalRoute === "oferta"
-      ? "Договор-оферта — ии-Тоня"
-      : "Политика конфиденциальности — ии-Тоня";
-} else {
-  app.innerHTML = renderLanding(
-    readPublicConfig({
-      VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
-    }),
-  );
+async function initialize(): Promise<void> {
+  if (route === "/admin/expert-verification") {
+    const { renderExpertVerificationPage, bindExpertVerificationActions } =
+      await import("./expert-verification-view.js");
+    root.innerHTML = renderExpertVerificationPage();
+    bindExpertVerificationActions(root);
+    document.title = "Проверка заявок — ии-Тоня";
+    return;
+  }
+  if (route === "/expert/account") {
+    const { renderExpertAccountPage, bindExpertAccountActions } =
+      await import("./expert-account-view.js");
+    root.innerHTML = renderExpertAccountPage();
+    bindExpertAccountActions(root);
+    document.title = "Кабинет эксперта — ии-Тоня";
+    return;
+  }
+  if (route === "/demo") {
+    const { renderDemoWalkthrough, bindDemoWalkthrough } =
+      await import("./demo-walkthrough.js");
+    root.innerHTML = renderDemoWalkthrough();
+    bindDemoWalkthrough(root);
+    document.title = "Интерактивное демо — ии-Тоня";
+    return;
+  }
+  if (route === "/catalog") {
+    const { renderCatalogPage, bindCatalogActions } =
+      await import("./catalog-view.js");
+    root.innerHTML = renderCatalogPage();
+    bindCatalogActions(root);
+    document.title = "Каталог услуг — ии-Тоня";
+    return;
+  }
+  if (route === "/consent" || route === "/my-data" || route === "/account") {
+    const {
+      renderConsentPage,
+      renderMyDataPage,
+      renderAccountPage,
+      bindPrivacyActions,
+    } = await import("./consent-view.js");
+    root.innerHTML =
+      route === "/consent"
+        ? renderConsentPage()
+        : route === "/my-data"
+          ? renderMyDataPage()
+          : renderAccountPage();
+    bindPrivacyActions(root);
+    document.title =
+      route === "/consent"
+        ? "Согласия — ии-Тоня"
+        : route === "/my-data"
+          ? "Мои данные — ии-Тоня"
+          : "Личный кабинет — ии-Тоня";
+    return;
+  }
+  if (legalRoute !== undefined) {
+    const { renderLegalPage } = await import("./legal-view.js");
+    root.innerHTML = renderLegalPage(legalRoute);
+    document.title =
+      legalRoute === "oferta"
+        ? "Договор-оферта — ии-Тоня"
+        : "Политика конфиденциальности — ии-Тоня";
+    return;
+  }
+
+  if (root.dataset.prerendered !== "true") {
+    const [{ readPublicConfig }, { renderLanding }] = await Promise.all([
+      import("./config.js"),
+      import("./landing-view.js"),
+    ]);
+    root.innerHTML = renderLanding(
+      readPublicConfig({
+        VITE_EXPERT_CHAT_URL: import.meta.env.VITE_EXPERT_CHAT_URL,
+      }),
+    );
+  }
   const reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
@@ -97,3 +105,5 @@ if (route === "/admin/expert-verification") {
     revealElements.forEach((element) => observer.observe(element));
   }
 }
+
+void initialize();

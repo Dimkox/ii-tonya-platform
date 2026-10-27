@@ -50,6 +50,11 @@ async function fixture(mapped = true) {
     await database.db.execute(
       sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) values(${identity.serviceId}::uuid,${accountId},1,60,'UTC',true,clock_timestamp())`,
     );
+  // A mapping change invalidates previously observed provider availability.
+  // This synthetic fixture models a successful refresh after verification.
+  await database.db.execute(
+    sql`update slots set observed_at=${now} where id=${slotId}::uuid`,
+  );
   const userId = await database.createUser();
   const bookings = new PostgresBookingRepository(database.db);
   const result = await bookings.reserve({
@@ -61,7 +66,8 @@ async function fixture(mapped = true) {
     minimumLeadMs: 86400000,
     confirmationBufferMs: 3600000,
   });
-  if (result.kind === "unavailable") throw new Error("fixture_unavailable");
+  if (result.kind === "unavailable")
+    throw new Error(`fixture_unavailable:${result.reason}`);
   const id = result.reservationId;
   const handle =
     `bk1.${randomUUID().replaceAll("-", "").padEnd(43, "A")}` as const;
@@ -604,3 +610,51 @@ it("completed provider bookings do not permanently block erasure", async () => {
     sql`update privacy_deletion_jobs set status='processor_complete' where id=${job}::uuid`,
   );
 });
+
+for (const state of ["pending", "sending", "booked"] as const) {
+  it(`refuses local reschedule while a ${state} provider operation owns the reservation`, async () => {
+    const f = await fixture();
+    await f.approve();
+    if (state !== "pending") {
+      const op = (await f.repository.claim(f.accountId, true))!;
+      expect(await f.repository.admitSend(op)).toBe(true);
+      if (state === "booked") await f.repository.complete(op, booking(op));
+    }
+    const before = await f.row();
+    const target = (
+      await database.db.execute<{ id: string }>(sql`
+        insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity)
+        select expert_service_id,'local',${randomUUID()},starts_at+interval '1 day',ends_at+interval '1 day',clock_timestamp(),1
+        from slots where id=(select slot_id from reservations where id=${f.id}::uuid) returning id
+      `)
+    ).rows[0]!.id;
+    const digest =
+      `sha256:${randomUUID().replaceAll("-", "").padEnd(64, "0")}` as const;
+    const request = (
+      await database.db.execute<{ id: string }>(
+        sql`insert into client_catalog_requests(user_id,request_digest,state,expires_at) values(${f.userId}::uuid,${randomUUID().replaceAll("-", "").padEnd(64, "0")},'ready',clock_timestamp()+interval '1 hour') returning id`,
+      )
+    ).rows[0]!.id;
+    await database.db.execute(
+      sql`insert into client_catalog_choices(request_id,choice_digest,slot_id,expires_at) values(${request}::uuid,${digest},${target}::uuid,clock_timestamp()+interval '1 hour')`,
+    );
+    expect(
+      await f.bookings.rescheduleOwnedByHandle({
+        userId: f.userId,
+        bookingHandle: f.handle,
+        choiceDigest: digest,
+        idempotencyKey: randomUUID().replaceAll("-", "").padEnd(64, "0"),
+        correlationId: randomUUID(),
+        confirmationBufferMs: 3600000,
+      }),
+    ).toEqual({ kind: "conflict" });
+    expect(await f.row()).toEqual(before);
+    expect(
+      (
+        await database.db.execute(
+          sql`select slot_id=${target}::uuid as moved from reservations where id=${f.id}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({ moved: false });
+  });
+}

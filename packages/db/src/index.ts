@@ -7,6 +7,11 @@ export {
   type DrizzleDb,
 } from "./client.js";
 export { sql } from "drizzle-orm";
+export { PostgresWaitlistRepository } from "./repositories/waitlist-repository.js";
+export {
+  PostgresLifecycleSchedulerRepository,
+  type LifecycleJobType,
+} from "./repositories/lifecycle-scheduler-repository.js";
 export * from "./repositories/expert-session-repository.js";
 export {
   PostgresBookingHandoffRevocationRepository,
@@ -351,6 +356,7 @@ export type {
 } from "./repositories/booking-notification-callback-repository.js";
 export * from "./repositories/expert-campaign-read-repository.js";
 export * from "./repositories/payer-receipt-contact-repository.js";
+export * from "./repositories/planerka-availability-repository.js";
 
 export * from "./repositories/expert-promo-repository.js";
 

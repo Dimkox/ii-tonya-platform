@@ -113,6 +113,21 @@ const http = {
   durationMs: "duration",
 } as const;
 const schemas: Readonly<Record<string, Schema>> = {
+  planerka_availability: {
+    outcome: [
+      "published",
+      "empty",
+      "account_rate_limit",
+      "provider_unavailable",
+      "invalid_response",
+      "mapping_invalid",
+      "slot_conflict",
+      "stale_claim",
+      "database_busy",
+    ],
+    processed: "count",
+    published: "count",
+  },
   telegram_ingress_security: {
     reason: ["authentication_rejected", "rate_limited"],
     ipFingerprint: "fingerprint",

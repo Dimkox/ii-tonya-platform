@@ -1,3 +1,4 @@
+import { loadEnv } from "@ii-tonya/config";
 import { describe, expect, it } from "vitest";
 import type { DrizzleDb } from "@ii-tonya/db";
 import {
@@ -29,11 +30,13 @@ describe("B2 Telegram worker composition", () => {
     ).toThrow("b2_telegram_delivery_capability_unavailable");
   });
   it("checks production client capability readiness before opening a database", async () => {
+    const config = loadEnv({
+      DATABASE_URL: "postgresql://placeholder.invalid/test?sslmode=require",
+    });
+    config.features.b2TelegramDispatch = true;
+    config.features.telegramEgressConsentGate = true;
     await expect(
-      createProductionWorkerRuntimeFactory().create({
-        features: { b2TelegramDispatch: true, telegramEgressConsentGate: true },
-        providers: { yookassa: false },
-      } as never),
+      createProductionWorkerRuntimeFactory().create(config),
     ).rejects.toThrow("b2_telegram_delivery_capability_unavailable");
   });
 });

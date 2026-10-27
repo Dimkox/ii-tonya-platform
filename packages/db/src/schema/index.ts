@@ -9,6 +9,7 @@ export * from "./expert-residency.js";
 export * from "./commercial-policy.js";
 export * from "./partner-commerce.js";
 export * from "./test-expert-trial.js";
+export * from "./lifecycle.js";
 export * from "./privacy-requests.js";
 export * from "./client-paid-orders.js";
 

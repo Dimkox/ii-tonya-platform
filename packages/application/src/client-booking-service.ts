@@ -56,6 +56,20 @@ export interface ProtectedClientBookingRepository {
     bookingHandle: `bk1.${string}`;
     correlationId: string;
   }): Promise<ClientBookingCancelRepositoryResult>;
+  rescheduleOwnedByHandle?(input: {
+    userId: string;
+    bookingHandle: `bk1.${string}`;
+    choiceDigest: `sha256:${string}`;
+    idempotencyKey: string;
+    correlationId: string;
+    confirmationBufferMs: number;
+  }): Promise<
+    Readonly<{
+      kind: "rescheduled" | "replayed" | "not_found" | "conflict";
+      reservationStatus?: ReservationStatus;
+      reservedUntil?: Date;
+    }>
+  >;
 }
 
 export interface ClientActiveBooking {
@@ -92,6 +106,16 @@ export interface ClientBookingService {
   ): Promise<{
     bookingHandle: `bk1.${string}`;
     state: "cancelled" | "cancellation_pending";
+  }>;
+  reschedule(
+    principal: ClientPrincipal,
+    bookingHandle: string,
+    input: { choiceHandle: string },
+  ): Promise<{
+    bookingHandle: `bk1.${string}`;
+    state: ClientBookingPublicState;
+    reservedUntil: string;
+    replayed: boolean;
   }>;
 }
 
@@ -291,6 +315,49 @@ export function createClientBookingService(deps: {
         state: result.providerCancellationPending
           ? "cancellation_pending"
           : "cancelled",
+      };
+    },
+    async reschedule(principal, bookingHandle, input) {
+      const userId = principalUserId(principal);
+      if (
+        !BOOKING_HANDLE_PATTERN.test(bookingHandle) ||
+        typeof input !== "object" ||
+        input === null ||
+        Object.keys(input).length !== 1 ||
+        !CHOICE_HANDLE_PATTERN.test(input.choiceHandle) ||
+        deps.repository.rescheduleOwnedByHandle === undefined
+      ) {
+        throw new ClientBookingInvalidRequestError();
+      }
+      const canonicalBookingHandle = bookingHandle as `bk1.${string}`;
+      const choiceDigest = `sha256:${createHash("sha256")
+        .update(input.choiceHandle)
+        .digest("hex")}` as const;
+      const result = await deps.repository.rescheduleOwnedByHandle({
+        userId,
+        bookingHandle: canonicalBookingHandle,
+        choiceDigest,
+        idempotencyKey: createHash("sha256")
+          .update(
+            `client-booking-reschedule-v1\0${userId}\0${canonicalBookingHandle}\0${choiceDigest}`,
+          )
+          .digest("hex"),
+        correlationId: newCorrelationId(),
+        confirmationBufferMs,
+      });
+      if (result.kind === "not_found") throw new ClientBookingNotFoundError();
+      if (result.kind === "conflict") throw new ClientBookingConflictError();
+      if (
+        result.reservationStatus === undefined ||
+        result.reservedUntil === undefined
+      ) {
+        throw new Error("client_booking_reschedule_result_invalid");
+      }
+      return {
+        bookingHandle: canonicalBookingHandle,
+        state: publicState(result.reservationStatus),
+        reservedUntil: publicInstant(result.reservedUntil),
+        replayed: result.kind === "replayed",
       };
     },
   };

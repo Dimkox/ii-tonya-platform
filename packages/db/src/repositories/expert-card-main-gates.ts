@@ -242,7 +242,6 @@ export async function prepareMainCardSettlement(
   ).rows[0];
   if (currentFacts?.valid !== true) return blocked();
   const lifecycle = await lockResidencyLifecycle(tx, binding.userId);
-  if (lifecycle.paused) return blocked();
   if (!binding.applicationId || !binding.reviewId) return blocked();
   const gate = await lockCardActivationGate(tx, {
     applicationId: binding.applicationId,
@@ -304,6 +303,21 @@ export async function prepareMainCardSettlement(
   ).rows[0]?.expired;
   if (expired !== false)
     return Object.freeze({ orderId: order.id, admitted: false, expired: true });
+
+  if (lifecycle.paused) {
+    // A pause suppresses activation and referral qualification, while verified
+    // money still retains its original, fully checked admission provenance.
+    // Explicit resume must revalidate the existing projection gates separately.
+    const pausedAdmission = await blocked();
+    if (!pausedAdmission.expired)
+      admissions.set(pausedAdmission, {
+        tx,
+        gate,
+        expertId: order.expertId,
+        providerEventId: canonical!.id,
+      });
+    return pausedAdmission;
+  }
 
   await tx.execute(
     sql`select id from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled' order by id for share nowait`,

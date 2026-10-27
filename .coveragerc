@@ -1,0 +1,15 @@
+[run]
+branch = True
+source =
+    .getzilla/getzilla
+    scripts
+omit =
+    tests/*
+    */__pycache__/*
+    .getzilla/runtime/*
+    engineering/*
+
+[report]
+skip_empty = True
+show_missing = True
+fail_under = 74

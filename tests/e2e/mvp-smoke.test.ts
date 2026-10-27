@@ -3,8 +3,11 @@ import { startMvpHarness } from "./support/mvp-harness.js";
 
 describe("AC-025 exact MVP chain", () => {
   it("grants 500, records exactly two dialogue debits, searches verified services, reserves, confirms, cancels, and reconciles without duplicates", async () => {
+    const clock = new Date();
+    const at = (offsetMs: number) =>
+      new Date(clock.getTime() + offsetMs).toISOString();
     const app = await startMvpHarness({
-      clock: new Date("2026-07-28T10:00:00.000Z"),
+      clock,
       testOnlyOutboundBillingMode: "provider_delivery_event",
     });
     try {
@@ -15,7 +18,7 @@ describe("AC-025 exact MVP chain", () => {
         validForDays: 30,
         idempotencyKey: "grant-ac025-1",
       });
-      expect(grant.expiresAt).toBe("2026-08-27T10:00:00.000Z");
+      expect(grant.expiresAt).toBe(at(30 * 24 * 60 * 60 * 1000));
       await app.acceptOrdinaryInbound({
         client,
         text: "Подбери проверенного специалиста",
@@ -30,13 +33,13 @@ describe("AC-025 exact MVP chain", () => {
         outbox: queuedAnswer,
         provider: "selarti",
         providerDeliveryEventId: "selarti-delivered-ac025-1",
-        deliveredAt: "2026-07-28T10:00:03.000Z",
+        deliveredAt: at(3000),
       });
       expect(await app.dialogueDebitCount(client.userId)).toBe(2);
       expect(await app.balance(client.userId)).toBe(498);
       const matches = await app.searchVerifiedServices({
         query: "психолог",
-        startsAfter: "2026-07-29T10:00:00.000Z",
+        startsAfter: at(24 * 60 * 60 * 1000),
       });
       expect(matches.length).toBeGreaterThan(0);
       const catalogFacts = await app.verifiedCatalogFacts(
@@ -102,7 +105,7 @@ describe("AC-025 exact MVP chain", () => {
         expect.objectContaining({ reservationId: reservation.id }),
       ]);
 
-      await app.removeBookingNotificationForNegativeControl(reservation.id);
+      await app.corruptBookingNotificationForNegativeControl(reservation.id);
       await expect(
         app.assertBookingNotifications(reservation.id),
       ).rejects.toThrow("Authoritative booking notifications");
@@ -113,7 +116,7 @@ describe("AC-025 exact MVP chain", () => {
           outbox: queuedAnswer,
           provider: "selarti",
           providerDeliveryEventId: "selarti-delivered-ac025-negative",
-          deliveredAt: "2026-07-28T10:00:04.000Z",
+          deliveredAt: at(4000),
         }),
       ).rejects.toThrow("Provider send path has no authoritative outbox row");
     } finally {

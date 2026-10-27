@@ -9,6 +9,7 @@ export {
 } from "./http/webhook-auth.js";
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
+export { planerkaSlotsSchema } from "./planerka/contracts.js";
 export {
   createPlanerkaClient,
   PlanerkaClientError,
@@ -159,6 +160,7 @@ export {
 } from "./yookassa/client.js";
 export type {
   CreateYooKassaPayment,
+  CreateYooKassaPaymentOptions,
   CreateYooKassaRefund,
   YooKassaClient,
   YooKassaClientConfig,
@@ -183,6 +185,7 @@ export type {
   YooKassaOperationKind,
   YooKassaOperationPort,
   YooKassaOperationStatus,
+  YooKassaReceiptAuthority,
   YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./yookassa/operation-port.js";
@@ -249,6 +252,15 @@ export {
   type SelartiMessagesResult,
   type SelartiRestFetch,
 } from "./selarti/rest-client.js";
+export {
+  createAuthenticatedSelartiClient,
+  type AuthenticatedSelartiClient,
+  type AuthenticatedSelartiClientOptions,
+  type AuthenticatedSelartiClientResult,
+  type AuthenticatedSelartiMessagesQuery,
+  type AuthenticatedSelartiSend,
+  type AuthenticatedSelartiUnavailableCode,
+} from "./selarti/authenticated-client.js";
 export { createClientAsyncTelegramTransport } from "./telegram/client-async-transport.js";
 export {
   createPayerReceiptVault,

@@ -943,12 +943,15 @@ describe("resident content safety PG17.5", () => {
     ).rows;
     for (const tag of tags) {
       await database.db.execute(
-        sql`update hashtags_db set display_label='#быстрые_деньги' where id=${tag.id}::uuid`,
-      );
-      await database.db.execute(
         sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) values(${d.draftId}::uuid,${f.userId}::uuid,${tag.id}::uuid)`,
       );
     }
+    // These selections were valid when saved; a later catalogue change makes
+    // them legacy forbidden labels that the owner must still be able to remove.
+    for (const tag of tags)
+      await database.db.execute(
+        sql`update hashtags_db set display_label='#быстрые_деньги' where id=${tag.id}::uuid`,
+      );
     for (const [index, tag] of tags.entries())
       expect(
         await f.card.toggleDraftTag({

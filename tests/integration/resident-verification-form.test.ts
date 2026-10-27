@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  residentPolicy,
+  type ResidentPolicy,
+} from "../../packages/domain/src/resident-verification-form.js";
 import { sql } from "drizzle-orm";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import {
@@ -14,13 +18,28 @@ const command = <T extends object>(scope: T) => ({
   requestKey: randomUUID(),
   requestDigest: "a".repeat(64),
 });
-async function owner(consent = true) {
+// These cases exercise the preserved V1 form contract after V2 became the default.
+// Seed a historical initial row explicitly; never weaken current admission or triggers.
+async function owner(
+  consent = true,
+  legacyPolicy: ResidentPolicy | false = residentPolicy,
+) {
   const userId = await database.createUser();
   const telegramUserId = String(Math.floor(Math.random() * 1e12) + 1);
   await database.db.execute(
     sql`insert into channel_identities(user_id,provider,external_id,external_chat_id,bot_key,status) values(${userId}::uuid,'telegram',${telegramUserId},${telegramUserId},'resident-promo','active')`,
   );
   if (consent) await seedClientConsent(database.db, userId, "client_messaging");
+  if (consent && legacyPolicy) {
+    await database.db.execute(sql`
+      insert into residents_applications(
+        user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id,
+        form_version,policy_version,education_requirement
+      ) select ${userId}::uuid,'717171','resident-promo',id,${telegramUserId},${telegramUserId},
+        1,${legacyPolicy.version},${legacyPolicy.education}
+      from channel_identities where user_id=${userId}::uuid and bot_key='resident-promo'
+    `);
+  }
   return {
     userId,
     botId: "717171",
@@ -339,7 +358,7 @@ describe("resident intake privacy and pricing boundaries", () => {
       messagingConsentPolicyVersion: "client-messaging-v1",
       fieldPolicy: policy,
     });
-    const scope = await owner();
+    const scope = await owner(true, policy);
     const a = await required.mutate({ ...command(scope), action: "start" });
     await required.mutate({
       ...command(scope),
@@ -525,7 +544,7 @@ it("classifies enabled registration atomically against a first quote and preserv
     messagingConsentPolicyVersion: "client-messaging-v1",
     verificationFormEnabled: true,
   });
-  const legacy = await owner();
+  const legacy = await owner(true, false);
   const original = await quotes.createQuote({
     userId: legacy.userId,
     tariffVersionId: tariff,
@@ -546,7 +565,7 @@ it("classifies enabled registration atomically against a first quote and preserv
       )
     ).rows[0]?.calculation_timestamp,
   ).toEqual(original.calculationTimestamp);
-  const fresh = await owner();
+  const fresh = await owner(true, false);
   await enabled.register(command(fresh));
   // The first transaction owns the shared subject barrier before the quote is launched.
   // Both repositories and the SQL admission trigger must preserve this ordering.
@@ -558,7 +577,7 @@ it("classifies enabled registration atomically against a first quote and preserv
       idempotencyKey: randomUUID(),
     }),
   ).rejects.toThrow();
-  const concurrent = await owner();
+  const concurrent = await owner(true, false);
   await Promise.allSettled([
     enabled.register(command(concurrent)),
     quotes.createQuote({

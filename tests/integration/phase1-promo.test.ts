@@ -331,18 +331,35 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
     await expect(
       repo.createApplication({ ...command(other), quoteId: quote.id }),
     ).rejects.toThrow("promo_quote_unavailable");
-    // A historical, already expired quote is authored as synthetic data through
-    // every unchanged SQL source/arithmetic/FK guard; no trigger or time control.
+    // Issue a real current quote against a short-lived tariff, then let its
+    // authoritative expiry pass without rewriting immutable profile facts.
     const expiredOwner = await identity();
-    const expiredQuoteId = randomUUID();
-    await database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`insert into expert_campaign_anchors(user_id,rule_version,calculation_timestamp) select ${expiredOwner.userId}::uuid,rule_version,calculation_timestamp-interval '1 hour' from expert_campaign_quotes where id=${quote.id}::uuid`,
-      );
-      await tx.execute(
-        sql`insert into expert_campaign_quotes select (jsonb_populate_record(null::expert_campaign_quotes,to_jsonb(q)||jsonb_build_object('id',${expiredQuoteId}::uuid,'user_id',${expiredOwner.userId}::uuid,'idempotency_key',${randomUUID()}::text,'calculation_timestamp',q.calculation_timestamp-interval '1 hour','quoted_at',q.quoted_at-interval '1 hour','expires_at',q.expires_at-interval '1 hour'))).* from expert_campaign_quotes q where q.id=${quote.id}::uuid`,
-      );
+    await repo.saveProfile({
+      ...command(expiredOwner),
+      cityCode: "kazan",
+      millionCity: false,
+      serviceFormat: "offline",
+      ticketMinor: "300000",
+      participantKind: "expert",
     });
+    const expiringTariff = await database.createResidencyTariff({
+      tariffKey: "BASE",
+      displayName: "Expiry",
+      priceMinor: 999000,
+      durationSeconds: 2592000,
+    });
+    await database.db.execute(
+      sql`update expert_residency_tariff_versions set active_to=date_trunc('milliseconds',clock_timestamp())+interval '1 second' where id=${expiringTariff}::uuid`,
+    );
+    const expiredQuote = await repo.createQuote({
+      ...command(expiredOwner),
+      tariffVersionId: expiringTariff,
+      termMonths: 3,
+    });
+    const expiredQuoteId = expiredQuote.id;
+    await database.db.execute(
+      sql`select pg_sleep(greatest(0,extract(epoch from expires_at-clock_timestamp()))+0.01) from expert_campaign_quotes where id=${expiredQuoteId}::uuid`,
+    );
     expect(
       (
         await database.db.execute(

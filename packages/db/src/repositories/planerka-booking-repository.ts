@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
+import { isPlanerkaAvailabilityLockContention } from "./planerka-availability-repository.js";
 
 import { lockBookingNotificationReservation } from "./booking-notification-authority.js";
 import {
@@ -101,7 +102,38 @@ export class PostgresPlanerkaBookingRepository {
   }
 
   /** One durable account-wide admission every 2s, shared by every workflow worker. */
-  async admitRequest(accountId: number): Promise<boolean> {
+  async admitRequest(
+    accountId: number,
+    options?: { availability: true; createEnabled: boolean },
+  ): Promise<boolean> {
+    if (options?.availability) {
+      return this.db
+        .transaction(async (tx) => {
+          await tx.execute(sql`set local lock_timeout='50ms'`);
+          await tx.execute(sql`set local statement_timeout='5s'`);
+          await tx.execute(
+            sql`insert into planerka_account_requests(account_id) values(${accountId}) on conflict do nothing`,
+          );
+          await tx.execute(
+            sql`select 1 from planerka_account_requests where account_id=${accountId} for update nowait`,
+          );
+          // Pending creation is actionable only when enabled. Recovery/in-flight
+          // work retains priority through its retry delay, across every process.
+          return (
+            (
+              await tx.execute(sql`update planerka_account_requests set next_request_at=clock_timestamp()+interval '2 seconds'
+          where account_id=${accountId} and next_request_at<=clock_timestamp()
+            and not exists(select 1 from planerka_booking_operations o where o.account_id=${accountId}
+              and (o.state in ('unknown','sending','cancel_pending','cancelling','cancel_unknown') or (${options.createEnabled} and o.state='pending')))
+          returning account_id`)
+            ).rows.length === 1
+          );
+        })
+        .catch((error: unknown) => {
+          if (isPlanerkaAvailabilityLockContention(error)) return false;
+          throw error;
+        });
+    }
     await this.db.execute(
       sql`insert into planerka_account_requests(account_id) values(${accountId}) on conflict do nothing`,
     );

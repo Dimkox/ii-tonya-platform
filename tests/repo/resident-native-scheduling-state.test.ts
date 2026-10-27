@@ -5,23 +5,23 @@ const base = "packages/db/migrations",
   read = (p: string) => JSON.parse(readFileSync(p, "utf8")),
   sha = (p: string) =>
     createHash("sha256").update(readFileSync(p)).digest("hex");
-it("binds native0070 scheduling and confirmation authority to the preserved historical chain", () => {
-  const m = read(`${base}/state/0070_manifest.json`),
-    s = read(`${base}/meta/0070_snapshot.json`),
-    o = read(`${base}/state/0070_sql_objects.json`);
+it("binds native0074 scheduling and confirmation authority to the preserved historical chain", () => {
+  const m = read(`${base}/state/0074_manifest.json`),
+    s = read(`${base}/meta/0074_snapshot.json`),
+    o = read(`${base}/state/0074_sql_objects.json`);
   expect(m.databaseVersion).toBe("170005");
   expect(m.generatePermitted).toBe(false);
-  expect(m.migrations).toHaveLength(71);
+  expect(m.migrations).toHaveLength(75);
   for (const migration of m.migrations)
     expect(sha(`${base}/${migration.tag}.sql`)).toBe(migration.sha256);
-  expect(sha(`${base}/meta/0070_snapshot.json`)).toBe(m.snapshotSha256);
-  expect(sha(`${base}/state/0070_sql_objects.json`)).toBe(m.sqlObjectsSha256);
-  expect(s.prevId).toBe(read(`${base}/meta/0069_snapshot.json`).id);
-  expect(Object.keys(s.tables)).toHaveLength(222);
-  expect(o.functions).toHaveLength(175);
-  expect(o.triggers).toHaveLength(210);
-  expect(o.constraints).toHaveLength(1509);
-  expect(o.indexes).toHaveLength(549);
+  expect(sha(`${base}/meta/0074_snapshot.json`)).toBe(m.snapshotSha256);
+  expect(sha(`${base}/state/0074_sql_objects.json`)).toBe(m.sqlObjectsSha256);
+  expect(s.prevId).toBe(read(`${base}/meta/0073_snapshot.json`).id);
+  expect(Object.keys(s.tables)).toHaveLength(227);
+  expect(o.functions).toHaveLength(177);
+  expect(o.triggers).toHaveLength(212);
+  expect(o.constraints).toHaveLength(1555);
+  expect(o.indexes).toHaveLength(564);
   const d = s.tables["public.expert_card_drafts"];
   for (const c of [
     "initial_schedule",
@@ -63,10 +63,10 @@ it("pins native scheduling artifacts exactly while rejecting mutated bytes and a
   const { classifyApprovedTrackedScopeContent } =
     await import("./support/payment-scope-boundary.js");
   for (const path of [
-    "packages/db/migrations/0070_resident_native_scheduling.sql",
-    "packages/db/migrations/meta/0070_snapshot.json",
-    "packages/db/migrations/state/0070_sql_objects.json",
-    "packages/db/migrations/state/0070_manifest.json",
+    "packages/db/migrations/0074_resident_native_scheduling.sql",
+    "packages/db/migrations/meta/0074_snapshot.json",
+    "packages/db/migrations/state/0074_sql_objects.json",
+    "packages/db/migrations/state/0074_manifest.json",
   ]) {
     const content = readFileSync(path, "utf8");
     expect(classifyApprovedTrackedScopeContent({ path, content })).toEqual([]);
@@ -75,7 +75,7 @@ it("pins native scheduling artifacts exactly while rejecting mutated bytes and a
     ).not.toEqual([]);
     expect(
       classifyApprovedTrackedScopeContent({
-        path: path.replace("0070", "0071"),
+        path: path.replace("0074", "0075"),
         content,
       }),
     ).not.toEqual([]);

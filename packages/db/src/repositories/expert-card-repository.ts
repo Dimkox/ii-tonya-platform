@@ -807,7 +807,7 @@ export class PostgresExpertCardRepository {
       status: row?.status ?? "collecting",
       entryCount: row?.entryCount ?? 0,
       materialStatus:
-        row?.materialStatus !== "none"
+        row && row.materialStatus !== "none"
           ? (row?.materialStatus ?? "none")
           : (appMaterial?.status ?? "none"),
       promoConfirmed: appConfirmed || (row?.promoConfirmed ?? false),

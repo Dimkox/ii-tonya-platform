@@ -172,25 +172,43 @@ describe("native dedicated-server production release", () => {
       expect(unit).toContain("ProtectSystem=strict");
       expect(unit).not.toMatch(/pnpm|docker|compose/u);
     }
-    expect(api).toContain(
-      "ExecStart=/usr/bin/node --jitless api/dist/server.js",
-    );
-    expect(worker).toContain(
-      "ExecStart=/usr/bin/node --jitless worker/dist/main.js",
-    );
+    expect(api).toContain("ExecStart=/usr/bin/node api/dist/server.js");
+    expect(worker).toContain("ExecStart=/usr/bin/node worker/dist/main.js");
   });
 
-  it("keeps Node compatible with W^X hardening and creates writable state paths", () => {
+  it("allows HTTP runtime executable memory while retaining migration W^X hardening", () => {
     const api = read("deploy/systemd/ii-tonya-api.service");
     const worker = read("deploy/systemd/ii-tonya-worker.service");
     const migrate = read("deploy/systemd/ii-tonya-migrate.service");
 
     for (const unit of [api, worker, migrate]) {
-      expect(unit).toContain("MemoryDenyWriteExecute=true");
       expect(unit).not.toContain("Environment=NODE_OPTIONS=");
-      expect(unit).toContain("ExecStart=/usr/bin/node --jitless");
+      expect(unit).toContain("User=ii_tonya");
+      expect(unit).toContain("Group=ii_tonya");
+      expect(unit).toContain("NoNewPrivileges=true");
+      expect(unit).toContain("PrivateTmp=true");
+      expect(unit).toContain("ProtectSystem=strict");
+      expect(unit).toContain("ProtectHome=true");
+      expect(unit).toContain("ProtectKernelTunables=true");
+      expect(unit).toContain("ProtectKernelModules=true");
+      expect(unit).toContain("ProtectControlGroups=true");
+      expect(unit).toContain("RestrictSUIDSGID=true");
+      expect(unit).toContain("LockPersonality=true");
+      expect(unit).toMatch(/^CapabilityBoundingSet=$/mu);
     }
+    expect(migrate).toContain("MemoryDenyWriteExecute=true");
+    expect(migrate).toContain(
+      "ExecStart=/usr/bin/node --jitless migrate-native.mjs",
+    );
     for (const unit of [api, worker]) {
+      expect(unit).toContain("MemoryDenyWriteExecute=false");
+      expect(unit).not.toContain("--jitless");
+      expect(unit).not.toContain("MemoryDenyWriteExecute=true");
+      expect(unit).toContain("Restart=on-failure");
+      expect(unit).toContain("RestartSec=5s");
+      expect(unit).toContain(
+        "ReadWritePaths=/var/lib/ii-tonya /var/log/ii-tonya",
+      );
       expect(unit).toContain("StateDirectory=ii-tonya");
       expect(unit).toContain("StateDirectoryMode=0750");
       expect(unit).toContain("LogsDirectory=ii-tonya");

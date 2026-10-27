@@ -14,6 +14,12 @@ let testDb: TestDatabase;
 
 // Provider identity is explicit in booking fixtures; production validation stays on.
 async function mapReservation(reservationId: string) {
+  const previous = (
+    await testDb.db.execute<{ observedAt: string | null }>(sql`
+      select s.observed_at as "observedAt" from slots s
+      join reservations r on r.slot_id=s.id where r.id=${reservationId}::uuid
+    `)
+  ).rows[0]!;
   await testDb.db.execute(
     sql`update slots set provider='planerka' where id=(select slot_id from reservations where id=${reservationId}::uuid)`,
   );
@@ -21,6 +27,12 @@ async function mapReservation(reservationId: string) {
     .execute(sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at)
     select expert_service_id,1,(select count(*)::integer+1 from planerka_service_mappings),60,'UTC',true,clock_timestamp() from reservations where id=${reservationId}::uuid
     on conflict(expert_service_id) do nothing`);
+  // Mapping writes invalidate observations. Model the independent synthetic
+  // refresh at this fixture's historical clock, without changing production gates.
+  await testDb.db.execute(sql`
+    update slots set observed_at=${previous.observedAt}::timestamptz
+    where id=(select slot_id from reservations where id=${reservationId}::uuid)
+  `);
 }
 
 // Historical read/terminal-transition fixtures need a bound provider fact.

@@ -575,6 +575,9 @@ it("calendar rejection's two-source transaction obeys disabled capture", async (
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,9876,1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
   );
+  await database.db.execute(
+    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
+  );
   await f.bookings.transition({
     reservationId: f.reserved.reservationId,
     expectedVersion: f.reserved.version,
@@ -641,6 +644,9 @@ it("local journey binds prepared HTTP receipt, ct2 decision and provider complet
   );
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,9877,1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
+  );
+  await database.db.execute(
+    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
   );
   const bodies: string[] = [];
   const transport = createBookingNotificationTransport({

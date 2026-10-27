@@ -4,17 +4,22 @@ Companion inventory for `project-connectivity-graph.md`. It records repository-l
 
 ## Root and workspace control plane
 
-| Entity                | Graph connection                                         | Status                                 |
-| --------------------- | -------------------------------------------------------- | -------------------------------------- |
-| `package.json`        | CI / verification entrypoint -> all workspaces           | ACTIVE                                 |
-| `pnpm-workspace.yaml` | workspace topology -> apps/packages                      | ACTIVE                                 |
-| `pnpm-lock.yaml`      | frozen dependency graph -> CI/build                      | ACTIVE                                 |
-| `tsconfig.base.json`  | TypeScript build/typecheck -> all TS workspaces          | ACTIVE                                 |
-| `vitest.config.ts`    | unit/integration/e2e/repo test discovery                 | ACTIVE                                 |
-| `.env.example`        | config/env policy -> API/worker composition              | ACTIVE POLICY; live integrations false |
-| `.gitignore`          | secret/env hygiene -> env-policy tests                   | ACTIVE POLICY                          |
-| `AGENTS.md`           | agent execution/test constraints -> development workflow | ACTIVE POLICY                          |
-| `README.md`           | repository orientation -> source/spec/handoff/graph      | ACTIVE DOC                             |
+| Entity                                                      | Graph connection                                                 | Status                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
+| `package.json`                                              | CI / verification entrypoint -> all workspaces                   | ACTIVE                                 |
+| `pnpm-workspace.yaml`                                       | workspace topology -> apps/packages                              | ACTIVE                                 |
+| `pnpm-lock.yaml`                                            | frozen dependency graph -> CI/build                              | ACTIVE                                 |
+| `tsconfig.base.json`                                        | TypeScript build/typecheck -> all TS workspaces                  | ACTIVE                                 |
+| `vitest.config.ts`                                          | unit/integration/e2e/repo test discovery                         | ACTIVE                                 |
+| `.env.example`                                              | config/env policy -> API/worker composition                      | ACTIVE POLICY; live integrations false |
+| `.gitignore`                                                | secret/env hygiene -> env-policy tests                           | ACTIVE POLICY                          |
+| `AGENTS.md`                                                 | agent execution/test constraints -> development workflow         | ACTIVE POLICY                          |
+| `README.md`                                                 | repository orientation -> source/spec/handoff/graph              | ACTIVE DOC                             |
+| `.agents/skills/seo-landing`                                | Codex landing workflow -> `apps/web` build and evidence          | ACTIVE DEV TOOL                        |
+| `.grok/`                                                    | local hooks/configuration -> routed development workflow         | LOCAL DEV TOOL                         |
+| `.getzilla/`                                                | active route and local receipts -> delivery evidence             | LOCAL EVIDENCE; not merge authority    |
+| `.agents/skills/getzilla-delivery` and routed domain skills | active route -> bounded implementation and verification workflow | LOCAL DEV TOOL                         |
+| `scripts/getzilla_*.py`                                     | route/status/change/verify/review helpers -> local evidence      | LOCAL DEV TOOL; LOCAL EVIDENCE         |
 
 ## CI, automation, deployment, and server control
 
@@ -54,6 +59,7 @@ All workspace roots are represented in the canonical graph and have containment 
 | --------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
 | `apps/api`                  | HTTP/webhook composition                        | application/config/db/integrations/observability           |
 | `apps/worker`               | bounded background lifecycle                    | config/db/integrations/observability/worker                |
+| `apps/web`                  | static-prerendered public landing and legal UI  | local content/assets; messenger deep links; Yandex Metrika |
 | `apps/sandbox-api`          | test-only checkout/admin composition            | sandbox-only; never production                             |
 | `packages/application`      | deterministic use cases + prompt boundary       | API/worker -> contracts/domain                             |
 | `packages/config`           | validated environment                           | both apps                                                  |

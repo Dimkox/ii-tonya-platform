@@ -1,0 +1,12 @@
+{
+  "reason": "Retain original RC availability migration bytes; canonical tip history occupies0051, existing RC history requires explicit reconciliation.",
+  "files": [
+    {
+      "sourceCommit": "3c39e69058d1142f00d3e3fb82492287cb40bc79",
+      "sourcePath": "packages/db/migrations/0051_planerka_availability.sql",
+      "archivePath": "packages/db/migrations/history/rc-before-unification/0051_planerka_availability.sql",
+      "canonicalPath": "packages/db/migrations/0070_planerka_availability.sql",
+      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
+    }
+  ]
+}

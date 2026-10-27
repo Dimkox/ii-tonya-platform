@@ -39,6 +39,57 @@ const disabled = new Proxy(
 );
 
 describe("server composition", () => {
+  it("passes the configured booking confirmation buffer to the waitlist repository factory", async () => {
+    const fakeDb = {
+      execute: async () => ({ rows: [] }),
+      transaction: async (operation: (value: unknown) => unknown) =>
+        operation({ execute: async () => ({ rows: [] }) }),
+    } as unknown as DrizzleDb;
+    const waitlistRepository = {
+      join: vi.fn(),
+      leave: vi.fn(),
+    };
+    const waitlistRepositoryFactory = vi.fn(() => waitlistRepository);
+    const confirmationBufferMs = 1_234_567;
+
+    const dependencies = await createDefaultLifecycle({
+      waitlistRepositoryFactory,
+    }).dependencies(
+      {
+        databaseUrl: "postgresql://placeholder.invalid/test",
+        integrations: {
+          selarti: false,
+          planerka: false,
+          telegram: false,
+          makeProjection: false,
+          intentModel: false,
+          payments: false,
+        },
+        minorOnboarding: false,
+        rawConversationLogging: false,
+        selartiOutboundBillingMode: "disabled",
+        displayTimezone: "Europe/Moscow",
+        yookassaRecovery: { enabled: false },
+        clientBookingConfirmationBufferMs: confirmationBufferMs,
+        features: {
+          workerOutboxDelivery: false,
+          clientCatalog: false,
+          clientWaitlist: true,
+          expertReferral: false,
+          expertReferralMaturityWorker: false,
+          expertResidencyBilling: false,
+        },
+      },
+      fakeDb,
+    );
+
+    expect(dependencies.clientWaitlistService).toBeDefined();
+    expect(waitlistRepositoryFactory).toHaveBeenCalledWith(
+      fakeDb,
+      confirmationBufferMs,
+    );
+  });
+
   it("requires an operational metric sink whenever deterministic promo is enabled", async () => {
     const fakeDb = {
       execute: async () => ({ rows: [] }),
@@ -692,10 +743,18 @@ describe("server composition", () => {
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
+      expertSession: {
+        botToken: `123456:${"a".repeat(35)}`,
+        botKey: "synthetic-expert-bot",
+        origin: "https://expert.example",
+        botUsername: "synthetic_expert_bot",
+        widgetEnabled: false,
+      },
       features: {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertSession: true,
         expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
@@ -721,6 +780,7 @@ describe("server composition", () => {
     });
     const fakeDb = {
       execute: async () => ({ rows: [] }),
+      transaction: vi.fn(),
       $client: { end: async () => undefined },
     } as unknown as DrizzleDb;
     const config: RuntimeConfig = {
@@ -738,10 +798,18 @@ describe("server composition", () => {
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
+      expertSession: {
+        botToken: `123456:${"a".repeat(35)}`,
+        botKey: "synthetic-expert-bot",
+        origin: "https://expert.example",
+        botUsername: "synthetic_expert_bot",
+        widgetEnabled: false,
+      },
       features: {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertSession: true,
         expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
@@ -753,7 +821,7 @@ describe("server composition", () => {
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertCodeKeyring).toBe(keyring);
     expect(dependencies.expertReferralAdminService).toBeDefined();
-    expect(dependencies.expertApi).toBeUndefined();
+    expect(dependencies.expertApi).toBeDefined();
     const app = await (
       await import("./app.js")
     ).buildApp({
@@ -772,6 +840,12 @@ describe("server composition", () => {
     expect(
       (app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring,
     ).toBe(keyring);
+    expect(
+      (await app.inject({ url: "/v1/expert/referrals/summary" })).statusCode,
+    ).toBe(404);
+    expect(
+      (await app.inject({ url: "/v1/expert/residency/tariffs" })).statusCode,
+    ).toBe(404);
     await app.close();
   });
 

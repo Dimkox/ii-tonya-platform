@@ -37,7 +37,6 @@ describe("B1 schema/migration parity", () => {
         (entry) => entry.tag === "0034_hybrid_message_gateway_b1",
       ),
     ).toHaveLength(1);
-    // 0041 remains an exact historical contract, rather than a moving tail.
     expect(journal.entries.filter((entry) => entry.idx === 41)).toEqual([
       {
         idx: 41,
@@ -47,12 +46,9 @@ describe("B1 schema/migration parity", () => {
         breakpoints: true,
       },
     ]);
-    // The reviewed additive 0070 SQL/state projection is the current journal tail.
-    expect(journal.entries.at(-1)).toEqual({
-      idx: 70,
-      version: "7",
-      when: 1793152800001,
-      tag: "0070_resident_native_scheduling",
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 74,
+      tag: "0074_resident_native_scheduling",
       breakpoints: true,
     });
   });

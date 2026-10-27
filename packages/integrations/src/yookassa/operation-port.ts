@@ -88,7 +88,18 @@ export interface YooKassaReceiptContact {
   readonly authorityReference: string;
 }
 
+/** Retained purchase identity; not consent or permission to disclose contact data. */
+export interface YooKassaReceiptAuthority {
+  readonly contactKind: "email" | "phone";
+  readonly authorityReference: string;
+}
+
 export interface YooKassaReceiptContactPort {
+  /** Payer sources expose this even when metadata is unavailable. Only legacy
+   * contact-only sources may omit the capability. Never fall back on failure. */
+  receiptAuthorityForOrder?(
+    orderId: string,
+  ): Promise<YooKassaReceiptAuthority | null>;
   receiptContactForOrder(
     orderId: string,
   ): Promise<YooKassaReceiptContact | null>;

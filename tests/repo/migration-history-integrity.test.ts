@@ -44,6 +44,7 @@ const HAND_SQL_FUNCTIONS = [
   "booking_notification_context_immutable",
   "booking_notification_delivery_immutable",
   "booking_notification_fact_immutable",
+  "booking_reschedule_facts_immutable",
   "clear_expert_offer_delivery_state",
   "client_booking_guard_privacy_completion",
   "client_commercial_policy_assignment_immutable",
@@ -114,6 +115,7 @@ const HAND_SQL_FUNCTIONS = [
   "lock_and_reject_selarti_budget_policy_overlap",
   "lock_partner_policy_window",
   "payer_receipt_redaction_due",
+  "planerka_availability_mapping_invalidate",
   "planerka_operation_guard",
   "planerka_privacy_completion",
   "planerka_reservation_transition",
@@ -220,6 +222,7 @@ const HAND_SQL_TRIGGERS = [
   "booking_notification_delivery_immutable",
   "booking_notification_fact_delivery_state",
   "booking_notification_fact_immutable",
+  "booking_reschedule_facts_immutable_guard",
   "client_booking_privacy_completion_guard",
   "client_commercial_policy_assignments_no_delete",
   "client_commercial_policy_assignments_no_update",
@@ -330,6 +333,7 @@ const HAND_SQL_TRIGGERS = [
   "partner_tariff_policy_versions_no_overlap",
   "payer_receipt_binding_guard",
   "payer_receipt_contact_guard",
+  "planerka_availability_mapping_invalidation",
   "planerka_operation_identity_guard",
   "planerka_privacy_completion_guard",
   "planerka_reservation_transition_guard",
@@ -479,7 +483,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(70);
+    expect(newest).toBe(74);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -594,7 +598,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0070 adds owner schedule, native source/snapshot and logistics authority.
-    expect(declared.size).toBe(222);
+    // Canonical main through0073 plus native0074.
+    expect(declared.size).toBe(227);
   });
 });

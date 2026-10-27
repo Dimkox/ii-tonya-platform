@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
-  check,
   boolean,
-  jsonb,
+  check,
   char,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -199,6 +199,105 @@ export const feedback = pgTable(
   (table) => [unique("feedback_source_event_unique").on(table.sourceEventId)],
 );
 
+export const bookingWaitlistEntries = pgTable(
+  "booking_waitlist_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slotId: uuid("slot_id")
+      .notNull()
+      .references(() => slots.id),
+    waitlistHandle: char("waitlist_handle", { length: 47 }).notNull(),
+    choiceDigest: char("choice_digest", { length: 71 }).notNull(),
+    joinIdempotencyKey: char("join_idempotency_key", { length: 64 }).notNull(),
+    status: text("status").notNull().default("waiting"),
+    promotedReservationId: uuid("promoted_reservation_id").references(
+      () => reservations.id,
+    ),
+    promotionHoldUntil: timestamp("promotion_hold_until", {
+      withTimezone: true,
+    }),
+    cancellationReason: text("cancellation_reason"),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    unique("booking_waitlist_handle_unique").on(table.waitlistHandle),
+    unique("booking_waitlist_join_key_unique").on(table.joinIdempotencyKey),
+    uniqueIndex("booking_waitlist_one_active_client_slot")
+      .on(table.userId, table.slotId)
+      .where(sql`${table.status} in ('waiting','promoting')`),
+    index("booking_waitlist_fifo_claim_idx")
+      .on(table.slotId, table.createdAt, table.id)
+      .where(sql`${table.status}='waiting'`),
+    check(
+      "booking_waitlist_status_check",
+      sql`${table.status} in ('waiting','promoting','promoted','cancelled','expired')`,
+    ),
+  ],
+);
+
+export const bookingWaitlistCommandReceipts = pgTable(
+  "booking_waitlist_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    commandType: text("command_type").notNull(),
+    idempotencyKey: char("idempotency_key", { length: 64 }).notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestHash: char("request_hash", { length: 71 }).notNull(),
+    waitlistEntryId: uuid("waitlist_entry_id").references(
+      () => bookingWaitlistEntries.id,
+    ),
+    result: jsonb("result").notNull(),
+    createdAt: mutableTimestamps.createdAt,
+  },
+  (table) => [
+    unique("booking_waitlist_receipt_unique").on(
+      table.commandType,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const bookingRescheduleFacts = pgTable(
+  "booking_reschedule_facts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reservationId: uuid("reservation_id")
+      .notNull()
+      .references(() => reservations.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    oldSlotId: uuid("old_slot_id")
+      .notNull()
+      .references(() => slots.id),
+    newSlotId: uuid("new_slot_id")
+      .notNull()
+      .references(() => slots.id),
+    oldVersion: integer("old_version").notNull(),
+    newVersion: integer("new_version").notNull(),
+    resultStatus: text("result_status"),
+    resultReservedUntil: timestamp("result_reserved_until", {
+      withTimezone: true,
+    }),
+    replayRecoverable: boolean("replay_recoverable").notNull().default(false),
+    idempotencyKey: char("idempotency_key", { length: 64 }).notNull().unique(),
+    correlationId: text("correlation_id").notNull(),
+    createdAt: mutableTimestamps.createdAt,
+  },
+  (table) => [
+    check(
+      "booking_reschedule_replay_result_check",
+      sql`(${table.replayRecoverable} and ${table.resultStatus}='reserved' and ${table.resultReservedUntil} is not null)
+        or (not ${table.replayRecoverable} and ${table.resultStatus} is null and ${table.resultReservedUntil} is null)`,
+    ),
+  ],
+);
+
 export const planerkaServiceMappings = pgTable("planerka_service_mappings", {
   expertServiceId: uuid("expert_service_id")
     .primaryKey()
@@ -244,6 +343,29 @@ export const planerkaAccountRequests = pgTable("planerka_account_requests", {
     .notNull()
     .defaultNow(),
 });
+export const planerkaAvailabilityRefreshes = pgTable(
+  "planerka_availability_refreshes",
+  {
+    expertServiceId: uuid("expert_service_id")
+      .primaryKey()
+      .references(() => expertServices.id),
+    accountId: integer("account_id").notNull(),
+    eventTypeId: integer("event_type_id").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    timeZone: text("time_zone").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", {
+      withTimezone: true,
+    }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    reasonCode: text("reason_code"),
+  },
+);
 export const planerkaLegacyBookingReviews = pgTable(
   "planerka_legacy_booking_reviews",
   {

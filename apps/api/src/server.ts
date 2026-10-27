@@ -43,6 +43,7 @@ import {
   createClientBookingService,
   createBookingService,
   createClientSessionService,
+  createWaitlistService,
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
@@ -54,6 +55,7 @@ import {
   type PrivacyService,
   type IdentityProofVerifier,
   type ClientCommercialPolicyPort,
+  type ProtectedWaitlistRepository,
   HybridMessageGateway,
   ClientNavigationGateway,
   createSelartiResponseService,
@@ -85,6 +87,7 @@ import {
   PostgresClientAccountPackagesRepository,
   PostgresCatalogRepository,
   PostgresBookingRepository,
+  PostgresWaitlistRepository,
   PostgresBookingNotificationCallbackRepository,
   PostgresClientSessionRepository,
   PostgresWebhookInboxRepository,
@@ -189,6 +192,10 @@ export const createDefaultLifecycle = (
       readonly verifier: IdentityProofVerifier;
     };
     clientCommercialPolicyRepository?: ClientCommercialPolicyPort;
+    waitlistRepositoryFactory?: (
+      db: DrizzleDb,
+      confirmationBufferMs: number,
+    ) => ProtectedWaitlistRepository;
     testExpertMetricSink?: {
       record(
         event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
@@ -518,6 +525,19 @@ export const createDefaultLifecycle = (
             ),
             confirmationBufferMs:
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
+          })
+        : undefined;
+    const clientWaitlistService =
+      config.features.clientWaitlist === true
+        ? createWaitlistService({
+            repository: (
+              options.waitlistRepositoryFactory ??
+              ((waitlistDb, confirmationBufferMs) =>
+                new PostgresWaitlistRepository(
+                  waitlistDb,
+                  confirmationBufferMs,
+                ))
+            )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000),
           })
         : undefined;
     const clientGateway =
@@ -877,6 +897,7 @@ export const createDefaultLifecycle = (
       clientBookingPrincipal === undefined
         ? {}
         : { clientBookingService, clientBookingPrincipal }),
+      ...(clientWaitlistService === undefined ? {} : { clientWaitlistService }),
       ...(expertTelegramQueries === undefined ? {} : { expertTelegramQueries }),
       ...(options.expertAiComposition === undefined
         ? {}

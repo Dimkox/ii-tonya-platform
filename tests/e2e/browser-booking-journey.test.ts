@@ -77,6 +77,7 @@ async function appFor(userId: string, grants = true, reserve = true) {
       repository: new PostgresBookingRepository(testDb.db),
     }),
     reserveEnabled: reserve,
+    waitlistEnabled: false,
   });
   await app.register(browserAccountRoutes, {
     origin,

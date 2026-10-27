@@ -744,7 +744,7 @@ it("settles saved three-month cash/duration consecutively, replays and reverses 
 });
 
 it.each(["user", "tariff"] as const)(
-  "rereads changed %s after an observed row-lock wait",
+  "rereads changed %s after an observed authority-lock wait",
   async (kind) => {
     const q = await quote(),
       c = command(q.id);
@@ -764,7 +764,7 @@ it.each(["user", "tariff"] as const)(
       );
     const boundary = gate((text) =>
       kind === "user"
-        ? text.includes("from users where")
+        ? text.startsWith("select pg_advisory_xact_lock(")
         : text.includes("from expert_residency_tariff_versions where"),
     );
     const work = orders(boundary.db).createCheckoutOrder(c);
@@ -1945,7 +1945,7 @@ it("expiry completes a historical partial allocation exactly once without revers
   await database.db.transaction(async (tx) => {
     await tx.execute(sql`set local session_replication_role=replica`);
     await tx.execute(
-      sql`update expert_residency_orders set payment_deadline=clock_timestamp()-interval '1 second' where id=${f.order.id}::uuid`,
+      sql`update expert_residency_orders set created_at=clock_timestamp()-interval '2 seconds',payment_deadline=clock_timestamp()-interval '1 second' where id=${f.order.id}::uuid`,
     );
   });
   expect(await legacy().releaseExpiredOrders()).toEqual({

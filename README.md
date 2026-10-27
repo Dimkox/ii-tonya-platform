@@ -12,14 +12,39 @@ authoritative ии-Тоня source document.
 
 ## Status
 
-Native production runtime deployed; live-provider activation remains closed. As of
-2026-09-18 the dedicated Ubuntu server serves
-`cb07bd1821d8106b0b0088b17bcf305662a1b792` as systemd-managed API and worker
-services with system PostgreSQL, nginx, and HTTPS for `ii-tonya.ru` and
-`www.ii-tonya.ru`. The prior immutable directory
-`7498ce656e1e49fe2d92c83f02d9667eb3f86b9b` is `.previous-release`
-([deploy evidence](docs/test-evidence/production/cb07bd18-deploy-2026-09-18.md);
-[host identity](docs/test-evidence/production/host-identity-2026-09-17.md)).
+Test delivery deadline: 2026-09-07. The test-only release boundary covers local fixtures,
+contract tests, isolated test containers, and provider-connected staging only where its
+authenticated evidence is recorded. Every external capability remains default-off until
+its own test evidence passes; production activation is outside this delivery scope. The
+non-secret credential inventory is maintained in
+[the test credential runbook](docs/runbooks/test-credential-inventory.md), and provider
+status is tracked in [the staging evidence runbook](docs/runbooks/provider-staging-evidence.md).
+
+The public landing is now emitted as raw, indexable HTML during the Vite build rather
+than being created only in the browser. It includes canonical/Open Graph/Twitter
+metadata, truthful `WebSite`/`Organization`/`FAQPage` JSON-LD, robots/sitemap assets,
+responsive AVIF/WebP imagery, and a project-local Codex adaptation of the upstream
+[`seo-landing` v1.11 skill](.agents/skills/seo-landing/UPSTREAM.md). Yandex Metrika counter
+`111827123` remains an explicitly approved first-load dependency. Historical landing
+evidence for the referenced exact product tree is recorded in
+[`docs/test-evidence/landing/1642fda93de2f201e3a8b59059e15fa45f0a3f93/verification.md`](docs/test-evidence/landing/1642fda93de2f201e3a8b59059e15fa45f0a3f93/verification.md).
+
+Release D1 implements and tests default-off client rescheduling and FIFO waitlist
+operations. PostgreSQL owns protected handles, owner authorization, immutable reschedule
+facts, capacity fencing, and retry-safe command receipts. Promoted reservations are held
+until the earlier of 72 hours or the slot start minus the configured client confirmation
+buffer. Reservation expiry records `waitlist.promote.v1` in the same transaction, so a
+crash cannot lose newly available capacity; provider delivery and Planerka activation
+remain later default-off test-release gates. Expert composite rescheduling remains
+deferred.
+
+This branch is a test/PR release candidate and is not claimed as the currently deployed
+production tree. Historical deployment evidence for exact release
+`233f3cf72e45e47117948ad5615b603252801e40` is recorded in
+[`docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md`](docs/test-evidence/production/233f3cf72e45e47117948ad5615b603252801e40/deployment.md).
+That historical native release required host-only recovery settings and is not accepted
+as a reproducible cold-deploy artifact; a corrected exact-SHA replacement remains a
+separate release task.
 The client platform foundation is implemented, while live-provider gates remain closed.
 Release B2 now contains the default-off single-dialogue response convergence slice:
 deterministic and accepted Selarti replies receive one monotonic dialogue sequence and
@@ -392,8 +417,9 @@ RUB from 2028. At listed ARPE `5,109 RUB`, those annual thresholds correspond to
 
 ## Production topology
 
-Production is a dedicated Linux server for this project. The application is deployed as
-a signed native release bundle and runs as two non-root systemd services: API and worker.
+Production targets a dedicated Linux server for this project. The application is designed
+to deploy as a signed native release bundle and run as two non-root systemd services: API
+and worker.
 The host uses its system PostgreSQL instance and nginx/TLS reverse proxy. Application
 containers, Docker Compose, and a container runtime are not part of production or
 staging. Docker remains available only for reproducible development, direct Claw tests, test
@@ -514,4 +540,4 @@ B1 owns authenticated private client Telegram text ingress at `POST /v1/webhooks
 
 Traceability: gateway routing and disabled behavior → `packages/application/src/hybrid-message-gateway.test.ts`; webhook authentication, terminal/retry HTTP semantics, and preserved expert ordering → `apps/api/src/routes/telegram-webhook.test.ts`; atomic identity, consent, replay, ownership, accounting isolation, retention, and outbox behavior → `tests/integration/hybrid-message-gateway-b1.test.ts`; 0033→0034 preservation → `tests/integration/hybrid-message-gateway-b1-migration-upgrade.test.ts`; migration/schema parity → `tests/repo/hybrid-message-gateway-schema-parity.test.ts`.
 
-Rollback/forward recovery: set `CLIENT_TELEGRAM_INGRESS_ENABLED=false` and restart the API; do not reverse migrations 0034–0036 or delete journaled dialogue/inbound/outbox, delivery, reservation, or reconciliation facts. Diagnose and repair forward, reconcile pending `selarti.request.v1` and ambiguous delivery/outcome rows by idempotency key, then re-enable only after focused replay, consent, ordering, retention, and budget tests pass. B2 response convergence/retention and B3 cost admission are implemented and default-off. Full `pnpm verify` and independent architecture, security, and release reviews have completed for the current Release B tree; evidence is recorded in PR #38 and the raw verification evidence. Any subsequent repository change invalidates that evidence and requires fresh exact-SHA verification. Live provider/Selarti activation, external Trust CI, signed approvals, and staging/native provider evidence remain pending/default-off. Because `selarti.request.v1` contains bounded client text, its production creation remains explicitly activation-blocked until those gates pass.
+Rollback/forward recovery: set `CLIENT_TELEGRAM_INGRESS_ENABLED=false` and restart the API; do not reverse migrations 0034–0036 or delete journaled dialogue/inbound/outbox, delivery, reservation, or reconciliation facts. Diagnose and repair forward, reconcile pending `selarti.request.v1` and ambiguous delivery/outcome rows by idempotency key, then re-enable only after focused replay, consent, ordering, retention, and budget tests pass. B2 response convergence/retention and B3 cost admission are implemented and default-off. Historical `pnpm verify` and independent architecture, security, and release-review evidence for Release B is recorded in PR #38 and the raw verification evidence; it is not evidence for this branch. The current release candidate requires fresh exact-SHA verification. Live provider/Selarti activation, external Trust CI, signed approvals, and staging/native provider evidence remain pending/default-off. Because `selarti.request.v1` contains bounded client text, its production creation remains explicitly activation-blocked until those gates pass.

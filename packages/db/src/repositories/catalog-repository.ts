@@ -46,6 +46,22 @@ type RawCatalogExpertRecord = Omit<CatalogExpertRecord, "slotStartsAt"> & {
 };
 
 const MAX_RESULTS = 500;
+const providerEligible = sql`(s.provider <> 'planerka' or exists (
+  select 1 from planerka_service_mappings m
+  where m.expert_service_id=s.expert_service_id and m.enabled
+    and m.verified_at<=clock_timestamp() and m.duration_minutes=es.duration_minutes
+    and extract(epoch from (s.ends_at-s.starts_at))=m.duration_minutes*60
+    and s.capacity=1
+))`;
+// Same-slot occupancy continues to respect capacity. Other slots/services for
+// this expert conflict by actual interval, independently of their provider.
+const noExpertOverlap = (now: Date) => sql`not exists (
+  select 1 from reservations occupied join slots booked_slot on booked_slot.id=occupied.slot_id
+  where occupied.expert_id=e.id and occupied.slot_id<>s.id
+    and (occupied.status='booked' or (occupied.status='reserved' and occupied.reserved_until>${now}))
+    and booked_slot.starts_at<coalesce((select occupied_until from resident_native_slots where slot_id=s.id),s.ends_at)
+    and coalesce((select occupied_until from resident_native_slots where slot_id=booked_slot.id),booked_slot.ends_at)>s.starts_at
+)`;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
@@ -154,6 +170,9 @@ export class PostgresCatalogRepository {
         and (${serviceCode}::text is null or es.code = ${serviceCode})
         and (${language}::text is null or es.language = ${language})
         and resident_slot_fresh(s.id,${input.now})
+        and ${providerEligible}
+        and ${noExpertOverlap(input.now)}
+        and s.ends_at>s.starts_at and s.capacity>0
         and s.starts_at >= ${earliest}
         and s.starts_at < ${input.to}
         and (
@@ -210,10 +229,15 @@ export class PostgresCatalogRepository {
       )
       where s.expert_service_id=${input.sourceKey}::uuid
         and e.active and e.verified and es.active
-        and (s.provider<>'resident_native' or resident_native_slot_valid(s.id,${input.databaseNow}))
+        and resident_slot_fresh(s.id,${input.databaseNow})
+        and s.starts_at>=${new Date(input.databaseNow.getTime() + 86400000)}
+        and s.ends_at>s.starts_at and s.capacity>0
+        and ${providerEligible}
+        and ${noExpertOverlap(input.databaseNow)}
         and not exists(select 1 from resident_schedule_busy b where b.expert_id=e.id and b.starts_at<s.ends_at and b.ends_at>s.starts_at)
         and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
       group by s.id,s.starts_at,s.observed_at,s.capacity
+      having s.capacity>count(r.id)
       order by s.starts_at,s.id
       limit ${MAX_RESULTS}
     `);

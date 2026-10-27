@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "policy": "minimum_or_newer; built is the tested pin",
+  "tools": [
+    {
+      "id": "python3",
+      "name": "Python 3",
+      "required": true,
+      "commands": [
+        "python3",
+        "python"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "3.12.3",
+      "minimum": "3.10",
+      "fallback": "3.12",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip",
+        "darwin": "brew install python@3.12",
+        "windows": "winget install -e --id Python.Python.3.12",
+        "generic": "https://www.python.org/downloads/"
+      }
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "required": true,
+      "commands": [
+        "git"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "2.43.0",
+      "minimum": "2.34",
+      "fallback": "2.43",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y git",
+        "darwin": "brew install git",
+        "windows": "winget install -e --id Git.Git",
+        "generic": "https://git-scm.com/downloads"
+      }
+    },
+    {
+      "id": "grok",
+      "name": "Grok Build CLI",
+      "required": false,
+      "profile": "tui",
+      "commands": [
+        "grok"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "1.0.5",
+      "minimum": "1.0.0",
+      "fallback": "1.0.5",
+      "install": {
+        "linux": "curl -fsSL https://x.ai/cli/install.sh | bash",
+        "darwin": "curl -fsSL https://x.ai/cli/install.sh | bash",
+        "windows": "irm https://x.ai/cli/install.ps1 | iex",
+        "generic": "https://x.ai/build"
+      }
+    },
+    {
+      "id": "pwsh",
+      "name": "PowerShell",
+      "required": false,
+      "profile": "windows",
+      "commands": [
+        "pwsh"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "7.4.6",
+      "minimum": "7.4",
+      "fallback": "7.4",
+      "install": {
+        "linux": "https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-linux",
+        "darwin": "brew install --cask powershell",
+        "windows": "winget install -e --id Microsoft.PowerShell",
+        "generic": "https://aka.ms/powershell-release?tag=lts"
+      }
+    },
+    {
+      "id": "gh",
+      "name": "GitHub CLI",
+      "required": false,
+      "profile": "release",
+      "commands": [
+        "gh"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "2.86.0",
+      "minimum": "2.40",
+      "fallback": "2.86",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y gh",
+        "darwin": "brew install gh",
+        "windows": "winget install -e --id GitHub.cli",
+        "generic": "https://cli.github.com/"
+      }
+    },
+    {
+      "id": "node",
+      "name": "Node.js",
+      "required": false,
+      "profile": "frontend",
+      "commands": [
+        "node"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "24.19.0",
+      "minimum": "20.0",
+      "fallback": "20",
+      "install": {
+        "linux": "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs",
+        "darwin": "brew install node@20",
+        "windows": "winget install -e --id OpenJS.NodeJS.LTS",
+        "generic": "https://nodejs.org/"
+      }
+    },
+    {
+      "id": "npm",
+      "name": "npm",
+      "required": false,
+      "profile": "frontend",
+      "commands": [
+        "npm"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "11.17.0",
+      "minimum": "9.0",
+      "fallback": "10",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y npm",
+        "darwin": "brew install node@20",
+        "windows": "winget install -e --id OpenJS.NodeJS.LTS",
+        "generic": "https://www.npmjs.com/get-npm"
+      }
+    },
+    {
+      "id": "php",
+      "name": "PHP",
+      "required": false,
+      "profile": "php",
+      "commands": [
+        "php"
+      ],
+      "version_args": [
+        "-v"
+      ],
+      "built": "8.2",
+      "minimum": "8.1",
+      "fallback": "8.2",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y php-cli php-xml php-mbstring",
+        "darwin": "brew install php@8.2",
+        "windows": "winget install -e --id PHP.PHP.8.2",
+        "generic": "https://www.php.net/downloads"
+      }
+    },
+    {
+      "id": "composer",
+      "name": "Composer",
+      "required": false,
+      "profile": "php",
+      "commands": [
+        "composer"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "2.7",
+      "minimum": "2.2",
+      "fallback": "2.7",
+      "install": {
+        "linux": "curl -sS https://getcomposer.org/installer | php && sudo mv composer.phar /usr/local/bin/composer",
+        "darwin": "brew install composer",
+        "windows": "winget install -e --id Composer.Composer",
+        "generic": "https://getcomposer.org/download/"
+      }
+    },
+    {
+      "id": "docker",
+      "name": "Docker Engine",
+      "required": false,
+      "profile": "trust-ci",
+      "commands": [
+        "docker"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "29.7.2",
+      "minimum": "24.0",
+      "fallback": "29",
+      "install": {
+        "linux": "sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2",
+        "darwin": "brew install --cask docker",
+        "windows": "winget install -e --id Docker.DockerDesktop",
+        "generic": "https://docs.docker.com/engine/install/"
+      }
+    },
+    {
+      "id": "syft",
+      "name": "Syft",
+      "required": false,
+      "profile": "supply-chain",
+      "commands": [
+        "syft"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "built": "1.51.0",
+      "minimum": "1.0",
+      "fallback": "1.51",
+      "install": {
+        "linux": "curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin",
+        "darwin": "curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin",
+        "windows": "winget install -e --id Anchore.Syft",
+        "generic": "https://github.com/anchore/syft/releases"
+      }
+    },
+    {
+      "id": "trivy",
+      "name": "Trivy",
+      "required": false,
+      "profile": "supply-chain",
+      "commands": [
+        "trivy"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "built": "0.74.0",
+      "minimum": "0.50",
+      "fallback": "0.74",
+      "install": {
+        "linux": "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.74.0",
+        "darwin": "brew install trivy",
+        "windows": "winget install -e --id AquaSecurity.Trivy",
+        "generic": "https://trivy.dev/docs/latest/getting-started/installation/"
+      }
+    },
+    {
+      "id": "cosign",
+      "name": "Cosign",
+      "required": false,
+      "profile": "supply-chain",
+      "commands": [
+        "cosign"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "built": "3.1.3",
+      "minimum": "2.0",
+      "fallback": "2.4",
+      "install": {
+        "linux": "curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.4.3/cosign-linux-amd64 -o /tmp/cosign && sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign",
+        "darwin": "brew install cosign",
+        "windows": "winget install -e --id sigstore.cosign",
+        "generic": "https://github.com/sigstore/cosign/releases"
+      }
+    },
+    {
+      "id": "jscpd",
+      "name": "jscpd (scan supports exactly 4.0.5)",
+      "required": false,
+      "profile": "duplicates",
+      "commands": [
+        "jscpd"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "minimum": "4.0.5",
+      "built": "4.0.5",
+      "fallback": "4.0.5",
+      "install": {
+        "generic": "npm install -g --ignore-scripts --no-audit --no-fund jscpd@4.0.5"
+      }
+    }
+  ],
+  "workflow_sources": {
+    "policy": "verified_against; mandatory pinned baseline installed for the selected agent",
+    "components": [
+      {
+        "id": "superpowers",
+        "name": "Superpowers",
+        "repository": "obra/superpowers",
+        "pinned": "6.4.2",
+        "upstream_tag": "v6.4.2",
+        "release_published_at": "2026-09-25",
+        "observed_latest": "6.4.2",
+        "observed_at": "2026-10-06",
+        "roles": [
+          "spec",
+          "plan",
+          "sdd-evidence"
+        ],
+        "tracked_prefixes": [
+          "docs/superpowers/",
+          ".superpowers/sdd/"
+        ],
+        "verification_tests": [
+          "tests.test_workflow_artifacts_adversarial.NativeStatusTests.test_unmodified_superpowers_and_richer_framework_documents_remain_advisory"
+        ],
+        "pinned_commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "install": {
+          "user": "git clone --branch <upstream_tag>, HEAD must equal pinned_commit",
+          "project": "skills/ copied into .agents/skills and the agent skill directory without overwriting; Copilot additionally needs the upstream marketplace plugin (not pinned)"
+        }
+      },
+      {
+        "id": "bmad",
+        "name": "BMAD Method",
+        "repository": "bmad-code-org/BMAD-METHOD",
+        "pinned": "6.12.1",
+        "upstream_tag": "v6.12.1",
+        "release_published_at": "2026-10-04",
+        "observed_latest": "6.12.1",
+        "observed_at": "2026-10-06",
+        "roles": [
+          "prd",
+          "spec",
+          "architecture",
+          "project-context",
+          "epics",
+          "stories",
+          "sprint-status",
+          "readiness"
+        ],
+        "tracked_prefixes": [
+          "_bmad/",
+          "_bmad-output/"
+        ],
+        "verification_tests": [
+          "tests.test_workflow_artifacts.WorkflowCompileTests.test_unmodified_bmad_story_subset_compiles_without_trusting_done_status"
+        ],
+        "breaking_notes": [
+          "persistent_facts ships empty (project-context.md is no longer auto-loaded)",
+          "{diff_output} is now {diff_file}",
+          "bmad-checkpoint-preview renamed bmad-walkthrough (CK to WT; old ID still forwards)"
+        ],
+        "pinned_commit": "790dae9c8e2a1d73575cb2d40b14dd4963391f29",
+        "install": {
+          "user": "git clone --branch <upstream_tag> (pinned source of record); Node.js for the installer",
+          "project": "npx --yes bmad-method@<pinned> install --directory <staging> --tools <tool> --yes, merged without overwriting",
+          "tools": {
+            "claude": "claude-code",
+            "codex": "codex",
+            "qwen": "qwen",
+            "gemini": "gemini",
+            "grok": "grok",
+            "copilot": "github-copilot"
+          }
+        }
+      },
+      {
+        "id": "spec-kit",
+        "name": "GitHub Spec Kit",
+        "repository": "github/spec-kit",
+        "pinned": "1.1.0",
+        "upstream_tag": "v1.1.0",
+        "release_published_at": "2026-10-02",
+        "observed_latest": "1.1.0",
+        "observed_at": "2026-10-06",
+        "roles": [
+          "constitution",
+          "spec",
+          "plan",
+          "tasks",
+          "checklist"
+        ],
+        "tracked_prefixes": [
+          ".specify/",
+          "specs/"
+        ],
+        "verification_tests": [
+          "tests.test_workflow_artifacts.WorkflowCompileTests.test_unmodified_spec_kit_tasks_subset_compiles_phases_and_parallel_markers"
+        ],
+        "pinned_commit": "f1d3a4f8337ebbd3ae22760a9c12e3352b93a175",
+        "install": {
+          "user": "uv tool install --force specify-cli --from git+https://github.com/<repository>.git@<upstream_tag>",
+          "project": "specify init --here --integration <integration> --non-interactive --ignore-agent-tools in a staging directory, merged without overwriting",
+          "integrations": {
+            "claude": "claude",
+            "codex": "codex",
+            "qwen": "qwen",
+            "gemini": "gemini",
+            "grok": "grok",
+            "copilot": "copilot"
+          }
+        }
+      }
+    ]
+  }
+}

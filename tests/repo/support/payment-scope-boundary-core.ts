@@ -97,7 +97,8 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
-  "packages/db/migrations/0070_resident_native_scheduling.sql",
+  "packages/db/migrations/0074_resident_native_scheduling.sql",
+  "packages/db/migrations/0070_planerka_availability.sql",
   "packages/db/migrations/0069_resident_semantic_tags.sql",
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0061_resident_content_safety.sql",
@@ -136,6 +137,9 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
+  "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0072_booking_waitlist_d1.sql",
+  "packages/db/migrations/0073_booking_reschedule_replay.sql",
   "packages/db/migrations/0039_consent_evidence_grant.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
@@ -264,6 +268,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "client_coupon_grants",
   "client_paid_settlements",
   "planerka_service_mappings",
+  "planerka_availability_refreshes",
   "planerka_booking_operations",
   "planerka_account_requests",
   "planerka_legacy_booking_reviews",
@@ -315,6 +320,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "selarti_response_proposals",
   "dialogue_deliveries",
   "dialogue_inbound_tombstones",
+  "lifecycle_jobs",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "selarti_budget_policies",
   "selarti_cost_reservations",
   "selarti_actual_usage_facts",
@@ -431,7 +440,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "dc65fa5ea4995a96c0e665b6f7d2c7ff078d62e9dc21de496d0830c902514674",
+    "2785cdbf845c7b68c695d855127ac0edee2ae0a90904f1e6c32e1599c8d3628f",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -439,7 +448,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/db/src/schema/index.ts",
-    "5aee7c39e247c880a929f286b94a4d42496f05e0b89bab868a1447d0c182b17f",
+    "c7d85fe5ddd7e7701ff47459fc720ef2a2f61f70200728380928cd181d760c5d",
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
@@ -477,7 +486,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/payer-receipt-source.ts",
-    "6ad654da46447e339f1beca611dece1279d2b76a13a64672b7fd40cad5431abb",
+    "25c08bcd83582d43193059371662c1f99d0cf9485facf2ff11a6c3364f7ef4e8",
   ],
   [
     "packages/integrations/src/yookassa/payer-receipt-vault.ts",
@@ -485,7 +494,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "e50af593b5dc130e0ac77412c481cd4c869e09aa0d11790ef774da7727724db7",
+    "f7bab87698f4c2e40567eb7c384e74ca160cff281ce66ab13b0174715d2ffc27",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -497,7 +506,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/client.ts",
-    "89a55569d5170d266f2c416963f26c023a11947917be6a102140f785e2173802",
+    "d2f344d4f4598a09babd95453a303a044de1db492a533632a1b95726b99fb8f8",
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
@@ -509,7 +518,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "1dbf7d327899b3366329da96b438b17fd50a18b7839bbf6c28313ddffe12fd64",
+    "e05e7a6d3806837ddecf651c575856ec0869d31a3d8782d53aaa6fe280e0ac5b",
   ],
   [
     "packages/integrations/src/yookassa/receipt-contact-source.ts",
@@ -517,7 +526,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
-    "1d7be29d640f6895983bfffc7b2db49d84855baac626dbdc8b46e5c4ff964bf2",
+    "39b16ddb47a45eb630ea4b50e4b2e1a717eecc51e194b54e8b03b3acd401a26a",
   ],
   [
     "packages/integrations/src/yookassa/reconciliation-reader.ts",
@@ -971,22 +980,122 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
-    "packages/db/migrations/0070_resident_native_scheduling.sql",
+    "packages/db/migrations/0074_resident_native_scheduling.sql",
+    "7ad346d5b1601d517173b03d1de7d020c8368ea195cc36e0facb2bb4cdd1fc53",
+  ],
+  [
+    "packages/db/migrations/meta/0074_snapshot.json",
+    "660ae7042892e4e001f33b719370fb79862d8a039ef8b84955b19add73421f72",
+  ],
+  [
+    "packages/db/migrations/state/0074_manifest.json",
+    "b49f86f02dc39518573bc381cb62b174c05988c41a281334f2caff58501b3bf3",
+  ],
+  [
+    "packages/db/migrations/state/0074_sql_objects.json",
+    "1210b6e2625484f2027a41afa2e4ef10452b3c64756e19e6c5beeee6ba21f4ca",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/0070_resident_native_scheduling.sql",
     "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
   ],
   [
-    "packages/db/migrations/meta/0070_snapshot.json",
+    "packages/db/migrations/history/native-before-main-20261027/manifest.json",
+    "85f53a3b8e77704c1110ab4e8b1af8f15d0628f6de076de1a56e39b304665713",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/meta/0070_snapshot.json",
     "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
   ],
   [
-    "packages/db/migrations/state/0070_sql_objects.json",
+    "packages/db/migrations/history/native-before-main-20261027/meta/_journal.json",
+    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/state/0070_manifest.json",
+    "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/state/0070_sql_objects.json",
     "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0",
+  ],
+
+  [
+    "packages/db/migrations/meta/0070_snapshot.json",
+    "538bfaf12180e49f5f2a0e9d4a4d2574645b899401d52aaf632fe1ce37b4ab0c",
   ],
   [
     "packages/db/migrations/state/0070_manifest.json",
-    "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+    "aff9330d9c1bbd94ef511e298ebd6d8c40849a4abcc0d869a41208d9179ee925",
   ],
-
+  [
+    "packages/db/migrations/state/0070_sql_objects.json",
+    "96a9dd70096a148a598a23c5a0719f50f3545659015234e5a9a6913da8a04aff",
+  ],
+  [
+    "packages/db/migrations/meta/0071_snapshot.json",
+    "e511235411b7c01a50e672daf14e5309563f5a8199ce583189512a83b8e187f8",
+  ],
+  [
+    "packages/db/migrations/state/0071_manifest.json",
+    "44564b00bcde15055269fd0a0e4dfb5fb94044e18d6dfda8867b4ff993209ef4",
+  ],
+  [
+    "packages/db/migrations/state/0071_sql_objects.json",
+    "57a3764156e186e7e6ca025059d489141e57add709de267691f54881052b97cf",
+  ],
+  [
+    "packages/db/migrations/meta/0072_snapshot.json",
+    "2dbc15b5c2f22ace38a587cf7190d0751eb9a9463c8f900160b9b7004909fa92",
+  ],
+  [
+    "packages/db/migrations/state/0072_manifest.json",
+    "0933260beb39a30155da3a96dec70875e1d9a5a4341e3469e38c3bd3df53b90f",
+  ],
+  [
+    "packages/db/migrations/state/0072_sql_objects.json",
+    "d011f500ac43301819458357621847f25ccbd1a5eb0c3050f243840f53e6eebd",
+  ],
+  [
+    "packages/db/migrations/meta/0073_snapshot.json",
+    "e415d2dfb48f49cacd58af880d239f3cc8c6f6da05ee55720db5535e07f10613",
+  ],
+  [
+    "packages/db/migrations/state/0073_manifest.json",
+    "db078855e5d7bffe45b65e40c0d295734fc50f3d804062044e13d364ee78edca",
+  ],
+  [
+    "packages/db/migrations/state/0073_sql_objects.json",
+    "43732405c71a10780f3549adef95bb41a092f1bf640ef608d53ded1419e75339",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0039_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0040_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0041_booking_reschedule_replay.sql",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/manifest.json",
+    "eb0370db0c6dc802c30b300cf8fc6bcac7cd7afe2853d5266075da9bc2ecefcf",
+  ],
+  [
+    "packages/db/migrations/history/rc-before-unification/0051_planerka_availability.sql",
+    "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e",
+  ],
+  [
+    "packages/db/migrations/history/rc-before-unification/manifest.json",
+    "7f9b67cfdde6889b3af37ad192b8247c21f32c1276b2a7c5c3b0e7ab9affb9e8",
+  ],
+  [
+    "packages/db/migrations/0070_planerka_availability.sql",
+    "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e",
+  ],
   [
     "packages/db/migrations/0069_resident_semantic_tags.sql",
     "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2",
@@ -1653,12 +1762,24 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
+    "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
+    "packages/db/migrations/0072_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/0073_booking_reschedule_replay.sql",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
+  ],
+  [
     "packages/db/migrations/0039_consent_evidence_grant.sql",
     "1da4691ba27f4e22bc84346cc367b820d4f12280fcb1f04077f75111bc5b2e0f",
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+    "8953ec42b629f280f8b04b8c744a019e0252d31ea6bf67d5a220dc4cab1397ff",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1738,7 +1859,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+    "8953ec42b629f280f8b04b8c744a019e0252d31ea6bf67d5a220dc4cab1397ff",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -1804,6 +1925,9 @@ const approvedDatabaseRelations = new Set([
   "channel_identities",
   "client_booking_erasure_work",
   "client_booking_receipts",
+  "booking_reschedule_facts",
+  "booking_waitlist_command_receipts",
+  "booking_waitlist_entries",
   "client_catalog_choices",
   "client_catalog_erasure_index",
   "client_catalog_requests",
@@ -1916,9 +2040,30 @@ const isExecutableAutomationPath = (path: string): boolean =>
 const isVersionedBmadToolingPath = (path: string): boolean =>
   path.startsWith("_bmad/") || /^\.agents\/skills\/bmad-[^/]+\//u.test(path);
 
+// Getzilla workflow tooling installed by `getzilla update`: its engine, hooks, root hook
+// shims and helper scripts. Vendored like BMAD; it never ships with the product.
+const GETZILLA_ROOT_HOOK_SHIMS = new Set([
+  "session_start.py",
+  "user_prompt_submit.py",
+  "pre_tool_use.py",
+  "post_tool_use.py",
+  "pre_compact.py",
+  "subagent_start.py",
+  "subagent_stop.py",
+  "stop_gate.py",
+  "session_end.py",
+]);
+
+const isVersionedGetzillaToolingPath = (path: string): boolean =>
+  path.startsWith(".getzilla/") ||
+  path.startsWith(".grok/hooks/") ||
+  /^scripts\/getzilla_[a-z_]+\.py$/u.test(path) ||
+  GETZILLA_ROOT_HOOK_SHIMS.has(path);
+
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
   if (isVersionedBmadToolingPath(path)) return false;
+  if (isVersionedGetzillaToolingPath(path)) return false;
   if (path.endsWith("/package.json") || path === "package.json") return true;
   if (
     /^packages\/db\/migrations\/.+\.(?:sql|json)$/u.test(path) ||

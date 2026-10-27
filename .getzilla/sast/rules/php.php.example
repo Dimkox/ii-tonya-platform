@@ -1,0 +1,31 @@
+<?php
+
+function findUser($conn, $name)
+{
+    // ruleid: getzilla.php.sql-injection
+    return mysqli_query($conn, "SELECT * FROM users WHERE name = '" . $name . "'");
+}
+
+findUser($conn, $_GET['name']);
+// ok: getzilla.php.sql-injection
+mysqli_query($conn, "SELECT * FROM users WHERE id = " . intval($_GET['id']));
+
+// ruleid: getzilla.php.command-injection
+system("ping -c 1 " . $_GET['host']);
+// ok: getzilla.php.command-injection
+system("ping -c 1 " . escapeshellarg($_GET['host']));
+
+// ruleid: getzilla.php.file-inclusion
+include $_GET['page'] . '.php';
+// ok: getzilla.php.file-inclusion
+include basename($_GET['page']) . '.php';
+
+// ruleid: getzilla.php.reflected-xss
+echo "Hello " . $_GET['name'];
+// ok: getzilla.php.reflected-xss
+echo "Hello " . htmlspecialchars($_GET['name']);
+
+// ruleid: getzilla.php.code-injection
+$data = unserialize($_COOKIE['cart']);
+// ok: getzilla.php.code-injection
+$data = json_decode($_COOKIE['cart'], true);

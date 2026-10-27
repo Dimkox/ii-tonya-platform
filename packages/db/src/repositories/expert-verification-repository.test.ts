@@ -65,7 +65,9 @@ describe("raw PostgreSQL timestamp authorization and settlement boundary", () =>
               ? [admin]
               : query.includes("select clock_timestamp() as now")
                 ? [{ now: value(clock) }]
-                : query.includes("where a.verification_status='pending'")
+                : query.includes(
+                      "from expert_onboarding_applications a join users",
+                    )
                   ? [queue]
                   : [],
         queries,

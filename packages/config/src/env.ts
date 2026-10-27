@@ -77,6 +77,7 @@ const schema = z
     PLANERKA_ENABLED: z.literal("false").default("false"),
     PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_RECOVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    PLANERKA_AVAILABILITY_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_API_KEY: z
       .string()
       .regex(/^cal_[A-Za-z0-9_-]{1,252}$/u)
@@ -115,6 +116,7 @@ const schema = z
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_WAITLIST_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_ERASURE_REQUESTS_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_WEB_ORIGIN: z
@@ -159,6 +161,12 @@ const schema = z
     TEST_EXPERT_RECONCILIATION_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    LIFECYCLE_REMINDERS_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_CHECKUPS_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_FEEDBACK_ENABLED: z.enum(["true", "false"]).default("false"),
+    LIFECYCLE_COUPON_NOTICES_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     TEST_EXPERT_PROMPT_VERSION: optionalNonEmptyString,
     SELARTI_RESPONSE_SHARED_SECRET: z
       .string()
@@ -168,7 +176,7 @@ const schema = z
       .optional(),
     CLIENT_TELEGRAM_BOT_KEY: z
       .string()
-      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
       .optional(),
     CLIENT_MESSAGING_CONSENT_POLICY_VERSION: z
       .string()
@@ -251,7 +259,8 @@ const schema = z
   .passthrough()
   .superRefine((value, context) => {
     if (
-      (value.PLANERKA_CREATE_ENABLED === "true" &&
+      ((value.PLANERKA_CREATE_ENABLED === "true" ||
+        value.PLANERKA_AVAILABILITY_ENABLED === "true") &&
         value.PLANERKA_RECOVERY_ENABLED !== "true") ||
       (value.PLANERKA_RECOVERY_ENABLED === "true" &&
         (!value.PLANERKA_API_KEY || !value.PLANERKA_ACCOUNT_ID))
@@ -444,6 +453,7 @@ export type RuntimeConfig = {
   };
   planerkaWorkflow?: {
     createEnabled: boolean;
+    availabilityEnabled?: true;
     apiKey: string;
     accountId: number;
   };
@@ -499,6 +509,7 @@ export type RuntimeConfig = {
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
+    clientWaitlist?: boolean;
     clientPrivacy?: boolean;
     clientErasureRequests?: boolean;
     clientFreeAccessV2?: boolean;
@@ -523,6 +534,10 @@ export type RuntimeConfig = {
     expertAiIngress?: boolean;
     expertTelegramReferral?: boolean;
     expertTelegramCheckout?: boolean;
+    lifecycleReminders?: boolean;
+    lifecycleCheckups?: boolean;
+    lifecycleFeedback?: boolean;
+    lifecycleCouponNotices?: boolean;
     yookassa?: boolean;
   };
   clientBookingConfirmationBufferMs?: number;
@@ -791,6 +806,33 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     throw new Error("booking_notifications_configuration_invalid");
   const value = schema.parse(source);
   if (
+    value.CLIENT_WAITLIST_ENABLED === "true" &&
+    (value.CLIENT_BOOKING_ENABLED !== "true" ||
+      value.CLIENT_CATALOG_ENABLED !== "true" ||
+      value.CLIENT_SESSION_ENABLED !== "true")
+  ) {
+    throw new Error("client_waitlist_configuration_incomplete");
+  }
+  if (value.LIFECYCLE_CHECKUPS_ENABLED === "true") {
+    throw new Error("lifecycle_checkup_authority_unavailable");
+  }
+  if (value.LIFECYCLE_FEEDBACK_ENABLED === "true") {
+    throw new Error("lifecycle_feedback_authority_unavailable");
+  }
+  if (value.LIFECYCLE_COUPON_NOTICES_ENABLED === "true") {
+    throw new Error("lifecycle_coupon_authority_unavailable");
+  }
+  if (value.LIFECYCLE_REMINDERS_ENABLED === "true") {
+    if (
+      value.CLIENT_BOOKING_ENABLED !== "true" ||
+      value.WORKER_OUTBOX_DELIVERY_ENABLED !== "true" ||
+      !value.CLIENT_TELEGRAM_BOT_KEY ||
+      !value.CLIENT_MESSAGING_CONSENT_POLICY_VERSION
+    ) {
+      throw new Error("lifecycle_scheduler_configuration_incomplete");
+    }
+  }
+  if (
     ((value.CLIENT_WEB_ORIGIN !== undefined &&
       (value.CLIENT_TELEGRAM_NAVIGATION_ENABLED !== "true" ||
         value.CLIENT_SESSION_ENABLED === "true" ||
@@ -865,6 +907,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       : {
           planerkaWorkflow: {
             createEnabled: value.PLANERKA_CREATE_ENABLED === "true",
+            ...(value.PLANERKA_AVAILABILITY_ENABLED === "true"
+              ? { availabilityEnabled: true as const }
+              : {}),
             apiKey: value.PLANERKA_API_KEY!,
             accountId: value.PLANERKA_ACCOUNT_ID!,
           },
@@ -979,6 +1024,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
+      clientWaitlist: value.CLIENT_WAITLIST_ENABLED === "true",
       clientPrivacy: value.CLIENT_PRIVACY_ENABLED === "true",
       clientErasureRequests: value.CLIENT_ERASURE_REQUESTS_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
@@ -1011,6 +1057,10 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       expertAiIngress: value.EXPERT_AI_INGRESS_ENABLED === "true",
       expertTelegramReferral: value.EXPERT_TELEGRAM_REFERRAL_ENABLED === "true",
       expertTelegramCheckout: value.EXPERT_TELEGRAM_CHECKOUT_ENABLED === "true",
+      lifecycleReminders: value.LIFECYCLE_REMINDERS_ENABLED === "true",
+      lifecycleCheckups: false,
+      lifecycleFeedback: false,
+      lifecycleCouponNotices: false,
       yookassa: value.YOOKASSA_ENABLED === "true",
     },
     clientBookingConfirmationBufferMs:

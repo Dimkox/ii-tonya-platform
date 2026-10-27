@@ -11,7 +11,7 @@ describe("booking SQL mutation guards", () => {
     );
 
     const migration = readFileSync(
-      "packages/db/migrations/0070_resident_native_scheduling.sql",
+      "packages/db/migrations/0074_resident_native_scheduling.sql",
       "utf8",
     );
     // Both search/callback time and the protected final database clock use the

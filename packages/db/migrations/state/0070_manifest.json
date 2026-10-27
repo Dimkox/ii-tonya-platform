@@ -1,7 +1,7 @@
 {
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
-  "method": "Full-chain hand-authored SQL replay on isolated PostgreSQL17.5; fresh empty-directory introspection normalized against exact positional constraint/index catalogue. SQL-only functions/triggers retained separately.",
+  "method": "SQL replay through 0070; database introspection normalized against positional catalog data",
   "generatePermitted": false,
   "migrations": [
     {
@@ -356,10 +356,10 @@
     },
     {
       "idx": 70,
-      "tag": "0070_resident_native_scheduling",
-      "sha256": "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75"
+      "tag": "0070_planerka_availability",
+      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
     }
   ],
-  "snapshotSha256": "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
-  "sqlObjectsSha256": "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0"
+  "snapshotSha256": "538bfaf12180e49f5f2a0e9d4a4d2574645b899401d52aaf632fe1ce37b4ab0c",
+  "sqlObjectsSha256": "96a9dd70096a148a598a23c5a0719f50f3545659015234e5a9a6913da8a04aff"
 }

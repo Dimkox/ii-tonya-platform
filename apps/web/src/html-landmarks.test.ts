@@ -59,18 +59,14 @@ describe("composed public page landmarks", () => {
     },
   );
 
-  it("has one accessible main and heading without JavaScript and preserves the fallback sentence", () => {
+  it("keeps the no-JavaScript notice free of duplicate prerendered landmarks", () => {
     const fallback = shell.match(
       /<noscript\b[^>]*>([\s\S]*?)<\/noscript\s*>/u,
     )?.[1];
     expect(fallback).toBeDefined();
-    expect(fallback!.match(/<main\b/gu)).toHaveLength(1);
-    expect(fallback!.match(/<\/main>/gu)).toHaveLength(1);
-    expect(fallback!.match(/<h1\b/gu)).toHaveLength(1);
-    expect(fallback).toContain('aria-labelledby="no-script-heading"');
-    expect(fallback).toMatch(
-      /<h1\b[^>]*id="no-script-heading"[^>]*>[^<]+<\/h1>/u,
-    );
+    // The production Vite plugin renders the real landing main and heading.
+    // A second landmark in this notice would duplicate that no-JS content.
+    expect(fallback).not.toMatch(/<(?:main|h1)\b/gu);
     expect(fallback).toContain(
       "Для открытия диалога и полной навигации включите JavaScript.",
     );

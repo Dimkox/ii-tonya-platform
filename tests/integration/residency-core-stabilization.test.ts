@@ -716,7 +716,7 @@ describe("residency core stabilization PG17.5", () => {
       );
       expect(fallback.statusCode).toBe(200);
       expect(fallback.json().text).toBe(
-        "Не удалось автоматически прочитать файл. Возможно, это картинка или сложный формат. Давайте заполним данные вручную.",
+        "Не удалось прочитать файл автоматически. Давайте пройдемся по вопросам вручную.",
       );
       expect(parser).toHaveBeenCalledTimes(1);
       const state = (

@@ -220,7 +220,7 @@ beforeAll(async () => {
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     );
     for (const entry of journal.entries.filter(
-      (e: { idx: number }) => e.idx < 70,
+      (e: { idx: number }) => e.idx < 74,
     ))
       await db.execute(
         sql.raw(
@@ -256,7 +256,7 @@ beforeAll(async () => {
     // Nullable projection columns allow the current reader to seed an approval
     // under unchanged 0069 source guards before native authority/backfill exists.
     const migration = readFileSync(
-      "packages/db/migrations/0070_resident_native_scheduling.sql",
+      "packages/db/migrations/0074_resident_native_scheduling.sql",
       "utf8",
     ).split("--> statement-breakpoint");
     await db.execute(sql.raw(migration.slice(0, 2).join(";")));
@@ -289,7 +289,7 @@ beforeAll(async () => {
   ).rows[0];
   const { readFileSync } = await import("node:fs");
   const migration = readFileSync(
-    "packages/db/migrations/0070_resident_native_scheduling.sql",
+    "packages/db/migrations/0074_resident_native_scheduling.sql",
     "utf8",
   ).split("--> statement-breakpoint");
   await database.db.execute(sql.raw(migration.slice(2).join(";")));
@@ -2074,4 +2074,123 @@ it("R5 production-composed runtime delivers due native private logistics and rec
     await runtime?.close();
     vi.unstubAllGlobals();
   }
+}, 60000);
+
+it("main compatibility: native source and target reschedule fail closed; external targets retain buffered occupancy and catalog filtering", async () => {
+  const { PostgresBookingRepository } =
+    await import("../../packages/db/src/repositories/booking-repository.js");
+  const { PostgresCatalogRepository } =
+    await import("../../packages/db/src/repositories/catalog-repository.js");
+  const { PostgresWaitlistRepository } =
+    await import("../../packages/db/src/repositories/waitlist-repository.js");
+  const f = await nativeFixture(),
+    n = await notificationFixture(f),
+    booked = await bookFirst(f, n);
+  const slots = await database.db.execute<{
+    id: string;
+  }>(sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity)
+    select expert_service_id,'local',${randomUUID()},ends_at+interval '5 minutes',ends_at+interval '65 minutes',clock_timestamp(),1 from slots where id=${booked.slotId}::uuid returning id`);
+  const overlap = slots.rows[0]!.id;
+  const future = (
+    await database.db.execute<{
+      id: string;
+    }>(sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity)
+    select expert_service_id,'local',${randomUUID()},starts_at+interval '1 day',ends_at+interval '1 day',clock_timestamp(),1 from slots where id=${booked.slotId}::uuid returning id`)
+  ).rows[0]!.id;
+  const other = await database.createUser();
+  const external = (
+    await database.db.execute<{
+      id: string;
+    }>(sql`insert into reservations(user_id,slot_id,expert_id,expert_service_id,status,idempotency_key,reserved_until)
+    select ${other}::uuid,id,${f.expertId}::uuid,expert_service_id,'reserved',${randomUUID()},clock_timestamp()+interval '1 hour' from slots where id=${future}::uuid returning id`)
+  ).rows[0]!.id;
+  const choice = async (user: string, slot: string) => {
+    const digest = `sha256:${hash(randomUUID())}` as const;
+    const request = (
+      await database.db.execute<{ id: string }>(
+        sql`insert into client_catalog_requests(user_id,request_digest,state,expires_at) values(${user}::uuid,${hash(randomUUID())},'ready',clock_timestamp()+interval '1 hour') returning id`,
+      )
+    ).rows[0]!.id;
+    await database.db.execute(
+      sql`insert into client_catalog_choices(request_id,choice_digest,slot_id,expires_at) values(${request}::uuid,${digest},${slot}::uuid,clock_timestamp()+interval '1 hour')`,
+    );
+    return digest;
+  };
+  const handle = async (user: string, reservation: string, slot: string) => {
+    const digest = await choice(user, slot),
+      handle =
+        `bk1.${Buffer.from(randomUUID()).toString("base64url").slice(0, 43)}` as const;
+    await database.db.execute(
+      sql`insert into client_booking_receipts(user_id,choice_digest,booking_handle,reservation_id) values(${user}::uuid,${digest},${handle},${reservation}::uuid)`,
+    );
+    return handle;
+  };
+  const nativeHandle = await handle(
+      n.clientId,
+      booked.reservationId,
+      booked.slotId,
+    ),
+    externalHandle = await handle(other, external, future);
+  const repository = new PostgresBookingRepository(database.db);
+  const reschedule = async (
+    userId: string,
+    bookingHandle: `bk1.${string}`,
+    slotId: string,
+  ) =>
+    repository.rescheduleOwnedByHandle({
+      userId,
+      bookingHandle,
+      choiceDigest: await choice(userId, slotId),
+      idempotencyKey: hash(randomUUID()),
+      correlationId: randomUUID(),
+      confirmationBufferMs: 3600000,
+    });
+  const snapshot = async () =>
+    (
+      await database.db.execute(
+        sql`select to_jsonb(r) row from reservations r where id in (${booked.reservationId}::uuid,${external}::uuid) order by id`,
+      )
+    ).rows;
+  const before = await snapshot();
+  await expect(reschedule(n.clientId, nativeHandle, future)).resolves.toEqual({
+    kind: "conflict",
+  });
+  await expect(
+    reschedule(other, externalHandle, booked.slotId),
+  ).resolves.toEqual({ kind: "conflict" });
+  await expect(reschedule(other, externalHandle, overlap)).resolves.toEqual({
+    kind: "conflict",
+  });
+  expect(await snapshot()).toEqual(before);
+  const service = (
+    await database.db.execute<{ id: string }>(
+      sql`select expert_service_id id from slots where id=${overlap}::uuid`,
+    )
+  ).rows[0]!.id;
+  const available = await new PostgresCatalogRepository(database.db).read({
+    sourceKey: service,
+    databaseNow: new Date(),
+  });
+  expect(available.kind).toBe("complete");
+  if (available.kind === "complete")
+    expect(available.slots.map((s) => s.localSlotId)).not.toContain(overlap);
+  const waiting = await database.createUser(),
+    wd = await choice(waiting, overlap);
+  await database.db.execute(
+    sql`insert into booking_waitlist_entries(user_id,slot_id,choice_digest,waitlist_handle,join_idempotency_key,status) values(${waiting}::uuid,${overlap}::uuid,${wd},${`wl1.${"W".repeat(43)}`},${hash(randomUUID())},'waiting')`,
+  );
+  expect(
+    await new PostgresWaitlistRepository(database.db).promoteNext({
+      slotId: overlap,
+      now: new Date(),
+      holdDurationMs: 259200000,
+    }),
+  ).toEqual({ kind: "stale_slot" });
+  expect(
+    (
+      await database.db.execute(
+        sql`select id from reservations where user_id=${waiting}::uuid`,
+      )
+    ).rows,
+  ).toHaveLength(0);
 }, 60000);

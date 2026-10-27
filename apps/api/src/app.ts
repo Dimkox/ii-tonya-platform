@@ -42,6 +42,7 @@ import type {
   ClientBookingService,
   ClientPrincipalResolver,
   ClientSessionService,
+  WaitlistService,
   ClientNavigationGateway,
   ClientIngressReplayRead,
   ConversationService,
@@ -212,6 +213,7 @@ export interface AppDependencies {
   clientPrincipal?: ClientPrincipalResolver;
   clientBookingService?: ClientBookingService;
   clientBookingPrincipal?: ClientPrincipalResolver;
+  clientWaitlistService?: WaitlistService;
   now?: () => Date;
   testExpertPromo?: TelegramTestExpertPromoIngress;
 }
@@ -371,6 +373,14 @@ export async function buildApp(
       deps.clientCatalogService === undefined)
   ) {
     throw new Error("Client booking runtime capability is required");
+  }
+  if (
+    deps.config.features.clientWaitlist === true &&
+    (deps.clientWaitlistService === undefined ||
+      deps.clientBookingService === undefined ||
+      deps.clientBookingPrincipal === undefined)
+  ) {
+    throw new Error("Client waitlist runtime capability is required");
   }
   if (
     (deps.config.features.expertTelegramQueries === true ||
@@ -567,7 +577,19 @@ export async function buildApp(
       bookings: deps.clientBookingService,
       principals: deps.clientBookingPrincipal,
       reserveEnabled: deps.config.features.clientBookingReserve === true,
-      metrics: { record: recordClientBookingMetric },
+      metrics: {
+        record: (labels) => {
+          if (labels.operation === "reserve" || labels.operation === "cancel")
+            recordClientBookingMetric({
+              ...labels,
+              operation: labels.operation,
+            });
+        },
+      },
+      waitlistEnabled: deps.config.features.clientWaitlist === true,
+      ...(deps.clientWaitlistService === undefined
+        ? {}
+        : { waitlist: deps.clientWaitlistService }),
     });
   }
   if (

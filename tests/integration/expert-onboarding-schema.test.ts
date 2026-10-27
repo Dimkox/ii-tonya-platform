@@ -1,3 +1,4 @@
+import { createDb } from "../../packages/db/src/client.js";
 import { readFileSync } from "node:fs";
 import {
   constraintStateSql,
@@ -98,18 +99,18 @@ describe("applicant queue foundation (PG17.5)", () => {
       ).rows[0],
     ).toEqual({ experts: 0, orders: 0, ledger: 0 });
   });
-  it("enforces one application per existing user on inserts and updates", async () => {
+  it("guards repeated applications and immutable user identity", async () => {
     const user = await database.createUser();
     await apply(user);
     await rejected(
       sql`insert into expert_onboarding_applications(user_id) values(${user}::uuid)`,
-      "23505",
+      "P0001",
     );
     const other = await database.createUser();
     await apply(other);
     await rejected(
       sql`update expert_onboarding_applications set user_id=${user}::uuid where user_id=${other}::uuid`,
-      "23505",
+      "23514",
     );
     await rejected(
       sql`insert into expert_onboarding_applications(user_id) values(${randomUUID()}::uuid)`,
@@ -140,14 +141,19 @@ describe("applicant queue foundation (PG17.5)", () => {
       sql`insert into expert_onboarding_applications(user_id,campaign_quote_id) values(${other}::uuid,${quote.id}::uuid)`,
       "23503",
     );
+    const absentQuoteOwner = await database.createUser();
+    await rejected(
+      sql`insert into expert_onboarding_applications(user_id,campaign_quote_id) values(${absentQuoteOwner}::uuid,${randomUUID()}::uuid)`,
+      "23503",
+    );
     await apply(other);
     await rejected(
       sql`update expert_onboarding_applications set campaign_quote_id=${quote.id}::uuid where user_id=${other}::uuid`,
-      "23503",
+      "23514",
     );
     await rejected(
       sql`update expert_onboarding_applications set campaign_quote_id=${randomUUID()}::uuid where user_id=${other}::uuid`,
-      "23503",
+      "23514",
     );
     expect(
       (
@@ -240,7 +246,7 @@ describe("applicant queue foundation (PG17.5)", () => {
   it("matches the hand-authored state supplement for new constraints and indexes", async () => {
     const expected = JSON.parse(
       readFileSync(
-        "packages/db/migrations/state/0051_sql_objects.json",
+        "packages/db/migrations/state/0074_sql_objects.json",
         "utf8",
       ),
     ) as {
@@ -254,12 +260,23 @@ describe("applicant queue foundation (PG17.5)", () => {
     expect(indexes).toEqual(expected.indexes);
   });
   it("preserves existing user, expert and integer-money history when applying the additive migration", async () => {
-    // The helper replays the committed chain. Remove only the new table inside a rolled-back transaction, seed existing facts, then reapply 0051.
-    await database.createUserWithPackage(100);
-    const client = await database.db.$client.connect();
+    // Replay only the predecessor prefix in a separate disposable database;
+    // later foreign keys and triggers remain intact in the full-chain fixture.
+    const historicalName = `onboarding_${randomUUID().replaceAll("-", "")}`;
+    await database.db.$client.query(`create database "${historicalName}"`);
+    const uri = new URL(container!.getConnectionUri());
+    uri.pathname = historicalName;
+    const historical = createDb(uri.toString());
+    const client = await historical.$client.connect();
     try {
-      await client.query("begin");
-      await client.query("drop table expert_onboarding_applications");
+      const journal = JSON.parse(
+        readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+      ) as { entries: Array<{ idx: number; tag: string }> };
+      for (const entry of journal.entries.filter((entry) => entry.idx < 51)) {
+        await client.query(
+          readFileSync(`packages/db/migrations/${entry.tag}.sql`, "utf8"),
+        );
+      }
       const user = await client.query<{ id: string }>(
         "insert into users default values returning id",
       );
@@ -267,6 +284,14 @@ describe("applicant queue foundation (PG17.5)", () => {
       await client.query(
         "insert into experts(user_id,active,verified) values($1,false,false)",
         [id],
+      );
+      const seededPackage = await client.query<{ id: string }>(
+        "insert into message_packages(user_id,granted_messages,grant_idempotency_key) values($1,100,$2) returning id",
+        [id, `historical-package:${id}`],
+      );
+      await client.query(
+        "insert into message_ledger_entries(package_id,entry_kind,delta,idempotency_key) values($1,'grant',100,$2)",
+        [seededPackage.rows[0]!.id, `historical-grant:${id}`],
       );
       const before = await client.query(
         "select (select jsonb_agg(to_jsonb(u)) from users u) users,(select jsonb_agg(to_jsonb(e)) from experts e) experts,(select jsonb_agg(to_jsonb(q)) from expert_campaign_quotes q) quotes,(select jsonb_agg(to_jsonb(t)) from expert_residency_tariff_versions t) tariffs,(select jsonb_agg(to_jsonb(l)) from expert_referral_ledger_entries l) ledger,(select jsonb_agg(to_jsonb(m)) from message_ledger_entries m) messages,(select jsonb_agg(to_jsonb(p)) from message_packages p) packages",
@@ -276,6 +301,19 @@ describe("applicant queue foundation (PG17.5)", () => {
           "packages/db/migrations/0051_expert_onboarding_applications.sql",
           "utf8",
         ),
+      );
+      // Keep the historical supplement pinned at its own migration boundary.
+      const expected51 = JSON.parse(
+        readFileSync(
+          "packages/db/migrations/state/0051_sql_objects.json",
+          "utf8",
+        ),
+      ) as { constraints: unknown[]; indexes: unknown[] };
+      expect((await client.query(constraintStateSql)).rows).toEqual(
+        expected51.constraints,
+      );
+      expect((await client.query(indexStateSql)).rows).toEqual(
+        expected51.indexes,
       );
       const after = await client.query(
         "select (select jsonb_agg(to_jsonb(u)) from users u) users,(select jsonb_agg(to_jsonb(e)) from experts e) experts,(select jsonb_agg(to_jsonb(q)) from expert_campaign_quotes q) quotes,(select jsonb_agg(to_jsonb(t)) from expert_residency_tariff_versions t) tariffs,(select jsonb_agg(to_jsonb(l)) from expert_referral_ledger_entries l) ledger,(select jsonb_agg(to_jsonb(m)) from message_ledger_entries m) messages,(select jsonb_agg(to_jsonb(p)) from message_packages p) packages",
@@ -289,8 +327,9 @@ describe("applicant queue foundation (PG17.5)", () => {
         ).rows[0]?.count,
       ).toBe(0);
     } finally {
-      await client.query("rollback");
       client.release();
+      await historical.$client.end();
+      await database.db.$client.query(`drop database "${historicalName}"`);
     }
   });
   it("erases only the subject application after captured manifests while preserving both users' ledger facts", async () => {

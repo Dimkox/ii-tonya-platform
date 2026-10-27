@@ -52,6 +52,9 @@ async function fixture(
   deps.clientBookingService = {
     reserve: vi.fn(),
     cancel: vi.fn(),
+    reschedule: vi.fn(async () => {
+      throw new Error("unexpected_reschedule");
+    }),
     list: vi.fn(),
   };
   const handleInbound = vi.fn<typeof deps.conversationService.handleInbound>(
@@ -136,6 +139,9 @@ it("preserves encapsulated body limits and fixed malformed JSON responses", asyn
     const response = await f.app.inject({
       method: "POST",
       url,
+      headers: {
+        "x-telegram-bot-api-secret-token": "synthetic-secret-".repeat(3),
+      },
       payload: { [canary]: canary.repeat(size) },
     });
     expect(response.statusCode, url).toBe(status);
@@ -368,13 +374,16 @@ it("retains encapsulated body-limit status when a local error response's onSend 
     const response = await f.app.inject({
       method: "POST",
       url,
+      headers: {
+        "x-telegram-bot-api-secret-token": "synthetic-secret-".repeat(3),
+      },
       payload: { detail: canary.repeat(size) },
     });
     expect(response.statusCode).toBe(status);
     expect(response.body).not.toContain(canary);
   }
   expect(f.issue).not.toHaveBeenCalled();
-  expect(onSend).toHaveBeenCalledTimes(2);
+  expect(onSend).toHaveBeenCalledTimes(3);
   expect(await emitted(f.logs)).not.toContain(canary);
 });
 

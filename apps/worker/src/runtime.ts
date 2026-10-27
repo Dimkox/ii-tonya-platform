@@ -9,6 +9,7 @@ import {
 } from "@ii-tonya/worker";
 
 export interface WorkerCycleReport {
+  readonly planerkaAvailability?: unknown;
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
   readonly expertCardMaterials?: unknown;
@@ -22,6 +23,8 @@ export interface WorkerCycleReport {
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
+  readonly waitlistPromotion: unknown;
+  readonly lifecycleScheduler: unknown;
   readonly expertResidencyExpiry: unknown;
   readonly expertTelegramCheckoutCleanup: unknown;
   readonly expertResidencyReconciliation: unknown;
@@ -53,6 +56,7 @@ interface BookingNotificationLifecycle {
 }
 
 export interface WorkerRuntimeDependencies {
+  readonly planerkaAvailability?: BoundedJob;
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
   readonly residentPrivateJobs?: {
@@ -89,6 +93,8 @@ export interface WorkerRuntimeDependencies {
   readonly reconcileUnknownOutcomes: BoundedJob;
   readonly stopRecovery?: () => void;
   readonly reservationExpiry: BoundedJob;
+  readonly waitlistPromotion?: BoundedJob | undefined;
+  readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly expertResidencyExpiry: BoundedJob;
   readonly expertTelegramCheckoutCleanup: BoundedJob;
   readonly expertResidencyReconciliation: BoundedJob;
@@ -104,6 +110,7 @@ export interface WorkerRuntimeDependencies {
 }
 
 export interface ProductionWorkerRuntimeDependencies {
+  readonly planerkaAvailability?: BoundedJob;
   readonly yookassaBoundRecovery?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -150,6 +157,8 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly expertSessionRetention?: BoundedJob;
   readonly payerReceiptRetention?: BoundedJob;
   readonly clientBookingErasure?: BoundedJob;
+  readonly lifecycleScheduler?: BoundedJob | undefined;
+  readonly waitlistPromotion?: BoundedJob | undefined;
   readonly clientErasureRequests?: BoundedJob;
   readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
@@ -253,6 +262,17 @@ export function createWorkerRuntime(
         ? await deps.reconcileUnknownOutcomes()
         : { reconciled: 0, reason: "closing" };
       const reservationExpiry = await deps.reservationExpiry();
+      const waitlistPromotion = (await deps.waitlistPromotion?.()) ?? {
+        examined: 0,
+        promoted: 0,
+        completed: 0,
+        reason: "disabled",
+      };
+      const lifecycleScheduler = (await deps.lifecycleScheduler?.()) ?? {
+        examined: 0,
+        materialized: 0,
+        reason: "disabled",
+      };
       const expertResidencyExpiry = await deps.expertResidencyExpiry();
       const expertTelegramCheckoutCleanup =
         await deps.expertTelegramCheckoutCleanup();
@@ -294,12 +314,16 @@ export function createWorkerRuntime(
         : undefined;
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
+      const planerkaAvailability = acceptingClaims
+        ? await deps.planerkaAvailability?.()
+        : undefined;
       const testExpertReconciliation =
         (await deps.testExpertReconciliation?.()) ?? {
           scanned: 0,
           reason: "test_expert_reconciliation_disabled",
         };
       return {
+        ...(planerkaAvailability === undefined ? {} : { planerkaAvailability }),
         ...(bookingHandoffRevocations === undefined
           ? {}
           : { bookingHandoffRevocations }),
@@ -321,6 +345,8 @@ export function createWorkerRuntime(
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
         reservationExpiry,
+        waitlistPromotion,
+        lifecycleScheduler,
         expertResidencyExpiry,
         expertTelegramCheckoutCleanup,
         expertResidencyReconciliation,
@@ -411,6 +437,9 @@ export function createProductionWorkerRuntime(
     throw new Error("worker_outbox_delivery_capability_unavailable");
   }
   return createWorkerRuntime({
+    ...(deps.planerkaAvailability === undefined
+      ? {}
+      : { planerkaAvailability: deps.planerkaAvailability }),
     ...(deps.residentPrivateJobs
       ? { residentPrivateJobs: deps.residentPrivateJobs }
       : {}),
@@ -475,6 +504,8 @@ export function createProductionWorkerRuntime(
         now: deps.now(),
         batchSize,
       }),
+    waitlistPromotion: deps.waitlistPromotion,
+    lifecycleScheduler: deps.lifecycleScheduler,
     expertResidencyExpiry: async () =>
       expireExpertResidencyOrders(
         deps.expertReferralJobsRepository,

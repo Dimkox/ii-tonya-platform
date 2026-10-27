@@ -231,23 +231,16 @@ describe("generic material transport before work handoff (PG17.5)", () => {
   afterAll(async () => {
     await database?.stop();
   }, 120000);
-  it("delivers only generic approved content to the verified promo identity before card approval", async () => {
+  it("withholds generic approved content from the promo identity before card approval", async () => {
     const job = (
       await database.db.execute<{ id: string }>(
         sql`select id from expert_application_material_jobs where application_id=${delivered.applicationId}::uuid`,
       )
     ).rows[0]!;
     expect(await delivered.cards.deliverMaterials(job.id)).toEqual({
-      kind: "delivered",
+      kind: "cancelled",
     });
-    expect(calls).toEqual([
-      {
-        botId: delivered.scope.botId,
-        botKey: delivered.scope.botKey,
-        chatId: delivered.scope.chatId,
-        payload: { text: "Утверждённые общие материалы", assets: [] },
-      },
-    ]);
+    expect(calls).toEqual([]);
     expect(
       (
         await database.db.execute(
@@ -256,42 +249,55 @@ describe("generic material transport before work handoff (PG17.5)", () => {
       ).rows,
     ).toHaveLength(0);
     expect(await delivered.cards.deliverMaterials(job.id)).toEqual({
-      kind: "already_delivered",
+      kind: "cancelled",
     });
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(0);
+    expect(
+      (
+        await database.db.execute(
+          sql`select status,attempt_id,delivery_receipt from expert_application_material_jobs where id=${job.id}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({
+      status: "waiting_content",
+      attempt_id: null,
+      delivery_receipt: null,
+    });
   });
-  it("quarantines a lost send outcome and never fabricates a receipt or retries it", async () => {
+  it("never attempts preapproval transport or fabricates an unknown outcome", async () => {
     const job = (
       await database.db.execute<{ id: string }>(
         sql`select id from expert_application_material_jobs where application_id=${uncertain.applicationId}::uuid`,
       )
     ).rows[0]!;
     expect(await uncertain.cards.deliverMaterials(job.id)).toEqual({
-      kind: "unknown_outcome",
+      kind: "cancelled",
     });
     expect(await uncertain.cards.deliverMaterials(job.id)).toEqual({
-      kind: "unknown_outcome",
+      kind: "cancelled",
     });
-    expect(unknownCalls).toBe(1);
+    expect(unknownCalls).toBe(0);
     expect(
       (
         await database.db.execute(
-          sql`select status,delivery_receipt from expert_application_material_jobs where id=${job.id}::uuid`,
+          sql`select status,attempt_id,delivery_receipt from expert_application_material_jobs where id=${job.id}::uuid`,
         )
       ).rows[0],
-    ).toEqual({ status: "unknown_outcome", delivery_receipt: null });
+    ).toEqual({
+      status: "waiting_content",
+      attempt_id: null,
+      delivery_receipt: null,
+    });
   });
-  it("filters mixed invalid heads before LIMIT so a healthy later job cannot starve", async () => {
+  it("excludes every unapproved job from dispatch even with a healthy verified promo identity", async () => {
     const expected = (
       await database.db.execute<{ id: string }>(
         sql`select id from expert_application_material_jobs where application_id=${healthy.applicationId}::uuid`,
       )
     ).rows[0]!;
-    expect(await healthy.cards.listDueMaterialJobs(1)).toEqual([
-      { jobId: expected.id },
-    ]);
+    expect(await healthy.cards.listDueMaterialJobs(1)).toEqual([]);
     expect(await healthy.cards.deliverMaterials(expected.id)).toEqual({
-      kind: "delivered",
+      kind: "cancelled",
     });
   });
 });

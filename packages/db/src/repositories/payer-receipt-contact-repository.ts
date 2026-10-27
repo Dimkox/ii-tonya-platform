@@ -4,6 +4,7 @@ import { payerReceiptCaptureRequestSchema } from "@ii-tonya/contracts";
 import type {
   PayerReceiptBinding,
   PayerReceiptVault,
+  YooKassaReceiptAuthority,
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
 import { lockClientConsentSubject } from "./client-consent-authority.js";
@@ -183,6 +184,34 @@ export class PostgresPayerReceiptContactRepository {
     } catch (e) {
       if (e instanceof PayerReceiptError) throw e;
       throw new PayerReceiptError("PAYER_RECEIPT_UNAVAILABLE");
+    }
+  }
+  async receiptAuthorityForOrder(
+    orderId: string,
+  ): Promise<YooKassaReceiptAuthority | null> {
+    if (
+      typeof orderId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
+        orderId,
+      )
+    )
+      return null;
+    try {
+      // Composite bindings and immutable contact identity survive redaction.
+      // This query deliberately selects neither envelope nor disclosure state.
+      const row = (
+        await this.db.execute<{ id: string; kind: "email" }>(
+          sql`select c.id,c.kind from payer_receipt_order_bindings b join payer_receipt_contacts c on c.id=b.contact_id and c.quote_id=b.quote_id and c.user_id=b.user_id join expert_residency_orders o on o.id=b.order_id and o.campaign_quote_id=b.quote_id where b.order_id=${orderId}::uuid`,
+        )
+      ).rows[0];
+      return row
+        ? {
+            contactKind: row.kind,
+            authorityReference: `payer-receipt:${row.id}`,
+          }
+        : null;
+    } catch {
+      return null;
     }
   }
   async receiptContactForOrder(orderId: string) {

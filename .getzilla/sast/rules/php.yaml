@@ -1,0 +1,96 @@
+rules:
+  - id: getzilla.php.sql-injection
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: Request data is built into a SQL string. Use prepared statements with bound parameters (in Bitrix, ORM filters or $connection->getSqlHelper()->forSql()).
+    metadata: {cwe: "CWE-89", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: &php-sources
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $_COOKIE
+          - pattern: $_SERVER['HTTP_' . $X]
+          - pattern: $REQUEST->get(...)
+          - pattern: $REQUEST->getQuery(...)
+          - pattern: $REQUEST->getPost(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: mysqli_query($CONN, $Q, ...)
+              - pattern: $DB->query($Q, ...)
+              - pattern: $DB->Query($Q, ...)
+              - pattern: $DB->exec($Q)
+          - focus-metavariable: $Q
+    pattern-sanitizers:
+      - pattern: intval(...)
+      - pattern: (int) $X
+      - pattern: $DB->ForSql(...)
+      - pattern: $H->forSql(...)
+      - pattern: mysqli_real_escape_string(...)
+  - id: getzilla.php.command-injection
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: Request data reaches a shell command. Avoid the shell, or escape every argument with escapeshellarg().
+    metadata: {cwe: "CWE-78", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *php-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: system(...)
+          - pattern: exec(...)
+          - pattern: shell_exec(...)
+          - pattern: passthru(...)
+          - pattern: popen(...)
+          - pattern: proc_open(...)
+    pattern-sanitizers:
+      - pattern: escapeshellarg(...)
+  - id: getzilla.php.file-inclusion
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: Request data chooses a file to include or read.
+    metadata: {cwe: "CWE-98", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *php-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: include $X;
+          - pattern: include_once $X;
+          - pattern: require $X;
+          - pattern: require_once $X;
+          - pattern: file_get_contents(...)
+          - pattern: readfile(...)
+    pattern-sanitizers:
+      - pattern: basename(...)
+  - id: getzilla.php.reflected-xss
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: Request data is printed into HTML without escaping. Use htmlspecialchars() (in Bitrix, HtmlFilter::encode()).
+    metadata: {cwe: "CWE-79", owasp: "A03:2021", confidence: MEDIUM}
+    pattern-sources: *php-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: echo ...;
+          - pattern: print(...);
+          - pattern: printf(...);
+    pattern-sanitizers:
+      - pattern: htmlspecialchars(...)
+      - pattern: htmlentities(...)
+      - pattern: \Bitrix\Main\Text\HtmlFilter::encode(...)
+      - pattern: intval(...)
+      - pattern: json_encode(...)
+  - id: getzilla.php.code-injection
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: Request data is evaluated or deserialized as code.
+    metadata: {cwe: "CWE-95", owasp: "A03:2021", confidence: HIGH}
+    pattern-sources: *php-sources
+    pattern-sinks:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: assert(...)
+          - pattern: unserialize(...)
+          - pattern: create_function(...)

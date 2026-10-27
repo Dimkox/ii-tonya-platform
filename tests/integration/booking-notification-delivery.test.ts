@@ -176,9 +176,16 @@ async function delivery(
     )
   ).rows[0]!;
 }
-async function admission(f: Awaited<ReturnType<typeof fixture>>) {
+async function admission(
+  f: Awaited<ReturnType<typeof fixture>>,
+  topic?: string,
+) {
   const claims = await f.ledger.claimDeliveries(20, "worker-a");
-  const claim = claims.find((c) => c.reservationId === f.reservationId);
+  const claim = claims.find(
+    (c) =>
+      c.reservationId === f.reservationId &&
+      (topic === undefined || c.topic === topic),
+  );
   expect(claim).toBeDefined();
   const grant = await f.ledger.admitAndConsume(claim!, "a".repeat(64));
   expect(grant).toBeDefined();
@@ -398,6 +405,9 @@ async function provider(f: Awaited<ReturnType<typeof fixture>>) {
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,${accountId},1,60,'UTC',true,clock_timestamp() from reservations where id=${f.reservationId}::uuid`,
   );
+  await database.db.execute(
+    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
+  );
   await f.bookings.transition({
     reservationId: f.reservationId,
     expectedVersion: 1,
@@ -446,7 +456,7 @@ it.each(["complete", "reject"] as const)(
     ).rows[0]!;
     expect(row.source_version).toBeNull();
     expect(row.provider_operation_id).toBe(p.op.id);
-    const { grant } = await admission(f);
+    const { grant } = await admission(f, topic);
     expect(grant.topic).toBe(topic);
     if (kind === "complete") expect(grant.calendar).toBe("verified_booked");
     else {
@@ -683,30 +693,39 @@ it("bounded definite retries stop after five attempts", async () => {
   expect(await f.ledger.claimDeliveries(20, "worker")).toEqual([]);
 });
 it("reconstructs snapshot0045 and exact SQL constraints on PostgreSQL17.5", async () => {
+  const historical = await startTestPostgres();
   const folder = "packages/db/migrations";
   const read = (p: string) => JSON.parse(readFileSync(p, "utf8"));
   const expected = read(`${folder}/meta/0045_snapshot.json`);
   expect(expected.prevId).toBe(read(`${folder}/meta/0044_snapshot.json`).id);
   const out = mkdtempSync(join(tmpdir(), "notification-0045-test-"));
   try {
+    const journal = read(`${folder}/meta/_journal.json`);
+    for (const entry of journal.entries.filter(
+      (entry: { idx: number }) => entry.idx <= 45,
+    )) {
+      await historical.db.execute(
+        sql.raw(readFileSync(`${folder}/${entry.tag}.sql`, "utf8")),
+      );
+    }
     execFileSync(
       process.execPath,
       [
         "node_modules/drizzle-kit/bin.cjs",
         "introspect",
         "--dialect=postgresql",
-        `--url=${database.db.$client.options.connectionString}`,
+        `--url=${historical.db.$client.options.connectionString}`,
         `--out=${out}`,
       ],
       { stdio: "ignore", timeout: 60000 },
     );
     const constraints = (
-      await database.db.execute<ConstraintState & Record<string, unknown>>(
+      await historical.db.execute<ConstraintState & Record<string, unknown>>(
         sql.raw(constraintStateSql),
       )
     ).rows;
     const indexes = (
-      await database.db.execute<IndexState & Record<string, unknown>>(
+      await historical.db.execute<IndexState & Record<string, unknown>>(
         sql.raw(indexStateSql),
       )
     ).rows;
@@ -720,16 +739,16 @@ it("reconstructs snapshot0045 and exact SQL constraints on PostgreSQL17.5", asyn
     const supplement = read(`${folder}/state/0045_sql_objects.json`);
     expect(constraints).toEqual(supplement.constraints);
     expect(indexes).toEqual(supplement.indexes);
-    const functions = await database.db.execute(
+    const functions = await historical.db.execute(
       sql`select p.proname name,pg_get_function_identity_arguments(p.oid) arguments,pg_get_functiondef(p.oid) definition from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and not exists(select 1 from pg_depend d where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e') order by name,arguments`,
     );
-    const triggers = await database.db.execute(
+    const triggers = await historical.db.execute(
       sql`select c.relname table_name,t.tgname name,pg_get_triggerdef(t.oid,true) definition,t.tgenabled enabled from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and not t.tgisinternal order by table_name,name`,
     );
-    const exclusionConstraints = await database.db.execute(
+    const exclusionConstraints = await historical.db.execute(
       sql`select r.relname table_name,c.conname name,pg_get_constraintdef(c.oid,true) definition from pg_constraint c join pg_class r on r.oid=c.conrelid join pg_namespace n on n.oid=c.connamespace where n.nspname='public' and c.contype='x' order by table_name,name`,
     );
-    const extensions = await database.db.execute(
+    const extensions = await historical.db.execute(
       sql`select extname name,extversion version from pg_extension where extname<>'plpgsql' order by name`,
     );
     expect({
@@ -741,7 +760,11 @@ it("reconstructs snapshot0045 and exact SQL constraints on PostgreSQL17.5", asyn
       indexes,
     }).toEqual(supplement);
   } finally {
-    rmSync(out, { recursive: true, force: true });
+    try {
+      await historical.stop();
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
   }
 }, 90000);
 // Review regressions: each uses the real ledger/SQL; no transport invocation.

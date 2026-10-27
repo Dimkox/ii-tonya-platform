@@ -126,13 +126,26 @@ describe("telegram.send_text.v1 dispatcher", () => {
       });
     await expect(
       dispatch(
-        make(async () => ({ status: 429, body: {} })),
+        make(async () => ({
+          status: 429,
+          body: { ok: false, error_code: 429, parameters: { retry_after: 1 } },
+        })),
         message(payload()),
       ),
     ).resolves.toEqual({
       kind: "not_applied",
       retryable: true,
       reasonCode: "rate_limited",
+      retryAfterMs: 1000,
+    });
+    await expect(
+      dispatch(
+        make(async () => ({ status: 429, body: {} })),
+        message(payload()),
+      ),
+    ).resolves.toMatchObject({
+      kind: "unknown_outcome",
+      reasonCode: "transport_outcome_unknown",
     });
     await expect(
       dispatch(

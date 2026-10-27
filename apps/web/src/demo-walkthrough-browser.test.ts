@@ -25,6 +25,11 @@ it("walks through the isolated demo in mobile Chrome with real CSS and reload", 
       asset.type === "asset" ? asset.source : asset.code,
     ]),
   );
+  // In-memory Vite output omits publicDir files; serve the real shell favicon too.
+  assets.set(
+    "/favicon.png",
+    await readFile(resolve("apps/web/public/favicon.png")),
+  );
   const requests: string[] = [];
   const server = createServer((req, res) => {
     const path = new URL(req.url!, "http://localhost").pathname;
@@ -43,7 +48,9 @@ it("walks through the isolated demo in mobile Chrome with real CSS and reload", 
         ? "text/javascript"
         : path.endsWith(".css")
           ? "text/css"
-          : "text/html; charset=utf-8",
+          : path.endsWith(".png")
+            ? "image/png"
+            : "text/html; charset=utf-8",
     );
     res.end(asset);
   });
