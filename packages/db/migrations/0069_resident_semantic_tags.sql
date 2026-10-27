@@ -67,8 +67,46 @@ END $$;
 --> statement-breakpoint
 CREATE TRIGGER resident_tag_before_write BEFORE INSERT OR UPDATE ON expert_card_drafts FOR EACH ROW EXECUTE FUNCTION resident_tag_before_write();
 --> statement-breakpoint
+-- Repair comparisons retain every non-selection answer and count scoped occurrences.
+CREATE FUNCTION resident_tag_nonselection_content(d expert_card_drafts) RETURNS jsonb LANGUAGE sql STABLE AS $$
+ SELECT (to_jsonb(d)-ARRAY['semantic_tags','tag_preview','revision','status','owner_confirmed_digest','preview_page','preview_token_digest','preview_content_digest','approved_review_id','updated_at']) || jsonb_build_object(
+ 'rich_profile',CASE WHEN d.rich_profile IS NULL THEN NULL ELSE jsonb_set(d.rich_profile,'{services}',coalesce((SELECT jsonb_agg(s-'tags' ORDER BY n) FROM jsonb_array_elements(d.rich_profile->'services') WITH ORDINALITY a(s,n)),'[]')) END,
+ 'rich_guided',d.rich_guided-'tags','rich_pending_services',coalesce((SELECT jsonb_agg(s-'tags' ORDER BY n) FROM jsonb_array_elements(d.rich_pending_services) WITH ORDINALITY a(s,n)),'[]'))
+$$;
+--> statement-breakpoint
+CREATE FUNCTION resident_tag_selection_items(d expert_card_drafts) RETURNS TABLE(scope text,label text) LANGUAGE sql STABLE AS $$
+ SELECT 'profile',jsonb_array_elements_text(d.semantic_tags)
+ UNION ALL SELECT 'guided',jsonb_array_elements_text(coalesce(d.rich_guided->'tags','[]'))
+ UNION ALL SELECT 'service:'||n,jsonb_array_elements_text(coalesce(s->'tags','[]')) FROM jsonb_array_elements(coalesce(d.rich_profile->'services','[]')) WITH ORDINALITY a(s,n)
+ UNION ALL SELECT 'pending:'||n,jsonb_array_elements_text(coalesce(s->'tags','[]')) FROM jsonb_array_elements(d.rich_pending_services) WITH ORDINALITY a(s,n)
+ UNION ALL SELECT 'catalogue:'||h.id,h.display_label FROM expert_card_draft_tags t JOIN hashtags_db h ON h.id=t.tag_id WHERE t.draft_id=d.id
+$$;
+--> statement-breakpoint
+CREATE FUNCTION resident_tag_obsolete(label text) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
+BEGIN
+ RETURN EXISTS(SELECT 1 FROM hashtags_db h WHERE resident_tag_identity(label)='catalogue:'||h.id::text AND NOT h.is_active)
+ OR (resident_safety_assess(jsonb_build_object('tag',label),0)->>'blocked')::boolean;
+END $$;
+--> statement-breakpoint
+CREATE FUNCTION resident_tag_repair_allowed(previous expert_card_drafts,current_draft expert_card_drafts) RETURNS boolean LANGUAGE sql VOLATILE AS $$
+ SELECT current_draft.status IN('collecting','changes_requested') AND current_draft.owner_confirmed_digest IS NULL
+ AND resident_tag_nonselection_content(previous)=resident_tag_nonselection_content(current_draft)
+ AND NOT EXISTS(SELECT * FROM resident_tag_selection_items(current_draft) EXCEPT ALL SELECT * FROM resident_tag_selection_items(previous))
+ AND EXISTS(SELECT 1 FROM (SELECT * FROM resident_tag_selection_items(previous) EXCEPT ALL SELECT * FROM resident_tag_selection_items(current_draft)) removed WHERE resident_tag_obsolete(label))
+$$;
+--> statement-breakpoint
+CREATE FUNCTION resident_tag_unselected_safe(d expert_card_drafts) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
+DECLARE fields jsonb:='{}'; f record;
+BEGIN
+ FOR f IN SELECT * FROM jsonb_each_text(resident_card_pre_semantic_fields(d.id)) LOOP
+  IF f.key LIKE 'tag:%' THEN CONTINUE; END IF;
+  fields:=fields||jsonb_build_object(f.key,CASE WHEN f.key='rich:guided' OR f.key LIKE 'rich:service:%' OR f.key LIKE 'rich:pending:%' THEN (f.value::jsonb-'tags')::text ELSE f.value END);
+ END LOOP;
+ RETURN NOT (resident_safety_assess(fields,d.revision)->>'blocked')::boolean;
+END $$;
+--> statement-breakpoint
 CREATE FUNCTION resident_tag_aggregate_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE d expert_card_drafts; total integer; old_total integer; assessment jsonb; selected jsonb; decreasing boolean:=false;
+DECLARE d expert_card_drafts; total integer; old_total integer; assessment jsonb; selected jsonb; decreasing boolean:=false; invalid_selection boolean; repair boolean:=false;
 BEGIN
  IF TG_TABLE_NAME='expert_card_drafts' THEN
   -- A read-only proposal may expose obsolete/over-limit selections for removal,
@@ -88,19 +126,34 @@ BEGIN
   -- and any addition remain blocked until the total is at most20.
   IF TG_TABLE_NAME='expert_card_drafts' AND TG_OP='UPDATE' AND d.status IN('collecting','changes_requested') AND d.owner_confirmed_digest IS NULL THEN
    SELECT count(DISTINCT identity) INTO old_total FROM resident_selected_tags(OLD);
-   decreasing:=old_total>total AND NOT EXISTS(SELECT identity FROM resident_selected_tags(d) EXCEPT SELECT identity FROM resident_selected_tags(OLD));
+   decreasing:=(old_total>total AND NOT EXISTS(SELECT * FROM resident_tag_selection_items(d) EXCEPT ALL SELECT * FROM resident_tag_selection_items(OLD))) OR resident_tag_repair_allowed(OLD,d);
    decreasing:=decreasing OR (old_total=total AND NEW.revision=OLD.revision AND NEW.status=OLD.status AND NEW.rich_profile IS NOT DISTINCT FROM OLD.rich_profile AND NEW.rich_guided IS NOT DISTINCT FROM OLD.rich_guided AND NEW.rich_pending_services IS NOT DISTINCT FROM OLD.rich_pending_services AND NEW.semantic_tags=OLD.semantic_tags AND NEW.public_payload IS NOT DISTINCT FROM OLD.public_payload AND NEW.owner_confirmed_digest IS NOT DISTINCT FROM OLD.owner_confirmed_digest);
   END IF;
+  IF TG_TABLE_NAME='expert_card_drafts' THEN decreasing:=decreasing AND resident_tag_nonselection_content(OLD)=resident_tag_nonselection_content(d);
+  ELSIF TG_OP='DELETE' AND d.status IN('collecting','changes_requested') AND d.owner_confirmed_digest IS NULL THEN decreasing:=resident_tag_unselected_safe(d); END IF;
   IF NOT decreasing THEN RAISE EXCEPTION 'card_tag_aggregate_limit:%/20; reduce selections explicitly',total; END IF;
  END IF;
- IF EXISTS(SELECT 1 FROM resident_selected_tags(d) t JOIN hashtags_db h ON t.identity='catalogue:'||h.id::text WHERE NOT h.is_active) THEN RAISE EXCEPTION 'card_inactive_tag'; END IF;
+ invalid_selection:=EXISTS(SELECT 1 FROM resident_selected_tags(d) t JOIN hashtags_db h ON t.identity='catalogue:'||h.id::text WHERE NOT h.is_active);
  assessment:=resident_safety_assess(selected,d.revision);
- IF (assessment->>'blocked')::boolean THEN RAISE EXCEPTION 'resident_safety_write_blocked'; END IF;
+ IF invalid_selection OR (assessment->>'blocked')::boolean THEN
+  IF TG_TABLE_NAME='expert_card_drafts' AND TG_OP='UPDATE' THEN
+   repair:=resident_tag_repair_allowed(OLD,d);
+  ELSIF TG_TABLE_NAME='expert_card_draft_tags' AND TG_OP='DELETE' THEN
+   repair:=d.status IN('collecting','changes_requested') AND d.owner_confirmed_digest IS NULL
+    AND resident_tag_obsolete((SELECT display_label FROM hashtags_db WHERE id=OLD.tag_id));
+  END IF;
+  IF repair AND resident_tag_unselected_safe(d) THEN RETURN NULL; END IF;
+  IF invalid_selection THEN RAISE EXCEPTION 'card_inactive_tag'; END IF;
+  RAISE EXCEPTION 'resident_safety_write_blocked';
+ END IF;
  IF d.status='approved' AND EXISTS(SELECT 1 FROM resident_selected_tags(d) t WHERE t.identity LIKE 'custom:%' AND NOT EXISTS(SELECT 1 FROM resident_tag_decisions c WHERE c.draft_id=d.id AND c.revision=d.revision AND c.identity=t.identity AND c.decision='approve')) THEN RAISE EXCEPTION 'card_custom_tags_pending'; END IF;
  RETURN NULL;
 END $$;
 --> statement-breakpoint
-CREATE CONSTRAINT TRIGGER resident_tag_aggregate_draft AFTER INSERT OR UPDATE ON expert_card_drafts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
+-- Selection/answer/confirmation writes are checked even when SET assigns an equal
+-- value. A catalogue deletion separately validates its OLD tag; its revision-only
+-- housekeeping cannot add content or confirm a card and does not need this trigger.
+CREATE CONSTRAINT TRIGGER resident_tag_aggregate_draft AFTER INSERT OR UPDATE OF semantic_tags,rich_mode,rich_profile,rich_guided,rich_pending_services,rich_proposal,status,owner_confirmed_digest,public_payload,input_mode,document_proposal,document_import_revision,user_id,application_id,messaging_policy_version,work_bot_id,work_bot_key,work_chat_id ON expert_card_drafts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
 CREATE CONSTRAINT TRIGGER resident_tag_aggregate_selection AFTER INSERT OR UPDATE OR DELETE ON expert_card_draft_tags DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
 --> statement-breakpoint
 ALTER FUNCTION resident_card_effective_fields(uuid) RENAME TO resident_card_pre_semantic_fields;
@@ -142,3 +195,16 @@ CREATE TABLE tag_embeddings_cache (
  cache jsonb NOT NULL CHECK(resident_tag_cache_valid(cache)),
  CHECK(cache->>'generation' IS NOT DISTINCT FROM generation AND cache->>'model' IS NOT DISTINCT FROM model_digest)
 );
+
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION resident_rich_write_safety() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE fields jsonb; s jsonb; i integer:=0; assessment jsonb;
+BEGIN
+ IF NOT NEW.rich_mode OR (TG_OP='UPDATE' AND NEW.rich_profile IS NOT DISTINCT FROM OLD.rich_profile AND NEW.rich_guided IS NOT DISTINCT FROM OLD.rich_guided AND NEW.rich_pending_services IS NOT DISTINCT FROM OLD.rich_pending_services) THEN RETURN NEW; END IF;
+ fields:=jsonb_build_object('rich:guided',NEW.rich_guided::text)||jsonb_build_object('rich:profile',(NEW.rich_profile-'services'-'photos')::text);
+ FOR s IN SELECT value FROM jsonb_array_elements(NEW.rich_profile->'services') LOOP fields:=fields||jsonb_build_object('rich:service:'||i,s::text); i:=i+1; END LOOP;
+ FOR s IN SELECT value FROM jsonb_array_elements(NEW.rich_pending_services) LOOP fields:=fields||jsonb_build_object('rich:pending:'||i,s::text); i:=i+1; END LOOP;
+ assessment:=resident_safety_assess(fields,NEW.revision);
+ IF (assessment->>'blocked')::boolean AND NOT (TG_OP='UPDATE' AND resident_tag_repair_allowed(OLD,NEW) AND resident_tag_unselected_safe(OLD)) THEN RAISE EXCEPTION 'resident_safety_write_blocked'; END IF;
+ RETURN NEW;
+END $$;

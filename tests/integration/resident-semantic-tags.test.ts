@@ -452,10 +452,11 @@ it("custom labels remain pending and BLOCKER refuses without overwriting answers
   });
   const d = (await f.card.getWorkflow(f.work))!;
   const detail = await f.card.readDraft(manager.sessionHash, f.applicationId);
-  writeFileSync(
-    ".superpowers/sdd/residency-semantic-tags-20261027/manager-api-fixture.json",
-    JSON.stringify({ detail: { kind: "ok", item: detail } }),
-  );
+  if (process.env.II_TONYA_SEMANTIC_BROWSER_FIXTURE)
+    writeFileSync(
+      process.env.II_TONYA_SEMANTIC_BROWSER_FIXTURE,
+      JSON.stringify({ detail: { kind: "ok", item: detail } }),
+    );
   expect(detail!.semanticTags).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -1297,3 +1298,159 @@ it("ordinary interview replies preserve text photo and document intake with tags
     }
   }
 }, 30000);
+
+it("R2 removes obsolete selections across catalogue and staged-service scopes without unrelated edits", async () => {
+  const f = await linked();
+  await patch(f, { bio: "Сохранить это описание" });
+  const ids = (
+    await database.db.execute<{ id: string; tag_value: string }>(
+      sql`select id,tag_value from hashtags_db where tag_value in ('панические_атаки','тревожность') order by tag_value`,
+    )
+  ).rows;
+  const revision = (await f.card.getWorkflow(f.work))!.revision;
+  await f.card.toggleDraftTag({
+    ...event(f.work),
+    expectedRevision: revision,
+    tagId: ids[0]!.id,
+  });
+  const d = (await f.card.getWorkflow(f.work))!;
+  await database.db.execute(
+    sql`update expert_card_drafts set rich_guided='{"tags":["#тревожность"]}'::jsonb,rich_pending_services='[{"tags":["#панические_атаки"]}]'::jsonb,revision=revision+1 where id=${d.draftId}::uuid`,
+  );
+  await database.db.execute(
+    sql`update hashtags_db set is_active=false where id=any(${"{" + ids.map((t) => t.id).join(",") + "}"}::uuid[])`,
+  );
+  try {
+    const original = (
+      await database.db.execute(
+        sql`select rich_profile,public_payload from expert_card_drafts where id=${d.draftId}::uuid`,
+      )
+    ).rows[0];
+    const page = await f.card.getDraftTags(f.work);
+    await f.card.toggleDraftTag({
+      ...event(f.work),
+      expectedRevision: page.revision,
+      tagId: ids[0]!.id,
+    });
+    const remove = async (scope: string) => {
+      let r = await f.card.tagAction({
+        ...event(f.work),
+        action: "recommend",
+        scope,
+      });
+      for (const label of [...r.preview!.selected])
+        r = await f.card.tagAction({
+          ...event(f.work),
+          action: "toggle",
+          token: r.preview!.token,
+          index: r.preview!.choices.indexOf(label),
+        });
+      await f.card.tagAction({
+        ...event(f.work),
+        action: "confirm",
+        token: r.preview!.token,
+      });
+    };
+    await expect(
+      database.db.execute(
+        sql`update expert_card_drafts set rich_profile=jsonb_set(rich_profile,'{bio}','"несогласованное изменение"'),revision=revision+1 where id=${d.draftId}::uuid`,
+      ),
+    ).rejects.toThrow();
+    await remove("guided");
+    await expect(
+      database.db.execute(
+        sql`update expert_card_drafts set semantic_tags='["#КПТ"]',revision=revision+1 where id=${d.draftId}::uuid`,
+      ),
+    ).rejects.toThrow();
+    await remove("pending:1");
+    expect(
+      (
+        await database.db.execute(
+          sql`select rich_profile,public_payload from expert_card_drafts where id=${d.draftId}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual(original);
+    expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(0);
+  } finally {
+    await database.db.execute(
+      sql`update hashtags_db set is_active=true where id=any(${"{" + ids.map((t) => t.id).join(",") + "}"}::uuid[])`,
+    );
+  }
+});
+
+it("R2 newly blocked repeated tags can be reduced but cannot authorize another blocked field", async () => {
+  const f = await linked(),
+    unsafe = await linked();
+  await patch(f, { bio: "Сохранить описание" });
+  await patch(unsafe, { bio: "опасное описание" });
+  const d = (await f.card.getWorkflow(f.work))!,
+    bad = (await unsafe.card.getWorkflow(unsafe.work))!;
+  for (const draft of [d, bad])
+    await database.db.execute(
+      sql`update expert_card_drafts set semantic_tags='["старая тема а"]',rich_guided='{"tags":["старая тема б"]}',rich_pending_services='[{"tags":["старая тема б"]}]',revision=revision+1 where id=${draft.draftId}::uuid`,
+    );
+  const previous = (
+    await database.db.execute<{ policy_id: string }>(
+      sql`select policy_id from resident_safety_active`,
+    )
+  ).rows[0]!.policy_id;
+  const managerId = (
+    await database.db.execute<{ admin_id: string }>(
+      sql`select admin_id from admin_sessions where session_id_hash=${manager.sessionHash}`,
+    )
+  ).rows[0]!.admin_id;
+  await database.db.execute(
+    sql`insert into admin_role_assignments(admin_id,role) values(${managerId}::uuid,'security_admin') on conflict do nothing`,
+  );
+  const candidate = randomUUID();
+  await database.db.execute(
+    sql`insert into resident_safety_policies(id) values(${candidate}::uuid)`,
+  );
+  for (const pattern of ["старая тема а", "старая тема б", "опасное описание"])
+    await database.db.execute(
+      sql`insert into forbidden_patterns(policy_id,pattern_regex,category,severity_level,error_message_template,provenance,positive_witness) values(${candidate}::uuid,${pattern},'MEDICAL_CLAIM','BLOCKER','Исправьте текст','synthetic R2 policy',${pattern})`,
+    );
+  await database.db.execute(
+    sql`select resident_safety_publish(${candidate}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+  );
+  const remove = async (owner: typeof f, scope: string) => {
+    let r = await owner.card.tagAction({
+      ...event(owner.work),
+      action: "recommend",
+      scope,
+    });
+    for (const label of [...r.preview!.selected])
+      r = await owner.card.tagAction({
+        ...event(owner.work),
+        action: "toggle",
+        token: r.preview!.token,
+        index: r.preview!.choices.indexOf(label),
+      });
+    return owner.card.tagAction({
+      ...event(owner.work),
+      action: "confirm",
+      token: r.preview!.token,
+    });
+  };
+  try {
+    await expect(remove(unsafe, "profile")).rejects.toThrow();
+    await remove(f, "profile");
+    await expect(
+      database.db.execute(
+        sql`update expert_card_drafts set owner_confirmed_digest=resident_rich_digest(expert_card_drafts) where id=${d.draftId}::uuid`,
+      ),
+    ).rejects.toThrow();
+    await remove(f, "guided");
+    expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(1);
+    await remove(f, "pending:1");
+    expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(0);
+    expect(
+      (await f.card.readDraft(manager.sessionHash, f.applicationId))!.rich!
+        .profile!.bio,
+    ).toBe("Сохранить описание");
+  } finally {
+    await database.db.execute(
+      sql`select resident_safety_publish(${previous}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+    );
+  }
+});

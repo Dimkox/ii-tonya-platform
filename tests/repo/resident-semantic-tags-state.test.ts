@@ -18,7 +18,7 @@ it("binds semantic0069 cache and selection authority to the preserved historical
   expect(sha(`${base}/state/0069_sql_objects.json`)).toBe(m.sqlObjectsSha256);
   expect(s.prevId).toBe(read(`${base}/meta/0068_snapshot.json`).id);
   expect(Object.keys(s.tables)).toHaveLength(213);
-  expect(o.functions).toHaveLength(151);
+  expect(o.functions).toHaveLength(156);
   expect(o.triggers).toHaveLength(193);
   expect(o.constraints).toHaveLength(1448);
   expect(o.indexes).toHaveLength(533);

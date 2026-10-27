@@ -584,7 +584,7 @@ async function paidVersionWitness(
             result: "План шагов",
             expiryDate: null,
             detailsUrl: null,
-            tags: ["#поддержка"],
+            tags: ["#тревожность"],
           },
         ],
       },
@@ -2206,7 +2206,7 @@ it("R11 disabled normal composition retains originals and truthfully declines pr
     await app.close();
   }
 });
-async function secondRichFixture() {
+async function secondRichFixture(tag = "#тревожность") {
   const f = await linked();
   const repo = new PostgresExpertCardRepository(database.db, {
     richOnboarding: true,
@@ -2233,7 +2233,7 @@ async function secondRichFixture() {
     result: "План",
     expiryDate: null,
     detailsUrl: null,
-    tags: ["поддержка"],
+    tags: [tag],
   };
   const workflow = () => repo.getWorkflow(f.work);
   const revision = async () => (await workflow())!.revision;
@@ -2277,7 +2277,7 @@ async function secondRichFixture() {
       services: [service],
     },
   });
-  const approve = async () => {
+  const prepareReview = async () => {
     let rev = await revision();
     rev = (
       await repo.editPublicCard({
@@ -2319,6 +2319,10 @@ async function secondRichFixture() {
       manager.sessionHash,
       f.applicationId,
     ))!;
+    return { rev, detail };
+  };
+  const approve = async () => {
+    const { rev, detail } = await prepareReview();
     return repo.reviewCard({
       sessionHash: manager.sessionHash,
       applicationId: f.applicationId,
@@ -2328,7 +2332,16 @@ async function secondRichFixture() {
       warningAcknowledgment: detail.safety.digest,
     });
   };
-  return { ...f, repo, service, photos, initialPhotos, revision, approve };
+  return {
+    ...f,
+    repo,
+    service,
+    photos,
+    initialPhotos,
+    revision,
+    approve,
+    prepareReview,
+  };
 }
 it("R4 second manager API exposes selected photos in order beyond ten retained historical rows", async () => {
   const f = await secondRichFixture();
@@ -2475,3 +2488,84 @@ it("R5 second legacy uppercase service edit removal and aliases preserve immutab
     ).rows[0]!.profile,
   ).toEqual(immutable);
 });
+
+it("S3b R4 complete review rejects pending rejected stale custom decisions and preserves immutable approval association", async () => {
+  const f = await secondRichFixture("Личная практика");
+  let { rev } = await f.prepareReview();
+  const command = () => ({
+    sessionHash: manager.sessionHash,
+    applicationId: f.applicationId,
+    expectedRevision: rev,
+    idempotencyKey: randomUUID(),
+  });
+  const review = async () =>
+    f.repo.reviewCard({
+      ...command(),
+      action: "approve",
+      warningAcknowledgment: (await f.repo.readDraft(
+        manager.sessionHash,
+        f.applicationId,
+      ))!.safety.digest,
+    });
+  const decide = (decision: "approve" | "reject") =>
+    f.repo.decideCustomTag({
+      ...command(),
+      identity: "custom:личная практика",
+      decision,
+      reason: "Решение по точной текущей версии",
+    });
+  await expect(review()).rejects.toThrow(
+    "card_fields:Собственные теги ждут текущего решения менеджера.",
+  );
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from resident_card_versions where draft_id=(select id from expert_card_drafts where application_id=${f.applicationId}::uuid)`,
+      )
+    ).rows[0]!.n,
+  ).toBe(0);
+  await decide("reject");
+  await f.repo.submitDraft({ ...event(f.work), expectedRevision: rev });
+  await expect(review()).rejects.toThrow(
+    "card_fields:Собственные теги ждут текущего решения менеджера.",
+  );
+  ({ rev } = await f.prepareReview());
+  await decide("approve");
+  const staleRev = rev;
+  ({ rev } = await f.prepareReview());
+  expect(rev).toBeGreaterThan(staleRev);
+  await expect(review()).rejects.toThrow(
+    "card_fields:Собственные теги ждут текущего решения менеджера.",
+  );
+  await decide("approve");
+  const approved = await review();
+  expect(approved.status).toBe("approved");
+  const proof = async () =>
+    (
+      await database.db.execute(
+        sql`select to_jsonb(v) as version,jsonb_agg(to_jsonb(c) order by c.identity) as decisions from resident_card_versions v join resident_tag_decisions c on c.draft_id=v.draft_id and c.revision=v.revision where v.review_id=${approved.reviewId!}::uuid group by v.review_id,v.draft_id,v.revision,v.profile,v.public_payload,v.safety_fields,v.safety_proof,v.created_at`,
+      )
+    ).rows[0]!;
+  const before = await proof();
+  expect(JSON.stringify(before)).toContain("Личная практика");
+  expect(JSON.stringify(before.decisions)).toContain('"decision":"approve"');
+  await expect(
+    database.db.execute(
+      sql`update resident_tag_decisions set decision='reject' where draft_id=${approved.draftId!}::uuid and revision=${rev}`,
+    ),
+  ).rejects.toMatchObject({
+    cause: expect.objectContaining({ message: "tag_decision_immutable" }),
+  });
+  ({ rev } = await f.prepareReview());
+  await decide("reject");
+  expect(await proof()).toEqual(before);
+  console.log(
+    JSON.stringify({
+      completeCardPendingDenied: true,
+      rejectedDenied: true,
+      staleDenied: true,
+      currentApproved: true,
+      immutableVersionDecisionAssociation: true,
+    }),
+  );
+}, 30000);

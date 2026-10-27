@@ -67,24 +67,29 @@ export function exactTagCandidates(
   catalogue: readonly SemanticCatalogueTag[],
 ): TagCandidate[] {
   if (text.length > 16000) throw Error("card_invalid_tags");
+  const tokens = (s: string) => normalizeTag(s).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const negation = new Set([
+    "не",
+    "нет",
+    "без",
+    "никогда",
+    "ни",
+    "кроме",
+    "исключая",
+  ]);
   const segments = text
     .split(/[;\n.!?]+/u)
-    .map(normalizeTag)
-    .filter(
-      (s) =>
-        !/(?:^|\s)(?:не|нет|без|никогда|ни|кроме|исключая)(?:\s|$)/u.test(s),
-    );
+    .map(tokens)
+    .filter((words) => !words.some((w) => negation.has(w)));
   return catalogue
     .filter((r) => r.isActive)
     .flatMap((r) => {
       const term = [r.tagValue, ...r.synonyms.map((s) => s.term)].find((t) => {
-        const words = normalizeTag(t).match(/[\p{L}\p{N}]+/gu) ?? [];
+        const words = tokens(t);
         return (
           words.length > 0 &&
           segments.some((s) =>
-            ` ${(s.match(/[\p{L}\p{N}]+/gu) ?? []).join(" ")} `.includes(
-              ` ${words.join(" ")} `,
-            ),
+            ` ${s.join(" ")} `.includes(` ${words.join(" ")} `),
           )
         );
       });

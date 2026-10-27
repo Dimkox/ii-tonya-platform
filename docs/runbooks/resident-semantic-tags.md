@@ -32,6 +32,13 @@ admission, publication, provider flag, hosting limit or production configuration
   version may only remove a strict subset until it reaches20; all additions and
   whole-card confirmation/review remain blocked above20. The owner must deselect any
   additional format recommendation before confirming such a reduction.
+- Newly inactive or newly blocked selections can be removed one scope at a time.
+  Repair compares scoped occurrences, so removing the first occurrence of a repeated
+  obsolete tag is progress even if the unique count stays unchanged above 20.
+  Repair cannot add or move selections, modify unrelated answers, or authorize
+  another blocked field. Whole-card confirmation and approval still require valid
+  selections. Catalogue deletion validates its original row separately from the
+  accompanying revision-only invalidation.
 
 A stale preview, changed catalogue or safety publication, or changed semantic model
 cannot commit. Callback tokens rotate on each edit. Original Telegram update identity
@@ -113,3 +120,8 @@ API public cache. Registry edits trigger a complete rebuild on the next request.
 Never edit old migrations or rewrite immutable profile versions. Add migration0069
 and its journal entry together; `drizzle-kit generate` remains forbidden. The additive
 state snapshot/supplement was reconstructed from hand SQL on isolated PostgreSQL17.5.
+
+Integration tests do not write browser fixtures by default. To regenerate the local
+synthetic browser witness explicitly, set `II_TONYA_SEMANTIC_BROWSER_FIXTURE` to a
+file in an existing temporary directory. The archived browser witness includes its
+original fixture; normal tests require no `.superpowers` evidence directory.

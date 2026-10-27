@@ -908,19 +908,19 @@ const approvedDependencySpecifiers = new Map([
 const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0069_resident_semantic_tags.sql",
-    "8276018079004255ddb41588749e8203ebb49ec0e0403cd6c1f5c7869bc184e2",
+    "1d7b398b7919d359537705d3bfb98219b4348f750362e6a08441794bd13636ec",
   ],
   [
     "packages/db/migrations/meta/0069_snapshot.json",
-    "9a615842c6e52de4ab820fda86b5048607470731a585c9019ae2c25096a80919",
+    "a5cb15ee76f31cb3b2d7802a80618499b170ced300b698a7f9ba96ee543feace",
   ],
   [
     "packages/db/migrations/state/0069_sql_objects.json",
-    "e2c9c5219dd0d01687fda9596b09d0e0f16a33bfe43141d899d3fe968c1ec129",
+    "c0fabce1f982663f1f3e3b1288c7cee5c9a16267b516240f178771303e3503a4",
   ],
   [
     "packages/db/migrations/state/0069_manifest.json",
-    "83dfba213ec2a3caed91fb12fe1d5b66ed4943a45dbecdbd6be4425c917c10cc",
+    "2d26e1ffccfac40c180febcb4939940b739010e36a30cd354a9a679ae8cee69e",
   ],
 
   [

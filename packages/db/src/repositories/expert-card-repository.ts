@@ -2289,9 +2289,22 @@ export class PostgresExpertCardRepository {
           await tx.execute(
             sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) values(${draft.id}::uuid,${draft.userId}::uuid,${tagId}::uuid)`,
           );
-        await tx.execute(
-          sql`update expert_card_drafts set semantic_tags=case when ${selectedBefore} then (select coalesce(jsonb_agg(t),'[]'::jsonb) from jsonb_array_elements_text(semantic_tags) t where resident_tag_identity(t)<>'catalogue:'||${tagId}) else semantic_tags end,revision=revision+1,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
-        );
+        const semanticSelected =
+          selectedBefore &&
+          (
+            await tx.execute<{ selected: boolean }>(
+              sql`select exists(select 1 from expert_card_drafts d cross join lateral jsonb_array_elements_text(d.semantic_tags) t where d.id=${draft.id}::uuid and resident_tag_identity(t)='catalogue:'||${tagId}) as selected`,
+            )
+          ).rows[0]!.selected;
+        if (selectedBefore && !semanticSelected) {
+          await tx.execute(
+            sql`update expert_card_drafts set revision=revision+1,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+          );
+        } else {
+          await tx.execute(
+            sql`update expert_card_drafts set semantic_tags=case when ${selectedBefore} then (select coalesce(jsonb_agg(t),'[]'::jsonb) from jsonb_array_elements_text(semantic_tags) t where resident_tag_identity(t)<>'catalogue:'||${tagId}) else semantic_tags end,revision=revision+1,public_payload=case when ${selectedBefore} then public_payload else null end,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+          );
+        }
         await this.invalidateJobs(tx, draft.id);
         return assessment;
       },

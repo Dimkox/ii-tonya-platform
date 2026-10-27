@@ -57,3 +57,22 @@ it("bounds custom and exact confirmed selection labels", () => {
     ).success,
   ).toBe(false);
 });
+it("punctuated negation uses the matching token stream without false panic proposals", () => {
+  for (const text of [
+    "тревожность (не паника)",
+    "Исключая: паника",
+    "без: ПА",
+    "[не] паника",
+  ])
+    expect(exactTagCandidates(text, catalogue).some((c) => c.id === "1")).toBe(
+      false,
+    );
+  expect(
+    exactTagCandidates("тревожность; исключая: паника", catalogue).map(
+      (c) => c.id,
+    ),
+  ).toEqual(["2"]);
+  expect(
+    exactTagCandidates("(паника); тревога", catalogue).map((c) => c.id),
+  ).toEqual(["1", "2"]);
+});
